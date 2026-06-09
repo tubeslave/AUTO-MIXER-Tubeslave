@@ -4111,7 +4111,12 @@ def build_processing_pipeline_snapshot(server: Any, include_methods: bool = True
         if hasattr(server, "get_manual_write_supervision_status")
         else {}
     )
-    snapshot = build_processing_registry_snapshot(include_methods=include_methods)
+    snapshot = build_processing_registry_snapshot(
+        include_methods=include_methods,
+        connection_mode=server.connection_mode,
+        wing_boundary_active=server._is_wing_deployment_write_boundary_active(),
+        auto_mode_unlocked=bool(getattr(server, "_auto_mode_unlocked", False)),
+    )
     proof_evidence = build_supervised_proof_evidence_snapshot(server)
     snapshot["runtime"] = build_pipeline_runtime_summary(operator_mode, manual_write_supervision)
     snapshot["operator_mode"] = operator_mode

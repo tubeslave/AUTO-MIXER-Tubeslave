@@ -3,13 +3,16 @@ from pathlib import Path
 from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate
 
 
-def proof_context(*rows):
-    return {
+def proof_context(*rows, auto_mode_unlocked: bool = False):
+    context = {
         "type": "supervised_proof_artifact_report",
         "summary": {"invalid_summary_count": 0},
         "rows": list(rows),
         "invalid_summaries": [],
     }
+    if auto_mode_unlocked:
+        context["auto_mode_unlocked"] = True
+    return context
 
 
 def physical_candidate(proof_id: str, value_type: str) -> dict:
@@ -151,3 +154,22 @@ def test_gate_blocks_supervised_when_static_policy_has_no_live_target_even_with_
     assert rows["supervised"]["live_apply_allowed"] is False
     assert rows["supervised"]["readiness_gap_bucket_counts"] == {}
     assert rows["supervised"]["readiness_gap_target_ids_by_bucket"] == {}
+
+
+def test_gate_reflects_auto_mode_unlock_in_auto_blockers_for_non_wing_connections():
+    locked_gate = build_autonomy_mode_transition_gate(
+        proof_context(),
+        connection_mode="local",
+        wing_boundary_active=False,
+    )
+    unlocked_gate = build_autonomy_mode_transition_gate(
+        proof_context(auto_mode_unlocked=True),
+        connection_mode="local",
+        wing_boundary_active=False,
+    )
+
+    locked_auto = {row["mode"]: row for row in locked_gate["rows"]}["auto"]
+    unlocked_auto = {row["mode"]: row for row in unlocked_gate["rows"]}["auto"]
+
+    assert "auto_mode_requires_explicit_runtime_unlock" in locked_auto["blockers"]
+    assert "auto_mode_requires_explicit_runtime_unlock" not in unlocked_auto["blockers"]

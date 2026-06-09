@@ -772,6 +772,20 @@ def test_registry_snapshot_includes_objective_alignment_projection():
         assert matrix_row["currently_live_writable"] == row["currently_live_writable"]
 
 
+def test_processing_registry_snapshot_reflects_runtime_auto_unlock():
+    snapshot = build_processing_registry_snapshot(
+        include_methods=False,
+        connection_mode="local",
+        wing_boundary_active=False,
+        auto_mode_unlocked=True,
+    )
+    auto_row = {row["mode"]: row for row in snapshot["autonomy_mode_transition_gate"]["rows"]}["auto"]
+
+    assert auto_row["status"] == "blocked"
+    assert auto_row["runtime_entry_allowed"] is False
+    assert "auto_mode_requires_explicit_runtime_unlock" not in auto_row["blockers"]
+
+
 def test_registry_snapshot_normalizes_goal_capability_readiness_payload():
     malformed_alignment_snapshot = {
         "type": "project_goal_capability_objective_alignment_snapshot",

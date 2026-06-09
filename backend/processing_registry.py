@@ -6662,13 +6662,24 @@ def build_module_status_map() -> List[Dict[str, Any]]:
     return rows
 
 
-def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[str, Any]:
+def build_processing_registry_snapshot(
+    *,
+    include_methods: bool = True,
+    connection_mode: str = "wing",
+    wing_boundary_active: bool = True,
+    auto_mode_unlocked: bool = False,
+) -> Dict[str, Any]:
     methods = [method.to_dict() for method in PROCESSING_METHODS]
     profiles = [profile.to_dict() for profile in PIPELINE_PROFILES]
     autonomy_promotion_readiness = build_autonomy_promotion_readiness_snapshot()
     objective_alignment_snapshot = build_project_goal_objective_alignment_snapshot()
     autonomy_mode_transition_gate = build_autonomy_mode_transition_gate(
-        {"autonomy_promotion_readiness": autonomy_promotion_readiness}
+        {
+            "autonomy_promotion_readiness": autonomy_promotion_readiness,
+            "auto_mode_unlocked": bool(auto_mode_unlocked),
+        },
+        connection_mode=connection_mode,
+        wing_boundary_active=wing_boundary_active,
     )
     objective_alignment_summary = objective_alignment_snapshot.get("summary", {})
     project_goal_capability_progress_snapshot = build_project_goal_capability_progress_snapshot()

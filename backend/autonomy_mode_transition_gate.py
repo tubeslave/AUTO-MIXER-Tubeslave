@@ -98,12 +98,18 @@ def _list_of_maps(value: Any) -> Tuple[Mapping[str, Any], ...]:
     return tuple(item for item in value if isinstance(item, Mapping))
 
 
-def _mode_policy(mode: str, *, connection_mode: str, wing_boundary_active: bool) -> Mapping[str, Any]:
+def _mode_policy(
+    mode: str,
+    *,
+    connection_mode: str,
+    wing_boundary_active: bool,
+    auto_mode_unlocked: bool,
+) -> Mapping[str, Any]:
     return build_operator_mode_status(
         mode=mode,
         connection_mode=connection_mode,
         wing_boundary_active=wing_boundary_active,
-        auto_mode_unlocked=False,
+        auto_mode_unlocked=auto_mode_unlocked,
     )
 
 
@@ -209,8 +215,14 @@ def _row_for_mode(
     overlay: Mapping[str, Any],
     connection_mode: str,
     wing_boundary_active: bool,
+    auto_mode_unlocked: bool,
 ) -> AutonomyModeGateRow:
-    policy = _mode_policy(mode, connection_mode=connection_mode, wing_boundary_active=wing_boundary_active)
+    policy = _mode_policy(
+        mode,
+        connection_mode=connection_mode,
+        wing_boundary_active=wing_boundary_active,
+        auto_mode_unlocked=auto_mode_unlocked,
+    )
     project_mode = policy.get("project_mode") if isinstance(policy.get("project_mode"), Mapping) else {}
     capabilities = policy.get("capabilities") if isinstance(policy.get("capabilities"), Mapping) else {}
     readiness_rows = _readiness_rows_by_id(readiness)
@@ -302,6 +314,7 @@ def build_autonomy_mode_transition_gate(
     """Build a read-only gate for Analysis, Assisted, Supervised, and Auto."""
 
     context = proof_context or {}
+    auto_mode_unlocked = bool(context.get("auto_mode_unlocked"))
     readiness = _promotion_readiness(context)
     overlay = _evidence_overlay(context)
     rows = tuple(
@@ -311,6 +324,7 @@ def build_autonomy_mode_transition_gate(
             overlay=overlay,
             connection_mode=connection_mode,
             wing_boundary_active=wing_boundary_active,
+            auto_mode_unlocked=auto_mode_unlocked,
         )
         for mode in VALID_OPERATOR_MODES
     )
