@@ -1137,6 +1137,11 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
         for row in rows
         if row.autonomy_mode_ceiling in {"supervised_narrow", "offline_only"}
     ]
+    blocked_live_actions = [
+        f"{row.id}: {row.next_step}"
+        for row in rows
+        if row.status == "blocked_live" and row.next_step
+    ]
 
     full_auto_row = by_id.get("mode_full_autonomous")
 
@@ -1155,11 +1160,16 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
             "missing_row_count": missing_count,
             "present_row_count": len(present_rows),
             "proposal_only_row_count": len(proposal_only_ids),
+            "proposal_only_row_ids": proposal_only_ids,
             "blocked_live_row_count": len(blocked_live_ids),
+            "blocked_live_row_ids": blocked_live_ids,
             "currently_live_writable_row_count": len(currently_live_writable_ids),
+            "currently_live_writable_row_ids": currently_live_writable_ids,
+            "supervised_candidate_row_ids": supervised_only_ids,
             "supervised_candidate_row_count": len(supervised_only_ids),
             "missing_rows": missing_rows,
             "blocked_live_rows": blocked_live_ids,
+            "blocked_live_row_actions": blocked_live_actions,
             "currently_live_writable_rows": currently_live_writable_ids,
             "full_autonomous_status": full_auto_row.status if full_auto_row else None,
         },

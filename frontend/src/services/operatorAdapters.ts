@@ -980,6 +980,9 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   const missingObjectiveRows = stringList(objectiveAlignmentSummary.missing_rows);
   const blockedLiveRows = stringList(objectiveAlignmentSummary.blocked_live_rows);
   const currentlyLiveWritableRows = stringList(objectiveAlignmentSummary.currently_live_writable_rows);
+  const proposalOnlyRows = stringList(objectiveAlignmentSummary.proposal_only_row_ids);
+  const supervisedCandidateRows = stringList(objectiveAlignmentSummary.supervised_candidate_row_ids);
+  const blockedLiveActions = stringList(objectiveAlignmentSummary.blocked_live_row_actions);
   const objectiveAlignmentRows: ModuleStatusRecord[] = Object.keys(objectiveAlignmentSummary).length
     ? [{
       moduleId: 'project_goal_capability_objective_alignment_summary',
@@ -997,11 +1000,15 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `missing:${Math.trunc(num(objectiveAlignmentSummary.missing_row_count, 0))}`,
         `proposal_only:${Math.trunc(num(objectiveAlignmentSummary.proposal_only_row_count, 0))}`,
         `blocked_live_rows:${Math.trunc(num(objectiveAlignmentSummary.blocked_live_row_count, 0))}`,
+        `blocked_live_row_ids:${blockedLiveRows.slice(0, 4).join(',')}`,
         `currently_live_writable:${Math.trunc(num(objectiveAlignmentSummary.currently_live_writable_row_count, 0))}`,
-        `supervised_candidates:${Math.trunc(num(objectiveAlignmentSummary.supervised_candidate_row_count, 0))}`,
-        `blocked_live_count:${blockedLiveRows.length}`,
-        `missing_row_ids:${missingObjectiveRows.slice(0, 4).join(',')}`,
         `currently_live_writable_ids:${currentlyLiveWritableRows.slice(0, 4).join(',')}`,
+        `proposal_only_row_ids:${proposalOnlyRows.slice(0, 4).join(',')}`,
+        `supervised_candidates:${Math.trunc(num(objectiveAlignmentSummary.supervised_candidate_row_count, 0))}`,
+        `supervised_candidate_row_ids:${supervisedCandidateRows.slice(0, 4).join(',')}`,
+        `blocked_live_count:${blockedLiveRows.length}`,
+        `blocked_live_actions:${blockedLiveActions.slice(0, 2).join(' | ')}`,
+        `missing_row_ids:${missingObjectiveRows.slice(0, 4).join(',')}`,
         `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
       ].filter((entry) => entry),
       blockedReason: missingObjectiveRows.length
@@ -1013,6 +1020,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
         `missing_rows:${missingObjectiveRows.slice(0, 4).join(',')}`,
         `blocked_live_rows:${blockedLiveRows.slice(0, 4).join(',')}`,
+        `blocked_live_actions:${blockedLiveActions.slice(0, 2).join(' | ')}`,
       ].filter((entry) => entry).join(' / ') || `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
       tone: missingObjectiveRows.length
         ? 'red'

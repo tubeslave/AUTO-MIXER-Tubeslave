@@ -1845,6 +1845,42 @@ def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
     )
     assert (
         payload["runtime"]["goal_capability_objective_alignment"][
+            "proposal_only_row_count"
+        ]
+        == alignment_snapshot["summary"]["proposal_only_row_count"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "supervised_candidate_row_count"
+        ]
+        == alignment_snapshot["summary"]["supervised_candidate_row_count"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "proposal_only_row_ids"
+        ]
+        == alignment_snapshot["summary"]["proposal_only_row_ids"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "supervised_candidate_row_ids"
+        ]
+        == alignment_snapshot["summary"]["supervised_candidate_row_ids"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "blocked_live_row_ids"
+        ]
+        == alignment_snapshot["summary"]["blocked_live_row_ids"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "blocked_live_row_actions"
+        ]
+        == alignment_snapshot["summary"]["blocked_live_row_actions"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
             "blocked_live_row_count"
         ]
         == len(payload["runtime"]["goal_capability_objective_alignment"]["blocked_live_rows"])

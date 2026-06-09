@@ -3933,11 +3933,32 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
                 "blocked_live_row_count": int(
                     objective_summary.get("blocked_live_row_count", 0) or 0
                 ),
+                "proposal_only_row_count": int(
+                    objective_summary.get("proposal_only_row_count", 0) or 0
+                ),
+                "proposal_only_row_ids": list(
+                    objective_summary.get("proposal_only_row_ids", ())
+                ),
                 "currently_live_writable_row_count": int(
                     objective_summary.get("currently_live_writable_row_count", 0) or 0
                 ),
+                "supervised_candidate_row_count": int(
+                    objective_summary.get("supervised_candidate_row_count", 0) or 0
+                ),
+                "supervised_candidate_row_ids": list(
+                    objective_summary.get("supervised_candidate_row_ids", ())
+                ),
                 "blocked_live_rows": list(
                     objective_summary.get("blocked_live_rows", ())
+                ),
+                "blocked_live_row_ids": list(
+                    objective_summary.get("blocked_live_row_ids", ())
+                ),
+                "blocked_live_row_actions": list(
+                    objective_summary.get("blocked_live_row_actions", ())
+                ),
+                "currently_live_writable_row_ids": list(
+                    objective_summary.get("currently_live_writable_row_ids", ())
                 ),
                 "full_autonomous_status": objective_summary.get("full_autonomous_status"),
                 "read_only": bool(

@@ -3507,9 +3507,12 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
         proposal_only_row_count: 1,
         blocked_live_row_count: 1,
         currently_live_writable_row_count: 0,
+        proposal_only_row_ids: ['cg_gate'],
+        supervised_candidate_row_ids: ['cg_vocal_pan'],
         supervised_candidate_row_count: 1,
         blocked_live_rows: ['cg_room_mic_eq'],
         currently_live_writable_rows: [],
+        blocked_live_row_actions: ['cg_room_mic_eq: Resolve EQ method and proof gap.'],
         missing_rows: ['cg_room_mics'],
         full_autonomous_status: 'blocked_live',
       },
@@ -3566,6 +3569,10 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('currently_live_writable:0'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('supervised_candidates:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('missing_row_ids:cg_room_mics'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('proposal_only_row_ids:cg_gate'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('supervised_candidate_row_ids:cg_vocal_pan'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('blocked_live_row_ids:cg_room_mic_eq'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('blocked_live_actions:cg_room_mic_eq: Resolve EQ method and proof gap.'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('currently_live_writable_ids:'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('full_autonomous_status:blocked_live'), true);
   assert.equal(objectiveAlignmentSummary?.blockedReason?.includes('Missing objective capabilities: cg_room_mics'), true);
@@ -3573,6 +3580,7 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
   assert.equal(objectiveAlignmentSummary?.nextStep.includes('full_autonomous_status:blocked_live'), true);
   assert.equal(objectiveAlignmentSummary?.nextStep.includes('missing_rows:cg_room_mics'), true);
   assert.equal(objectiveAlignmentSummary?.nextStep.includes('blocked_live_rows:cg_room_mic_eq'), true);
+  assert.equal(objectiveAlignmentSummary?.nextStep.includes('blocked_live_actions:cg_room_mic_eq: Resolve EQ method and proof gap.'), true);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {
