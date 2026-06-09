@@ -70,16 +70,21 @@ def normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
         for field in ("status_counts", "ready_row_ids", "gap_row_ids"):
             raw_value = raw_row.get(field)
             if field == "status_counts":
+                if field not in raw_row:
+                    continue
                 if isinstance(raw_value, dict):
                     normalized_row[field] = {
                         str(status): _safe_int_value(value)
                         for status, value in raw_value.items()
                     }
-                    has_field = has_field or bool(normalized_row[field])
+                else:
+                    normalized_row[field] = {}
+                has_field = has_field or bool(normalized_row[field])
             else:
+                if field not in raw_row:
+                    continue
                 normalized_values = _normalize_str_list(raw_value)
-                if normalized_values:
-                    normalized_row[field] = normalized_values
+                normalized_row[field] = normalized_values
                 has_field = has_field or bool(normalized_values)
 
         raw_blocker_rows = raw_row.get("blocker_rows")
