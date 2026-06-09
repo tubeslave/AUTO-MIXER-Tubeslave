@@ -3800,6 +3800,24 @@ test('adaptSafetyMonitor normalizes malformed goal-capability readiness payloads
   assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities, [
     { goal_area: 'eq', gap_row_count: 4, readiness_score: 66 },
   ]);
+  assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessByGoalArea, {
+    eq: {
+      goal_area: 'eq',
+      gap_row_count: 1,
+      blocker_row_count: 2,
+      blocker_row_ids: ['cg_eq_1', 'cg_eq_2'],
+      full_autonomous_status: 'blocked_live',
+      target_live_writable_row_count: 0,
+      target_proof_gap_count: 1,
+    },
+    input_gain: {
+      goal_area: 'input_gain',
+      ready_row_count: 2,
+      gap_row_count: 0,
+      blocker_rows: ['cg_gain_1'],
+      blocker_row_ids: ['cg_gain_1'],
+    },
+  });
   assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessHotspots, [
     {
       goal_area: 'eq',

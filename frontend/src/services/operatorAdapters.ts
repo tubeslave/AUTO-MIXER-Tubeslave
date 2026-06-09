@@ -172,8 +172,8 @@ function normalizeGoalCapabilityReadinessPriorityRows(value: unknown): GoalCapab
 
 function normalizeGoalCapabilityReadinessByGoalAreaMap(value: unknown): Record<string, GoalCapabilityObjectiveReadinessByGoalArea> {
   const rows = asRecord(value);
-  return Object.fromEntries(
-    Object.entries(rows).map(([goalArea, entry]) => {
+  const normalizedRows = Object.entries(rows)
+    .map(([goalArea, entry]) => {
       const row = asRecord(entry);
       const normalized: GoalCapabilityObjectiveReadinessByGoalArea = { goal_area: str(row.goal_area, goalArea) };
       const required = intOrUndefined(row.required_row_count);
@@ -202,11 +202,29 @@ function normalizeGoalCapabilityReadinessByGoalAreaMap(value: unknown): Record<s
       if (status) normalized.full_autonomous_status = status;
       if (statusLabel) normalized.full_autonomous_status_label = statusLabel;
       if (blockerRowNames && blockerRowNames.length) normalized.blocker_rows = blockerRowNames;
+      if (normalized.blocker_row_ids === undefined && blockerRowNames && blockerRowNames.length) {
+        normalized.blocker_row_ids = blockerRowNames;
+      }
       if (blockerRowCount !== undefined) normalized.target_live_writable_row_count = blockerRowCount;
       if (proofGapCount !== undefined) normalized.target_proof_gap_count = proofGapCount;
       return [goalArea, normalized];
-    }),
-  ) as Record<string, GoalCapabilityObjectiveReadinessByGoalArea>;
+    })
+    .filter(([, row]) => {
+      const hasAnyMetric = typeof row.readiness_score === 'number'
+        || typeof row.gap_row_count === 'number'
+        || typeof row.ready_row_count === 'number'
+        || typeof row.required_row_count === 'number'
+        || typeof row.blocker_row_count === 'number'
+        || typeof row.target_live_writable_row_count === 'number'
+        || typeof row.target_proof_gap_count === 'number'
+        || row.blocker_row_ids !== undefined
+        || row.blocker_rows !== undefined
+        || Boolean(row.full_autonomous_status)
+        || Boolean(row.full_autonomous_status_label);
+      return hasAnyMetric;
+    });
+
+  return Object.fromEntries(normalizedRows) as Record<string, GoalCapabilityObjectiveReadinessByGoalArea>;
 }
 
 function normalizeGoalCapabilityReadinessHotspotRows(

@@ -286,6 +286,7 @@ function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
   const proofReadinessPriority = goalAreaReadinessSummary(safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities);
   const hotspotText = hotspotSummary(safety.goalCapabilityObjectiveReadinessHotspots);
   const proofHotspotText = hotspotSummary(safety.proofGoalCapabilityObjectiveReadinessHotspots);
+  const proofBlockedAreaText = blockedAreaSummary(safety.proofGoalCapabilityObjectiveReadinessByGoalArea);
 
   return (
     <Panel title="Safety Monitor">
@@ -299,6 +300,7 @@ function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
           { label: 'Readiness priority', value: readinessPriority, tone: safety.goalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
           { label: 'Top hotspot', value: hotspotText, tone: safety.goalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
           { label: 'Top blocked goal-area', value: blockedAreaSummary(safety.goalCapabilityObjectiveReadinessByGoalArea), tone: safety.goalCapabilityObjectiveReadinessByGoalArea && Object.keys(safety.goalCapabilityObjectiveReadinessByGoalArea).length ? 'yellow' as const : 'green' as const },
+          { label: 'Proof blocked goal-area', value: proofBlockedAreaText, tone: safety.proofGoalCapabilityObjectiveReadinessByGoalArea && Object.keys(safety.proofGoalCapabilityObjectiveReadinessByGoalArea).length ? 'yellow' as const : 'green' as const },
           { label: 'Proof hotspot', value: proofHotspotText, tone: safety.proofGoalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
           { label: 'Proof priority', value: proofReadinessPriority, tone: safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
         ].map(row => (
