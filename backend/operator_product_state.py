@@ -3930,6 +3930,15 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
                 "missing_row_count": int(
                     objective_summary.get("missing_row_count", 0) or 0
                 ),
+                "autonomy_readiness_score": int(
+                    objective_summary.get("autonomy_readiness_score", 0) or 0
+                ),
+                "autonomy_readiness_ready_row_count": int(
+                    objective_summary.get("autonomy_readiness_ready_row_count", 0) or 0
+                ),
+                "autonomy_readiness_gap_row_count": int(
+                    objective_summary.get("autonomy_readiness_gap_row_count", 0) or 0
+                ),
                 "blocked_live_row_count": int(
                     objective_summary.get("blocked_live_row_count", 0) or 0
                 ),

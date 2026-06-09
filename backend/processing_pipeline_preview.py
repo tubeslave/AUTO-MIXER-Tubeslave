@@ -1317,6 +1317,27 @@ def build_main_pipeline_preview(
                 )
                 or 0
             ),
+            "project_goal_capability_objective_readiness_score": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "autonomy_readiness_score",
+                    0,
+                )
+                or 0
+            ),
+            "project_goal_capability_objective_readiness_ready_row_count": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "autonomy_readiness_ready_row_count",
+                    0,
+                )
+                or 0
+            ),
+            "project_goal_capability_objective_readiness_gap_row_count": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "autonomy_readiness_gap_row_count",
+                    0,
+                )
+                or 0
+            ),
             "project_goal_capability_objective_blocked_live_row_count": int(
                 project_goal_capability_objective_alignment_summary.get(
                     "blocked_live_row_count",

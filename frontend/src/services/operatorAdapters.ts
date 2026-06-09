@@ -997,6 +997,13 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       pipelineProfiles: [
         `required:${Math.trunc(num(objectiveAlignmentSummary.required_row_count, 0))}`,
         `present:${Math.trunc(num(objectiveAlignmentSummary.present_row_count, 0))}`,
+        `readiness_score:${Math.trunc(num(objectiveAlignmentSummary.autonomy_readiness_score, 0))}`,
+        `readiness_ready_row_count:${Math.trunc(
+          num(objectiveAlignmentSummary.autonomy_readiness_ready_row_count, 0)
+        )}`,
+        `readiness_gap_row_count:${Math.trunc(
+          num(objectiveAlignmentSummary.autonomy_readiness_gap_row_count, 0)
+        )}`,
         `missing:${Math.trunc(num(objectiveAlignmentSummary.missing_row_count, 0))}`,
         `proposal_only:${Math.trunc(num(objectiveAlignmentSummary.proposal_only_row_count, 0))}`,
         `blocked_live_rows:${Math.trunc(num(objectiveAlignmentSummary.blocked_live_row_count, 0))}`,

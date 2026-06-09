@@ -703,6 +703,22 @@ def test_registry_snapshot_includes_objective_alignment_projection():
         == objective_alignment["summary"]["missing_row_count"]
     )
     assert (
+        snapshot["summary"]["project_goal_capability_objective_readiness_score"]
+        == objective_alignment["summary"]["autonomy_readiness_score"]
+    )
+    assert (
+        snapshot["summary"][
+            "project_goal_capability_objective_readiness_ready_row_count"
+        ]
+        == objective_alignment["summary"]["autonomy_readiness_ready_row_count"]
+    )
+    assert (
+        snapshot["summary"][
+            "project_goal_capability_objective_readiness_gap_row_count"
+        ]
+        == objective_alignment["summary"]["autonomy_readiness_gap_row_count"]
+    )
+    assert (
         snapshot["summary"]["project_goal_capability_objective_blocked_live_row_count"]
         == len(objective_alignment["summary"]["blocked_live_rows"])
     )

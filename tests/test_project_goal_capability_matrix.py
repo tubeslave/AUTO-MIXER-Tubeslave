@@ -73,6 +73,13 @@ def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
     assert summary["required_row_count"] == len(AUTOMIXER_OBJECTIVE_CAPABILITY_IDS)
     assert summary["required_row_count"] == summary["present_row_count"]
     assert summary["full_autonomous_status"] == "blocked_live"
+    assert summary["autonomy_readiness_score"] >= 0
+    assert summary["autonomy_readiness_score"] <= 100
+    assert (
+        summary["autonomy_readiness_ready_row_count"]
+        + summary["autonomy_readiness_gap_row_count"]
+        == summary["required_row_count"]
+    )
     assert summary["blocked_live_row_ids"] == ["mode_full_autonomous"]
     assert "mode_supervised_automix" in summary["proposal_only_row_ids"]
     assert summary["supervised_candidate_row_count"] == len(summary["supervised_candidate_row_ids"])

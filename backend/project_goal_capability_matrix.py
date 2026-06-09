@@ -1142,6 +1142,26 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
         for row in rows
         if row.status == "blocked_live" and row.next_step
     ]
+    autonomy_readiness_ready_row_count = len(
+        [
+            row
+            for row in rows
+            if row.id in required_ids
+            and row.status in {"canonical", "supervised_narrow"}
+        ]
+    )
+    autonomy_readiness_required_row_count = len(required_ids)
+    autonomy_readiness_gap_row_count = max(
+        0, autonomy_readiness_required_row_count - autonomy_readiness_ready_row_count
+    )
+    autonomy_readiness_score = (
+        int(
+            (autonomy_readiness_ready_row_count / autonomy_readiness_required_row_count)
+            * 100
+        )
+        if autonomy_readiness_required_row_count
+        else 0
+    )
 
     full_auto_row = by_id.get("mode_full_autonomous")
 
@@ -1159,6 +1179,9 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
             "required_row_count": len(required_ids),
             "missing_row_count": missing_count,
             "present_row_count": len(present_rows),
+            "autonomy_readiness_score": autonomy_readiness_score,
+            "autonomy_readiness_ready_row_count": autonomy_readiness_ready_row_count,
+            "autonomy_readiness_gap_row_count": autonomy_readiness_gap_row_count,
             "proposal_only_row_count": len(proposal_only_ids),
             "proposal_only_row_ids": proposal_only_ids,
             "blocked_live_row_count": len(blocked_live_ids),

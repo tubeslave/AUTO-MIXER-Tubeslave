@@ -3503,6 +3503,9 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
       summary: {
         required_row_count: 2,
         present_row_count: 1,
+        autonomy_readiness_score: 50,
+        autonomy_readiness_ready_row_count: 1,
+        autonomy_readiness_gap_row_count: 1,
         missing_row_count: 1,
         proposal_only_row_count: 1,
         blocked_live_row_count: 1,
@@ -3563,6 +3566,9 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
     (row) => row.moduleId === 'project_goal_capability_objective_alignment_summary',
   );
   assert.equal(objectiveAlignmentSummary?.module, 'required:2');
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('readiness_score:50'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('readiness_ready_row_count:1'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('readiness_gap_row_count:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('missing:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('proposal_only:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('blocked_live_rows:1'), true);
