@@ -1194,7 +1194,14 @@ def build_main_pipeline_preview(
     )
     blockers = build_registry_blockers(pipeline_id=MAIN_PIPELINE_ID)
     proposal_only_contracts = build_proposal_only_method_contracts(pipeline_id=MAIN_PIPELINE_ID)
-    registry_snapshot = build_processing_registry_snapshot(include_methods=include_methods)
+    registry_snapshot = build_processing_registry_snapshot(
+        include_methods=include_methods,
+        connection_mode=getattr(server, "connection_mode", "wing"),
+        wing_boundary_active=server._is_wing_deployment_write_boundary_active()
+        if hasattr(server, "_is_wing_deployment_write_boundary_active")
+        else True,
+        auto_mode_unlocked=bool(getattr(server, "_auto_mode_unlocked", False)),
+    )
     project_goal_capability_matrix = registry_snapshot.get(
         "project_goal_capability_matrix",
         {},

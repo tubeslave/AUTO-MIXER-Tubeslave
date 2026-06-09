@@ -5563,6 +5563,27 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert {
         row["mode"] for row in main_pipeline_registry["autonomy_mode_transition_gate"]["rows"]
     } == {"analyze", "assist", "supervised", "auto"}
+
+
+def test_main_pipeline_preview_forwards_auto_mode_unlock_runtime_context(server):
+    server.mixer_client = CachedMixer()
+    server.mixer_client.set_fader = MagicMock()
+    server.mixer_client.set_gain = MagicMock()
+    server.mixer_client.set_eq = MagicMock()
+    server.mixer_client.set_compressor = MagicMock()
+    server.operator_mode = "auto"
+    server._auto_mode_unlocked = True
+    server.connection_mode = "local"
+    server.audio_capture = FakeAudioCapture()
+
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    queue = build_decision_queue(server)
+    auto_row = {
+        row["mode"]: row
+        for row in payload["registry"]["autonomy_mode_transition_gate"]["rows"]
+    }["auto"]
+
+    assert "auto_mode_requires_explicit_runtime_unlock" not in auto_row["blockers"]
     assert payload["summary"]["operator_analysis_proposal_count"] == 1
     assert payload["summary"]["agentic_foundation_proposal_count"] == 1
     assert queue["summary"]["pending_count"] == 0
