@@ -1588,6 +1588,41 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_called_once_with(4, False)
 
     @pytest.mark.asyncio
+    async def test_websocket_pan_is_quarantined_for_wing_deployment_boundary(self, dummy_wing_server):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_pan"](
+            websocket,
+            {"channel": 1, "value": 12.5, "approved": True, "approval_id": "unit-pan-approval"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "deployment_write_surface_quarantined"
+        assert payload["surface"] == "set_pan"
+        server.mixer_client.set_channel_pan.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_websocket_pan_routes_directly_when_wing_boundary_disabled(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.connection_mode = "offline"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_pan"](
+            websocket,
+            {"channel": 1, "pan_percent": 125.0},
+        )
+
+        assert websocket.send.await_count == 0
+        server.mixer_client.set_channel_pan.assert_called_once_with(1, 100.0)
+
+    @pytest.mark.asyncio
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     @patch("server.BleedService")
     async def test_auto_mode_unlocked_offline_allows_direct_fader_write(

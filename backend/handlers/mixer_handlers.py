@@ -127,6 +127,26 @@ def register_handlers(server):
         if server.mixer_client:
             server.mixer_client.set_channel_mute(channel, value)
 
+    async def handle_set_pan(websocket, data):
+        channel = data.get("channel")
+        raw_value = data.get("value", data.get("pan", data.get("pan_percent", 0.0)))
+        if server._is_wing_deployment_write_boundary_active():
+            blocked = await server._block_quarantined_wing_write_surface(
+                websocket,
+                surface="set_pan",
+                result_type="manual_write_blocked",
+                request=data,
+            )
+            if blocked:
+                return
+
+        value = server._coerce_optional_float(raw_value)
+        if value is None:
+            value = 0.0
+        value = server._clamp_manual_write_value(value, "pan")
+        if server.mixer_client:
+            server.mixer_client.set_channel_pan(channel, value)
+
     async def handle_mute_channel(websocket, data):
         payload = dict(data)
         if "muted" not in payload and "value" not in payload:
@@ -229,6 +249,7 @@ def register_handlers(server):
         "set_fader": handle_set_fader,
         "set_gain": handle_set_gain,
         "set_mute": handle_set_mute,
+        "set_pan": handle_set_pan,
         "mute_channel": handle_mute_channel,
         "unmute_channel": handle_unmute_channel,
         "set_eq": handle_set_eq,
