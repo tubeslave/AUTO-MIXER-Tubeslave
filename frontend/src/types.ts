@@ -73,6 +73,13 @@ export interface SafetyMonitorState {
   traceCount: number;
   blockedTraceCount: number;
   sourceLabel: string;
+  goalCapabilityObjectiveReadinessScore: number;
+  goalCapabilityObjectiveReadinessGoalAreaPriorities: Array<Record<string, unknown>>;
+  goalCapabilityObjectiveReadinessByGoalArea: Record<string, Record<string, unknown>>;
+  goalCapabilityObjectiveReadinessHotspots: Array<Record<string, unknown>>;
+  proofGoalCapabilityObjectiveReadinessGoalAreaPriorities: Array<Record<string, unknown>>;
+  proofGoalCapabilityObjectiveReadinessByGoalArea: Record<string, Record<string, unknown>>;
+  proofGoalCapabilityObjectiveReadinessHotspots: Array<Record<string, unknown>>;
 }
 
 export interface ReplayRunRecord {

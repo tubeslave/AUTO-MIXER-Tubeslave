@@ -87,6 +87,13 @@ function fallbackViewData(): OperatorViewData {
       lastReadbackStatus: 'mock',
       traceCount: 0,
       blockedTraceCount: 0,
+      goalCapabilityObjectiveReadinessScore: 0,
+      goalCapabilityObjectiveReadinessGoalAreaPriorities: [],
+      goalCapabilityObjectiveReadinessByGoalArea: {},
+      goalCapabilityObjectiveReadinessHotspots: [],
+      proofGoalCapabilityObjectiveReadinessGoalAreaPriorities: [],
+      proofGoalCapabilityObjectiveReadinessByGoalArea: {},
+      proofGoalCapabilityObjectiveReadinessHotspots: [],
       sourceLabel: 'Mock'
     },
     replayRuns: [],

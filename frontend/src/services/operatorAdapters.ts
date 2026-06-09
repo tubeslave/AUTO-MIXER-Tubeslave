@@ -3971,6 +3971,18 @@ export function adaptSafetyMonitor(payload: unknown, backend: BackendUiState): S
   const lastReadback = asRecord(proof.last_readback);
   const summary = asRecord(data.summary);
   const mode = asRecord(data.operator_mode);
+  const readinessGoalAreaPriorities = asArray(
+    summary.project_goal_capability_objective_readiness_goal_area_priorities
+  );
+  const readinessByGoalArea = asRecord(summary.project_goal_capability_objective_readiness_by_goal_area);
+  const readinessHotspots = asArray(summary.project_goal_capability_objective_readiness_hotspots);
+  const proofGoalReadinessGoalAreaPriorities = asArray(
+    proof.goal_capability_objective_readiness_goal_area_priorities
+  );
+  const proofGoalReadinessByGoalArea = asRecord(
+    proof.goal_capability_objective_readiness_by_goal_area
+  );
+  const proofGoalReadinessHotspots = asArray(proof.goal_capability_objective_readiness_hotspots);
   const blockedSurfaces = Array.isArray(data.blocked_surfaces)
     ? data.blocked_surfaces.map(item => String(item))
     : ['eq', 'compressor', 'routing', 'snapshots', 'autonomous_apply'];
@@ -3990,6 +4002,13 @@ export function adaptSafetyMonitor(payload: unknown, backend: BackendUiState): S
     lastReadbackStatus: str(lastReadback.status, 'none'),
     traceCount: Math.trunc(num(summary.trace_count, 0)),
     blockedTraceCount: Math.trunc(num(summary.blocked_trace_count, 0)),
+    goalCapabilityObjectiveReadinessScore: Math.trunc(num(summary.project_goal_capability_objective_readiness_score, 0)),
+    goalCapabilityObjectiveReadinessGoalAreaPriorities: readinessGoalAreaPriorities.map(item => asRecord(item)),
+    goalCapabilityObjectiveReadinessByGoalArea: readinessByGoalArea,
+    goalCapabilityObjectiveReadinessHotspots: readinessHotspots.map(item => asRecord(item)),
+    proofGoalCapabilityObjectiveReadinessGoalAreaPriorities: proofGoalReadinessGoalAreaPriorities.map(item => asRecord(item)),
+    proofGoalCapabilityObjectiveReadinessByGoalArea: proofGoalReadinessByGoalArea,
+    proofGoalCapabilityObjectiveReadinessHotspots: proofGoalReadinessHotspots.map(item => asRecord(item)),
     sourceLabel: str(data.source, backend.sourceLabel)
   };
 }

@@ -3589,6 +3589,117 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
   assert.equal(objectiveAlignmentSummary?.nextStep.includes('blocked_live_actions:cg_room_mic_eq: Resolve EQ method and proof gap.'), true);
 });
 
+test('adaptSafetyMonitor maps new goal-capability objective readiness hotspots', async () => {
+  const { adaptSafetyMonitor, mockBackendState } = await importTypeScript('services/operatorAdapters.ts');
+
+  const safetyMonitor = adaptSafetyMonitor({
+    operator_mode: { mode: 'supervised' },
+    live_write_policy: { apply_path: '/console', policy: 'fader_gain_supervised_review' },
+    manual_write_supervision: {
+      emergency_stopped: false,
+      reset_required: true,
+      approved_live_write_kinds: ['gain'],
+    },
+    proof: {
+      last_readback: { status: 'verified' },
+      goal_capability_objective_readiness_goal_area_priorities: [
+        { goal_area: 'eq', gap_row_count: 1, readiness_score: 66 },
+      ],
+      goal_capability_objective_readiness_by_goal_area: {
+        eq: {
+          goal_area: 'eq',
+          ready_row_count: 2,
+          gap_row_count: 1,
+          readiness_score: 66,
+        },
+      },
+      goal_capability_objective_readiness_hotspots: [
+        {
+          goal_area: 'eq',
+          gap_row_count: 1,
+          blocker_row_ids: ['cg_room_mic_eq'],
+        },
+      ],
+      last_proof_status: 'applied',
+    },
+    summary: {
+      ready: true,
+      mixer_connected: true,
+      trace_count: 14,
+      blocked_trace_count: 3,
+      project_goal_capability_objective_readiness_score: 78,
+      project_goal_capability_objective_readiness_goal_area_priorities: [
+        { goal_area: 'input_gain', gap_row_count: 0, readiness_score: 100 },
+      ],
+      project_goal_capability_objective_readiness_by_goal_area: {
+        input_gain: {
+          goal_area: 'input_gain',
+          ready_row_count: 4,
+          gap_row_count: 0,
+          readiness_score: 100,
+        },
+      },
+      project_goal_capability_objective_readiness_hotspots: [
+        {
+          goal_area: 'input_gain',
+          gap_row_count: 0,
+          blocker_row_ids: [],
+        },
+      ],
+    },
+    blocked_surfaces: ['eq', 'compressor'],
+    type: 'safety_monitor',
+    source: 'runtime_policy',
+  }, {
+    ...mockBackendState,
+    liveWritePolicy: 'fader_gain_supervised_review',
+    applyPath: '/console',
+  });
+
+  assert.equal(safetyMonitor.goalCapabilityObjectiveReadinessScore, 78);
+  assert.deepEqual(safetyMonitor.goalCapabilityObjectiveReadinessGoalAreaPriorities, [
+    { goal_area: 'input_gain', gap_row_count: 0, readiness_score: 100 },
+  ]);
+  assert.deepEqual(safetyMonitor.goalCapabilityObjectiveReadinessByGoalArea, {
+    input_gain: {
+      goal_area: 'input_gain',
+      ready_row_count: 4,
+      gap_row_count: 0,
+      readiness_score: 100,
+    },
+  });
+  assert.deepEqual(safetyMonitor.goalCapabilityObjectiveReadinessHotspots, [
+    {
+      goal_area: 'input_gain',
+      gap_row_count: 0,
+      blocker_row_ids: [],
+    },
+  ]);
+  assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities, [
+    { goal_area: 'eq', gap_row_count: 1, readiness_score: 66 },
+  ]);
+  assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessByGoalArea, {
+    eq: {
+      goal_area: 'eq',
+      ready_row_count: 2,
+      gap_row_count: 1,
+      readiness_score: 66,
+    },
+  });
+  assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessHotspots, [
+    {
+      goal_area: 'eq',
+      gap_row_count: 1,
+      blocker_row_ids: ['cg_room_mic_eq'],
+    },
+  ]);
+  assert.equal(safetyMonitor.traceCount, 14);
+  assert.equal(safetyMonitor.blockedTraceCount, 3);
+  assert.equal(safetyMonitor.emergencyStopped, false);
+  assert.equal(safetyMonitor.resetRequired, true);
+  assert.equal(safetyMonitor.lastReadbackStatus, 'verified');
+});
+
 test('Settings bottom section grid has one column per read-only section card', async () => {
   const source = await fs.readFile(path.join(srcRoot, 'views/SettingsView.tsx'), 'utf8');
   const sectionTitles = [

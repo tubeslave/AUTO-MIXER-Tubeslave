@@ -37,6 +37,22 @@ function taskQueueMetrics(taskRows: TaskRow[]): Metric[] {
   ];
 }
 
+function goalAreaReadinessSummary(rows: Array<Record<string, unknown>>): string {
+  const row = rows[0];
+  if (!row) return 'none';
+  const goalArea = typeof row.goal_area === 'string' && row.goal_area ? row.goal_area : 'unknown';
+  const readiness = typeof row.readiness_score === 'number'
+    ? `${Math.round(row.readiness_score)}%`
+    : 'n/a';
+  return `${goalArea}: ${readiness}`;
+}
+
+function toneForReadinessScore(score: number): Tone {
+  if (score >= 80) return 'green';
+  if (score >= 40) return 'yellow';
+  return 'red';
+}
+
 function focusTaskDetail(actions: UiActions, task: TaskRow) {
   actions.selectTask(task.id);
   actions.focusAction({
@@ -226,6 +242,9 @@ function OperatorDecisionPanel({ ui, policy }: { ui: UiState; policy: DecisionPo
 }
 
 function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
+  const readinessPriority = goalAreaReadinessSummary(safety.goalCapabilityObjectiveReadinessGoalAreaPriorities);
+  const proofReadinessPriority = goalAreaReadinessSummary(safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities);
+
   return (
     <Panel title="Safety Monitor">
       <div className="grid grid-cols-2 gap-1">
@@ -233,7 +252,11 @@ function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
           { label: 'Mode', value: safety.operatorMode, tone: safety.operatorMode === 'supervised' ? 'yellow' as const : 'blue' as const },
           { label: 'Policy', value: safety.liveWritePolicy, tone: safety.liveWritePolicy.includes('fader_gain') ? 'green' as const : 'yellow' as const },
           { label: 'Emergency', value: safety.resetRequired ? 'Reset required' : 'Clear', tone: safety.resetRequired ? 'red' as const : 'green' as const },
-          { label: 'Traces', value: `${safety.traceCount} / ${safety.blockedTraceCount} blocked`, tone: safety.blockedTraceCount ? 'yellow' as const : 'green' as const }
+          { label: 'Traces', value: `${safety.traceCount} / ${safety.blockedTraceCount} blocked`, tone: safety.blockedTraceCount ? 'yellow' as const : 'green' as const },
+          { label: 'Goal readiness', value: `${safety.goalCapabilityObjectiveReadinessScore}%`, tone: toneForReadinessScore(safety.goalCapabilityObjectiveReadinessScore) },
+          { label: 'Readiness priority', value: readinessPriority, tone: safety.goalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
+          { label: 'Proof hotspots', value: String(safety.proofGoalCapabilityObjectiveReadinessHotspots.length), tone: safety.proofGoalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
+          { label: 'Proof priority', value: proofReadinessPriority, tone: safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
         ].map(row => (
           <div className="rounded-[5px] border border-line bg-row px-1.5 py-1" key={row.label}>
             <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">{row.label}</div>
