@@ -83,20 +83,17 @@ def normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
                 has_field = has_field or bool(normalized_values)
 
         raw_blocker_rows = raw_row.get("blocker_rows")
-        if isinstance(raw_blocker_rows, list):
-            normalized_blocker_rows = [str(item) for item in raw_blocker_rows]
-            if normalized_blocker_rows:
-                normalized_row["blocker_rows"] = normalized_blocker_rows
-                normalized_row["blocker_row_ids"] = normalized_blocker_rows
-                has_field = True
-        elif "blocker_rows" in raw_row:
-            has_field = has_field or False
+        normalized_blocker_rows = _normalize_str_list(raw_blocker_rows)
+        if normalized_blocker_rows:
+            normalized_row["blocker_rows"] = normalized_blocker_rows
+            normalized_row["blocker_row_ids"] = normalized_blocker_rows
+            has_field = True
 
         raw_blocker_row_ids = raw_row.get("blocker_row_ids")
-        if isinstance(raw_blocker_row_ids, list):
-            normalized_blocker_row_ids = [str(item) for item in raw_blocker_row_ids]
+        normalized_blocker_row_ids = _normalize_str_list(raw_blocker_row_ids)
+        if normalized_blocker_row_ids:
             normalized_row["blocker_row_ids"] = normalized_blocker_row_ids
-            has_field = has_field or bool(normalized_blocker_row_ids)
+            has_field = True
 
         for status_field, payload_field in (
             ("full_autonomous_status", "full_autonomous_status"),
