@@ -1175,9 +1175,12 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
                 "readiness_score": 0,
                 "ready_row_ids": [],
                 "gap_row_ids": [],
+                "status_counts": {},
             },
         )
         area_stats["required_row_count"] += 1
+        area_stats["status_counts"].setdefault(row.status, 0)
+        area_stats["status_counts"][row.status] += 1
         if row.status in {"canonical", "supervised_narrow"}:
             area_stats["ready_row_count"] += 1
             area_stats["ready_row_ids"].append(row.id)

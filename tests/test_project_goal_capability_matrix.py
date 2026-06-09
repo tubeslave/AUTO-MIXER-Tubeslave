@@ -81,10 +81,13 @@ def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
         == summary["required_row_count"]
     )
     required_rows_by_area = {}
+    required_status_counts_by_area: Dict[str, Dict[str, int]] = {}
     for row_id in AUTOMIXER_OBJECTIVE_CAPABILITY_IDS:
         row = get_project_goal_capability(row_id)
         assert row is not None
         required_rows_by_area.setdefault(row.goal_area, set()).add(row.id)
+        area_status_counts = required_status_counts_by_area.setdefault(row.goal_area, {})
+        area_status_counts[row.status] = area_status_counts.get(row.status, 0) + 1
     expected_score = (
         int(
             (summary["autonomy_readiness_ready_row_count"] / summary["required_row_count"])
@@ -115,6 +118,7 @@ def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
         assert area_summary["gap_row_count"] >= 0
         assert isinstance(area_summary["ready_row_ids"], list)
         assert isinstance(area_summary["gap_row_ids"], list)
+        assert isinstance(area_summary["status_counts"], dict)
         assert area_summary["ready_row_count"] + area_summary["gap_row_count"] == area_summary["required_row_count"]
         assert (
             set(area_summary["ready_row_ids"]).isdisjoint(
@@ -129,6 +133,8 @@ def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
         assert set(area_summary["ready_row_ids"]).union(area_summary["gap_row_ids"]) == set(
             required_rows_by_area[area_id]
         )
+        assert sum(area_summary["status_counts"].values()) == area_summary["required_row_count"]
+        assert area_summary["status_counts"] == required_status_counts_by_area[area_id]
         expected_area_score = (
             int((area_summary["ready_row_count"] / area_summary["required_row_count"]) * 100)
             if area_summary["required_row_count"]
