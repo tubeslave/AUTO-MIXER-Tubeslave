@@ -6609,6 +6609,9 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
             "project_goal_capability_objective_readiness_gap_row_count": int(
                 objective_alignment_summary.get("autonomy_readiness_gap_row_count", 0) or 0
             ),
+            "project_goal_capability_objective_readiness_by_goal_area": dict(
+                objective_alignment_summary.get("autonomy_readiness_by_goal_area", {}) or {}
+            ),
             "project_goal_capability_objective_blocked_live_row_count": len(
                 objective_alignment_summary.get("blocked_live_rows", ())
             ),

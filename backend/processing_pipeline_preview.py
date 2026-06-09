@@ -1338,6 +1338,13 @@ def build_main_pipeline_preview(
                 )
                 or 0
             ),
+            "project_goal_capability_objective_readiness_by_goal_area": dict(
+                project_goal_capability_objective_alignment_summary.get(
+                    "autonomy_readiness_by_goal_area",
+                    {},
+                )
+                or {}
+            ),
             "project_goal_capability_objective_blocked_live_row_count": int(
                 project_goal_capability_objective_alignment_summary.get(
                     "blocked_live_row_count",

@@ -89,6 +89,37 @@ def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
         else 0
     )
     assert summary["autonomy_readiness_score"] == expected_score
+    readiness_by_area = summary["autonomy_readiness_by_goal_area"]
+    assert isinstance(readiness_by_area, dict)
+    assert readiness_by_area
+    assert (
+        sum(item["required_row_count"] for item in readiness_by_area.values())
+        == summary["required_row_count"]
+    )
+    assert (
+        sum(item["ready_row_count"] for item in readiness_by_area.values())
+        == summary["autonomy_readiness_ready_row_count"]
+    )
+    assert (
+        sum(item["gap_row_count"] for item in readiness_by_area.values())
+        == summary["autonomy_readiness_gap_row_count"]
+    )
+    for area_id, area_summary in readiness_by_area.items():
+        assert area_summary["required_row_count"] >= 0
+        assert area_summary["ready_row_count"] >= 0
+        assert area_summary["gap_row_count"] >= 0
+        assert area_summary["ready_row_count"] + area_summary["gap_row_count"] == area_summary["required_row_count"]
+        expected_area_score = (
+            int((area_summary["ready_row_count"] / area_summary["required_row_count"]) * 100)
+            if area_summary["required_row_count"]
+            else 0
+        )
+        assert area_summary["readiness_score"] == expected_area_score
+        assert (
+            (area_summary["readiness_score"] == 100)
+            == (area_summary["gap_row_count"] == 0)
+            or area_summary["required_row_count"] == 0
+        )
     assert summary["blocked_live_row_ids"] == ["mode_full_autonomous"]
     assert "mode_supervised_automix" in summary["proposal_only_row_ids"]
     assert summary["supervised_candidate_row_count"] == len(summary["supervised_candidate_row_ids"])
