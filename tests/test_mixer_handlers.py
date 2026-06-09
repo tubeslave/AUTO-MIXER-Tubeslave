@@ -124,6 +124,19 @@ def test_parse_readonly_parameter_request_by_address():
     assert address == "/ch/12/fdr"
 
 
+def test_parse_readonly_parameter_request_by_pan_address():
+    server = FakeServer()
+    channel, parsed_kind, address, error = mixer_handlers._parse_readonly_parameter_request(
+        server,
+        {"address": "/ch/9/pan"},
+    )
+
+    assert error is None
+    assert channel == 9
+    assert parsed_kind == "pan"
+    assert address == "/ch/9/pan"
+
+
 def test_parse_readonly_parameter_request_rejects_unsupported_kind():
     server = FakeServer()
     channel, parsed_kind, address, error = mixer_handlers._parse_readonly_parameter_request(
