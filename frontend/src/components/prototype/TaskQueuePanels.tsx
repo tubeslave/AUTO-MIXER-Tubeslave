@@ -18,6 +18,8 @@ import type {
   SafetyMonitorState,
   SafetyEvidenceItem,
   Task,
+  GoalCapabilityObjectiveReadinessHotspot,
+  GoalCapabilityObjectiveReadinessPriority,
   Tone,
   UiActions,
   UiState
@@ -37,14 +39,24 @@ function taskQueueMetrics(taskRows: TaskRow[]): Metric[] {
   ];
 }
 
-function goalAreaReadinessSummary(rows: Array<Record<string, unknown>>): string {
+function goalAreaReadinessSummary(rows: GoalCapabilityObjectiveReadinessPriority[]): string {
   const row = rows[0];
   if (!row) return 'none';
-  const goalArea = typeof row.goal_area === 'string' && row.goal_area ? row.goal_area : 'unknown';
+  const goalArea = row.goal_area || 'unknown';
   const readiness = typeof row.readiness_score === 'number'
     ? `${Math.round(row.readiness_score)}%`
     : 'n/a';
   return `${goalArea}: ${readiness}`;
+}
+
+function hotspotSummary(rows: GoalCapabilityObjectiveReadinessHotspot[]): string {
+  if (!rows.length) return 'none';
+  const row = rows[0];
+  const area = row.goal_area || 'unknown';
+  const gaps = row.gap_row_count ?? 0;
+  const blockers = row.blocker_row_ids ?? [];
+  const blockersSummary = blockers.length ? blockers.slice(0, 3).join(', ') : 'none';
+  return `${area}: ${gaps} gap(s), blockers ${blockersSummary}`;
 }
 
 function toneForReadinessScore(score: number): Tone {
@@ -244,6 +256,8 @@ function OperatorDecisionPanel({ ui, policy }: { ui: UiState; policy: DecisionPo
 function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
   const readinessPriority = goalAreaReadinessSummary(safety.goalCapabilityObjectiveReadinessGoalAreaPriorities);
   const proofReadinessPriority = goalAreaReadinessSummary(safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities);
+  const hotspotText = hotspotSummary(safety.goalCapabilityObjectiveReadinessHotspots);
+  const proofHotspotText = hotspotSummary(safety.proofGoalCapabilityObjectiveReadinessHotspots);
 
   return (
     <Panel title="Safety Monitor">
@@ -255,7 +269,8 @@ function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
           { label: 'Traces', value: `${safety.traceCount} / ${safety.blockedTraceCount} blocked`, tone: safety.blockedTraceCount ? 'yellow' as const : 'green' as const },
           { label: 'Goal readiness', value: `${safety.goalCapabilityObjectiveReadinessScore}%`, tone: toneForReadinessScore(safety.goalCapabilityObjectiveReadinessScore) },
           { label: 'Readiness priority', value: readinessPriority, tone: safety.goalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
-          { label: 'Proof hotspots', value: String(safety.proofGoalCapabilityObjectiveReadinessHotspots.length), tone: safety.proofGoalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
+          { label: 'Top hotspot', value: hotspotText, tone: safety.goalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
+          { label: 'Proof hotspot', value: proofHotspotText, tone: safety.proofGoalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
           { label: 'Proof priority', value: proofReadinessPriority, tone: safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
         ].map(row => (
           <div className="rounded-[5px] border border-line bg-row px-1.5 py-1" key={row.label}>

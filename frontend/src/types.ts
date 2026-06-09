@@ -58,6 +58,37 @@ export interface DecisionTraceRecord {
   tone: Tone;
 }
 
+export interface GoalCapabilityObjectiveReadinessPriority {
+  goal_area: string;
+  required_row_count?: number;
+  ready_row_count?: number;
+  gap_row_count?: number;
+  readiness_score?: number;
+}
+
+export interface GoalCapabilityObjectiveReadinessByGoalArea {
+  goal_area: string;
+  required_row_count?: number;
+  ready_row_count?: number;
+  gap_row_count?: number;
+  readiness_score?: number;
+  blocker_row_count?: number;
+  blocker_row_ids?: string[];
+  full_autonomous_status?: string;
+  full_autonomous_status_label?: string;
+  blocker_rows?: string[];
+  target_live_writable_row_count?: number;
+  target_proof_gap_count?: number;
+}
+
+export interface GoalCapabilityObjectiveReadinessHotspot {
+  goal_area: string;
+  gap_row_count?: number;
+  readiness_score?: number;
+  blocker_row_count?: number;
+  blocker_row_ids?: string[];
+}
+
 export interface SafetyMonitorState {
   operatorMode: string;
   liveWritePolicy: string;
@@ -74,12 +105,12 @@ export interface SafetyMonitorState {
   blockedTraceCount: number;
   sourceLabel: string;
   goalCapabilityObjectiveReadinessScore: number;
-  goalCapabilityObjectiveReadinessGoalAreaPriorities: Array<Record<string, unknown>>;
-  goalCapabilityObjectiveReadinessByGoalArea: Record<string, Record<string, unknown>>;
-  goalCapabilityObjectiveReadinessHotspots: Array<Record<string, unknown>>;
-  proofGoalCapabilityObjectiveReadinessGoalAreaPriorities: Array<Record<string, unknown>>;
-  proofGoalCapabilityObjectiveReadinessByGoalArea: Record<string, Record<string, unknown>>;
-  proofGoalCapabilityObjectiveReadinessHotspots: Array<Record<string, unknown>>;
+  goalCapabilityObjectiveReadinessGoalAreaPriorities: GoalCapabilityObjectiveReadinessPriority[];
+  goalCapabilityObjectiveReadinessByGoalArea: Record<string, GoalCapabilityObjectiveReadinessByGoalArea>;
+  goalCapabilityObjectiveReadinessHotspots: GoalCapabilityObjectiveReadinessHotspot[];
+  proofGoalCapabilityObjectiveReadinessGoalAreaPriorities: GoalCapabilityObjectiveReadinessPriority[];
+  proofGoalCapabilityObjectiveReadinessByGoalArea: Record<string, GoalCapabilityObjectiveReadinessByGoalArea>;
+  proofGoalCapabilityObjectiveReadinessHotspots: GoalCapabilityObjectiveReadinessHotspot[];
 }
 
 export interface ReplayRunRecord {

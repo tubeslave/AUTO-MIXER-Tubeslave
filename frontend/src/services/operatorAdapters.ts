@@ -10,6 +10,9 @@ import type {
   DecisionTraceRecord,
   DeviceRecord,
   DirectorRuntime,
+  GoalCapabilityObjectiveReadinessByGoalArea,
+  GoalCapabilityObjectiveReadinessHotspot,
+  GoalCapabilityObjectiveReadinessPriority,
   ChannelIntelligenceRecord,
   LogRecord,
   MemoryRecord,
@@ -144,6 +147,88 @@ function asArray(value: unknown): UnknownRecord[] {
 function num(value: unknown, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function intOrUndefined(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : undefined;
+}
+
+function normalizeGoalCapabilityReadinessPriorityRows(value: unknown): GoalCapabilityObjectiveReadinessPriority[] {
+  return asArray(value).map(row => {
+    const goalArea = str(row.goal_area);
+    const normalized: GoalCapabilityObjectiveReadinessPriority = { goal_area: goalArea };
+    const required = intOrUndefined(row.required_row_count);
+    const ready = intOrUndefined(row.ready_row_count);
+    const gap = intOrUndefined(row.gap_row_count);
+    const score = intOrUndefined(row.readiness_score);
+    if (required !== undefined) normalized.required_row_count = required;
+    if (ready !== undefined) normalized.ready_row_count = ready;
+    if (gap !== undefined) normalized.gap_row_count = gap;
+    if (score !== undefined) normalized.readiness_score = score;
+    return normalized;
+  }).filter(row => row.goal_area !== '');
+}
+
+function normalizeGoalCapabilityReadinessByGoalAreaMap(value: unknown): Record<string, GoalCapabilityObjectiveReadinessByGoalArea> {
+  const rows = asRecord(value);
+  return Object.fromEntries(
+    Object.entries(rows).map(([goalArea, entry]) => {
+      const row = asRecord(entry);
+      const normalized: GoalCapabilityObjectiveReadinessByGoalArea = { goal_area: str(row.goal_area, goalArea) };
+      const required = intOrUndefined(row.required_row_count);
+      const ready = intOrUndefined(row.ready_row_count);
+      const gap = intOrUndefined(row.gap_row_count);
+      const score = intOrUndefined(row.readiness_score);
+      const blockerCount = intOrUndefined(row.blocker_row_count);
+      const blockerRowCount = intOrUndefined(row.target_live_writable_row_count);
+      const proofGapCount = intOrUndefined(row.target_proof_gap_count);
+      const blockerRows = Object.prototype.hasOwnProperty.call(row, 'blocker_row_ids')
+        ? Array.isArray(row.blocker_row_ids)
+          ? row.blocker_row_ids.map(id => String(id))
+          : []
+        : undefined;
+      const blockerRowNames = Array.isArray(row.blocker_rows)
+        ? row.blocker_rows.map(id => String(id))
+        : undefined;
+      const status = str(row.full_autonomous_status);
+      const statusLabel = str(row.full_autonomous_status_label);
+      if (required !== undefined) normalized.required_row_count = required;
+      if (ready !== undefined) normalized.ready_row_count = ready;
+      if (gap !== undefined) normalized.gap_row_count = gap;
+      if (score !== undefined) normalized.readiness_score = score;
+      if (blockerCount !== undefined) normalized.blocker_row_count = blockerCount;
+      if (blockerRows !== undefined) normalized.blocker_row_ids = blockerRows;
+      if (status) normalized.full_autonomous_status = status;
+      if (statusLabel) normalized.full_autonomous_status_label = statusLabel;
+      if (blockerRowNames && blockerRowNames.length) normalized.blocker_rows = blockerRowNames;
+      if (blockerRowCount !== undefined) normalized.target_live_writable_row_count = blockerRowCount;
+      if (proofGapCount !== undefined) normalized.target_proof_gap_count = proofGapCount;
+      return [goalArea, normalized];
+    }),
+  ) as Record<string, GoalCapabilityObjectiveReadinessByGoalArea>;
+}
+
+function normalizeGoalCapabilityReadinessHotspotRows(
+  value: unknown,
+): GoalCapabilityObjectiveReadinessHotspot[] {
+  return asArray(value).map(row => {
+    const goalArea = str(row.goal_area);
+    const normalized: GoalCapabilityObjectiveReadinessHotspot = { goal_area: goalArea };
+    const gap = intOrUndefined(row.gap_row_count);
+    const score = intOrUndefined(row.readiness_score);
+    const blockerCount = intOrUndefined(row.blocker_row_count);
+    const blockerRows = Object.prototype.hasOwnProperty.call(row, 'blocker_row_ids')
+      ? Array.isArray(row.blocker_row_ids)
+        ? row.blocker_row_ids.map(id => String(id))
+        : []
+      : undefined;
+    if (gap !== undefined) normalized.gap_row_count = gap;
+    if (score !== undefined) normalized.readiness_score = score;
+    if (blockerCount !== undefined) normalized.blocker_row_count = blockerCount;
+    if (blockerRows !== undefined) normalized.blocker_row_ids = blockerRows;
+    return normalized;
+  }).filter(row => row.goal_area !== '');
 }
 
 function boolish(value: unknown): boolean | undefined {
@@ -3971,18 +4056,24 @@ export function adaptSafetyMonitor(payload: unknown, backend: BackendUiState): S
   const lastReadback = asRecord(proof.last_readback);
   const summary = asRecord(data.summary);
   const mode = asRecord(data.operator_mode);
-  const readinessGoalAreaPriorities = asArray(
+  const readinessGoalAreaPriorities = normalizeGoalCapabilityReadinessPriorityRows(
     summary.project_goal_capability_objective_readiness_goal_area_priorities
   );
-  const readinessByGoalArea = asRecord(summary.project_goal_capability_objective_readiness_by_goal_area);
-  const readinessHotspots = asArray(summary.project_goal_capability_objective_readiness_hotspots);
-  const proofGoalReadinessGoalAreaPriorities = asArray(
+  const readinessByGoalArea = normalizeGoalCapabilityReadinessByGoalAreaMap(
+    summary.project_goal_capability_objective_readiness_by_goal_area
+  );
+  const readinessHotspots = normalizeGoalCapabilityReadinessHotspotRows(
+    summary.project_goal_capability_objective_readiness_hotspots
+  );
+  const proofGoalReadinessGoalAreaPriorities = normalizeGoalCapabilityReadinessPriorityRows(
     proof.goal_capability_objective_readiness_goal_area_priorities
   );
-  const proofGoalReadinessByGoalArea = asRecord(
+  const proofGoalReadinessByGoalArea = normalizeGoalCapabilityReadinessByGoalAreaMap(
     proof.goal_capability_objective_readiness_by_goal_area
   );
-  const proofGoalReadinessHotspots = asArray(proof.goal_capability_objective_readiness_hotspots);
+  const proofGoalReadinessHotspots = normalizeGoalCapabilityReadinessHotspotRows(
+    proof.goal_capability_objective_readiness_hotspots
+  );
   const blockedSurfaces = Array.isArray(data.blocked_surfaces)
     ? data.blocked_surfaces.map(item => String(item))
     : ['eq', 'compressor', 'routing', 'snapshots', 'autonomous_apply'];
@@ -4003,12 +4094,12 @@ export function adaptSafetyMonitor(payload: unknown, backend: BackendUiState): S
     traceCount: Math.trunc(num(summary.trace_count, 0)),
     blockedTraceCount: Math.trunc(num(summary.blocked_trace_count, 0)),
     goalCapabilityObjectiveReadinessScore: Math.trunc(num(summary.project_goal_capability_objective_readiness_score, 0)),
-    goalCapabilityObjectiveReadinessGoalAreaPriorities: readinessGoalAreaPriorities.map(item => asRecord(item)),
+    goalCapabilityObjectiveReadinessGoalAreaPriorities: readinessGoalAreaPriorities,
     goalCapabilityObjectiveReadinessByGoalArea: readinessByGoalArea,
-    goalCapabilityObjectiveReadinessHotspots: readinessHotspots.map(item => asRecord(item)),
-    proofGoalCapabilityObjectiveReadinessGoalAreaPriorities: proofGoalReadinessGoalAreaPriorities.map(item => asRecord(item)),
+    goalCapabilityObjectiveReadinessHotspots: readinessHotspots,
+    proofGoalCapabilityObjectiveReadinessGoalAreaPriorities: proofGoalReadinessGoalAreaPriorities,
     proofGoalCapabilityObjectiveReadinessByGoalArea: proofGoalReadinessByGoalArea,
-    proofGoalCapabilityObjectiveReadinessHotspots: proofGoalReadinessHotspots.map(item => asRecord(item)),
+    proofGoalCapabilityObjectiveReadinessHotspots: proofGoalReadinessHotspots,
     sourceLabel: str(data.source, backend.sourceLabel)
   };
 }
