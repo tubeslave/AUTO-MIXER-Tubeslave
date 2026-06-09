@@ -309,6 +309,124 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_passes_with_state_unavailable_but_readbacks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {
+                "type": "state_update",
+                "mode": "wing",
+                "state": {},
+                "status": "state_unavailable",
+                "reason": "mixer_client_state_source_unavailable",
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:gain",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "gain",
+                "address": "/ch/3/in/set/trim",
+                "value": -0.25,
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:pan",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "pan",
+                "address": "/ch/3/pan",
+                "value": 0.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain,pan",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain,pan",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    assert websocket.url == "ws://fake-backend"
+    assert [request["type"] for request in websocket.sent] == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+        "query_mixer_parameter",
+        "query_mixer_parameter",
+    ]
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "passed"
+    assert summary["reason"] == "wing_readonly_preflight_passed"
+    assert summary["captured_at"].endswith("Z")
+    assert summary["connection_mode"] == "wing"
+    assert summary["operator_channel_confirmation_required"] is True
+    assert summary["operator_confirmed_channels"] == [3]
+    assert summary["operator_session_confirmation_required"] is True
+    assert summary["operator_confirmed_session_ready"] is True
+    assert summary["expected_plan_path"] == str(expected_plan)
+    assert summary["expected_plan_match"] is True
+    assert summary["expected_plan_sha256"]
+    assert summary["expected_plan_violations"] == []
+    assert summary["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
+    assert summary["physical_readback_count"] == 3
+    assert summary["forbidden_request_types_sent"] == []
+    assert [event["event_type"] for event in read_events(summary)] == [
+        "send",
+        "recv",
+        "send",
+        "recv",
+        "send",
+        "recv",
+        "send",
+        "recv",
+        "send",
+        "recv",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_blocks_when_backend_is_not_wing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
