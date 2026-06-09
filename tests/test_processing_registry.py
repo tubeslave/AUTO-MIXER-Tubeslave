@@ -673,6 +673,37 @@ def test_read_surface_inventory_is_visible_but_not_live_authority():
     assert get_read_surface("fx_slots_and_inserts").mutates_console_state is False
 
 
+def test_registry_snapshot_includes_objective_alignment_projection():
+    snapshot = build_processing_registry_snapshot(include_methods=False)
+    objective_alignment = snapshot[
+        "project_goal_capability_objective_alignment_snapshot"
+    ]
+
+    assert objective_alignment["type"] == "project_goal_capability_objective_alignment_snapshot"
+    assert objective_alignment["safety"]["read_only"] is True
+    assert objective_alignment["safety"]["live_write"] is False
+    assert objective_alignment["summary"]["missing_row_count"] == 0
+    assert objective_alignment["summary"]["required_row_count"] == objective_alignment[
+        "summary"
+    ]["present_row_count"]
+    assert (
+        objective_alignment["summary"]["required_row_count"]
+        <= snapshot["project_goal_capability_matrix"]["summary"]["row_count"]
+    )
+    assert objective_alignment["summary"]["blocked_live_rows"] == ["mode_full_autonomous"]
+    assert objective_alignment["summary"]["currently_live_writable_rows"]
+
+    matrix_rows = {
+        row["id"]: row for row in snapshot["project_goal_capability_matrix"]["rows"]
+    }
+    for row in objective_alignment["rows"]:
+        matrix_row = matrix_rows[row["id"]]
+        assert matrix_row["id"] == row["id"]
+        assert matrix_row["status"] == row["status"]
+        assert matrix_row["goal_area"] == row["goal_area"]
+        assert matrix_row["currently_live_writable"] == row["currently_live_writable"]
+
+
 def test_write_surface_inventory_is_fail_closed_by_default():
     surfaces = list(iter_write_surfaces())
     ids = [surface.id for surface in surfaces]

@@ -1822,6 +1822,18 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert goal_matrix["type"] == "project_goal_capability_matrix"
     assert goal_matrix["safety"]["live_write"] is False
     assert goal_matrix["safety"]["live_widening_allowed"] is False
+    goal_alignment = payload["project_goal_capability_objective_alignment_snapshot"]
+    assert (
+        goal_alignment["type"]
+        == "project_goal_capability_objective_alignment_snapshot"
+    )
+    assert goal_alignment["safety"]["read_only"] is True
+    assert goal_alignment["safety"]["live_write"] is False
+    assert (
+        goal_alignment["summary"]["required_row_count"]
+        == goal_alignment["summary"]["present_row_count"]
+    )
+    assert goal_alignment["summary"]["missing_row_count"] == 0
     goal_progress = payload["project_goal_capability_progress_snapshot"]
     assert goal_progress["type"] == "project_goal_capability_progress_snapshot"
     assert goal_progress["summary"]["row_count"] == goal_matrix["summary"]["row_count"]
@@ -7564,9 +7576,20 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     assert by_type["processing_pipeline_snapshot"]["methods"] == []
     assert by_type["processing_pipeline_snapshot"]["summary"]["live_apply_policy"] == "supervised_fader_gain_only"
     assert "project_goal_capability_progress_snapshot" in by_type["processing_pipeline_snapshot"]
+    assert (
+        "project_goal_capability_objective_alignment_snapshot"
+        in by_type["processing_pipeline_snapshot"]
+    )
     progress_snapshot = by_type["processing_pipeline_snapshot"][
         "project_goal_capability_progress_snapshot"
     ]
+    alignment_snapshot = by_type["processing_pipeline_snapshot"][
+        "project_goal_capability_objective_alignment_snapshot"
+    ]
+    assert (
+        alignment_snapshot["type"]
+        == "project_goal_capability_objective_alignment_snapshot"
+    )
     assert progress_snapshot["type"] == "project_goal_capability_progress_snapshot"
     assert progress_snapshot["summary"]["row_count"] > 0
     assert progress_snapshot["goal_area_progress"]
