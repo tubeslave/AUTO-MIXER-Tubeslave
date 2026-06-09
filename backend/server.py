@@ -1950,40 +1950,69 @@ class AutoMixerServer:
                 logger.warning("Failed to deliver runtime error to client: %s", exc, exc_info=True)
 
     def _handle_external_fader_update(self, address: str, args: tuple[Any, ...]) -> None:
-        """Track manual fader moves and forward them to live controllers when possible."""
+        """Track manual fader/trim moves and forward them to live controllers when possible."""
         parsed = self._parse_manual_write_address(address)
         if parsed is None:
             return
         channel, value_type = parsed
-        if value_type != "fader" or not args:
+        if value_type not in {"fader", "gain"} or not args:
             return
         if not 1 <= channel <= 48:
             logger.debug("Ignoring external fader update for out-of-range channel %s: %s", channel, address)
             return
         try:
-            fader_value = float(args[0])
+            value = float(args[0])
         except (TypeError, ValueError, IndexError, AttributeError):
             return
-        if not math.isfinite(fader_value):
-            logger.debug("Ignoring external fader update with non-finite value for channel %s: %s", channel, fader_value)
+        if not math.isfinite(value):
+            logger.debug(
+                "Ignoring external update with non-finite value for channel %s: %s",
+                channel,
+                value,
+            )
             return
 
-        safe_fader_value = self._clamp_manual_write_value(fader_value, "fader")
-        if safe_fader_value != fader_value:
+        if value_type == "fader":
+            safe_value = self._clamp_manual_write_value(value, "fader")
+            if safe_value != value:
+                logger.debug(
+                    "Clamped external fader update value for channel %s: %s -> %s",
+                    channel,
+                    value,
+                    safe_value,
+                )
+            self.last_fader_values[channel] = safe_value
+            controller = self.auto_fader_controller
+            if controller and controller.realtime_enabled:
+                try:
+                    controller.handle_external_fader_change(channel, safe_value)
+                except Exception as exc:
+                    logger.warning(
+                        "Auto Fader external change handler failed for channel %s: %s",
+                        channel,
+                        exc,
+                        exc_info=True,
+                    )
+            return
+
+        # value_type == "gain" (trim)
+        safe_value = self._clamp_manual_write_value(value, "gain")
+        if safe_value != value:
             logger.debug(
-                "Clamped external fader update value for channel %s: %s -> %s",
+                "Clamped external gain update value for channel %s: %s -> %s",
                 channel,
-                fader_value,
-                safe_fader_value,
+                value,
+                safe_value,
             )
-        self.last_fader_values[channel] = safe_fader_value
-        controller = self.auto_fader_controller
-        if controller and controller.realtime_enabled:
+        gain_controller = self.gain_staging
+        if gain_controller and gain_controller.realtime_correction_enabled:
             try:
-                controller.handle_external_fader_change(channel, safe_fader_value)
+                external_trim_handler = getattr(gain_controller, "handle_external_trim_change", None)
+                if external_trim_handler:
+                    external_trim_handler(channel, safe_value)
             except Exception as exc:
                 logger.warning(
-                    "Auto Fader external change handler failed for channel %s: %s",
+                    "Auto gain-staging external trim handler failed for channel %s: %s",
                     channel,
                     exc,
                     exc_info=True,

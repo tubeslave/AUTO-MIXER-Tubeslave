@@ -1104,6 +1104,36 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server.last_fader_values == {}
         controller.handle_external_fader_change.assert_not_called()
 
+    def test_handle_external_gain_update_tracks_gain_and_notifies_gain_staging_controller(self, minimal_server):
+        gain_controller = MagicMock()
+        gain_controller.realtime_correction_enabled = True
+        minimal_server.gain_staging = gain_controller
+
+        minimal_server._handle_external_fader_update("/ch/5/in/set/trim", (1.75,))
+
+        gain_controller.handle_external_trim_change.assert_called_once_with(5, 1.75)
+
+    def test_handle_external_gain_update_clamps_extreme_gain_values(self, minimal_server):
+        gain_controller = MagicMock()
+        gain_controller.realtime_correction_enabled = True
+        minimal_server.gain_staging = gain_controller
+
+        minimal_server._handle_external_fader_update("/ch/6/in/set/trim", (100.0,))
+        minimal_server._handle_external_fader_update("/ch/7/in/set/trim", (-200.0,))
+
+        gain_controller.handle_external_trim_change.assert_any_call(6, 18.0)
+        gain_controller.handle_external_trim_change.assert_any_call(7, -18.0)
+
+    def test_handle_external_gain_update_ignores_non_finite_value(self, minimal_server):
+        gain_controller = MagicMock()
+        gain_controller.realtime_correction_enabled = True
+        minimal_server.gain_staging = gain_controller
+
+        minimal_server._handle_external_fader_update("/ch/8/in/set/trim", (float("nan"),))
+        minimal_server._handle_external_fader_update("/ch/8/in/set/trim", (float("inf"),))
+
+        assert not gain_controller.handle_external_trim_change.called
+
     def test_handle_external_fader_update_gracefully_ignores_invalid_value(self, minimal_server):
         minimal_server._handle_external_fader_update("/ch/5/fdr", ("abc",))
 

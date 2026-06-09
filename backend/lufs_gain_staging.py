@@ -5191,6 +5191,38 @@ class LUFSGainStagingController:
             })
         
         return True
+
+    def handle_external_trim_change(self, mixer_channel: int, new_trim_db: float) -> None:
+        """Обработка внешнего изменения TRIM для канала микшера."""
+        if not self.realtime_correction_enabled:
+            return
+
+        try:
+            new_trim_db = float(new_trim_db)
+        except (TypeError, ValueError):
+            return
+
+        if not np.isfinite(new_trim_db):
+            return
+
+        safe_trim_db = float(np.clip(new_trim_db, -18.0, 18.0))
+        try:
+            mixer_channel_id = int(mixer_channel)
+        except (TypeError, ValueError):
+            return
+
+        handled = False
+        for agc in self.channels.values():
+            if agc.channel_id == mixer_channel_id:
+                agc.set_base_trim(safe_trim_db)
+                if self.peak_staging_mode and mixer_channel_id in self.trim_correction_active:
+                    self.last_trim_value[agc.channel_id] = safe_trim_db
+                    self.trim_reduction_count[agc.channel_id] = 0
+                handled = True
+                break
+
+        if not handled:
+            logger.debug("No active TRIM channel state for mixer channel %s", mixer_channel)
     
     def _correction_loop(self):
         """Основной цикл коррекции."""
