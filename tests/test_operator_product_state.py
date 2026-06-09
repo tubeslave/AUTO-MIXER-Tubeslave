@@ -1834,6 +1834,18 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
         == goal_alignment["summary"]["present_row_count"]
     )
     assert goal_alignment["summary"]["missing_row_count"] == 0
+    assert (
+        payload["summary"]["project_goal_capability_objective_required_row_count"]
+        == goal_alignment["summary"]["required_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_present_row_count"]
+        == goal_alignment["summary"]["present_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_missing_row_count"]
+        == goal_alignment["summary"]["missing_row_count"]
+    )
     goal_progress = payload["project_goal_capability_progress_snapshot"]
     assert goal_progress["type"] == "project_goal_capability_progress_snapshot"
     assert goal_progress["summary"]["row_count"] == goal_matrix["summary"]["row_count"]
@@ -5262,6 +5274,24 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
         == goal_progress["summary"]["row_count"]
     )
     assert (
+        payload["summary"]["project_goal_capability_objective_required_row_count"]
+        == payload["registry"][
+            "project_goal_capability_objective_alignment_snapshot"
+        ]["summary"]["required_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_present_row_count"]
+        == payload["registry"][
+            "project_goal_capability_objective_alignment_snapshot"
+        ]["summary"]["present_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_missing_row_count"]
+        == payload["registry"][
+            "project_goal_capability_objective_alignment_snapshot"
+        ]["summary"]["missing_row_count"]
+    )
+    assert (
         main_pipeline_registry["autonomy_promotion_readiness"]["type"]
         == "autonomy_promotion_readiness"
     )
@@ -7589,6 +7619,24 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     assert (
         alignment_snapshot["type"]
         == "project_goal_capability_objective_alignment_snapshot"
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"][
+            "summary"
+        ]["project_goal_capability_objective_required_row_count"]
+        == alignment_snapshot["summary"]["required_row_count"]
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"][
+            "summary"
+        ]["project_goal_capability_objective_present_row_count"]
+        == alignment_snapshot["summary"]["present_row_count"]
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"][
+            "summary"
+        ]["project_goal_capability_objective_missing_row_count"]
+        == alignment_snapshot["summary"]["missing_row_count"]
     )
     assert progress_snapshot["type"] == "project_goal_capability_progress_snapshot"
     assert progress_snapshot["summary"]["row_count"] > 0

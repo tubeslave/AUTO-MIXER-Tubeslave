@@ -6566,9 +6566,11 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
     methods = [method.to_dict() for method in PROCESSING_METHODS]
     profiles = [profile.to_dict() for profile in PIPELINE_PROFILES]
     autonomy_promotion_readiness = build_autonomy_promotion_readiness_snapshot()
+    objective_alignment_snapshot = build_project_goal_objective_alignment_snapshot()
     autonomy_mode_transition_gate = build_autonomy_mode_transition_gate(
         {"autonomy_promotion_readiness": autonomy_promotion_readiness}
     )
+    objective_alignment_summary = objective_alignment_snapshot.get("summary", {})
     status_counts: Dict[str, int] = {status: 0 for status in sorted(PROCESSING_STATUSES)}
     domain_counts: Dict[str, int] = {domain: 0 for domain in sorted(PROCESSING_DOMAINS)}
     for method in PROCESSING_METHODS:
@@ -6589,6 +6591,18 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
             "pipeline_count": len(PIPELINE_PROFILES),
             "status_counts": status_counts,
             "domain_counts": domain_counts,
+            "project_goal_capability_objective_required_row_count": int(
+                objective_alignment_summary.get("required_row_count", 0) or 0
+            ),
+            "project_goal_capability_objective_present_row_count": int(
+                objective_alignment_summary.get("present_row_count", 0) or 0
+            ),
+            "project_goal_capability_objective_missing_row_count": int(
+                objective_alignment_summary.get("missing_row_count", 0) or 0
+            ),
+            "project_goal_capability_objective_blocked_live_row_count": len(
+                objective_alignment_summary.get("blocked_live_rows", ())
+            ),
             "live_executor_method_ids": live_executor_ids,
             "live_allowed_write_kinds": list(LIVE_ALLOWED_WRITE_KINDS),
             "main_pipeline_id": "main_live_assist",
@@ -6601,7 +6615,7 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
             build_project_goal_capability_progress_snapshot()
         ),
         "project_goal_capability_objective_alignment_snapshot": (
-            build_project_goal_objective_alignment_snapshot()
+            objective_alignment_snapshot
         ),
         "autonomy_promotion_readiness": autonomy_promotion_readiness,
         "autonomy_mode_transition_gate": autonomy_mode_transition_gate,

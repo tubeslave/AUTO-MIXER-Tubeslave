@@ -1205,6 +1205,13 @@ def build_main_pipeline_preview(
     project_goal_capability_progress_snapshot_summary = (
         project_goal_capability_progress_snapshot.get("summary", {})
     )
+    project_goal_capability_objective_alignment_snapshot = registry_snapshot.get(
+        "project_goal_capability_objective_alignment_snapshot",
+        {},
+    )
+    project_goal_capability_objective_alignment_summary = (
+        project_goal_capability_objective_alignment_snapshot.get("summary", {})
+    )
     autonomy_promotion_readiness = registry_snapshot.get(
         "autonomy_promotion_readiness",
         {},
@@ -1290,6 +1297,24 @@ def build_main_pipeline_preview(
             ),
             "project_goal_capability_progress_row_count": int(
                 project_goal_capability_progress_snapshot_summary.get("row_count", 0)
+                or 0
+            ),
+            "project_goal_capability_objective_required_row_count": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "required_row_count", 0
+                )
+                or 0
+            ),
+            "project_goal_capability_objective_present_row_count": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "present_row_count", 0
+                )
+                or 0
+            ),
+            "project_goal_capability_objective_missing_row_count": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "missing_row_count", 0
+                )
                 or 0
             ),
             "autonomy_promotion_target_count": int(
@@ -2573,6 +2598,12 @@ def build_main_pipeline_preview(
             "project_goal_capability_progress_snapshot": registry_snapshot.get(
                 "project_goal_capability_progress_snapshot",
                 {},
+            ),
+            "project_goal_capability_objective_alignment_snapshot": (
+                registry_snapshot.get(
+                    "project_goal_capability_objective_alignment_snapshot",
+                    {},
+                )
             ),
             "autonomy_promotion_readiness": registry_snapshot.get(
                 "autonomy_promotion_readiness",
