@@ -24,6 +24,7 @@ MANUAL_LIVE_WRITE_KIND_ALIASES = {
     "trim": "gain",
     "input_gain": "gain",
     "preamp_gain": "gain",
+    "pan_percent": "pan",
 }
 
 

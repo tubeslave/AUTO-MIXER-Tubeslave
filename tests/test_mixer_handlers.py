@@ -54,6 +54,8 @@ class FakeServer:
         value = str(raw_value).strip().lower()
         if value == "preamp":
             return "gain"
+        if value == "pan_percent":
+            return "pan"
         return value
 
     def _manual_write_address(self, channel: int, value_type: str) -> str:
@@ -109,6 +111,19 @@ def test_parse_readonly_parameter_request_supports_pan_value_type():
     assert channel == 5
     assert parsed_kind == "pan"
     assert address == server._manual_write_address(5, "pan")
+
+
+def test_parse_readonly_parameter_request_supports_pan_percent_alias():
+    server = FakeServer()
+    channel, parsed_kind, address, error = mixer_handlers._parse_readonly_parameter_request(
+        server,
+        {"channel": 11, "value_type": "pan_percent"},
+    )
+
+    assert error is None
+    assert channel == 11
+    assert parsed_kind == "pan"
+    assert address == server._manual_write_address(11, "pan")
 
 
 def test_parse_readonly_parameter_request_by_address():
