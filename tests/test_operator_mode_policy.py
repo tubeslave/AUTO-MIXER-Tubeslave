@@ -60,6 +60,18 @@ def test_goal_language_aliases_handle_robust_separator_variants():
         )
 
 
+def test_goal_language_aliases_handle_russian_variants():
+    assert normalize_operator_mode("анализ") == "analyze"
+    assert normalize_operator_mode("режим_анализа") == "analyze"
+    assert normalize_operator_mode("ассист") == "assist"
+    assert normalize_operator_mode("assistant") == "assist"
+    assert normalize_operator_mode("супервизор") == "supervised"
+    assert normalize_operator_mode("режим_супервизии") == "supervised"
+    assert normalize_operator_mode("полный_автономный_режим") == "auto"
+    assert normalize_operator_mode("автономный_режим") == "auto"
+    assert normalize_operator_mode("full_autonomous") == "auto"
+
+
 def test_goal_language_aliases_fallback_to_assist_for_unknown_inputs():
     assert normalize_operator_mode(None) == "assist"
     assert normalize_operator_mode("") == "assist"
