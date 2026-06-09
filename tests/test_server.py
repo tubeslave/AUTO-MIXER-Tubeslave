@@ -792,6 +792,30 @@ class TestAutoMixerServerRuntimeErrors:
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_set_pan_applies_pan(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.set_channel_pan = MagicMock()
+        client.is_connected = True
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command({
+            "type": "set_pan",
+            "channel": 1,
+            "value": -25.0,
+        })
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_executed"
+        assert payload["command"] == "set_pan"
+        assert payload["channel"] == 1
+        assert payload["value"] == -25.0
+        client.set_channel_pan.assert_called_once_with(1, -25.0)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
     async def test_run_auto_soundcheck_cycle_reraises_cancelled_error_and_cleans_up(self, mock_config, mock_bleed):
         server = AutoMixerServer()
         server.auto_soundcheck_running = True
@@ -980,6 +1004,7 @@ class DummyWingLike:
         self.get_compressor_gain = MagicMock(return_value=0.0)
         self.set_compressor_gain = MagicMock(return_value=True)
         self.set_channel_mute = MagicMock(return_value=True)
+        self.set_channel_pan = MagicMock(return_value=True)
         self.set_channel_phase_invert = MagicMock(return_value=True)
         self.set_channel_delay = MagicMock(return_value=True)
         self.get_write_gate_status = MagicMock(return_value={"state": "unconfigured"})
@@ -2923,6 +2948,7 @@ class TestWingDeploymentWriteBoundary:
             ({"type": "compressor_threshold", "channel": 1, "threshold": -18.0}, "set_compressor_threshold"),
             ({"type": "compressor_gain_up", "channel": 1, "db": 1}, "set_compressor_gain"),
             ({"type": "compressor_gain_down", "channel": 1, "db": 1}, "set_compressor_gain"),
+            ({"type": "set_pan", "channel": 1, "value": -25.0}, "set_channel_pan"),
         ],
     )
     async def test_voice_write_commands_are_quarantined_for_wing_boundary(

@@ -685,6 +685,7 @@ class AutoMixerServer:
         return str(cmd_type or "").strip().lower() in {
             "set_fader",
             "set_gain",
+            "set_pan",
             "load_snap",
             "mute_channel",
             "volume_up",
@@ -7076,6 +7077,16 @@ class AutoMixerServer:
                     "command": cmd_type,
                     "channel": channel,
                     "value": value
+                })
+
+            elif cmd_type == "set_pan":
+                value = command.get("value", command.get("pan", 0.0))
+                self.mixer_client.set_channel_pan(channel, float(value))
+                await self.broadcast({
+                    "type": "voice_command_executed",
+                    "command": cmd_type,
+                    "channel": channel,
+                    "value": float(value)
                 })
                 
             elif cmd_type == "load_snap":
