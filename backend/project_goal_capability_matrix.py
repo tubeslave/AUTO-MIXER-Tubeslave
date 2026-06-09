@@ -1318,6 +1318,7 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
     goal_area_counts = {}
     goal_area_status_counts: Dict[str, Dict[str, int]] = {}
     blocker_count_by_area = {}
+    objective_autonomy_readiness_by_goal_area: Dict[str, Dict[str, Any]] = {}
     runtime_mode_rows = []
 
     currently_live_writable_ids: list[str] = []
@@ -1328,6 +1329,28 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
     next_step_outline: list[Dict[str, str]] = []
 
     for row in rows:
+        if row.id in AUTOMIXER_OBJECTIVE_CAPABILITY_IDS:
+            area_stats = objective_autonomy_readiness_by_goal_area.setdefault(
+                row.goal_area,
+                {
+                    "required_row_count": 0,
+                    "ready_row_count": 0,
+                    "gap_row_count": 0,
+                    "readiness_score": 0,
+                    "ready_row_ids": [],
+                    "gap_row_ids": [],
+                    "status_counts": {},
+                },
+            )
+            area_stats["required_row_count"] += 1
+            area_stats["status_counts"].setdefault(row.status, 0)
+            area_stats["status_counts"][row.status] += 1
+            if row.status in {"canonical", "supervised_narrow"}:
+                area_stats["ready_row_count"] += 1
+                area_stats["ready_row_ids"].append(row.id)
+            else:
+                area_stats["gap_row_ids"].append(row.id)
+
         status_counts[row.status] += 1
         goal_area_counts[row.goal_area] = goal_area_counts.get(row.goal_area, 0) + 1
 
@@ -1370,6 +1393,43 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
         area
         for area, count in sorted(blocker_count_by_area.items(), key=lambda item: (-item[1], item[0]))
     ]
+    for area_stats in objective_autonomy_readiness_by_goal_area.values():
+        required_row_count = area_stats["required_row_count"]
+        ready_row_count = area_stats["ready_row_count"]
+        area_stats["gap_row_count"] = (
+            required_row_count - ready_row_count if required_row_count else 0
+        )
+        area_stats["readiness_score"] = (
+            int((ready_row_count / required_row_count) * 100)
+            if required_row_count
+            else 0
+        )
+
+    objective_autonomy_readiness_goal_area_priorities = [
+        {
+            "goal_area": area_id,
+            "required_row_count": area_stats["required_row_count"],
+            "ready_row_count": area_stats["ready_row_count"],
+            "gap_row_count": area_stats["gap_row_count"],
+            "readiness_score": area_stats["readiness_score"],
+        }
+        for area_id, area_stats in sorted(
+            objective_autonomy_readiness_by_goal_area.items(),
+            key=lambda item: (
+                -item[1]["gap_row_count"],
+                item[1]["readiness_score"],
+                item[0],
+            ),
+        )
+    ]
+    objective_readiness_gap_row_count = sum(
+        area_stats["gap_row_count"]
+        for area_stats in objective_autonomy_readiness_by_goal_area.values()
+    )
+    objective_readiness_ready_row_count = sum(
+        area_stats["ready_row_count"]
+        for area_stats in objective_autonomy_readiness_by_goal_area.values()
+    )
 
     return {
         "type": "project_goal_capability_progress_snapshot",
@@ -1393,6 +1453,10 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
             "currently_live_writable_capability_ids": currently_live_writable_ids,
             "supervised_narrow_live_candidates": supervised_candidates,
             "goal_areas_with_blockers": blocker_pressure_areas,
+            "project_goal_objective_autonomy_readiness_by_goal_area": objective_autonomy_readiness_by_goal_area,
+            "project_goal_objective_autonomy_readiness_goal_area_priorities": objective_autonomy_readiness_goal_area_priorities,
+            "project_goal_objective_autonomy_readiness_gap_row_count": objective_readiness_gap_row_count,
+            "project_goal_objective_autonomy_readiness_ready_row_count": objective_readiness_ready_row_count,
             "next_global_step": (
                 "Prioritize blocked areas, expand proof and evidence on supervised "
                 "candidate families, and keep read-only safety-first controls."

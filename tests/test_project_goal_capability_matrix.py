@@ -1,6 +1,7 @@
 from backend.processing_registry import iter_processing_methods
 from backend.project_goal_capability_matrix import (
     AUTOMIXER_OBJECTIVE_CAPABILITY_IDS,
+    AUTOMIXER_OBJECTIVE_CAPABILITY_IDS,
     AUTONOMY_MODE_CEILINGS,
     CURRENT_PROVEN_LIVE_WRITE_KINDS,
     GOAL_CAPABILITY_STATUSES,
@@ -889,3 +890,23 @@ def test_goal_capability_progress_snapshot_aligns_with_matrix_and_highlights_act
     status_counts = progress["summary"]["status_counts"]
     for status in GOAL_CAPABILITY_STATUSES:
         assert status in status_counts
+
+    objective_alignment = build_project_goal_objective_alignment_snapshot()
+    summary = progress["summary"]
+    assert summary["project_goal_objective_autonomy_readiness_gap_row_count"] == (
+        objective_alignment["summary"]["autonomy_readiness_gap_row_count"]
+    )
+    assert summary["project_goal_objective_autonomy_readiness_ready_row_count"] == (
+        objective_alignment["summary"]["autonomy_readiness_ready_row_count"]
+    )
+    assert summary["project_goal_objective_autonomy_readiness_by_goal_area"] == (
+        objective_alignment["summary"]["autonomy_readiness_by_goal_area"]
+    )
+    assert summary[
+        "project_goal_objective_autonomy_readiness_goal_area_priorities"
+    ] == objective_alignment["summary"]["autonomy_readiness_goal_area_priorities"]
+
+    required_rows = [row_id for row_id in AUTOMIXER_OBJECTIVE_CAPABILITY_IDS if row_id in set(
+        row["id"] for row in progress["rows"]
+    )]
+    assert len(required_rows) == objective_alignment["summary"]["required_row_count"]
