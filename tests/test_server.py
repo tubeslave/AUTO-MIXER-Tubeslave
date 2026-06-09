@@ -1063,6 +1063,7 @@ class TestWingDeploymentWriteBoundary:
         assert minimal_server._parse_manual_write_address("/ch/12/fdr") == (12, "fader")
         assert minimal_server._parse_manual_write_address("/ch/12/in/set/trim") == (12, "gain")
         assert minimal_server._parse_manual_write_address("  /ch/12/mute  ") == (12, "mute")
+        assert minimal_server._parse_manual_write_address("/ch/12/pan") == (12, "pan")
         assert minimal_server._parse_manual_write_address(b"/ch/13/fdr") == (13, "fader")
         assert minimal_server._parse_manual_write_address(Path("/ch/15/fdr")) == (15, "fader")
         class CustomPathLike(os.PathLike):
@@ -1224,6 +1225,39 @@ class TestWingDeploymentWriteBoundary:
 
         assert 10 not in minimal_server.last_fader_values
         controller.handle_external_fader_change.assert_not_called()
+
+    def test_handle_external_mute_update_tracks_mute_state(self, minimal_server):
+        minimal_server._handle_external_fader_update("/ch/12/mute", (1.0,))
+        minimal_server._handle_external_fader_update("/ch/13/mute", (0,))
+        minimal_server._handle_external_fader_update("/ch/14/mute", ("true",))
+
+        assert minimal_server.last_mute_values[12] is True
+        assert minimal_server.last_mute_values[13] is False
+        assert minimal_server.last_mute_values[14] is True
+        assert 12 not in minimal_server.last_fader_values
+
+    def test_handle_external_mute_update_ignores_invalid_mute_payload(self, minimal_server):
+        minimal_server._handle_external_fader_update("/ch/15/mute", (2,))
+        minimal_server._handle_external_fader_update("/ch/16/mute", ("bad",))
+
+        assert 15 not in minimal_server.last_mute_values
+        assert 16 not in minimal_server.last_mute_values
+
+    def test_handle_external_pan_update_tracks_and_clamps_value(self, minimal_server):
+        minimal_server._handle_external_fader_update("/ch/12/pan", (125.0,))
+        minimal_server._handle_external_fader_update("/ch/13/pan", (-170.0,))
+        minimal_server._handle_external_fader_update("/ch/14/pan", (12.5,))
+
+        assert minimal_server.last_pan_values[12] == 100.0
+        assert minimal_server.last_pan_values[13] == -100.0
+        assert minimal_server.last_pan_values[14] == 12.5
+        assert 12 not in minimal_server.last_fader_values
+
+    def test_handle_external_pan_update_ignores_non_finite_value(self, minimal_server):
+        minimal_server._handle_external_fader_update("/ch/15/pan", (float("nan"),))
+        minimal_server._handle_external_fader_update("/ch/15/pan", (float("inf"),))
+
+        assert 15 not in minimal_server.last_pan_values
 
     def test_handle_external_fader_update_clamps_extreme_fader_value(self, minimal_server):
         controller = MagicMock()

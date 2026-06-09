@@ -129,6 +129,12 @@ MANUAL_WRITE_KIND_CONFIG = {
         "readback_tolerance": 0.0,
         "clamp": lambda value: 1.0 if bool(value) else 0.0,
     },
+    "pan": {
+        "address": "/ch/{channel}/pan",
+        "method": "set_channel_pan",
+        "readback_tolerance": 0.5,
+        "clamp": lambda value: max(-100.0, min(100.0, float(value))),
+    },
 }
 
 SUPPORTED_MANUAL_WRITE_KINDS_SET = frozenset(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
@@ -217,6 +223,8 @@ class AutoMixerServer:
         
         # Track last known fader values for relative changes
         self.last_fader_values: dict[int, float] = {}
+        self.last_mute_values: dict[int, bool] = {}
+        self.last_pan_values: dict[int, float] = {}
         
         # Auto Soundcheck state
         self.auto_soundcheck_running = False
@@ -1955,10 +1963,18 @@ class AutoMixerServer:
         if parsed is None:
             return
         channel, value_type = parsed
-        if value_type not in {"fader", "gain"} or not args:
+        if value_type not in {"fader", "gain", "mute", "pan"} or not args:
             return
         if not 1 <= channel <= 48:
             logger.debug("Ignoring external fader update for out-of-range channel %s: %s", channel, address)
+            return
+
+        if value_type == "mute":
+            parsed_mute = self._coerce_optional_bool(args[0])
+            if parsed_mute is None:
+                return
+            safe_value = bool(self._clamp_manual_write_value(bool(parsed_mute), "mute"))
+            self.last_mute_values[channel] = safe_value
             return
         try:
             value = float(args[0])
@@ -1971,6 +1987,7 @@ class AutoMixerServer:
                 value,
             )
             return
+        value = float(value)
 
         if value_type == "fader":
             safe_value = self._clamp_manual_write_value(value, "fader")
@@ -1996,27 +2013,42 @@ class AutoMixerServer:
             return
 
         # value_type == "gain" (trim)
-        safe_value = self._clamp_manual_write_value(value, "gain")
-        if safe_value != value:
-            logger.debug(
-                "Clamped external gain update value for channel %s: %s -> %s",
-                channel,
-                value,
-                safe_value,
-            )
-        gain_controller = self.gain_staging
-        if gain_controller and gain_controller.realtime_correction_enabled:
-            try:
-                external_trim_handler = getattr(gain_controller, "handle_external_trim_change", None)
-                if external_trim_handler:
-                    external_trim_handler(channel, safe_value)
-            except Exception as exc:
-                logger.warning(
-                    "Auto gain-staging external trim handler failed for channel %s: %s",
+        if value_type == "gain":
+            safe_value = self._clamp_manual_write_value(value, "gain")
+            if safe_value != value:
+                logger.debug(
+                    "Clamped external gain update value for channel %s: %s -> %s",
                     channel,
-                    exc,
-                    exc_info=True,
+                    value,
+                    safe_value,
                 )
+            gain_controller = self.gain_staging
+            if gain_controller and gain_controller.realtime_correction_enabled:
+                try:
+                    external_trim_handler = getattr(gain_controller, "handle_external_trim_change", None)
+                    if external_trim_handler:
+                        external_trim_handler(channel, safe_value)
+                except Exception as exc:
+                    logger.warning(
+                        "Auto gain-staging external trim handler failed for channel %s: %s",
+                        channel,
+                        exc,
+                        exc_info=True,
+                    )
+            return
+
+        # value_type == "pan" (read-only for now; parse/validate for safety)
+        if value_type == "pan":
+            safe_value = self._clamp_manual_write_value(value, "pan")
+            if safe_value != value:
+                logger.debug(
+                    "Clamped external pan update value for channel %s: %s -> %s",
+                    channel,
+                    value,
+                    safe_value,
+                )
+            self.last_pan_values[channel] = safe_value
+            return
 
     def _schedule_mixer_update_broadcast(
         self,
