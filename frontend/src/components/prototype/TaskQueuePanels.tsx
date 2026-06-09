@@ -13,6 +13,7 @@ import type {
   DecisionTraceRecord,
   DecisionPolicy,
   Metric,
+  GoalCapabilityObjectiveReadinessByGoalArea,
   ProposalPreview,
   ReplayRunRecord,
   SafetyMonitorState,
@@ -57,6 +58,33 @@ function hotspotSummary(rows: GoalCapabilityObjectiveReadinessHotspot[]): string
   const blockers = row.blocker_row_ids ?? [];
   const blockersSummary = blockers.length ? blockers.slice(0, 3).join(', ') : 'none';
   return `${area}: ${gaps} gap(s), blockers ${blockersSummary}`;
+}
+
+function topBlockedGoalAreaRows(
+  rows: Record<string, GoalCapabilityObjectiveReadinessByGoalArea>,
+): GoalCapabilityObjectiveReadinessByGoalArea[] {
+  return Object.entries(rows)
+    .map(([goalArea, data]) => ({
+      ...data,
+      goal_area: data.goal_area || goalArea,
+    }))
+    .sort((left, right) => {
+      const gapDelta = (right.gap_row_count ?? 0) - (left.gap_row_count ?? 0);
+      if (gapDelta !== 0) return gapDelta;
+      const blockerDelta = (right.blocker_row_count ?? 0) - (left.blocker_row_count ?? 0);
+      if (blockerDelta !== 0) return blockerDelta;
+      return left.goal_area.localeCompare(right.goal_area);
+    });
+}
+
+function blockedAreaSummary(rows: Record<string, GoalCapabilityObjectiveReadinessByGoalArea>): string {
+  const top = topBlockedGoalAreaRows(rows)[0];
+  if (!top) return 'none';
+  const goalArea = top.goal_area || 'unknown';
+  const gaps = top.gap_row_count ?? 0;
+  const blockers = top.blocker_row_ids ?? [];
+  const blockerLabel = blockers.length ? blockers.join(', ') : 'none';
+  return `${goalArea}: ${gaps} gap(s), blockers ${blockerLabel}`;
 }
 
 function toneForReadinessScore(score: number): Tone {
@@ -270,6 +298,7 @@ function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
           { label: 'Goal readiness', value: `${safety.goalCapabilityObjectiveReadinessScore}%`, tone: toneForReadinessScore(safety.goalCapabilityObjectiveReadinessScore) },
           { label: 'Readiness priority', value: readinessPriority, tone: safety.goalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
           { label: 'Top hotspot', value: hotspotText, tone: safety.goalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
+          { label: 'Top blocked goal-area', value: blockedAreaSummary(safety.goalCapabilityObjectiveReadinessByGoalArea), tone: safety.goalCapabilityObjectiveReadinessByGoalArea && Object.keys(safety.goalCapabilityObjectiveReadinessByGoalArea).length ? 'yellow' as const : 'green' as const },
           { label: 'Proof hotspot', value: proofHotspotText, tone: safety.proofGoalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
           { label: 'Proof priority', value: proofReadinessPriority, tone: safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
         ].map(row => (

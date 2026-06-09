@@ -3700,6 +3700,121 @@ test('adaptSafetyMonitor maps new goal-capability objective readiness hotspots',
   assert.equal(safetyMonitor.lastReadbackStatus, 'verified');
 });
 
+test('adaptSafetyMonitor normalizes malformed goal-capability readiness payloads', async () => {
+  const { adaptSafetyMonitor, mockBackendState } = await importTypeScript('services/operatorAdapters.ts');
+
+  const safetyMonitor = adaptSafetyMonitor({
+    operator_mode: { mode: 'auto' },
+    live_write_policy: { apply_path: '/console', policy: 'full_autonomous_review' },
+    manual_write_supervision: {
+      emergency_stopped: 0,
+      reset_required: '',
+      approved_live_write_kinds: ['gain', null, 12],
+    },
+    proof: {
+      last_readback: { status: '' },
+      goal_capability_objective_readiness_goal_area_priorities: [
+        { goal_area: 'eq', readiness_score: 66, gap_row_count: '4' },
+        'bad-entry',
+        { bad: true },
+      ],
+      goal_capability_objective_readiness_by_goal_area: {
+        eq: {
+          goal_area: 'eq',
+          gap_row_count: '1',
+          blocker_row_count: 2,
+          blocker_row_ids: ['cg_eq_1', 'cg_eq_2'],
+          full_autonomous_status: 'blocked_live',
+          target_live_writable_row_count: 0,
+          target_proof_gap_count: 1,
+        },
+        input_gain: {
+          goal_area: 'input_gain',
+          ready_row_count: '2',
+          gap_row_count: 0,
+          blocker_rows: ['cg_gain_1'],
+        },
+        malformed: 'value',
+      },
+      goal_capability_objective_readiness_hotspots: [
+        { goal_area: 'eq', gap_row_count: 2, blocker_row_ids: ['cg_eq_1'] },
+        null,
+        { goal_area: 'eq', gap_row_count: '3', blocker_row_count: 2 },
+      ],
+      last_proof_status: 'applied',
+    },
+    summary: {
+      ready: 'true',
+      mixer_connected: 1,
+      trace_count: '12',
+      blocked_trace_count: null,
+      project_goal_capability_objective_readiness_score: '88',
+      project_goal_capability_objective_readiness_goal_area_priorities: [
+        { goal_area: 'input_gain', readiness_score: 50, gap_row_count: 1 },
+      ],
+      project_goal_capability_objective_readiness_by_goal_area: {
+        eq: {
+          goal_area: 'eq',
+          ready_row_count: '4',
+          gap_row_count: 5,
+          blocker_row_count: 2,
+          blocker_row_ids: 'not-an-array',
+        },
+      },
+      project_goal_capability_objective_readiness_hotspots: [
+        { goal_area: 'eq', gap_row_count: 2, blocker_row_ids: [] },
+      ],
+    },
+    blocked_surfaces: [],
+    type: 'safety_monitor',
+    source: 'runtime_policy',
+  }, {
+    ...mockBackendState,
+    liveWritePolicy: 'full_autonomous_review',
+    applyPath: '/console',
+  });
+
+  assert.equal(safetyMonitor.operatorMode, 'auto');
+  assert.equal(safetyMonitor.traceCount, 12);
+  assert.equal(safetyMonitor.blockedTraceCount, 0);
+  assert.equal(safetyMonitor.goalCapabilityObjectiveReadinessScore, 88);
+  assert.deepEqual(safetyMonitor.goalCapabilityObjectiveReadinessGoalAreaPriorities, [
+    { goal_area: 'input_gain', gap_row_count: 1, readiness_score: 50 },
+  ]);
+  assert.deepEqual(safetyMonitor.goalCapabilityObjectiveReadinessByGoalArea, {
+    eq: {
+      goal_area: 'eq',
+      ready_row_count: 4,
+      gap_row_count: 5,
+      blocker_row_count: 2,
+      blocker_row_ids: [],
+    },
+  });
+  assert.deepEqual(safetyMonitor.goalCapabilityObjectiveReadinessHotspots, [
+    {
+      goal_area: 'eq',
+      gap_row_count: 2,
+      blocker_row_ids: [],
+    },
+  ]);
+  assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities, [
+    { goal_area: 'eq', gap_row_count: 4, readiness_score: 66 },
+  ]);
+  assert.deepEqual(safetyMonitor.proofGoalCapabilityObjectiveReadinessHotspots, [
+    {
+      goal_area: 'eq',
+      gap_row_count: 2,
+      blocker_row_ids: ['cg_eq_1'],
+    },
+    {
+      goal_area: 'eq',
+      gap_row_count: 3,
+      blocker_row_count: 2,
+    },
+  ]);
+  assert.equal(safetyMonitor.lastReadbackStatus, 'none');
+});
+
 test('Settings bottom section grid has one column per read-only section card', async () => {
   const source = await fs.readFile(path.join(srcRoot, 'views/SettingsView.tsx'), 'utf8');
   const sectionTitles = [
