@@ -816,6 +816,30 @@ class TestAutoMixerServerRuntimeErrors:
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_set_pan_clamps_bounds(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.set_channel_pan = MagicMock()
+        client.is_connected = True
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command({
+            "type": "set_pan",
+            "channel": 1,
+            "value": 150,
+        })
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_executed"
+        assert payload["command"] == "set_pan"
+        assert payload["channel"] == 1
+        assert payload["value"] == 100.0
+        client.set_channel_pan.assert_called_once_with(1, 100.0)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
     async def test_run_auto_soundcheck_cycle_reraises_cancelled_error_and_cleans_up(self, mock_config, mock_bleed):
         server = AutoMixerServer()
         server.auto_soundcheck_running = True

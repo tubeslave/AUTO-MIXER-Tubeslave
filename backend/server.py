@@ -7080,13 +7080,17 @@ class AutoMixerServer:
                 })
 
             elif cmd_type == "set_pan":
-                value = command.get("value", command.get("pan", 0.0))
-                self.mixer_client.set_channel_pan(channel, float(value))
+                raw_value = command.get("value", command.get("pan", command.get("pan_percent", 0.0)))
+                value = self._coerce_optional_float(raw_value)
+                if value is None:
+                    value = 0.0
+                value = self._clamp_manual_write_value(value, "pan")
+                self.mixer_client.set_channel_pan(channel, value)
                 await self.broadcast({
                     "type": "voice_command_executed",
                     "command": cmd_type,
                     "channel": channel,
-                    "value": float(value)
+                    "value": value,
                 })
                 
             elif cmd_type == "load_snap":
