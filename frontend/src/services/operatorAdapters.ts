@@ -975,6 +975,40 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     }]
     : [];
 
+  const objectiveAlignmentSnapshot = asRecord(data.project_goal_capability_objective_alignment_snapshot);
+  const objectiveAlignmentSummary = asRecord(objectiveAlignmentSnapshot.summary);
+  const objectiveAlignmentRows: ModuleStatusRecord[] = Object.keys(objectiveAlignmentSummary).length
+    ? [{
+      moduleId: 'project_goal_capability_objective_alignment_summary',
+      label: 'Project goal objective alignment',
+      domain: 'project_goal_capability',
+      status: str(objectiveAlignmentSnapshot.status, 'available'),
+      entrypoint: 'project_goal_capability_objective_alignment_snapshot.summary',
+      module: `required:${Math.trunc(num(objectiveAlignmentSummary.required_row_count, 0))}`,
+      uiSurface: 'Project goal objective alignment summary',
+      canWriteLive: false,
+      liveWriteKinds: [],
+      pipelineProfiles: [
+        `required:${Math.trunc(num(objectiveAlignmentSummary.required_row_count, 0))}`,
+        `present:${Math.trunc(num(objectiveAlignmentSummary.present_row_count, 0))}`,
+        `missing:${Math.trunc(num(objectiveAlignmentSummary.missing_row_count, 0))}`,
+        `blocked_live_rows:${Math.trunc(num(objectiveAlignmentSummary.blocked_live_row_count, 0))}`,
+        `currently_live_writable:${Math.trunc(num(objectiveAlignmentSummary.currently_live_writable_row_count, 0))}`,
+        `blocked_live_count:${stringList(objectiveAlignmentSummary.blocked_live_rows).length}`,
+        `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
+      ].filter((entry) => entry),
+      blockedReason: objectiveAlignmentSummary.missing_row_count
+        ? `Missing objective capabilities: ${stringList(objectiveAlignmentSummary.missing_capability_ids).length}`
+        : 'Objective alignment summary is currently complete.',
+      nextStep: `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
+      tone: stringList(objectiveAlignmentSummary.missing_capability_ids).length
+        ? 'red'
+        : stringList(objectiveAlignmentSummary.blocked_live_rows).length
+          ? 'red'
+          : 'blue',
+    }]
+    : [];
+
   const proofEvidence = asRecord(data.supervised_proof_evidence);
   const proofSummary = asRecord(proofEvidence.summary);
   const proofEvidenceRows: ModuleStatusRecord[] = Object.keys(proofEvidence).length ? (() => {
@@ -3088,6 +3122,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     ...projectGoalCapabilityRows,
     ...projectGoalCapabilitySummaryRows,
     ...progressSummaryRows,
+    ...objectiveAlignmentRows,
     ...modeGateRows,
     ...readinessRows,
     ...proofEvidenceRows,

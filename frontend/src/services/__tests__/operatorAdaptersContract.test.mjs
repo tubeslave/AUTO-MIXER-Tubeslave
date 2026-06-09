@@ -3498,6 +3498,22 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
         next_global_step: 'Collect proofs in progress order.',
       },
     },
+    project_goal_capability_objective_alignment_snapshot: {
+      status: 'ok',
+      summary: {
+        required_row_count: 2,
+        present_row_count: 1,
+        missing_row_count: 1,
+        proposal_only_row_count: 1,
+        blocked_live_row_count: 1,
+        currently_live_writable_row_count: 0,
+        supervised_candidate_row_count: 1,
+        blocked_live_rows: ['cg_room_mic_eq'],
+        currently_live_writable_rows: [],
+        missing_rows: ['cg_room_mics'],
+        full_autonomous_status: 'blocked_live',
+      },
+    },
   });
 
   const capabilityRows = rows.filter((row) => row.domain === 'project_goal_capability' && row.moduleId.startsWith('project_goal_capability:'));
@@ -3539,6 +3555,17 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
   assert.equal(progressSummary?.pipelineProfiles.includes('goal_areas_with_blockers:eq,input_gain'), true);
   assert.equal(progressSummary?.tone, 'red');
   assert.equal(progressSummary?.nextStep.includes('cg_room_mic_eq (eq/full_autonomous): Resolve EQ method and proof gap.'), true);
+
+  const objectiveAlignmentSummary = rows.find(
+    (row) => row.moduleId === 'project_goal_capability_objective_alignment_summary',
+  );
+  assert.equal(objectiveAlignmentSummary?.module, 'required:2');
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('missing:1'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('blocked_live_rows:1'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('currently_live_writable:0'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('full_autonomous_status:blocked_live'), true);
+  assert.equal(objectiveAlignmentSummary?.tone, 'red');
+  assert.equal(objectiveAlignmentSummary?.nextStep, 'full_autonomous_status:blocked_live');
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {
