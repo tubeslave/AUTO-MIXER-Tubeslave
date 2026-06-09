@@ -7089,6 +7089,15 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
     connection = dashboard.get("connection", {})
     safety = dashboard.get("safety", {})
     ready_for_live = safety.get("ready_for_live") if isinstance(safety, dict) else {}
+    goal_capability_objective_alignment = dashboard.get("runtime", {}).get(
+        "goal_capability_objective_alignment",
+        {},
+    )
+    goal_capability_objective_alignment_summary = (
+        goal_capability_objective_alignment
+        if isinstance(goal_capability_objective_alignment, dict)
+        else {}
+    )
     if not isinstance(ready_for_live, dict):
         ready_for_live = {}
     manual = (
@@ -7148,7 +7157,29 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
             "last_readback": (last_trace or {}).get("readback"),
             "last_rollback": (last_trace or {}).get("rollback"),
             "last_proof_status": (last_trace or {}).get("proof_status"),
+            "goal_capability_objective_readiness_goal_area_priorities": list(
+                goal_capability_objective_alignment.get(
+                    "project_goal_capability_objective_readiness_goal_area_priorities",
+                    [],
+                )
+                or []
+            ),
+            "goal_capability_objective_readiness_by_goal_area": dict(
+                goal_capability_objective_alignment.get(
+                    "project_goal_capability_objective_readiness_by_goal_area",
+                    {},
+                )
+                or {}
+            ),
+            "goal_capability_objective_readiness_hotspots": list(
+                goal_capability_objective_alignment.get(
+                    "project_goal_capability_objective_readiness_hotspots",
+                    [],
+                )
+                or []
+            ),
         },
+        "goal_capability_objective_alignment": goal_capability_objective_alignment,
         "blocked_surfaces": quarantined_surfaces,
         "summary": {
             "ready": bool(ready_for_live.get("ready")),
@@ -7157,6 +7188,37 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
             "reset_required": bool(manual.get("reset_required")),
             "trace_count": traces["summary"]["trace_count"],
             "blocked_trace_count": traces["summary"]["blocked_count"],
+            "project_goal_capability_objective_readiness_score": int(
+                goal_capability_objective_alignment_summary.get("autonomy_readiness_score", 0)
+                or 0
+            ),
+            "project_goal_capability_objective_readiness_goal_area_priorities": list(
+                goal_capability_objective_alignment_summary.get(
+                    "autonomy_readiness_goal_area_priorities",
+                    [],
+                )
+                if isinstance(
+                    goal_capability_objective_alignment_summary.get(
+                        "autonomy_readiness_goal_area_priorities"
+                    ),
+                    list,
+                )
+                else []
+            ),
+            "project_goal_capability_objective_readiness_by_goal_area": dict(
+                goal_capability_objective_alignment.get(
+                    "project_goal_capability_objective_readiness_by_goal_area",
+                    {},
+                )
+                or {}
+            ),
+            "project_goal_capability_objective_readiness_hotspots": list(
+                goal_capability_objective_alignment.get(
+                    "project_goal_capability_objective_readiness_hotspots",
+                    [],
+                )
+                or []
+            ),
         },
     }
 

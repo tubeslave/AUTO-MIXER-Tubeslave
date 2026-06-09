@@ -11149,9 +11149,47 @@ async def test_decision_trace_and_safety_monitor_expose_apply_evidence(server, t
     assert traces["traces"][-1]["idempotency_key"] == "trace-key"
     assert traces["traces"][-1]["proof_status"] == "verified"
     monitor = build_safety_monitor(server)
+    from backend.project_goal_capability_matrix import (
+        build_project_goal_capability_progress_snapshot,
+        build_project_goal_objective_alignment_snapshot,
+    )
+    alignment_snapshot = build_project_goal_objective_alignment_snapshot()
+    progress_snapshot = build_project_goal_capability_progress_snapshot()
+    alignment_payload = monitor.get("goal_capability_objective_alignment", {})
+
     assert monitor["type"] == "safety_monitor"
     assert monitor["live_write_policy"]["direct_writes_allowed"] is False
     assert "eq" in monitor["blocked_surfaces"]
+    assert (
+        alignment_payload["autonomy_readiness_score"]
+        == alignment_snapshot["summary"]["autonomy_readiness_score"]
+    )
+    assert (
+        alignment_payload["project_goal_capability_objective_readiness_goal_area_priorities"]
+        == alignment_snapshot["summary"]["autonomy_readiness_goal_area_priorities"]
+    )
+    assert (
+        alignment_payload["project_goal_capability_objective_readiness_hotspots"]
+        == progress_snapshot["summary"][
+            "project_goal_objective_autonomy_readiness_hotspots"
+        ]
+    )
+    assert (
+        alignment_payload["project_goal_capability_objective_readiness_by_goal_area"]
+        == progress_snapshot["summary"][
+            "project_goal_objective_autonomy_readiness_by_goal_area"
+        ]
+    )
+    assert (
+        monitor["summary"]["project_goal_capability_objective_readiness_score"]
+        == alignment_snapshot["summary"]["autonomy_readiness_score"]
+    )
+    assert (
+        monitor["summary"]["project_goal_capability_objective_readiness_hotspots"]
+        == progress_snapshot["summary"][
+            "project_goal_objective_autonomy_readiness_hotspots"
+        ]
+    )
 
 
 def test_build_safety_monitor_falls_back_to_allowed_live_write_kinds_when_manual_status_missing(server):
