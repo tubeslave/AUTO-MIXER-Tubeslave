@@ -19,7 +19,7 @@ MODE_AUTO = "auto"
 DEFAULT_OPERATOR_MODE = MODE_ASSIST
 VALID_OPERATOR_MODES = (MODE_ANALYZE, MODE_ASSIST, MODE_SUPERVISED, MODE_AUTO)
 CURRENT_PROVEN_LIVE_WRITE_KINDS = ("fader", "gain")
-SUPPORTED_MANUAL_LIVE_WRITE_KINDS = ("fader", "gain", "mute")
+SUPPORTED_MANUAL_LIVE_WRITE_KINDS = ("fader", "gain", "mute", "pan")
 MANUAL_LIVE_WRITE_KIND_ALIASES = {
     "trim": "gain",
     "input_gain": "gain",
@@ -72,6 +72,7 @@ PROVEN_LIVE_WRITE_SURFACE_BY_KIND = {
     "fader": ("fader",),
     "gain": ("preamp", "trim"),
     "mute": ("mute",),
+    "pan": ("pan",),
 }
 
 OPERATOR_MODE_ALIASES = {

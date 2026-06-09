@@ -152,5 +152,16 @@ def test_unlocked_non_wing_auto_still_exposes_only_current_proven_write_scope():
 
 def test_normalize_manual_live_write_kinds_filters_unsupported_and_aliases_values():
     assert normalize_manual_live_write_kinds(
-        ["fader", "gain", "eq", "trim", "input_gain", "preamp_gain", "fader", "mute"]
-    ) == ["fader", "gain", "mute"]
+        [
+            "fader",
+            "gain",
+            "eq",
+            "trim",
+            "input_gain",
+            "preamp_gain",
+            "fader",
+            "mute",
+            "pan_percent",
+            "pan",
+        ]
+    ) == ["fader", "gain", "mute", "pan"]
