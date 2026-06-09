@@ -1162,7 +1162,7 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
         if autonomy_readiness_required_row_count
         else 0
     )
-    autonomy_readiness_by_goal_area: Dict[str, Dict[str, int]] = {}
+    autonomy_readiness_by_goal_area: Dict[str, Dict[str, Any]] = {}
     for row in rows:
         if row.id not in required_ids:
             continue
@@ -1173,11 +1173,16 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
                 "ready_row_count": 0,
                 "gap_row_count": 0,
                 "readiness_score": 0,
+                "ready_row_ids": [],
+                "gap_row_ids": [],
             },
         )
         area_stats["required_row_count"] += 1
         if row.status in {"canonical", "supervised_narrow"}:
             area_stats["ready_row_count"] += 1
+            area_stats["ready_row_ids"].append(row.id)
+        else:
+            area_stats["gap_row_ids"].append(row.id)
 
     for area_stats in autonomy_readiness_by_goal_area.values():
         required_row_count = area_stats["required_row_count"]

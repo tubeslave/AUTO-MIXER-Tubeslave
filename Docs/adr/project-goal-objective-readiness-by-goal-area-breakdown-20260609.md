@@ -16,6 +16,8 @@ The payload is keyed by `goal_area`, and each value contains:
 - `ready_row_count`
 - `gap_row_count`
 - `readiness_score`
+- `ready_row_ids`
+- `gap_row_ids`
 
 The readiness calculation in each area uses the same rule as the global score:
 `int((ready_row_count / required_row_count) * 100)` with required set
