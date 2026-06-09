@@ -12,6 +12,12 @@ def _safe_int_value(value: Any, default: int = 0) -> int:
         return default
 
 
+def _normalize_str_list(raw_value: Any) -> List[str]:
+    if isinstance(raw_value, (list, tuple)):
+        return [str(item) for item in raw_value]
+    return []
+
+
 def normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
     """Normalize objective readiness metrics by goal area.
 
@@ -62,10 +68,10 @@ def normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
                     }
                     has_field = has_field or bool(normalized_row[field])
             else:
-                normalized_values = [str(item) for item in raw_value] if isinstance(raw_value, list) else []
-                if isinstance(raw_value, list):
+                normalized_values = _normalize_str_list(raw_value)
+                if normalized_values:
                     normalized_row[field] = normalized_values
-                    has_field = has_field or bool(normalized_values)
+                has_field = has_field or bool(normalized_values)
 
         raw_blocker_rows = raw_row.get("blocker_rows")
         if isinstance(raw_blocker_rows, list):
@@ -127,10 +133,10 @@ def normalize_goal_capability_readiness_hotspots(raw_rows: Any) -> List[Dict[str
                 has_field = True
 
         raw_blocker_row_ids = raw_row.get("blocker_row_ids")
-        if isinstance(raw_blocker_row_ids, list):
-            normalized_blocker_row_ids = [str(item) for item in raw_blocker_row_ids]
+        normalized_blocker_row_ids = _normalize_str_list(raw_blocker_row_ids)
+        if normalized_blocker_row_ids:
             normalized_row["blocker_row_ids"] = normalized_blocker_row_ids
-            has_field = has_field or bool(normalized_blocker_row_ids)
+        has_field = has_field or bool(normalized_blocker_row_ids)
 
         if has_field:
             normalized.append(normalized_row)

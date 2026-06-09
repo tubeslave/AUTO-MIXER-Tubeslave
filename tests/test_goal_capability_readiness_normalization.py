@@ -20,7 +20,7 @@ def test_normalize_goal_capability_readiness_rows_converts_types_and_filters():
                 "target_proof_gap_count": "3",
                 "status_counts": {"blocked": "2", "ready": 3.2},
                 "ready_row_ids": [1, 2, "3"],
-                "gap_row_ids": ["4", 5],
+                "gap_row_ids": ("4", 5),
                 "blocker_rows": ["cg_eq_1", 7],
                 "blocker_row_ids": [9],
                 "full_autonomous_status": "candidate",
