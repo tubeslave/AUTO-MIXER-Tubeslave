@@ -237,8 +237,12 @@ def _normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
     for goal_area, raw_row in raw_rows.items():
         if not isinstance(raw_row, dict):
             continue
-        area = str(raw_row.get("goal_area", goal_area or "")).strip() or str(goal_area)
-        normalized_row: Dict[str, Any] = {"goal_area": area}
+        normalized_row: Dict[str, Any] = {}
+        raw_goal_area = raw_row.get("goal_area")
+        if isinstance(raw_goal_area, str):
+            normalized_goal_area = raw_goal_area.strip()
+            if normalized_goal_area:
+                normalized_row["goal_area"] = normalized_goal_area
         has_field = False
 
         for field in (
@@ -257,6 +261,21 @@ def _normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
             if normalized_value is not None:
                 normalized_row[field] = normalized_value
                 has_field = True
+
+        for field in ("status_counts", "ready_row_ids", "gap_row_ids"):
+            raw_value = raw_row.get(field)
+            if field == "status_counts":
+                if isinstance(raw_value, dict):
+                    normalized_row[field] = {
+                        str(status): _safe_int_value(value)
+                        for status, value in raw_value.items()
+                    }
+                    has_field = has_field or bool(normalized_row[field])
+            else:
+                normalized_values = [str(item) for item in raw_value] if isinstance(raw_value, list) else []
+                if isinstance(raw_value, list):
+                    normalized_row[field] = normalized_values
+                    has_field = has_field or bool(normalized_values)
 
         raw_blocker_rows = raw_row.get("blocker_rows")
         if isinstance(raw_blocker_rows, list):
