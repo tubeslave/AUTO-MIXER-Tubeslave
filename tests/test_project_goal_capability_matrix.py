@@ -1,8 +1,10 @@
 from backend.processing_registry import iter_processing_methods
 from backend.project_goal_capability_matrix import (
+    AUTOMIXER_OBJECTIVE_CAPABILITY_IDS,
     AUTONOMY_MODE_CEILINGS,
     CURRENT_PROVEN_LIVE_WRITE_KINDS,
     GOAL_CAPABILITY_STATUSES,
+    build_project_goal_objective_alignment_snapshot,
     build_project_goal_capability_matrix_snapshot,
     build_project_goal_capability_progress_snapshot,
     get_project_goal_capability,
@@ -57,6 +59,22 @@ def test_project_goal_matrix_covers_explicit_goal_requirements():
     }
 
     assert expected <= ids
+
+
+def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
+    snapshot = build_project_goal_objective_alignment_snapshot()
+    assert snapshot["type"] == "project_goal_capability_objective_alignment_snapshot"
+    assert snapshot["safety"]["read_only"] is True
+    assert snapshot["safety"]["live_write"] is False
+    assert snapshot["safety"]["full_autonomous_live_allowed"] is False
+
+    summary = snapshot["summary"]
+    assert summary["missing_row_count"] == 0
+    assert summary["required_row_count"] == len(AUTOMIXER_OBJECTIVE_CAPABILITY_IDS)
+    assert summary["required_row_count"] == summary["present_row_count"]
+    assert summary["full_autonomous_status"] == "blocked_live"
+    assert summary["blocked_live_rows"] == ["mode_full_autonomous"]
+    assert summary["currently_live_writable_rows"]
 
 
 def test_runtime_mode_capability_rows_match_operator_mode_policy():

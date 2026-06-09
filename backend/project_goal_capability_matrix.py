@@ -1071,6 +1071,102 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
 )
 
 
+AUTOMIXER_OBJECTIVE_CAPABILITY_IDS: Tuple[str, ...] = (
+    "mode_analysis",
+    "mode_assisted",
+    "mode_supervised_automix",
+    "mode_full_autonomous",
+    "analyze_multichannel_audio",
+    "identify_source_types",
+    "identify_arrangement_roles",
+    "gain_staging",
+    "equalization",
+    "compression",
+    "gating",
+    "deessing",
+    "panning",
+    "frequency_separation",
+    "cross_channel_unmasking",
+    "phase_correction",
+    "effects_management",
+    "effect_sends",
+    "mix_balance",
+    "musician_level_adaptation",
+    "live_adaptation",
+    "genre_variants",
+    "master_bus_optimization",
+    "realtime_corrections",
+    "console_read_parameters",
+    "console_analyze_state",
+    "console_preamp_trim_control",
+    "console_fader_control",
+    "console_mute_control",
+    "console_pan_control",
+    "console_eq_control",
+    "console_compressor_control",
+    "console_gate_control",
+    "console_routing_control",
+    "console_dca_group_matrix_control",
+    "console_fx_control",
+    "console_scene_preset_control",
+    "decision_basis",
+    "long_term_memory_learning",
+)
+
+
+def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
+    """Build a compact objective-progress snapshot used by operators and tests."""
+
+    rows = tuple(iter_project_goal_capabilities())
+    by_id = {row.id: row for row in rows}
+
+    required_ids = list(AUTOMIXER_OBJECTIVE_CAPABILITY_IDS)
+    missing_rows = [row_id for row_id in required_ids if row_id not in by_id]
+    present_rows = [row_id for row_id in required_ids if row_id in by_id]
+
+    blocked_live_ids = [
+        row.id for row in rows if row.status == "blocked_live"
+    ]
+    proposal_only_ids = [row.id for row in rows if row.status == "proposal_only"]
+    missing_count = len(missing_rows)
+    currently_live_writable_ids = [
+        row.id for row in rows if row.currently_live_writable
+    ]
+    supervised_only_ids = [
+        row.id
+        for row in rows
+        if row.autonomy_mode_ceiling in {"supervised_narrow", "offline_only"}
+    ]
+
+    full_auto_row = by_id.get("mode_full_autonomous")
+
+    return {
+        "type": "project_goal_capability_objective_alignment_snapshot",
+        "generated_at": _utc_now(),
+        "status": "ok" if missing_count == 0 else "alignment_missing_rows",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "live_widening_allowed": False,
+            "full_autonomous_live_allowed": False,
+        },
+        "summary": {
+            "required_row_count": len(required_ids),
+            "missing_row_count": missing_count,
+            "present_row_count": len(present_rows),
+            "proposal_only_row_count": len(proposal_only_ids),
+            "blocked_live_row_count": len(blocked_live_ids),
+            "currently_live_writable_row_count": len(currently_live_writable_ids),
+            "supervised_candidate_row_count": len(supervised_only_ids),
+            "missing_rows": missing_rows,
+            "blocked_live_rows": blocked_live_ids,
+            "currently_live_writable_rows": currently_live_writable_ids,
+            "full_autonomous_status": full_auto_row.status if full_auto_row else None,
+        },
+        "rows": [row.to_dict() for row in rows if row.id in required_ids],
+    }
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
