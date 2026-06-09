@@ -61,6 +61,34 @@ def test_normalize_goal_capability_readiness_rows_with_invalid_row_types():
     assert normalize_goal_capability_readiness_rows({"eq": None}) == {}
 
 
+def test_normalize_goal_capability_readiness_rows_keeps_explicit_empty_collection_fields():
+    normalized = normalize_goal_capability_readiness_rows(
+        {
+            "eq": {
+                "goal_area": "eq",
+                "status_counts": {},
+                "ready_row_ids": [],
+                "gap_row_ids": [],
+                "blocker_rows": [],
+                "blocker_row_ids": [],
+                "blocker_row_count": "0",
+            }
+        }
+    )
+
+    assert normalized == {
+        "eq": {
+            "goal_area": "eq",
+            "blocker_row_count": 0,
+            "status_counts": {},
+            "ready_row_ids": [],
+            "gap_row_ids": [],
+            "blocker_rows": [],
+            "blocker_row_ids": [],
+        },
+    }
+
+
 def test_normalize_goal_capability_readiness_hotspots_converts_and_skips_empty():
     normalized = normalize_goal_capability_readiness_hotspots(
         [
