@@ -230,6 +230,96 @@ def _bounded_int_value(value: Any, *, default: int, minimum: int, maximum: int) 
     return max(minimum, min(numeric, maximum))
 
 
+def _normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
+    if not isinstance(raw_rows, dict):
+        return {}
+    normalized: Dict[str, Dict[str, Any]] = {}
+    for goal_area, raw_row in raw_rows.items():
+        if not isinstance(raw_row, dict):
+            continue
+        area = str(raw_row.get("goal_area", goal_area or "")).strip() or str(goal_area)
+        normalized_row: Dict[str, Any] = {"goal_area": area}
+        has_field = False
+
+        for field in (
+            "required_row_count",
+            "ready_row_count",
+            "gap_row_count",
+            "readiness_score",
+            "blocker_row_count",
+            "target_live_writable_row_count",
+            "target_proof_gap_count",
+        ):
+            raw_value = raw_row.get(field)
+            if raw_value is None:
+                continue
+            normalized_value = _safe_int_value(raw_value, default=None)  # type: ignore[arg-type]
+            if normalized_value is not None:
+                normalized_row[field] = normalized_value
+                has_field = True
+
+        raw_blocker_rows = raw_row.get("blocker_rows")
+        if isinstance(raw_blocker_rows, list):
+            normalized_blocker_rows = [str(item) for item in raw_blocker_rows]
+            if normalized_blocker_rows:
+                normalized_row["blocker_rows"] = normalized_blocker_rows
+                normalized_row["blocker_row_ids"] = normalized_blocker_rows
+                has_field = True
+        elif "blocker_rows" in raw_row:
+            has_field = has_field or False
+
+        raw_blocker_row_ids = raw_row.get("blocker_row_ids")
+        if isinstance(raw_blocker_row_ids, list):
+            normalized_blocker_row_ids = [str(item) for item in raw_blocker_row_ids]
+            normalized_row["blocker_row_ids"] = normalized_blocker_row_ids
+            has_field = has_field or bool(normalized_blocker_row_ids)
+
+        for status_field, payload_field in (
+            ("full_autonomous_status", "full_autonomous_status"),
+            ("full_autonomous_status_label", "full_autonomous_status_label"),
+        ):
+            raw_status = raw_row.get(status_field)
+            if isinstance(raw_status, str) and raw_status:
+                normalized_row[payload_field] = raw_status
+                has_field = True
+
+        if not has_field:
+            continue
+        normalized[goal_area] = normalized_row
+
+    return normalized
+
+
+def _normalize_goal_capability_readiness_hotspots(raw_rows: Any) -> list[Dict[str, Any]]:
+    if not isinstance(raw_rows, list):
+        return []
+    normalized: list[Dict[str, Any]] = []
+    for raw_row in raw_rows:
+        if not isinstance(raw_row, dict):
+            continue
+        area = str(raw_row.get("goal_area", "")).strip()
+        if not area:
+            continue
+        normalized_row: Dict[str, Any] = {"goal_area": area}
+        has_field = False
+        for field in ("gap_row_count", "readiness_score", "blocker_row_count"):
+            raw_value = raw_row.get(field)
+            if raw_value is None:
+                continue
+            parsed = _safe_int_value(raw_value, default=None)  # type: ignore[arg-type]
+            if parsed is not None:
+                normalized_row[field] = parsed
+                has_field = True
+        raw_blocker_row_ids = raw_row.get("blocker_row_ids")
+        if isinstance(raw_blocker_row_ids, list):
+            normalized_blocker_row_ids = [str(item) for item in raw_blocker_row_ids]
+            normalized_row["blocker_row_ids"] = normalized_blocker_row_ids
+            has_field = has_field or bool(normalized_blocker_row_ids)
+        if has_field:
+            normalized.append(normalized_row)
+    return normalized
+
+
 def _is_connected(client: Any) -> bool:
     return bool(client and getattr(client, "is_connected", False))
 
@@ -7098,6 +7188,28 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
         if isinstance(goal_capability_objective_alignment, dict)
         else {}
     )
+    normalized_goal_area_readiness = _normalize_goal_capability_readiness_rows(
+        goal_capability_objective_alignment.get("project_goal_capability_objective_readiness_by_goal_area", {})
+    )
+    normalized_goal_area_hotspots = _normalize_goal_capability_readiness_hotspots(
+        goal_capability_objective_alignment.get(
+            "project_goal_capability_objective_readiness_hotspots",
+            [],
+        )
+    )
+    normalized_goal_area_priorities = list(
+        goal_capability_objective_alignment.get(
+            "project_goal_capability_objective_readiness_goal_area_priorities",
+            [],
+        )
+        if isinstance(
+            goal_capability_objective_alignment.get(
+                "project_goal_capability_objective_readiness_goal_area_priorities"
+            ),
+            list,
+        )
+        else []
+    )
     if not isinstance(ready_for_live, dict):
         ready_for_live = {}
     manual = (
@@ -7158,25 +7270,13 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
             "last_rollback": (last_trace or {}).get("rollback"),
             "last_proof_status": (last_trace or {}).get("proof_status"),
             "goal_capability_objective_readiness_goal_area_priorities": list(
-                goal_capability_objective_alignment.get(
-                    "project_goal_capability_objective_readiness_goal_area_priorities",
-                    [],
-                )
-                or []
+                normalized_goal_area_priorities
             ),
             "goal_capability_objective_readiness_by_goal_area": dict(
-                goal_capability_objective_alignment.get(
-                    "project_goal_capability_objective_readiness_by_goal_area",
-                    {},
-                )
-                or {}
+                normalized_goal_area_readiness
             ),
             "goal_capability_objective_readiness_hotspots": list(
-                goal_capability_objective_alignment.get(
-                    "project_goal_capability_objective_readiness_hotspots",
-                    [],
-                )
-                or []
+                normalized_goal_area_hotspots
             ),
         },
         "goal_capability_objective_alignment": goal_capability_objective_alignment,
@@ -7206,18 +7306,10 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
                 else []
             ),
             "project_goal_capability_objective_readiness_by_goal_area": dict(
-                goal_capability_objective_alignment.get(
-                    "project_goal_capability_objective_readiness_by_goal_area",
-                    {},
-                )
-                or {}
+                normalized_goal_area_readiness
             ),
             "project_goal_capability_objective_readiness_hotspots": list(
-                goal_capability_objective_alignment.get(
-                    "project_goal_capability_objective_readiness_hotspots",
-                    [],
-                )
-                or []
+                normalized_goal_area_hotspots
             ),
         },
     }

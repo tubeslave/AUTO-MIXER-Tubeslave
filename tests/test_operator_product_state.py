@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+import backend.operator_product_state as operator_product_state
 from backend.automation_trace import AutomationTraceStore
 from backend.decision_memory import DecisionMemoryStore, decision_memory_entry_from_trace
 from backend.operator_analysis import build_operator_analysis_report
@@ -11261,6 +11262,78 @@ def test_build_safety_monitor_prefers_manual_approved_live_write_kinds_and_filte
         "gain",
         "mute",
     ]
+
+
+def test_build_safety_monitor_normalizes_goal_capability_readiness_payload(server):
+    server.operator_mode = "supervised"
+    server.get_manual_write_supervision_status = lambda: {"approved_live_write_kinds": ["fader", "gain", None]}
+    fake_dashboard = {
+        "connection": {"connected": True},
+        "safety": {
+            "ready_for_live": {"ready": True},
+        },
+        "runtime": {
+            "goal_capability_objective_alignment": {
+                "autonomy_readiness_score": 88,
+                "autonomy_readiness_goal_area_priorities": [
+                    {"goal_area": "eq", "readiness_score": 66, "gap_row_count": 4},
+                ],
+                "project_goal_capability_objective_readiness_by_goal_area": {
+                    "eq": {
+                        "goal_area": "eq",
+                        "gap_row_count": "1",
+                        "blocker_row_count": 2,
+                        "blocker_rows": ["cg_eq_1", "cg_eq_2"],
+                        "full_autonomous_status": "blocked_live",
+                        "target_live_writable_row_count": "0",
+                        "target_proof_gap_count": 1,
+                    },
+                    "input_gain": {
+                        "goal_area": "input_gain",
+                        "ready_row_count": "2",
+                        "gap_row_count": 0,
+                        "blocker_rows": ["cg_gain_1"],
+                        "blocker_row_ids": "not-an-array",
+                    },
+                    "malformed": "value",
+                },
+                "project_goal_capability_objective_readiness_hotspots": [
+                    {"goal_area": "eq", "gap_row_count": "2", "blocker_row_ids": ["cg_eq_1"]},
+                    {"goal_area": "", "gap_row_count": "99"},
+                    "bad-entry",
+                ],
+            }
+        }
+    }
+
+    with patch.object(operator_product_state, "build_dashboard_snapshot", return_value=fake_dashboard):
+        with patch.object(operator_product_state, "build_decision_traces", return_value={"traces": [{"id": "t1"}], "summary": {"trace_count": 1, "blocked_count": 0}}):
+            monitor = build_safety_monitor(server)
+
+    assert monitor["proof"]["goal_capability_objective_readiness_by_goal_area"] == {
+        "eq": {
+            "goal_area": "eq",
+            "gap_row_count": 1,
+            "blocker_row_count": 2,
+            "blocker_row_ids": ["cg_eq_1", "cg_eq_2"],
+            "blocker_rows": ["cg_eq_1", "cg_eq_2"],
+            "full_autonomous_status": "blocked_live",
+            "target_live_writable_row_count": 0,
+            "target_proof_gap_count": 1,
+        },
+        "input_gain": {
+            "goal_area": "input_gain",
+            "ready_row_count": 2,
+            "gap_row_count": 0,
+            "blocker_row_ids": ["cg_gain_1"],
+            "blocker_rows": ["cg_gain_1"],
+        },
+    }
+    assert monitor["summary"]["project_goal_capability_objective_readiness_by_goal_area"] == monitor["proof"]["goal_capability_objective_readiness_by_goal_area"]
+    assert monitor["proof"]["goal_capability_objective_readiness_hotspots"] == [
+        {"goal_area": "eq", "gap_row_count": 2, "blocker_row_ids": ["cg_eq_1"]},
+    ]
+    assert monitor["summary"]["project_goal_capability_objective_readiness_hotspots"] == monitor["proof"]["goal_capability_objective_readiness_hotspots"]
 
 
 def test_operator_analysis_reports_without_creating_in_analyze_mode(server):
