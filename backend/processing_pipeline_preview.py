@@ -1338,6 +1338,13 @@ def build_main_pipeline_preview(
                 )
                 or 0
             ),
+            "project_goal_capability_objective_readiness_goal_area_priorities": list(
+                project_goal_capability_objective_alignment_summary.get(
+                    "autonomy_readiness_goal_area_priorities",
+                    [],
+                )
+                or []
+            ),
             "project_goal_capability_objective_readiness_by_goal_area": dict(
                 project_goal_capability_objective_alignment_summary.get(
                     "autonomy_readiness_by_goal_area",

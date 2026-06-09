@@ -720,6 +720,12 @@ def test_registry_snapshot_includes_objective_alignment_projection():
     )
     assert (
         snapshot["summary"][
+            "project_goal_capability_objective_readiness_goal_area_priorities"
+        ]
+        == objective_alignment["summary"]["autonomy_readiness_goal_area_priorities"]
+    )
+    assert (
+        snapshot["summary"][
             "project_goal_capability_objective_readiness_by_goal_area"
         ]
         == objective_alignment["summary"]["autonomy_readiness_by_goal_area"]

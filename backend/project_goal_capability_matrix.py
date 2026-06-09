@@ -1198,6 +1198,23 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
             if required_row_count
             else 0
         )
+    autonomy_readiness_goal_area_priorities = [
+        {
+            "goal_area": area_id,
+            "required_row_count": area_stats["required_row_count"],
+            "ready_row_count": area_stats["ready_row_count"],
+            "gap_row_count": area_stats["gap_row_count"],
+            "readiness_score": area_stats["readiness_score"],
+        }
+        for area_id, area_stats in sorted(
+            autonomy_readiness_by_goal_area.items(),
+            key=lambda item: (
+                -item[1]["gap_row_count"],
+                item[1]["readiness_score"],
+                item[0],
+            ),
+        )
+    ]
 
     full_auto_row = by_id.get("mode_full_autonomous")
 
@@ -1218,6 +1235,7 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
             "autonomy_readiness_score": autonomy_readiness_score,
             "autonomy_readiness_ready_row_count": autonomy_readiness_ready_row_count,
             "autonomy_readiness_gap_row_count": autonomy_readiness_gap_row_count,
+            "autonomy_readiness_goal_area_priorities": autonomy_readiness_goal_area_priorities,
             "autonomy_readiness_by_goal_area": autonomy_readiness_by_goal_area,
             "proposal_only_row_count": len(proposal_only_ids),
             "proposal_only_row_ids": proposal_only_ids,

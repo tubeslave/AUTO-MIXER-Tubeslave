@@ -112,6 +112,24 @@ def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
         sum(item["gap_row_count"] for item in readiness_by_area.values())
         == summary["autonomy_readiness_gap_row_count"]
     )
+    priority_expected = [
+        {
+            "goal_area": area_id,
+            "required_row_count": area_summary["required_row_count"],
+            "ready_row_count": area_summary["ready_row_count"],
+            "gap_row_count": area_summary["gap_row_count"],
+            "readiness_score": area_summary["readiness_score"],
+        }
+        for area_id, area_summary in sorted(
+            readiness_by_area.items(),
+            key=lambda item: (
+                -item[1]["gap_row_count"],
+                item[1]["readiness_score"],
+                item[0],
+            ),
+        )
+    ]
+    assert summary["autonomy_readiness_goal_area_priorities"] == priority_expected
     for area_id, area_summary in readiness_by_area.items():
         assert area_summary["required_row_count"] >= 0
         assert area_summary["ready_row_count"] >= 0
