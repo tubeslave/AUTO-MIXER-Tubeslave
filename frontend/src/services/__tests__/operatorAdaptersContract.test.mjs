@@ -3561,9 +3561,12 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
   );
   assert.equal(objectiveAlignmentSummary?.module, 'required:2');
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('missing:1'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('proposal_only:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('blocked_live_rows:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('currently_live_writable:0'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('supervised_candidates:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('full_autonomous_status:blocked_live'), true);
+  assert.equal(objectiveAlignmentSummary?.blockedReason?.includes('Missing objective capabilities: cg_room_mics'), true);
   assert.equal(objectiveAlignmentSummary?.tone, 'red');
   assert.equal(objectiveAlignmentSummary?.nextStep, 'full_autonomous_status:blocked_live');
 });

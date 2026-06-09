@@ -977,6 +977,8 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
 
   const objectiveAlignmentSnapshot = asRecord(data.project_goal_capability_objective_alignment_snapshot);
   const objectiveAlignmentSummary = asRecord(objectiveAlignmentSnapshot.summary);
+  const missingObjectiveRows = stringList(objectiveAlignmentSummary.missing_rows);
+  const blockedLiveRows = stringList(objectiveAlignmentSummary.blocked_live_rows);
   const objectiveAlignmentRows: ModuleStatusRecord[] = Object.keys(objectiveAlignmentSummary).length
     ? [{
       moduleId: 'project_goal_capability_objective_alignment_summary',
@@ -992,18 +994,22 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `required:${Math.trunc(num(objectiveAlignmentSummary.required_row_count, 0))}`,
         `present:${Math.trunc(num(objectiveAlignmentSummary.present_row_count, 0))}`,
         `missing:${Math.trunc(num(objectiveAlignmentSummary.missing_row_count, 0))}`,
+        `proposal_only:${Math.trunc(num(objectiveAlignmentSummary.proposal_only_row_count, 0))}`,
         `blocked_live_rows:${Math.trunc(num(objectiveAlignmentSummary.blocked_live_row_count, 0))}`,
         `currently_live_writable:${Math.trunc(num(objectiveAlignmentSummary.currently_live_writable_row_count, 0))}`,
-        `blocked_live_count:${stringList(objectiveAlignmentSummary.blocked_live_rows).length}`,
+        `supervised_candidates:${Math.trunc(num(objectiveAlignmentSummary.supervised_candidate_row_count, 0))}`,
+        `blocked_live_count:${blockedLiveRows.length}`,
         `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
       ].filter((entry) => entry),
-      blockedReason: objectiveAlignmentSummary.missing_row_count
-        ? `Missing objective capabilities: ${stringList(objectiveAlignmentSummary.missing_capability_ids).length}`
+      blockedReason: missingObjectiveRows.length
+        ? `Missing objective capabilities: ${missingObjectiveRows.join(', ')}`
+        : blockedLiveRows.length
+          ? `Blocked-live objective capabilities: ${blockedLiveRows.join(', ')}`
         : 'Objective alignment summary is currently complete.',
       nextStep: `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
-      tone: stringList(objectiveAlignmentSummary.missing_capability_ids).length
+      tone: missingObjectiveRows.length
         ? 'red'
-        : stringList(objectiveAlignmentSummary.blocked_live_rows).length
+        : blockedLiveRows.length
           ? 'red'
           : 'blue',
     }]
