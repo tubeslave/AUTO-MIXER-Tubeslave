@@ -41,6 +41,7 @@ from backend.operator_product_state import (
     build_user_presets_snapshot,
 )
 from backend.processing_pipeline_preview import build_main_pipeline_preview
+from backend import processing_pipeline_preview
 from backend.operator_recommendation_bridge import (
     build_safe_gain_operator_proposals,
     build_soundcheck_operator_proposals,
@@ -1989,15 +1990,19 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
         payload["summary"][
             "project_goal_capability_objective_readiness_by_goal_area"
         ]
-        == goal_alignment["summary"]["autonomy_readiness_by_goal_area"]
+        == processing_pipeline_preview._normalize_goal_capability_readiness_rows(
+            goal_alignment["summary"]["autonomy_readiness_by_goal_area"]
+        )
     )
     assert (
         payload["summary"][
             "project_goal_capability_objective_readiness_hotspots"
         ]
-        == payload["project_goal_capability_progress_snapshot"]["summary"][
+        == processing_pipeline_preview._normalize_goal_capability_readiness_hotspots(
+            payload["project_goal_capability_progress_snapshot"]["summary"][
             "project_goal_objective_autonomy_readiness_hotspots"
         ]
+        )
     )
     assert (
         payload["summary"]["project_goal_capability_objective_blocked_live_row_count"]
@@ -5578,6 +5583,98 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     server.mixer_client.set_compressor.assert_not_called()
 
 
+def test_main_pipeline_preview_normalizes_goal_capability_readiness_payload(server):
+    server.mixer_client = CachedMixer()
+    server.connection_mode = "local"
+    server.audio_capture = FakeAudioCapture()
+
+    baseline_registry_snapshot = deepcopy(
+        processing_pipeline_preview.build_processing_registry_snapshot(include_methods=False)
+    )
+    baseline_registry_snapshot["project_goal_capability_objective_alignment_snapshot"] = {
+        "type": "project_goal_capability_objective_alignment_snapshot",
+        "summary": {
+            "required_row_count": "4",
+            "present_row_count": "3",
+            "missing_row_count": "1",
+            "autonomy_readiness_score": "88",
+            "autonomy_readiness_ready_row_count": "2",
+            "autonomy_readiness_gap_row_count": "1",
+            "autonomy_readiness_goal_area_priorities": ("eq", "gain"),
+            "autonomy_readiness_by_goal_area": {
+                "eq": {
+                    "goal_area": "eq",
+                    "gap_row_count": "7",
+                    "blocker_row_ids": ["cg_eq_1"],
+                    "blocker_rows": ["cg_eq_2"],
+                    "target_live_writable_row_count": "3",
+                    "target_proof_gap_count": "2",
+                    "ready_row_count": "1",
+                    "required_row_count": "2",
+                    "blocker_row_count": "4",
+                    "readiness_score": "5",
+                    "full_autonomous_status": "blocked_live",
+                    "full_autonomous_status_label": "blocked",
+                },
+                "malformed": "value",
+            },
+            "blocked_live_rows": ["mode_full_autonomous"],
+            "currently_live_writable_row_count": "9",
+            "full_autonomous_status": "candidate",
+        },
+        "rows": [],
+    }
+    baseline_registry_snapshot["project_goal_capability_progress_snapshot"] = {
+        "type": "project_goal_capability_progress_snapshot",
+        "summary": {
+            "row_count": 4,
+            "project_goal_objective_autonomy_readiness_hotspots": [
+                {"goal_area": "eq", "gap_row_count": "3", "blocker_row_ids": ["cg_eq_1"]},
+                {"goal_area": "", "gap_row_count": "9"},
+                "bad-entry",
+            ],
+        },
+        "goal_area_progress": [],
+        "next_steps": [],
+        "rows": [],
+    }
+
+    with patch.object(
+        processing_pipeline_preview,
+        "build_processing_registry_snapshot",
+        return_value=baseline_registry_snapshot,
+    ):
+        payload = build_main_pipeline_preview(server, total_channels=4)
+
+    assert (
+        payload["summary"][
+            "project_goal_capability_objective_readiness_goal_area_priorities"
+        ]
+        == []
+    )
+    assert payload["summary"][
+        "project_goal_capability_objective_readiness_by_goal_area"
+    ] == {
+        "eq": {
+            "goal_area": "eq",
+            "gap_row_count": 7,
+            "blocker_row_ids": ["cg_eq_1"],
+            "blocker_rows": ["cg_eq_2"],
+            "target_live_writable_row_count": 3,
+            "target_proof_gap_count": 2,
+            "ready_row_count": 1,
+            "required_row_count": 2,
+            "blocker_row_count": 4,
+            "readiness_score": 5,
+            "full_autonomous_status": "blocked_live",
+            "full_autonomous_status_label": "blocked",
+        },
+    }
+    assert payload["summary"]["project_goal_capability_objective_readiness_hotspots"] == [
+        {"goal_area": "eq", "gap_row_count": 3, "blocker_row_ids": ["cg_eq_1"]}
+    ]
+
+
 def test_main_pipeline_preview_keeps_non_fader_gain_methods_blocked(server):
     payload = build_main_pipeline_preview(server, total_channels=4)
     blockers = {blocker["method_id"]: blocker for blocker in payload["blockers"]}
@@ -7849,15 +7946,19 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
         by_type["processing_pipeline_snapshot"]["summary"][
             "project_goal_capability_objective_readiness_by_goal_area"
         ]
-        == alignment_snapshot["summary"]["autonomy_readiness_by_goal_area"]
+        == processing_pipeline_preview._normalize_goal_capability_readiness_rows(
+            alignment_snapshot["summary"]["autonomy_readiness_by_goal_area"]
+        )
     )
     assert (
         by_type["processing_pipeline_snapshot"]["summary"][
             "project_goal_capability_objective_readiness_hotspots"
         ]
-        == by_type["processing_pipeline_snapshot"][
+        == processing_pipeline_preview._normalize_goal_capability_readiness_hotspots(
+            by_type["processing_pipeline_snapshot"][
             "project_goal_capability_progress_snapshot"
         ]["summary"]["project_goal_objective_autonomy_readiness_hotspots"]
+        )
     )
     assert (
         by_type["processing_pipeline_snapshot"]["summary"][

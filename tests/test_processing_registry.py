@@ -1,3 +1,7 @@
+from unittest.mock import patch
+
+import backend.processing_registry as processing_registry
+
 from backend.processing_registry import (
     LIVE_ALLOWED_WRITE_KINDS,
     PROCESSING_DOMAINS,
@@ -728,15 +732,19 @@ def test_registry_snapshot_includes_objective_alignment_projection():
         snapshot["summary"][
             "project_goal_capability_objective_readiness_by_goal_area"
         ]
-        == objective_alignment["summary"]["autonomy_readiness_by_goal_area"]
+        == processing_registry._normalize_goal_capability_readiness_rows(
+            objective_alignment["summary"]["autonomy_readiness_by_goal_area"]
+        )
     )
     assert (
         snapshot["summary"][
             "project_goal_capability_objective_readiness_hotspots"
         ]
-        == snapshot["project_goal_capability_progress_snapshot"]["summary"][
+        == processing_registry._normalize_goal_capability_readiness_hotspots(
+            snapshot["project_goal_capability_progress_snapshot"]["summary"][
             "project_goal_objective_autonomy_readiness_hotspots"
         ]
+        )
     )
     assert (
         snapshot["summary"]["project_goal_capability_objective_blocked_live_row_count"]
@@ -762,6 +770,87 @@ def test_registry_snapshot_includes_objective_alignment_projection():
         assert matrix_row["status"] == row["status"]
         assert matrix_row["goal_area"] == row["goal_area"]
         assert matrix_row["currently_live_writable"] == row["currently_live_writable"]
+
+
+def test_registry_snapshot_normalizes_goal_capability_readiness_payload():
+    malformed_alignment_snapshot = {
+        "type": "project_goal_capability_objective_alignment_snapshot",
+        "summary": {
+            "required_row_count": "4",
+            "present_row_count": "3",
+            "missing_row_count": "1",
+            "autonomy_readiness_score": "88",
+            "autonomy_readiness_ready_row_count": "2",
+            "autonomy_readiness_gap_row_count": "1",
+            "autonomy_readiness_goal_area_priorities": ("eq", "input_gain"),
+            "autonomy_readiness_by_goal_area": {
+                "eq": {
+                    "goal_area": "eq",
+                    "gap_row_count": "7",
+                    "blocker_row_ids": ["cg_eq_1"],
+                    "blocker_rows": ["cg_eq_2"],
+                    "target_live_writable_row_count": "3",
+                    "target_proof_gap_count": "2",
+                    "ready_row_count": "1",
+                    "required_row_count": "2",
+                    "blocker_row_count": "4",
+                    "readiness_score": "5",
+                    "full_autonomous_status": "blocked_live",
+                    "full_autonomous_status_label": "blocked",
+                },
+                "malformed": "value",
+            },
+            "blocked_live_rows": ["mode_full_autonomous"],
+            "currently_live_writable_row_count": "9",
+            "full_autonomous_status": "candidate",
+        },
+        "rows": [],
+    }
+    malformed_progress_snapshot = {
+        "type": "project_goal_capability_progress_snapshot",
+        "summary": {
+            "row_count": 4,
+            "project_goal_objective_autonomy_readiness_hotspots": [
+                {"goal_area": "eq", "gap_row_count": "3", "blocker_row_ids": ["cg_eq_1"]},
+                {"goal_area": "", "gap_row_count": "9"},
+                "bad-entry",
+            ],
+        },
+        "goal_area_progress": [],
+        "next_steps": [],
+        "rows": [],
+    }
+
+    with patch.object(processing_registry, "build_project_goal_objective_alignment_snapshot", return_value=malformed_alignment_snapshot), patch.object(processing_registry, "build_project_goal_capability_progress_snapshot", return_value=malformed_progress_snapshot):
+        snapshot = build_processing_registry_snapshot(include_methods=False)
+
+    assert (
+        snapshot["summary"][
+            "project_goal_capability_objective_readiness_goal_area_priorities"
+        ]
+        == []
+    )
+    assert snapshot["summary"][
+        "project_goal_capability_objective_readiness_by_goal_area"
+    ] == {
+        "eq": {
+            "goal_area": "eq",
+            "gap_row_count": 7,
+            "blocker_row_ids": ["cg_eq_1"],
+            "blocker_rows": ["cg_eq_2"],
+            "target_live_writable_row_count": 3,
+            "target_proof_gap_count": 2,
+            "ready_row_count": 1,
+            "required_row_count": 2,
+            "blocker_row_count": 4,
+            "readiness_score": 5,
+            "full_autonomous_status": "blocked_live",
+            "full_autonomous_status_label": "blocked",
+        },
+    }
+    assert snapshot["summary"]["project_goal_capability_objective_readiness_hotspots"] == [
+        {"goal_area": "eq", "gap_row_count": 3, "blocker_row_ids": ["cg_eq_1"]}
+    ]
 
 
 def test_write_surface_inventory_is_fail_closed_by_default():

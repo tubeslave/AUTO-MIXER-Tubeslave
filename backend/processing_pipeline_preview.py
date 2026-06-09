@@ -12,7 +12,11 @@ try:
         feature_snapshot_from_channel_inventory,
     )
     from operator_analysis import build_operator_analysis_report
-    from operator_product_state import build_channel_inventory
+    from operator_product_state import (
+        build_channel_inventory,
+        _normalize_goal_capability_readiness_hotspots,
+        _normalize_goal_capability_readiness_rows,
+    )
     from operator_recommendation_bridge import build_safe_gain_operator_proposals
     from processing_proposal_adapters import (
         MAIN_PIPELINE_ID,
@@ -1343,16 +1347,21 @@ def build_main_pipeline_preview(
                     "autonomy_readiness_goal_area_priorities",
                     [],
                 )
-                or []
+                if isinstance(
+                    project_goal_capability_objective_alignment_summary.get(
+                        "autonomy_readiness_goal_area_priorities"
+                    ),
+                    list,
+                )
+                else []
             ),
-            "project_goal_capability_objective_readiness_by_goal_area": dict(
+            "project_goal_capability_objective_readiness_by_goal_area": _normalize_goal_capability_readiness_rows(
                 project_goal_capability_objective_alignment_summary.get(
                     "autonomy_readiness_by_goal_area",
                     {},
                 )
-                or {}
             ),
-            "project_goal_capability_objective_readiness_hotspots": list(
+            "project_goal_capability_objective_readiness_hotspots": _normalize_goal_capability_readiness_hotspots(
                 project_goal_capability_progress_snapshot_summary.get(
                     "project_goal_objective_autonomy_readiness_hotspots",
                     [],
