@@ -1079,7 +1079,7 @@ class TestWingDeploymentWriteBoundary:
         server.operator_mode = "supervised"
 
         status = server.get_manual_write_supervision_status()
-        assert status["approved_live_write_kinds"] == ["fader", "gain", "mute"]
+        assert status["approved_live_write_kinds"] == ["fader", "gain", "pan", "mute"]
 
         server.operator_mode = "auto"
         server._auto_mode_unlocked = True
@@ -1101,7 +1101,7 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client = DummyWingLike()
 
         status = server.get_manual_write_supervision_status()
-        assert status["approved_live_write_kinds"] == ["fader", "gain"]
+        assert status["approved_live_write_kinds"] == ["fader", "gain", "pan"]
 
     def test_supported_manual_write_kinds_remain_in_sync(self):
         assert AutoMixerServer._get_supported_manual_write_kinds() == tuple(
@@ -1680,7 +1680,7 @@ class TestWingDeploymentWriteBoundary:
 
         assert result["status"] == "blocked"
         assert result["reason"] == "approval_required"
-        assert result["allowed_live_write_kinds"] == ["fader", "gain"]
+        assert result["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1709,7 +1709,7 @@ class TestWingDeploymentWriteBoundary:
 
         assert result["status"] == "blocked"
         assert result["reason"] == "live_write_kind_not_allowed_in_mode"
-        assert result["allowed_live_write_kinds"] == ["fader", "gain"]
+        assert result["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
         server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio

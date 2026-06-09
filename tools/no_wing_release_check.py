@@ -28,7 +28,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status  # noqa: E402
+from backend.operator_mode_policy import (
+    CURRENT_PROVEN_LIVE_WRITE_KINDS,
+    MODE_SUPERVISED,
+    build_operator_mode_status,
+)  # noqa: E402
 from backend.bus_group_main_dca_physical_readback_contract import (  # noqa: E402
     BUS_GROUP_MAIN_DCA_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
     BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_ARTIFACT_TYPE,
@@ -9570,6 +9574,7 @@ def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> Chec
 
         row_count = len(rows)
         row_value_types: set[str] = set()
+        expected_value_types = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
         expected_row_statuses = {
             "manual_safety_review_candidate",
             "remediation_required",
@@ -9586,7 +9591,7 @@ def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> Chec
             row_status = str(row.get("status") or "")
             target_id = str(row.get("target_id") or "")
             row_value_types.add(value_type)
-            if value_type not in {"fader", "gain"}:
+            if value_type not in expected_value_types:
                 violations.append(f"autonomy_overlay_row_{index}_unexpected_value_type")
             if row.get("autonomous_ready") is not False:
                 violations.append(f"autonomy_overlay_row_{index}_autonomous_ready_not_false")
@@ -9619,7 +9624,7 @@ def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> Chec
         for status, summary_ids in expected_summary_buckets.items():
             if summary_ids != actual_target_ids_by_status[status]:
                 violations.append(f"autonomy_overlay_{status}_target_ids_mismatch")
-        if row_value_types != {"fader", "gain"}:
+        if row_value_types != expected_value_types:
             violations.append("autonomy_overlay_fader_gain_rows_missing")
         if not dry_run_ids:
             violations.append("autonomy_overlay_dry_run_target_ids_missing")

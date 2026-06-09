@@ -130,7 +130,7 @@ def _memory_draft_payload(prior_consumer, *, records=None, blocked=None, status=
             "policy_gate_payload_required": True,
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "append_only_memory_write_allowed_by_draft": False,
             "requires_separate_memory_writer": True,
             "execution_allowed_by_draft": False,

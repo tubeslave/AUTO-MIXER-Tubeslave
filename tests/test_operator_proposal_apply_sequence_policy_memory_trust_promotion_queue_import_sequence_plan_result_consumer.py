@@ -99,7 +99,7 @@ def _preflight_result(proposal_id, *, prefix="seq-plan"):
             "proposal_status_mutation": False,
             "idempotency_reserved": False,
             "manual_console_write_called": False,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "live_apply_entrypoint": "apply_operator_proposal",
         },
     }
@@ -259,7 +259,7 @@ def _sequence_plan(prefix="seq-plan", *, steps=None, blocked_results=None):
             "queries_console": False,
             "live_widening_allowed": False,
             "live_apply_entrypoint": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
         },
         "planned_apply_sequence": planned_steps,
         "blocked_results": blocked,

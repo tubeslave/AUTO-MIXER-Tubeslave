@@ -91,7 +91,7 @@ def _audit_payload(prefix="seq-policy", *, rows=None, blocked=None, status="pass
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
             "live_apply_entrypoint_required": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "execution_allowed_by_audit": False,
             "live_write": False,
             "apply_attempted": False,

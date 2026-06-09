@@ -127,7 +127,7 @@ def _sequence_plan(prior_consumer, *, steps=None, blocked_results=None):
             "queries_console": False,
             "live_widening_allowed": False,
             "live_apply_entrypoint": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
         },
         "planned_apply_sequence": planned_steps,
         "blocked_results": blocked,

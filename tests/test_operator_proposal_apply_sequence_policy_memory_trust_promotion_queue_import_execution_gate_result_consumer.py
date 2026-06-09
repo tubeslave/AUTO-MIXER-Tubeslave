@@ -124,7 +124,7 @@ def _gate_payload(prefix="seq-exec", *, candidates=None, blocked=None, status="r
             "queries_console": False,
             "live_widening_allowed": False,
             "live_apply_entrypoint": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
         },
         "ready_for_executor": ready_for_executor,
         "blocked_results": blocked_results,

@@ -74,7 +74,7 @@ def _writer_dry_run_payload(*, record_count=1):
             "target_memory_path": ".ai/memory/project.md",
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "live_write": False,
             "apply_attempted": False,
             "queue_mutation": False,

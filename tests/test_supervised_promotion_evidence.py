@@ -151,4 +151,5 @@ def test_current_artifact_shape_has_no_autonomous_or_automatic_update_path():
     assert set(snapshot["summary"]["blocked_evidence_row_ids"]) == {
         "fader_supervised_evidence",
         "gain_supervised_evidence",
+        "pan_supervised_evidence",
     }

@@ -35,6 +35,7 @@ OVERLAY_STATUSES = {
 TARGET_BY_VALUE_TYPE = {
     "fader": "fader_supervised_promotion",
     "gain": "gain_trim_supervised_promotion",
+    "pan": "pan_phase_supervised_promotion",
 }
 PROMOTION_VALUE_TYPES = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 

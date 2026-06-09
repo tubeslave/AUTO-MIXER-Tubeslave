@@ -123,7 +123,7 @@ def _dry_run_payload(prefix="seq-gate", *, results=None):
             "queries_console": False,
             "live_widening_allowed": False,
             "live_apply_entrypoint": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
         },
         "dry_run_results": dry_run_results,
     }

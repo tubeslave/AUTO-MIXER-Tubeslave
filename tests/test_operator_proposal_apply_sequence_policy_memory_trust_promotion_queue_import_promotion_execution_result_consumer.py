@@ -133,7 +133,7 @@ def _execution_payload(prior_consumer, *, rows=None, status="applied"):
             "requires_gate_ready": True,
             "uses_existing_apply_operator_proposal": True,
             "live_apply_entrypoint": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "live_write": True,
             "direct_live_write": False,
             "apply_attempted": True,

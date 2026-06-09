@@ -724,7 +724,7 @@ def test_snapshot_is_read_only_and_fail_closed_for_live_widening():
         "read_only": True,
         "live_write": False,
         "live_widening_allowed": False,
-        "current_proven_live_write_kinds": ["fader", "gain"],
+        "current_proven_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
     }
     assert "deessing" not in snapshot["summary"]["missing_capability_ids"]
     assert "mode_full_autonomous" in snapshot["summary"]["blocked_live_capability_ids"]

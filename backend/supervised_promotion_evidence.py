@@ -27,6 +27,7 @@ PROMOTION_VALUE_TYPES = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 SAFETY_ROW_BY_VALUE_TYPE = {
     "fader": "fader_supervised",
     "gain": "gain_supervised",
+    "pan": "pan_phase_delay",
 }
 DEFAULT_MIN_PHYSICAL_CANDIDATES = {value_type: 1 for value_type in PROMOTION_VALUE_TYPES}
 
@@ -104,6 +105,11 @@ def _next_evidence_for(value_type: str, *, has_physical_candidate: bool) -> Tupl
         return (
             "Run one small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and emergency-stop block evidence.",
             "Keep gain-up blocked unless the operator authored the reason and headroom/bleed safety is proven.",
+        )
+    if value_type == "pan":
+        return (
+            "Run one controlled supervised pan-space proof with physical pre-read, apply readback, and rollback evidence across representative channels.",
+            "Keep phase/delay related pan transforms proposal-only until proposal-level proof and stereo safety are established.",
         )
     return (
         "Run repeated controlled fader proofs across representative channels with connection-loss and emergency-stop reset evidence.",

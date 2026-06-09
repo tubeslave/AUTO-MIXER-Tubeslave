@@ -77,7 +77,7 @@ def _preflight_result(proposal_id, *, prefix, ready=True):
             "proposal_status_mutation": False,
             "idempotency_reserved": False,
             "manual_console_write_called": False,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "live_apply_entrypoint": "apply_operator_proposal",
         },
     }

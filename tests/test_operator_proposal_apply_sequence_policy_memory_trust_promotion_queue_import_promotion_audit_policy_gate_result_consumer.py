@@ -111,7 +111,7 @@ def _policy_gate_payload(prior_consumer, *, rows=None, blocked=None, status="rea
             "audit_payload_required": True,
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "execution_allowed_by_policy_gate": False,
             "execution_allowed_by_audit": False,
             "live_write": False,

@@ -188,7 +188,7 @@ def test_pipeline_runtime_summary_prefers_manual_approved_live_write_kinds():
     operator_mode = {
         "mode": "supervised",
         "capabilities": {
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "can_apply_to_console": True,
         },
     }
@@ -221,12 +221,12 @@ def test_pipeline_runtime_summary_prefers_manual_approved_live_write_kinds():
 def test_pipeline_runtime_summary_falls_back_to_supervised_mode_live_write_kinds():
     operator_mode = {
         "mode": "supervised",
-        "capabilities": {"allowed_live_write_kinds": ["fader", "gain"], "can_apply_to_console": True},
+        "capabilities": {"allowed_live_write_kinds": ["fader", "gain", "pan"], "can_apply_to_console": True},
     }
 
     runtime = build_pipeline_runtime_summary(operator_mode, {})
 
-    assert runtime["allowed_live_write_kinds"] == ["fader", "gain", "mute"]
+    assert runtime["allowed_live_write_kinds"] == ["fader", "gain", "pan", "mute"]
 
 
 def test_pipeline_runtime_summary_shows_no_live_write_kinds_in_assisted_mode_without_manual_override():
@@ -599,10 +599,11 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["autonomy_mode_transition_gate"]["summary"]["supervised_current_live_write_kinds"] == [
         "fader",
         "gain",
+        "pan",
     ]
     assert snapshot["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_surfaces"
-    ] == ["preamp", "trim", "fader"]
+    ] == ["preamp", "trim", "fader", "pan"]
     assert "auto" in snapshot["autonomy_mode_transition_gate"]["summary"]["blocked_modes"]
     assert "deessing" not in snapshot["project_goal_capability_matrix"]["summary"][
         "missing_capability_ids"

@@ -1497,7 +1497,7 @@ def test_operator_agent_roster_marks_executor_ready_only_for_supervised_connecte
     assert roster["summary"]["can_live_execute"] is True
     assert executor["status"] == "ACTIVE"
     assert executor["can_write"] is True
-    assert executor["write_scope"] == ["fader", "gain"]
+    assert executor["write_scope"] == ["fader", "gain", "pan"]
 
 
 def _walk_keys(value):
@@ -1817,7 +1817,7 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert payload["type"] == "processing_pipeline_snapshot"
     assert payload["runtime"]["main_pipeline_id"] == "main_live_assist"
     assert payload["summary"]["live_executor_method_ids"] == ["supervised_manual_fader_gain"]
-    assert payload["summary"]["live_allowed_write_kinds"] == ["fader", "gain"]
+    assert payload["summary"]["live_allowed_write_kinds"] == ["fader", "gain", "pan"]
     goal_matrix = payload["project_goal_capability_matrix"]
     assert goal_matrix["type"] == "project_goal_capability_matrix"
     assert goal_matrix["safety"]["live_write"] is False
@@ -1851,7 +1851,11 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert module_map["product_operator_state"]["ui_surface"].startswith("Control Center")
     assert module_map["supervised_manual_fader_gain"]["entrypoint"] == "apply_operator_proposal -> supervised manual gate"
     assert module_map["supervised_manual_fader_gain"]["can_write_live"] is True
-    assert module_map["supervised_manual_fader_gain"]["live_write_kinds"] == ["fader", "gain"]
+    assert module_map["supervised_manual_fader_gain"]["live_write_kinds"] == [
+        "fader",
+        "gain",
+        "pan",
+    ]
     assert module_map["auto_eq"]["can_write_live"] is False
     assert module_map["auto_eq"]["next_step"].startswith("proposal_adapter") or "ADR" in module_map["auto_eq"]["next_step"]
     assert module_map["automixer_production_mix_v1"]["entrypoint"] == "none in this checkout"
@@ -1899,7 +1903,10 @@ def proof_report_with_autonomy_overlay(report_status="ok"):
                 "manual_safety_review_candidate_target_ids": [],
                 "remediation_required_target_ids": [],
                 "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
-                "no_current_evidence_target_ids": ["fader_supervised_promotion"],
+                "no_current_evidence_target_ids": [
+                    "fader_supervised_promotion",
+                    "pan_phase_supervised_promotion",
+                ],
                 "autonomous_ready_target_ids": ["gain_trim_supervised_promotion"],
                 "global_blockers": ["source_only_blocker"],
             },
@@ -5218,7 +5225,11 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert payload["executor_policy"]["preview_only"] is True
     assert payload["executor_policy"]["queue_mutation"] is False
     assert payload["executor_policy"]["live_write"] is False
-    assert payload["executor_policy"]["allowed_requested_change_value_types"] == ["fader", "gain"]
+    assert payload["executor_policy"]["allowed_requested_change_value_types"] == [
+        "fader",
+        "gain",
+        "pan",
+    ]
     assert payload["summary"]["proposal_count"] == 2
     goal_progress = payload["registry"][
         "project_goal_capability_progress_snapshot"
@@ -5266,13 +5277,13 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     ]
     assert main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_kinds"
-    ] == ["fader", "gain"]
+    ] == ["fader", "gain", "pan"]
     assert main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_surfaces"
-    ] == ["preamp", "trim", "fader"]
+    ] == ["preamp", "trim", "fader", "pan"]
     assert payload["summary"][
         "autonomy_mode_transition_gate_supervised_current_live_write_surfaces"
-    ] == ["preamp", "trim", "fader"]
+    ] == ["preamp", "trim", "fader", "pan"]
     assert (
         payload["summary"]["autonomy_mode_transition_gate_mode_count"]
         == len(main_pipeline_registry["autonomy_mode_transition_gate"]["rows"])
@@ -5384,7 +5395,11 @@ def test_main_pipeline_preview_exposes_non_fader_gain_proposal_contracts(server)
         assert contract["proposal_contract"]["live_apply_allowed"] is False
         assert contract["proposal_contract"]["readback_required"] is True
         assert contract["proposal_contract"]["rollback_required"] is True
-        assert contract["proposal_contract"]["allowed_live_write_kinds"] == ["fader", "gain"]
+        assert contract["proposal_contract"]["allowed_live_write_kinds"] == [
+            "fader",
+            "gain",
+            "pan",
+        ]
         assert f"unsupported_value_type:{value_type}" in contract["blockers"]
         assert "requested_change" not in contract
 
@@ -8407,7 +8422,7 @@ async def test_preflight_operator_proposal_apply_blocks_unsupported_kind_without
     assert payload["status"] == "blocked"
     assert payload["reason"] == "unsupported_value_type"
     assert payload["value_type"] == "eq"
-    assert payload["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert payload["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
     assert payload["safety"]["live_write"] is False
     assert payload["safety"]["apply_attempted"] is False
     assert build_decision_queue(server)["summary"]["pending_count"] == 1
@@ -8597,7 +8612,7 @@ async def test_plan_operator_proposal_apply_sequence_builds_read_only_plan_from_
         "queries_console": False,
         "live_widening_allowed": False,
         "live_apply_entrypoint": "apply_operator_proposal",
-        "allowed_live_write_kinds": ["fader", "gain"],
+        "allowed_live_write_kinds": ["fader", "gain", "pan"],
     }
     step = payload["planned_apply_sequence"][0]
     assert step["planned_apply_index"] == 0
@@ -8936,7 +8951,7 @@ async def test_dry_run_operator_proposal_apply_sequence_reports_would_apply_with
         "queries_console": False,
         "live_widening_allowed": False,
         "live_apply_entrypoint": "apply_operator_proposal",
-        "allowed_live_write_kinds": ["fader", "gain"],
+        "allowed_live_write_kinds": ["fader", "gain", "pan"],
     }
     result = payload["dry_run_results"][0]
     assert result["status"] == "would_apply"
@@ -9232,7 +9247,7 @@ async def test_gate_operator_proposal_apply_sequence_execution_reports_ready_wit
         "queries_console": False,
         "live_widening_allowed": False,
         "live_apply_entrypoint": "apply_operator_proposal",
-        "allowed_live_write_kinds": ["fader", "gain"],
+        "allowed_live_write_kinds": ["fader", "gain", "pan"],
     }
     candidate = payload["ready_for_executor"][0]
     assert candidate["status"] == "ready_for_executor"
@@ -9440,7 +9455,7 @@ async def test_execute_operator_proposal_apply_sequence_applies_gate_ready_row_v
     assert payload["summary"]["stopped_on_block"] is False
     assert payload["safety"]["sequence_executor"] is True
     assert payload["safety"]["uses_existing_apply_operator_proposal"] is True
-    assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
     assert payload["safety"]["direct_live_write"] is False
     assert payload["safety"]["queue_mutation_by_executor_directly"] is False
     assert payload["safety"]["idempotency_reserved_by_executor_directly"] is False
@@ -9617,7 +9632,7 @@ async def test_execute_operator_proposal_apply_sequence_blocks_forged_unsupporte
     assert payload["summary"]["idempotency_reserved"] is False
     assert payload["summary"]["manual_console_write_called_by_sequence_executor"] is False
     assert payload["summary"]["manual_console_write_called_by_apply_operator_proposal"] is False
-    assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
     assert payload["safety"]["direct_manual_console_write_called"] is False
     assert payload["blocked_results"][0]["proposal_id"] == "execute-forged-eq"
     assert payload["blocked_results"][0]["reason"] == (
@@ -9713,7 +9728,7 @@ async def test_audit_operator_proposal_apply_sequence_execution_passes_verified_
         "does_not_call_apply_operator_proposal": True,
         "does_not_call_manual_console_write": True,
         "live_apply_entrypoint_required": "apply_operator_proposal",
-        "allowed_live_write_kinds": ["fader", "gain"],
+        "allowed_live_write_kinds": ["fader", "gain", "pan"],
         "execution_allowed_by_audit": False,
         "live_write": False,
         "apply_attempted": False,
@@ -9914,7 +9929,7 @@ async def test_gate_operator_proposal_apply_sequence_audit_policy_marks_passed_a
         "audit_payload_required": True,
         "does_not_call_apply_operator_proposal": True,
         "does_not_call_manual_console_write": True,
-        "allowed_live_write_kinds": ["fader", "gain"],
+        "allowed_live_write_kinds": ["fader", "gain", "pan"],
         "execution_allowed_by_policy_gate": False,
         "execution_allowed_by_audit": False,
         "live_write": False,
@@ -10138,7 +10153,7 @@ async def test_draft_operator_proposal_apply_sequence_policy_memory_creates_read
         "policy_gate_payload_required": True,
         "does_not_call_apply_operator_proposal": True,
         "does_not_call_manual_console_write": True,
-        "allowed_live_write_kinds": ["fader", "gain"],
+        "allowed_live_write_kinds": ["fader", "gain", "pan"],
         "append_only_memory_write_allowed_by_draft": False,
         "requires_separate_memory_writer": True,
         "execution_allowed_by_draft": False,
@@ -10839,6 +10854,7 @@ def test_build_safety_monitor_falls_back_to_allowed_live_write_kinds_when_manual
     assert monitor["live_write_policy"]["approved_live_write_kinds"] == [
         "fader",
         "gain",
+        "pan",
         "mute",
     ]
 
@@ -10869,7 +10885,11 @@ def test_build_safety_monitor_falls_back_to_auto_live_kinds_when_manual_status_m
 
     monitor = build_safety_monitor(server)
 
-    assert monitor["live_write_policy"]["approved_live_write_kinds"] == ["fader", "gain"]
+    assert monitor["live_write_policy"]["approved_live_write_kinds"] == [
+        "fader",
+        "gain",
+        "pan",
+    ]
 
 
 def test_build_safety_monitor_prefers_manual_approved_live_write_kinds_and_filters_unsupported_values(server):
@@ -15677,7 +15697,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
             "requires_gate_ready": True,
             "uses_existing_apply_operator_proposal": True,
             "live_apply_entrypoint": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "live_write": True,
             "direct_live_write": False,
             "apply_attempted": True,
@@ -15826,7 +15846,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
             "live_apply_entrypoint_required": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "execution_allowed_by_audit": False,
             "live_write": False,
             "apply_attempted": False,
@@ -15958,7 +15978,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
             "audit_payload_required": True,
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "execution_allowed_by_policy_gate": False,
             "execution_allowed_by_audit": False,
             "live_write": False,
@@ -16104,7 +16124,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
             "policy_gate_payload_required": True,
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "append_only_memory_write_allowed_by_draft": False,
             "requires_separate_memory_writer": True,
             "execution_allowed_by_draft": False,
@@ -16282,7 +16302,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
             "target_memory_path": ".ai/memory/project.md",
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "live_write": False,
             "apply_attempted": False,
             "queue_mutation": False,
@@ -16434,7 +16454,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
             "target_memory_path": ".ai/memory/project.md",
             "does_not_call_apply_operator_proposal": True,
             "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain"],
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
             "live_write": False,
             "apply_attempted": False,
             "queue_mutation": False,

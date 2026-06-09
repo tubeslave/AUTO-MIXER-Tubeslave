@@ -231,11 +231,11 @@ def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy(
     assert current_supervised_live_write_kinds() == tuple(
         policy_status["capabilities"]["allowed_live_write_kinds"]
     )
-    assert current_supervised_live_write_kinds() == ("fader", "gain")
+    assert current_supervised_live_write_kinds() == ("fader", "gain", "pan")
     assert current_supervised_live_write_surfaces() == tuple(
         policy_status["capabilities"]["allowed_live_write_surfaces"]
     )
-    assert current_supervised_live_write_surfaces() == ("preamp", "trim", "fader")
+    assert current_supervised_live_write_surfaces() == ("preamp", "trim", "fader", "pan")
 
 
 def test_no_wing_release_check_validates_read_surface_fixture_evidence_snapshot():
@@ -4758,8 +4758,8 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         "Add fresh mute-state intent and physical proof before promotion.",
                     ],
                 },
-                "supervised_current_live_write_kinds": ["fader", "gain"],
-                "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
+                "supervised_current_live_write_kinds": ["fader", "gain", "pan"],
+                "supervised_current_live_write_surfaces": ["preamp", "trim", "fader", "pan"],
                 "next_required_evidence": [
                     "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
                     "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists.",
@@ -4810,17 +4810,20 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "operator_required": True,
             },
             "summary": {
-                "target_count": 2,
+                "target_count": 3,
                 "status_counts": {
                     "dry_run_only": 1,
                     "manual_safety_review_candidate": 0,
-                    "no_current_evidence": 1,
+                    "no_current_evidence": 2,
                     "remediation_required": 0,
                 },
                 "manual_safety_review_candidate_target_ids": [],
                 "remediation_required_target_ids": [],
                 "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
-                "no_current_evidence_target_ids": ["fader_supervised_promotion"],
+                "no_current_evidence_target_ids": [
+                    "fader_supervised_promotion",
+                    "pan_phase_supervised_promotion",
+                ],
                 "autonomous_ready_target_ids": [],
                 "global_blockers": [
                     "overlay_does_not_modify_safety_rows",
@@ -4868,6 +4871,26 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "remediation_action_ids": [],
                     "blockers": ["physical_proof_required_for_promotion"],
                     "next_required_actions": ["Run one small supervised gain proof on WING."],
+                },
+                {
+                    "id": "pan_autonomy_evidence_overlay",
+                    "target_id": "pan_phase_supervised_promotion",
+                    "value_type": "pan",
+                    "status": "no_current_evidence",
+                    "safety_review_candidate": False,
+                    "supervised_live_allowed_static": False,
+                    "autonomous_ready": False,
+                    "proof_artifact_count": 0,
+                    "physical_candidate_count": 0,
+                    "dry_run_ready_count": 0,
+                    "blocked_artifact_count": 0,
+                    "remediation_action_count": 0,
+                    "physical_candidate_proof_ids": [],
+                    "dry_run_ready_proof_ids": [],
+                    "blocked_proof_ids": [],
+                    "remediation_action_ids": [],
+                    "blockers": ["proof_artifact_missing"],
+                    "next_required_actions": ["Run one physical supervised pan proof."],
                 },
             ],
         },
@@ -5024,17 +5047,19 @@ def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path
         "hardware_readback_rollback_and_emergency_proof",
     ]
     assert "bus_group_matrix" in result.detail["next_required_evidence_by_action_family"]
-    assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain"]
+    assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain", "pan"]
     assert result.detail["supervised_current_live_write_surfaces"] == [
         "preamp",
         "trim",
         "fader",
+        "pan",
     ]
-    assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain"]
+    assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain", "pan"]
     assert result.detail["policy_supervised_live_write_surfaces"] == [
         "preamp",
         "trim",
         "fader",
+        "pan",
     ]
 
 
@@ -5058,9 +5083,12 @@ def test_no_wing_release_check_validates_autonomy_evidence_overlay_schema(tmp_pa
 
     assert result.status == "passed"
     assert result.detail["overlay_status"] == "dry_run_only"
-    assert result.detail["row_count"] == 2
+    assert result.detail["row_count"] == 3
     assert result.detail["dry_run_only_target_ids"] == ["gain_trim_supervised_promotion"]
-    assert result.detail["no_current_evidence_target_ids"] == ["fader_supervised_promotion"]
+    assert result.detail["no_current_evidence_target_ids"] == [
+        "fader_supervised_promotion",
+        "pan_phase_supervised_promotion",
+    ]
     assert result.detail["violations"] == []
 
 
@@ -5437,7 +5465,7 @@ def test_no_wing_release_check_rejects_autonomy_overlay_summary_row_drift(tmp_pa
     report_path = tmp_path / "supervised_proof_artifact_report.json"
     payload = valid_proof_report_with_gap_rollup()
     overlay = payload["autonomy_evidence_overlay"]
-    overlay["summary"]["target_count"] = 3
+    overlay["summary"]["target_count"] = 4
     overlay["summary"]["status_counts"]["dry_run_only"] = 2
     overlay["summary"]["dry_run_only_target_ids"] = [
         "gain_trim_supervised_promotion",
@@ -6396,10 +6424,10 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
                 "bus_group_matrix": ["Add bus/group/matrix safety review before promotion."],
                 "mute": ["Add fresh mute-state intent before promotion."],
             },
-            "supervised_current_live_write_kinds": ["fader", "gain"],
-            "policy_supervised_live_write_kinds": ["fader", "gain"],
-            "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
-            "policy_supervised_live_write_surfaces": ["preamp", "trim", "fader"],
+            "supervised_current_live_write_kinds": ["fader", "gain", "pan"],
+            "policy_supervised_live_write_kinds": ["fader", "gain", "pan"],
+            "supervised_current_live_write_surfaces": ["preamp", "trim", "fader", "pan"],
+            "policy_supervised_live_write_surfaces": ["preamp", "trim", "fader", "pan"],
             "unexpected_supervised_live_write_surfaces": [],
             "unexpected_supervised_live_write_kinds": [],
             "violations": [],
@@ -6433,9 +6461,18 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert "evidence_requirement_ids_by_action_family" in markdown_summary
     assert "bus_group_assignment_cache_freshness" in markdown_summary
     assert "next_required_evidence_by_action_family" in markdown_summary
-    assert 'supervised_current_live_write_kinds: `["fader", "gain"]`' in markdown_summary
-    assert 'supervised_current_live_write_surfaces: `["preamp", "trim", "fader"]`' in markdown_summary
-    assert 'policy_supervised_live_write_surfaces: `["preamp", "trim", "fader"]`' in markdown_summary
+    assert (
+        'supervised_current_live_write_kinds: `["fader", "gain", "pan"]`'
+        in markdown_summary
+    )
+    assert (
+        'supervised_current_live_write_surfaces: `["preamp", "trim", "fader", "pan"]`'
+        in markdown_summary
+    )
+    assert (
+        'policy_supervised_live_write_surfaces: `["preamp", "trim", "fader", "pan"]`'
+        in markdown_summary
+    )
 
 
 def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):
@@ -6475,17 +6512,20 @@ def test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay(tmp_path
         duration_sec=1.0,
         detail={
             "overlay_status": "dry_run_only",
-            "row_count": 2,
+            "row_count": 3,
             "status_counts": {
                 "dry_run_only": 1,
                 "manual_safety_review_candidate": 0,
-                "no_current_evidence": 1,
+                "no_current_evidence": 2,
                 "remediation_required": 0,
             },
             "manual_safety_review_candidate_target_ids": [],
             "remediation_required_target_ids": [],
             "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
-            "no_current_evidence_target_ids": ["fader_supervised_promotion"],
+            "no_current_evidence_target_ids": [
+                "fader_supervised_promotion",
+                "pan_phase_supervised_promotion",
+            ],
             "global_blockers": [
                 "overlay_does_not_modify_safety_rows",
                 "manual_safety_review_required_before_promotion",
