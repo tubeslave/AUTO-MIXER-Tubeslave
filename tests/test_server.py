@@ -2561,6 +2561,26 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_get_state_returns_unavailable_state_without_mixer_client(self, minimal_server):
+        server = minimal_server
+        server.connection_mode = "wing"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["get_state"](
+            websocket,
+            {},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "state_update"
+        assert payload["mode"] == "wing"
+        assert payload["state"] == {}
+        assert payload["status"] == "state_unavailable"
+        assert payload["reason"] == "mixer_client_state_source_unavailable"
+
+    @pytest.mark.asyncio
     async def test_query_mixer_parameter_reads_mute_without_writing(self, dummy_wing_server):
         server = dummy_wing_server
         server.mixer_client.state = {}

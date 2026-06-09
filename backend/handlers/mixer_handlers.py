@@ -207,12 +207,26 @@ def register_handlers(server):
         await server.send_to_client(websocket, {"type": result_type, **result})
 
     async def handle_get_state(websocket, data):
-        if server.mixer_client:
-            await server.send_to_client(websocket, {
+        state_getter = getattr(server.mixer_client, "get_state", None)
+        if callable(state_getter):
+            payload = {
                 "type": "state_update",
                 "mode": server.connection_mode,
-                "state": server.mixer_client.get_state()
-            })
+                "state": state_getter(),
+            }
+            await server.send_to_client(websocket, payload)
+            return
+
+        await server.send_to_client(
+            websocket,
+            {
+                "type": "state_update",
+                "mode": server.connection_mode,
+                "state": {},
+                "status": "state_unavailable",
+                "reason": "mixer_client_state_source_unavailable",
+            },
+        )
 
     async def handle_query_mixer_parameter(websocket, data):
         channel, value_type, address, error = _parse_readonly_parameter_request(server, data)
