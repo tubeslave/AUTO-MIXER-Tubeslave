@@ -18,6 +18,15 @@ def _normalize_str_list(raw_value: Any) -> List[str]:
     return []
 
 
+def normalize_goal_capability_readiness_goal_area_priorities(
+    raw_priorities: Any,
+) -> List[Any]:
+    """Normalize list-like goal area priority rows for reliable UI snapshots."""
+    if isinstance(raw_priorities, tuple):
+        raw_priorities = list(raw_priorities)
+    return list(raw_priorities) if isinstance(raw_priorities, list) else []
+
+
 def normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
     """Normalize objective readiness metrics by goal area.
 

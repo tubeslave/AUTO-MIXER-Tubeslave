@@ -42,11 +42,13 @@ try:
     from goal_capability_readiness_normalization import (
         normalize_goal_capability_readiness_hotspots,
         normalize_goal_capability_readiness_rows,
+        normalize_goal_capability_readiness_goal_area_priorities,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.goal_capability_readiness_normalization import (
         normalize_goal_capability_readiness_hotspots,
         normalize_goal_capability_readiness_rows,
+        normalize_goal_capability_readiness_goal_area_priorities,
     )
 try:
     from operator_mode_policy import normalize_manual_live_write_kinds
@@ -242,6 +244,10 @@ def _bounded_int_value(value: Any, *, default: int, minimum: int, maximum: int) 
 
 def _normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
     return normalize_goal_capability_readiness_rows(raw_rows)
+
+
+def _normalize_goal_capability_readiness_goal_area_priorities(raw_priorities: Any) -> list[Any]:
+    return normalize_goal_capability_readiness_goal_area_priorities(raw_priorities)
 
 
 def _normalize_goal_capability_readiness_hotspots(raw_rows: Any) -> list[Dict[str, Any]]:
@@ -3961,13 +3967,8 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
                 "autonomy_readiness_gap_row_count": int(
                     objective_summary.get("autonomy_readiness_gap_row_count", 0) or 0
                 ),
-                "project_goal_capability_objective_readiness_goal_area_priorities": list(
+                "project_goal_capability_objective_readiness_goal_area_priorities": _normalize_goal_capability_readiness_goal_area_priorities(
                     objective_summary.get("autonomy_readiness_goal_area_priorities", [])
-                    if isinstance(
-                        objective_summary.get("autonomy_readiness_goal_area_priorities"),
-                        list,
-                    )
-                    else []
                 ),
                 "project_goal_capability_objective_readiness_by_goal_area": _normalize_goal_capability_readiness_rows(
                     objective_progress_summary.get(
@@ -7223,18 +7224,11 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
                 goal_capability_objective_alignment_summary.get("autonomy_readiness_score", 0)
                 or 0
             ),
-            "project_goal_capability_objective_readiness_goal_area_priorities": list(
+            "project_goal_capability_objective_readiness_goal_area_priorities": _normalize_goal_capability_readiness_goal_area_priorities(
                 goal_capability_objective_alignment_summary.get(
                     "autonomy_readiness_goal_area_priorities",
                     [],
                 )
-                if isinstance(
-                    goal_capability_objective_alignment_summary.get(
-                        "autonomy_readiness_goal_area_priorities"
-                    ),
-                    list,
-                )
-                else []
             ),
             "project_goal_capability_objective_readiness_by_goal_area": dict(
                 normalized_goal_area_readiness

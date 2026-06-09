@@ -16,6 +16,7 @@ try:
         build_channel_inventory,
         _normalize_goal_capability_readiness_hotspots,
         _normalize_goal_capability_readiness_rows,
+        _normalize_goal_capability_readiness_goal_area_priorities,
     )
     from operator_recommendation_bridge import build_safe_gain_operator_proposals
     from processing_proposal_adapters import (
@@ -153,7 +154,12 @@ except ImportError:  # pragma: no cover - package import compatibility
         feature_snapshot_from_channel_inventory,
     )
     from backend.operator_analysis import build_operator_analysis_report
-    from backend.operator_product_state import build_channel_inventory
+    from backend.operator_product_state import (
+        build_channel_inventory,
+        _normalize_goal_capability_readiness_goal_area_priorities,
+        _normalize_goal_capability_readiness_hotspots,
+        _normalize_goal_capability_readiness_rows,
+    )
     from backend.operator_recommendation_bridge import build_safe_gain_operator_proposals
     from backend.processing_proposal_adapters import (
         MAIN_PIPELINE_ID,
@@ -1349,18 +1355,11 @@ def build_main_pipeline_preview(
                 )
                 or 0
             ),
-            "project_goal_capability_objective_readiness_goal_area_priorities": list(
+            "project_goal_capability_objective_readiness_goal_area_priorities": _normalize_goal_capability_readiness_goal_area_priorities(
                 project_goal_capability_objective_alignment_summary.get(
                     "autonomy_readiness_goal_area_priorities",
                     [],
                 )
-                if isinstance(
-                    project_goal_capability_objective_alignment_summary.get(
-                        "autonomy_readiness_goal_area_priorities"
-                    ),
-                    list,
-                )
-                else []
             ),
             "project_goal_capability_objective_readiness_by_goal_area": _normalize_goal_capability_readiness_rows(
                 project_goal_capability_objective_alignment_summary.get(

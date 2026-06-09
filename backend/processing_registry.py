@@ -63,6 +63,7 @@ try:
     from goal_capability_readiness_normalization import (
         normalize_goal_capability_readiness_hotspots,
         normalize_goal_capability_readiness_rows,
+        normalize_goal_capability_readiness_goal_area_priorities,
     )
     from read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from read_surface_inventory import build_read_surface_inventory_snapshot
@@ -384,6 +385,7 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.goal_capability_readiness_normalization import (
         normalize_goal_capability_readiness_hotspots,
         normalize_goal_capability_readiness_rows,
+        normalize_goal_capability_readiness_goal_area_priorities,
     )
     from backend.read_surface_fixture_evidence import build_read_surface_fixture_evidence_snapshot
     from backend.read_surface_inventory import build_read_surface_inventory_snapshot
@@ -6526,6 +6528,10 @@ def _normalize_goal_capability_readiness_rows(raw_rows: Any) -> Dict[str, Any]:
     return normalize_goal_capability_readiness_rows(raw_rows)
 
 
+def _normalize_goal_capability_readiness_goal_area_priorities(raw_priorities: Any) -> list[Any]:
+    return normalize_goal_capability_readiness_goal_area_priorities(raw_priorities)
+
+
 def _normalize_goal_capability_readiness_hotspots(raw_rows: Any) -> list[Dict[str, Any]]:
     return normalize_goal_capability_readiness_hotspots(raw_rows)
 
@@ -6638,15 +6644,11 @@ def build_processing_registry_snapshot(
             "project_goal_capability_objective_readiness_gap_row_count": int(
                 objective_alignment_summary.get("autonomy_readiness_gap_row_count", 0) or 0
             ),
-            "project_goal_capability_objective_readiness_goal_area_priorities": list(
+            "project_goal_capability_objective_readiness_goal_area_priorities": _normalize_goal_capability_readiness_goal_area_priorities(
                 objective_alignment_summary.get(
-                    "autonomy_readiness_goal_area_priorities", []
+                    "autonomy_readiness_goal_area_priorities",
+                    [],
                 )
-                if isinstance(
-                    objective_alignment_summary.get("autonomy_readiness_goal_area_priorities"),
-                    list,
-                )
-                else []
             ),
             "project_goal_capability_objective_readiness_by_goal_area": _normalize_goal_capability_readiness_rows(
                 objective_alignment_summary.get(

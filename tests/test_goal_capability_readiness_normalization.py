@@ -3,6 +3,7 @@
 from backend.goal_capability_readiness_normalization import (
     normalize_goal_capability_readiness_hotspots,
     normalize_goal_capability_readiness_rows,
+    normalize_goal_capability_readiness_goal_area_priorities,
 )
 
 
@@ -78,3 +79,15 @@ def test_normalize_goal_capability_readiness_hotspots_converts_and_skips_empty()
 
 def test_normalize_goal_capability_readiness_hotspots_invalid_input():
     assert normalize_goal_capability_readiness_hotspots("bad") == []
+
+
+def test_normalize_goal_capability_readiness_goal_area_priorities_coerces_tuple_lists():
+    assert normalize_goal_capability_readiness_goal_area_priorities(("eq", "gain")) == [
+        "eq",
+        "gain",
+    ]
+    assert normalize_goal_capability_readiness_goal_area_priorities(("eq", {"goal_area": "gain"})) == [
+        "eq",
+        {"goal_area": "gain"},
+    ]
+    assert normalize_goal_capability_readiness_goal_area_priorities("bad") == []

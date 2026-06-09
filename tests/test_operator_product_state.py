@@ -5675,7 +5675,7 @@ def test_main_pipeline_preview_normalizes_goal_capability_readiness_payload(serv
         payload["summary"][
             "project_goal_capability_objective_readiness_goal_area_priorities"
         ]
-        == []
+        == ["eq", "gain"]
     )
     assert payload["summary"][
         "project_goal_capability_objective_readiness_by_goal_area"

@@ -842,7 +842,7 @@ def test_registry_snapshot_normalizes_goal_capability_readiness_payload():
         snapshot["summary"][
             "project_goal_capability_objective_readiness_goal_area_priorities"
         ]
-        == []
+        == ["eq", "input_gain"]
     )
     assert snapshot["summary"][
         "project_goal_capability_objective_readiness_by_goal_area"
