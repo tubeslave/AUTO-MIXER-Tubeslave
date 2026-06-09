@@ -979,6 +979,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   const objectiveAlignmentSummary = asRecord(objectiveAlignmentSnapshot.summary);
   const missingObjectiveRows = stringList(objectiveAlignmentSummary.missing_rows);
   const blockedLiveRows = stringList(objectiveAlignmentSummary.blocked_live_rows);
+  const currentlyLiveWritableRows = stringList(objectiveAlignmentSummary.currently_live_writable_rows);
   const objectiveAlignmentRows: ModuleStatusRecord[] = Object.keys(objectiveAlignmentSummary).length
     ? [{
       moduleId: 'project_goal_capability_objective_alignment_summary',
@@ -999,6 +1000,8 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         `currently_live_writable:${Math.trunc(num(objectiveAlignmentSummary.currently_live_writable_row_count, 0))}`,
         `supervised_candidates:${Math.trunc(num(objectiveAlignmentSummary.supervised_candidate_row_count, 0))}`,
         `blocked_live_count:${blockedLiveRows.length}`,
+        `missing_row_ids:${missingObjectiveRows.slice(0, 4).join(',')}`,
+        `currently_live_writable_ids:${currentlyLiveWritableRows.slice(0, 4).join(',')}`,
         `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
       ].filter((entry) => entry),
       blockedReason: missingObjectiveRows.length
@@ -1006,7 +1009,11 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         : blockedLiveRows.length
           ? `Blocked-live objective capabilities: ${blockedLiveRows.join(', ')}`
         : 'Objective alignment summary is currently complete.',
-      nextStep: `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
+      nextStep: [
+        `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
+        `missing_rows:${missingObjectiveRows.slice(0, 4).join(',')}`,
+        `blocked_live_rows:${blockedLiveRows.slice(0, 4).join(',')}`,
+      ].filter((entry) => entry).join(' / ') || `full_autonomous_status:${str(objectiveAlignmentSummary.full_autonomous_status, 'blocked')}`,
       tone: missingObjectiveRows.length
         ? 'red'
         : blockedLiveRows.length

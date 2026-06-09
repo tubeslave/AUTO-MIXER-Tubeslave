@@ -3565,10 +3565,14 @@ test('adaptModuleStatusRecords surfaces project goal capability matrix and progr
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('blocked_live_rows:1'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('currently_live_writable:0'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('supervised_candidates:1'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('missing_row_ids:cg_room_mics'), true);
+  assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('currently_live_writable_ids:'), true);
   assert.equal(objectiveAlignmentSummary?.pipelineProfiles.includes('full_autonomous_status:blocked_live'), true);
   assert.equal(objectiveAlignmentSummary?.blockedReason?.includes('Missing objective capabilities: cg_room_mics'), true);
   assert.equal(objectiveAlignmentSummary?.tone, 'red');
-  assert.equal(objectiveAlignmentSummary?.nextStep, 'full_autonomous_status:blocked_live');
+  assert.equal(objectiveAlignmentSummary?.nextStep.includes('full_autonomous_status:blocked_live'), true);
+  assert.equal(objectiveAlignmentSummary?.nextStep.includes('missing_rows:cg_room_mics'), true);
+  assert.equal(objectiveAlignmentSummary?.nextStep.includes('blocked_live_rows:cg_room_mic_eq'), true);
 });
 
 test('Settings bottom section grid has one column per read-only section card', async () => {
