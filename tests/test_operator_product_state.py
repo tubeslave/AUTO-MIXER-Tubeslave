@@ -1800,10 +1800,14 @@ def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
 
     snapshot = server._dispatch  # keep handler registration intact
     from backend.project_goal_capability_matrix import build_project_goal_objective_alignment_snapshot
+    from backend.project_goal_capability_matrix import (
+        build_project_goal_capability_progress_snapshot,
+    )
     from backend.operator_product_state import build_dashboard_snapshot
 
     payload = build_dashboard_snapshot(server)
     alignment_snapshot = build_project_goal_objective_alignment_snapshot()
+    progress_snapshot = build_project_goal_capability_progress_snapshot()
 
     assert snapshot
     assert payload["type"] == "dashboard_snapshot"
@@ -1860,6 +1864,28 @@ def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
             "autonomy_readiness_gap_row_count"
         ]
         == alignment_snapshot["summary"]["autonomy_readiness_gap_row_count"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "project_goal_capability_objective_readiness_goal_area_priorities"
+        ]
+        == alignment_snapshot["summary"]["autonomy_readiness_goal_area_priorities"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "project_goal_capability_objective_readiness_by_goal_area"
+        ]
+        == progress_snapshot["summary"][
+            "project_goal_objective_autonomy_readiness_by_goal_area"
+        ]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "project_goal_capability_objective_readiness_hotspots"
+        ]
+        == progress_snapshot["summary"][
+            "project_goal_objective_autonomy_readiness_hotspots"
+        ]
     )
     assert (
         payload["runtime"]["goal_capability_objective_alignment"][

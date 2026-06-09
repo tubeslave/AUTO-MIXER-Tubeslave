@@ -31,10 +31,12 @@ except ImportError:  # pragma: no cover - package import compatibility
 try:
     from project_goal_capability_matrix import (
         build_project_goal_objective_alignment_snapshot,
+        build_project_goal_capability_progress_snapshot,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.project_goal_capability_matrix import (
         build_project_goal_objective_alignment_snapshot,
+        build_project_goal_capability_progress_snapshot,
     )
 try:
     from operator_mode_policy import normalize_manual_live_write_kinds
@@ -3896,7 +3898,9 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
     )
     processing_runtime = build_pipeline_runtime_summary(operator_mode, manual_write_supervision)
     objective_alignment_snapshot = build_project_goal_objective_alignment_snapshot()
+    objective_progress_snapshot = build_project_goal_capability_progress_snapshot()
     objective_summary = objective_alignment_snapshot.get("summary", {})
+    objective_progress_summary = objective_progress_snapshot.get("summary", {})
 
     return {
         "type": "dashboard_snapshot",
@@ -3938,6 +3942,28 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
                 ),
                 "autonomy_readiness_gap_row_count": int(
                     objective_summary.get("autonomy_readiness_gap_row_count", 0) or 0
+                ),
+                "project_goal_capability_objective_readiness_goal_area_priorities": list(
+                    objective_summary.get("autonomy_readiness_goal_area_priorities", [])
+                    if isinstance(
+                        objective_summary.get("autonomy_readiness_goal_area_priorities"),
+                        list,
+                    )
+                    else []
+                ),
+                "project_goal_capability_objective_readiness_by_goal_area": dict(
+                    objective_progress_summary.get(
+                        "project_goal_objective_autonomy_readiness_by_goal_area",
+                        {},
+                    )
+                    or {}
+                ),
+                "project_goal_capability_objective_readiness_hotspots": list(
+                    objective_progress_summary.get(
+                        "project_goal_objective_autonomy_readiness_hotspots",
+                        [],
+                    )
+                    or []
                 ),
                 "blocked_live_row_count": int(
                     objective_summary.get("blocked_live_row_count", 0) or 0
