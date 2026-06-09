@@ -1318,6 +1318,7 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
     goal_area_counts = {}
     goal_area_status_counts: Dict[str, Dict[str, int]] = {}
     blocker_count_by_area = {}
+    objective_blocker_row_ids_by_area: Dict[str, list[str]] = {}
     objective_autonomy_readiness_by_goal_area: Dict[str, Dict[str, Any]] = {}
     runtime_mode_rows = []
 
@@ -1350,6 +1351,10 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
                 area_stats["ready_row_ids"].append(row.id)
             else:
                 area_stats["gap_row_ids"].append(row.id)
+            if row.blocker and row.status not in {"canonical", "supervised_narrow"}:
+                objective_blocker_row_ids_by_area.setdefault(
+                    row.goal_area, []
+                ).append(row.id)
 
         status_counts[row.status] += 1
         goal_area_counts[row.goal_area] = goal_area_counts.get(row.goal_area, 0) + 1
@@ -1430,6 +1435,28 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
         area_stats["ready_row_count"]
         for area_stats in objective_autonomy_readiness_by_goal_area.values()
     )
+    objective_goal_area_hotspots = [
+        {
+            "goal_area": area_id,
+            "gap_row_count": area_stats["gap_row_count"],
+            "readiness_score": area_stats["readiness_score"],
+            "blocker_row_count": len(
+                objective_blocker_row_ids_by_area.get(area_id, [])
+            ),
+            "blocker_row_ids": sorted(
+                objective_blocker_row_ids_by_area.get(area_id, [])
+            ),
+        }
+        for area_id, area_stats in sorted(
+            objective_autonomy_readiness_by_goal_area.items(),
+            key=lambda item: (
+                -item[1]["gap_row_count"],
+                item[1]["readiness_score"],
+                item[0],
+            ),
+        )
+        if area_stats["gap_row_count"] > 0
+    ]
 
     return {
         "type": "project_goal_capability_progress_snapshot",
@@ -1457,6 +1484,7 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
             "project_goal_objective_autonomy_readiness_goal_area_priorities": objective_autonomy_readiness_goal_area_priorities,
             "project_goal_objective_autonomy_readiness_gap_row_count": objective_readiness_gap_row_count,
             "project_goal_objective_autonomy_readiness_ready_row_count": objective_readiness_ready_row_count,
+            "project_goal_objective_autonomy_readiness_hotspots": objective_goal_area_hotspots,
             "next_global_step": (
                 "Prioritize blocked areas, expand proof and evidence on supervised "
                 "candidate families, and keep read-only safety-first controls."

@@ -28,6 +28,15 @@ The progress snapshot also mirrors this readiness partition in two summary field
 - `project_goal_objective_autonomy_readiness_by_goal_area`
 - `project_goal_objective_autonomy_readiness_goal_area_priorities`
 
+For planning action, it also exposes:
+- `project_goal_objective_autonomy_readiness_hotspots`, a gap-first list of
+  areas with:
+  - `goal_area`
+  - `gap_row_count`
+  - `readiness_score`
+  - `blocker_row_count`
+  - `blocker_row_ids`
+
 The readiness calculation in each area uses the same rule as the global score:
 `int((ready_row_count / required_row_count) * 100)` with required set
 `{canonical, supervised_narrow}` as ready.

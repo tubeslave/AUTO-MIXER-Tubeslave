@@ -905,6 +905,54 @@ def test_goal_capability_progress_snapshot_aligns_with_matrix_and_highlights_act
     assert summary[
         "project_goal_objective_autonomy_readiness_goal_area_priorities"
     ] == objective_alignment["summary"]["autonomy_readiness_goal_area_priorities"]
+    hotspots = summary["project_goal_objective_autonomy_readiness_hotspots"]
+    assert isinstance(hotspots, list)
+    assert hotspots
+    assert all(
+        item["goal_area"]
+        and isinstance(item["gap_row_count"], int)
+        and isinstance(item["readiness_score"], int)
+        and isinstance(item["blocker_row_count"], int)
+        and isinstance(item["blocker_row_ids"], list)
+        for item in hotspots
+    )
+    assert all(
+        item["gap_row_count"] > 0
+        for item in hotspots
+    )
+    assert sum(item["gap_row_count"] for item in hotspots) == objective_alignment["summary"]["autonomy_readiness_gap_row_count"]
+    assert hotspots == sorted(
+        [
+            {
+                "goal_area": area_id,
+                "gap_row_count": area_data["gap_row_count"],
+                "readiness_score": area_data["readiness_score"],
+                "blocker_row_count": len(
+                    [
+                        row["id"]
+                        for row in objective_alignment["rows"]
+                        if row["goal_area"] == area_id
+                        and row["status"] not in {"canonical", "supervised_narrow"}
+                        and row["blocker"]
+                    ]
+                ),
+                "blocker_row_ids": sorted(
+                    [
+                        row["id"]
+                        for row in objective_alignment["rows"]
+                        if row["goal_area"] == area_id
+                        and row["status"] not in {"canonical", "supervised_narrow"}
+                        and row["blocker"]
+                    ]
+                ),
+            }
+            for area_id, area_data in objective_alignment["summary"][
+                "autonomy_readiness_by_goal_area"
+            ].items()
+            if area_data["gap_row_count"] > 0
+        ],
+        key=lambda item: (-item["gap_row_count"], item["readiness_score"], item["goal_area"]),
+    )
 
     required_rows = [row_id for row_id in AUTOMIXER_OBJECTIVE_CAPABILITY_IDS if row_id in set(
         row["id"] for row in progress["rows"]
