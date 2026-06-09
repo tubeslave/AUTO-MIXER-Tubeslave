@@ -1799,9 +1799,11 @@ def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
         delattr(server, "get_supervised_pilot_status")
 
     snapshot = server._dispatch  # keep handler registration intact
+    from backend.project_goal_capability_matrix import build_project_goal_objective_alignment_snapshot
     from backend.operator_product_state import build_dashboard_snapshot
 
     payload = build_dashboard_snapshot(server)
+    alignment_snapshot = build_project_goal_objective_alignment_snapshot()
 
     assert snapshot
     assert payload["type"] == "dashboard_snapshot"
@@ -1828,6 +1830,24 @@ def test_dashboard_snapshot_tolerates_missing_supervised_pilot_status(server):
     assert (
         payload["runtime"]["goal_capability_objective_alignment"]["full_autonomous_status"]
         == "blocked_live"
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "blocked_live_row_count"
+        ]
+        == alignment_snapshot["summary"]["blocked_live_row_count"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "currently_live_writable_row_count"
+        ]
+        == alignment_snapshot["summary"]["currently_live_writable_row_count"]
+    )
+    assert (
+        payload["runtime"]["goal_capability_objective_alignment"][
+            "blocked_live_row_count"
+        ]
+        == len(payload["runtime"]["goal_capability_objective_alignment"]["blocked_live_rows"])
     )
 
 
@@ -1865,6 +1885,18 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert (
         payload["summary"]["project_goal_capability_objective_missing_row_count"]
         == goal_alignment["summary"]["missing_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_blocked_live_row_count"]
+        == goal_alignment["summary"]["blocked_live_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_currently_live_writable_row_count"]
+        == goal_alignment["summary"]["currently_live_writable_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_full_autonomous_status"]
+        == goal_alignment["summary"]["full_autonomous_status"]
     )
     goal_progress = payload["project_goal_capability_progress_snapshot"]
     assert goal_progress["type"] == "project_goal_capability_progress_snapshot"
@@ -5312,6 +5344,24 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
         ]["summary"]["missing_row_count"]
     )
     assert (
+        payload["summary"]["project_goal_capability_objective_blocked_live_row_count"]
+        == payload["registry"][
+            "project_goal_capability_objective_alignment_snapshot"
+        ]["summary"]["blocked_live_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_currently_live_writable_row_count"]
+        == payload["registry"][
+            "project_goal_capability_objective_alignment_snapshot"
+        ]["summary"]["currently_live_writable_row_count"]
+    )
+    assert (
+        payload["summary"]["project_goal_capability_objective_full_autonomous_status"]
+        == payload["registry"][
+            "project_goal_capability_objective_alignment_snapshot"
+        ]["summary"]["full_autonomous_status"]
+    )
+    assert (
         main_pipeline_registry["autonomy_promotion_readiness"]["type"]
         == "autonomy_promotion_readiness"
     )
@@ -7657,6 +7707,24 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
             "summary"
         ]["project_goal_capability_objective_missing_row_count"]
         == alignment_snapshot["summary"]["missing_row_count"]
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"]["summary"][
+            "project_goal_capability_objective_blocked_live_row_count"
+        ]
+        == alignment_snapshot["summary"]["blocked_live_row_count"]
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"]["summary"][
+            "project_goal_capability_objective_currently_live_writable_row_count"
+        ]
+        == alignment_snapshot["summary"]["currently_live_writable_row_count"]
+    )
+    assert (
+        by_type["processing_pipeline_snapshot"]["summary"][
+            "project_goal_capability_objective_full_autonomous_status"
+        ]
+        == alignment_snapshot["summary"]["full_autonomous_status"]
     )
     assert progress_snapshot["type"] == "project_goal_capability_progress_snapshot"
     assert progress_snapshot["summary"]["row_count"] > 0

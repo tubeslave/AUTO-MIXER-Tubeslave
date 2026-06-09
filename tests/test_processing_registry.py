@@ -706,6 +706,14 @@ def test_registry_snapshot_includes_objective_alignment_projection():
         snapshot["summary"]["project_goal_capability_objective_blocked_live_row_count"]
         == len(objective_alignment["summary"]["blocked_live_rows"])
     )
+    assert (
+        snapshot["summary"]["project_goal_capability_objective_currently_live_writable_row_count"]
+        == len(objective_alignment["summary"]["currently_live_writable_rows"])
+    )
+    assert (
+        snapshot["summary"]["project_goal_capability_objective_full_autonomous_status"]
+        == objective_alignment["summary"]["full_autonomous_status"]
+    )
     assert objective_alignment["summary"]["blocked_live_rows"] == ["mode_full_autonomous"]
     assert objective_alignment["summary"]["currently_live_writable_rows"]
 

@@ -6603,6 +6603,13 @@ def build_processing_registry_snapshot(*, include_methods: bool = True) -> Dict[
             "project_goal_capability_objective_blocked_live_row_count": len(
                 objective_alignment_summary.get("blocked_live_rows", ())
             ),
+            "project_goal_capability_objective_currently_live_writable_row_count": int(
+                objective_alignment_summary.get("currently_live_writable_row_count", 0)
+                or 0
+            ),
+            "project_goal_capability_objective_full_autonomous_status": objective_alignment_summary.get(
+                "full_autonomous_status"
+            ),
             "live_executor_method_ids": live_executor_ids,
             "live_allowed_write_kinds": list(LIVE_ALLOWED_WRITE_KINDS),
             "main_pipeline_id": "main_live_assist",

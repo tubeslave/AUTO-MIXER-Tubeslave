@@ -3930,6 +3930,12 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
                 "missing_row_count": int(
                     objective_summary.get("missing_row_count", 0) or 0
                 ),
+                "blocked_live_row_count": int(
+                    objective_summary.get("blocked_live_row_count", 0) or 0
+                ),
+                "currently_live_writable_row_count": int(
+                    objective_summary.get("currently_live_writable_row_count", 0) or 0
+                ),
                 "blocked_live_rows": list(
                     objective_summary.get("blocked_live_rows", ())
                 ),

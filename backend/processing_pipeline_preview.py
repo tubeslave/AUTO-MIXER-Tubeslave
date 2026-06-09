@@ -1317,6 +1317,25 @@ def build_main_pipeline_preview(
                 )
                 or 0
             ),
+            "project_goal_capability_objective_blocked_live_row_count": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "blocked_live_row_count",
+                    0,
+                )
+                or 0
+            ),
+            "project_goal_capability_objective_currently_live_writable_row_count": int(
+                project_goal_capability_objective_alignment_summary.get(
+                    "currently_live_writable_row_count",
+                    0,
+                )
+                or 0
+            ),
+            "project_goal_capability_objective_full_autonomous_status": (
+                project_goal_capability_objective_alignment_summary.get(
+                    "full_autonomous_status"
+                )
+            ),
             "autonomy_promotion_target_count": int(
                 autonomy_promotion_readiness_summary.get("target_count", 0) or 0
             ),
