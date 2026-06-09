@@ -2,21 +2,13 @@
 
 from typing import Any, Optional
 
-try:
-    from operator_mode_policy import SUPPORTED_MANUAL_LIVE_WRITE_KINDS
-except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import SUPPORTED_MANUAL_LIVE_WRITE_KINDS
-
-
-SUPPORTED_MANUAL_WRITE_KINDS = set(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
-
 
 def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int], Optional[str], Optional[str], Optional[str]]:
     value_type = server._normalize_manual_write_kind(data.get("value_type"))
     channel = data.get("channel")
     address = str(data.get("address") or "").strip()
 
-    if value_type in SUPPORTED_MANUAL_WRITE_KINDS and channel is not None:
+    if value_type and channel is not None:
         try:
             channel_int = int(channel)
         except (TypeError, ValueError):
@@ -24,6 +16,8 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
         if channel_int < 1 or channel_int > 48:
             return None, None, None, "channel_out_of_range"
         expected_address = server._manual_write_address(channel_int, value_type)
+        if not expected_address:
+            return None, None, None, "missing_read_target"
         if address and address != expected_address:
             return None, None, None, "address_value_type_mismatch"
         return channel_int, value_type, expected_address, None

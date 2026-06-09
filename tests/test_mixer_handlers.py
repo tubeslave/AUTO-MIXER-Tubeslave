@@ -31,6 +31,11 @@ class FakeServer:
                 return int(normalized.split("/")[2]), "mute"
             except (IndexError, TypeError, ValueError):
                 return None
+        if normalized.startswith("/ch/") and normalized.endswith("/pan"):
+            try:
+                return int(normalized.split("/")[2]), "pan"
+            except (IndexError, TypeError, ValueError):
+                return None
         parts = normalized.split("/")
         if (
             len(parts) == 6
@@ -58,6 +63,8 @@ class FakeServer:
             return f"/ch/{channel}/in/set/trim"
         if value_type == "mute":
             return f"/ch/{channel}/mute"
+        if value_type == "pan":
+            return f"/ch/{channel}/pan"
         return ""
 
 
@@ -89,6 +96,19 @@ def test_parse_readonly_parameter_request_aliases_gain_like_input():
     assert channel == 3
     assert parsed_kind == "gain"
     assert address == server._manual_write_address(3, "gain")
+
+
+def test_parse_readonly_parameter_request_supports_pan_value_type():
+    server = FakeServer()
+    channel, parsed_kind, address, error = mixer_handlers._parse_readonly_parameter_request(
+        server,
+        {"channel": 5, "value_type": "pan"},
+    )
+
+    assert error is None
+    assert channel == 5
+    assert parsed_kind == "pan"
+    assert address == server._manual_write_address(5, "pan")
 
 
 def test_parse_readonly_parameter_request_by_address():
