@@ -335,6 +335,12 @@ WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflig
 WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
     "artifacts/wing_readonly_preflight_plan/latest_plan.json"
 )
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = [
+    "PYTHONPATH=backend",
+    "python3",
+    "tools/no_wing_release_check.py",
+    "--quick",
+]
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
@@ -3233,6 +3239,28 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_existing_backend_connection_boundary_not_true"
         )
+    if plan.get("backend_port_prestart_check_required") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_check_not_required"
+        )
+    if plan.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_check_boundary_not_true"
+        )
+    if (
+        plan.get("backend_port_prestart_check_command")
+        != WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    ):
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_check_command_mismatch"
+        )
+    if plan.get("backend_port_prestart_check_failure_detail_fields") != [
+        "listener_processes",
+        "operator_next_step",
+    ]:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_check_detail_fields_mismatch"
+        )
     if plan.get("manual_review_required_before_readiness_update") is not True:
         violations.append(
             "wing_readonly_preflight_plan_manual_review_boundary_not_true"
@@ -3365,6 +3393,18 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["physical_preflight_requires_existing_backend_connection"] = plan.get(
         "physical_preflight_requires_existing_backend_connection"
     )
+    detail["backend_port_prestart_check_required"] = plan.get(
+        "backend_port_prestart_check_required"
+    )
+    detail["backend_port_prestart_check_must_pass_before_starting_backend"] = plan.get(
+        "backend_port_prestart_check_must_pass_before_starting_backend"
+    )
+    detail["backend_port_prestart_check_command"] = plan.get(
+        "backend_port_prestart_check_command"
+    )
+    detail["backend_port_prestart_check_failure_detail_fields"] = plan.get(
+        "backend_port_prestart_check_failure_detail_fields"
+    )
     detail["manual_review_required_before_readiness_update"] = plan.get(
         "manual_review_required_before_readiness_update"
     )
@@ -3475,6 +3515,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         str(expected_plan_path),
     ]
     expected_commands = {
+        "prestart_backend_port_check": (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
         "preview_readonly_request_plan": expected_preview_command,
         "capture_readonly_preflight": expected_capture_command,
         "review_artifact_and_write_pending_decision_template": (
@@ -3516,10 +3559,19 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         "operator_required",
         "expected_plan_required_for_real_run",
         "physical_preflight_requires_existing_backend_connection",
+        "backend_port_prestart_check_required",
+        "backend_port_prestart_check_must_pass_before_starting_backend",
         "manual_review_required_before_readiness_update",
     ):
         if packet.get(key) is not True:
             violations.append(f"wing_readonly_preflight_handoff_packet_{key}_not_true")
+    if packet.get("backend_port_prestart_check_failure_detail_fields") != [
+        "listener_processes",
+        "operator_next_step",
+    ]:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_port_prestart_check_detail_fields_mismatch"
+        )
     for key in (
         "live_write",
         "mutates_console_state",
@@ -3544,6 +3596,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append("wing_readonly_preflight_handoff_packet_focused_validation_missing")
     if "--plan-only" not in commands.get("preview_readonly_request_plan", []):
         violations.append("wing_readonly_preflight_handoff_packet_preview_plan_only_missing")
+    if commands.get("prestart_backend_port_check") != (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_backend_port_check_mismatch"
+        )
     if "--operator-confirm-session-ready" not in commands.get(
         "preview_readonly_request_plan", []
     ):
@@ -3610,6 +3668,15 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["physical_preflight_requires_existing_backend_connection"] = packet.get(
         "physical_preflight_requires_existing_backend_connection"
     )
+    detail["backend_port_prestart_check_required"] = packet.get(
+        "backend_port_prestart_check_required"
+    )
+    detail["backend_port_prestart_check_must_pass_before_starting_backend"] = packet.get(
+        "backend_port_prestart_check_must_pass_before_starting_backend"
+    )
+    detail["backend_port_prestart_check_failure_detail_fields"] = packet.get(
+        "backend_port_prestart_check_failure_detail_fields"
+    )
     detail["manual_review_required_before_readiness_update"] = packet.get(
         "manual_review_required_before_readiness_update"
     )
@@ -3633,6 +3700,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["capture_command_requires_physical_readback"] = (
         "--require-physical-readback" in commands.get("capture_readonly_preflight", [])
+    )
+    detail["prestart_backend_port_check_command"] = commands.get(
+        "prestart_backend_port_check"
     )
     detail["review_command_writes_decision_template"] = (
         "--decision-template-output"
@@ -10346,6 +10416,26 @@ def wing_readonly_preflight_plan_artifact_summary(
                 detail.get("physical_preflight_requires_existing_backend_connection")
                 is True
             ),
+            "backend_port_prestart_check_required": (
+                detail.get("backend_port_prestart_check_required") is True
+            ),
+            "backend_port_prestart_check_must_pass_before_starting_backend": (
+                detail.get("backend_port_prestart_check_must_pass_before_starting_backend")
+                is True
+            ),
+            "backend_port_prestart_check_command": (
+                list(detail.get("backend_port_prestart_check_command"))
+                if isinstance(detail.get("backend_port_prestart_check_command"), list)
+                else []
+            ),
+            "backend_port_prestart_check_failure_detail_fields": (
+                list(detail.get("backend_port_prestart_check_failure_detail_fields"))
+                if isinstance(
+                    detail.get("backend_port_prestart_check_failure_detail_fields"),
+                    list,
+                )
+                else []
+            ),
             "manual_review_required_before_readiness_update": (
                 detail.get("manual_review_required_before_readiness_update") is True
             ),
@@ -10431,6 +10521,21 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 detail.get("physical_preflight_requires_existing_backend_connection")
                 is True
             ),
+            "backend_port_prestart_check_required": (
+                detail.get("backend_port_prestart_check_required") is True
+            ),
+            "backend_port_prestart_check_must_pass_before_starting_backend": (
+                detail.get("backend_port_prestart_check_must_pass_before_starting_backend")
+                is True
+            ),
+            "backend_port_prestart_check_failure_detail_fields": (
+                list(detail.get("backend_port_prestart_check_failure_detail_fields"))
+                if isinstance(
+                    detail.get("backend_port_prestart_check_failure_detail_fields"),
+                    list,
+                )
+                else []
+            ),
             "manual_review_required_before_readiness_update": (
                 detail.get("manual_review_required_before_readiness_update") is True
             ),
@@ -10466,6 +10571,11 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "capture_command_requires_physical_readback": (
                 detail.get("capture_command_requires_physical_readback") is True
+            ),
+            "prestart_backend_port_check_command": (
+                list(detail.get("prestart_backend_port_check_command"))
+                if isinstance(detail.get("prestart_backend_port_check_command"), list)
+                else []
             ),
             "review_command_writes_decision_template": (
                 detail.get("review_command_writes_decision_template") is True
@@ -13537,6 +13647,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_plan_artifact['expected_plan_required_for_real_run']).lower()}`",
                 "- physical_preflight_requires_existing_backend_connection: "
                 f"`{str(wing_readonly_preflight_plan_artifact['physical_preflight_requires_existing_backend_connection']).lower()}`",
+                "- backend_port_prestart_check_required: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_check_required']).lower()}`",
+                "- backend_port_prestart_check_must_pass_before_starting_backend: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
+                "- backend_port_prestart_check_command: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['backend_port_prestart_check_command'])}`",
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_plan_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- operator_session_confirmation_required: "
@@ -13594,6 +13710,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['expected_plan_required_for_real_run']).lower()}`",
                 "- physical_preflight_requires_existing_backend_connection: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['physical_preflight_requires_existing_backend_connection']).lower()}`",
+                "- backend_port_prestart_check_required: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_required']).lower()}`",
+                "- backend_port_prestart_check_must_pass_before_starting_backend: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- execution_allowed_by_packet: "
@@ -13622,6 +13742,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['preview_command_uses_plan_only']).lower()}`",
                 "- capture_command_requires_physical_readback: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_requires_physical_readback']).lower()}`",
+                "- prestart_backend_port_check_command: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['prestart_backend_port_check_command'])}`",
                 "- review_command_writes_decision_template: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_writes_decision_template']).lower()}`",
                 "- blockers_not_closed_by_packet: "

@@ -19,12 +19,13 @@ It does not approve live writes.
 
 ## Preconditions
 
-- The intended WING Rack is connected to the backend.
-- The backend WebSocket is running, usually at `ws://localhost:8765`.
-- `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` does not
-  fail `backend_port_free` against an unexpected local listener. If it does,
-  inspect `listener_processes` in the generated summary before changing local
-  services; the gate is diagnostic only and does not stop processes.
+- Before starting the intended backend/WING session, run
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` and confirm
+  it does not fail `backend_port_free` against an unexpected local listener. If
+  it does, inspect `listener_processes` in the generated summary before changing
+  local services; the gate is diagnostic only and does not stop processes.
+- Then connect the intended WING Rack to the backend and start the backend
+  WebSocket, usually at `ws://localhost:8765`.
 - The operator knows which channel is safe to inspect.
 - No live performance is in progress unless the operator explicitly allows
   read-only inspection.

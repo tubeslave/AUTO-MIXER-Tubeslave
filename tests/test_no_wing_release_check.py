@@ -683,6 +683,18 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "operator_required": True,
         "expected_plan_required_for_real_run": True,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": [
+            "PYTHONPATH=backend",
+            "python3",
+            "tools/no_wing_release_check.py",
+            "--quick",
+        ],
+        "backend_port_prestart_check_failure_detail_fields": [
+            "listener_processes",
+            "operator_next_step",
+        ],
         "manual_review_required_before_readiness_update": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "contacts_backend": False,
@@ -764,6 +776,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "operator_required": True,
         "expected_plan_required_for_real_run": True,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_failure_detail_fields": [
+            "listener_processes",
+            "operator_next_step",
+        ],
         "manual_review_required_before_readiness_update": True,
         "execution_allowed_by_packet": False,
         "readiness_matrix_update_allowed_by_packet": False,
@@ -791,6 +809,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
         ),
         "commands": {
+            "prestart_backend_port_check": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/no_wing_release_check.py",
+                "--quick",
+            ],
             "preview_readonly_request_plan": [
                 "python3",
                 "tools/wing_readonly_preflight_runner.py",
@@ -863,6 +887,11 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             ],
         },
         "operator_sequence": [
+            (
+                "Before starting the intended backend/WING session, run "
+                "prestart_backend_port_check and resolve only confirmed "
+                "unexpected listeners."
+            ),
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
             "Confirm backend is connected to the intended WING Rack.",
             "Confirm the selected channel numbers are safe to inspect.",
@@ -2230,7 +2259,14 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["value_types"] == ["fader", "gain", "pan"]
     assert result.detail["preview_command_uses_plan_only"] is True
     assert result.detail["capture_command_requires_physical_readback"] is True
+    assert result.detail["prestart_backend_port_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
     assert result.detail["review_command_writes_decision_template"] is True
+    assert "prestart_backend_port_check" in result.detail["command_names"]
     assert "preview_readonly_request_plan" in result.detail["command_names"]
     assert "confirm_no_live_authority" in result.detail[
         "required_review_checklist_ids"
@@ -2251,7 +2287,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert "physical_console_readback_proof" in result.detail[
         "blockers_not_closed_by_packet"
     ]
-    assert result.detail["operator_sequence_count"] == 8
+    assert result.detail["operator_sequence_count"] == 9
     assert result.detail["violations"] == []
 
 
@@ -7310,6 +7346,18 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "operator_required": True,
             "expected_plan_required_for_real_run": True,
             "physical_preflight_requires_existing_backend_connection": True,
+            "backend_port_prestart_check_required": True,
+            "backend_port_prestart_check_must_pass_before_starting_backend": True,
+            "backend_port_prestart_check_command": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/no_wing_release_check.py",
+                "--quick",
+            ],
+            "backend_port_prestart_check_failure_detail_fields": [
+                "listener_processes",
+                "operator_next_step",
+            ],
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_plan": False,
             "live_authority_granted": False,
@@ -7345,6 +7393,18 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["operator_required"] is True
     assert artifact["expected_plan_required_for_real_run"] is True
     assert artifact["physical_preflight_requires_existing_backend_connection"] is True
+    assert artifact["backend_port_prestart_check_required"] is True
+    assert artifact["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert artifact["backend_port_prestart_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
+    assert artifact["backend_port_prestart_check_failure_detail_fields"] == [
+        "listener_processes",
+        "operator_next_step",
+    ]
     assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_plan"] is False
     assert artifact["live_authority_granted"] is False
@@ -7378,6 +7438,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
         "physical_preflight_requires_existing_backend_connection: `true`"
         in markdown_summary
     )
+    assert "backend_port_prestart_check_required: `true`" in markdown_summary
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown_summary
+    assert "tools/no_wing_release_check.py" in markdown_summary
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert "operator_session_confirmation_required: `true`" in markdown_summary
     assert "operator_confirmed_session_ready: `true`" in markdown_summary
@@ -7412,6 +7475,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "operator_required": True,
             "expected_plan_required_for_real_run": True,
             "physical_preflight_requires_existing_backend_connection": True,
+            "backend_port_prestart_check_required": True,
+            "backend_port_prestart_check_must_pass_before_starting_backend": True,
+            "backend_port_prestart_check_failure_detail_fields": [
+                "listener_processes",
+                "operator_next_step",
+            ],
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_packet": False,
             "readiness_matrix_update_allowed_by_packet": False,
@@ -7424,17 +7493,24 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "command_names": [
                 "capture_readonly_preflight",
                 "focused_validation",
+                "prestart_backend_port_check",
                 "preview_readonly_request_plan",
                 "review_artifact_and_write_pending_decision_template",
                 "review_edited_decision_json",
             ],
             "preview_command_uses_plan_only": True,
             "capture_command_requires_physical_readback": True,
+            "prestart_backend_port_check_command": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/no_wing_release_check.py",
+                "--quick",
+            ],
             "review_command_writes_decision_template": True,
             "required_review_checklist_ids": ["confirm_no_live_authority"],
             "forbidden_live_request_types": ["apply_operator_proposal"],
             "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
-            "operator_sequence_count": 8,
+            "operator_sequence_count": 9,
             "violations": [],
         },
     )
@@ -7453,6 +7529,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["executes_tests"] is False
     assert artifact["expected_plan_required_for_real_run"] is True
     assert artifact["physical_preflight_requires_existing_backend_connection"] is True
+    assert artifact["backend_port_prestart_check_required"] is True
+    assert artifact["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert artifact["backend_port_prestart_check_failure_detail_fields"] == [
+        "listener_processes",
+        "operator_next_step",
+    ]
     assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_packet"] is False
     assert artifact["readiness_matrix_update_allowed_by_packet"] is False
@@ -7464,8 +7546,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["plan_artifact_violations"] == []
     assert artifact["preview_command_uses_plan_only"] is True
     assert artifact["capture_command_requires_physical_readback"] is True
+    assert artifact["prestart_backend_port_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
     assert artifact["review_command_writes_decision_template"] is True
-    assert artifact["operator_sequence_count"] == 8
+    assert artifact["operator_sequence_count"] == 9
     assert artifact["violations"] == []
     assert "## WING Read-Only Preflight Handoff Packet Artifact" in markdown_summary
     assert "expected_plan_required_for_real_run: `true`" in markdown_summary
@@ -7473,6 +7561,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "physical_preflight_requires_existing_backend_connection: `true`"
         in markdown_summary
     )
+    assert "backend_port_prestart_check_required: `true`" in markdown_summary
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown_summary
+    assert "prestart_backend_port_check_command" in markdown_summary
+    assert "tools/no_wing_release_check.py" in markdown_summary
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
     assert "execution_allowed_by_packet: `false`" in markdown_summary

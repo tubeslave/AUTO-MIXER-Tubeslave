@@ -22,6 +22,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["operator_required"] is True
     assert packet["expected_plan_required_for_real_run"] is True
     assert packet["physical_preflight_requires_existing_backend_connection"] is True
+    assert packet["backend_port_prestart_check_required"] is True
+    assert packet["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert packet["backend_port_prestart_check_failure_detail_fields"] == [
+        "listener_processes",
+        "operator_next_step",
+    ]
     assert packet["manual_review_required_before_readiness_update"] is True
     assert packet["execution_allowed_by_packet"] is False
     assert packet["readiness_matrix_update_allowed_by_packet"] is False
@@ -66,6 +72,15 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "--expected-plan",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
     ]
+    assert packet["commands"]["prestart_backend_port_check"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
+    assert packet["operator_sequence"][0].startswith(
+        "Before starting the intended backend/WING session"
+    )
     assert "--decision-template-output" in packet["commands"][
         "review_artifact_and_write_pending_decision_template"
     ]
@@ -169,6 +184,10 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "live_write: `false`" in markdown
     assert "expected_plan_required_for_real_run: `true`" in markdown
     assert "physical_preflight_requires_existing_backend_connection: `true`" in markdown
+    assert "backend_port_prestart_check_required: `true`" in markdown
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
+    assert "prestart_backend_port_check" in markdown
+    assert "tools/no_wing_release_check.py" in markdown
     assert "manual_review_required_before_readiness_update: `true`" in markdown
     assert "preview_readonly_request_plan" in markdown
     assert "--plan-only" in markdown
@@ -194,6 +213,8 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["type"] == "wing_readonly_preflight_handoff_packet"
     assert payload["expected_plan_required_for_real_run"] is True
     assert payload["physical_preflight_requires_existing_backend_connection"] is True
+    assert payload["backend_port_prestart_check_required"] is True
+    assert payload["backend_port_prestart_check_must_pass_before_starting_backend"] is True
     assert payload["manual_review_required_before_readiness_update"] is True
     assert payload["live_authority_granted"] is False
 

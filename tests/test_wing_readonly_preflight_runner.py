@@ -1000,6 +1000,18 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["operator_required"] is True
     assert written["expected_plan_required_for_real_run"] is True
     assert written["physical_preflight_requires_existing_backend_connection"] is True
+    assert written["backend_port_prestart_check_required"] is True
+    assert written["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert written["backend_port_prestart_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
+    assert written["backend_port_prestart_check_failure_detail_fields"] == [
+        "listener_processes",
+        "operator_next_step",
+    ]
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert written["read_only"] is True

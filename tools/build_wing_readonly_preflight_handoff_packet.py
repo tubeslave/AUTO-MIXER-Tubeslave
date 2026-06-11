@@ -41,6 +41,12 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_wing_readonly_preflight_review_decision_tool.py",
     "tests/test_no_wing_release_check.py",
 ]
+BACKEND_PORT_PRESTART_CHECK_COMMAND = [
+    "PYTHONPATH=backend",
+    "python3",
+    "tools/no_wing_release_check.py",
+    "--quick",
+]
 FORBIDDEN_LIVE_REQUEST_TYPES = list(
     no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
 )
@@ -224,6 +230,12 @@ def build_handoff_packet(
         "operator_required": True,
         "expected_plan_required_for_real_run": True,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_failure_detail_fields": [
+            "listener_processes",
+            "operator_next_step",
+        ],
         "manual_review_required_before_readiness_update": True,
         "execution_allowed_by_packet": False,
         "readiness_matrix_update_allowed_by_packet": False,
@@ -246,9 +258,15 @@ def build_handoff_packet(
             "capture_readonly_preflight": capture,
             "review_artifact_and_write_pending_decision_template": review,
             "review_edited_decision_json": decision,
+            "prestart_backend_port_check": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
             "focused_validation": list(FOCUSED_VALIDATION_COMMAND),
         },
         "operator_sequence": [
+            (
+                "Before starting the intended backend/WING session, run "
+                "prestart_backend_port_check and resolve only confirmed "
+                "unexpected listeners."
+            ),
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
             "Confirm backend is connected to the intended WING Rack and ready for read-only inspection.",
             "Confirm the selected channel numbers are safe to inspect.",
@@ -285,6 +303,10 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['expected_plan_required_for_real_run']).lower()}`",
         "- physical_preflight_requires_existing_backend_connection: "
         f"`{str(packet['physical_preflight_requires_existing_backend_connection']).lower()}`",
+        "- backend_port_prestart_check_required: "
+        f"`{str(packet['backend_port_prestart_check_required']).lower()}`",
+        "- backend_port_prestart_check_must_pass_before_starting_backend: "
+        f"`{str(packet['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
         "- manual_review_required_before_readiness_update: "
         f"`{str(packet['manual_review_required_before_readiness_update']).lower()}`",
         "- execution_allowed_by_packet: "
@@ -303,6 +325,7 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         lines.append(f"{index}. {item}")
     lines.extend(["", "## Commands", ""])
     for name in (
+        "prestart_backend_port_check",
         "preview_readonly_request_plan",
         "capture_readonly_preflight",
         "review_artifact_and_write_pending_decision_template",

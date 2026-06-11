@@ -60,6 +60,12 @@ FORBIDDEN_REQUEST_TYPES = {
 }
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 PHYSICAL_READBACK_SOURCES = {"physical_readback", "wing_physical_readback", "physical_wing", "wing"}
+BACKEND_PORT_PRESTART_CHECK_COMMAND = [
+    "PYTHONPATH=backend",
+    "python3",
+    "tools/no_wing_release_check.py",
+    "--quick",
+]
 EXPECTED_PLAN_MATCH_KEYS = (
     "type",
     "status",
@@ -81,6 +87,10 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "operator_required",
     "expected_plan_required_for_real_run",
     "physical_preflight_requires_existing_backend_connection",
+    "backend_port_prestart_check_required",
+    "backend_port_prestart_check_must_pass_before_starting_backend",
+    "backend_port_prestart_check_command",
+    "backend_port_prestart_check_failure_detail_fields",
     "manual_review_required_before_readiness_update",
     "contacts_backend",
     "queries_console",
@@ -438,6 +448,13 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "operator_required": True,
         "expected_plan_required_for_real_run": True,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
+        "backend_port_prestart_check_failure_detail_fields": [
+            "listener_processes",
+            "operator_next_step",
+        ],
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,
