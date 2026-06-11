@@ -10,28 +10,49 @@ import pytest
 class TestRatioConversion:
     def test_ratio_float_to_wing_basic(self):
         from signal_analysis import ratio_float_to_wing
-        assert ratio_float_to_wing(1.0) == "1.0:1"
-        assert ratio_float_to_wing(2.0) == "2.0:1"
-        assert ratio_float_to_wing(4.0) == "4.0:1"
+        assert ratio_float_to_wing(1.0) == "1:1"
+        assert ratio_float_to_wing(2.0) == "2:1"
+        assert ratio_float_to_wing(4.0) == "4:1"
 
     def test_ratio_negative_returns_1(self):
         from signal_analysis import ratio_float_to_wing
-        assert ratio_float_to_wing(-1.0) == "1.0:1"
-        assert ratio_float_to_wing(0) == "1.0:1"
+        assert ratio_float_to_wing(-1.0) == "1:1"
+        assert ratio_float_to_wing(0) == "1:1"
 
-    def test_ratio_infinity(self):
+    def test_ratio_infinity_clamps_to_max_supported_wing_ratio(self):
         from signal_analysis import ratio_float_to_wing
-        assert ratio_float_to_wing(float('inf')) == "inf:1"
+        assert ratio_float_to_wing(float('inf')) == "20:1"
 
     def test_ratio_nearest(self):
         from signal_analysis import ratio_float_to_wing
-        # 2.5 should snap to 2.0 or 3.0
-        result = ratio_float_to_wing(2.5)
-        assert result in ("2.0:1", "3.0:1")
+        assert ratio_float_to_wing(2.6) == "2.5:1"
 
-    def test_wing_ratio_strings(self):
+    def test_wing_ratio_table_matches_documented_protocol_order(self):
         from signal_analysis import WING_RATIO_VALUES, WING_RATIO_STRINGS
-        assert len(WING_RATIO_VALUES) == len(WING_RATIO_STRINGS)
+        assert WING_RATIO_VALUES == [
+            1.0,
+            1.5,
+            2.0,
+            2.5,
+            3.0,
+            4.0,
+            5.0,
+            7.0,
+            10.0,
+            20.0,
+        ]
+        assert WING_RATIO_STRINGS == [
+            "1:1",
+            "1.5:1",
+            "2:1",
+            "2.5:1",
+            "3:1",
+            "4:1",
+            "5:1",
+            "7:1",
+            "10:1",
+            "20:1",
+        ]
 
 
 class TestSpectralAnalyzer:

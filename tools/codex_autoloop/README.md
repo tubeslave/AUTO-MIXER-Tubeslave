@@ -29,6 +29,10 @@ you want the background automation active.
   `budget_light`, `budget_balanced`, `budget_strict`, and rare `premium_high`.
 - If all allowed local profiles are exhausted, the wrapper exits successfully
   without starting Codex so quota is preserved for the next day/week/month.
+- Codex limit checks are disabled. The current runner does not use the older
+  `CODEX_LIMITS_*` provider-limit files and does not skip runs based on limits;
+  the active model-budget profile gate is a separate local cycle-routing guard.
+  Current policy supersedes older local reports that described a limit gate.
 - The default automated path avoids GPT-5.5 high reasoning. High reasoning is
   reserved for rare architecture/safety review windows and is disabled for
   normal daily automation by the profile.

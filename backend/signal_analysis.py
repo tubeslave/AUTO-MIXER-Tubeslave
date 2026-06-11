@@ -15,9 +15,20 @@ from lufs_gain_staging import LUFSMeter, TruePeakMeter
 
 logger = logging.getLogger(__name__)
 
-# Wing compressor ratio values (float) and their corresponding OSC string labels
-WING_RATIO_VALUES = [1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 20.0, float('inf')]
-WING_RATIO_STRINGS = ["1.0:1", "1.5:1", "2.0:1", "3.0:1", "4.0:1", "6.0:1", "8.0:1", "10:1", "20:1", "inf:1"]
+# Canonical WING compressor ratio index labels from Docs/TOOLS.md.
+WING_RATIO_VALUES = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
+WING_RATIO_STRINGS = [
+    "1:1",
+    "1.5:1",
+    "2:1",
+    "2.5:1",
+    "3:1",
+    "4:1",
+    "5:1",
+    "7:1",
+    "10:1",
+    "20:1",
+]
 
 
 @dataclass
@@ -51,9 +62,9 @@ class ChannelSignalFeatures:
 def ratio_float_to_wing(ratio: float) -> str:
     """Convert float ratio to nearest Wing OSC ratio string."""
     if ratio <= 0:
-        return "1.0:1"
+        return WING_RATIO_STRINGS[0]
     if ratio == float('inf'):
-        return "inf:1"
+        return WING_RATIO_STRINGS[-1]
     best_idx = 0
     best_diff = abs(WING_RATIO_VALUES[0] - ratio)
     for i, v in enumerate(WING_RATIO_VALUES):
