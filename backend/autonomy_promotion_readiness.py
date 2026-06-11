@@ -55,6 +55,17 @@ GAP_BUCKETS = (
     "other",
 )
 
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
+    "PYTHONPATH=backend",
+    "python3",
+    "tools/no_wing_release_check.py",
+    "--quick",
+)
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FIELDS = (
+    "listener_processes",
+    "operator_next_step",
+)
+
 
 @dataclass(frozen=True)
 class PromotionTarget:
@@ -361,6 +372,7 @@ def _wing_readonly_preflight_readiness_overlay(
         ]
         if candidate_available
         else [
+            "Before starting the intended backend/WING session, run the no-WING quick gate and resolve only confirmed unexpected listeners.",
             "Run the read-only WING preflight runner and capture physical readback artifacts.",
             "Do not update readiness rows from missing or invalid preflight evidence.",
         ]
@@ -378,6 +390,14 @@ def _wing_readonly_preflight_readiness_overlay(
         "valid_candidate_count": valid_candidate_count,
         "invalid_candidate_count": invalid_candidate_count,
         "readiness_update_candidate_available": candidate_available,
+        "prestart_backend_port_check_required": True,
+        "prestart_backend_port_check_must_pass_before_starting_backend": True,
+        "prestart_backend_port_check_command": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "prestart_backend_port_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FIELDS
+        ),
         "candidate_blocker_ids": candidate_ids,
         "closed_blocker_ids": closed_ids,
         "latest_valid_candidate_run_id": summary.get("latest_valid_candidate_run_id"),

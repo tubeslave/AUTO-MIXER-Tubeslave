@@ -122,6 +122,18 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
     assert preflight["full_autonomous_ready"] is False
     assert preflight["evidence_status"] == "operator_preflight_required"
     assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["prestart_backend_port_check_required"] is True
+    assert preflight["prestart_backend_port_check_must_pass_before_starting_backend"] is True
+    assert preflight["prestart_backend_port_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
+    assert preflight["prestart_backend_port_check_failure_detail_fields"] == [
+        "listener_processes",
+        "operator_next_step",
+    ]
     assert preflight["candidate_blocker_ids"] == []
     assert preflight["closed_blocker_ids"] == []
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
@@ -357,6 +369,18 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
     assert preflight["valid_candidate_count"] == 1
     assert preflight["invalid_candidate_count"] == 0
     assert preflight["readiness_update_candidate_available"] is True
+    assert preflight["prestart_backend_port_check_required"] is True
+    assert preflight["prestart_backend_port_check_must_pass_before_starting_backend"] is True
+    assert preflight["prestart_backend_port_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
+    assert preflight["prestart_backend_port_check_failure_detail_fields"] == [
+        "listener_processes",
+        "operator_next_step",
+    ]
     assert preflight["candidate_blocker_ids"] == [
         "wing_readonly_connection_proof",
         "physical_console_readback_proof",

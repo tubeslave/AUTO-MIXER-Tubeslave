@@ -2,6 +2,25 @@ from pathlib import Path
 
 from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan
 
+PRESTART_BACKEND_PORT_CHECK_COMMAND = [
+    "PYTHONPATH=backend",
+    "python3",
+    "tools/no_wing_release_check.py",
+    "--quick",
+]
+
+
+def assert_prestart_check(summary: dict) -> None:
+    assert summary["readonly_preflight_prestart_check_required"] is True
+    assert (
+        summary["readonly_preflight_prestart_check_must_pass_before_starting_backend"]
+        is True
+    )
+    assert (
+        summary["readonly_preflight_prestart_check_command"]
+        == PRESTART_BACKEND_PORT_CHECK_COMMAND
+    )
+
 
 def evidence_snapshot(*rows):
     return {
@@ -73,6 +92,11 @@ def preflight_ready_snapshot() -> dict:
                 "blocked_by": [
                     "operator_must_review_readonly_preflight_candidate_before_readiness_update"
                 ],
+                "prestart_backend_port_check_required": True,
+                "prestart_backend_port_check_must_pass_before_starting_backend": True,
+                "prestart_backend_port_check_command": list(
+                    PRESTART_BACKEND_PORT_CHECK_COMMAND
+                ),
                 "next_required_actions": [
                     "Manually review the read-only preflight candidate before updating readiness rows."
                 ],
@@ -186,6 +210,7 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert plan["summary"]["readonly_preflight_required"] is True
     assert plan["summary"]["readonly_preflight_candidate_available"] is True
     assert plan["summary"]["readonly_preflight_evidence_status"] == "readonly_preflight_candidate_available"
+    assert_prestart_check(plan["summary"])
     assert plan["summary"]["readonly_preflight_step_count"] == 0
     assert plan["summary"]["readonly_preflight_review_decision_required"] is True
     assert plan["summary"]["readonly_preflight_review_decision_accepted"] is True
@@ -246,6 +271,7 @@ def test_plan_blocks_physical_proof_steps_until_review_decision_is_accepted():
     assert plan["status"] == "manual_review_ready"
     assert plan["summary"]["step_count"] == 0
     assert plan["summary"]["readonly_preflight_candidate_available"] is True
+    assert_prestart_check(plan["summary"])
     assert plan["summary"]["readonly_preflight_step_count"] == 0
     assert plan["summary"]["readonly_preflight_review_decision_required"] is True
     assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
@@ -277,6 +303,7 @@ def test_plan_blocks_physical_proof_steps_for_conflicting_review_decisions():
     assert plan["status"] == "manual_review_ready"
     assert plan["summary"]["step_count"] == 0
     assert plan["summary"]["readonly_preflight_candidate_available"] is True
+    assert_prestart_check(plan["summary"])
     assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
     assert (
         plan["summary"]["readonly_preflight_review_decision_status"]
@@ -350,7 +377,13 @@ def test_plan_blocks_physical_proof_steps_until_readonly_preflight_candidate_exi
                     "invalid_candidate_count": 0,
                     "evidence_status": "operator_preflight_required",
                     "blocked_by": ["operator_must_run_wing_readonly_preflight_runner"],
+                    "prestart_backend_port_check_required": True,
+                    "prestart_backend_port_check_must_pass_before_starting_backend": True,
+                    "prestart_backend_port_check_command": list(
+                        PRESTART_BACKEND_PORT_CHECK_COMMAND
+                    ),
                     "next_required_actions": [
+                        "Before starting the intended backend/WING session, run the no-WING quick gate and resolve only confirmed unexpected listeners.",
                         "Run the read-only WING preflight runner and capture physical readback artifacts."
                     ],
                 },
@@ -364,6 +397,7 @@ def test_plan_blocks_physical_proof_steps_until_readonly_preflight_candidate_exi
     assert plan["summary"]["readonly_preflight_required"] is True
     assert plan["summary"]["readonly_preflight_candidate_available"] is False
     assert plan["summary"]["readonly_preflight_evidence_status"] == "operator_preflight_required"
+    assert_prestart_check(plan["summary"])
     assert plan["summary"]["readonly_preflight_step_count"] == 1
     assert "readonly_preflight_candidate_required_before_supervised_proof" in plan["summary"]["global_blockers"]
     assert "operator_must_run_wing_readonly_preflight_runner" in plan["summary"]["global_blockers"]
@@ -401,6 +435,11 @@ def test_plan_blocks_physical_proof_steps_for_mixed_preflight_artifacts():
                     "blocked_by": [
                         "operator_must_replace_invalid_readonly_preflight_artifact"
                     ],
+                    "prestart_backend_port_check_required": True,
+                    "prestart_backend_port_check_must_pass_before_starting_backend": True,
+                    "prestart_backend_port_check_command": list(
+                        PRESTART_BACKEND_PORT_CHECK_COMMAND
+                    ),
                     "next_required_actions": [
                         "Do not update readiness rows from missing or invalid preflight evidence."
                     ],
@@ -416,6 +455,7 @@ def test_plan_blocks_physical_proof_steps_for_mixed_preflight_artifacts():
         plan["summary"]["readonly_preflight_evidence_status"]
         == "readonly_preflight_artifact_replacement_required"
     )
+    assert_prestart_check(plan["summary"])
     assert plan["summary"]["readonly_preflight_blocked_by"] == [
         "operator_must_replace_invalid_readonly_preflight_artifact"
     ]

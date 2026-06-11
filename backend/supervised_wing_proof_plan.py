@@ -490,6 +490,18 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_candidate_available": preflight_candidate,
             "readonly_preflight_evidence_status": preflight.get("evidence_status"),
             "readonly_preflight_blocked_by": _string_list(preflight.get("blocked_by")),
+            "readonly_preflight_prestart_check_required": (
+                preflight.get("prestart_backend_port_check_required") is True
+            ),
+            "readonly_preflight_prestart_check_must_pass_before_starting_backend": (
+                preflight.get(
+                    "prestart_backend_port_check_must_pass_before_starting_backend"
+                )
+                is True
+            ),
+            "readonly_preflight_prestart_check_command": _string_list(
+                preflight.get("prestart_backend_port_check_command")
+            ),
             "readonly_preflight_next_required_actions": _string_list(
                 preflight.get("next_required_actions")
             ),

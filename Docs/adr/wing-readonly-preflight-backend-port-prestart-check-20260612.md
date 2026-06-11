@@ -25,7 +25,9 @@ no-WING WING-readonly evidence overlay also surfaces the same command so the
 operator-visible readiness summary starts with the pre-start port check. The
 next WING proof plan validator also requires that the read-only preflight
 overlay carried this pre-start check before it can be treated as aligned with
-the supervised proof plan.
+the supervised proof plan. The backend autonomy readiness snapshot now emits the
+same pre-start check metadata, and the supervised proof plan summary preserves
+it.
 
 ## Why this won
 
@@ -49,7 +51,9 @@ intended backend to be reachable.
 4. Surface the pre-start command in the WING-readonly evidence overlay.
 5. Require the same pre-start command in the `next_wing_proof_plan` preflight
    overlay validation.
-6. Clarify the runbook sequence.
+6. Emit the pre-start check from backend autonomy readiness and carry it through
+   supervised proof plan summaries.
+7. Clarify the runbook sequence.
 
 ## Test plan
 
