@@ -1287,6 +1287,28 @@ def _listener_processes_for_port(port: int) -> tuple[list[dict[str, object]], st
     return processes, None
 
 
+def _backend_port_markdown_details(result: CheckResult) -> list[str]:
+    if result.name != "backend_port_free" or result.status == "passed":
+        return []
+    detail = result.detail or {}
+    if not detail.get("listener_detected"):
+        return []
+    lines = []
+    listener_processes = detail.get("listener_processes")
+    if isinstance(listener_processes, list) and listener_processes:
+        lines.append(
+            "  - listener_processes: "
+            f"`{json.dumps(listener_processes, ensure_ascii=False, sort_keys=True)}`"
+        )
+    listener_process_error = detail.get("listener_process_error")
+    if listener_process_error:
+        lines.append(f"  - listener_process_error: `{listener_process_error}`")
+    operator_next_step = detail.get("operator_next_step")
+    if operator_next_step:
+        lines.append(f"  - operator_next_step: `{operator_next_step}`")
+    return lines
+
+
 def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -> CheckResult:
     started = datetime.now(timezone.utc)
     detail: dict[str, object] = {"host": host, "port": port, "policy": "port_must_not_have_unexpected_listener"}
@@ -1298,6 +1320,11 @@ def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -
     if connected:
         listener_processes, listener_process_error = _listener_processes_for_port(port)
         detail["listener_processes"] = listener_processes
+        detail["operator_next_step"] = (
+            "Stop or reconfigure the unexpected local listener only after "
+            "confirming it is not the intended Automixer backend, then rerun "
+            "the no-WING gate and WING read-only preflight."
+        )
         if listener_process_error:
             detail["listener_process_error"] = listener_process_error
     return CheckResult(
@@ -13135,6 +13162,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     ]
     for result in results:
         lines.append(f"- `{result.name}`: `{result.status}`")
+        lines.extend(_backend_port_markdown_details(result))
     if gap_rollup is not None:
         lines.extend(
             [

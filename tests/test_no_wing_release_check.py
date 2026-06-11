@@ -6408,6 +6408,40 @@ def test_no_wing_release_check_summary_reports_failed_checks(tmp_path):
     assert "`example_check`: `failed`" in (tmp_path / "summary.md").read_text()
 
 
+def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
+    result = CheckResult(
+        name="backend_port_free",
+        status="failed",
+        started_at="2026-06-12T00:00:00Z",
+        finished_at="2026-06-12T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "host": "127.0.0.1",
+            "port": 8765,
+            "policy": "port_must_not_have_unexpected_listener",
+            "listener_detected": True,
+            "listener_processes": [
+                {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
+            ],
+            "operator_next_step": (
+                "Stop or reconfigure the unexpected local listener only after "
+                "confirming it is not the intended Automixer backend, then rerun "
+                "the no-WING gate and WING read-only preflight."
+            ),
+        },
+    )
+
+    write_summary(tmp_path, [result], generated_at="2026-06-12T00:00:00Z")
+
+    markdown_summary = (tmp_path / "summary.md").read_text()
+    assert "`backend_port_free`: `failed`" in markdown_summary
+    assert "listener_processes" in markdown_summary
+    assert '"command": "Python"' in markdown_summary
+    assert '"pid": 87210' in markdown_summary
+    assert "operator_next_step" in markdown_summary
+    assert "WING read-only preflight" in markdown_summary
+
+
 def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     result = CheckResult(
         name="supervised_proof_report_gap_rollup_schema",

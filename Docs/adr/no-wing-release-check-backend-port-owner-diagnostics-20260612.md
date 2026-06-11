@@ -19,7 +19,8 @@ separate diagnostics before knowing what owns the port.
 Use option 3. When `backend_port_free` fails, the release check now adds
 `listener_processes` from a best-effort local `lsof` query. If that lookup is not
 available or fails, the check remains failed and records `listener_process_error`
-instead.
+instead. The generated markdown summary also surfaces the listener owner and the
+operator next step so the diagnosis is visible without opening raw JSON.
 
 ## Why this won
 
@@ -39,8 +40,10 @@ unrelated local services or assume operator intent.
 1. Add a small `lsof -F pcn` parser for listener owner details.
 2. Attach listener owner data only when the socket probe confirms the port is
    busy.
-3. Preserve previous pass/fail behavior and keep the lookup best-effort.
-4. Cover the busy-port detail and parser behavior with focused tests.
+3. Surface the same detail in `summary.md` for operator review.
+4. Preserve previous pass/fail behavior and keep the lookup best-effort.
+5. Cover the busy-port detail, markdown output, and parser behavior with
+   focused tests.
 
 ## Test plan
 
