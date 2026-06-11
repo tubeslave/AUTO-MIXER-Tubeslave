@@ -1,13 +1,17 @@
 from pathlib import Path
 
+from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+)
 from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan
 
-PRESTART_BACKEND_PORT_CHECK_COMMAND = [
-    "PYTHONPATH=backend",
-    "python3",
-    "tools/no_wing_release_check.py",
-    "--quick",
-]
+PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+)
 
 
 def assert_prestart_check(summary: dict) -> None:
@@ -19,6 +23,10 @@ def assert_prestart_check(summary: dict) -> None:
     assert (
         summary["readonly_preflight_prestart_check_command"]
         == PRESTART_BACKEND_PORT_CHECK_COMMAND
+    )
+    assert (
+        summary["readonly_preflight_prestart_check_failure_detail_fields"]
+        == PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
     )
 
 
@@ -96,6 +104,9 @@ def preflight_ready_snapshot() -> dict:
                 "prestart_backend_port_check_must_pass_before_starting_backend": True,
                 "prestart_backend_port_check_command": list(
                     PRESTART_BACKEND_PORT_CHECK_COMMAND
+                ),
+                "prestart_backend_port_check_failure_detail_fields": list(
+                    PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
                 ),
                 "next_required_actions": [
                     "Manually review the read-only preflight candidate before updating readiness rows."
@@ -382,6 +393,9 @@ def test_plan_blocks_physical_proof_steps_until_readonly_preflight_candidate_exi
                     "prestart_backend_port_check_command": list(
                         PRESTART_BACKEND_PORT_CHECK_COMMAND
                     ),
+                    "prestart_backend_port_check_failure_detail_fields": list(
+                        PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
+                    ),
                     "next_required_actions": [
                         "Before starting the intended backend/WING session, run the no-WING quick gate and resolve only confirmed unexpected listeners.",
                         "Run the read-only WING preflight runner and capture physical readback artifacts."
@@ -439,6 +453,9 @@ def test_plan_blocks_physical_proof_steps_for_mixed_preflight_artifacts():
                     "prestart_backend_port_check_must_pass_before_starting_backend": True,
                     "prestart_backend_port_check_command": list(
                         PRESTART_BACKEND_PORT_CHECK_COMMAND
+                    ),
+                    "prestart_backend_port_check_failure_detail_fields": list(
+                        PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
                     ),
                     "next_required_actions": [
                         "Do not update readiness rows from missing or invalid preflight evidence."

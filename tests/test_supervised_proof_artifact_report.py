@@ -1,14 +1,18 @@
 import json
 from pathlib import Path
 
+from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+)
 from tools import evaluate_supervised_proof_artifacts as report_tool
 
-PRESTART_BACKEND_PORT_CHECK_COMMAND = [
-    "PYTHONPATH=backend",
-    "python3",
-    "tools/no_wing_release_check.py",
-    "--quick",
-]
+PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+)
 
 
 def write_summary(run_dir: Path, payload: dict) -> Path:
@@ -27,6 +31,10 @@ def assert_prestart_backend_port_check(summary: dict) -> None:
     assert (
         summary["readonly_preflight_prestart_check_command"]
         == PRESTART_BACKEND_PORT_CHECK_COMMAND
+    )
+    assert (
+        summary["readonly_preflight_prestart_check_failure_detail_fields"]
+        == PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
     )
 
 

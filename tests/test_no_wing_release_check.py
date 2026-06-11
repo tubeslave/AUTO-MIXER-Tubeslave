@@ -4971,6 +4971,10 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         "tools/no_wing_release_check.py",
                         "--quick",
                     ],
+                    "prestart_backend_port_check_failure_detail_fields": [
+                        "listener_processes",
+                        "operator_next_step",
+                    ],
                     "blocked_by": [
                         "operator_must_review_readonly_preflight_candidate_before_readiness_update"
                     ],
@@ -5021,6 +5025,18 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "readonly_preflight_evidence_status": "readonly_preflight_candidate_available",
                 "readonly_preflight_blocked_by": [
                     "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+                ],
+                "readonly_preflight_prestart_check_required": True,
+                "readonly_preflight_prestart_check_must_pass_before_starting_backend": True,
+                "readonly_preflight_prestart_check_command": [
+                    "PYTHONPATH=backend",
+                    "python3",
+                    "tools/no_wing_release_check.py",
+                    "--quick",
+                ],
+                "readonly_preflight_prestart_check_failure_detail_fields": [
+                    "listener_processes",
+                    "operator_next_step",
                 ],
                 "readonly_preflight_next_required_actions": [
                     "Manually review the read-only preflight candidate before updating readiness rows."
@@ -10333,6 +10349,10 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
                 "tools/no_wing_release_check.py",
                 "--quick",
             ],
+            "readonly_preflight_prestart_check_failure_detail_fields": [
+                "listener_processes",
+                "operator_next_step",
+            ],
             "readonly_preflight_step_count": 0,
             "readonly_preflight_review_decision_required": True,
             "readonly_preflight_review_decision_accepted": True,
@@ -10393,6 +10413,15 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             "--quick",
         ]
     )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_prestart_check_failure_detail_fields"
+        ]
+        == [
+            "listener_processes",
+            "operator_next_step",
+        ]
+    )
     assert json_summary["next_wing_proof_plan"]["readonly_preflight_step_count"] == 0
     assert (
         json_summary["next_wing_proof_plan"][
@@ -10451,6 +10480,8 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert "readonly_preflight_prestart_check_command" in markdown_summary
+    assert "readonly_preflight_prestart_check_failure_detail_fields" in markdown_summary
+    assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
     assert "readonly_preflight_step_count: `0`" in markdown_summary
     assert "readonly_preflight_review_decision_accepted: `true`" in markdown_summary

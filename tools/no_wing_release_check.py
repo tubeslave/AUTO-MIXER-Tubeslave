@@ -9081,6 +9081,7 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_prestart_check_required = False
     readonly_preflight_prestart_check_must_pass_before_starting_backend = False
     readonly_preflight_prestart_check_command: list[str] = []
+    readonly_preflight_prestart_check_failure_detail_fields: list[str] = []
     readonly_preflight_step_count = 0
     readonly_preflight_review_decision_required = False
     readonly_preflight_review_decision_accepted = False
@@ -9286,6 +9287,20 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 if isinstance(preflight.get("prestart_backend_port_check_command"), list)
                 else []
             )
+            readonly_preflight_prestart_check_failure_detail_fields = (
+                [
+                    str(item)
+                    for item in preflight.get(
+                        "prestart_backend_port_check_failure_detail_fields", []
+                    )
+                    if item
+                ]
+                if isinstance(
+                    preflight.get("prestart_backend_port_check_failure_detail_fields"),
+                    list,
+                )
+                else []
+            )
             if not readonly_preflight_prestart_check_required:
                 violations.append(
                     "next_wing_proof_plan_preflight_prestart_check_not_required"
@@ -9300,6 +9315,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             ):
                 violations.append(
                     "next_wing_proof_plan_preflight_prestart_check_command_mismatch"
+                )
+            if readonly_preflight_prestart_check_failure_detail_fields != list(
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ):
+                violations.append(
+                    "next_wing_proof_plan_preflight_prestart_check_detail_fields_mismatch"
                 )
             expected_candidate = (
                 preflight.get("readiness_update_candidate_available") is True
@@ -9505,6 +9526,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_prestart_check_command"] = (
         readonly_preflight_prestart_check_command
+    )
+    detail["readonly_preflight_prestart_check_failure_detail_fields"] = (
+        readonly_preflight_prestart_check_failure_detail_fields
     )
     detail["readonly_preflight_step_count"] = readonly_preflight_step_count
     detail["readonly_preflight_review_decision_required"] = (
@@ -13061,6 +13085,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         readonly_preflight_prestart_check_command = detail.get(
             "readonly_preflight_prestart_check_command"
         )
+        readonly_preflight_prestart_check_failure_detail_fields = detail.get(
+            "readonly_preflight_prestart_check_failure_detail_fields"
+        )
         readonly_preflight_review_decision_blocked_by = detail.get(
             "readonly_preflight_review_decision_blocked_by"
         )
@@ -13103,6 +13130,14 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_prestart_check_command": (
                 list(readonly_preflight_prestart_check_command)
                 if isinstance(readonly_preflight_prestart_check_command, list)
+                else []
+            ),
+            "readonly_preflight_prestart_check_failure_detail_fields": (
+                list(readonly_preflight_prestart_check_failure_detail_fields)
+                if isinstance(
+                    readonly_preflight_prestart_check_failure_detail_fields,
+                    list,
+                )
                 else []
             ),
             "readonly_preflight_step_count": int(
@@ -15439,6 +15474,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(next_plan['readonly_preflight_prestart_check_must_pass_before_starting_backend']).lower()}`",
                 "- readonly_preflight_prestart_check_command: "
                 f"`{json.dumps(next_plan['readonly_preflight_prestart_check_command'])}`",
+                "- readonly_preflight_prestart_check_failure_detail_fields: "
+                f"`{json.dumps(next_plan['readonly_preflight_prestart_check_failure_detail_fields'])}`",
                 "- readonly_preflight_step_count: "
                 f"`{next_plan['readonly_preflight_step_count']}`",
                 "- readonly_preflight_review_decision_required: "

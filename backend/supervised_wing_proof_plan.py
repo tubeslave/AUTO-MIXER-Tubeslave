@@ -502,6 +502,9 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_prestart_check_command": _string_list(
                 preflight.get("prestart_backend_port_check_command")
             ),
+            "readonly_preflight_prestart_check_failure_detail_fields": _string_list(
+                preflight.get("prestart_backend_port_check_failure_detail_fields")
+            ),
             "readonly_preflight_next_required_actions": _string_list(
                 preflight.get("next_required_actions")
             ),
