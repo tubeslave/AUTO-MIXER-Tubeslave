@@ -17,6 +17,11 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
 
 try:
+    from safety_coverage_matrix import iter_safety_coverage_rows
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.safety_coverage_matrix import iter_safety_coverage_rows
+
+try:
     from wing_readonly_preflight_review_decision import (
         build_wing_readonly_preflight_review_decision_ledger,
     )
@@ -67,6 +72,7 @@ class WingProofPlanStep:
     abort_conditions: Tuple[str, ...]
     expected_artifacts: Tuple[str, ...]
     evidence_blockers_to_review: Tuple[str, ...]
+    required_evidence_components: Tuple[str, ...]
 
     def __post_init__(self) -> None:
         if self.execution_allowed_by_plan:
@@ -84,6 +90,7 @@ class WingProofPlanStep:
             "abort_conditions",
             "expected_artifacts",
             "evidence_blockers_to_review",
+            "required_evidence_components",
         ):
             payload[key] = list(payload[key])
         return payload
@@ -212,6 +219,14 @@ def _row_by_value_type(evidence_snapshot: Mapping[str, Any]) -> Dict[str, Mappin
         str(row.get("value_type")): row
         for row in _evidence_rows(evidence_snapshot)
         if row.get("value_type")
+    }
+
+
+def _required_evidence_components_by_value_type() -> Dict[str, Tuple[str, ...]]:
+    return {
+        row.action_type: tuple(row.required_evidence_components)
+        for row in iter_safety_coverage_rows()
+        if row.required_evidence_components
     }
 
 
@@ -360,6 +375,7 @@ def _build_steps(
     delta_db_by_value_type: Mapping[str, float],
 ) -> Tuple[WingProofPlanStep, ...]:
     rows = _row_by_value_type(evidence_snapshot)
+    required_components = _required_evidence_components_by_value_type()
     steps: list[WingProofPlanStep] = []
     for value_type in ("gain", "fader"):
         row = rows.get(value_type, {})
@@ -393,6 +409,7 @@ def _build_steps(
                     abort_conditions=_abort_conditions(),
                     expected_artifacts=_expected_artifacts(value_type, int(channel)),
                     evidence_blockers_to_review=blockers,
+                    required_evidence_components=required_components.get(value_type, ()),
                 )
             )
     return tuple(steps)

@@ -9473,6 +9473,15 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 continue
             if delta_db >= 0 or abs(delta_db) > 0.5:
                 violations.append(f"next_wing_proof_plan_step_{index}_delta_not_safe_negative_proof")
+            required_evidence_components = (
+                [str(item) for item in step.get("required_evidence_components", []) if item]
+                if isinstance(step.get("required_evidence_components"), list)
+                else []
+            )
+            if value_type == "gain" and required_evidence_components != _required_gain_evidence_components():
+                violations.append(
+                    f"next_wing_proof_plan_step_{index}_gain_evidence_components_mismatch"
+                )
             command = (
                 [str(item) for item in step.get("command", []) if item]
                 if isinstance(step.get("command"), list)

@@ -5108,6 +5108,7 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "abort_conditions": ["operator concern"],
                     "expected_artifacts": ["summary.json"],
                     "evidence_blockers_to_review": ["physical_candidate_missing"],
+                    "required_evidence_components": list(GAIN_REQUIRED_EVIDENCE_COMPONENTS),
                 }
             ],
         },
@@ -5252,6 +5253,23 @@ def test_no_wing_release_check_rejects_next_wing_plan_stale_operator_confirmatio
     )
     assert (
         "next_wing_proof_plan_step_0_operator_confirm_delta_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_next_wing_gain_plan_without_evidence_components(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["next_wing_proof_plan"]["steps"][0]["required_evidence_components"] = [
+        "physical_pre_read"
+    ]
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        "next_wing_proof_plan_step_0_gain_evidence_components_mismatch"
         in result.detail["violations"]
     )
 

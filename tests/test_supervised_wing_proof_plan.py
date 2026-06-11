@@ -12,6 +12,15 @@ PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
 PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
+GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
+    "physical_pre_read",
+    "bounded_gain_down_apply",
+    "apply_readback",
+    "rollback_readback",
+    "emergency_stop_block",
+    "unsafe_gain_up_followup_blocked",
+    "gain_up_operator_authored_opt_in",
+]
 
 
 def assert_prestart_check(summary: dict) -> None:
@@ -258,6 +267,7 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     )
     assert "--prove-blocked-apply" in gain_step["command"]
     assert "--prove-emergency-stop" in gain_step["command"]
+    assert gain_step["required_evidence_components"] == GAIN_REQUIRED_EVIDENCE_COMPONENTS
     assert "ws://proof-backend" in gain_step["command"]
     assert (
         "A clean read-only WING preflight candidate exists and has been manually reviewed."
