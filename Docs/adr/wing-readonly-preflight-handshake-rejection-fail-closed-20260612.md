@@ -18,7 +18,9 @@ errors, which made the first WING MVP blocker harder to diagnose.
 Use option 3. The preflight runner now reports
 `read_only_preflight_ws_handshake_rejected` with blocker
 `ws_handshake_rejected` when the WebSocket handshake is rejected before
-read-only requests are sent.
+read-only requests are sent. The summary also records transport context that
+tells the operator to verify the `--url` points at the intended Automixer
+backend rather than another local service.
 
 ## Why this won
 
@@ -36,7 +38,8 @@ or physical readback evidence was captured.
 
 1. Add a small transport-failure classifier to the runner.
 2. Add a regression test for HTTP 403 handshake rejection before any send.
-3. Document the fail-closed condition in the WING read-only runbook.
+3. Record an operator next-step hint in the fail-closed summary.
+4. Document the fail-closed condition in the WING read-only runbook.
 
 ## Test plan
 

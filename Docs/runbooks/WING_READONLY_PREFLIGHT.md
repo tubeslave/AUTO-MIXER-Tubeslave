@@ -247,7 +247,9 @@ Then update:
   preflight;
 - backend returns an unexpected response type for the request in flight;
 - the backend WebSocket listener rejects the handshake, including HTTP 403
-  before any read-only request is sent;
+  before any read-only request is sent. In this case verify that `--url`
+  points to the intended Automixer backend WebSocket and not another local
+  service on the same port;
 - backend transport fails (including send failure), the request times out, or the
   WebSocket connection is lost;
 - `events.jsonl` is missing or does not match `summary.json`;

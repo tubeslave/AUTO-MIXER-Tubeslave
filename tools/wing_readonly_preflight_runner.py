@@ -190,7 +190,7 @@ def response_request_id_matches(
     return payload.get("request_id") == request.get("request_id")
 
 
-def transport_failure_reason(exc: Exception) -> tuple[str, list[str]]:
+def transport_failure_classification(exc: Exception) -> tuple[str, list[str], Dict[str, Any]]:
     exc_type = type(exc).__name__
     message = str(exc)
     if (
@@ -198,10 +198,29 @@ def transport_failure_reason(exc: Exception) -> tuple[str, list[str]]:
         or "server rejected WebSocket connection" in message
         or "HTTP 403" in message
     ):
-        return "read_only_preflight_ws_handshake_rejected", ["ws_handshake_rejected"]
+        return (
+            "read_only_preflight_ws_handshake_rejected",
+            ["ws_handshake_rejected"],
+            {
+                "handshake_rejected_before_request": True,
+                "preflight_requests_sent": False,
+                "operator_next_step": (
+                    "Verify --url points to the intended Automixer backend "
+                    "WebSocket, not another local service, then rerun the "
+                    "expected-plan preflight."
+                ),
+            },
+        )
     return (
         "read_only_preflight_transport_error",
         ["transport_timeout_or_connection_loss"],
+        {
+            "handshake_rejected_before_request": False,
+            "operator_next_step": (
+                "Verify backend WebSocket reachability and rerun the "
+                "expected-plan preflight."
+            ),
+        },
     )
 
 
@@ -738,13 +757,14 @@ async def run(args: argparse.Namespace) -> int:
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 1
     except Exception as exc:
-        reason, blockers = transport_failure_reason(exc)
+        reason, blockers, transport_context = transport_failure_classification(exc)
         summary.update(
             {
                 "status": "blocked",
                 "reason": reason,
                 "fail_closed": True,
                 "blockers": blockers,
+                "transport_context": transport_context,
                 "transport_failure": {"type": type(exc).__name__, "message": str(exc)},
             }
         )

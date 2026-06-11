@@ -686,6 +686,11 @@ async def test_readonly_preflight_writes_fail_closed_handshake_rejection(
     assert summary["reason"] == "read_only_preflight_ws_handshake_rejected"
     assert summary["fail_closed"] is True
     assert summary["blockers"] == ["ws_handshake_rejected"]
+    assert summary["transport_context"]["handshake_rejected_before_request"] is True
+    assert summary["transport_context"]["preflight_requests_sent"] is False
+    assert "intended Automixer backend WebSocket" in summary["transport_context"][
+        "operator_next_step"
+    ]
     assert summary["transport_failure"]["type"] == "InvalidStatus"
     assert summary["transport_failure"]["message"] == (
         "server rejected WebSocket connection: HTTP 403"
