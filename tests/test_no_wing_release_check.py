@@ -4950,6 +4950,14 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "readiness_update_candidate_available": True,
                     "valid_candidate_count": 1,
                     "invalid_candidate_count": 0,
+                    "prestart_backend_port_check_required": True,
+                    "prestart_backend_port_check_must_pass_before_starting_backend": True,
+                    "prestart_backend_port_check_command": [
+                        "PYTHONPATH=backend",
+                        "python3",
+                        "tools/no_wing_release_check.py",
+                        "--quick",
+                    ],
                     "blocked_by": [
                         "operator_must_review_readonly_preflight_candidate_before_readiness_update"
                     ],
@@ -10304,6 +10312,14 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             "readonly_preflight_blocked_by": [
                 "operator_must_review_readonly_preflight_candidate_before_readiness_update"
             ],
+            "readonly_preflight_prestart_check_required": True,
+            "readonly_preflight_prestart_check_must_pass_before_starting_backend": True,
+            "readonly_preflight_prestart_check_command": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/no_wing_release_check.py",
+                "--quick",
+            ],
             "readonly_preflight_step_count": 0,
             "readonly_preflight_review_decision_required": True,
             "readonly_preflight_review_decision_accepted": True,
@@ -10340,6 +10356,29 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert (
         json_summary["next_wing_proof_plan"]["readonly_preflight_evidence_status"]
         == "readonly_preflight_candidate_available"
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_prestart_check_required"
+        ]
+        is True
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_prestart_check_must_pass_before_starting_backend"
+        ]
+        is True
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_prestart_check_command"
+        ]
+        == [
+            "PYTHONPATH=backend",
+            "python3",
+            "tools/no_wing_release_check.py",
+            "--quick",
+        ]
     )
     assert json_summary["next_wing_proof_plan"]["readonly_preflight_step_count"] == 0
     assert (
@@ -10393,6 +10432,13 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert "## Next WING Proof Plan" in markdown_summary
     assert 'planned_value_types: `["gain"]`' in markdown_summary
     assert "readonly_preflight_candidate_available: `true`" in markdown_summary
+    assert "readonly_preflight_prestart_check_required: `true`" in markdown_summary
+    assert (
+        "readonly_preflight_prestart_check_must_pass_before_starting_backend: `true`"
+        in markdown_summary
+    )
+    assert "readonly_preflight_prestart_check_command" in markdown_summary
+    assert "tools/no_wing_release_check.py" in markdown_summary
     assert "readonly_preflight_step_count: `0`" in markdown_summary
     assert "readonly_preflight_review_decision_accepted: `true`" in markdown_summary
     assert (

@@ -9079,6 +9079,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_candidate_available = False
     readonly_preflight_evidence_status: object = None
     readonly_preflight_blocked_by: list[str] = []
+    readonly_preflight_prestart_check_required = False
+    readonly_preflight_prestart_check_must_pass_before_starting_backend = False
+    readonly_preflight_prestart_check_command: list[str] = []
     readonly_preflight_step_count = 0
     readonly_preflight_review_decision_required = False
     readonly_preflight_review_decision_accepted = False
@@ -9270,6 +9273,35 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 violations.append("next_wing_proof_plan_preflight_status_mismatch")
             if readonly_preflight_blocked_by != _string_list(preflight.get("blocked_by")):
                 violations.append("next_wing_proof_plan_preflight_blockers_mismatch")
+            readonly_preflight_prestart_check_required = (
+                preflight.get("prestart_backend_port_check_required") is True
+            )
+            readonly_preflight_prestart_check_must_pass_before_starting_backend = (
+                preflight.get(
+                    "prestart_backend_port_check_must_pass_before_starting_backend"
+                )
+                is True
+            )
+            readonly_preflight_prestart_check_command = (
+                [str(item) for item in preflight.get("prestart_backend_port_check_command", []) if item]
+                if isinstance(preflight.get("prestart_backend_port_check_command"), list)
+                else []
+            )
+            if not readonly_preflight_prestart_check_required:
+                violations.append(
+                    "next_wing_proof_plan_preflight_prestart_check_not_required"
+                )
+            if not readonly_preflight_prestart_check_must_pass_before_starting_backend:
+                violations.append(
+                    "next_wing_proof_plan_preflight_prestart_check_boundary_missing"
+                )
+            if (
+                readonly_preflight_prestart_check_command
+                != WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+            ):
+                violations.append(
+                    "next_wing_proof_plan_preflight_prestart_check_command_mismatch"
+                )
             expected_candidate = (
                 preflight.get("readiness_update_candidate_available") is True
             )
@@ -9466,6 +9498,15 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     detail["readonly_preflight_candidate_available"] = readonly_preflight_candidate_available
     detail["readonly_preflight_evidence_status"] = readonly_preflight_evidence_status
     detail["readonly_preflight_blocked_by"] = readonly_preflight_blocked_by
+    detail["readonly_preflight_prestart_check_required"] = (
+        readonly_preflight_prestart_check_required
+    )
+    detail["readonly_preflight_prestart_check_must_pass_before_starting_backend"] = (
+        readonly_preflight_prestart_check_must_pass_before_starting_backend
+    )
+    detail["readonly_preflight_prestart_check_command"] = (
+        readonly_preflight_prestart_check_command
+    )
     detail["readonly_preflight_step_count"] = readonly_preflight_step_count
     detail["readonly_preflight_review_decision_required"] = (
         readonly_preflight_review_decision_required
@@ -13018,6 +13059,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         planned_value_types = detail.get("planned_value_types")
         planned_channels = detail.get("planned_channels")
         readonly_preflight_blocked_by = detail.get("readonly_preflight_blocked_by")
+        readonly_preflight_prestart_check_command = detail.get(
+            "readonly_preflight_prestart_check_command"
+        )
         readonly_preflight_review_decision_blocked_by = detail.get(
             "readonly_preflight_review_decision_blocked_by"
         )
@@ -13046,6 +13090,20 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_blocked_by": (
                 list(readonly_preflight_blocked_by)
                 if isinstance(readonly_preflight_blocked_by, list)
+                else []
+            ),
+            "readonly_preflight_prestart_check_required": (
+                detail.get("readonly_preflight_prestart_check_required") is True
+            ),
+            "readonly_preflight_prestart_check_must_pass_before_starting_backend": (
+                detail.get(
+                    "readonly_preflight_prestart_check_must_pass_before_starting_backend"
+                )
+                is True
+            ),
+            "readonly_preflight_prestart_check_command": (
+                list(readonly_preflight_prestart_check_command)
+                if isinstance(readonly_preflight_prestart_check_command, list)
                 else []
             ),
             "readonly_preflight_step_count": int(
@@ -15376,6 +15434,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{next_plan['readonly_preflight_evidence_status']}`",
                 "- readonly_preflight_blocked_by: "
                 f"`{json.dumps(next_plan['readonly_preflight_blocked_by'])}`",
+                "- readonly_preflight_prestart_check_required: "
+                f"`{str(next_plan['readonly_preflight_prestart_check_required']).lower()}`",
+                "- readonly_preflight_prestart_check_must_pass_before_starting_backend: "
+                f"`{str(next_plan['readonly_preflight_prestart_check_must_pass_before_starting_backend']).lower()}`",
+                "- readonly_preflight_prestart_check_command: "
+                f"`{json.dumps(next_plan['readonly_preflight_prestart_check_command'])}`",
                 "- readonly_preflight_step_count: "
                 f"`{next_plan['readonly_preflight_step_count']}`",
                 "- readonly_preflight_review_decision_required: "
