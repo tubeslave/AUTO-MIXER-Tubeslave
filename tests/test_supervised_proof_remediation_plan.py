@@ -96,6 +96,21 @@ def test_legacy_blocked_artifact_gets_current_schema_rerun_action_without_execut
     assert action["live_execution_required"] is True
     assert action["operator_approval_required"] is True
     assert "--execute" in action["command"]
+    assert "--operator-confirm-channel" in action["command"]
+    assert (
+        action["command"][action["command"].index("--operator-confirm-channel") + 1]
+        == "4"
+    )
+    assert "--operator-confirm-value-type" in action["command"]
+    assert (
+        action["command"][action["command"].index("--operator-confirm-value-type") + 1]
+        == "gain"
+    )
+    assert "--operator-confirm-delta-db" in action["command"]
+    assert (
+        action["command"][action["command"].index("--operator-confirm-delta-db") + 1]
+        == "-0.25"
+    )
     assert "--prove-blocked-apply" in action["command"]
     assert "--prove-emergency-stop" in action["command"]
     assert "ws://proof-backend" in action["command"]
