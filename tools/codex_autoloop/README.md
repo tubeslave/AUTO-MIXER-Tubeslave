@@ -116,6 +116,12 @@ you want the background automation active.
   memory/queue/result-consumer/report-only work. The wall-clock cadence remains
   the existing LaunchAgent interval of `21600` seconds when installed; no new
   background service is installed by the guard.
+- When WING Rack is connected, the guarded next action starts with
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before
+  starting the intended backend/WING session, then continues to the read-only
+  WING preflight or manual review of a real preflight artifact. This prestart
+  gate is diagnostic only and does not stop processes, contact WING, or grant
+  live authority.
 - Project Director Agent activation is inside each Codex cycle after the
   direction guard. `tools/codex_autoloop/project_director_agent.py` reads
   `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, and

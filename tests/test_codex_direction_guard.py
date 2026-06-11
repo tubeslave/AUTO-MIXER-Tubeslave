@@ -218,9 +218,13 @@ def test_codex_cycle_prompt_runs_direction_guard_before_plan_and_final_report():
 
 def test_codex_autoloop_readme_documents_direction_guard_activation_time():
     text = README_PATH.read_text(encoding="utf-8")
+    normalized_text = " ".join(text.split())
 
     assert "Direction guard activation" in text
     assert "before task selection" in text
     assert "before the final cycle report" in text
+    assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in text
+    assert "before starting the intended backend/WING session" in normalized_text
+    assert "diagnostic only" in text
     assert "21600" in text
     assert "seconds" in text
