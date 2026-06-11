@@ -16,8 +16,16 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Tuple
 try:
     from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from backend.wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    )
 
 
 WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID = "wing_readonly_preflight_evidence"
@@ -129,6 +137,12 @@ EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS = (
     "unexpected_response_type",
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",
+)
+EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND = tuple(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
 EXPECTED_PLAN_SUMMARY_FIELDS = (
     "proof_artifact_schema",
@@ -407,6 +421,22 @@ def _validate_expected_plan_payload(
             violations.append(f"expected_plan_{field}_not_false")
     if plan.get("manual_review_required_before_readiness_update") is not True:
         violations.append("expected_plan_manual_review_required_not_true")
+    if plan.get("backend_port_prestart_check_required") is not True:
+        violations.append("expected_plan_backend_port_prestart_check_required_not_true")
+    if plan.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
+        violations.append(
+            "expected_plan_backend_port_prestart_check_must_pass_before_starting_backend_not_true"
+        )
+    if plan.get("backend_port_prestart_check_command") != list(
+        EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    ):
+        violations.append("expected_plan_backend_port_prestart_check_command_mismatch")
+    if plan.get("backend_port_prestart_check_failure_detail_fields") != list(
+        EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    ):
+        violations.append(
+            "expected_plan_backend_port_prestart_check_failure_detail_fields_mismatch"
+        )
     if plan.get("allowed_request_types") != list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES):
         violations.append("expected_plan_allowed_request_types_mismatch")
 

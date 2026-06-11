@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 
 from backend.wing_readonly_preflight_evidence import (
+    EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
     EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
     EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
@@ -171,6 +173,14 @@ def _valid_expected_plan(summary: dict) -> dict:
         "physical_preflight_requires_existing_backend_connection": summary[
             "physical_preflight_requires_existing_backend_connection"
         ],
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,

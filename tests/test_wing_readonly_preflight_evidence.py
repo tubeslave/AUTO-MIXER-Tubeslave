@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 from backend.wing_readonly_preflight_evidence import (
+    EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS,
     EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
     EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -179,6 +181,14 @@ def _valid_expected_plan(summary: dict) -> dict:
         "physical_preflight_requires_existing_backend_connection": summary[
             "physical_preflight_requires_existing_backend_connection"
         ],
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
@@ -545,6 +555,10 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
     plan["selected_mvp_blocker_status"] = "closed"
     plan["operator_required"] = False
     plan["plan_output"] = "artifacts/other_plan.json"
+    plan["backend_port_prestart_check_required"] = False
+    plan["backend_port_prestart_check_must_pass_before_starting_backend"] = False
+    plan["backend_port_prestart_check_command"] = ["python3", "other_check.py"]
+    plan["backend_port_prestart_check_failure_detail_fields"] = ["other_field"]
     plan["allowed_request_types"] = ["get_operator_mode", "set_gain"]
     plan["forbidden_request_types"] = ["set_fader"]
     plan["fail_closed_conditions"] = ["backend_not_in_wing_mode"]
@@ -561,6 +575,22 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
     assert "expected_plan_selected_mvp_blocker_status_mismatch" in violations
     assert "expected_plan_operator_required_not_true" in violations
     assert "expected_plan_plan_output_mismatch" in violations
+    assert (
+        "expected_plan_backend_port_prestart_check_required_not_true"
+        in violations
+    )
+    assert (
+        "expected_plan_backend_port_prestart_check_must_pass_before_starting_backend_not_true"
+        in violations
+    )
+    assert (
+        "expected_plan_backend_port_prestart_check_command_mismatch"
+        in violations
+    )
+    assert (
+        "expected_plan_backend_port_prestart_check_failure_detail_fields_mismatch"
+        in violations
+    )
     assert "expected_plan_allowed_request_types_mismatch" in violations
     assert "expected_plan_forbidden_request_types_mismatch" in violations
     assert "expected_plan_forbidden_request_type_missing:set_gain" in violations
