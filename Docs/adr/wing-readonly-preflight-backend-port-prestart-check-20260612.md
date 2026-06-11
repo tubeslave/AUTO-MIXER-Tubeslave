@@ -27,7 +27,9 @@ next WING proof plan validator also requires that the read-only preflight
 overlay carried this pre-start check before it can be treated as aligned with
 the supervised proof plan. The backend autonomy readiness snapshot now emits the
 same pre-start check metadata, and the supervised proof plan summary preserves
-it.
+it. The canonical command and diagnostic detail field list now live in
+`backend/wing_readonly_preflight_contract.py` so backend readiness and the
+no-WING release gate cannot silently drift.
 
 ## Why this won
 
@@ -53,7 +55,9 @@ intended backend to be reachable.
    overlay validation.
 6. Emit the pre-start check from backend autonomy readiness and carry it through
    supervised proof plan summaries.
-7. Clarify the runbook sequence.
+7. Centralize the pre-start command and diagnostic detail fields in a shared
+   backend contract module.
+8. Clarify the runbook sequence.
 
 ## Test plan
 

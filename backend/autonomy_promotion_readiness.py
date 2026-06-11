@@ -16,12 +16,20 @@ try:
     from project_goal_capability_matrix import get_project_goal_capability
     from read_surface_inventory import get_read_surface
     from safety_coverage_matrix import get_safety_coverage_row
+    from wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    )
     from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from write_surface_inventory import get_write_surface
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.project_goal_capability_matrix import get_project_goal_capability
     from backend.read_surface_inventory import get_read_surface
     from backend.safety_coverage_matrix import get_safety_coverage_row
+    from backend.wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    )
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from backend.write_surface_inventory import get_write_surface
 
@@ -54,18 +62,6 @@ GAP_BUCKETS = (
     "evidence_requirement",
     "other",
 )
-
-WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
-    "PYTHONPATH=backend",
-    "python3",
-    "tools/no_wing_release_check.py",
-    "--quick",
-)
-WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FIELDS = (
-    "listener_processes",
-    "operator_next_step",
-)
-
 
 @dataclass(frozen=True)
 class PromotionTarget:
@@ -396,7 +392,7 @@ def _wing_readonly_preflight_readiness_overlay(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
         ),
         "prestart_backend_port_check_failure_detail_fields": list(
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FIELDS
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
         "candidate_blocker_ids": candidate_ids,
         "closed_blocker_ids": closed_ids,

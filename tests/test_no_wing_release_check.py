@@ -6,6 +6,10 @@ from pathlib import Path
 import pytest
 
 from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status
+from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+)
 from tools import no_wing_release_check as release_check
 from tools.no_wing_release_check import (
     CheckResult,
@@ -107,6 +111,15 @@ from tools.no_wing_release_check import (
     wing_readonly_preflight_plan_path_for_run,
     write_summary,
 )
+
+
+def test_wing_readonly_preflight_prestart_contract_uses_shared_backend_constants():
+    assert release_check.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert list(
+        release_check.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    ) == list(WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS)
 
 
 def test_no_wing_release_check_commands_have_no_live_write_tokens(tmp_path):

@@ -293,6 +293,7 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
     build_wing_readonly_preflight_evidence,
 )
+from backend import wing_readonly_preflight_contract as preflight_contract  # noqa: E402
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES,
@@ -335,12 +336,15 @@ WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflig
 WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
     "artifacts/wing_readonly_preflight_plan/latest_plan.json"
 )
-WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = [
-    "PYTHONPATH=backend",
-    "python3",
-    "tools/no_wing_release_check.py",
-    "--quick",
-]
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
+    preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
+    getattr(
+        preflight_contract,
+        "WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS",
+    )
+)
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
@@ -2980,12 +2984,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_capture_expected_plan_missing")
     if capture_expected_plan != plan_output:
         violations.append("wing_readonly_preflight_capture_expected_plan_mismatch")
-    if prestart_backend_port_check_command != [
-        "PYTHONPATH=backend",
-        "python3",
-        "tools/no_wing_release_check.py",
-        "--quick",
-    ]:
+    if (
+        prestart_backend_port_check_command
+        != WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    ):
         violations.append(
             "wing_readonly_preflight_prestart_backend_port_check_command_mismatch"
         )
@@ -3091,10 +3093,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["prestart_backend_port_check_command"] = list(
         prestart_backend_port_check_command
     )
-    detail["prestart_backend_port_check_failure_detail_fields"] = [
-        "listener_processes",
-        "operator_next_step",
-    ]
+    detail["prestart_backend_port_check_failure_detail_fields"] = list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     detail["capture_command_template"] = capture_command
     detail["capture_command_channels"] = capture_channels
     detail["capture_command_operator_confirmed_channels"] = capture_confirmed_channels
@@ -3275,10 +3276,9 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_check_command_mismatch"
         )
-    if plan.get("backend_port_prestart_check_failure_detail_fields") != [
-        "listener_processes",
-        "operator_next_step",
-    ]:
+    if plan.get("backend_port_prestart_check_failure_detail_fields") != list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    ):
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_check_detail_fields_mismatch"
         )
@@ -3586,10 +3586,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     ):
         if packet.get(key) is not True:
             violations.append(f"wing_readonly_preflight_handoff_packet_{key}_not_true")
-    if packet.get("backend_port_prestart_check_failure_detail_fields") != [
-        "listener_processes",
-        "operator_next_step",
-    ]:
+    if packet.get("backend_port_prestart_check_failure_detail_fields") != list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    ):
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_check_detail_fields_mismatch"
         )
