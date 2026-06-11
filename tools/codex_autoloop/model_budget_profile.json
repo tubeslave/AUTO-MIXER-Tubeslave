@@ -1,0 +1,98 @@
+{
+  "schema": "automixer.codex_autoloop.model_budget.v1",
+  "timezone": "Europe/Moscow",
+  "default_profile": "budget_balanced",
+  "fallback_profile": "budget_light",
+  "state_path": "logs/codex_autoloop/model_budget_state.json",
+  "profiles": {
+    "budget_light": {
+      "model": "gpt-5",
+      "reasoning_effort": "low",
+      "daily_limit": 4,
+      "weekly_limit": 21,
+      "monthly_limit": 80,
+      "allowed_roles": [
+        "Scout",
+        "Director"
+      ],
+      "description": "Cheap evidence gathering, report review, small docs, and deterministic task selection."
+    },
+    "budget_balanced": {
+      "model": "gpt-5.5",
+      "reasoning_effort": "medium",
+      "daily_limit": 2,
+      "weekly_limit": 10,
+      "monthly_limit": 36,
+      "allowed_roles": [
+        "Director",
+        "Implementer",
+        "Safety Reviewer"
+      ],
+      "description": "Default implementation profile for scoped blocker work."
+    },
+    "budget_strict": {
+      "model": "gpt-5.5",
+      "reasoning_effort": "medium",
+      "daily_limit": 1,
+      "weekly_limit": 7,
+      "monthly_limit": 24,
+      "allowed_roles": [
+        "Safety Reviewer"
+      ],
+      "description": "Safety-heavy review profile for live-sound gates and rollback/fail-closed reasoning."
+    },
+    "premium_high": {
+      "model": "gpt-5.5",
+      "reasoning_effort": "high",
+      "daily_limit": 1,
+      "weekly_limit": 1,
+      "monthly_limit": 3,
+      "allowed_roles": [
+        "Heavy Architect"
+      ],
+      "description": "Rare high-reasoning architecture review. Disabled for normal daily automation."
+    }
+  },
+  "task_routes": [
+    {
+      "match": [
+        "status",
+        "evidence",
+        "report",
+        "read-only",
+        "preflight"
+      ],
+      "profile": "budget_light"
+    },
+    {
+      "match": [
+        "test",
+        "implementation",
+        "runner",
+        "validator",
+        "proof artifact"
+      ],
+      "profile": "budget_balanced"
+    },
+    {
+      "match": [
+        "safety",
+        "rollback",
+        "emergency stop",
+        "fail-closed",
+        "operator approval"
+      ],
+      "profile": "budget_strict"
+    }
+  ],
+  "skip_policy": {
+    "skip_when_all_profiles_exhausted": true,
+    "skip_exit_code": 0,
+    "message": "Automixer autoloop skipped to preserve daily/weekly/monthly GPT budget."
+  },
+  "overrides": {
+    "profile_env": "CODEX_AUTOLOOP_MODEL_PROFILE",
+    "model_env": "CODEX_AUTOLOOP_MODEL",
+    "reasoning_env": "CODEX_AUTOLOOP_REASONING_EFFORT"
+  }
+}

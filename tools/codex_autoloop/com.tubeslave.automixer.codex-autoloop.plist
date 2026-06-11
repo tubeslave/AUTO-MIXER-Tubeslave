@@ -31,6 +31,10 @@
     <string>1</string>
     <key>CODEX_AUTOLOOP_EXPECTED_PROJECT_ROOT</key>
     <string>/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main</string>
+    <key>CODEX_AUTOLOOP_MODEL_PROFILE</key>
+    <string>budget_balanced</string>
+    <key>CODEX_AUTOLOOP_TASK_HINT</key>
+    <string>supervised WING Rack MVP blocker</string>
   </dict>
 
   <key>StandardOutPath</key>

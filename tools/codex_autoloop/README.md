@@ -1,7 +1,8 @@
 # Codex Autoloop LaunchAgent
 
 This folder prepares a local macOS LaunchAgent that can run safe Codex
-development cycles for Automixer every 6 hours.
+development cycles for Automixer every 6 hours, with a local model-budget gate
+before each cycle.
 
 It is not installed automatically. Review the files first, then install only if
 you want the background automation active.
@@ -10,6 +11,9 @@ you want the background automation active.
 
 - `run_codex_cycle.sh` - one-shot wrapper that runs one Codex cycle and exits.
 - `codex_cycle_prompt.md` - prompt used by each Codex cycle.
+- `model_budget_profile.json` - local daily/weekly/monthly model profile caps.
+- `check_model_budget.py` - selects the cheapest safe model profile for one
+  cycle and records reservations in `logs/codex_autoloop/model_budget_state.json`.
 - `validate_cycle_report.py` - local checker for required cycle-report evidence.
 - `../no_wing_release_check.py` - timeout-bounded offline release-check runner
   for backend/frontend gates without WING access.
@@ -17,14 +21,17 @@ you want the background automation active.
 
 ## Behavior
 
-- The LaunchAgent starts one Codex cycle every `21600` seconds.
-- Codex limit checks are disabled. The wrapper does not inspect quota state and
-  does not skip runs based on limits.
-- Current policy supersedes older local reports that described a limit gate:
-  this checkout has no `check_codex_limits.py`, no `codex_limits.example.json`,
-  and no limit-state environment contract in the runner or plist. Reintroducing
-  limit gating should be a separate reviewed change with matching tests and
-  docs.
+- The LaunchAgent attempts one Codex cycle every `21600` seconds.
+- Before Codex starts, `check_model_budget.py` selects a model profile from
+  `model_budget_profile.json` and reserves one local budget event.
+- The budget gate cannot read provider-side tariff usage. It protects the plan
+  conservatively by limiting automated requests for expensive profiles:
+  `budget_light`, `budget_balanced`, `budget_strict`, and rare `premium_high`.
+- If all allowed local profiles are exhausted, the wrapper exits successfully
+  without starting Codex so quota is preserved for the next day/week/month.
+- The default automated path avoids GPT-5.5 high reasoning. High reasoning is
+  reserved for rare architecture/safety review windows and is disabled for
+  normal daily automation by the profile.
 - The wrapper has a hard project-root guard and refuses to run unless both the
   script path and git root resolve to
   `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`.
@@ -121,8 +128,9 @@ you want the background automation active.
   subprocess check has a default timeout and records a `timeout` result instead
   of leaving an autonomous run silent indefinitely.
 - Requires `codex` CLI to be available.
-- Uses `codex exec -C <project> --sandbox workspace-write`.
+- Uses `codex exec -C <project> --sandbox workspace-write --model <selected>`.
 - Sets Codex approval policy to `never` for non-interactive execution.
+- Sets `model_reasoning_effort` from the selected profile.
 - Does not enable live WING/OSC writes. The prompt explicitly requires
   dry-run/audit-only behavior for risky actions.
 - Does not commit or push.
@@ -140,6 +148,29 @@ plutil -lint tools/codex_autoloop/com.tubeslave.automixer.codex-autoloop.plist
 Dry run still checks the project-root, prompt, validator, and lock contract, but
 it does not require a working Codex CLI executable because it never starts
 `codex exec`.
+
+The dry run also prints the selected local model profile without reserving a
+budget event.
+
+## Model Budget Overrides
+
+The default profile is conservative. For one manual cycle you can override it:
+
+```bash
+CODEX_AUTOLOOP_MODEL_PROFILE=budget_light tools/codex_autoloop/run_codex_cycle.sh
+CODEX_AUTOLOOP_MODEL_PROFILE=budget_strict tools/codex_autoloop/run_codex_cycle.sh
+```
+
+Use `premium_high` only for explicit architecture/safety review. It is capped
+by `model_budget_profile.json` and is not part of normal daily automation.
+
+You may override the exact model string if the local Codex installation exposes
+a different model name:
+
+```bash
+CODEX_AUTOLOOP_MODEL=gpt-5.5 CODEX_AUTOLOOP_REASONING_EFFORT=low \
+  tools/codex_autoloop/run_codex_cycle.sh
+```
 
 If `shellcheck` is installed:
 

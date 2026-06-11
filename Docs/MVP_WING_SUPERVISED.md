@@ -8,6 +8,12 @@ This is the current MVP rail for Automixer. The long-term goal is a capable AI
 mixing engineer, but the current project milestone is narrower: prove one safe
 supervised hardware loop on WING Rack before broad autonomy work continues.
 
+Goal-mode Codex automation must also follow
+`.ai/project-layer/autonomous_mvp_and_model_routing.md` and
+`.ai/agent-core/model_budget_policy.md`. Those files preserve the full project
+goal while preventing daily/weekly/monthly model budget from being consumed by
+broad, high-reasoning work before the supervised WING proof is ready.
+
 ## In Scope
 
 The MVP includes only:
@@ -102,3 +108,11 @@ work, but only on the first non-closed MVP blocker.
 Run the read-only preflight runbook when WING Rack and backend are ready:
 
 `Docs/runbooks/WING_READONLY_PREFLIGHT.md`
+
+## Autonomy Budget Rule
+
+Automated cycles may continue without asking "continue?", but they must be
+bounded by `tools/codex_autoloop/model_budget_profile.json`. If the expensive
+profile is exhausted, Codex must keep work on the MVP rail with a cheaper model
+profile or skip the cycle cleanly instead of spending GPT-5.5 high reasoning on
+routine reports.

@@ -9,6 +9,9 @@ Paperclip, ADRs, tests, or git history.
 
 - Use `Docs/MVP_WING_SUPERVISED.md` and
   `.ai/project-layer/wing_mvp_blockers.md` as the current execution rail.
+- Use `.ai/project-layer/autonomous_mvp_and_model_routing.md` and
+  `.ai/agent-core/model_budget_policy.md` for Goal-mode autonomy, virtual
+  subagent routing, and model-budget protection.
 - Follow `tools/codex_autoloop/project_director_agent.py` before selecting
   Codex work; the selected task must come from the first non-closed WING MVP
   blocker.
@@ -28,6 +31,8 @@ Paperclip, ADRs, tests, or git history.
 - Do not let report automation become a WING/OSC write path.
 - Do not let Project Director Agent become a code-writing or live-WING actor;
   it is an audit/planning agent only.
+- Do not spend GPT-5.5 high reasoning on routine cycles; use the local budget
+  gate and keep high reasoning for rare architecture/safety review windows.
 - Do not treat shadow-only or offline-only evidence as live readiness.
 - Do not widen correction-method live writes before the supervised WING MVP
   hardware proof and a separate ADR.

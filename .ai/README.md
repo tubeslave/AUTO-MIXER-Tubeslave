@@ -14,6 +14,17 @@ This directory is the shared memory layer between Codex.app, Codex CLI, Kimi CLI
 - `.ai/project-layer/` - Automixer-specific goal, architecture, WING policy, safety, tasks, decisions, experiments, reports, and glossary
 - `.ai/pipeline/` - Markdown memory pipeline, Codex/Paperclip cycles, and append templates
 
+## Autonomy And Model Budget
+
+- `.ai/agent-core/model_budget_policy.md` - virtual subagent roles and model
+  escalation rules for autonomous Codex cycles
+- `.ai/project-layer/autonomous_mvp_and_model_routing.md` - preserved full
+  Automixer goal, current supervised WING MVP, and model routing strategy
+- `tools/codex_autoloop/model_budget_profile.json` - local daily/weekly/monthly
+  profile caps for GPT model use
+- `tools/codex_autoloop/check_model_budget.py` - selects or skips one cycle
+  before `codex exec` starts
+
 ## Project-Specific Notes
 
 - Use `Docs/adr/`, not `docs/adr/`. This repository already uses `Docs/`, and keeping one canonical path avoids case-related confusion on macOS.
