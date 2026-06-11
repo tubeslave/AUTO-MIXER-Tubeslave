@@ -293,6 +293,7 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
     build_wing_readonly_preflight_evidence,
 )
+from backend.safety_coverage_matrix import get_safety_coverage_row  # noqa: E402
 from backend import wing_readonly_preflight_contract as preflight_contract  # noqa: E402
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
@@ -325,6 +326,13 @@ DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
 DEFAULT_BACKEND_PORT = 8765
 DEFAULT_COMMAND_TIMEOUT_SEC = 900
 AUTONOMY_GAP_ROLLUP_SOURCE = "autonomy_mode_transition_gate.rows[mode=auto]"
+
+
+def _required_gain_evidence_components() -> list[str]:
+    row = get_safety_coverage_row("gain_supervised")
+    return list(row.required_evidence_components) if row else []
+
+
 DEFAULT_HOMEBREW_GIT = Path("/opt/homebrew/bin/git")
 GAIN_DRY_RUN_REASON = "no_wing_release_gain_dry_run"
 REPO_LOCAL_COMMAND_OUTPUT_FLAGS = {"--artifact-root", "--output", "--plan-output"}
@@ -1514,6 +1522,10 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
             violations.append("autonomy_gap_rollup_evidence_by_family_empty")
         if int(rollup_counts.get("evidence_requirement") or 0) > 0 and not next_by_family:
             violations.append("autonomy_gap_rollup_next_by_family_empty")
+        required_gain_evidence_components = _required_gain_evidence_components()
+        gain_evidence_components = evidence_by_family.get("gain", [])
+        if gain_evidence_components != required_gain_evidence_components:
+            violations.append("autonomy_gap_rollup_gain_evidence_components_mismatch")
         if gate_summary.get("autonomous_apply_allowed_modes") != []:
             violations.append("mode_gate_autonomous_apply_modes_not_empty")
         blocked_modes = gate_summary.get("blocked_modes")
@@ -1545,6 +1557,7 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
         detail["autonomy_gap_rollup_present"] = bool(rollup)
         detail["full_auto_gap_bucket_counts"] = dict(rollup_counts)
         detail["evidence_requirement_ids_by_action_family"] = evidence_by_family
+        detail["required_gain_evidence_components"] = required_gain_evidence_components
         detail["next_required_evidence_by_action_family"] = next_by_family
         detail["supervised_current_live_write_kinds"] = list(supervised_write_kinds)
         detail["policy_supervised_live_write_kinds"] = list(current_supervised_live_write_kinds())

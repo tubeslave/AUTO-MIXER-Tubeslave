@@ -112,6 +112,16 @@ from tools.no_wing_release_check import (
     write_summary,
 )
 
+GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
+    "physical_pre_read",
+    "bounded_gain_down_apply",
+    "apply_readback",
+    "rollback_readback",
+    "emergency_stop_block",
+    "unsafe_gain_up_followup_blocked",
+    "gain_up_operator_authored_opt_in",
+]
+
 
 def test_wing_readonly_preflight_prestart_contract_uses_shared_backend_constants():
     assert release_check.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND == list(
@@ -4792,8 +4802,9 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "full_autonomous_ready": False,
                 "source": "autonomy_mode_transition_gate.rows[mode=auto]",
                 "full_autonomous_blocked": True,
-                "full_auto_gap_bucket_counts": {"read_surface": 1, "evidence_requirement": 12},
+                "full_auto_gap_bucket_counts": {"read_surface": 1, "evidence_requirement": 19},
                 "evidence_requirement_ids_by_action_family": {
+                    "gain": list(GAIN_REQUIRED_EVIDENCE_COMPONENTS),
                     "bus_group_matrix": [
                         "bus_group_assignment_cache_freshness",
                         "bus_group_fader_readback",
@@ -5113,8 +5124,14 @@ def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path
     assert result.detail["autonomy_gap_rollup_present"] is True
     assert result.detail["full_auto_gap_bucket_counts"] == {
         "read_surface": 1,
-        "evidence_requirement": 12,
+        "evidence_requirement": 19,
     }
+    assert result.detail["evidence_requirement_ids_by_action_family"]["gain"] == (
+        GAIN_REQUIRED_EVIDENCE_COMPONENTS
+    )
+    assert result.detail["required_gain_evidence_components"] == (
+        GAIN_REQUIRED_EVIDENCE_COMPONENTS
+    )
     assert result.detail["evidence_requirement_ids_by_action_family"]["bus_group_matrix"] == [
         "bus_group_assignment_cache_freshness",
         "bus_group_fader_readback",
@@ -5611,6 +5628,28 @@ def test_no_wing_release_check_rejects_missing_proof_report_gap_rollup(tmp_path)
     assert "autonomy_gap_rollup_source_not_auto_mode_gate_row" in result.detail["violations"]
     assert "autonomy_gap_rollup_evidence_by_family_missing" in result.detail["violations"]
     assert "autonomy_gap_rollup_next_by_family_missing" in result.detail["violations"]
+    assert "autonomy_gap_rollup_gain_evidence_components_mismatch" in (
+        result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_gap_rollup_without_gain_evidence_components(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["summary"]["autonomy_gap_rollup"][
+        "evidence_requirement_ids_by_action_family"
+    ]["gain"] = ["physical_pre_read"]
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_gap_rollup(report_path)
+
+    assert result.status == "failed"
+    assert result.detail["required_gain_evidence_components"] == (
+        GAIN_REQUIRED_EVIDENCE_COMPONENTS
+    )
+    assert "autonomy_gap_rollup_gain_evidence_components_mismatch" in (
+        result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims(tmp_path):
@@ -6527,9 +6566,10 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
             "full_auto_gap_bucket_counts": {
                 "read_surface": 14,
                 "write_surface": 19,
-                "evidence_requirement": 12,
+                "evidence_requirement": 19,
             },
             "evidence_requirement_ids_by_action_family": {
+                "gain": list(GAIN_REQUIRED_EVIDENCE_COMPONENTS),
                 "bus_group_matrix": [
                     "bus_group_assignment_cache_freshness",
                     "bus_group_fader_readback",
@@ -6561,8 +6601,11 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert json_summary["autonomy_gap_rollup"]["full_auto_gap_bucket_counts"] == {
         "read_surface": 14,
         "write_surface": 19,
-        "evidence_requirement": 12,
+        "evidence_requirement": 19,
     }
+    assert json_summary["autonomy_gap_rollup"]["evidence_requirement_ids_by_action_family"][
+        "gain"
+    ] == GAIN_REQUIRED_EVIDENCE_COMPONENTS
     assert json_summary["autonomy_gap_rollup"]["evidence_requirement_ids_by_action_family"][
         "bus_group_matrix"
     ] == [
@@ -6578,6 +6621,7 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert "full_auto_gap_bucket_counts" in markdown_summary
     assert '"read_surface": 14' in markdown_summary
     assert "evidence_requirement_ids_by_action_family" in markdown_summary
+    assert "bounded_gain_down_apply" in markdown_summary
     assert "bus_group_assignment_cache_freshness" in markdown_summary
     assert "next_required_evidence_by_action_family" in markdown_summary
     assert (
