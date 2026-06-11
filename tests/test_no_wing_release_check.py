@@ -1,4 +1,5 @@
 import json
+import socket
 import sys
 from pathlib import Path
 
@@ -10267,6 +10268,59 @@ def test_no_wing_release_check_records_command_timeout(tmp_path):
     assert "Command timed out after 2.0 seconds." in Path(result.stderr_log).read_text()
 
 
+def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
+    listener_processes = [
+        {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
+    ]
+    monkeypatch.setattr(
+        release_check,
+        "_listener_processes_for_port",
+        lambda port: (listener_processes, None),
+    )
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+
+        result = release_check.check_port_free(port=port)
+
+    assert result.status == "failed"
+    assert result.detail["listener_detected"] is True
+    assert result.detail["listener_processes"] == listener_processes
+    assert "listener_process_error" not in result.detail
+
+
+def test_listener_processes_for_port_parses_lsof_field_output(monkeypatch):
+    def fake_run(command, capture_output, check, text, timeout):
+        assert command == (
+            "lsof",
+            "-nP",
+            "-iTCP:8765",
+            "-sTCP:LISTEN",
+            "-F",
+            "pcn",
+        )
+        assert capture_output is True
+        assert check is False
+        assert text is True
+        assert timeout == 1.0
+        return release_check.subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="p87210\ncPython\nnTCP *:8765 (LISTEN)\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(release_check.subprocess, "run", fake_run)
+
+    processes, error = release_check._listener_processes_for_port(8765)
+
+    assert error is None
+    assert processes == [
+        {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
+    ]
+
+
 def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeypatch):
     def fake_busy_port_check(port: int, host: str = "127.0.0.1") -> CheckResult:
         return CheckResult(
@@ -10278,6 +10332,9 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
             detail={
                 "host": host,
                 "listener_detected": True,
+                "listener_processes": [
+                    {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
+                ],
                 "policy": "port_must_not_have_unexpected_listener",
                 "port": port,
             },

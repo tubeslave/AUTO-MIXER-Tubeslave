@@ -1237,6 +1237,56 @@ def _looks_like_local_path_token(value: object) -> bool:
     return "/" in text or "\\" in text
 
 
+def _listener_processes_for_port(port: int) -> tuple[list[dict[str, object]], str | None]:
+    command = (
+        "lsof",
+        "-nP",
+        f"-iTCP:{port}",
+        "-sTCP:LISTEN",
+        "-F",
+        "pcn",
+    )
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=1.0,
+        )
+    except FileNotFoundError:
+        return [], "lsof_not_available"
+    except subprocess.TimeoutExpired:
+        return [], "lsof_timeout"
+    except OSError as exc:
+        return [], f"lsof_error:{exc.__class__.__name__}"
+
+    if completed.returncode != 0:
+        stderr = completed.stderr.strip()
+        if stderr:
+            return [], f"lsof_failed:{stderr}"
+        return [], f"lsof_failed:returncode_{completed.returncode}"
+
+    processes: list[dict[str, object]] = []
+    current: dict[str, object] = {}
+    for raw_line in completed.stdout.splitlines():
+        if not raw_line:
+            continue
+        field = raw_line[0]
+        value = raw_line[1:]
+        if field == "p":
+            if current:
+                processes.append(current)
+            current = {"pid": int(value) if value.isdigit() else value}
+        elif field == "c":
+            current["command"] = value
+        elif field == "n":
+            current["name"] = value
+    if current:
+        processes.append(current)
+    return processes, None
+
+
 def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -> CheckResult:
     started = datetime.now(timezone.utc)
     detail: dict[str, object] = {"host": host, "port": port, "policy": "port_must_not_have_unexpected_listener"}
@@ -1245,6 +1295,11 @@ def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -
         connected = sock.connect_ex((host, port)) == 0
     finished = datetime.now(timezone.utc)
     detail["listener_detected"] = connected
+    if connected:
+        listener_processes, listener_process_error = _listener_processes_for_port(port)
+        detail["listener_processes"] = listener_processes
+        if listener_process_error:
+            detail["listener_process_error"] = listener_process_error
     return CheckResult(
         name="backend_port_free",
         status="failed" if connected else "passed",
