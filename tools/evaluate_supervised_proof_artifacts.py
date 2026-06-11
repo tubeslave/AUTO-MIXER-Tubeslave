@@ -25,6 +25,7 @@ from backend.supervised_proof_artifact_evaluator import (  # noqa: E402
     EVALUATION_STATUSES,
     evaluate_supervised_proof_artifact_dict,
 )
+from backend.safety_coverage_matrix import iter_safety_coverage_rows  # noqa: E402
 from backend.autonomy_evidence_overlay import build_autonomy_evidence_overlay  # noqa: E402
 from backend.autonomy_mode_transition_gate import build_autonomy_mode_transition_gate  # noqa: E402
 from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot  # noqa: E402
@@ -144,6 +145,14 @@ def _string_list_map(value: Any) -> dict[str, list[str]]:
     return normalized
 
 
+def _required_evidence_components_by_value_type() -> dict[str, list[str]]:
+    return {
+        row.action_type: list(row.required_evidence_components)
+        for row in iter_safety_coverage_rows()
+        if row.required_evidence_components
+    }
+
+
 def _promotion_gap_summary(report: Mapping[str, Any]) -> Mapping[str, Any]:
     readiness = report.get("autonomy_promotion_readiness")
     if not isinstance(readiness, Mapping):
@@ -256,6 +265,9 @@ def build_supervised_proof_artifact_report(
             "blocked_proof_ids": blocked_ids,
             "autonomous_ready_proof_ids": [],
             "require_physical": require_physical,
+            "required_evidence_components_by_value_type": (
+                _required_evidence_components_by_value_type()
+            ),
             "next_required_evidence": [
                 "Run physical supervised fader/gain proof before changing safety coverage rows."
                 if not promotion_ids

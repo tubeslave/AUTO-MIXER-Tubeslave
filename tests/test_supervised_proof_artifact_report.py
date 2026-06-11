@@ -13,6 +13,15 @@ PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
 PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
+GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
+    "physical_pre_read",
+    "bounded_gain_down_apply",
+    "apply_readback",
+    "rollback_readback",
+    "emergency_stop_block",
+    "unsafe_gain_up_followup_blocked",
+    "gain_up_operator_authored_opt_in",
+]
 
 
 def write_summary(run_dir: Path, payload: dict) -> Path:
@@ -226,6 +235,9 @@ def test_report_distinguishes_dry_run_physical_ignored_and_invalid_summaries(tmp
     assert report["summary"]["dry_run_ready_proof_ids"] == ["dry-gain-proof"]
     assert report["summary"]["blocked_proof_ids"] == ["20260523T104641Z_wing_operator_proposal_ch4_gain"]
     assert report["summary"]["autonomous_ready_proof_ids"] == []
+    assert report["summary"]["required_evidence_components_by_value_type"]["gain"] == (
+        GAIN_REQUIRED_EVIDENCE_COMPONENTS
+    )
     assert report["ignored_summaries"] == [str(ignored)]
     assert report["invalid_summaries"] == [{"artifact_path": str(invalid), "reason": "json_load_error:JSONDecodeError"}]
 
@@ -347,6 +359,9 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
         "mute_physical_fixture",
         "hardware_readback_rollback_and_emergency_proof",
     ]
+    assert gap_rollup["evidence_requirement_ids_by_action_family"]["gain"] == (
+        GAIN_REQUIRED_EVIDENCE_COMPONENTS
+    )
     assert "Add bus/group/matrix safety review" in (
         gap_rollup["next_required_evidence_by_action_family"]["bus_group_matrix"][0]
     )
