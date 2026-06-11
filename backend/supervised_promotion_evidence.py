@@ -53,6 +53,7 @@ class SupervisedPromotionEvidenceRow:
     blocked_proof_ids: Tuple[str, ...]
     blockers: Tuple[str, ...]
     next_required_evidence: Tuple[str, ...]
+    safety_required_evidence_components: Tuple[str, ...]
 
     def __post_init__(self) -> None:
         if self.status not in EVIDENCE_STATUSES:
@@ -70,6 +71,7 @@ class SupervisedPromotionEvidenceRow:
             "blocked_proof_ids",
             "blockers",
             "next_required_evidence",
+            "safety_required_evidence_components",
         ):
             payload[key] = list(payload[key])
         return payload
@@ -178,6 +180,9 @@ def _build_row(
         blocked_proof_ids=_ids(blocked),
         blockers=evidence_blockers,
         next_required_evidence=_next_evidence_for(value_type, has_physical_candidate=safety_row_review_candidate),
+        safety_required_evidence_components=(
+            tuple(safety.required_evidence_components) if safety else ()
+        ),
     )
 
 

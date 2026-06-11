@@ -40,6 +40,7 @@ class SafetyCoverageRow:
     emergency_stop_proof: str
     current_blocker: str
     next_required_evidence: str
+    required_evidence_components: Tuple[str, ...] = ()
     notes: Tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -105,6 +106,15 @@ SAFETY_COVERAGE_ROWS: Tuple[SafetyCoverageRow, ...] = (
         emergency_stop_proof="missing",
         current_blocker="Physical WING gain proof is not complete.",
         next_required_evidence="One small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and blocked unsafe follow-up.",
+        required_evidence_components=(
+            "physical_pre_read",
+            "bounded_gain_down_apply",
+            "apply_readback",
+            "rollback_readback",
+            "emergency_stop_block",
+            "unsafe_gain_up_followup_blocked",
+            "gain_up_operator_authored_opt_in",
+        ),
         notes=("gain-up remains blocked unless operator-authored",),
     ),
     SafetyCoverageRow(

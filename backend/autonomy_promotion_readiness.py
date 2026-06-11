@@ -421,7 +421,9 @@ def _target_readiness(target: PromotionTarget, *, full_autonomous_blocked: bool)
     if safety is None:
         blockers.append("safety_coverage_row_missing")
         next_required.append("Create a safety coverage row with unit, offline, fake-mixer, real-WING, readback, rollback, and emergency-stop proof states.")
+        safety_required_evidence_components: Tuple[str, ...] = ()
     else:
+        safety_required_evidence_components = tuple(safety.required_evidence_components)
         if not safety.live_allowed:
             blockers.append("safety_live_not_allowed")
         if safety.status in {"blocked", "quarantined"}:
@@ -494,7 +496,16 @@ def _target_readiness(target: PromotionTarget, *, full_autonomous_blocked: bool)
         write_surface_statuses=tuple(surface.status for surface in write_surfaces),
         read_surface_ids=tuple(surface.id for surface in read_surfaces),
         read_surface_statuses=tuple(surface.status for surface in read_surfaces),
-        evidence_requirement_ids=target.evidence_requirement_ids,
+        evidence_requirement_ids=tuple(
+            dict.fromkeys(
+                item
+                for item in (
+                    *target.evidence_requirement_ids,
+                    *safety_required_evidence_components,
+                )
+                if item
+            )
+        ),
         blockers=tuple(sorted(set(blockers))),
         next_required_evidence=tuple(dict.fromkeys(item for item in next_required if item)),
     )

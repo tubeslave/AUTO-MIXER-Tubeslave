@@ -165,6 +165,15 @@ def test_gain_declared_executor_surface_is_still_safety_proof_blocked():
     assert "safety_live_not_allowed" in row.blockers
     assert "real_wing_proof_missing" in row.blockers
     assert "capability_declares_live_kind_without_safety_proof" in row.blockers
+    assert row.evidence_requirement_ids == (
+        "physical_pre_read",
+        "bounded_gain_down_apply",
+        "apply_readback",
+        "rollback_readback",
+        "emergency_stop_block",
+        "unsafe_gain_up_followup_blocked",
+        "gain_up_operator_authored_opt_in",
+    )
 
 
 def test_broad_console_surfaces_are_blocked_by_missing_proof_or_manual_only_policy():
@@ -350,6 +359,16 @@ def test_readiness_snapshot_groups_autonomy_gaps_without_granting_authority():
     assert "read_only_scoped_diff_evidence" in evidence_by_family["scene_preset"]
 
     next_by_family = gap_summary["next_required_evidence_by_action_family"]
+    evidence_by_family = gap_summary["evidence_requirement_ids_by_action_family"]
+    assert evidence_by_family["gain"] == [
+        "physical_pre_read",
+        "bounded_gain_down_apply",
+        "apply_readback",
+        "rollback_readback",
+        "emergency_stop_block",
+        "unsafe_gain_up_followup_blocked",
+        "gain_up_operator_authored_opt_in",
+    ]
     assert any("Keep scene apply blocked" in item for item in next_by_family["scene_preset"])
 
 

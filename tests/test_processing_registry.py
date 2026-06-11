@@ -1015,7 +1015,17 @@ def test_safety_coverage_matrix_records_live_proof_gaps():
             assert row.status in {"dry_run_ready", "proposal_only", "quarantined", "blocked"}
 
     assert get_safety_coverage_row("fader_supervised").live_allowed is True
-    assert get_safety_coverage_row("gain_supervised").live_allowed is False
+    gain = get_safety_coverage_row("gain_supervised")
+    assert gain.live_allowed is False
+    assert gain.required_evidence_components == (
+        "physical_pre_read",
+        "bounded_gain_down_apply",
+        "apply_readback",
+        "rollback_readback",
+        "emergency_stop_block",
+        "unsafe_gain_up_followup_blocked",
+        "gain_up_operator_authored_opt_in",
+    )
     bus = get_safety_coverage_row("bus_group_matrix")
     mute = get_safety_coverage_row("mute_supervised")
 
@@ -1035,7 +1045,7 @@ def test_safety_coverage_matrix_records_live_proof_gaps():
     assert mute.pre_read == "missing"
     assert mute.rollback_readback == "missing"
     assert "manual_mute_authority_preserved" in mute.notes
-    assert get_safety_coverage_row("gain_supervised").real_wing_proof == "missing"
+    assert gain.real_wing_proof == "missing"
     assert get_safety_coverage_row("routing_snapshots_scenes").status == "blocked"
 
 

@@ -99,6 +99,15 @@ def test_physical_gain_candidate_allows_manual_safety_review_but_not_live_wideni
     assert gain["safety_row_review_candidate"] is True
     assert gain["automatic_safety_update_allowed"] is False
     assert gain["autonomous_ready"] is False
+    assert gain["safety_required_evidence_components"] == [
+        "physical_pre_read",
+        "bounded_gain_down_apply",
+        "apply_readback",
+        "rollback_readback",
+        "emergency_stop_block",
+        "unsafe_gain_up_followup_blocked",
+        "gain_up_operator_authored_opt_in",
+    ]
     assert snapshot["safety"]["live_widening_allowed"] is False
     assert snapshot["summary"]["safety_row_review_candidate_ids"] == ["gain_supervised_evidence"]
 
