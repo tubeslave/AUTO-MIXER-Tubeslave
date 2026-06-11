@@ -85,6 +85,7 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
             "Docs/CORRECTION_METHODS_ROADMAP.md",
             ".ai/project-layer/correction_methods_backlog.md",
             "Docs/runbooks/WING_READONLY_PREFLIGHT.md",
+            "backend/wing_readonly_preflight_contract.py",
             "tools/wing_readonly_preflight_runner.py",
             "tools/review_wing_readonly_preflight_artifacts.py",
             "tools/no_wing_release_check.py",

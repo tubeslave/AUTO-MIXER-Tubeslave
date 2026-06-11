@@ -32,10 +32,13 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert directive["current_mvp"] == "supervised_wing_rack_proof"
     assert directive["selected_blocker"] == "WING read-only connection proof"
     assert directive["selected_blocker_status"] == "tooling_ready_waits_real_wing"
-    assert "Run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`" in directive["selected_action"]
+    assert "tools/no_wing_release_check.py --quick" in directive["selected_action"]
+    assert "before starting the intended backend/WING session" in directive["selected_action"]
+    assert "`Docs/runbooks/WING_READONLY_PREFLIGHT.md`" in directive["selected_action"]
     assert directive["stop_broad_work"] is True
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]
+    assert "backend/wing_readonly_preflight_contract.py" in directive["required_files"]
     assert "Docs/CORRECTION_METHODS_ROADMAP.md" in directive["required_files"]
     assert "tools/wing_readonly_preflight_runner.py" in directive["required_files"]
     assert "tools/review_wing_readonly_preflight_artifacts.py" in directive["required_files"]
