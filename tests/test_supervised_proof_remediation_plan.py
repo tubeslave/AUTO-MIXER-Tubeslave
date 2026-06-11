@@ -95,6 +95,7 @@ def test_legacy_blocked_artifact_gets_current_schema_rerun_action_without_execut
     assert action["execution_allowed_by_plan"] is False
     assert action["live_execution_required"] is True
     assert action["operator_approval_required"] is True
+    assert action["command"][0] == "python3"
     assert "--execute" in action["command"]
     assert "--operator-confirm-channel" in action["command"]
     assert (

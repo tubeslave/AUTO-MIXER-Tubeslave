@@ -115,7 +115,7 @@ def _proof_command(
     delta_db: float,
 ) -> Tuple[str, ...]:
     return (
-        "python",
+        "python3",
         "tools/wing_operator_proposal_validation_runner.py",
         "--url",
         backend_url,
