@@ -2884,6 +2884,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     capture_command = wing_readonly_preflight_capture_command_template()
     review_command = wing_readonly_preflight_review_command()
     handoff_command = wing_readonly_preflight_handoff_packet_command()
+    prestart_backend_port_check_command = (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
     review_manual_checklist_ids = wing_readonly_preflight_review_manual_checklist_ids()
     review_decision_template_required_fields = (
         wing_readonly_preflight_review_decision_template_required_fields()
@@ -2977,6 +2980,15 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_capture_expected_plan_missing")
     if capture_expected_plan != plan_output:
         violations.append("wing_readonly_preflight_capture_expected_plan_mismatch")
+    if prestart_backend_port_check_command != [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]:
+        violations.append(
+            "wing_readonly_preflight_prestart_backend_port_check_command_mismatch"
+        )
 
     if evidence.get("type") != "wing_readonly_preflight_evidence":
         violations.append("wing_readonly_preflight_evidence_type_mismatch")
@@ -3074,6 +3086,15 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["plan_command_value_types"] = plan_value_types
     detail["plan_command_artifact_root"] = plan_artifact_root
     detail["plan_command_matches_capture"] = plan_matches_capture
+    detail["prestart_backend_port_check_required"] = True
+    detail["prestart_backend_port_check_must_pass_before_starting_backend"] = True
+    detail["prestart_backend_port_check_command"] = list(
+        prestart_backend_port_check_command
+    )
+    detail["prestart_backend_port_check_failure_detail_fields"] = [
+        "listener_processes",
+        "operator_next_step",
+    ]
     detail["capture_command_template"] = capture_command
     detail["capture_command_channels"] = capture_channels
     detail["capture_command_operator_confirmed_channels"] = capture_confirmed_channels
@@ -10257,6 +10278,9 @@ def wing_readonly_preflight_evidence_summary(
             "review_decision_template_required_fields"
         )
         handoff_packet_command = detail.get("handoff_packet_command")
+        prestart_backend_port_check_command = detail.get(
+            "prestart_backend_port_check_command"
+        )
         valid_candidate_count = int(detail.get("valid_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
         readiness_update_candidate_available = (
@@ -10319,6 +10343,26 @@ def wing_readonly_preflight_evidence_summary(
             "plan_command_artifact_root": detail.get("plan_command_artifact_root"),
             "plan_command_matches_capture": (
                 detail.get("plan_command_matches_capture") is True
+            ),
+            "prestart_backend_port_check_required": (
+                detail.get("prestart_backend_port_check_required") is True
+            ),
+            "prestart_backend_port_check_must_pass_before_starting_backend": (
+                detail.get("prestart_backend_port_check_must_pass_before_starting_backend")
+                is True
+            ),
+            "prestart_backend_port_check_command": (
+                list(prestart_backend_port_check_command)
+                if isinstance(prestart_backend_port_check_command, list)
+                else []
+            ),
+            "prestart_backend_port_check_failure_detail_fields": (
+                list(detail.get("prestart_backend_port_check_failure_detail_fields"))
+                if isinstance(
+                    detail.get("prestart_backend_port_check_failure_detail_fields"),
+                    list,
+                )
+                else []
             ),
             "capture_command_template": (
                 list(capture_command) if isinstance(capture_command, list) else []
@@ -13585,6 +13629,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- plan_command_artifact_root: `{wing_readonly_preflight['plan_command_artifact_root']}`",
                 "- plan_command_matches_capture: "
                 f"`{str(wing_readonly_preflight['plan_command_matches_capture']).lower()}`",
+                "- prestart_backend_port_check_required: "
+                f"`{str(wing_readonly_preflight['prestart_backend_port_check_required']).lower()}`",
+                "- prestart_backend_port_check_must_pass_before_starting_backend: "
+                f"`{str(wing_readonly_preflight['prestart_backend_port_check_must_pass_before_starting_backend']).lower()}`",
+                "- prestart_backend_port_check_command: "
+                f"`{json.dumps(wing_readonly_preflight['prestart_backend_port_check_command'])}`",
                 "- capture_command_template: "
                 f"`{json.dumps(wing_readonly_preflight['capture_command_template'])}`",
                 f"- capture_command_channels: `{wing_readonly_preflight['capture_command_channels']}`",

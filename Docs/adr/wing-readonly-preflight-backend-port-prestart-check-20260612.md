@@ -20,7 +20,9 @@ not yet require that pre-start check.
 Use option 3. The offline plan and handoff packet now require
 `backend_port_prestart_check_required=true`, record the canonical
 `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` command, and
-state that it must pass before starting the intended backend/WING session.
+state that it must pass before starting the intended backend/WING session. The
+no-WING WING-readonly evidence overlay also surfaces the same command so the
+operator-visible readiness summary starts with the pre-start port check.
 
 ## Why this won
 
@@ -41,7 +43,8 @@ intended backend to be reachable.
 1. Add pre-start backend-port check fields to the plan-only artifact.
 2. Add the same fields and command to the handoff packet and markdown.
 3. Extend no-WING release checks to validate the new plan/handoff contract.
-4. Clarify the runbook sequence.
+4. Surface the pre-start command in the WING-readonly evidence overlay.
+5. Clarify the runbook sequence.
 
 ## Test plan
 

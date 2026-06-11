@@ -7078,6 +7078,18 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "plan_command_value_types": "fader,gain,pan",
             "plan_command_artifact_root": "artifacts/wing_readonly_preflight",
             "plan_command_matches_capture": True,
+            "prestart_backend_port_check_required": True,
+            "prestart_backend_port_check_must_pass_before_starting_backend": True,
+            "prestart_backend_port_check_command": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/no_wing_release_check.py",
+                "--quick",
+            ],
+            "prestart_backend_port_check_failure_detail_fields": [
+                "listener_processes",
+                "operator_next_step",
+            ],
             "capture_command_template": [
                 "python3",
                 "tools/wing_readonly_preflight_runner.py",
@@ -7214,6 +7226,18 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["plan_command_value_types"] == "fader,gain,pan"
     assert preflight["plan_command_artifact_root"] == "artifacts/wing_readonly_preflight"
     assert preflight["plan_command_matches_capture"] is True
+    assert preflight["prestart_backend_port_check_required"] is True
+    assert preflight["prestart_backend_port_check_must_pass_before_starting_backend"] is True
+    assert preflight["prestart_backend_port_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
+    assert preflight["prestart_backend_port_check_failure_detail_fields"] == [
+        "listener_processes",
+        "operator_next_step",
+    ]
     assert preflight["capture_command_template"][1] == "tools/wing_readonly_preflight_runner.py"
     assert preflight["capture_command_channels"] == "3"
     assert preflight["capture_command_operator_confirmed_channels"] == "3"
@@ -7291,6 +7315,13 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "plan_command_uses_plan_only: `true`" in markdown_summary
     assert "wing_readonly_preflight_plan/latest_plan.json" in markdown_summary
     assert "plan_command_matches_capture: `true`" in markdown_summary
+    assert "prestart_backend_port_check_required: `true`" in markdown_summary
+    assert (
+        "prestart_backend_port_check_must_pass_before_starting_backend: `true`"
+        in markdown_summary
+    )
+    assert "prestart_backend_port_check_command" in markdown_summary
+    assert "tools/no_wing_release_check.py" in markdown_summary
     assert "capture_command_channels: `3`" in markdown_summary
     assert "capture_command_operator_confirmed_channels: `3`" in markdown_summary
     assert "capture_command_operator_confirmation_matches_channels: `true`" in markdown_summary
