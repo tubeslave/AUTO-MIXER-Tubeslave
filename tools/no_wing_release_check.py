@@ -1338,6 +1338,10 @@ def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -
     if connected:
         listener_processes, listener_process_error = _listener_processes_for_port(port)
         detail["listener_processes"] = listener_processes
+        detail["preflight_blocked_until_listener_confirmed"] = True
+        detail["intended_backend_confirmation_required"] = True
+        detail["safe_to_stop_listener_by_gate"] = False
+        detail["fail_closed_reason"] = "backend_port_listener_requires_operator_confirmation"
         detail["operator_next_step"] = (
             "Stop or reconfigure the unexpected local listener only after "
             "confirming it is not the intended Automixer backend, then rerun "

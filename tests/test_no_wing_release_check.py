@@ -10613,6 +10613,14 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
     assert result.status == "failed"
     assert result.detail["listener_detected"] is True
     assert result.detail["listener_processes"] == listener_processes
+    assert result.detail["preflight_blocked_until_listener_confirmed"] is True
+    assert result.detail["intended_backend_confirmation_required"] is True
+    assert result.detail["safe_to_stop_listener_by_gate"] is False
+    assert (
+        result.detail["fail_closed_reason"]
+        == "backend_port_listener_requires_operator_confirmation"
+    )
+    assert "operator_next_step" in result.detail
     assert "listener_process_error" not in result.detail
 
 
@@ -10661,6 +10669,15 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
                 "listener_processes": [
                     {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
                 ],
+                "preflight_blocked_until_listener_confirmed": True,
+                "intended_backend_confirmation_required": True,
+                "safe_to_stop_listener_by_gate": False,
+                "fail_closed_reason": "backend_port_listener_requires_operator_confirmation",
+                "operator_next_step": (
+                    "Stop or reconfigure the unexpected local listener only after "
+                    "confirming it is not the intended Automixer backend, then rerun "
+                    "the no-WING gate and WING read-only preflight."
+                ),
                 "policy": "port_must_not_have_unexpected_listener",
                 "port": port,
             },
@@ -10678,6 +10695,13 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
     assert summary["status"] == "failed"
     assert summary["failed_checks"] == ["backend_port_free"]
     assert summary["live_write"] is False
+    assert summary["results"][0]["detail"]["preflight_blocked_until_listener_confirmed"] is True
+    assert summary["results"][0]["detail"]["intended_backend_confirmation_required"] is True
+    assert summary["results"][0]["detail"]["safe_to_stop_listener_by_gate"] is False
+    assert (
+        summary["results"][0]["detail"]["fail_closed_reason"]
+        == "backend_port_listener_requires_operator_confirmation"
+    )
     run_dir = Path(summary["run_dir"])
     assert (run_dir / "summary.json").exists()
     assert not (run_dir / "logs").exists()
