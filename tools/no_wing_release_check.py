@@ -1255,6 +1255,30 @@ def _looks_like_local_path_token(value: object) -> bool:
     return "/" in text or "\\" in text
 
 
+def _process_command_line(pid: int | str) -> tuple[str | None, str | None]:
+    try:
+        completed = subprocess.run(
+            ("ps", "-p", str(pid), "-o", "command="),
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=1.0,
+        )
+    except FileNotFoundError:
+        return None, "ps_not_available"
+    except subprocess.TimeoutExpired:
+        return None, "ps_timeout"
+    except OSError as exc:
+        return None, f"ps_error:{exc.__class__.__name__}"
+    if completed.returncode != 0:
+        stderr = completed.stderr.strip()
+        if stderr:
+            return None, f"ps_failed:{stderr}"
+        return None, f"ps_failed:returncode_{completed.returncode}"
+    command_line = completed.stdout.strip()
+    return (command_line or None), None
+
+
 def _listener_processes_for_port(port: int) -> tuple[list[dict[str, object]], str | None]:
     command = (
         "lsof",
@@ -1302,6 +1326,15 @@ def _listener_processes_for_port(port: int) -> tuple[list[dict[str, object]], st
             current["name"] = value
     if current:
         processes.append(current)
+    for process in processes:
+        pid = process.get("pid")
+        if pid is None:
+            continue
+        command_line, command_line_error = _process_command_line(pid)
+        if command_line:
+            process["command_line"] = command_line
+        if command_line_error:
+            process["command_line_error"] = command_line_error
     return processes, None
 
 

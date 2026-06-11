@@ -10626,22 +10626,29 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
 
 def test_listener_processes_for_port_parses_lsof_field_output(monkeypatch):
     def fake_run(command, capture_output, check, text, timeout):
-        assert command == (
+        assert capture_output is True
+        assert check is False
+        assert text is True
+        assert timeout == 1.0
+        if command == (
             "lsof",
             "-nP",
             "-iTCP:8765",
             "-sTCP:LISTEN",
             "-F",
             "pcn",
-        )
-        assert capture_output is True
-        assert check is False
-        assert text is True
-        assert timeout == 1.0
+        ):
+            return release_check.subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="p87210\ncPython\nnTCP *:8765 (LISTEN)\n",
+                stderr="",
+            )
+        assert command == ("ps", "-p", "87210", "-o", "command=")
         return release_check.subprocess.CompletedProcess(
             command,
             0,
-            stdout="p87210\ncPython\nnTCP *:8765 (LISTEN)\n",
+            stdout="python3 backend/server.py --mode wing\n",
             stderr="",
         )
 
@@ -10651,7 +10658,48 @@ def test_listener_processes_for_port_parses_lsof_field_output(monkeypatch):
 
     assert error is None
     assert processes == [
-        {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line": "python3 backend/server.py --mode wing",
+        }
+    ]
+
+
+def test_listener_processes_for_port_records_command_line_probe_failure(monkeypatch):
+    def fake_run(command, capture_output, check, text, timeout):
+        assert capture_output is True
+        assert check is False
+        assert text is True
+        assert timeout == 1.0
+        if command[0] == "lsof":
+            return release_check.subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="p87210\ncPython\nnTCP *:8765 (LISTEN)\n",
+                stderr="",
+            )
+        assert command == ("ps", "-p", "87210", "-o", "command=")
+        return release_check.subprocess.CompletedProcess(
+            command,
+            1,
+            stdout="",
+            stderr="permission denied",
+        )
+
+    monkeypatch.setattr(release_check.subprocess, "run", fake_run)
+
+    processes, error = release_check._listener_processes_for_port(8765)
+
+    assert error is None
+    assert processes == [
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line_error": "ps_failed:permission denied",
+        }
     ]
 
 
