@@ -183,8 +183,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Project Director Agent является рабочим директором цикла: выбери задачу из
   его `Selected Work`, то есть из first non-closed row в
   `.ai/project-layer/wing_mvp_blockers.md`.
-- Если WING Rack подключен, следующий шаг должен быть read-only preflight или
-  ручной review реального preflight artifact.
+- Если WING Rack подключен, следующий шаг должен начинаться с
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` до старта
+  intended backend/WING session, затем read-only preflight или ручной review
+  реального preflight artifact.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит
   физический read-only/supervised proof и имеет тест.
 - Методы коррекций Gain/Trim, Pan, EQ, Comp, FX, Balance и другие продолжай

@@ -34,7 +34,11 @@ def test_direction_guard_accepts_wing_preflight_and_timeout_work():
     assert report["score"] >= 70
     assert report["summary"]["target_item_count"] == 3
     assert report["summary"]["drift_item_count"] == 0
-    assert "run read-only preflight" in report["next_allowed_actions"][0]
+    assert "tools/no_wing_release_check.py --quick" in report["next_allowed_actions"][0]
+    assert "Before starting the intended backend/WING session" in report[
+        "next_allowed_actions"
+    ][0]
+    assert "then run read-only preflight" in report["next_allowed_actions"][0]
 
 
 def test_direction_guard_flags_memory_queue_consumer_drift():
@@ -207,6 +211,9 @@ def test_codex_cycle_prompt_runs_direction_guard_before_plan_and_final_report():
     assert "codex_direction_guard_latest.md" in text
     assert "codex_direction_guard_final.md" in text
     assert "project_director_agent.py" in text
+    assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in text
+    assert "до старта" in text
+    assert "intended backend/WING session" in text
 
 
 def test_codex_autoloop_readme_documents_direction_guard_activation_time():

@@ -79,7 +79,11 @@ DRIFT_PATTERNS = (
 )
 
 NEXT_ALLOWED_ACTIONS = (
-    "If WING Rack is connected, run read-only preflight and capture a real artifact.",
+    (
+        "Before starting the intended backend/WING session, run "
+        "`PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`; "
+        "then run read-only preflight and capture a real artifact."
+    ),
     "Review a real wing_readonly_preflight.v1 artifact before any readiness update.",
     "Prepare supervised fader/gain proof only after explicit operator approval.",
     "Preserve rollback, emergency-stop, timeout/fail-closed, and readback evidence.",
