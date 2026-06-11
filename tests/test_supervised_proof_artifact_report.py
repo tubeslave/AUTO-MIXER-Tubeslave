@@ -3,12 +3,31 @@ from pathlib import Path
 
 from tools import evaluate_supervised_proof_artifacts as report_tool
 
+PRESTART_BACKEND_PORT_CHECK_COMMAND = [
+    "PYTHONPATH=backend",
+    "python3",
+    "tools/no_wing_release_check.py",
+    "--quick",
+]
+
 
 def write_summary(run_dir: Path, payload: dict) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     path = run_dir / "summary.json"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
+
+
+def assert_prestart_backend_port_check(summary: dict) -> None:
+    assert summary["readonly_preflight_prestart_check_required"] is True
+    assert (
+        summary["readonly_preflight_prestart_check_must_pass_before_starting_backend"]
+        is True
+    )
+    assert (
+        summary["readonly_preflight_prestart_check_command"]
+        == PRESTART_BACKEND_PORT_CHECK_COMMAND
+    )
 
 
 def dry_run_summary(proof_id: str = "dry-gain-proof") -> dict:
@@ -344,6 +363,7 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert report["next_wing_proof_plan"]["summary"]["planned_value_types"] == []
     assert report["next_wing_proof_plan"]["summary"]["step_count"] == 0
     assert report["next_wing_proof_plan"]["summary"]["readonly_preflight_required"] is True
+    assert_prestart_backend_port_check(report["next_wing_proof_plan"]["summary"])
     assert (
         report["next_wing_proof_plan"]["summary"]["readonly_preflight_candidate_available"]
         is False
@@ -432,6 +452,7 @@ def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(
     assert "physical_candidate_missing" in fader_row["blockers"]
     assert report["next_wing_proof_plan"]["status"] == "blocked_by_readonly_preflight"
     assert report["next_wing_proof_plan"]["summary"]["step_count"] == 0
+    assert_prestart_backend_port_check(report["next_wing_proof_plan"]["summary"])
     assert (
         "readonly_preflight_candidate_required_before_supervised_proof"
         in report["next_wing_proof_plan"]["summary"]["global_blockers"]
