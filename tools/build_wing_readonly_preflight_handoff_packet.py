@@ -14,6 +14,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+)
 from tools import no_wing_release_check
 
 DEFAULT_URL = "ws://localhost:8765"
@@ -41,12 +45,12 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_wing_readonly_preflight_review_decision_tool.py",
     "tests/test_no_wing_release_check.py",
 ]
-BACKEND_PORT_PRESTART_CHECK_COMMAND = [
-    "PYTHONPATH=backend",
-    "python3",
-    "tools/no_wing_release_check.py",
-    "--quick",
-]
+BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+)
 FORBIDDEN_LIVE_REQUEST_TYPES = list(
     no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
 )
@@ -232,10 +236,9 @@ def build_handoff_packet(
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
-        "backend_port_prestart_check_failure_detail_fields": [
-            "listener_processes",
-            "operator_next_step",
-        ],
+        "backend_port_prestart_check_failure_detail_fields": list(
+            BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "manual_review_required_before_readiness_update": True,
         "execution_allowed_by_packet": False,
         "readiness_matrix_update_allowed_by_packet": False,

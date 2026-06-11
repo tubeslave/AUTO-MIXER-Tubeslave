@@ -20,6 +20,14 @@ from typing import Any, Dict, Iterable, Optional
 
 import websockets
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+)
 
 EXPECTED_MODE_EVENTS = {"operator_mode_status"}
 EXPECTED_STATE_EVENTS = {"state_update"}
@@ -60,12 +68,12 @@ FORBIDDEN_REQUEST_TYPES = {
 }
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 PHYSICAL_READBACK_SOURCES = {"physical_readback", "wing_physical_readback", "physical_wing", "wing"}
-BACKEND_PORT_PRESTART_CHECK_COMMAND = [
-    "PYTHONPATH=backend",
-    "python3",
-    "tools/no_wing_release_check.py",
-    "--quick",
-]
+BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+)
 EXPECTED_PLAN_MATCH_KEYS = (
     "type",
     "status",
@@ -451,10 +459,9 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
-        "backend_port_prestart_check_failure_detail_fields": [
-            "listener_processes",
-            "operator_next_step",
-        ],
+        "backend_port_prestart_check_failure_detail_fields": list(
+            BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,

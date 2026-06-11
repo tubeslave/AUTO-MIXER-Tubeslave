@@ -28,8 +28,9 @@ overlay carried this pre-start check before it can be treated as aligned with
 the supervised proof plan. The backend autonomy readiness snapshot now emits the
 same pre-start check metadata, and the supervised proof plan summary preserves
 it. The canonical command and diagnostic detail field list now live in
-`backend/wing_readonly_preflight_contract.py` so backend readiness and the
-no-WING release gate cannot silently drift.
+`backend/wing_readonly_preflight_contract.py` so the offline plan generator,
+handoff packet builder, backend readiness, and no-WING release gate cannot
+silently drift.
 
 ## Why this won
 
@@ -56,7 +57,7 @@ intended backend to be reachable.
 6. Emit the pre-start check from backend autonomy readiness and carry it through
    supervised proof plan summaries.
 7. Centralize the pre-start command and diagnostic detail fields in a shared
-   backend contract module.
+   backend contract module and consume it from the plan/handoff generators.
 8. Clarify the runbook sequence.
 
 ## Test plan

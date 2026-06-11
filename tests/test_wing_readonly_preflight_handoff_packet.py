@@ -3,6 +3,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+)
 from tools import build_wing_readonly_preflight_handoff_packet as handoff
 from tools import no_wing_release_check
 
@@ -24,10 +28,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["physical_preflight_requires_existing_backend_connection"] is True
     assert packet["backend_port_prestart_check_required"] is True
     assert packet["backend_port_prestart_check_must_pass_before_starting_backend"] is True
-    assert packet["backend_port_prestart_check_failure_detail_fields"] == [
-        "listener_processes",
-        "operator_next_step",
-    ]
+    assert packet["backend_port_prestart_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert packet["manual_review_required_before_readiness_update"] is True
     assert packet["execution_allowed_by_packet"] is False
     assert packet["readiness_matrix_update_allowed_by_packet"] is False
@@ -72,12 +75,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "--expected-plan",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
     ]
-    assert packet["commands"]["prestart_backend_port_check"] == [
-        "PYTHONPATH=backend",
-        "python3",
-        "tools/no_wing_release_check.py",
-        "--quick",
-    ]
+    assert packet["commands"]["prestart_backend_port_check"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
     assert packet["operator_sequence"][0].startswith(
         "Before starting the intended backend/WING session"
     )
