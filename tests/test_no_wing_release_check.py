@@ -801,6 +801,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": [
+            "PYTHONPATH=backend",
+            "python3",
+            "tools/no_wing_release_check.py",
+            "--quick",
+        ],
         "backend_port_prestart_check_failure_detail_fields": [
             "listener_processes",
             "operator_next_step",
@@ -2288,6 +2294,12 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "tools/no_wing_release_check.py",
         "--quick",
     ]
+    assert result.detail["backend_port_prestart_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
     assert result.detail["review_command_writes_decision_template"] is True
     assert "prestart_backend_port_check" in result.detail["command_names"]
     assert "preview_readonly_request_plan" in result.detail["command_names"]
@@ -2342,6 +2354,7 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     payload["queries_console"] = True
     payload["expected_plan_required_for_real_run"] = False
     payload["physical_preflight_requires_existing_backend_connection"] = False
+    payload["backend_port_prestart_check_command"] = ["python3", "other_check.py"]
     payload["manual_review_required_before_readiness_update"] = False
     payload["commands"]["preview_readonly_request_plan"].remove("--plan-only")
     payload["blockers_not_closed_by_packet"].remove("physical_console_readback_proof")
@@ -2369,6 +2382,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     assert "wing_readonly_preflight_handoff_packet_manual_review_required_before_readiness_update_not_true" in result.detail[
         "violations"
     ]
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_port_prestart_check_command_mismatch"
+        in result.detail["violations"]
+    )
     assert "wing_readonly_preflight_handoff_packet_preview_readonly_request_plan_mismatch" in result.detail[
         "violations"
     ]

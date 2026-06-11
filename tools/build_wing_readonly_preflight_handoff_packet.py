@@ -236,6 +236,7 @@ def build_handoff_packet(
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
@@ -310,6 +311,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['backend_port_prestart_check_required']).lower()}`",
         "- backend_port_prestart_check_must_pass_before_starting_backend: "
         f"`{str(packet['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
+        "- backend_port_prestart_check_command: "
+        f"`{_command_text(packet['backend_port_prestart_check_command'])}`",
         "- manual_review_required_before_readiness_update: "
         f"`{str(packet['manual_review_required_before_readiness_update']).lower()}`",
         "- execution_allowed_by_packet: "

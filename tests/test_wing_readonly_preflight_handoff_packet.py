@@ -28,6 +28,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["physical_preflight_requires_existing_backend_connection"] is True
     assert packet["backend_port_prestart_check_required"] is True
     assert packet["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert packet["backend_port_prestart_check_command"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
     assert packet["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
@@ -186,6 +189,7 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "physical_preflight_requires_existing_backend_connection: `true`" in markdown
     assert "backend_port_prestart_check_required: `true`" in markdown
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
+    assert "backend_port_prestart_check_command" in markdown
     assert "prestart_backend_port_check" in markdown
     assert "tools/no_wing_release_check.py" in markdown
     assert "manual_review_required_before_readiness_update: `true`" in markdown
@@ -215,6 +219,9 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["physical_preflight_requires_existing_backend_connection"] is True
     assert payload["backend_port_prestart_check_required"] is True
     assert payload["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert payload["backend_port_prestart_check_command"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
     assert payload["manual_review_required_before_readiness_update"] is True
     assert payload["live_authority_granted"] is False
 

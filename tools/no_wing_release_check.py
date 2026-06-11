@@ -3605,6 +3605,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_check_detail_fields_mismatch"
         )
+    if packet.get("backend_port_prestart_check_command") != (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_port_prestart_check_command_mismatch"
+        )
     for key in (
         "live_write",
         "mutates_console_state",
@@ -3706,6 +3712,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_check_must_pass_before_starting_backend"] = packet.get(
         "backend_port_prestart_check_must_pass_before_starting_backend"
+    )
+    detail["backend_port_prestart_check_command"] = packet.get(
+        "backend_port_prestart_check_command"
     )
     detail["backend_port_prestart_check_failure_detail_fields"] = packet.get(
         "backend_port_prestart_check_failure_detail_fields"
