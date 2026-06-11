@@ -446,6 +446,7 @@ WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
     "event_log_wing_mode_not_proven",
     "transport_timeout_or_connection_loss",
+    "ws_handshake_rejected",
     "operator_channel_confirmation_mismatch",
     "operator_session_confirmation_missing",
     "physical_readback_missing",

@@ -2142,6 +2142,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
         in result.detail["violations"]
     )
     assert (
+        "wing_readonly_preflight_plan_fail_closed_condition_ws_handshake_rejected_missing"
+        in result.detail["violations"]
+    )
+    assert (
         "wing_readonly_preflight_plan_fail_closed_condition_existing_backend_connection_boundary_missing_missing"
         in result.detail["violations"]
     )

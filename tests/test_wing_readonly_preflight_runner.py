@@ -54,6 +54,10 @@ class SendFailWebSocket(FakeWebSocket):
         raise RuntimeError("send failed")
 
 
+class InvalidStatus(Exception):
+    pass
+
+
 def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebSocket) -> None:
     def fake_connect(url: str) -> FakeWebSocketConnect:
         websocket.url = url
@@ -641,6 +645,57 @@ async def test_readonly_preflight_writes_fail_closed_send_error(
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_writes_fail_closed_handshake_rejection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reject_connect(url: str):
+        raise InvalidStatus("server rejected WebSocket connection: HTTP 403")
+
+    monkeypatch.setattr(runner.websockets, "connect", reject_connect)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 1
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "read_only_preflight_ws_handshake_rejected"
+    assert summary["fail_closed"] is True
+    assert summary["blockers"] == ["ws_handshake_rejected"]
+    assert summary["transport_failure"]["type"] == "InvalidStatus"
+    assert summary["transport_failure"]["message"] == (
+        "server rejected WebSocket connection: HTTP 403"
+    )
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_blocks_missing_physical_readback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -980,6 +1035,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert "physical_readback_missing" in written["fail_closed_conditions"]
     assert "event_log_wing_mode_not_proven" in written["fail_closed_conditions"]
     assert "transport_timeout_or_connection_loss" in written["fail_closed_conditions"]
+    assert "ws_handshake_rejected" in written["fail_closed_conditions"]
     assert "operator_session_confirmation_missing" in written["fail_closed_conditions"]
     assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
     assert "expected_plan_missing_or_mismatch" in written["fail_closed_conditions"]

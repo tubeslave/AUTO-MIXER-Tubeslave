@@ -246,6 +246,8 @@ Then update:
 - `--operator-confirm-session-ready` is missing for a physical read-only
   preflight;
 - backend returns an unexpected response type for the request in flight;
+- the backend WebSocket listener rejects the handshake, including HTTP 403
+  before any read-only request is sent;
 - backend transport fails (including send failure), the request times out, or the
   WebSocket connection is lost;
 - `events.jsonl` is missing or does not match `summary.json`;

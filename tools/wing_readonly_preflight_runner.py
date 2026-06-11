@@ -190,6 +190,21 @@ def response_request_id_matches(
     return payload.get("request_id") == request.get("request_id")
 
 
+def transport_failure_reason(exc: Exception) -> tuple[str, list[str]]:
+    exc_type = type(exc).__name__
+    message = str(exc)
+    if (
+        exc_type in {"InvalidStatus", "InvalidStatusCode"}
+        or "server rejected WebSocket connection" in message
+        or "HTTP 403" in message
+    ):
+        return "read_only_preflight_ws_handshake_rejected", ["ws_handshake_rejected"]
+    return (
+        "read_only_preflight_transport_error",
+        ["transport_timeout_or_connection_loss"],
+    )
+
+
 class EventRecorder:
     def __init__(self, run_dir: Path):
         self.run_dir = run_dir
@@ -444,6 +459,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             "backend_not_in_wing_mode",
             "event_log_wing_mode_not_proven",
             "transport_timeout_or_connection_loss",
+            "ws_handshake_rejected",
             "operator_channel_confirmation_mismatch",
             "operator_session_confirmation_missing",
             "physical_readback_missing",
@@ -722,12 +738,13 @@ async def run(args: argparse.Namespace) -> int:
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 1
     except Exception as exc:
+        reason, blockers = transport_failure_reason(exc)
         summary.update(
             {
                 "status": "blocked",
-                "reason": "read_only_preflight_transport_error",
+                "reason": reason,
                 "fail_closed": True,
-                "blockers": ["transport_timeout_or_connection_loss"],
+                "blockers": blockers,
                 "transport_failure": {"type": type(exc).__name__, "message": str(exc)},
             }
         )
