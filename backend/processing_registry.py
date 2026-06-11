@@ -6661,6 +6661,14 @@ def build_processing_registry_snapshot(
                 )
                 or []
             ),
+            "project_goal_capability_objective_readiness_next_focus": (
+                dict(objective_alignment_summary.get("autonomy_readiness_next_focus"))
+                if isinstance(
+                    objective_alignment_summary.get("autonomy_readiness_next_focus"),
+                    dict,
+                )
+                else {}
+            ),
             "project_goal_capability_objective_blocked_live_row_count": len(
                 objective_alignment_summary.get("blocked_live_rows", ())
             ),

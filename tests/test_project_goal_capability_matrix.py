@@ -171,6 +171,24 @@ def test_project_goal_objective_alignment_snapshot_is_read_only_and_complete():
     assert summary["blocked_live_row_actions"]
     assert summary["blocked_live_rows"] == ["mode_full_autonomous"]
     assert summary["currently_live_writable_rows"]
+    next_focus = summary["autonomy_readiness_next_focus"]
+    assert next_focus["reason"] == "highest_gap_goal_area_first_gap_row"
+    assert next_focus["goal_area"] == priority_expected[0]["goal_area"]
+    assert next_focus["capability_id"] in readiness_by_area[
+        next_focus["goal_area"]
+    ]["gap_row_ids"]
+    focused_row = get_project_goal_capability(next_focus["capability_id"])
+    assert focused_row is not None
+    assert next_focus["label"] == focused_row.label
+    assert next_focus["status"] == focused_row.status
+    assert next_focus["autonomy_mode_ceiling"] == focused_row.autonomy_mode_ceiling
+    assert next_focus["blocker"] == focused_row.blocker
+    assert next_focus["next_step"] == focused_row.next_step
+    assert next_focus["method_ids"] == list(focused_row.method_ids)
+    assert next_focus["support_paths"] == list(focused_row.support_paths)
+    assert next_focus["target_console_surfaces"] == list(
+        focused_row.target_console_surfaces
+    )
 
 
 def test_runtime_mode_capability_rows_match_operator_mode_policy():
@@ -905,6 +923,9 @@ def test_goal_capability_progress_snapshot_aligns_with_matrix_and_highlights_act
     assert summary[
         "project_goal_objective_autonomy_readiness_goal_area_priorities"
     ] == objective_alignment["summary"]["autonomy_readiness_goal_area_priorities"]
+    assert summary["project_goal_objective_autonomy_readiness_next_focus"] == (
+        objective_alignment["summary"]["autonomy_readiness_next_focus"]
+    )
     hotspots = summary["project_goal_objective_autonomy_readiness_hotspots"]
     assert isinstance(hotspots, list)
     assert hotspots

@@ -1217,6 +1217,11 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
     ]
 
     full_auto_row = by_id.get("mode_full_autonomous")
+    autonomy_readiness_next_focus = _build_objective_readiness_next_focus(
+        by_id=by_id,
+        readiness_by_goal_area=autonomy_readiness_by_goal_area,
+        goal_area_priorities=autonomy_readiness_goal_area_priorities,
+    )
 
     return {
         "type": "project_goal_capability_objective_alignment_snapshot",
@@ -1237,6 +1242,7 @@ def build_project_goal_objective_alignment_snapshot() -> Dict[str, Any]:
             "autonomy_readiness_gap_row_count": autonomy_readiness_gap_row_count,
             "autonomy_readiness_goal_area_priorities": autonomy_readiness_goal_area_priorities,
             "autonomy_readiness_by_goal_area": autonomy_readiness_by_goal_area,
+            "autonomy_readiness_next_focus": autonomy_readiness_next_focus,
             "proposal_only_row_count": len(proposal_only_ids),
             "proposal_only_row_ids": proposal_only_ids,
             "blocked_live_row_count": len(blocked_live_ids),
@@ -1265,6 +1271,40 @@ def iter_project_goal_capabilities() -> Iterable[ProjectGoalCapabilityRow]:
 
 def get_project_goal_capability(row_id: str) -> ProjectGoalCapabilityRow | None:
     return next((row for row in PROJECT_GOAL_CAPABILITIES if row.id == row_id), None)
+
+
+def _build_objective_readiness_next_focus(
+    *,
+    by_id: Dict[str, ProjectGoalCapabilityRow],
+    readiness_by_goal_area: Dict[str, Dict[str, Any]],
+    goal_area_priorities: list[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Select the next read-only capability focus from the largest objective gap."""
+
+    for area_priority in goal_area_priorities:
+        goal_area = str(area_priority.get("goal_area") or "")
+        area_stats = readiness_by_goal_area.get(goal_area, {})
+        gap_row_ids = area_stats.get("gap_row_ids", [])
+        if not isinstance(gap_row_ids, list):
+            continue
+        for row_id in gap_row_ids:
+            row = by_id.get(str(row_id))
+            if row is None:
+                continue
+            return {
+                "goal_area": row.goal_area,
+                "capability_id": row.id,
+                "label": row.label,
+                "status": row.status,
+                "autonomy_mode_ceiling": row.autonomy_mode_ceiling,
+                "blocker": row.blocker,
+                "next_step": row.next_step,
+                "method_ids": list(row.method_ids),
+                "support_paths": list(row.support_paths),
+                "target_console_surfaces": list(row.target_console_surfaces),
+                "reason": "highest_gap_goal_area_first_gap_row",
+            }
+    return {}
 
 
 def build_project_goal_capability_matrix_snapshot() -> Dict[str, Any]:
@@ -1457,6 +1497,11 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
         )
         if area_stats["gap_row_count"] > 0
     ]
+    objective_next_focus = _build_objective_readiness_next_focus(
+        by_id={row.id: row for row in rows},
+        readiness_by_goal_area=objective_autonomy_readiness_by_goal_area,
+        goal_area_priorities=objective_autonomy_readiness_goal_area_priorities,
+    )
 
     return {
         "type": "project_goal_capability_progress_snapshot",
@@ -1485,6 +1530,7 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
             "project_goal_objective_autonomy_readiness_gap_row_count": objective_readiness_gap_row_count,
             "project_goal_objective_autonomy_readiness_ready_row_count": objective_readiness_ready_row_count,
             "project_goal_objective_autonomy_readiness_hotspots": objective_goal_area_hotspots,
+            "project_goal_objective_autonomy_readiness_next_focus": objective_next_focus,
             "next_global_step": (
                 "Prioritize blocked areas, expand proof and evidence on supervised "
                 "candidate families, and keep read-only safety-first controls."
