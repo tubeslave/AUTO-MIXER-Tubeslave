@@ -3693,6 +3693,8 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append("wing_readonly_preflight_handoff_packet_type_mismatch")
     if packet.get("status") != "operator_hardware_step_required":
         violations.append("wing_readonly_preflight_handoff_packet_status_mismatch")
+    if packet.get("url") != WING_READONLY_PREFLIGHT_RUNNER_URL:
+        violations.append("wing_readonly_preflight_handoff_packet_url_mismatch")
     if packet.get("plan_output") != str(expected_plan_path):
         violations.append("wing_readonly_preflight_handoff_packet_plan_output_mismatch")
     if packet.get("artifact_root") != WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT:
@@ -3908,7 +3910,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["live_authority_granted"] = packet.get("live_authority_granted")
     detail["full_autonomous_ready"] = packet.get("full_autonomous_ready")
+    detail["url"] = packet.get("url")
     detail["plan_output"] = packet.get("plan_output")
+    detail["artifact_root"] = packet.get("artifact_root")
     detail["channels"] = packet.get("channels") if isinstance(packet.get("channels"), list) else []
     detail["value_types"] = (
         packet.get("value_types") if isinstance(packet.get("value_types"), list) else []

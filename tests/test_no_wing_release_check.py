@@ -2411,7 +2411,9 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["readiness_closure_allowed_by_packet"] is False
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["url"] == "ws://localhost:8765"
     assert result.detail["plan_output"] == str(plan_path)
+    assert result.detail["artifact_root"] == "artifacts/wing_readonly_preflight"
     assert result.detail["channels"] == [3]
     assert result.detail["value_types"] == ["fader", "gain", "pan"]
     assert result.detail["preview_command_uses_plan_only"] is True
@@ -2657,6 +2659,7 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
     payload["live_authority_granted"] = True
     payload["queries_console"] = True
+    payload["url"] = "ws://localhost:9999"
     payload["expected_plan_required_for_real_run"] = False
     payload["physical_preflight_requires_existing_backend_connection"] = False
     payload["backend_port_prestart_check_command"] = ["python3", "other_check.py"]
@@ -2676,6 +2679,9 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
         "violations"
     ]
     assert "wing_readonly_preflight_handoff_packet_live_authority_granted_not_false" in result.detail[
+        "violations"
+    ]
+    assert "wing_readonly_preflight_handoff_packet_url_mismatch" in result.detail[
         "violations"
     ]
     assert "wing_readonly_preflight_handoff_packet_expected_plan_required_for_real_run_not_true" in result.detail[
