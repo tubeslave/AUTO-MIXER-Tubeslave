@@ -10862,6 +10862,8 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         checklist_ids = detail.get("required_review_checklist_ids")
         forbidden_types = detail.get("forbidden_live_request_types")
         blockers = detail.get("blockers_not_closed_by_packet")
+        supervised_prestart_gate = detail.get("supervised_prestart_gate")
+        expected_supervised_prestart_gate = detail.get("expected_supervised_prestart_gate")
         return {
             "status": result.status,
             "read_only": detail.get("read_only") is True,
@@ -10965,6 +10967,16 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                     list,
                 )
                 else []
+            ),
+            "supervised_prestart_gate": (
+                dict(supervised_prestart_gate)
+                if isinstance(supervised_prestart_gate, Mapping)
+                else {}
+            ),
+            "expected_supervised_prestart_gate": (
+                dict(expected_supervised_prestart_gate)
+                if isinstance(expected_supervised_prestart_gate, Mapping)
+                else {}
             ),
             "violations": list(violations) if isinstance(violations, list) else [],
         }
@@ -14197,6 +14209,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_is_final']).lower()}`",
                 "- required_supervised_prestart_gate_markers: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_markers'])}`",
+                "- supervised_prestart_gate: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate'])}`",
+                "- expected_supervised_prestart_gate: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_supervised_prestart_gate'])}`",
                 "- violations: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['violations'])}`",
             ]

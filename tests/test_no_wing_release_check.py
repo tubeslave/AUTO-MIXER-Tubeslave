@@ -7997,6 +7997,42 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             ),
             "operator_sequence_supervised_prestart_gate_step_index": 8,
             "operator_sequence_supervised_prestart_gate_is_final": True,
+            "supervised_prestart_gate": {
+                "required": True,
+                "operator_sequence_step_index": 8,
+                "operator_sequence_step_must_be_final": True,
+                "operator_sequence_step": (
+                    "Only after accepted_decision_ready and a valid accepted-candidate "
+                    "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                ),
+                "required_markers": [
+                    "accepted_decision_ready",
+                    "valid accepted-candidate prestart trace",
+                    "WING_SUPERVISED_FADER_GAIN_PROOF",
+                ],
+                "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
+                "grants_live_authority": False,
+                "requires_operator_decision_status": "accepted_decision_ready",
+                "requires_accepted_candidate_prestart_trace": True,
+            },
+            "expected_supervised_prestart_gate": {
+                "required": True,
+                "operator_sequence_step_index": 8,
+                "operator_sequence_step_must_be_final": True,
+                "operator_sequence_step": (
+                    "Only after accepted_decision_ready and a valid accepted-candidate "
+                    "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                ),
+                "required_markers": [
+                    "accepted_decision_ready",
+                    "valid accepted-candidate prestart trace",
+                    "WING_SUPERVISED_FADER_GAIN_PROOF",
+                ],
+                "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
+                "grants_live_authority": False,
+                "requires_operator_decision_status": "accepted_decision_ready",
+                "requires_accepted_candidate_prestart_trace": True,
+            },
             "required_supervised_prestart_gate_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
@@ -8051,6 +8087,17 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert artifact["operator_sequence_supervised_prestart_gate_step_index"] == 8
     assert artifact["operator_sequence_supervised_prestart_gate_is_final"] is True
+    assert artifact["supervised_prestart_gate"] == artifact[
+        "expected_supervised_prestart_gate"
+    ]
+    assert artifact["supervised_prestart_gate"]["operator_sequence_step_index"] == 8
+    assert artifact["supervised_prestart_gate"][
+        "operator_sequence_step_must_be_final"
+    ] is True
+    assert artifact["supervised_prestart_gate"]["grants_live_authority"] is False
+    assert artifact["supervised_prestart_gate"][
+        "requires_accepted_candidate_prestart_trace"
+    ] is True
     assert artifact["required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
@@ -8079,6 +8126,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "operator_sequence_supervised_prestart_gate_step_index: `8`" in markdown_summary
     assert "operator_sequence_supervised_prestart_gate_is_final: `true`" in markdown_summary
     assert "required_supervised_prestart_gate_markers" in markdown_summary
+    assert "supervised_prestart_gate" in markdown_summary
+    assert "expected_supervised_prestart_gate" in markdown_summary
+    assert '"grants_live_authority": false' in markdown_summary
+    assert '"requires_accepted_candidate_prestart_trace": true' in markdown_summary
     assert "valid accepted-candidate prestart trace" in markdown_summary
     assert "physical_console_readback_proof" in markdown_summary
 
