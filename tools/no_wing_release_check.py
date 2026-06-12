@@ -580,10 +580,14 @@ def wing_readonly_preflight_handoff_packet_command() -> list[str]:
     return [
         "python3",
         WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
+        "--url",
+        WING_READONLY_PREFLIGHT_RUNNER_URL,
         "--channels",
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
         "--value-types",
         WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
         "--plan-output",
         WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
         "--output",
@@ -1005,10 +1009,14 @@ def build_checks(
             command=(
                 sys.executable,
                 WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
+                "--url",
+                WING_READONLY_PREFLIGHT_RUNNER_URL,
                 "--channels",
                 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
                 "--value-types",
                 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+                "--artifact-root",
+                WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
                 "--plan-output",
                 str(wing_readonly_plan_output),
                 "--format",
@@ -3028,10 +3036,16 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     handoff_channels = command_value_after_flag(handoff_command, "--channels")
     handoff_value_types = command_value_after_flag(handoff_command, "--value-types")
+    handoff_url = command_value_after_flag(handoff_command, "--url")
+    handoff_artifact_root = command_value_after_flag(handoff_command, "--artifact-root")
     handoff_plan_output = command_value_after_flag(handoff_command, "--plan-output")
     handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
     handoff_value_types_match_capture = (
         bool(handoff_value_types) and handoff_value_types == capture_value_types
+    )
+    handoff_url_matches_capture = bool(handoff_url) and handoff_url == WING_READONLY_PREFLIGHT_RUNNER_URL
+    handoff_artifact_root_matches_capture = (
+        bool(handoff_artifact_root) and handoff_artifact_root == capture_artifact_root
     )
 
     if not capture_tool_available:
@@ -3050,8 +3064,16 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_handoff_packet_channels_missing")
     if "--output" not in handoff_command:
         violations.append("wing_readonly_preflight_handoff_packet_output_missing")
+    if "--url" not in handoff_command or not handoff_url:
+        violations.append("wing_readonly_preflight_handoff_packet_url_missing")
+    if "--artifact-root" not in handoff_command or not handoff_artifact_root:
+        violations.append("wing_readonly_preflight_handoff_packet_artifact_root_missing")
     if "--plan-output" not in handoff_command or not handoff_plan_output:
         violations.append("wing_readonly_preflight_handoff_packet_plan_output_missing")
+    if not handoff_url_matches_capture:
+        violations.append("wing_readonly_preflight_handoff_packet_url_mismatch")
+    if not handoff_artifact_root_matches_capture:
+        violations.append("wing_readonly_preflight_handoff_packet_artifact_root_mismatch")
     if not handoff_channel_matches_capture:
         violations.append("wing_readonly_preflight_handoff_packet_channel_mismatch")
     if not handoff_value_types_match_capture:
@@ -3232,8 +3254,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["handoff_packet_command"] = handoff_command
     detail["handoff_packet_output"] = WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
     detail["handoff_packet_plan_output"] = handoff_plan_output
+    detail["handoff_packet_url"] = handoff_url
+    detail["handoff_packet_artifact_root"] = handoff_artifact_root
     detail["handoff_packet_channels"] = handoff_channels
     detail["handoff_packet_value_types"] = handoff_value_types
+    detail["handoff_packet_url_matches_capture"] = handoff_url_matches_capture
+    detail["handoff_packet_artifact_root_matches_capture"] = handoff_artifact_root_matches_capture
     detail["handoff_packet_channel_matches_capture"] = handoff_channel_matches_capture
     detail["handoff_packet_value_types_match_capture"] = handoff_value_types_match_capture
     detail["blocked_by"] = (
@@ -10790,8 +10816,16 @@ def wing_readonly_preflight_evidence_summary(
             ),
             "handoff_packet_output": detail.get("handoff_packet_output"),
             "handoff_packet_plan_output": detail.get("handoff_packet_plan_output"),
+            "handoff_packet_url": detail.get("handoff_packet_url"),
+            "handoff_packet_artifact_root": detail.get("handoff_packet_artifact_root"),
             "handoff_packet_channels": detail.get("handoff_packet_channels"),
             "handoff_packet_value_types": detail.get("handoff_packet_value_types"),
+            "handoff_packet_url_matches_capture": (
+                detail.get("handoff_packet_url_matches_capture") is True
+            ),
+            "handoff_packet_artifact_root_matches_capture": (
+                detail.get("handoff_packet_artifact_root_matches_capture") is True
+            ),
             "handoff_packet_channel_matches_capture": (
                 detail.get("handoff_packet_channel_matches_capture") is True
             ),
@@ -14127,9 +14161,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['handoff_packet_command'])}`",
                 f"- handoff_packet_output: `{wing_readonly_preflight['handoff_packet_output']}`",
                 f"- handoff_packet_plan_output: `{wing_readonly_preflight['handoff_packet_plan_output']}`",
+                f"- handoff_packet_url: `{wing_readonly_preflight['handoff_packet_url']}`",
+                "- handoff_packet_artifact_root: "
+                f"`{wing_readonly_preflight['handoff_packet_artifact_root']}`",
                 f"- handoff_packet_channels: `{wing_readonly_preflight['handoff_packet_channels']}`",
                 "- handoff_packet_value_types: "
                 f"`{wing_readonly_preflight['handoff_packet_value_types']}`",
+                "- handoff_packet_url_matches_capture: "
+                f"`{str(wing_readonly_preflight['handoff_packet_url_matches_capture']).lower()}`",
+                "- handoff_packet_artifact_root_matches_capture: "
+                f"`{str(wing_readonly_preflight['handoff_packet_artifact_root_matches_capture']).lower()}`",
                 "- handoff_packet_channel_matches_capture: "
                 f"`{str(wing_readonly_preflight['handoff_packet_channel_matches_capture']).lower()}`",
                 "- handoff_packet_value_types_match_capture: "

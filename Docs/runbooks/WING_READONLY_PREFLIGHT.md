@@ -55,8 +55,10 @@ packet. This does not contact WING and does not approve live writes:
 
 ```bash
 python3 tools/build_wing_readonly_preflight_handoff_packet.py \
+  --url ws://localhost:8765 \
   --channels 3 \
   --value-types fader,gain,pan \
+  --artifact-root artifacts/wing_readonly_preflight \
   --plan-output artifacts/wing_readonly_preflight_plan/latest_plan.json \
   --output Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md
 ```

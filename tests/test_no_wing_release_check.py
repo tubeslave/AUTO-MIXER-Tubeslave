@@ -691,10 +691,14 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["handoff_packet_command"] == [
         "python3",
         "tools/build_wing_readonly_preflight_handoff_packet.py",
+        "--url",
+        "ws://localhost:8765",
         "--channels",
         "3",
         "--value-types",
         "fader,gain,pan",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
         "--plan-output",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
         "--output",
@@ -706,8 +710,14 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["handoff_packet_plan_output"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
+    assert result.detail["handoff_packet_url"] == "ws://localhost:8765"
+    assert result.detail["handoff_packet_artifact_root"] == (
+        "artifacts/wing_readonly_preflight"
+    )
     assert result.detail["handoff_packet_channels"] == "3"
     assert result.detail["handoff_packet_value_types"] == "fader,gain,pan"
+    assert result.detail["handoff_packet_url_matches_capture"] is True
+    assert result.detail["handoff_packet_artifact_root_matches_capture"] is True
     assert result.detail["handoff_packet_channel_matches_capture"] is True
     assert result.detail["handoff_packet_value_types_match_capture"] is True
     assert result.detail["blocked_by"] == [
@@ -2864,10 +2874,14 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_channel_mismatch(
         lambda: [
             "python3",
             "tools/build_wing_readonly_preflight_handoff_packet.py",
+            "--url",
+            "ws://localhost:8765",
             "--channels",
             "4",
             "--value-types",
             "fader,gain,pan",
+            "--artifact-root",
+            "artifacts/wing_readonly_preflight",
             "--plan-output",
             "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             "--output",
@@ -5006,10 +5020,14 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
         check for check in checks if check.name == "wing_readonly_preflight_handoff_packet"
     )
     assert "tools/build_wing_readonly_preflight_handoff_packet.py" in handoff_check.command
+    assert "--url" in handoff_check.command
+    assert "ws://localhost:8765" in handoff_check.command
     assert "--channels" in handoff_check.command
     assert "3" in handoff_check.command
     assert "--value-types" in handoff_check.command
     assert "fader,gain,pan" in handoff_check.command
+    assert "--artifact-root" in handoff_check.command
+    assert "artifacts/wing_readonly_preflight" in handoff_check.command
     assert "--plan-output" in handoff_check.command
     assert str(wing_readonly_preflight_plan_path_for_run(tmp_path)) in handoff_check.command
     assert "--format" in handoff_check.command
@@ -7735,10 +7753,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "handoff_packet_command": [
                 "python3",
                 "tools/build_wing_readonly_preflight_handoff_packet.py",
+                "--url",
+                "ws://localhost:8765",
                 "--channels",
                 "3",
                 "--value-types",
                 "fader,gain,pan",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
                 "--plan-output",
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json",
                 "--output",
@@ -7750,8 +7772,12 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "handoff_packet_plan_output": (
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json"
             ),
+            "handoff_packet_url": "ws://localhost:8765",
+            "handoff_packet_artifact_root": "artifacts/wing_readonly_preflight",
             "handoff_packet_channels": "3",
             "handoff_packet_value_types": "fader,gain,pan",
+            "handoff_packet_url_matches_capture": True,
+            "handoff_packet_artifact_root_matches_capture": True,
             "handoff_packet_channel_matches_capture": True,
             "handoff_packet_value_types_match_capture": True,
             "blocked_by": [
@@ -7877,8 +7903,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["handoff_packet_plan_output"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
+    assert preflight["handoff_packet_url"] == "ws://localhost:8765"
+    assert preflight["handoff_packet_artifact_root"] == (
+        "artifacts/wing_readonly_preflight"
+    )
     assert preflight["handoff_packet_channels"] == "3"
     assert preflight["handoff_packet_value_types"] == "fader,gain,pan"
+    assert preflight["handoff_packet_url_matches_capture"] is True
+    assert preflight["handoff_packet_artifact_root_matches_capture"] is True
     assert preflight["handoff_packet_channel_matches_capture"] is True
     assert preflight["handoff_packet_value_types_match_capture"] is True
     assert preflight["artifact_operator_next_steps"] == [
@@ -7928,7 +7960,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md" in markdown_summary
     assert "handoff_packet_plan_output" in markdown_summary
+    assert "handoff_packet_url: `ws://localhost:8765`" in markdown_summary
+    assert (
+        "handoff_packet_artifact_root: `artifacts/wing_readonly_preflight`"
+        in markdown_summary
+    )
     assert "handoff_packet_value_types: `fader,gain,pan`" in markdown_summary
+    assert "handoff_packet_url_matches_capture: `true`" in markdown_summary
+    assert "handoff_packet_artifact_root_matches_capture: `true`" in markdown_summary
     assert "handoff_packet_channel_matches_capture: `true`" in markdown_summary
     assert "handoff_packet_value_types_match_capture: `true`" in markdown_summary
 

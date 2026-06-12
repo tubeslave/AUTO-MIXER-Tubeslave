@@ -87,7 +87,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "review_wing_readonly_preflight_artifacts.py" in readonly
     assert "--require-physical-readback" in readonly
     assert "--operator-confirm-channels" in readonly
+    assert "--url ws://localhost:8765" in readonly
     assert "--value-types fader,gain,pan" in readonly
+    assert "--artifact-root artifacts/wing_readonly_preflight" in readonly
     assert "--value-types fader,gain \\" not in readonly
     assert "--plan-output artifacts/wing_readonly_preflight_plan/latest_plan.json" in readonly
     assert "--execute" not in readonly
