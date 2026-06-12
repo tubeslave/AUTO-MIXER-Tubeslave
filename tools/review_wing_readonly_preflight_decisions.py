@@ -120,6 +120,11 @@ def build_decision_review_report(
         "unreviewed_candidate_source_ids": _string_list(
             summary.get("unreviewed_candidate_source_ids")
         ),
+        "candidate_reviews": (
+            summary.get("candidate_reviews")
+            if isinstance(summary.get("candidate_reviews"), list)
+            else []
+        ),
         "required_checklist_ids": _string_list(summary.get("required_checklist_ids")),
         "manual_readiness_update_candidate_available": accepted_ready,
         "blocked_by": _string_list(summary.get("blocked_by")),
@@ -192,9 +197,42 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"`{json.dumps(report['unreviewed_candidate_source_ids'])}`",
         f"- required_checklist_ids: `{json.dumps(report['required_checklist_ids'])}`",
         "",
-        "## Blockers",
+        "## Candidate Prestart Contract",
         "",
     ]
+    candidate_reviews = (
+        report.get("candidate_reviews")
+        if isinstance(report.get("candidate_reviews"), list)
+        else []
+    )
+    if candidate_reviews:
+        for item in candidate_reviews:
+            row = item if isinstance(item, Mapping) else {}
+            lines.extend(
+                [
+                    f"- source: `{row.get('source_id')}`",
+                    f"  - status: `{row.get('status')}`",
+                    f"  - run_id: `{row.get('run_id')}`",
+                    f"  - summary_path: `{row.get('summary_path')}`",
+                    "  - backend_port_prestart_check_required: "
+                    f"`{str(row.get('backend_port_prestart_check_required') is True).lower()}`",
+                    "  - backend_port_prestart_check_must_pass_before_starting_backend: "
+                    f"`{str(row.get('backend_port_prestart_check_must_pass_before_starting_backend') is True).lower()}`",
+                    "  - backend_port_prestart_check_command: "
+                    f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
+                    "  - backend_port_prestart_check_failure_detail_fields: "
+                    f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
+                ]
+            )
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            "",
+            "## Blockers",
+            "",
+        ]
+    )
     blocked_by = report.get("blocked_by") if isinstance(report.get("blocked_by"), list) else []
     lines.extend(f"- `{item}`" for item in blocked_by)
     if not blocked_by:

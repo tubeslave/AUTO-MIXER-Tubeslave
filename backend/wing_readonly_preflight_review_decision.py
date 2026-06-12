@@ -162,6 +162,42 @@ def _candidate_items_by_source(evidence: Mapping[str, Any]) -> Dict[str, Mapping
     }
 
 
+def _candidate_review_rows(
+    candidates_by_source: Mapping[str, Mapping[str, Any]],
+) -> list[Dict[str, Any]]:
+    rows: list[Dict[str, Any]] = []
+    for source_id, candidate in candidates_by_source.items():
+        rows.append(
+            {
+                "source_id": source_id,
+                "status": candidate.get("status"),
+                "run_id": candidate.get("run_id"),
+                "captured_at": candidate.get("captured_at"),
+                "summary_path": candidate.get("summary_path"),
+                "summary_sha256": candidate.get("summary_sha256"),
+                "events_path": candidate.get("events_path"),
+                "events_sha256": candidate.get("events_sha256"),
+                "backend_port_prestart_check_required": (
+                    candidate.get("backend_port_prestart_check_required") is True
+                ),
+                "backend_port_prestart_check_must_pass_before_starting_backend": (
+                    candidate.get(
+                        "backend_port_prestart_check_must_pass_before_starting_backend"
+                    )
+                    is True
+                ),
+                "backend_port_prestart_check_command": list(
+                    candidate.get("backend_port_prestart_check_command") or []
+                ),
+                "backend_port_prestart_check_failure_detail_fields": list(
+                    candidate.get("backend_port_prestart_check_failure_detail_fields")
+                    or []
+                ),
+            }
+        )
+    return rows
+
+
 def _record_id(record: Mapping[str, Any], index: int) -> str:
     explicit = _string(record.get("review_id"))
     if explicit:
@@ -457,6 +493,7 @@ def build_wing_readonly_preflight_review_decision_ledger(
             "duplicate_source_ids": list(duplicate_source_ids),
             "conflicting_source_ids": list(conflicting_source_ids),
             "unreviewed_candidate_source_ids": list(unreviewed_candidate_source_ids),
+            "candidate_reviews": _candidate_review_rows(candidates_by_source),
             "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
             "operator_review_required": True,
             "manual_readiness_update_candidate_available": bool(accepted_records)

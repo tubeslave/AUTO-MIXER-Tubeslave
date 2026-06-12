@@ -148,6 +148,34 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
     assert ledger["summary"]["review_candidate_count"] == 1
     assert ledger["summary"]["unreviewed_candidate_count"] == 1
     assert ledger["summary"]["unreviewed_candidate_source_ids"] == ["inline_payload_0"]
+    assert ledger["summary"]["candidate_reviews"] == [
+        {
+            "source_id": "inline_payload_0",
+            "status": "valid_readonly_preflight_artifact",
+            "run_id": "20260606T120000Z_wing_readonly_preflight",
+            "captured_at": "2026-06-07T01:00:00Z",
+            "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+            "summary_sha256": "1" * 64,
+            "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+            "events_sha256": "2" * 64,
+            "backend_port_prestart_check_required": True,
+            "backend_port_prestart_check_must_pass_before_starting_backend": True,
+            "backend_port_prestart_check_command": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/no_wing_release_check.py",
+                "--quick",
+            ],
+            "backend_port_prestart_check_failure_detail_fields": [
+                "listener_processes",
+                "preflight_blocked_until_listener_confirmed",
+                "intended_backend_confirmation_required",
+                "safe_to_stop_listener_by_gate",
+                "fail_closed_reason",
+                "operator_next_step",
+            ],
+        }
+    ]
     assert "operator_must_record_readonly_preflight_review_decision" in ledger[
         "summary"
     ]["blocked_by"]

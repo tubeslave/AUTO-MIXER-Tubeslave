@@ -279,10 +279,21 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert report["accepted_record_count"] == 1
     assert report["manual_readiness_update_candidate_available"] is True
     assert report["accepted_source_ids"] == [str(summary_path)]
+    assert report["candidate_reviews"][0]["backend_port_prestart_check_required"] is True
+    assert (
+        report["candidate_reviews"][0][
+            "backend_port_prestart_check_must_pass_before_starting_backend"
+        ]
+        is True
+    )
     assert decision_tool.exit_code_for_report(report) == 0
     markdown = decision_tool.render_markdown(report)
     assert "accepted_decision_ready" in markdown
     assert "live_authority_granted: `false`" in markdown
+    assert "Candidate Prestart Contract" in markdown
+    assert "backend_port_prestart_check_command" in markdown
+    assert "backend_port_prestart_check_failure_detail_fields" in markdown
+    assert "listener_processes" in markdown
     assert str(summary_path) in markdown
     assert "does not contact WING" in markdown
 
