@@ -114,6 +114,10 @@ Stop the current Codex work direction and return to the first open blocker if:
   `operator_sequence_step_must_be_first: true`.
 - A supervised proof is planned while `backend_port_prestart_gate` does not show
   `runs_command: prestart_backend_port_check`.
+- A supervised proof is planned while `backend_port_prestart_gate` does not
+  exactly list `required_markers` for
+  `Before starting the intended backend/WING session`,
+  `prestart_backend_port_check`, and `unexpected listeners`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate`.
@@ -158,6 +162,11 @@ The same `backend_port_prestart_gate` must show
 
 The same `backend_port_prestart_gate` must also show
 `backend_port_prestart_gate.runs_command: prestart_backend_port_check`.
+
+The same `backend_port_prestart_gate` must also show
+`backend_port_prestart_gate.required_markers` exactly listing
+`Before starting the intended backend/WING session`,
+`prestart_backend_port_check`, and `unexpected listeners`.
 
 It must also show `supervised_prestart_gate` exactly matching
 `expected_supervised_prestart_gate`, with

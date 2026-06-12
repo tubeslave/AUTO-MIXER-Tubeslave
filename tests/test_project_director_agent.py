@@ -54,6 +54,12 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "backend_port_prestart_gate.runs_command: prestart_backend_port_check"
         in directive["selected_action"]
     )
+    assert "backend_port_prestart_gate.required_markers" in directive[
+        "selected_action"
+    ]
+    assert "Before starting the intended backend/WING session" in directive[
+        "selected_action"
+    ]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
     ]
@@ -245,6 +251,8 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in prompt
     assert "backend_port_prestart_gate.runs_command: prestart_backend_port_check" in prompt
+    assert "backend_port_prestart_gate.required_markers" in prompt
+    assert "Before starting the intended backend/WING session" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_check_operator_sequence_step" in prompt
     assert "prestart_backend_port_check" in prompt
@@ -264,6 +272,8 @@ def test_prompt_and_readme_document_project_director_agent():
         in readme
     )
     assert "backend_port_prestart_gate.runs_command: prestart_backend_port_check" in readme
+    assert "backend_port_prestart_gate.required_markers" in readme
+    assert "Before starting the intended backend/WING session" in readme
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme
     assert "backend_port_prestart_check_operator_sequence_step" in readme
     assert "prestart_backend_port_check" in readme

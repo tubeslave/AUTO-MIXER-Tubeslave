@@ -140,38 +140,41 @@ blockers выше.
    `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`;
 7. verify `backend_port_prestart_gate.runs_command:
    prestart_backend_port_check`;
-8. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+8. verify `backend_port_prestart_gate.required_markers` exactly lists
+   `Before starting the intended backend/WING session`,
+   `prestart_backend_port_check`, and `unexpected listeners`;
+9. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_operator_sequence_step` includes
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
-9. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+10. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-10. verify `supervised_prestart_gate.grants_live_authority: false`;
-11. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
+11. verify `supervised_prestart_gate.grants_live_authority: false`;
+12. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
-12. verify `supervised_prestart_gate.requires_operator_decision_status:
+13. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
-13. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-14. verify `operator_sequence_count: 10`;
-15. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-16. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+14. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+15. verify `operator_sequence_count: 10`;
+16. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+17. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-17. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-18. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+18. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+19. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-19. verify `required_supervised_prestart_gate_markers` exactly lists
+20. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-20. run dry-run recommendation;
-21. require explicit operator approval for the exact action;
-22. apply only bounded supervised fader/gain action;
-23. read back the result;
-24. test rollback;
-25. record proof artifact.
+21. run dry-run recommendation;
+22. require explicit operator approval for the exact action;
+23. apply only bounded supervised fader/gain action;
+24. read back the result;
+25. test rollback;
+26. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -233,6 +236,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the structured
   `backend_port_prestart_gate` must also show
   `backend_port_prestart_gate.runs_command: prestart_backend_port_check`.
+- Before any supervised fader/gain proof, the structured
+  `backend_port_prestart_gate.required_markers` must exactly list
+  `Before starting the intended backend/WING session`,
+  `prestart_backend_port_check`, and `unexpected listeners`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including

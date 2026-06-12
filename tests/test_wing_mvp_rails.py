@@ -46,6 +46,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in text
     assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in text
     assert "backend_port_prestart_gate.runs_command: prestart_backend_port_check" in text
+    assert "backend_port_prestart_gate.required_markers" in text
+    assert "Before starting the intended backend/WING session" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text
     assert "unexpected listeners" in text
@@ -106,6 +108,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "backend_port_prestart_gate.runs_command: prestart_backend_port_check"
         in rows[0]["next action"]
     )
+    assert "backend_port_prestart_gate.required_markers" in rows[0]["next action"]
+    assert "Before starting the intended backend/WING session" in rows[0][
+        "next action"
+    ]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in rows[0][
         "next action"
     ]
@@ -259,6 +265,8 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         in readonly
     )
     assert "backend_port_prestart_gate.runs_command: prestart_backend_port_check" in readonly
+    assert "backend_port_prestart_gate.required_markers" in readonly
+    assert "Before starting the intended backend/WING session" in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert "required_supervised_prestart_gate_markers" in readonly
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readonly
@@ -305,6 +313,8 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in report
     assert "backend_port_prestart_gate.runs_command: prestart_backend_port_check" in report
+    assert "backend_port_prestart_gate.required_markers" in report
+    assert "Before starting the intended backend/WING session" in report
     assert "backend_port_prestart_check_operator_sequence_step" in report
     assert "prestart_backend_port_check" in report
     assert "unexpected listeners" in report
@@ -395,6 +405,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in text
     assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in text
     assert "backend_port_prestart_gate.runs_command: prestart_backend_port_check" in text
+    assert "backend_port_prestart_gate.required_markers" in text
+    assert "Before starting the intended backend/WING session" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text
     assert "unexpected listeners" in text
@@ -516,6 +528,7 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     assert "backend_port_prestart_gate" in text
     assert "expected_backend_port_prestart_gate" in text
     assert "backend_port_prestart_gate.runs_command" in text
+    assert "backend_port_prestart_gate.required_markers" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
