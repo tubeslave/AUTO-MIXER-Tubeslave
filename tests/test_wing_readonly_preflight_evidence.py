@@ -47,6 +47,14 @@ def _valid_summary() -> dict:
         "expected_plan_violations": [],
         "expected_plan_required_for_real_run": True,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -603,6 +611,31 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
         "expected_plan_fail_closed_condition_missing:manual_review_decision_missing_or_invalid"
         in violations
     )
+
+
+def test_file_preflight_artifact_requires_summary_prestart_contract(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "summary-prestart-mismatch")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    summary["backend_port_prestart_check_required"] = False
+    summary["backend_port_prestart_check_must_pass_before_starting_backend"] = False
+    summary["backend_port_prestart_check_command"] = ["python3", "other_check.py"]
+    summary["backend_port_prestart_check_failure_detail_fields"] = ["other_field"]
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_roots=(tmp_path / "preflight",)
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    violations = evidence["summary"]["violations"]
+    assert "backend_port_prestart_check_required_not_true" in violations
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend_not_true"
+        in violations
+    )
+    assert "backend_port_prestart_check_command_mismatch" in violations
+    assert "backend_port_prestart_check_failure_detail_fields_mismatch" in violations
 
 
 def test_file_preflight_artifact_requires_expected_plan_request_sequence_to_match_summary(tmp_path):

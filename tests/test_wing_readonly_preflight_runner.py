@@ -114,6 +114,17 @@ def write_expected_plan(tmp_path: Path, *argv: str) -> Path:
     return plan_path
 
 
+def assert_summary_prestart_contract(summary: dict) -> None:
+    assert summary["backend_port_prestart_check_required"] is True
+    assert summary["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert summary["backend_port_prestart_check_command"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert summary["backend_port_prestart_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+
+
 def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
     expected = {
         "set_fader",
@@ -296,6 +307,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["expected_plan_match"] is True
     assert summary["expected_plan_sha256"]
     assert summary["expected_plan_violations"] == []
+    assert_summary_prestart_contract(summary)
     assert summary["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert summary["read_only"] is True
     assert summary["live_write"] is False
@@ -414,6 +426,7 @@ async def test_readonly_preflight_passes_with_state_unavailable_but_readbacks(
     assert summary["expected_plan_match"] is True
     assert summary["expected_plan_sha256"]
     assert summary["expected_plan_violations"] == []
+    assert_summary_prestart_contract(summary)
     assert summary["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert summary["read_only"] is True
     assert summary["live_write"] is False
@@ -910,6 +923,7 @@ async def test_readonly_preflight_requires_expected_plan_before_websocket(
     assert summary["status"] == "blocked"
     assert summary["reason"] == "expected_plan_missing"
     assert summary["expected_plan_required_for_real_run"] is True
+    assert_summary_prestart_contract(summary)
     assert summary["expected_plan_match"] is False
     assert summary["expected_plan_violations"] == ["expected_plan_missing"]
     assert summary["sent_request_types"] == []

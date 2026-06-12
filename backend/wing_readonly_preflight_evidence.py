@@ -761,6 +761,22 @@ def validate_wing_readonly_preflight_artifact(
         is not True
     ):
         violations.append("physical_preflight_requires_existing_backend_connection_not_true")
+    if payload.get("backend_port_prestart_check_required") is not True:
+        violations.append("backend_port_prestart_check_required_not_true")
+    if payload.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
+        violations.append(
+            "backend_port_prestart_check_must_pass_before_starting_backend_not_true"
+        )
+    if payload.get("backend_port_prestart_check_command") != list(
+        EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    ):
+        violations.append("backend_port_prestart_check_command_mismatch")
+    if payload.get("backend_port_prestart_check_failure_detail_fields") != list(
+        EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    ):
+        violations.append(
+            "backend_port_prestart_check_failure_detail_fields_mismatch"
+        )
     if payload.get("require_physical_readback") is not True:
         violations.append("require_physical_readback_not_true")
     channels = _int_tuple(payload.get("channels"))

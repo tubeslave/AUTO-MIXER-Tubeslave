@@ -41,6 +41,14 @@ def _valid_summary() -> dict:
         "expected_plan_violations": [],
         "expected_plan_required_for_real_run": True,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,

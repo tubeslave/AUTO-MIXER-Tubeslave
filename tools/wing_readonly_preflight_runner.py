@@ -589,6 +589,12 @@ async def run(args: argparse.Namespace) -> int:
         "write_request_sent": False,
         "proposal_request_sent": False,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),

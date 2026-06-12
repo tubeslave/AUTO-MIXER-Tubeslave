@@ -6,6 +6,7 @@ from backend.autonomy_promotion_readiness import (
 )
 from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
 )
 
@@ -33,6 +34,14 @@ def _valid_wing_preflight_summary() -> dict:
         "expected_plan_violations": [],
         "expected_plan_required_for_real_run": True,
         "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
