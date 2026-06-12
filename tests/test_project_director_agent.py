@@ -47,6 +47,9 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "mvp_blocker_anchor_matches_current_first_open: true" in directive[
         "selected_action"
     ]
+    assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in directive[
+        "selected_action"
+    ]
     assert "accepted-candidate prestart trace" in directive["selected_action"]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
