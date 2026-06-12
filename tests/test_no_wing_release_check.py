@@ -2352,6 +2352,13 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     ]
     assert result.detail["operator_sequence_count"] == 9
     assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
+    assert (
+        result.detail["operator_sequence_supervised_prestart_gate_step"]
+        == (
+            "Only after accepted_decision_ready and a valid accepted-candidate "
+            "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+        )
+    )
     assert result.detail["required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
@@ -2396,6 +2403,39 @@ def test_no_wing_release_check_rejects_handoff_packet_without_supervised_prestar
 
     assert result.status == "failed"
     assert result.detail["operator_sequence_has_supervised_prestart_gate"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_missing"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_split_supervised_prestart_gate(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-split-prestart-gate.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"].insert(
+        -1,
+        "Verify valid accepted-candidate prestart trace before proof planning.",
+    )
+    payload["operator_sequence"][-1] = (
+        "Only after accepted_decision_ready, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+    )
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_has_supervised_prestart_gate"] is False
+    assert result.detail["operator_sequence_supervised_prestart_gate_step"] == ""
     assert (
         "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_missing"
         in result.detail["violations"]
@@ -7864,6 +7904,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
             "operator_sequence_count": 9,
             "operator_sequence_has_supervised_prestart_gate": True,
+            "operator_sequence_supervised_prestart_gate_step": (
+                "Only after accepted_decision_ready and a valid accepted-candidate "
+                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+            ),
             "required_supervised_prestart_gate_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
@@ -7912,6 +7956,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["review_command_writes_decision_template"] is True
     assert artifact["operator_sequence_count"] == 9
     assert artifact["operator_sequence_has_supervised_prestart_gate"] is True
+    assert artifact["operator_sequence_supervised_prestart_gate_step"] == (
+        "Only after accepted_decision_ready and a valid accepted-candidate "
+        "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+    )
     assert artifact["required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
@@ -7936,6 +7984,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "preview_command_uses_plan_only: `true`" in markdown_summary
     assert "capture_command_requires_physical_readback: `true`" in markdown_summary
     assert "operator_sequence_has_supervised_prestart_gate: `true`" in markdown_summary
+    assert "operator_sequence_supervised_prestart_gate_step" in markdown_summary
     assert "required_supervised_prestart_gate_markers" in markdown_summary
     assert "valid accepted-candidate prestart trace" in markdown_summary
     assert "physical_console_readback_proof" in markdown_summary

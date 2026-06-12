@@ -3737,10 +3737,19 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             )
     if len(operator_sequence) < 8:
         violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
-    operator_sequence_text = "\n".join(str(item) for item in operator_sequence)
-    operator_sequence_has_supervised_prestart_gate = all(
-        marker in operator_sequence_text
-        for marker in WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
+    operator_sequence_supervised_prestart_gate_step = next(
+        (
+            str(item)
+            for item in operator_sequence
+            if all(
+                marker in str(item)
+                for marker in WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
+            )
+        ),
+        "",
+    )
+    operator_sequence_has_supervised_prestart_gate = bool(
+        operator_sequence_supervised_prestart_gate_step
     )
     if not operator_sequence_has_supervised_prestart_gate:
         violations.append(
@@ -3824,6 +3833,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["operator_sequence_count"] = len(operator_sequence)
     detail["operator_sequence_has_supervised_prestart_gate"] = (
         operator_sequence_has_supervised_prestart_gate
+    )
+    detail["operator_sequence_supervised_prestart_gate_step"] = (
+        operator_sequence_supervised_prestart_gate_step
     )
     detail["required_supervised_prestart_gate_markers"] = list(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
@@ -10893,6 +10905,9 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "operator_sequence_has_supervised_prestart_gate": (
                 detail.get("operator_sequence_has_supervised_prestart_gate") is True
             ),
+            "operator_sequence_supervised_prestart_gate_step": (
+                str(detail.get("operator_sequence_supervised_prestart_gate_step") or "")
+            ),
             "required_supervised_prestart_gate_markers": (
                 list(detail.get("required_supervised_prestart_gate_markers"))
                 if isinstance(
@@ -14124,6 +14139,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count']}`",
                 "- operator_sequence_has_supervised_prestart_gate: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_has_supervised_prestart_gate']).lower()}`",
+                "- operator_sequence_supervised_prestart_gate_step: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_step']}`",
                 "- required_supervised_prestart_gate_markers: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_markers'])}`",
                 "- violations: "
