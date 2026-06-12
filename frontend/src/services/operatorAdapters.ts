@@ -172,7 +172,7 @@ function normalizeGoalCapabilityReadinessPriorityRows(value: unknown): GoalCapab
 
 function normalizeGoalCapabilityReadinessByGoalAreaMap(value: unknown): Record<string, GoalCapabilityObjectiveReadinessByGoalArea> {
   const rows = asRecord(value);
-  const normalizedRows = Object.entries(rows)
+  const normalizedRows: Array<[string, GoalCapabilityObjectiveReadinessByGoalArea]> = Object.entries(rows)
     .map(([goalArea, entry]) => {
       const row = asRecord(entry);
       const normalized: GoalCapabilityObjectiveReadinessByGoalArea = { goal_area: str(row.goal_area, goalArea) };
@@ -207,7 +207,7 @@ function normalizeGoalCapabilityReadinessByGoalAreaMap(value: unknown): Record<s
       }
       if (blockerRowCount !== undefined) normalized.target_live_writable_row_count = blockerRowCount;
       if (proofGapCount !== undefined) normalized.target_proof_gap_count = proofGapCount;
-      return [goalArea, normalized];
+      return [goalArea, normalized] as [string, GoalCapabilityObjectiveReadinessByGoalArea];
     })
     .filter(([, row]) => {
       const hasAnyMetric = typeof row.readiness_score === 'number'
@@ -726,7 +726,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   const data = asRecord(payload);
   const rows = asArray(data.module_status_map);
 
-  const moduleRows = rows.map(row => {
+  const moduleRows: ModuleStatusRecord[] = rows.map(row => {
     const status = str(row.status, 'unknown');
     const canWriteLive = Boolean(row.can_write_live);
     return {
@@ -752,7 +752,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
 
   const inventory = asRecord(data.write_surface_inventory);
   const surfaces = asArray(inventory.surfaces);
-  const surfaceRows = surfaces.map(row => {
+  const surfaceRows: ModuleStatusRecord[] = surfaces.map(row => {
     const surfaceId = str(row.id, 'unknown_surface');
     const status = str(row.status, 'unknown');
     const canWriteLive = Boolean(row.allowed_live);
@@ -782,7 +782,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   });
 
   const coverage = asRecord(data.safety_coverage_matrix);
-  const coverageRows = asArray(coverage.rows).map(row => {
+  const coverageRows: ModuleStatusRecord[] = asArray(coverage.rows).map(row => {
     const rowId = str(row.id, 'unknown_coverage');
     const status = str(row.status, 'unknown');
     const canWriteLive = Boolean(row.live_allowed);
@@ -839,7 +839,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     || autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds.length > 0
     || autonomyModeTransitionGateSupervisedCurrentLiveWriteSurfaces.length > 0
   );
-  const modeGateRows = asArray(modeGate.rows).map(row => {
+  const modeGateRows: ModuleStatusRecord[] = asArray(modeGate.rows).map(row => {
     const mode = str(row.mode, 'unknown_mode');
     const status = str(row.status, 'unknown');
     const blockers = stringList(row.blockers);
@@ -888,7 +888,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       tone: toneForModeGateStatus(status)
     };
   });
-  const readinessRows = asArray(readiness.rows).map(row => {
+  const readinessRows: ModuleStatusRecord[] = asArray(readiness.rows).map(row => {
     const targetId = str(row.id, 'unknown_promotion_target');
     const status = str(row.status, 'unknown');
     const blockers = stringList(row.blockers);
@@ -926,7 +926,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     };
   });
 
-  const readinessSummaryRows = hasAutonomyReadinessSummarySignals
+  const readinessSummaryRows: ModuleStatusRecord[] = hasAutonomyReadinessSummarySignals
     ? [{
       moduleId: 'autonomy_promotion_summary',
       label: 'Autonomy readiness summary',
@@ -3157,7 +3157,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   })() : [];
 
   const overlay = asRecord(data.autonomy_evidence_overlay);
-  const overlayRows = asArray(overlay.rows).map(row => {
+  const overlayRows: ModuleStatusRecord[] = asArray(overlay.rows).map(row => {
     const valueType = str(row.value_type, 'unknown');
     const targetId = str(row.target_id, 'unknown_target');
     const status = str(row.status, 'unknown');
@@ -3242,7 +3242,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         ? `${count} gap(s): ${blockedTargets.join(', ')}`
         : `${count} promotion evidence gap(s).`,
       nextStep,
-      tone: 'red'
+      tone: 'red' as Tone
     });
   });
 

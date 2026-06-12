@@ -57,7 +57,7 @@ test.describe('Automixer frontend prototype', () => {
     await expect(page.getByText('Safety Evidence')).toBeVisible();
     await expect(page.getByText('Apply Plan')).toBeVisible();
     await page.getByLabel('Automation mode').selectOption('Supervised');
-    await expect(page.getByText('Mode changed to Supervised. Mock fallback only.')).toBeVisible();
+    await expect(page.getByText('Mode changed to Supervised AutoMix', { exact: true })).toBeVisible();
 
     const leadVocalRow = page.locator('.am-table-row').filter({ hasText: 'Reduce Lead Vocal presence' });
     await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
@@ -88,22 +88,22 @@ test.describe('Automixer frontend prototype', () => {
     const leadVocalRow = page.locator('.am-table-row').filter({ hasText: 'Reduce Lead Vocal presence' });
 
     await page.getByLabel('Automation mode').selectOption('Analyze');
-    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Analyze');
+    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Analysis Mode');
     await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
     const blockedFocus = page.locator('section').filter({ hasText: 'Action Focus' }).filter({ hasText: 'Apply Blocked' });
     await expect(blockedFocus).toContainText('Analyze mode is read-only');
     await expect(leadVocalRow).toContainText('Pending');
 
     await page.getByLabel('Automation mode').selectOption('Assist');
-    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Assist');
+    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Assisted Mixing');
     await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
-    await expect(page.getByText('Assist mode does not apply changes')).toBeVisible();
+    await expect(page.getByText('Assisted Mixing does not apply changes')).toBeVisible();
     await expect(leadVocalRow).toContainText('Review');
 
     await page.getByLabel('Automation mode').selectOption('Auto');
-    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Auto');
+    await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Full Autonomous Mixing');
     await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
-    await expect(page.getByText('Auto mode simulated the apply locally')).toBeVisible();
+    await expect(page.getByText('Full Autonomous Mixing mode simulated the apply locally')).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toHaveCount(0);
   });
 
@@ -111,7 +111,7 @@ test.describe('Automixer frontend prototype', () => {
     await page.goto('/#/dashboard');
     await page.getByLabel('Automation mode').selectOption('Supervised');
 
-    await expect(page.getByText('Mode changed to Supervised. Mock fallback only.')).toBeVisible();
+    await expect(page.getByText('Mode changed to Supervised AutoMix', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Automation mode')).toHaveValue('Supervised');
   });
 

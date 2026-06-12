@@ -2266,6 +2266,10 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
         "existing_backend_connection_boundary_missing"
         in result.detail["fail_closed_conditions"]
     )
+    assert (
+        "stale_backend_port_prestart_detail_contract"
+        in result.detail["fail_closed_conditions"]
+    )
     assert result.detail["post_run_review_commands"] == [
         " ".join(release_check.wing_readonly_preflight_review_command()),
         " ".join(release_check.wing_readonly_preflight_review_decision_command()),
