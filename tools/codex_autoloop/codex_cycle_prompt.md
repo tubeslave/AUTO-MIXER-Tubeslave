@@ -139,6 +139,8 @@ blockers выше.
 6. verify `backend_port_prestart_gate.operator_sequence_step_index: 0` and
    `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`;
 7. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+   `backend_port_prestart_check_operator_sequence_step` includes
+   `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
 8. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
@@ -228,6 +230,8 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
+  `backend_port_prestart_check_operator_sequence_step` including
+  `prestart_backend_port_check` and `unexpected listeners`,
   `backend_port_prestart_check_must_be_first_operator_step: true`, and
   `backend_port_prestart_check_operator_sequence_step_is_first: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

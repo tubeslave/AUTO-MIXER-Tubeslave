@@ -137,6 +137,8 @@ you want the background automation active.
   These fields keep the structured gate aligned with the first operator step.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
+  `backend_port_prestart_check_operator_sequence_step` including
+  `prestart_backend_port_check` and `unexpected listeners`,
   `backend_port_prestart_check_must_be_first_operator_step: true`, and
   `backend_port_prestart_check_operator_sequence_step_is_first: true`.
   This proves the backend-port prestart check remains the first operator step

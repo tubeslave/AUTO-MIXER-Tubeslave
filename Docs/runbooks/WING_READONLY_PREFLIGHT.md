@@ -331,6 +331,8 @@ The handoff validation must report:
 
 - `operator_sequence_count: 10`
 - `backend_port_prestart_check_operator_sequence_step_index: 0`
+- `backend_port_prestart_check_operator_sequence_step` includes
+  `prestart_backend_port_check` and `unexpected listeners`
 - `backend_port_prestart_check_must_be_first_operator_step: true`
 - `backend_port_prestart_check_operator_sequence_step_is_first: true`
 - `backend_port_prestart_gate` exactly matches

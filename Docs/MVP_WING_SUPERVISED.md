@@ -125,6 +125,9 @@ Stop the current Codex work direction and return to the first open blocker if:
   `operator_sequence_supervised_prestart_gate_step_index: 9`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `operator_sequence_count: 10`.
+- A supervised proof is planned while
+  `backend_port_prestart_check_operator_sequence_step` does not include
+  `prestart_backend_port_check` and `unexpected listeners`.
 
 This is not a stop to development. Codex must continue uninterrupted Goal-mode
 work, but only on the first non-closed MVP blocker.
@@ -175,6 +178,10 @@ The operator sequence indexes must also remain explicit:
 
 The handoff summary must also show `operator_sequence_count: 10` so reviewers
 can reject packets with missing or extra operator steps.
+
+The first operator step text must also be explicit:
+`backend_port_prestart_check_operator_sequence_step` must include
+`prestart_backend_port_check` and `unexpected listeners`.
 
 ## Autonomy Budget Rule
 

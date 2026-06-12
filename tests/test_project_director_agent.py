@@ -53,6 +53,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
     ]
+    assert "backend_port_prestart_check_operator_sequence_step" in directive[
+        "selected_action"
+    ]
+    assert "prestart_backend_port_check" in directive["selected_action"]
+    assert "unexpected listeners" in directive["selected_action"]
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in directive[
         "selected_action"
     ]
@@ -236,6 +241,9 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
+    assert "backend_port_prestart_check_operator_sequence_step" in prompt
+    assert "prestart_backend_port_check" in prompt
+    assert "unexpected listeners" in prompt
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in prompt
     assert "backend_port_prestart_gate" in readme
@@ -251,6 +259,9 @@ def test_prompt_and_readme_document_project_director_agent():
         in readme
     )
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme
+    assert "backend_port_prestart_check_operator_sequence_step" in readme
+    assert "prestart_backend_port_check" in readme
+    assert "unexpected listeners" in readme
     assert (
         "backend_port_prestart_check_must_be_first_operator_step: true"
         in readme
