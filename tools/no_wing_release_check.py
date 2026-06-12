@@ -3980,6 +3980,28 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
         )
+    operator_sequence_mvp_blocker_anchor_digest_review_step_index = next(
+        (
+            index
+            for index, item in enumerate(operator_sequence)
+            if "mvp_blocker_anchor" in str(item)
+            and "mvp_blocker_anchor_sha256" in str(item)
+            and "current first open blocker" in str(item)
+        ),
+        None,
+    )
+    operator_sequence_mvp_blocker_anchor_digest_review_step = (
+        str(operator_sequence[operator_sequence_mvp_blocker_anchor_digest_review_step_index])
+        if operator_sequence_mvp_blocker_anchor_digest_review_step_index is not None
+        else ""
+    )
+    operator_sequence_has_mvp_blocker_anchor_digest_review = bool(
+        operator_sequence_mvp_blocker_anchor_digest_review_step
+    )
+    if not operator_sequence_has_mvp_blocker_anchor_digest_review:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_step_missing"
+        )
     expected_supervised_prestart_gate = {
         "required": True,
         "operator_sequence_step_index": operator_sequence_supervised_prestart_gate_step_index,
@@ -4114,6 +4136,15 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
     )
     detail["operator_sequence_count"] = len(operator_sequence)
+    detail["operator_sequence_has_mvp_blocker_anchor_digest_review"] = (
+        operator_sequence_has_mvp_blocker_anchor_digest_review
+    )
+    detail["operator_sequence_mvp_blocker_anchor_digest_review_step"] = (
+        operator_sequence_mvp_blocker_anchor_digest_review_step
+    )
+    detail["operator_sequence_mvp_blocker_anchor_digest_review_step_index"] = (
+        operator_sequence_mvp_blocker_anchor_digest_review_step_index
+    )
     detail["operator_sequence_has_supervised_prestart_gate"] = (
         operator_sequence_has_supervised_prestart_gate
     )
@@ -11296,6 +11327,21 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 detail.get("mvp_blocker_anchor_sha256_matches_current_first_open") is True
             ),
             "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "operator_sequence_has_mvp_blocker_anchor_digest_review": (
+                detail.get("operator_sequence_has_mvp_blocker_anchor_digest_review")
+                is True
+            ),
+            "operator_sequence_mvp_blocker_anchor_digest_review_step": (
+                str(
+                    detail.get(
+                        "operator_sequence_mvp_blocker_anchor_digest_review_step"
+                    )
+                    or ""
+                )
+            ),
+            "operator_sequence_mvp_blocker_anchor_digest_review_step_index": (
+                detail.get("operator_sequence_mvp_blocker_anchor_digest_review_step_index")
+            ),
             "operator_sequence_has_supervised_prestart_gate": (
                 detail.get("operator_sequence_has_supervised_prestart_gate") is True
             ),
@@ -14584,6 +14630,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_mvp_blocker_anchor'])}`",
                 "- operator_sequence_count: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count']}`",
+                "- operator_sequence_has_mvp_blocker_anchor_digest_review: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_has_mvp_blocker_anchor_digest_review']).lower()}`",
+                "- operator_sequence_mvp_blocker_anchor_digest_review_step: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_mvp_blocker_anchor_digest_review_step']}`",
+                "- operator_sequence_mvp_blocker_anchor_digest_review_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_mvp_blocker_anchor_digest_review_step_index']}`",
                 "- operator_sequence_has_supervised_prestart_gate: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_has_supervised_prestart_gate']).lower()}`",
                 "- operator_sequence_supervised_prestart_gate_step: "

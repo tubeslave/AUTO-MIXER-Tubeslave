@@ -138,6 +138,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "mvp_blocker_anchor_sha256" in readonly
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in readonly
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in readonly
+    assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readonly
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in readonly
+    assert "current first open blocker" in readonly
     assert "backend_port_prestart_gate" in readonly
     assert "expected_backend_port_prestart_gate" in readonly
     assert "backend_port_prestart_gate.grants_live_authority: false" in readonly
@@ -282,6 +285,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BLOCKER_HANDOFF_ANCHOR_DIGEST_NEXT_ACTION_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_HANDOFF_ANCHOR_DIGEST_OPERATOR_REVIEW_STEP_20260612.md"
         in text
     )
     assert (

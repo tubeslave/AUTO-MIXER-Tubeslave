@@ -104,6 +104,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["operator_sequence"][0].startswith(
         "Before starting the intended backend/WING session"
     )
+    assert len(packet["operator_sequence"]) == 10
     first_gate_step = packet["operator_sequence"][0]
     assert packet["backend_port_prestart_gate"] == {
         "required": True,
@@ -122,13 +123,18 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["expected_backend_port_prestart_gate"] == packet[
         "backend_port_prestart_gate"
     ]
+    anchor_digest_review_step = packet["operator_sequence"][-2]
+    assert "mvp_blocker_anchor" in anchor_digest_review_step
+    assert "mvp_blocker_anchor_sha256" in anchor_digest_review_step
+    assert "current first open blocker" in anchor_digest_review_step
+    assert "supervised proof planning" in anchor_digest_review_step
     supervised_gate_step = packet["operator_sequence"][-1]
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in supervised_gate_step
     assert packet["supervised_prestart_gate"] == {
         "required": True,
-        "operator_sequence_step_index": 8,
+        "operator_sequence_step_index": 9,
         "operator_sequence_step_must_be_final": True,
         "operator_sequence_step": supervised_gate_step,
         "required_markers": [

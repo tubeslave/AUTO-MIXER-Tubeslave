@@ -212,7 +212,7 @@ def build_handoff_packet(
 ) -> dict[str, Any]:
     channel_numbers = _validate_channels(channels)
     value_type_names = _validate_value_types(value_types)
-    supervised_gate_step_index = 8
+    supervised_gate_step_index = 9
     supervised_gate_step = (
         "Only after accepted_decision_ready and a valid accepted-candidate "
         "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
@@ -233,6 +233,10 @@ def build_handoff_packet(
         "prestart_backend_port_check",
         "unexpected listeners",
     ]
+    mvp_blocker_anchor_digest_review_step = (
+        "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
+        "current first open blocker before supervised proof planning."
+    )
     expected_prestart_gate = {
         "required": True,
         "operator_sequence_step_index": prestart_step_index,
@@ -338,6 +342,7 @@ def build_handoff_packet(
             "Run review_artifact_and_write_pending_decision_template.",
             "Edit the pending decision template into an accepted or rejected JSON record.",
             "Run review_edited_decision_json.",
+            mvp_blocker_anchor_digest_review_step,
             supervised_gate_step,
         ],
         "backend_port_prestart_gate": dict(expected_prestart_gate),

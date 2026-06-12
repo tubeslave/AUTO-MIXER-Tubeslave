@@ -68,7 +68,10 @@ in `.ai/project-layer/wing_mvp_blockers.md`. The no-WING validator must report
 `mvp_blocker_anchor_matches_current_first_open: true`; otherwise the handoff is
 stale and cannot gate supervised proof planning. The packet must also include a
 matching `mvp_blocker_anchor_sha256` so reviewers can compare the displayed
-anchor with the exact blocker-row digest.
+anchor with the exact blocker-row digest. The packet operator sequence must
+include a dedicated review step that names `mvp_blocker_anchor`,
+`mvp_blocker_anchor_sha256`, and the current first open blocker before
+supervised proof planning.
 
 Replace channel `3` with the operator-approved channel:
 
@@ -334,6 +337,10 @@ The handoff validation must report:
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`
 - `mvp_blocker_anchor.packet_does_not_close_blocker: true`
+- `operator_sequence_has_mvp_blocker_anchor_digest_review: true`
+- `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+  `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
+  `current first open blocker`
 - the final handoff operator-sequence step contains the supervised prestart gate
 - `operator_sequence_has_supervised_prestart_gate: true`
 - `operator_sequence_supervised_prestart_gate_is_final: true`

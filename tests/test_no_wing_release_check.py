@@ -1024,6 +1024,10 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "Edit the pending decision template into an accepted or rejected JSON record.",
             "Run review_edited_decision_json.",
             (
+                "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
+                "current first open blocker before supervised proof planning."
+            ),
+            (
                 "Only after accepted_decision_ready and a valid accepted-candidate "
                 "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
@@ -1066,7 +1070,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         },
         "supervised_prestart_gate": {
             "required": True,
-            "operator_sequence_step_index": 8,
+            "operator_sequence_step_index": 9,
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
                 "Only after accepted_decision_ready and a valid accepted-candidate "
@@ -1084,7 +1088,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         },
         "expected_supervised_prestart_gate": {
             "required": True,
-            "operator_sequence_step_index": 8,
+            "operator_sequence_step_index": 9,
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
                 "Only after accepted_decision_ready and a valid accepted-candidate "
@@ -2549,7 +2553,20 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["mvp_blocker_anchor"]["selected_evidence_file_count"] == len(
         result.detail["mvp_blocker_anchor"]["selected_evidence_files"]
     )
-    assert result.detail["operator_sequence_count"] == 9
+    assert result.detail["operator_sequence_count"] == 10
+    assert (
+        result.detail["operator_sequence_has_mvp_blocker_anchor_digest_review"]
+        is True
+    )
+    assert result.detail[
+        "operator_sequence_mvp_blocker_anchor_digest_review_step"
+    ] == (
+        "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
+        "current first open blocker before supervised proof planning."
+    )
+    assert result.detail[
+        "operator_sequence_mvp_blocker_anchor_digest_review_step_index"
+    ] == 8
     assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
     assert (
         result.detail["operator_sequence_supervised_prestart_gate_step"]
@@ -2558,7 +2575,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
             "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
         )
     )
-    assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 8
+    assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 9
     assert result.detail["operator_sequence_supervised_prestart_gate_is_final"] is True
     assert result.detail["supervised_prestart_gate"] == result.detail[
         "expected_supervised_prestart_gate"
@@ -2568,7 +2585,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     ]
     assert result.detail["supervised_prestart_gate"][
         "operator_sequence_step_index"
-    ] == 8
+    ] == 9
     assert result.detail["supervised_prestart_gate"][
         "operator_sequence_step_must_be_final"
     ] is True
@@ -2643,6 +2660,46 @@ def test_no_wing_release_check_rejects_handoff_packet_mvp_blocker_anchor_digest_
     )
     assert (
         "wing_readonly_preflight_handoff_packet_expected_mvp_blocker_anchor_sha256_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_without_anchor_digest_review_step(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-without-anchor-digest-review-step.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"] = [
+        item
+        for item in payload["operator_sequence"]
+        if "mvp_blocker_anchor_sha256" not in item
+    ]
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_count"] == 9
+    assert (
+        result.detail["operator_sequence_has_mvp_blocker_anchor_digest_review"]
+        is False
+    )
+    assert result.detail[
+        "operator_sequence_mvp_blocker_anchor_digest_review_step"
+    ] == ""
+    assert result.detail[
+        "operator_sequence_mvp_blocker_anchor_digest_review_step_index"
+    ] is None
+    assert (
+        "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_step_missing"
         in result.detail["violations"]
     )
 
@@ -2823,7 +2880,7 @@ def test_no_wing_release_check_rejects_handoff_packet_with_nonfinal_supervised_p
 
     assert result.status == "failed"
     assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
-    assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 8
+    assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 9
     assert result.detail["operator_sequence_supervised_prestart_gate_is_final"] is False
     assert (
         "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
@@ -8473,17 +8530,23 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "required_review_checklist_ids": ["confirm_no_live_authority"],
             "forbidden_live_request_types": ["apply_operator_proposal"],
             "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
-            "operator_sequence_count": 9,
+            "operator_sequence_count": 10,
+            "operator_sequence_has_mvp_blocker_anchor_digest_review": True,
+            "operator_sequence_mvp_blocker_anchor_digest_review_step": (
+                "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
+                "current first open blocker before supervised proof planning."
+            ),
+            "operator_sequence_mvp_blocker_anchor_digest_review_step_index": 8,
             "operator_sequence_has_supervised_prestart_gate": True,
             "operator_sequence_supervised_prestart_gate_step": (
                 "Only after accepted_decision_ready and a valid accepted-candidate "
                 "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
-            "operator_sequence_supervised_prestart_gate_step_index": 8,
+            "operator_sequence_supervised_prestart_gate_step_index": 9,
             "operator_sequence_supervised_prestart_gate_is_final": True,
             "supervised_prestart_gate": {
                 "required": True,
-                "operator_sequence_step_index": 8,
+                "operator_sequence_step_index": 9,
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
                     "Only after accepted_decision_ready and a valid accepted-candidate "
@@ -8501,7 +8564,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             },
             "expected_supervised_prestart_gate": {
                 "required": True,
-                "operator_sequence_step_index": 8,
+                "operator_sequence_step_index": 9,
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
                     "Only after accepted_decision_ready and a valid accepted-candidate "
@@ -8584,18 +8647,24 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "--quick",
     ]
     assert artifact["review_command_writes_decision_template"] is True
-    assert artifact["operator_sequence_count"] == 9
+    assert artifact["operator_sequence_count"] == 10
+    assert artifact["operator_sequence_has_mvp_blocker_anchor_digest_review"] is True
+    assert artifact["operator_sequence_mvp_blocker_anchor_digest_review_step"] == (
+        "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
+        "current first open blocker before supervised proof planning."
+    )
+    assert artifact["operator_sequence_mvp_blocker_anchor_digest_review_step_index"] == 8
     assert artifact["operator_sequence_has_supervised_prestart_gate"] is True
     assert artifact["operator_sequence_supervised_prestart_gate_step"] == (
         "Only after accepted_decision_ready and a valid accepted-candidate "
         "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
     )
-    assert artifact["operator_sequence_supervised_prestart_gate_step_index"] == 8
+    assert artifact["operator_sequence_supervised_prestart_gate_step_index"] == 9
     assert artifact["operator_sequence_supervised_prestart_gate_is_final"] is True
     assert artifact["supervised_prestart_gate"] == artifact[
         "expected_supervised_prestart_gate"
     ]
-    assert artifact["supervised_prestart_gate"]["operator_sequence_step_index"] == 8
+    assert artifact["supervised_prestart_gate"]["operator_sequence_step_index"] == 9
     assert artifact["supervised_prestart_gate"][
         "operator_sequence_step_must_be_final"
     ] is True
@@ -8638,8 +8707,17 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "preview_command_uses_plan_only: `true`" in markdown_summary
     assert "capture_command_requires_physical_readback: `true`" in markdown_summary
     assert "operator_sequence_has_supervised_prestart_gate: `true`" in markdown_summary
+    assert (
+        "operator_sequence_has_mvp_blocker_anchor_digest_review: `true`"
+        in markdown_summary
+    )
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in markdown_summary
+    assert (
+        "operator_sequence_mvp_blocker_anchor_digest_review_step_index: `8`"
+        in markdown_summary
+    )
     assert "operator_sequence_supervised_prestart_gate_step" in markdown_summary
-    assert "operator_sequence_supervised_prestart_gate_step_index: `8`" in markdown_summary
+    assert "operator_sequence_supervised_prestart_gate_step_index: `9`" in markdown_summary
     assert "operator_sequence_supervised_prestart_gate_is_final: `true`" in markdown_summary
     assert "required_supervised_prestart_gate_markers" in markdown_summary
     assert "supervised_prestart_gate" in markdown_summary
