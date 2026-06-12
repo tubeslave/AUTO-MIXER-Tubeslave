@@ -141,6 +141,24 @@ def test_wing_readonly_preflight_runbook_lists_prestart_failure_detail_fields():
         assert field_name in runbook_text
 
 
+def test_offline_no_wing_runbook_lists_wing_proof_candidate_prestart_gate():
+    runbook_text = Path("Docs/OFFLINE_NO_WING_VALIDATION_RUNBOOK.md").read_text()
+
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+        in runbook_text
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_source_ids"
+        in runbook_text
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in runbook_text
+    )
+    assert "backend-port prestart contract" in runbook_text
+
+
 def test_no_wing_release_check_commands_have_no_live_write_tokens(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_package=True)
 

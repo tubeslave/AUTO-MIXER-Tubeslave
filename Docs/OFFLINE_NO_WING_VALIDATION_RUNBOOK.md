@@ -99,6 +99,14 @@ The no-WING validation can be treated as passed only if:
   automatic safety update and `full_autonomous_ready=false`;
 - `summary.json` and `summary.md` expose the Next WING Proof Plan as
   read-only and operator-required with `execution_allowed_by_plan=false`;
+- `summary.json` and `summary.md` expose
+  `readonly_preflight_review_decision_candidate_prestart_contract_valid` and
+  `readonly_preflight_review_decision_candidate_prestart_source_ids`; physical
+  WING proof steps are not acceptable unless every accepted read-only preflight
+  review source id is backed by a candidate review row with the backend-port prestart contract;
+- if accepted read-only preflight source ids exist but the candidate prestart
+  trace is invalid, `global_blockers` must include
+  `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`;
 - `summary.json` and `summary.md` expose Read Surface Fixture Evidence as
   read-only, non-live, non-autonomous evidence, including the remaining physical
   readback fixture gaps;
