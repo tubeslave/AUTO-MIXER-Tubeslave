@@ -4017,13 +4017,30 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         label="Supervised WING Proof Plan",
         domain="evaluation",
         status="shadow_only",
-        summary="Read-only operator checklist for the next bounded physical WING fader/gain proof; emits commands but never executes them.",
+        summary=(
+            "Read-only operator checklist for the next bounded physical WING "
+            "fader/gain proof; physical proof steps stay blocked until an "
+            "accepted read-only preflight decision is bound to a candidate "
+            "review row with the backend-port prestart contract."
+        ),
         module="backend/supervised_wing_proof_plan.py",
         can_analyze=True,
         pipeline_profiles=("shadow_quality", "lab_dsp"),
-        blocked_reason="operator_must_execute_physical_proof_manually",
-        promotion_next="run the generated physical proof plan only with explicit operator approval and then re-evaluate artifacts",
-        notes=("transport_free", "proof_plan_only", "no_live_writes", "execution_allowed_by_plan_false"),
+        blocked_reason=(
+            "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        ),
+        promotion_next=(
+            "run generated physical proof steps only after accepted candidate "
+            "prestart trace validation and explicit operator approval, then "
+            "re-evaluate artifacts"
+        ),
+        notes=(
+            "transport_free",
+            "proof_plan_only",
+            "no_live_writes",
+            "execution_allowed_by_plan_false",
+            "candidate_prestart_trace_required",
+        ),
     ),
     ProcessingMethod(
         id="wing_readonly_preflight_evidence",
@@ -6220,7 +6237,10 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
     "supervised_wing_proof_plan": {
         "entrypoint": "build_supervised_wing_proof_plan",
         "ui_surface": "Proof artifact report, next WING test runbook",
-        "next_step": "Use only as an operator checklist; do not execute physical proof without explicit approval.",
+        "next_step": (
+            "Use only as an operator checklist; physical proof steps require a "
+            "valid accepted-candidate prestart trace plus explicit operator approval."
+        ),
     },
     "wing_readonly_preflight_evidence": {
         "entrypoint": "build_wing_readonly_preflight_evidence",

@@ -297,6 +297,14 @@ def test_supervised_wing_proof_plan_is_shadow_only_not_executor():
     assert method.can_write_live is False
     assert method.live_write_kinds == ()
     assert set(method.pipeline_profiles) == {"shadow_quality", "lab_dsp"}
+    assert (
+        method.blocked_reason
+        == "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+    )
+    assert "accepted read-only preflight decision" in method.summary
+    assert "backend-port prestart contract" in method.summary
+    assert "candidate_prestart_trace_required" in method.notes
+    assert "explicit operator approval" in method.promotion_next
 
     main = get_pipeline_profile("main_live_assist")
     assert main is not None
