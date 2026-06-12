@@ -5,6 +5,9 @@ from backend.autonomy_promotion_readiness import (
     iter_promotion_readiness_rows,
 )
 from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
+from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+)
 
 
 def _valid_wing_preflight_summary() -> dict:
@@ -130,10 +133,9 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
         "tools/no_wing_release_check.py",
         "--quick",
     ]
-    assert preflight["prestart_backend_port_check_failure_detail_fields"] == [
-        "listener_processes",
-        "operator_next_step",
-    ]
+    assert preflight["prestart_backend_port_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert preflight["candidate_blocker_ids"] == []
     assert preflight["closed_blocker_ids"] == []
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
@@ -396,10 +398,9 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
         "tools/no_wing_release_check.py",
         "--quick",
     ]
-    assert preflight["prestart_backend_port_check_failure_detail_fields"] == [
-        "listener_processes",
-        "operator_next_step",
-    ]
+    assert preflight["prestart_backend_port_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert preflight["candidate_blocker_ids"] == [
         "wing_readonly_connection_proof",
         "physical_console_readback_proof",

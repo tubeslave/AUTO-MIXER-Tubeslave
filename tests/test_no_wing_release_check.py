@@ -714,10 +714,9 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
             "tools/no_wing_release_check.py",
             "--quick",
         ],
-        "backend_port_prestart_check_failure_detail_fields": [
-            "listener_processes",
-            "operator_next_step",
-        ],
+        "backend_port_prestart_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "manual_review_required_before_readiness_update": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "contacts_backend": False,
@@ -807,10 +806,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "tools/no_wing_release_check.py",
             "--quick",
         ],
-        "backend_port_prestart_check_failure_detail_fields": [
-            "listener_processes",
-            "operator_next_step",
-        ],
+        "backend_port_prestart_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
         "manual_review_required_before_readiness_update": True,
         "execution_allowed_by_packet": False,
         "readiness_matrix_update_allowed_by_packet": False,
@@ -4999,10 +4997,9 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         "tools/no_wing_release_check.py",
                         "--quick",
                     ],
-                    "prestart_backend_port_check_failure_detail_fields": [
-                        "listener_processes",
-                        "operator_next_step",
-                    ],
+                    "prestart_backend_port_check_failure_detail_fields": list(
+                        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                    ),
                     "blocked_by": [
                         "operator_must_review_readonly_preflight_candidate_before_readiness_update"
                     ],
@@ -5062,10 +5059,9 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "tools/no_wing_release_check.py",
                     "--quick",
                 ],
-                "readonly_preflight_prestart_check_failure_detail_fields": [
-                    "listener_processes",
-                    "operator_next_step",
-                ],
+                "readonly_preflight_prestart_check_failure_detail_fields": list(
+                    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                ),
                 "readonly_preflight_next_required_actions": [
                     "Manually review the read-only preflight candidate before updating readiness rows."
                 ],
@@ -7219,10 +7215,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "tools/no_wing_release_check.py",
                 "--quick",
             ],
-            "prestart_backend_port_check_failure_detail_fields": [
-                "listener_processes",
-                "operator_next_step",
-            ],
+            "prestart_backend_port_check_failure_detail_fields": list(
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ),
             "capture_command_template": [
                 "python3",
                 "tools/wing_readonly_preflight_runner.py",
@@ -7367,10 +7362,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "tools/no_wing_release_check.py",
         "--quick",
     ]
-    assert preflight["prestart_backend_port_check_failure_detail_fields"] == [
-        "listener_processes",
-        "operator_next_step",
-    ]
+    assert preflight["prestart_backend_port_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert preflight["capture_command_template"][1] == "tools/wing_readonly_preflight_runner.py"
     assert preflight["capture_command_channels"] == "3"
     assert preflight["capture_command_operator_confirmed_channels"] == "3"
@@ -7518,10 +7512,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
                 "tools/no_wing_release_check.py",
                 "--quick",
             ],
-            "backend_port_prestart_check_failure_detail_fields": [
-                "listener_processes",
-                "operator_next_step",
-            ],
+            "backend_port_prestart_check_failure_detail_fields": list(
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ),
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_plan": False,
             "live_authority_granted": False,
@@ -7565,10 +7558,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
         "tools/no_wing_release_check.py",
         "--quick",
     ]
-    assert artifact["backend_port_prestart_check_failure_detail_fields"] == [
-        "listener_processes",
-        "operator_next_step",
-    ]
+    assert artifact["backend_port_prestart_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_plan"] is False
     assert artifact["live_authority_granted"] is False
@@ -7641,10 +7633,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "physical_preflight_requires_existing_backend_connection": True,
             "backend_port_prestart_check_required": True,
             "backend_port_prestart_check_must_pass_before_starting_backend": True,
-            "backend_port_prestart_check_failure_detail_fields": [
-                "listener_processes",
-                "operator_next_step",
-            ],
+            "backend_port_prestart_check_failure_detail_fields": list(
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ),
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_packet": False,
             "readiness_matrix_update_allowed_by_packet": False,
@@ -7695,10 +7686,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["physical_preflight_requires_existing_backend_connection"] is True
     assert artifact["backend_port_prestart_check_required"] is True
     assert artifact["backend_port_prestart_check_must_pass_before_starting_backend"] is True
-    assert artifact["backend_port_prestart_check_failure_detail_fields"] == [
-        "listener_processes",
-        "operator_next_step",
-    ]
+    assert artifact["backend_port_prestart_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_packet"] is False
     assert artifact["readiness_matrix_update_allowed_by_packet"] is False
@@ -10445,10 +10435,9 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
                 "tools/no_wing_release_check.py",
                 "--quick",
             ],
-            "readonly_preflight_prestart_check_failure_detail_fields": [
-                "listener_processes",
-                "operator_next_step",
-            ],
+            "readonly_preflight_prestart_check_failure_detail_fields": list(
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ),
             "readonly_preflight_step_count": 0,
             "readonly_preflight_review_decision_required": True,
             "readonly_preflight_review_decision_accepted": True,
@@ -10513,10 +10502,7 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         json_summary["next_wing_proof_plan"][
             "readonly_preflight_prestart_check_failure_detail_fields"
         ]
-        == [
-            "listener_processes",
-            "operator_next_step",
-        ]
+        == list(WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS)
     )
     assert json_summary["next_wing_proof_plan"]["readonly_preflight_step_count"] == 0
     assert (
