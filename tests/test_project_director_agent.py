@@ -61,6 +61,9 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     ]
     assert "supervised_prestart_gate" in directive["selected_action"]
     assert "expected_supervised_prestart_gate" in directive["selected_action"]
+    assert "supervised_prestart_gate.grants_live_authority: false" in directive[
+        "selected_action"
+    ]
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in directive["selected_action"]

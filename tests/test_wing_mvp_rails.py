@@ -93,6 +93,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     ]
     assert "supervised_prestart_gate" in rows[0]["next action"]
     assert "expected_supervised_prestart_gate" in rows[0]["next action"]
+    assert "supervised_prestart_gate.grants_live_authority: false" in rows[0][
+        "next action"
+    ]
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in rows[0]["next action"]
