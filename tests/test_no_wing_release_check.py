@@ -6943,6 +6943,9 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
                     "command_line": "python3 backend/server.py --mode wing",
                 }
             ],
+            "listener_confirmation_checklist": list(
+                release_check.BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
+            ),
             "preflight_blocked_until_listener_confirmed": True,
             "intended_backend_confirmation_required": True,
             "safe_to_stop_listener_by_gate": False,
@@ -6963,6 +6966,10 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     assert '"command": "Python"' in markdown_summary
     assert '"command_line": "python3 backend/server.py --mode wing"' in markdown_summary
     assert '"pid": 87210' in markdown_summary
+    assert "listener_confirmation_checklist" in markdown_summary
+    assert "do not stop or reconfigure the listener from this no-WING gate" in (
+        markdown_summary
+    )
     assert "preflight_blocked_until_listener_confirmed: `True`" in markdown_summary
     assert "intended_backend_confirmation_required: `True`" in markdown_summary
     assert "safe_to_stop_listener_by_gate: `False`" in markdown_summary
@@ -11129,6 +11136,9 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
     assert result.status == "failed"
     assert result.detail["listener_detected"] is True
     assert result.detail["listener_processes"] == listener_processes
+    assert result.detail["listener_confirmation_checklist"] == list(
+        release_check.BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
+    )
     assert result.detail["preflight_blocked_until_listener_confirmed"] is True
     assert result.detail["intended_backend_confirmation_required"] is True
     assert result.detail["safe_to_stop_listener_by_gate"] is False
@@ -11233,6 +11243,9 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
                 "listener_processes": [
                     {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
                 ],
+                "listener_confirmation_checklist": list(
+                    release_check.BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
+                ),
                 "preflight_blocked_until_listener_confirmed": True,
                 "intended_backend_confirmation_required": True,
                 "safe_to_stop_listener_by_gate": False,
@@ -11260,6 +11273,9 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
     assert summary["failed_checks"] == ["backend_port_free"]
     assert summary["live_write"] is False
     assert summary["results"][0]["detail"]["preflight_blocked_until_listener_confirmed"] is True
+    assert summary["results"][0]["detail"]["listener_confirmation_checklist"] == list(
+        release_check.BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
+    )
     assert summary["results"][0]["detail"]["intended_backend_confirmation_required"] is True
     assert summary["results"][0]["detail"]["safe_to_stop_listener_by_gate"] is False
     assert (

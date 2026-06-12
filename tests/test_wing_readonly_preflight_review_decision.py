@@ -166,14 +166,9 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
                 "tools/no_wing_release_check.py",
                 "--quick",
             ],
-            "backend_port_prestart_check_failure_detail_fields": [
-                "listener_processes",
-                "preflight_blocked_until_listener_confirmed",
-                "intended_backend_confirmation_required",
-                "safe_to_stop_listener_by_gate",
-                "fail_closed_reason",
-                "operator_next_step",
-            ],
+            "backend_port_prestart_check_failure_detail_fields": list(
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ),
         }
     ]
     assert "operator_must_record_readonly_preflight_review_decision" in ledger[

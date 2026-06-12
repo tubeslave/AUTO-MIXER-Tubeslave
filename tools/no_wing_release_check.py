@@ -353,6 +353,12 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list
         "WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS",
     )
 )
+BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST = [
+    "confirm whether the listener is the intended Automixer backend for this WING preflight",
+    "confirm the listener command line and PID match the operator-started backend session",
+    "do not stop or reconfigure the listener from this no-WING gate",
+    "rerun the no-WING gate after manual confirmation or after clearing an unexpected listener",
+]
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
 )
@@ -1362,6 +1368,12 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
     listener_process_error = detail.get("listener_process_error")
     if listener_process_error:
         lines.append(f"  - listener_process_error: `{listener_process_error}`")
+    listener_confirmation_checklist = detail.get("listener_confirmation_checklist")
+    if isinstance(listener_confirmation_checklist, list) and listener_confirmation_checklist:
+        lines.append(
+            "  - listener_confirmation_checklist: "
+            f"`{json.dumps(listener_confirmation_checklist, ensure_ascii=False)}`"
+        )
     for field in (
         "preflight_blocked_until_listener_confirmed",
         "intended_backend_confirmation_required",
@@ -1387,6 +1399,9 @@ def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -
     if connected:
         listener_processes, listener_process_error = _listener_processes_for_port(port)
         detail["listener_processes"] = listener_processes
+        detail["listener_confirmation_checklist"] = list(
+            BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
+        )
         detail["preflight_blocked_until_listener_confirmed"] = True
         detail["intended_backend_confirmation_required"] = True
         detail["safe_to_stop_listener_by_gate"] = False
