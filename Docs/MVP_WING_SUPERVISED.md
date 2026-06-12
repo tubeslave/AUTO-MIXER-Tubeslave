@@ -129,6 +129,8 @@ Stop the current Codex work direction and return to the first open blocker if:
   `fail_closed_reason`, and `operator_next_step`.
 - A readiness update is planned while the no-WING handoff summary does not show
   `manual_review_required_before_readiness_update: true`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `execution_allowed_by_packet: false`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate`.
@@ -192,6 +194,9 @@ The no-WING handoff summary must also show
 
 The no-WING handoff summary must also show
 `manual_review_required_before_readiness_update: true`.
+
+The no-WING handoff summary must also show
+`execution_allowed_by_packet: false`.
 
 It must also show `supervised_prestart_gate` exactly matching
 `expected_supervised_prestart_gate`, with

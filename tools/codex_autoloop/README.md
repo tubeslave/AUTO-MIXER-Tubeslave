@@ -162,6 +162,9 @@ you want the background automation active.
   This keeps offline handoff packets from being treated as accepted real WING
   proof.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `execution_allowed_by_packet: false`.
+  This keeps the handoff packet from being treated as authority to execute.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
   `prestart_backend_port_check` and `unexpected listeners`,
