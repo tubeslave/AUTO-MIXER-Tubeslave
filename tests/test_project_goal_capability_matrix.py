@@ -255,6 +255,8 @@ def test_supervised_automix_goal_requires_wing_candidate_prestart_trace():
     assert row.current_live_write_kinds == CURRENT_PROVEN_LIVE_WRITE_KINDS
     assert "accepted-candidate prestart trace" in row.next_step
     assert "read-only preflight review" in row.next_step
+    assert "supervised_prestart_gate" in row.next_step
+    assert "expected_supervised_prestart_gate" in row.next_step
     assert "before widening" in row.next_step
 
 

@@ -113,7 +113,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         next_step=(
             "Add fake-mixer and physical proof one action family at a time "
             "before widening; WING physical proof steps also require an "
-            "accepted-candidate prestart trace from read-only preflight review."
+            "accepted-candidate prestart trace from read-only preflight review "
+            "and supervised_prestart_gate matching expected_supervised_prestart_gate."
         ),
     ),
     ProjectGoalCapabilityRow(
