@@ -144,19 +144,21 @@ blockers выше.
 8. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
 9. verify `supervised_prestart_gate.grants_live_authority: false`;
-10. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-11. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+10. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
+   `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
+11. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+12. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-12. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+13. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-13. run dry-run recommendation;
-14. require explicit operator approval for the exact action;
-15. apply only bounded supervised fader/gain action;
-16. read back the result;
-17. test rollback;
-18. record proof artifact.
+14. run dry-run recommendation;
+15. require explicit operator approval for the exact action;
+16. apply only bounded supervised fader/gain action;
+17. read back the result;
+18. test rollback;
+19. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -223,6 +225,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate` and
   `supervised_prestart_gate.grants_live_authority: false`.
+- Before any supervised fader/gain proof, the structured
+  `supervised_prestart_gate` must show
+  `supervised_prestart_gate.operator_sequence_step_index: 9` and
+  `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `mvp_blocker_anchor_matches_current_first_open: true`,
   `mvp_blocker_anchor_sha256_matches_current_first_open: true`,

@@ -352,6 +352,8 @@ The handoff validation must report:
 - `supervised_prestart_gate` exactly matches
   `expected_supervised_prestart_gate`
 - `supervised_prestart_gate.grants_live_authority: false`
+- `supervised_prestart_gate.operator_sequence_step_index: 9`
+- `supervised_prestart_gate.operator_sequence_step_must_be_final: true`
 - `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`
 
 Until those markers are present in the final operator step and the structured

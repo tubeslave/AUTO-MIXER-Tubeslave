@@ -147,6 +147,11 @@ you want the background automation active.
   `expected_supervised_prestart_gate` and
   `supervised_prestart_gate.grants_live_authority: false`. This structured gate
   is evidence for the proof boundary only and does not grant live authority.
+- Before any supervised fader/gain proof, the structured
+  `supervised_prestart_gate` must also show
+  `supervised_prestart_gate.operator_sequence_step_index: 9` and
+  `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
+  These fields keep the supervised gate aligned with the final operator step.
 - Before any supervised fader/gain proof, the no-WING handoff summary must also
   show `mvp_blocker_anchor_matches_current_first_open: true`,
   `mvp_blocker_anchor_sha256_matches_current_first_open: true`,

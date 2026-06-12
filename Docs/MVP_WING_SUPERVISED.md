@@ -117,6 +117,9 @@ Stop the current Codex work direction and return to the first open blocker if:
   `expected_supervised_prestart_gate`.
 - A supervised proof is planned while `supervised_prestart_gate` claims
   `grants_live_authority: true`.
+- A supervised proof is planned while `supervised_prestart_gate` does not show
+  `operator_sequence_step_index: 9` and
+  `operator_sequence_step_must_be_final: true`.
 
 This is not a stop to development. Codex must continue uninterrupted Goal-mode
 work, but only on the first non-closed MVP blocker.
@@ -146,6 +149,10 @@ The same `backend_port_prestart_gate` must show
 It must also show `supervised_prestart_gate` exactly matching
 `expected_supervised_prestart_gate`, with
 `supervised_prestart_gate.grants_live_authority: false`.
+
+The same `supervised_prestart_gate` must show
+`supervised_prestart_gate.operator_sequence_step_index: 9` and
+`supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
 
 ## Autonomy Budget Rule
 
