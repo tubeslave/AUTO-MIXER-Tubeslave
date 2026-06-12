@@ -10,6 +10,7 @@ BLOCKERS_DOC = PROJECT_ROOT / ".ai" / "project-layer" / "wing_mvp_blockers.md"
 CORRECTION_BACKLOG = PROJECT_ROOT / ".ai" / "project-layer" / "correction_methods_backlog.md"
 READONLY_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_READONLY_PREFLIGHT.md"
 SUPERVISED_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_SUPERVISED_FADER_GAIN_PROOF.md"
+DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
 PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
 
@@ -152,3 +153,17 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert ".ai/project-layer/wing_mvp_blockers.md" in text
     assert "Docs/reports/MVP_PROGRESS_LATEST.md" in text
     assert "first non-closed row" in text
+
+
+def test_docs_index_points_to_current_wing_mvp_prestart_gate():
+    text = DOCS_INDEX.read_text(encoding="utf-8")
+
+    assert "Current WING MVP rails" in text
+    assert "Docs/runbooks/WING_READONLY_PREFLIGHT.md" in text
+    assert "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md" in text
+    assert (
+        "Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_FINAL_PRESTART_GATE_20260612.md"
+        in text
+    )
+    assert "final handoff operator-sequence step" in text
+    assert "accepted-candidate prestart gate" in text
