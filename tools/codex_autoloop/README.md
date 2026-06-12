@@ -145,6 +145,11 @@ you want the background automation active.
   `prestart_backend_port_check`, and `unexpected listeners`.
   These markers bind the first gate to the operator-facing stop condition.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_check_command` exactly matching
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
+  This keeps the structured prestart command aligned with the required
+  no-WING release check.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
   `prestart_backend_port_check` and `unexpected listeners`,
