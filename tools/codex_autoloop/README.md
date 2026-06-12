@@ -165,6 +165,10 @@ you want the background automation active.
   `readiness_matrix_update_allowed_by_packet: false`.
   This keeps packet handoff review from being treated as permission to update
   the readiness matrix.
+- Before closing any readiness item, the no-WING handoff summary must show
+  `readiness_closure_allowed_by_packet: false`.
+  This keeps packet handoff review from being treated as blocker-closure
+  authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.

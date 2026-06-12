@@ -131,6 +131,8 @@ Stop the current Codex work direction and return to the first open blocker if:
   `manual_review_required_before_readiness_update: true`.
 - A readiness update is planned while the no-WING handoff summary does not show
   `readiness_matrix_update_allowed_by_packet: false`.
+- A readiness closure is planned while the no-WING handoff summary does not
+  show `readiness_closure_allowed_by_packet: false`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `execution_allowed_by_packet: false`.
 - A supervised proof is planned before the no-WING handoff summary shows
@@ -199,6 +201,9 @@ The no-WING handoff summary must also show
 
 The no-WING handoff summary must also show
 `readiness_matrix_update_allowed_by_packet: false`.
+
+The no-WING handoff summary must also show
+`readiness_closure_allowed_by_packet: false`.
 
 The no-WING handoff summary must also show
 `execution_allowed_by_packet: false`.
