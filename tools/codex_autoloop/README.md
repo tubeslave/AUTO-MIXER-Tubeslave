@@ -190,6 +190,9 @@ you want the background automation active.
   `operator_required: true`.
   This keeps the no-WING packet tied to explicit operator action.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_plan_required_for_real_run: true`.
+  This keeps the real read-only preflight tied to the offline expected plan.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

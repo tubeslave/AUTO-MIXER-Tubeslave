@@ -361,6 +361,7 @@ The handoff validation must report:
 - `queries_console: false`
 - `executes_tests: false`
 - `operator_required: true`
+- `expected_plan_required_for_real_run: true`
 - `execution_allowed_by_packet: false`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
