@@ -199,9 +199,14 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "supervised_prestart_gate.grants_live_authority: false" in prompt
     assert "mvp_blocker_anchor_matches_current_first_open: true" in prompt
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in prompt
+    assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in prompt
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in prompt
     assert "operator_sequence_has_supervised_prestart_gate: true" in prompt
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in prompt
+    assert "operator_sequence_supervised_prestart_gate_step" in prompt
+    assert "accepted_decision_ready" in prompt
+    assert "valid accepted-candidate prestart trace" in prompt
+    assert "WING_SUPERVISED_FADER_GAIN_PROOF" in prompt
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in prompt
@@ -211,9 +216,14 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "supervised_prestart_gate.grants_live_authority: false" in readme
     assert "mvp_blocker_anchor_matches_current_first_open: true" in readme
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in readme
+    assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in readme
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readme
     assert "operator_sequence_has_supervised_prestart_gate: true" in readme
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in readme
+    assert "operator_sequence_supervised_prestart_gate_step" in readme
+    assert "accepted_decision_ready" in readme
+    assert "valid accepted-candidate prestart trace" in readme
+    assert "WING_SUPERVISED_FADER_GAIN_PROOF" in readme
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in readme

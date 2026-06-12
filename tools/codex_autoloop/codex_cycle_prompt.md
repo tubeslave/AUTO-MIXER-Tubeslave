@@ -139,12 +139,16 @@ blockers выше.
 6. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
 7. verify `supervised_prestart_gate.grants_live_authority: false`;
-8. run dry-run recommendation;
-9. require explicit operator approval for the exact action;
-10. apply only bounded supervised fader/gain action;
-11. read back the result;
-12. test rollback;
-13. record proof artifact.
+8. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+9. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+   `WING_SUPERVISED_FADER_GAIN_PROOF`;
+10. run dry-run recommendation;
+11. require explicit operator approval for the exact action;
+12. apply only bounded supervised fader/gain action;
+13. read back the result;
+14. test rollback;
+15. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -206,10 +210,15 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `mvp_blocker_anchor_matches_current_first_open: true`,
   `mvp_blocker_anchor_sha256_matches_current_first_open: true`,
+  `mvp_blocker_anchor.packet_does_not_close_blocker: true`,
   `operator_sequence_has_mvp_blocker_anchor_digest_review: true`,
   `operator_sequence_has_supervised_prestart_gate: true`,
   `operator_sequence_supervised_prestart_gate_is_final: true`, and
   `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`.
+- Before any supervised fader/gain proof, the final
+  `operator_sequence_supervised_prestart_gate_step` must include
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит
   физический read-only/supervised proof и имеет тест.
 - Методы коррекций Gain/Trim, Pan, EQ, Comp, FX, Balance и другие продолжай
