@@ -161,6 +161,10 @@ you want the background automation active.
   `manual_review_required_before_readiness_update: true`.
   This keeps offline handoff packets from being treated as accepted real WING
   proof.
+- Before any readiness update, the no-WING handoff summary must show
+  `readiness_matrix_update_allowed_by_packet: false`.
+  This keeps packet handoff review from being treated as permission to update
+  the readiness matrix.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
