@@ -177,6 +177,17 @@ def _valid_artifact_review_rows(report: Mapping[str, Any]) -> list[Mapping[str, 
     ]
 
 
+def _artifact_operator_next_steps(artifacts: Iterable[Any]) -> list[str]:
+    steps: list[str] = []
+    for item in artifacts:
+        if not isinstance(item, Mapping):
+            continue
+        step = str(item.get("operator_next_step") or "")
+        if step and step not in steps:
+            steps.append(step)
+    return steps
+
+
 def build_review_decision_template(
     report: Mapping[str, Any],
     *,
@@ -246,6 +257,7 @@ def build_review_report(
     summary = evidence.get("summary") if isinstance(evidence.get("summary"), Mapping) else {}
     safety = evidence.get("safety") if isinstance(evidence.get("safety"), Mapping) else {}
     artifacts = evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
+    artifact_operator_next_steps = _artifact_operator_next_steps(artifacts)
     valid_candidate_count = int(summary.get("valid_candidate_count") or 0)
     invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
     candidate_available = (
@@ -257,6 +269,16 @@ def build_review_report(
         and summary.get("live_authority_granted") is not True
         and summary.get("full_autonomous_ready") is not True
     )
+    next_required_action = str(
+        summary.get("next_global_step")
+        or "Capture a clean WING read-only preflight artifact."
+    )
+    if artifact_operator_next_steps:
+        next_required_action = artifact_operator_next_steps[0]
+    if candidate_available:
+        next_required_action = (
+            "Operator manually reviews summary.json and events.jsonl before readiness update."
+        )
     return {
         "type": "wing_readonly_preflight_artifact_review",
         "generated_at": utc_now(),
@@ -276,6 +298,7 @@ def build_review_report(
         "review_decision_template_available": candidate_available,
         "review_decision_template_required_fields": review_decision_template_required_fields(),
         "review_decision_template_status": REVIEW_DECISION_TEMPLATE_STATUS,
+        "artifact_operator_next_steps": artifact_operator_next_steps,
         "evidence_status": evidence.get("status"),
         "artifact_count": int(summary.get("artifact_count") or 0),
         "valid_candidate_count": valid_candidate_count,
@@ -283,11 +306,7 @@ def build_review_report(
         "latest_valid_candidate_run_id": summary.get("latest_valid_candidate_run_id"),
         "blocked_by": _string_list(summary.get("blocked_by")),
         "violations": _string_list(summary.get("violations")),
-        "next_required_action": (
-            "Operator manually reviews summary.json and events.jsonl before readiness update."
-            if candidate_available
-            else str(summary.get("next_global_step") or "Capture a clean WING read-only preflight artifact.")
-        ),
+        "next_required_action": next_required_action,
         "evidence": evidence,
         "artifact_sources": [
             str(item.get("source_id"))
@@ -321,6 +340,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- invalid_candidate_count: `{report['invalid_candidate_count']}`",
         f"- readiness_update_candidate_available: `{str(report['readiness_update_candidate_available']).lower()}`",
         f"- latest_valid_candidate_run_id: `{report['latest_valid_candidate_run_id']}`",
+        f"- artifact_operator_next_steps: `{json.dumps(report.get('artifact_operator_next_steps') or [])}`",
         "",
         "## Safety",
         "",

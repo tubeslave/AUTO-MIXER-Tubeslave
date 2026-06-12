@@ -446,9 +446,18 @@ def test_review_report_surfaces_blocked_runner_operator_next_step(tmp_path: Path
         "Regenerate the offline expected plan with the current runtime args "
         "and prestart contract before opening the backend WebSocket."
     )
+    assert report["artifact_operator_next_steps"] == [
+        "Regenerate the offline expected plan with the current runtime args "
+        "and prestart contract before opening the backend WebSocket."
+    ]
+    assert report["next_required_action"] == (
+        "Regenerate the offline expected plan with the current runtime args "
+        "and prestart contract before opening the backend WebSocket."
+    )
     assert "status_not_passed" in report["violations"]
     markdown = review_tool.render_markdown(report)
     assert "operator_next_step" in markdown
+    assert "artifact_operator_next_steps" in markdown
     assert "before opening the backend WebSocket" in markdown
     assert "live_authority_granted: `false`" in markdown
 
