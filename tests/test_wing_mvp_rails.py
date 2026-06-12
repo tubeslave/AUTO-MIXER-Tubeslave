@@ -82,6 +82,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in rows[0][
         "next action"
     ]
+    assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in rows[0][
+        "next action"
+    ]
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in rows[0][
         "next action"
     ]
