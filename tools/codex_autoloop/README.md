@@ -178,6 +178,10 @@ you want the background automation active.
   `operator_sequence_supervised_prestart_gate_step` must include
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
+- Before any supervised fader/gain proof,
+  `required_supervised_prestart_gate_markers` must exactly list
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Project Director Agent activation is inside each Codex cycle after the
   direction guard. `tools/codex_autoloop/project_director_agent.py` reads
   `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, and

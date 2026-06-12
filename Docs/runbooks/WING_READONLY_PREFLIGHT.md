@@ -349,6 +349,9 @@ The handoff validation must report:
 - `operator_sequence_supervised_prestart_gate_step` includes
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
+- `required_supervised_prestart_gate_markers` exactly lists
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `supervised_prestart_gate` exactly matches
   `expected_supervised_prestart_gate`
 - `supervised_prestart_gate.grants_live_authority: false`

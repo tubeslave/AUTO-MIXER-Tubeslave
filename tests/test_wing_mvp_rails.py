@@ -47,6 +47,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in text
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
+    assert "required_supervised_prestart_gate_markers" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
@@ -130,6 +131,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_supervised_prestart_gate_step" in rows[0][
         "next action"
     ]
+    assert "required_supervised_prestart_gate_markers" in rows[0]["next action"]
     assert "accepted_decision_ready" in rows[0]["next action"]
     assert "valid accepted-candidate prestart trace" in rows[0]["next action"]
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rows[0]["next action"]
@@ -229,6 +231,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         in readonly
     )
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
+    assert "required_supervised_prestart_gate_markers" in readonly
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readonly
     assert (
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
@@ -281,6 +284,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in report
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in report
     assert "operator_sequence_has_supervised_prestart_gate: true" in report
+    assert "required_supervised_prestart_gate_markers" in report
     assert "supervised_prestart_gate" in report
     assert "expected_supervised_prestart_gate" in report
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in report
@@ -358,6 +362,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
     assert "supervised_prestart_gate.requires_operator_decision_status:" in text
     assert "supervised_prestart_gate.unlocks_runbook:" in text
+    assert "required_supervised_prestart_gate_markers" in text
 
 
 def test_docs_index_points_to_current_wing_mvp_prestart_gate():
@@ -432,6 +437,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_SUPERVISED_GATE_DECISION_RUNBOOK_CONTRACT_NEXT_ACTION_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_SUPERVISED_GATE_REQUIRED_MARKERS_NEXT_ACTION_20260612.md"
         in text
     )
     assert (

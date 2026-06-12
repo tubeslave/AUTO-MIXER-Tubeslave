@@ -159,6 +159,11 @@ It must also show
 and
 `supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`.
 
+The handoff summary must also show `required_supervised_prestart_gate_markers`
+exactly listing `accepted_decision_ready`,
+`valid accepted-candidate prestart trace`, and
+`WING_SUPERVISED_FADER_GAIN_PROOF`.
+
 ## Autonomy Budget Rule
 
 Automated cycles may continue without asking "continue?", but they must be

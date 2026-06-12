@@ -156,12 +156,15 @@ blockers выше.
 14. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-15. run dry-run recommendation;
-16. require explicit operator approval for the exact action;
-17. apply only bounded supervised fader/gain action;
-18. read back the result;
-19. test rollback;
-20. record proof artifact.
+15. verify `required_supervised_prestart_gate_markers` exactly lists
+   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+   `WING_SUPERVISED_FADER_GAIN_PROOF`;
+16. run dry-run recommendation;
+17. require explicit operator approval for the exact action;
+18. apply only bounded supervised fader/gain action;
+19. read back the result;
+20. test rollback;
+21. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -251,6 +254,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `current first open blocker`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `WING_SUPERVISED_FADER_GAIN_PROOF`.
+- Before any supervised fader/gain proof,
+  `required_supervised_prestart_gate_markers` must exactly list
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит

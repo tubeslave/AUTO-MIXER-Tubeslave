@@ -86,6 +86,9 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_sequence_supervised_prestart_gate_step" in directive[
         "selected_action"
     ]
+    assert "required_supervised_prestart_gate_markers" in directive[
+        "selected_action"
+    ]
     assert "accepted_decision_ready" in directive["selected_action"]
     assert "valid accepted-candidate prestart trace" in directive["selected_action"]
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in directive["selected_action"]
@@ -279,6 +282,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_has_supervised_prestart_gate: true" in prompt
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in prompt
     assert "operator_sequence_supervised_prestart_gate_step" in prompt
+    assert "required_supervised_prestart_gate_markers" in prompt
     assert "accepted_decision_ready" in prompt
     assert "valid accepted-candidate prestart trace" in prompt
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in prompt
@@ -298,6 +302,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_has_supervised_prestart_gate: true" in readme
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in readme
     assert "operator_sequence_supervised_prestart_gate_step" in readme
+    assert "required_supervised_prestart_gate_markers" in readme
     assert "accepted_decision_ready" in readme
     assert "valid accepted-candidate prestart trace" in readme
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in readme
