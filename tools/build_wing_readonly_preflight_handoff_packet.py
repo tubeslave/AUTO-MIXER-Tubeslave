@@ -33,6 +33,7 @@ DEFAULT_DECISION_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_
 DEFAULT_PACKET_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
 DEFAULT_PLAN_OUTPUT = "artifacts/wing_readonly_preflight_plan/latest_plan.json"
 MAX_WING_INPUT_CHANNEL = 48
+SUPPORTED_VALUE_TYPES = {"fader", "gain", "pan"}
 FOCUSED_VALIDATION_COMMAND = [
     "PYTHONPATH=backend",
     "python3",
@@ -72,6 +73,18 @@ def _command_text(command: Sequence[str]) -> str:
 
 def _split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _validate_value_types(value_types: str) -> list[str]:
+    parsed = _split_csv(value_types)
+    if not parsed:
+        raise ValueError("value_types_must_include_at_least_one_value_type")
+    if len(set(parsed)) != len(parsed):
+        raise ValueError("value_types_must_not_contain_duplicates")
+    unsupported = sorted(set(parsed) - SUPPORTED_VALUE_TYPES)
+    if unsupported:
+        raise ValueError(f"value_types_unsupported:{','.join(unsupported)}")
+    return parsed
 
 
 def _validate_channels(channels: str) -> list[int]:
@@ -198,6 +211,7 @@ def build_handoff_packet(
     generated_at: str | None = None,
 ) -> dict[str, Any]:
     channel_numbers = _validate_channels(channels)
+    value_type_names = _validate_value_types(value_types)
     supervised_gate_step_index = 8
     supervised_gate_step = (
         "Only after accepted_decision_ready and a valid accepted-candidate "
@@ -269,7 +283,7 @@ def build_handoff_packet(
         "full_autonomous_ready": False,
         "url": url,
         "channels": channel_numbers,
-        "value_types": _split_csv(value_types),
+        "value_types": value_type_names,
         "artifact_root": artifact_root,
         "decision_root": decision_root,
         "expected_run_artifact_glob": f"{artifact_root}/<run_id>/summary.json",

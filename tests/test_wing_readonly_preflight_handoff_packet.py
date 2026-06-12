@@ -197,6 +197,37 @@ def test_handoff_packet_rejects_invalid_channels():
         raise AssertionError("expected invalid channel to fail")
 
 
+def test_handoff_packet_rejects_invalid_value_types(tmp_path: Path):
+    invalid_cases = [
+        ("", "value_types_must_include_at_least_one_value_type"),
+        ("fader,fader", "value_types_must_not_contain_duplicates"),
+        ("fader,eq", "value_types_unsupported:eq"),
+    ]
+
+    for value_types, expected_error in invalid_cases:
+        try:
+            handoff.build_handoff_packet(value_types=value_types)
+        except ValueError as exc:
+            assert str(exc) == expected_error
+        else:
+            raise AssertionError("expected invalid value type to fail")
+
+    output = tmp_path / "handoff.md"
+    assert (
+        handoff.main(
+            [
+                "--value-types",
+                "fader,eq",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
+        == 2
+    )
+    assert not output.exists()
+
+
 def test_handoff_packet_rejects_channels_outside_wing_input_range(tmp_path: Path):
     try:
         handoff.build_handoff_packet(channels="49")
