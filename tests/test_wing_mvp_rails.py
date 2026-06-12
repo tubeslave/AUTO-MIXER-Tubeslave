@@ -59,6 +59,15 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in rows[0]["next action"]
     )
+    fader_row = next(row for row in rows if row["blocker"] == "Supervised fader write proof")
+    gain_row = next(
+        row for row in rows if row["blocker"] == "Supervised gain-down / trim proof"
+    )
+    for row in (fader_row, gain_row):
+        assert row["status"] == "blocked_by_readonly_preflight"
+        assert "accepted decision JSON" in row["next action"]
+        assert "final handoff operator-sequence step" in row["next action"]
+        assert "valid accepted-candidate prestart trace" in row["next action"]
     assert all(row["status"] != "closed" for row in rows)
     assert progress.first_open_blocker(rows)["blocker"] == "WING read-only connection proof"
 
@@ -101,6 +110,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in report
     )
+    assert "final handoff operator-sequence step" in report
     assert "Offline tooling, shadow" in report
 
     output = tmp_path / "MVP_PROGRESS_LATEST.md"

@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-06-12T06:44:54Z`
+Generated: `2026-06-12T07:21:10Z`
 
 ## Current MVP
 
@@ -19,8 +19,8 @@ Supervised WING Rack proof.
 | --- | --- | --- |
 | WING read-only connection proof | tooling_ready_waits_real_wing | Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, accepted review source ids must have a valid accepted-candidate prestart trace; otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers. |
 | Physical console readback proof | tooling_ready_waits_real_wing | Run read-only preflight with `--require-physical-readback` and review summary plus `events.jsonl`. |
-| Supervised fader write proof | blocked_by_readonly_preflight | After clean read-only preflight review and an accepted decision JSON, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type fader`. |
-| Supervised gain-down / trim proof | blocked_by_readonly_preflight | After clean read-only preflight review and an accepted decision JSON, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type gain` with a negative delta only. |
+| Supervised fader write proof | blocked_by_readonly_preflight | After clean read-only preflight review, an accepted decision JSON, and the final handoff operator-sequence step with valid accepted-candidate prestart trace, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type fader`. |
+| Supervised gain-down / trim proof | blocked_by_readonly_preflight | After clean read-only preflight review, an accepted decision JSON, and the final handoff operator-sequence step with valid accepted-candidate prestart trace, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type gain` with a negative delta only. |
 | Rollback proof | blocked_by_readonly_preflight | Preserve rollback request, rollback readback, and artifact review from the supervised fader/gain run. |
 | Emergency-stop proof | blocked_by_readonly_preflight | Use `--prove-emergency-stop` only inside the explicit supervised proof run. |
 | Connection-loss / timeout fail-closed proof | tooling_ready_waits_real_wing | Capture a controlled real-run timeout/connection-loss artifact and verify fail-closed semantics. |
