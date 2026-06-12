@@ -36,6 +36,13 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "tools/review_wing_readonly_preflight_artifacts.py" in text
     assert "tools/no_wing_release_check.py" in text
     assert "readiness candidates are not enough" in text
+    assert "backend_port_prestart_gate" in text
+    assert "expected_backend_port_prestart_gate" in text
+    assert "backend_port_prestart_gate.grants_live_authority: false" in text
+    assert (
+        "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in text
+    )
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
@@ -188,6 +195,13 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "first non-closed row" in text
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
+    assert "backend_port_prestart_gate" in text
+    assert "expected_backend_port_prestart_gate" in text
+    assert "backend_port_prestart_gate.grants_live_authority: false" in text
+    assert (
+        "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in text
+    )
     assert "supervised_prestart_gate.grants_live_authority: false" in text
 
 
@@ -214,10 +228,16 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
         in text
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_READONLY_HANDOFF_STRUCTURED_PRESTART_GATE_20260612.md"
+        in text
+    )
+    assert (
         "Docs/reports/AUTOMIXER_PROJECT_GOAL_SUPERVISED_AUTOMIX_STRUCTURED_GATE_20260612.md"
         in text
     )
     assert "final handoff operator-sequence step" in text
     assert "accepted-candidate prestart gate" in text
+    assert "backend_port_prestart_gate" in text
+    assert "expected_backend_port_prestart_gate" in text
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text

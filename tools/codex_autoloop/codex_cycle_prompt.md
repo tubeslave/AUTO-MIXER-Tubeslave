@@ -132,15 +132,19 @@ blockers выше.
 1. read-only preflight;
 2. capture current console state;
 3. verify physical readback;
-4. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+4. verify the no-WING handoff summary has `backend_port_prestart_gate` exactly
+   matching `expected_backend_port_prestart_gate`;
+5. verify `backend_port_prestart_gate.grants_live_authority: false` and
+   `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`;
+6. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-5. verify `supervised_prestart_gate.grants_live_authority: false`;
-6. run dry-run recommendation;
-7. require explicit operator approval for the exact action;
-8. apply only bounded supervised fader/gain action;
-9. read back the result;
-10. test rollback;
-11. record proof artifact.
+7. verify `supervised_prestart_gate.grants_live_authority: false`;
+8. run dry-run recommendation;
+9. require explicit operator approval for the exact action;
+10. apply only bounded supervised fader/gain action;
+11. read back the result;
+12. test rollback;
+13. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -190,6 +194,11 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` до старта
   intended backend/WING session, затем read-only preflight или ручной review
   реального preflight artifact.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_gate` exactly matching
+  `expected_backend_port_prestart_gate`,
+  `backend_port_prestart_gate.grants_live_authority: false`, and
+  `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate` and

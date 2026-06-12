@@ -103,6 +103,13 @@ Stop the current Codex work direction and return to the first open blocker if:
   accepted-candidate prestart trace, or while the proof plan still carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
 - A supervised proof is planned before the no-WING handoff summary shows
+  `backend_port_prestart_gate` exactly matching
+  `expected_backend_port_prestart_gate`.
+- A supervised proof is planned while `backend_port_prestart_gate` claims
+  `grants_live_authority: true`, or while
+  `backend_port_prestart_gate.must_pass_before_backend_wing_session` is not
+  `true`.
+- A supervised proof is planned before the no-WING handoff summary shows
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate`.
 - A supervised proof is planned while `supervised_prestart_gate` claims
@@ -123,10 +130,15 @@ is missing or invalid, the proof plan must keep
 `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
 as an operator blocker.
 
-The no-WING handoff summary must also show `supervised_prestart_gate` exactly
-matching `expected_supervised_prestart_gate`, with
-`supervised_prestart_gate.grants_live_authority: false`, before any supervised
-fader/gain proof runbook is used.
+The no-WING handoff summary must also show `backend_port_prestart_gate` exactly
+matching `expected_backend_port_prestart_gate`, with
+`backend_port_prestart_gate.grants_live_authority: false` and
+`backend_port_prestart_gate.must_pass_before_backend_wing_session: true`, before
+any supervised fader/gain proof runbook is used.
+
+It must also show `supervised_prestart_gate` exactly matching
+`expected_supervised_prestart_gate`, with
+`supervised_prestart_gate.grants_live_authority: false`.
 
 ## Autonomy Budget Rule
 
