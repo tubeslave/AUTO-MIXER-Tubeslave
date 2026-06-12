@@ -1354,6 +1354,14 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
     listener_process_error = detail.get("listener_process_error")
     if listener_process_error:
         lines.append(f"  - listener_process_error: `{listener_process_error}`")
+    for field in (
+        "preflight_blocked_until_listener_confirmed",
+        "intended_backend_confirmation_required",
+        "safe_to_stop_listener_by_gate",
+        "fail_closed_reason",
+    ):
+        if field in detail:
+            lines.append(f"  - {field}: `{detail[field]}`")
     operator_next_step = detail.get("operator_next_step")
     if operator_next_step:
         lines.append(f"  - operator_next_step: `{operator_next_step}`")

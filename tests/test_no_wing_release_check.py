@@ -6568,8 +6568,17 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
             "policy": "port_must_not_have_unexpected_listener",
             "listener_detected": True,
             "listener_processes": [
-                {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
+                {
+                    "pid": 87210,
+                    "command": "Python",
+                    "name": "TCP *:8765 (LISTEN)",
+                    "command_line": "python3 backend/server.py --mode wing",
+                }
             ],
+            "preflight_blocked_until_listener_confirmed": True,
+            "intended_backend_confirmation_required": True,
+            "safe_to_stop_listener_by_gate": False,
+            "fail_closed_reason": "backend_port_listener_requires_operator_confirmation",
             "operator_next_step": (
                 "Stop or reconfigure the unexpected local listener only after "
                 "confirming it is not the intended Automixer backend, then rerun "
@@ -6584,7 +6593,15 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     assert "`backend_port_free`: `failed`" in markdown_summary
     assert "listener_processes" in markdown_summary
     assert '"command": "Python"' in markdown_summary
+    assert '"command_line": "python3 backend/server.py --mode wing"' in markdown_summary
     assert '"pid": 87210' in markdown_summary
+    assert "preflight_blocked_until_listener_confirmed: `True`" in markdown_summary
+    assert "intended_backend_confirmation_required: `True`" in markdown_summary
+    assert "safe_to_stop_listener_by_gate: `False`" in markdown_summary
+    assert (
+        "fail_closed_reason: `backend_port_listener_requires_operator_confirmation`"
+        in markdown_summary
+    )
     assert "operator_next_step" in markdown_summary
     assert "WING read-only preflight" in markdown_summary
 
