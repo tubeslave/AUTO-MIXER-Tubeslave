@@ -150,21 +150,23 @@ blockers выше.
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
 12. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-13. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+13. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+14. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-14. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+15. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+16. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-15. verify `required_supervised_prestart_gate_markers` exactly lists
+17. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-16. run dry-run recommendation;
-17. require explicit operator approval for the exact action;
-18. apply only bounded supervised fader/gain action;
-19. read back the result;
-20. test rollback;
-21. record proof artifact.
+18. run dry-run recommendation;
+19. require explicit operator approval for the exact action;
+20. apply only bounded supervised fader/gain action;
+21. read back the result;
+22. test rollback;
+23. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -249,9 +251,13 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `operator_sequence_supervised_prestart_gate_is_final: true`, and
   `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`.
 - Before any supervised fader/gain proof, the
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
+- Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step` must include
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
   `current first open blocker`.
+- Before any supervised fader/gain proof, the
+  `operator_sequence_supervised_prestart_gate_step_index` must be `9`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and

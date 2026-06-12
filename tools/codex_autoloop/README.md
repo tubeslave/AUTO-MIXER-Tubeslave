@@ -171,9 +171,13 @@ you want the background automation active.
   current first WING MVP blocker and keeps supervised proof planning behind a
   valid accepted-candidate prestart trace; they do not grant live authority.
 - Before any supervised fader/gain proof, the
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
+- Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step` must include
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
   `current first open blocker`.
+- Before any supervised fader/gain proof, the
+  `operator_sequence_supervised_prestart_gate_step_index` must be `9`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and

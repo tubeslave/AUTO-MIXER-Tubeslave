@@ -51,6 +51,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "supervised_prestart_gate.grants_live_authority: false" in text
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8" in text
+    assert "operator_sequence_supervised_prestart_gate_step_index: 9" in text
     assert (
         "supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready"
         in text
@@ -120,6 +122,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in rows[0][
         "next action"
     ]
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8" in rows[
+        0
+    ]["next action"]
     assert "mvp_blocker_anchor_sha256" in rows[0]["next action"]
     assert "current first open blocker" in rows[0]["next action"]
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in rows[0][
@@ -129,6 +134,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "next action"
     ]
     assert "operator_sequence_supervised_prestart_gate_step" in rows[0][
+        "next action"
+    ]
+    assert "operator_sequence_supervised_prestart_gate_step_index: 9" in rows[0][
         "next action"
     ]
     assert "required_supervised_prestart_gate_markers" in rows[0]["next action"]
@@ -217,6 +225,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in readonly
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readonly
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in readonly
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8" in readonly
     assert "current first open blocker" in readonly
     assert "backend_port_prestart_gate" in readonly
     assert "expected_backend_port_prestart_gate" in readonly
@@ -233,6 +242,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert "required_supervised_prestart_gate_markers" in readonly
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readonly
+    assert "operator_sequence_supervised_prestart_gate_step_index: 9" in readonly
     assert (
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in readonly
@@ -282,7 +292,9 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "mvp_blocker_anchor_matches_current_first_open: true" in report
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in report
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in report
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8" in report
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in report
+    assert "operator_sequence_supervised_prestart_gate_step_index: 9" in report
     assert "operator_sequence_has_supervised_prestart_gate: true" in report
     assert "required_supervised_prestart_gate_markers" in report
     assert "supervised_prestart_gate" in report
@@ -360,6 +372,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "supervised_prestart_gate.grants_live_authority: false" in text
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in text
+    assert "operator_sequence_supervised_prestart_gate_step_index" in text
     assert "supervised_prestart_gate.requires_operator_decision_status:" in text
     assert "supervised_prestart_gate.unlocks_runbook:" in text
     assert "required_supervised_prestart_gate_markers" in text
@@ -444,6 +458,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
         in text
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_OPERATOR_SEQUENCE_STEP_INDEXES_NEXT_ACTION_20260612.md"
+        in text
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_AUTOLOOP_BACKEND_PRESTART_DIRECTOR_DOCS_20260612.md"
         in text
     )
@@ -469,3 +487,5 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     assert "expected_backend_port_prestart_gate" in text
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in text
+    assert "operator_sequence_supervised_prestart_gate_step_index" in text

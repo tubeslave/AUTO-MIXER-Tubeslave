@@ -71,7 +71,10 @@ matching `mvp_blocker_anchor_sha256` so reviewers can compare the displayed
 anchor with the exact blocker-row digest. The packet operator sequence must
 include a dedicated review step that names `mvp_blocker_anchor`,
 `mvp_blocker_anchor_sha256`, and the current first open blocker before
-supervised proof planning.
+supervised proof planning. The no-WING handoff summary must expose that review
+step as `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` so
+reviewers can confirm the digest check occurs immediately before the final
+supervised prestart gate.
 
 Replace channel `3` with the operator-approved channel:
 
@@ -340,12 +343,14 @@ The handoff validation must report:
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`
 - `mvp_blocker_anchor.packet_does_not_close_blocker: true`
 - `operator_sequence_has_mvp_blocker_anchor_digest_review: true`
+- `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
 - `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
   `current first open blocker`
 - the final handoff operator-sequence step contains the supervised prestart gate
 - `operator_sequence_has_supervised_prestart_gate: true`
 - `operator_sequence_supervised_prestart_gate_is_final: true`
+- `operator_sequence_supervised_prestart_gate_step_index: 9`
 - `operator_sequence_supervised_prestart_gate_step` includes
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`

@@ -120,6 +120,9 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while `supervised_prestart_gate` does not show
   `operator_sequence_step_index: 9` and
   `operator_sequence_step_must_be_final: true`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
+  `operator_sequence_supervised_prestart_gate_step_index: 9`.
 
 This is not a stop to development. Codex must continue uninterrupted Goal-mode
 work, but only on the first non-closed MVP blocker.
@@ -163,6 +166,10 @@ The handoff summary must also show `required_supervised_prestart_gate_markers`
 exactly listing `accepted_decision_ready`,
 `valid accepted-candidate prestart trace`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`.
+
+The operator sequence indexes must also remain explicit:
+`operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
+`operator_sequence_supervised_prestart_gate_step_index: 9`.
 
 ## Autonomy Budget Rule
 
