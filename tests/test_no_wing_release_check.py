@@ -7457,6 +7457,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         in markdown_summary
     )
     assert "prestart_backend_port_check_command" in markdown_summary
+    assert "prestart_backend_port_check_failure_detail_fields" in markdown_summary
+    assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
     assert "capture_command_channels: `3`" in markdown_summary
     assert "capture_command_operator_confirmed_channels: `3`" in markdown_summary
@@ -7605,6 +7607,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     )
     assert "backend_port_prestart_check_required: `true`" in markdown_summary
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown_summary
+    assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
+    assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert "operator_session_confirmation_required: `true`" in markdown_summary
@@ -7727,6 +7731,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "backend_port_prestart_check_required: `true`" in markdown_summary
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown_summary
     assert "prestart_backend_port_check_command" in markdown_summary
+    assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
+    assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary

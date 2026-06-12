@@ -13803,6 +13803,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight['prestart_backend_port_check_must_pass_before_starting_backend']).lower()}`",
                 "- prestart_backend_port_check_command: "
                 f"`{json.dumps(wing_readonly_preflight['prestart_backend_port_check_command'])}`",
+                "- prestart_backend_port_check_failure_detail_fields: "
+                f"`{json.dumps(wing_readonly_preflight['prestart_backend_port_check_failure_detail_fields'])}`",
                 "- capture_command_template: "
                 f"`{json.dumps(wing_readonly_preflight['capture_command_template'])}`",
                 f"- capture_command_channels: `{wing_readonly_preflight['capture_command_channels']}`",
@@ -13871,6 +13873,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
                 "- backend_port_prestart_check_command: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['backend_port_prestart_check_command'])}`",
+                "- backend_port_prestart_check_failure_detail_fields: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['backend_port_prestart_check_failure_detail_fields'])}`",
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_plan_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- operator_session_confirmation_required: "
@@ -13962,6 +13966,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_requires_physical_readback']).lower()}`",
                 "- prestart_backend_port_check_command: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['prestart_backend_port_check_command'])}`",
+                "- backend_port_prestart_check_failure_detail_fields: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_failure_detail_fields'])}`",
                 "- review_command_writes_decision_template: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_writes_decision_template']).lower()}`",
                 "- blockers_not_closed_by_packet: "
