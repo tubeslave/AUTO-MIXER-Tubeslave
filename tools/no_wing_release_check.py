@@ -10794,6 +10794,7 @@ def wing_readonly_preflight_review_decision_summary(
         duplicate_source_ids = detail.get("duplicate_source_ids")
         conflicting_source_ids = detail.get("conflicting_source_ids")
         unreviewed_candidate_source_ids = detail.get("unreviewed_candidate_source_ids")
+        candidate_reviews = detail.get("candidate_reviews")
         decision_search_roots = detail.get("decision_search_roots")
         review_command = detail.get("review_command")
         review_exit_codes = detail.get("review_exit_codes")
@@ -10865,6 +10866,9 @@ def wing_readonly_preflight_review_decision_summary(
                 list(unreviewed_candidate_source_ids)
                 if isinstance(unreviewed_candidate_source_ids, list)
                 else []
+            ),
+            "candidate_reviews": (
+                list(candidate_reviews) if isinstance(candidate_reviews, list) else []
             ),
             "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
@@ -14033,6 +14037,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_review_decision['conflicting_source_ids'])}`",
                 "- unreviewed_candidate_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['unreviewed_candidate_source_ids'])}`",
+                "- candidate_reviews: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['candidate_reviews'], sort_keys=True)}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight_review_decision['blocked_by'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight_review_decision['violations'])}`",
             ]

@@ -7873,6 +7873,26 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
             "rejected_source_ids": [],
             "invalid_record_ids": [],
             "unreviewed_candidate_source_ids": [],
+            "candidate_reviews": [
+                {
+                    "source_id": "artifacts/wing_readonly_preflight/run/summary.json",
+                    "status": "valid_readonly_preflight_artifact",
+                    "run_id": "20260606T120000Z_wing_readonly_preflight",
+                    "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+                    "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+                    "backend_port_prestart_check_required": True,
+                    "backend_port_prestart_check_must_pass_before_starting_backend": True,
+                    "backend_port_prestart_check_command": [
+                        "PYTHONPATH=backend",
+                        "python3",
+                        "tools/no_wing_release_check.py",
+                        "--quick",
+                    ],
+                    "backend_port_prestart_check_failure_detail_fields": list(
+                        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                    ),
+                }
+            ],
             "blocked_by": ["operator_must_capture_valid_readonly_preflight_candidate_first"],
             "violations": [],
         },
@@ -7895,6 +7915,16 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert decision["review_tool_available"] is True
     assert decision["review_command"][1] == "tools/review_wing_readonly_preflight_decisions.py"
     assert decision["review_exit_codes"]["accepted_decision_ready"] == 0
+    assert decision["candidate_reviews"][0]["backend_port_prestart_check_required"] is True
+    assert (
+        decision["candidate_reviews"][0][
+            "backend_port_prestart_check_must_pass_before_starting_backend"
+        ]
+        is True
+    )
+    assert "listener_processes" in decision["candidate_reviews"][0][
+        "backend_port_prestart_check_failure_detail_fields"
+    ]
     assert decision["decision_search_roots"] == [
         "artifacts/wing_readonly_preflight_review_decisions"
     ]
@@ -7907,6 +7937,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert "readiness_matrix_update_allowed_by_decision: `false`" in markdown_summary
     assert "WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md" in markdown_summary
     assert "accepted_decision_ready" in markdown_summary
+    assert "candidate_reviews:" in markdown_summary
+    assert "backend_port_prestart_check_required" in markdown_summary
+    assert "listener_processes" in markdown_summary
     assert "wing_readonly_preflight_review_decisions" in markdown_summary
     assert "manual_readiness_update_candidate_available: `false`" in markdown_summary
 
