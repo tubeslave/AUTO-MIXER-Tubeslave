@@ -28,6 +28,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["physical_preflight_requires_existing_backend_connection"] is True
     assert packet["backend_port_prestart_check_required"] is True
     assert packet["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert packet["backend_port_prestart_check_operator_sequence_step_index"] == 0
+    assert packet["backend_port_prestart_check_must_be_first_operator_step"] is True
     assert packet["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )
@@ -251,6 +253,8 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "physical_preflight_requires_existing_backend_connection: `true`" in markdown
     assert "backend_port_prestart_check_required: `true`" in markdown
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
+    assert "backend_port_prestart_check_operator_sequence_step_index: `0`" in markdown
+    assert "backend_port_prestart_check_must_be_first_operator_step: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
     for field_name in WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS:
@@ -286,6 +290,8 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["physical_preflight_requires_existing_backend_connection"] is True
     assert payload["backend_port_prestart_check_required"] is True
     assert payload["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert payload["backend_port_prestart_check_operator_sequence_step_index"] == 0
+    assert payload["backend_port_prestart_check_must_be_first_operator_step"] is True
     assert payload["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )

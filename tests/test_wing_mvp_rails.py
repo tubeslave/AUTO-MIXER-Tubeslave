@@ -105,6 +105,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "artifact_operator_next_steps" in readonly
     assert "before opening a backend/WING WebSocket" in readonly
     assert "they do not approve live writes or close readiness rows" in readonly
+    assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readonly
+    assert "backend_port_prestart_check_must_be_first_operator_step: true" in readonly
+    assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"

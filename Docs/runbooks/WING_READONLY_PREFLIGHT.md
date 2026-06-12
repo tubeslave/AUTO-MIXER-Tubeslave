@@ -316,6 +316,9 @@ continue to:
 
 The handoff validation must report:
 
+- `backend_port_prestart_check_operator_sequence_step_index: 0`
+- `backend_port_prestart_check_must_be_first_operator_step: true`
+- `backend_port_prestart_check_operator_sequence_step_is_first: true`
 - the final handoff operator-sequence step contains the supervised prestart gate
 - `operator_sequence_has_supervised_prestart_gate: true`
 - `operator_sequence_supervised_prestart_gate_is_final: true`

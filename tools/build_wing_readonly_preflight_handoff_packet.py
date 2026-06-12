@@ -222,6 +222,12 @@ def build_handoff_packet(
         "valid accepted-candidate prestart trace",
         "WING_SUPERVISED_FADER_GAIN_PROOF",
     ]
+    prestart_step_index = 0
+    prestart_step = (
+        "Before starting the intended backend/WING session, run "
+        "prestart_backend_port_check and resolve only confirmed "
+        "unexpected listeners."
+    )
     expected_supervised_gate = {
         "required": True,
         "operator_sequence_step_index": supervised_gate_step_index,
@@ -271,6 +277,8 @@ def build_handoff_packet(
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_operator_sequence_step_index": prestart_step_index,
+        "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -301,11 +309,7 @@ def build_handoff_packet(
             "focused_validation": list(FOCUSED_VALIDATION_COMMAND),
         },
         "operator_sequence": [
-            (
-                "Before starting the intended backend/WING session, run "
-                "prestart_backend_port_check and resolve only confirmed "
-                "unexpected listeners."
-            ),
+            prestart_step,
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
             "Confirm backend is connected to the intended WING Rack and ready for read-only inspection.",
             "Confirm the selected channel numbers are safe to inspect.",
@@ -348,6 +352,10 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['backend_port_prestart_check_required']).lower()}`",
         "- backend_port_prestart_check_must_pass_before_starting_backend: "
         f"`{str(packet['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
+        "- backend_port_prestart_check_operator_sequence_step_index: "
+        f"`{packet['backend_port_prestart_check_operator_sequence_step_index']}`",
+        "- backend_port_prestart_check_must_be_first_operator_step: "
+        f"`{str(packet['backend_port_prestart_check_must_be_first_operator_step']).lower()}`",
         "- backend_port_prestart_check_command: "
         f"`{_command_text(packet['backend_port_prestart_check_command'])}`",
         "- backend_port_prestart_check_failure_detail_fields: "

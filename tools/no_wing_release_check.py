@@ -3722,10 +3722,18 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         "physical_preflight_requires_existing_backend_connection",
         "backend_port_prestart_check_required",
         "backend_port_prestart_check_must_pass_before_starting_backend",
+        "backend_port_prestart_check_must_be_first_operator_step",
         "manual_review_required_before_readiness_update",
     ):
         if packet.get(key) is not True:
             violations.append(f"wing_readonly_preflight_handoff_packet_{key}_not_true")
+    backend_port_prestart_step_index = packet.get(
+        "backend_port_prestart_check_operator_sequence_step_index"
+    )
+    if backend_port_prestart_step_index != 0:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_index_mismatch"
+        )
     if packet.get("backend_port_prestart_check_failure_detail_fields") != list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     ):
@@ -3811,6 +3819,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             )
     if len(operator_sequence) < 8:
         violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
+    backend_port_prestart_step = str(operator_sequence[0]) if operator_sequence else ""
+    backend_port_prestart_step_is_first = (
+        bool(backend_port_prestart_step)
+        and "Before starting the intended backend/WING session" in backend_port_prestart_step
+        and "prestart_backend_port_check" in backend_port_prestart_step
+    )
+    if not backend_port_prestart_step_is_first:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_not_first"
+        )
     operator_sequence_supervised_prestart_gate_step_index = next(
         (
             index
@@ -3892,6 +3910,18 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_check_must_pass_before_starting_backend"] = packet.get(
         "backend_port_prestart_check_must_pass_before_starting_backend"
+    )
+    detail["backend_port_prestart_check_operator_sequence_step_index"] = packet.get(
+        "backend_port_prestart_check_operator_sequence_step_index"
+    )
+    detail["backend_port_prestart_check_must_be_first_operator_step"] = packet.get(
+        "backend_port_prestart_check_must_be_first_operator_step"
+    )
+    detail["backend_port_prestart_check_operator_sequence_step"] = (
+        backend_port_prestart_step
+    )
+    detail["backend_port_prestart_check_operator_sequence_step_is_first"] = (
+        backend_port_prestart_step_is_first
     )
     detail["backend_port_prestart_check_command"] = packet.get(
         "backend_port_prestart_check_command"
@@ -10982,6 +11012,20 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 detail.get("backend_port_prestart_check_must_pass_before_starting_backend")
                 is True
             ),
+            "backend_port_prestart_check_operator_sequence_step_index": (
+                detail.get("backend_port_prestart_check_operator_sequence_step_index")
+            ),
+            "backend_port_prestart_check_must_be_first_operator_step": (
+                detail.get("backend_port_prestart_check_must_be_first_operator_step")
+                is True
+            ),
+            "backend_port_prestart_check_operator_sequence_step": str(
+                detail.get("backend_port_prestart_check_operator_sequence_step") or ""
+            ),
+            "backend_port_prestart_check_operator_sequence_step_is_first": (
+                detail.get("backend_port_prestart_check_operator_sequence_step_is_first")
+                is True
+            ),
             "backend_port_prestart_check_failure_detail_fields": (
                 list(detail.get("backend_port_prestart_check_failure_detail_fields"))
                 if isinstance(
@@ -14300,6 +14344,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_requires_physical_readback']).lower()}`",
                 "- prestart_backend_port_check_command: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['prestart_backend_port_check_command'])}`",
+                "- backend_port_prestart_check_operator_sequence_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step_index']}`",
+                "- backend_port_prestart_check_must_be_first_operator_step: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_must_be_first_operator_step']).lower()}`",
+                "- backend_port_prestart_check_operator_sequence_step: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step']}`",
+                "- backend_port_prestart_check_operator_sequence_step_is_first: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step_is_first']).lower()}`",
                 "- backend_port_prestart_check_failure_detail_fields: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_failure_detail_fields'])}`",
                 "- review_command_writes_decision_template: "

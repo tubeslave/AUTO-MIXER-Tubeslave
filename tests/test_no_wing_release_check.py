@@ -891,6 +891,8 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_operator_sequence_step_index": 0,
+        "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": [
             "PYTHONPATH=backend",
             "python3",
@@ -2434,6 +2436,16 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "tools/no_wing_release_check.py",
         "--quick",
     ]
+    assert result.detail["backend_port_prestart_check_operator_sequence_step_index"] == 0
+    assert result.detail["backend_port_prestart_check_must_be_first_operator_step"] is True
+    assert (
+        "Before starting the intended backend/WING session"
+        in result.detail["backend_port_prestart_check_operator_sequence_step"]
+    )
+    assert "prestart_backend_port_check" in result.detail[
+        "backend_port_prestart_check_operator_sequence_step"
+    ]
+    assert result.detail["backend_port_prestart_check_operator_sequence_step_is_first"] is True
     assert result.detail["review_command_writes_decision_template"] is True
     assert "prestart_backend_port_check" in result.detail["command_names"]
     assert "preview_readonly_request_plan" in result.detail["command_names"]
@@ -2500,6 +2512,47 @@ def test_no_wing_release_check_rejects_missing_wing_preflight_handoff_packet_art
     assert "wing_readonly_preflight_handoff_packet_missing_report" in result.detail[
         "violations"
     ]
+
+
+def test_no_wing_release_check_rejects_handoff_packet_without_first_prestart_gate(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-without-first-prestart-gate.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["backend_port_prestart_check_operator_sequence_step_index"] = 1
+    payload["backend_port_prestart_check_must_be_first_operator_step"] = False
+    payload["operator_sequence"].insert(0, "Start backend/WING session first.")
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["backend_port_prestart_check_operator_sequence_step_index"] == 1
+    assert result.detail["backend_port_prestart_check_must_be_first_operator_step"] is False
+    assert (
+        result.detail["backend_port_prestart_check_operator_sequence_step_is_first"]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_index_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_port_prestart_check_must_be_first_operator_step_not_true"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_not_first"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_handoff_packet_without_supervised_prestart_gate(
@@ -8141,6 +8194,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "physical_preflight_requires_existing_backend_connection": True,
             "backend_port_prestart_check_required": True,
             "backend_port_prestart_check_must_pass_before_starting_backend": True,
+            "backend_port_prestart_check_operator_sequence_step_index": 0,
+            "backend_port_prestart_check_must_be_first_operator_step": True,
+            "backend_port_prestart_check_operator_sequence_step": (
+                "Before starting the intended backend/WING session, run "
+                "prestart_backend_port_check and resolve only confirmed "
+                "unexpected listeners."
+            ),
+            "backend_port_prestart_check_operator_sequence_step_is_first": True,
             "backend_port_prestart_check_failure_detail_fields": list(
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
@@ -8242,6 +8303,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["physical_preflight_requires_existing_backend_connection"] is True
     assert artifact["backend_port_prestart_check_required"] is True
     assert artifact["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert artifact["backend_port_prestart_check_operator_sequence_step_index"] == 0
+    assert artifact["backend_port_prestart_check_must_be_first_operator_step"] is True
+    assert artifact["backend_port_prestart_check_operator_sequence_step"] == (
+        "Before starting the intended backend/WING session, run "
+        "prestart_backend_port_check and resolve only confirmed unexpected listeners."
+    )
+    assert artifact["backend_port_prestart_check_operator_sequence_step_is_first"] is True
     assert artifact["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
@@ -8296,6 +8364,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "backend_port_prestart_check_required: `true`" in markdown_summary
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown_summary
+    assert "backend_port_prestart_check_operator_sequence_step_index: `0`" in (
+        markdown_summary
+    )
+    assert "backend_port_prestart_check_must_be_first_operator_step: `true`" in (
+        markdown_summary
+    )
+    assert "backend_port_prestart_check_operator_sequence_step_is_first: `true`" in (
+        markdown_summary
+    )
     assert "prestart_backend_port_check_command" in markdown_summary
     assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
     assert "listener_processes" in markdown_summary
