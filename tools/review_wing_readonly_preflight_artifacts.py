@@ -124,6 +124,26 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                 "operator_confirmed_session_ready": (
                     item.get("operator_confirmed_session_ready") is True
                 ),
+                "backend_port_prestart_check_required": (
+                    item.get("backend_port_prestart_check_required") is True
+                ),
+                "backend_port_prestart_check_must_pass_before_starting_backend": (
+                    item.get("backend_port_prestart_check_must_pass_before_starting_backend")
+                    is True
+                ),
+                "backend_port_prestart_check_command": (
+                    item.get("backend_port_prestart_check_command")
+                    if isinstance(item.get("backend_port_prestart_check_command"), list)
+                    else []
+                ),
+                "backend_port_prestart_check_failure_detail_fields": (
+                    item.get("backend_port_prestart_check_failure_detail_fields")
+                    if isinstance(
+                        item.get("backend_port_prestart_check_failure_detail_fields"),
+                        list,
+                    )
+                    else []
+                ),
                 "value_types": (
                     item.get("value_types") if isinstance(item.get("value_types"), list) else []
                 ),
@@ -385,6 +405,14 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{str(row.get('operator_session_confirmation_required') is True).lower()}`",
                     "  - operator_confirmed_session_ready: "
                     f"`{str(row.get('operator_confirmed_session_ready') is True).lower()}`",
+                    "  - backend_port_prestart_check_required: "
+                    f"`{str(row.get('backend_port_prestart_check_required') is True).lower()}`",
+                    "  - backend_port_prestart_check_must_pass_before_starting_backend: "
+                    f"`{str(row.get('backend_port_prestart_check_must_pass_before_starting_backend') is True).lower()}`",
+                    "  - backend_port_prestart_check_command: "
+                    f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
+                    "  - backend_port_prestart_check_failure_detail_fields: "
+                    f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
                     f"  - value_types: `{json.dumps(row.get('value_types') or [])}`",
                     f"  - readback_count: `{int(row.get('readback_count') or 0)}`",
                     "  - physical_readback_count: "

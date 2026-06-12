@@ -279,11 +279,19 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "operator_confirmed_channels": [3],
             "operator_session_confirmation_required": True,
             "operator_confirmed_session_ready": True,
-                "value_types": ["fader", "gain", "pan"],
-                "readback_count": 3,
-                "physical_readback_count": 3,
-                "violations": [],
-            }
+            "backend_port_prestart_check_required": True,
+            "backend_port_prestart_check_must_pass_before_starting_backend": True,
+            "backend_port_prestart_check_command": list(
+                EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+            ),
+            "backend_port_prestart_check_failure_detail_fields": list(
+                EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ),
+            "value_types": ["fader", "gain", "pan"],
+            "readback_count": 3,
+            "physical_readback_count": 3,
+            "violations": [],
+        }
         ]
     assert review_tool.exit_code_for_report(report) == 0
     markdown = review_tool.render_markdown(report)
@@ -296,6 +304,11 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "operator_confirmed_channels: `[3]`" in markdown
     assert "operator_session_confirmation_required: `true`" in markdown
     assert "operator_confirmed_session_ready: `true`" in markdown
+    assert "backend_port_prestart_check_required: `true`" in markdown
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
+    assert "backend_port_prestart_check_command" in markdown
+    assert "backend_port_prestart_check_failure_detail_fields" in markdown
+    assert "listener_processes" in markdown
     assert "Manual Review Gate" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "confirm_event_log_readonly_sequence" in markdown

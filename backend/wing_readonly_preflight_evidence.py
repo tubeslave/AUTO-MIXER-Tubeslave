@@ -181,6 +181,10 @@ class WingReadonlyPreflightArtifactRecord:
     operator_confirmed_channels: Tuple[int, ...]
     operator_session_confirmation_required: bool
     operator_confirmed_session_ready: bool
+    backend_port_prestart_check_required: bool
+    backend_port_prestart_check_must_pass_before_starting_backend: bool
+    backend_port_prestart_check_command: Tuple[str, ...]
+    backend_port_prestart_check_failure_detail_fields: Tuple[str, ...]
     value_types: Tuple[str, ...]
     violations: Tuple[str, ...]
 
@@ -197,6 +201,12 @@ class WingReadonlyPreflightArtifactRecord:
         payload["sent_request_types"] = list(self.sent_request_types)
         payload["channels"] = list(self.channels)
         payload["operator_confirmed_channels"] = list(self.operator_confirmed_channels)
+        payload["backend_port_prestart_check_command"] = list(
+            self.backend_port_prestart_check_command
+        )
+        payload["backend_port_prestart_check_failure_detail_fields"] = list(
+            self.backend_port_prestart_check_failure_detail_fields
+        )
         payload["value_types"] = list(self.value_types)
         payload["violations"] = list(self.violations)
         return payload
@@ -885,6 +895,26 @@ def validate_wing_readonly_preflight_artifact(
             "operator_confirmed_session_ready": (
                 payload.get("operator_confirmed_session_ready") is True
             ),
+            "backend_port_prestart_check_required": (
+                payload.get("backend_port_prestart_check_required") is True
+            ),
+            "backend_port_prestart_check_must_pass_before_starting_backend": (
+                payload.get("backend_port_prestart_check_must_pass_before_starting_backend")
+                is True
+            ),
+            "backend_port_prestart_check_command": (
+                list(payload.get("backend_port_prestart_check_command"))
+                if isinstance(payload.get("backend_port_prestart_check_command"), list)
+                else []
+            ),
+            "backend_port_prestart_check_failure_detail_fields": (
+                list(payload.get("backend_port_prestart_check_failure_detail_fields"))
+                if isinstance(
+                    payload.get("backend_port_prestart_check_failure_detail_fields"),
+                    list,
+                )
+                else []
+            ),
             "value_types": list(value_types),
         },
     }
@@ -926,6 +956,19 @@ def _record_from_validation(
         operator_confirmed_session_ready=(
             evidence.get("operator_confirmed_session_ready") is True
         ),
+        backend_port_prestart_check_required=(
+            evidence.get("backend_port_prestart_check_required") is True
+        ),
+        backend_port_prestart_check_must_pass_before_starting_backend=(
+            evidence.get("backend_port_prestart_check_must_pass_before_starting_backend")
+            is True
+        ),
+        backend_port_prestart_check_command=_string_tuple(
+            evidence.get("backend_port_prestart_check_command")
+        ),
+        backend_port_prestart_check_failure_detail_fields=_string_tuple(
+            evidence.get("backend_port_prestart_check_failure_detail_fields")
+        ),
         value_types=_string_tuple(evidence.get("value_types")),
         violations=_string_tuple(validation.get("violations")),
     )
@@ -950,6 +993,10 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         operator_confirmed_channels=(),
         operator_session_confirmation_required=False,
         operator_confirmed_session_ready=False,
+        backend_port_prestart_check_required=False,
+        backend_port_prestart_check_must_pass_before_starting_backend=False,
+        backend_port_prestart_check_command=(),
+        backend_port_prestart_check_failure_detail_fields=(),
         value_types=(),
         violations=(f"artifact_load_error:{type(exc).__name__}",),
     )
