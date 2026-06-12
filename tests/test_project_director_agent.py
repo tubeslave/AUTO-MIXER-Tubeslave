@@ -53,6 +53,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in directive[
         "selected_action"
     ]
+    assert "operator_sequence_supervised_prestart_gate_is_final: true" in directive[
+        "selected_action"
+    ]
+    assert "supervised_prestart_gate" in directive["selected_action"]
+    assert "expected_supervised_prestart_gate" in directive["selected_action"]
     assert "accepted-candidate prestart trace" in directive["selected_action"]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
