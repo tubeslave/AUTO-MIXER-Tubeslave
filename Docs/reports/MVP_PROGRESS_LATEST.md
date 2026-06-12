@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-06-12T10:58:30Z`
+Generated: `2026-06-12T11:38:24Z`
 
 ## Current MVP
 
@@ -11,13 +11,13 @@ Supervised WING Rack proof.
 - Total blockers: 9
 - Closed blockers: 0
 - Current first open blocker: WING read-only connection proof
-- Next required action: Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false` and `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`; accepted review source ids must also have a valid accepted-candidate prestart trace, otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers.
+- Next required action: Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false`, `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`, `mvp_blocker_anchor` matching the current first open blocker row, and `mvp_blocker_anchor_matches_current_first_open: true`; accepted review source ids must also have a valid accepted-candidate prestart trace, otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers.
 
 ## Blockers
 
 | Blocker | Status | Next action |
 | --- | --- | --- |
-| WING read-only connection proof | tooling_ready_waits_real_wing | Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false` and `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`; accepted review source ids must also have a valid accepted-candidate prestart trace, otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers. |
+| WING read-only connection proof | tooling_ready_waits_real_wing | Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false`, `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`, `mvp_blocker_anchor` matching the current first open blocker row, and `mvp_blocker_anchor_matches_current_first_open: true`; accepted review source ids must also have a valid accepted-candidate prestart trace, otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers. |
 | Physical console readback proof | tooling_ready_waits_real_wing | Run read-only preflight with `--require-physical-readback` and review summary plus `events.jsonl`. |
 | Supervised fader write proof | blocked_by_readonly_preflight | After clean read-only preflight review, an accepted decision JSON, `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate` without live authority, the final handoff operator-sequence step with valid accepted-candidate prestart trace, and `supervised_prestart_gate` exactly matching `expected_supervised_prestart_gate`, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type fader`. |
 | Supervised gain-down / trim proof | blocked_by_readonly_preflight | After clean read-only preflight review, an accepted decision JSON, `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate` without live authority, the final handoff operator-sequence step with valid accepted-candidate prestart trace, and `supervised_prestart_gate` exactly matching `expected_supervised_prestart_gate`, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type gain` with a negative delta only. |
