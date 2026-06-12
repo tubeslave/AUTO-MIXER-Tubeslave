@@ -52,9 +52,18 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]
     assert "backend/wing_readonly_preflight_contract.py" in directive["required_files"]
+    assert (
+        "backend/wing_readonly_preflight_review_decision.py"
+        in directive["required_files"]
+    )
+    assert "backend/supervised_wing_proof_plan.py" in directive["required_files"]
     assert "Docs/CORRECTION_METHODS_ROADMAP.md" in directive["required_files"]
     assert "tools/wing_readonly_preflight_runner.py" in directive["required_files"]
     assert "tools/review_wing_readonly_preflight_artifacts.py" in directive["required_files"]
+    assert (
+        "tools/review_wing_readonly_preflight_decisions.py"
+        in directive["required_files"]
+    )
     assert (
         "tools/build_wing_readonly_preflight_handoff_packet.py"
         in directive["required_files"]
