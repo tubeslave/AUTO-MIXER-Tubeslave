@@ -353,6 +353,9 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list
         "WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS",
     )
 )
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
+    "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+)
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
@@ -9476,6 +9479,15 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             ):
                 violations.append(
                     "next_wing_proof_plan_review_decision_candidate_prestart_sources_mismatch"
+                )
+            if (
+                _string_list(review_summary.get("accepted_source_ids"))
+                and not expected_candidate_prestart_contract_valid
+                and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+                not in global_blockers
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
                 )
             expected_decision_accepted = (
                 review_summary.get("manual_readiness_update_candidate_available") is True

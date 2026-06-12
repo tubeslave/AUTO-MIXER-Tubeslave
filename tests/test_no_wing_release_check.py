@@ -5319,6 +5319,54 @@ def test_no_wing_release_check_rejects_next_wing_plan_without_candidate_prestart
         "next_wing_proof_plan_review_decision_accepted_mismatch"
         in result.detail["violations"]
     )
+    assert (
+        "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_allows_next_wing_plan_blocked_by_candidate_prestart_trace(
+    tmp_path,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["wing_readonly_preflight_review_decision_ledger"]["summary"][
+        "candidate_reviews"
+    ][0]["backend_port_prestart_check_required"] = False
+    plan = payload["next_wing_proof_plan"]
+    plan["status"] = "manual_review_ready"
+    plan["summary"]["step_count"] = 0
+    plan["summary"]["planned_value_types"] = []
+    plan["summary"]["planned_channels"] = []
+    plan["summary"]["readonly_preflight_review_decision_accepted"] = False
+    plan["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+    ] = False
+    plan["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_source_ids"
+    ] = []
+    plan["summary"]["global_blockers"] = [
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof",
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof",
+        "readiness_matrix_update_still_requires_separate_manual_action",
+    ]
+    plan["steps"] = []
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "passed"
+    assert result.detail["readonly_preflight_review_decision_accepted"] is False
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+        ]
+        is False
+    )
+    assert result.detail[
+        "readonly_preflight_review_decision_candidate_prestart_source_ids"
+    ] == []
+    assert result.detail["violations"] == []
 
 
 def test_no_wing_release_check_rejects_next_wing_plan_stale_operator_confirmation(tmp_path):
