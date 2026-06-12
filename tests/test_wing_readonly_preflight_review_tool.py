@@ -203,9 +203,14 @@ def _valid_expected_plan(summary: dict) -> dict:
     }
 
 
-def _write_artifact(run_dir: Path, *, tamper_events: bool = False) -> Path:
+def _write_artifact(
+    run_dir: Path,
+    *,
+    summary: dict | None = None,
+    tamper_events: bool = False,
+) -> Path:
     run_dir.mkdir(parents=True)
-    summary = _valid_summary()
+    summary = summary or _valid_summary()
     summary_path = run_dir / "summary.json"
     events_path = run_dir / "events.jsonl"
     plan_path = run_dir / "expected_plan.json"
@@ -287,6 +292,7 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "backend_port_prestart_check_failure_detail_fields": list(
                 EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
+            "operator_next_step": None,
             "value_types": ["fader", "gain", "pan"],
             "readback_count": 3,
             "physical_readback_count": 3,
@@ -310,6 +316,7 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
     assert "listener_processes" in markdown
     assert "listener_confirmation_checklist" in markdown
+    assert "operator_next_step: `None`" in markdown
     assert "Manual Review Gate" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "confirm_event_log_readonly_sequence" in markdown
@@ -411,6 +418,39 @@ def test_review_report_blocks_tampered_event_log(tmp_path: Path):
     assert "event_log_forbidden_request_type_sent" in report["violations"]
     assert "forbidden_request_types_sent_not_empty" in report["violations"]
     assert review_tool.exit_code_for_report(report) == 3
+
+
+def test_review_report_surfaces_blocked_runner_operator_next_step(tmp_path: Path):
+    summary = _valid_summary()
+    summary.update(
+        {
+            "status": "blocked",
+            "reason": "expected_plan_mismatch",
+            "expected_plan_match": False,
+            "expected_plan_violations": [
+                "expected_plan_backend_port_prestart_check_failure_detail_fields_mismatch",
+            ],
+            "operator_next_step": (
+                "Regenerate the offline expected plan with the current runtime args "
+                "and prestart contract before opening the backend WebSocket."
+            ),
+        }
+    )
+    _write_artifact(tmp_path / "preflight" / "run", summary=summary)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+
+    assert report["status"] == "blocked"
+    assert report["readiness_update_candidate_available"] is False
+    assert report["artifact_reviews"][0]["operator_next_step"] == (
+        "Regenerate the offline expected plan with the current runtime args "
+        "and prestart contract before opening the backend WebSocket."
+    )
+    assert "status_not_passed" in report["violations"]
+    markdown = review_tool.render_markdown(report)
+    assert "operator_next_step" in markdown
+    assert "before opening the backend WebSocket" in markdown
+    assert "live_authority_granted: `false`" in markdown
 
 
 def test_review_tool_main_writes_output_and_returns_gate_status(tmp_path: Path):

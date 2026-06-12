@@ -144,6 +144,11 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                     )
                     else []
                 ),
+                "operator_next_step": (
+                    str(item.get("operator_next_step"))
+                    if item.get("operator_next_step")
+                    else None
+                ),
                 "value_types": (
                     item.get("value_types") if isinstance(item.get("value_types"), list) else []
                 ),
@@ -413,6 +418,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
                     "  - backend_port_prestart_check_failure_detail_fields: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
+                    f"  - operator_next_step: `{row.get('operator_next_step')}`",
                     f"  - value_types: `{json.dumps(row.get('value_types') or [])}`",
                     f"  - readback_count: `{int(row.get('readback_count') or 0)}`",
                     "  - physical_readback_count: "

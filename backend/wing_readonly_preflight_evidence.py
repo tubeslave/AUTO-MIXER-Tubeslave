@@ -186,6 +186,7 @@ class WingReadonlyPreflightArtifactRecord:
     backend_port_prestart_check_must_pass_before_starting_backend: bool
     backend_port_prestart_check_command: Tuple[str, ...]
     backend_port_prestart_check_failure_detail_fields: Tuple[str, ...]
+    operator_next_step: str | None
     value_types: Tuple[str, ...]
     violations: Tuple[str, ...]
 
@@ -208,6 +209,7 @@ class WingReadonlyPreflightArtifactRecord:
         payload["backend_port_prestart_check_failure_detail_fields"] = list(
             self.backend_port_prestart_check_failure_detail_fields
         )
+        payload["operator_next_step"] = self.operator_next_step
         payload["value_types"] = list(self.value_types)
         payload["violations"] = list(self.violations)
         return payload
@@ -916,6 +918,11 @@ def validate_wing_readonly_preflight_artifact(
                 )
                 else []
             ),
+            "operator_next_step": (
+                str(payload.get("operator_next_step"))
+                if payload.get("operator_next_step")
+                else None
+            ),
             "value_types": list(value_types),
         },
     }
@@ -970,6 +977,11 @@ def _record_from_validation(
         backend_port_prestart_check_failure_detail_fields=_string_tuple(
             evidence.get("backend_port_prestart_check_failure_detail_fields")
         ),
+        operator_next_step=(
+            str(evidence.get("operator_next_step"))
+            if evidence.get("operator_next_step")
+            else None
+        ),
         value_types=_string_tuple(evidence.get("value_types")),
         violations=_string_tuple(validation.get("violations")),
     )
@@ -998,6 +1010,7 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         backend_port_prestart_check_must_pass_before_starting_backend=False,
         backend_port_prestart_check_command=(),
         backend_port_prestart_check_failure_detail_fields=(),
+        operator_next_step=None,
         value_types=(),
         violations=(f"artifact_load_error:{type(exc).__name__}",),
     )
