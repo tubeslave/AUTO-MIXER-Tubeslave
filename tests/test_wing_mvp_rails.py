@@ -97,6 +97,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "operator_sequence_supervised_prestart_gate_is_final" in readonly
     assert "supervised_prestart_gate" in readonly
     assert "expected_supervised_prestart_gate" in readonly
+    assert "artifact_operator_next_steps" in readonly
+    assert "before opening a backend/WING WebSocket" in readonly
+    assert "they do not approve live writes or close readiness rows" in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"

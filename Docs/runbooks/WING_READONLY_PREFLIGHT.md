@@ -31,6 +31,11 @@ It does not approve live writes.
   the real preflight remains blocked until the operator follows the checklist
   to confirm the listener is the intended backend or frees/reconfigures the
   unexpected listener. The gate is diagnostic only and does not stop processes.
+- If the no-WING release summary includes
+  `wing_readonly_preflight_evidence.artifact_operator_next_steps`, inspect and
+  complete those repair instructions before opening a backend/WING WebSocket.
+  They come from blocked read-only preflight artifacts and are diagnostic only;
+  they do not approve live writes or close readiness rows.
 - Then connect the intended WING Rack to the backend and start the backend
   WebSocket, usually at `ws://localhost:8765`.
 - The operator knows which channel is safe to inspect.
@@ -150,6 +155,8 @@ The offline review report must show:
 
 - `manual_review_required_before_readiness_update: true`
 - `manual_review_decision_required: true` only when a clean candidate exists
+- `artifact_operator_next_steps` when blocked artifacts include a specific
+  repair instruction
 - checklist rows for artifact paths, operator channel scope, operator session
   readiness, physical readbacks, read-only event-log sequence, and no live
   authority
