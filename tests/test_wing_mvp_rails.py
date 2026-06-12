@@ -82,6 +82,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in rows[0][
         "next action"
     ]
+    assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in rows[0][
+        "next action"
+    ]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in rows[0]["next action"]
@@ -184,6 +187,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "mvp_blocker_anchor" in report
     assert "mvp_blocker_anchor_matches_current_first_open: true" in report
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in report
+    assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in report
     assert "accepted-candidate prestart trace" in report
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
@@ -289,6 +293,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_HANDOFF_ANCHOR_DIGEST_OPERATOR_REVIEW_STEP_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BLOCKER_HANDOFF_DIGEST_REVIEW_NEXT_ACTION_20260612.md"
         in text
     )
     assert (
