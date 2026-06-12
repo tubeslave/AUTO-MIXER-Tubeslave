@@ -1006,6 +1006,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "tests/test_no_wing_release_check.py",
             ],
         },
+        "mvp_blocker_anchor": release_check.wing_mvp_first_open_blocker_anchor(),
         "operator_sequence": [
             (
                 "Before starting the intended backend/WING session, run "
@@ -2518,6 +2519,20 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert "physical_console_readback_proof" in result.detail[
         "blockers_not_closed_by_packet"
     ]
+    assert result.detail["mvp_blocker_anchor"] == (
+        release_check.wing_mvp_first_open_blocker_anchor()
+    )
+    assert result.detail["expected_mvp_blocker_anchor"] == (
+        release_check.wing_mvp_first_open_blocker_anchor()
+    )
+    assert result.detail["mvp_blocker_anchor_matches_current_first_open"] is True
+    assert (
+        result.detail["mvp_blocker_anchor"]["selected_blocker"]
+        == "WING read-only connection proof"
+    )
+    assert result.detail["mvp_blocker_anchor"]["selected_evidence_file_count"] == len(
+        result.detail["mvp_blocker_anchor"]["selected_evidence_files"]
+    )
     assert result.detail["operator_sequence_count"] == 9
     assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
     assert (
@@ -2548,6 +2563,37 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "WING_SUPERVISED_FADER_GAIN_PROOF",
     ]
     assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_stale_handoff_packet_mvp_blocker_anchor(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "stale-handoff-anchor.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["mvp_blocker_anchor"]["selected_blocker_status"] = "closed"
+    payload["mvp_blocker_anchor"]["packet_does_not_close_blocker"] = False
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["mvp_blocker_anchor_matches_current_first_open"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_closes_blocker"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_missing_wing_preflight_handoff_packet_artifact(

@@ -83,6 +83,19 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["commands"]["prestart_backend_port_check"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )
+    assert packet["mvp_blocker_anchor"] == (
+        no_wing_release_check.wing_mvp_first_open_blocker_anchor()
+    )
+    assert (
+        packet["mvp_blocker_anchor"]["selected_blocker"]
+        == "WING read-only connection proof"
+    )
+    assert packet["mvp_blocker_anchor"]["selected_evidence_file_count"] == len(
+        packet["mvp_blocker_anchor"]["selected_evidence_files"]
+    )
+    assert "tools/wing_readonly_preflight_runner.py" in packet[
+        "mvp_blocker_anchor"
+    ]["selected_evidence_files"]
     assert packet["operator_sequence"][0].startswith(
         "Before starting the intended backend/WING session"
     )
@@ -133,6 +146,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "## Supervised Prestart Gate" in rendered
     assert "## Expected Supervised Prestart Gate" in rendered
     assert "expected_supervised_prestart_gate" in rendered
+    assert "## MVP Blocker Anchor" in rendered
+    assert "WING read-only connection proof" in rendered
+    assert "selected_evidence_file_count" in rendered
+    assert "tools/wing_readonly_preflight_runner.py" in rendered
     assert "actual_matches_expected: `true`" in rendered
     assert "operator_sequence_step_must_be_final: `true`" in rendered
     assert "grants_live_authority: `false`" in rendered

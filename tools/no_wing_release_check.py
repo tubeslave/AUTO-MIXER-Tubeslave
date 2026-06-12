@@ -474,6 +474,7 @@ WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS = (
     "supervised_gain_down_trim_proof",
     "readiness_matrix_update_based_on_real_proof",
 )
+WING_MVP_BLOCKERS_TABLE = ".ai/project-layer/wing_mvp_blockers.md"
 WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
     "event_log_wing_mode_not_proven",
@@ -492,6 +493,67 @@ WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",
 )
+
+
+def _markdown_table_cells(line: str) -> list[str]:
+    stripped = line.strip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        return []
+    return [cell.strip() for cell in stripped.strip("|").split("|")]
+
+
+def _extract_backtick_paths(text: str) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(r"`([^`]+)`", text):
+        path = match.group(1)
+        if "/" not in path or path in seen:
+            continue
+        seen.add(path)
+        paths.append(path)
+    return paths
+
+
+def wing_mvp_first_open_blocker_anchor(
+    blockers_path: Path | None = None,
+) -> dict[str, object]:
+    path = blockers_path or (REPO_ROOT / WING_MVP_BLOCKERS_TABLE)
+    rows: list[dict[str, str]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        cells = _markdown_table_cells(line)
+        if len(cells) != 4:
+            continue
+        if cells[0] in {"Blocker", "---"}:
+            continue
+        rows.append(
+            {
+                "blocker": cells[0],
+                "status": cells[1],
+                "evidence": cells[2],
+                "next_action": cells[3],
+            }
+        )
+    first_open = next((row for row in rows if row["status"] != "closed"), None)
+    if first_open is None:
+        return {
+            "blocker_table": WING_MVP_BLOCKERS_TABLE,
+            "selected_blocker": "none",
+            "selected_blocker_status": "closed",
+            "selected_action": "All MVP blockers are closed.",
+            "selected_evidence_file_count": 0,
+            "selected_evidence_files": [],
+            "packet_does_not_close_blocker": True,
+        }
+    evidence_files = _extract_backtick_paths(first_open["evidence"])
+    return {
+        "blocker_table": WING_MVP_BLOCKERS_TABLE,
+        "selected_blocker": first_open["blocker"],
+        "selected_blocker_status": first_open["status"],
+        "selected_action": first_open["next_action"],
+        "selected_evidence_file_count": len(evidence_files),
+        "selected_evidence_files": evidence_files,
+        "packet_does_not_close_blocker": True,
+    }
 
 
 def wing_readonly_preflight_capture_command_template() -> list[str]:
@@ -3631,6 +3693,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("expected_supervised_prestart_gate"), Mapping)
         else {}
     )
+    mvp_blocker_anchor = (
+        packet.get("mvp_blocker_anchor")
+        if isinstance(packet.get("mvp_blocker_anchor"), Mapping)
+        else {}
+    )
+    expected_mvp_blocker_anchor = wing_mvp_first_open_blocker_anchor()
     required_checklist = (
         packet.get("required_review_checklist_ids")
         if isinstance(packet.get("required_review_checklist_ids"), list)
@@ -3920,6 +3988,14 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_next_manual_artifact_mismatch"
         )
+    if not mvp_blocker_anchor:
+        violations.append("wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_missing")
+    elif dict(mvp_blocker_anchor) != expected_mvp_blocker_anchor:
+        violations.append("wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_mismatch")
+    if mvp_blocker_anchor.get("packet_does_not_close_blocker") is not True:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_closes_blocker"
+        )
 
     detail["packet_type"] = packet.get("type")
     detail["packet_status"] = packet.get("status")
@@ -4030,6 +4106,11 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["required_supervised_prestart_gate_markers"] = list(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
+    )
+    detail["mvp_blocker_anchor"] = dict(mvp_blocker_anchor)
+    detail["expected_mvp_blocker_anchor"] = dict(expected_mvp_blocker_anchor)
+    detail["mvp_blocker_anchor_matches_current_first_open"] = (
+        dict(mvp_blocker_anchor) == expected_mvp_blocker_anchor
     )
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
@@ -11036,6 +11117,8 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         )
         supervised_prestart_gate = detail.get("supervised_prestart_gate")
         expected_supervised_prestart_gate = detail.get("expected_supervised_prestart_gate")
+        mvp_blocker_anchor = detail.get("mvp_blocker_anchor")
+        expected_mvp_blocker_anchor = detail.get("expected_mvp_blocker_anchor")
         return {
             "status": result.status,
             "read_only": detail.get("read_only") is True,
@@ -11147,6 +11230,19 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "blockers_not_closed_by_packet": (
                 list(blockers) if isinstance(blockers, list) else []
+            ),
+            "mvp_blocker_anchor": (
+                dict(mvp_blocker_anchor)
+                if isinstance(mvp_blocker_anchor, Mapping)
+                else {}
+            ),
+            "expected_mvp_blocker_anchor": (
+                dict(expected_mvp_blocker_anchor)
+                if isinstance(expected_mvp_blocker_anchor, Mapping)
+                else {}
+            ),
+            "mvp_blocker_anchor_matches_current_first_open": (
+                detail.get("mvp_blocker_anchor_matches_current_first_open") is True
             ),
             "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
             "operator_sequence_has_supervised_prestart_gate": (
@@ -14423,6 +14519,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_writes_decision_template']).lower()}`",
                 "- blockers_not_closed_by_packet: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['blockers_not_closed_by_packet'])}`",
+                "- mvp_blocker_anchor_matches_current_first_open: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_matches_current_first_open']).lower()}`",
+                "- mvp_blocker_anchor: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor'])}`",
+                "- expected_mvp_blocker_anchor: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_mvp_blocker_anchor'])}`",
                 "- operator_sequence_count: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count']}`",
                 "- operator_sequence_has_supervised_prestart_gate: "

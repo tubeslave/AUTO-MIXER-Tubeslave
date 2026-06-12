@@ -278,6 +278,7 @@ def build_handoff_packet(
         decision_root=decision_root,
         decision_review_output=decision_review_output,
     )
+    mvp_blocker_anchor = no_wing_release_check.wing_mvp_first_open_blocker_anchor()
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
@@ -323,6 +324,7 @@ def build_handoff_packet(
             "prestart_backend_port_check": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
             "focused_validation": list(FOCUSED_VALIDATION_COMMAND),
         },
+        "mvp_blocker_anchor": mvp_blocker_anchor,
         "operator_sequence": [
             prestart_step,
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
@@ -499,11 +501,36 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             f"- pending decision template: `{packet['decision_template_output']}`",
             f"- artifact review report: `{packet['review_output']}`",
             f"- decision review report: `{packet['decision_review_output']}`",
-            "",
-            "## Required Checklist",
-            "",
         ]
     )
+    blocker_anchor = (
+        packet.get("mvp_blocker_anchor")
+        if isinstance(packet.get("mvp_blocker_anchor"), Mapping)
+        else {}
+    )
+    if blocker_anchor:
+        lines.extend(
+            [
+                "## MVP Blocker Anchor",
+                "",
+                f"- blocker_table: `{blocker_anchor.get('blocker_table')}`",
+                f"- selected_blocker: `{blocker_anchor.get('selected_blocker')}`",
+                "- selected_blocker_status: "
+                f"`{blocker_anchor.get('selected_blocker_status')}`",
+                f"- selected_action: {blocker_anchor.get('selected_action')}",
+                "- selected_evidence_file_count: "
+                f"`{blocker_anchor.get('selected_evidence_file_count')}`",
+                "- packet_does_not_close_blocker: "
+                f"`{str(blocker_anchor.get('packet_does_not_close_blocker')).lower()}`",
+                "",
+                "### Selected Evidence Files",
+                "",
+            ]
+        )
+        for item in blocker_anchor.get("selected_evidence_files") or []:
+            lines.append(f"- `{item}`")
+        lines.append("")
+    lines.extend(["## Required Checklist", ""])
     for item in packet.get("required_review_checklist_ids") or []:
         lines.append(f"- `{item}`")
     lines.extend(["", "## Forbidden Request Types", ""])
