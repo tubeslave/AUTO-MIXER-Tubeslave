@@ -69,6 +69,8 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         assert "accepted decision JSON" in row["next action"]
         assert "final handoff operator-sequence step" in row["next action"]
         assert "valid accepted-candidate prestart trace" in row["next action"]
+        assert "supervised_prestart_gate" in row["next action"]
+        assert "expected_supervised_prestart_gate" in row["next action"]
     assert all(row["status"] != "closed" for row in rows)
     assert progress.first_open_blocker(rows)["blocker"] == "WING read-only connection proof"
 
@@ -123,6 +125,8 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in report
     )
     assert "final handoff operator-sequence step" in report
+    assert "supervised_prestart_gate" in report
+    assert "expected_supervised_prestart_gate" in report
     assert "Offline tooling, shadow" in report
 
     output = tmp_path / "MVP_PROGRESS_LATEST.md"
