@@ -22,8 +22,14 @@ It does not approve live writes.
 - Before starting the intended backend/WING session, run
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` and confirm
   it does not fail `backend_port_free` against an unexpected local listener. If
-  it does, inspect `listener_processes` in the generated summary before changing
-  local services; the gate is diagnostic only and does not stop processes.
+  it does, inspect the generated summary fields `listener_processes`,
+  `preflight_blocked_until_listener_confirmed`,
+  `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+  `fail_closed_reason`, and `operator_next_step` before changing local
+  services. Optional `command_line` diagnostics may identify the listener, but
+  the real preflight remains blocked until the operator confirms the listener
+  is the intended backend or frees/reconfigures the unexpected listener. The
+  gate is diagnostic only and does not stop processes.
 - Then connect the intended WING Rack to the backend and start the backend
   WebSocket, usually at `ws://localhost:8765`.
 - The operator knows which channel is safe to inspect.

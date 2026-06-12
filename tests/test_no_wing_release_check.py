@@ -132,6 +132,15 @@ def test_wing_readonly_preflight_prestart_contract_uses_shared_backend_constants
     ) == list(WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS)
 
 
+def test_wing_readonly_preflight_runbook_lists_prestart_failure_detail_fields():
+    runbook_text = Path("Docs/runbooks/WING_READONLY_PREFLIGHT.md").read_text()
+
+    assert "backend_port_free" in runbook_text
+    assert "command_line" in runbook_text
+    for field_name in WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS:
+        assert field_name in runbook_text
+
+
 def test_no_wing_release_check_commands_have_no_live_write_tokens(tmp_path):
     checks = build_checks(run_dir=tmp_path, include_package=True)
 
