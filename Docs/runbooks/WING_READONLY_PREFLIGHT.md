@@ -81,7 +81,7 @@ Then run the real read-only preflight only when the intended backend/WING
 session is ready. The real run must point at the offline plan generated above
 with `--expected-plan`; if the flag is omitted, or if the runtime arguments or
 request sequence do not match that plan, the runner fails closed before opening
-WebSocket:
+WebSocket and writes `operator_next_step` in `summary.json`:
 
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \

@@ -531,6 +531,28 @@ def validate_expected_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> li
     return violations
 
 
+def expected_plan_operator_next_step(reason: str) -> str:
+    if reason == "expected_plan_missing":
+        return (
+            "Run the read-only preflight runner with --plan-only to generate "
+            "the offline expected plan, then rerun the real preflight with "
+            "--expected-plan pointing to that file."
+        )
+    if reason == "expected_plan_missing_or_invalid":
+        return (
+            "Regenerate the offline expected plan from the same channel, value "
+            "type, artifact-root, and operator-confirmation arguments, then "
+            "rerun the real preflight with --expected-plan."
+        )
+    if reason == "expected_plan_mismatch":
+        return (
+            "Regenerate or select the expected plan that exactly matches the "
+            "current runtime arguments and prestart contract before opening "
+            "the backend/WING WebSocket."
+        )
+    return "Resolve the expected-plan gate before opening the backend/WING WebSocket."
+
+
 async def run(args: argparse.Namespace) -> int:
     validation_error = validate_args(args)
     if args.plan_only:
@@ -614,6 +636,9 @@ async def run(args: argparse.Namespace) -> int:
                 "reason": "expected_plan_missing",
                 "expected_plan_match": False,
                 "expected_plan_violations": ["expected_plan_missing"],
+                "operator_next_step": expected_plan_operator_next_step(
+                    "expected_plan_missing"
+                ),
             }
         )
         recorder.write_summary(summary)
@@ -635,6 +660,9 @@ async def run(args: argparse.Namespace) -> int:
                         "type": type(exc).__name__,
                         "message": str(exc),
                     },
+                    "operator_next_step": expected_plan_operator_next_step(
+                        "expected_plan_missing_or_invalid"
+                    ),
                 }
             )
             recorder.write_summary(summary)
@@ -653,6 +681,9 @@ async def run(args: argparse.Namespace) -> int:
                 {
                     "status": "blocked",
                     "reason": "expected_plan_mismatch",
+                    "operator_next_step": expected_plan_operator_next_step(
+                        "expected_plan_mismatch"
+                    ),
                 }
             )
             recorder.write_summary(summary)

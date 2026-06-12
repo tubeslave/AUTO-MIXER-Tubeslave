@@ -926,6 +926,46 @@ async def test_readonly_preflight_requires_expected_plan_before_websocket(
     assert_summary_prestart_contract(summary)
     assert summary["expected_plan_match"] is False
     assert summary["expected_plan_violations"] == ["expected_plan_missing"]
+    assert "--plan-only" in summary["operator_next_step"]
+    assert "--expected-plan" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_reports_invalid_expected_plan_next_step_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"invalid expected-plan must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    expected_plan = tmp_path / "invalid-expected-plan.json"
+    expected_plan.write_text("{not json", encoding="utf-8")
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "expected_plan_missing_or_invalid"
+    assert summary["expected_plan_match"] is False
+    assert summary["expected_plan_error"]["type"] == "JSONDecodeError"
+    assert "Regenerate the offline expected plan" in summary["operator_next_step"]
+    assert "--expected-plan" in summary["operator_next_step"]
     assert summary["sent_request_types"] == []
 
 
@@ -972,6 +1012,8 @@ async def test_readonly_preflight_blocks_expected_plan_mismatch_before_websocket
     assert summary["expected_plan_match"] is False
     assert "expected_plan_channels_mismatch" in summary["expected_plan_violations"]
     assert "expected_plan_request_sequence_mismatch" in summary["expected_plan_violations"]
+    assert "current runtime arguments" in summary["operator_next_step"]
+    assert "backend/WING WebSocket" in summary["operator_next_step"]
     assert summary["sent_request_types"] == []
 
 
@@ -1030,6 +1072,8 @@ async def test_readonly_preflight_blocks_stale_prestart_detail_plan_before_webso
     assert "expected_plan_backend_port_prestart_check_failure_detail_fields_mismatch" in (
         summary["expected_plan_violations"]
     )
+    assert "prestart contract" in summary["operator_next_step"]
+    assert "backend/WING WebSocket" in summary["operator_next_step"]
     assert summary["sent_request_types"] == []
 
 
