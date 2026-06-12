@@ -3737,23 +3737,37 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             )
     if len(operator_sequence) < 8:
         violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
-    operator_sequence_supervised_prestart_gate_step = next(
+    operator_sequence_supervised_prestart_gate_step_index = next(
         (
-            str(item)
-            for item in operator_sequence
+            index
+            for index, item in enumerate(operator_sequence)
             if all(
                 marker in str(item)
                 for marker in WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
             )
         ),
-        "",
+        None,
+    )
+    operator_sequence_supervised_prestart_gate_step = (
+        str(operator_sequence[operator_sequence_supervised_prestart_gate_step_index])
+        if operator_sequence_supervised_prestart_gate_step_index is not None
+        else ""
     )
     operator_sequence_has_supervised_prestart_gate = bool(
         operator_sequence_supervised_prestart_gate_step
     )
+    operator_sequence_supervised_prestart_gate_is_final = (
+        operator_sequence_supervised_prestart_gate_step_index == len(operator_sequence) - 1
+        if operator_sequence_has_supervised_prestart_gate
+        else False
+    )
     if not operator_sequence_has_supervised_prestart_gate:
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_missing"
+        )
+    elif not operator_sequence_supervised_prestart_gate_is_final:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
         )
     if packet.get("next_manual_artifact_required") != (
         "real wing_readonly_preflight.v1 summary.json"
@@ -3836,6 +3850,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["operator_sequence_supervised_prestart_gate_step"] = (
         operator_sequence_supervised_prestart_gate_step
+    )
+    detail["operator_sequence_supervised_prestart_gate_step_index"] = (
+        operator_sequence_supervised_prestart_gate_step_index
+    )
+    detail["operator_sequence_supervised_prestart_gate_is_final"] = (
+        operator_sequence_supervised_prestart_gate_is_final
     )
     detail["required_supervised_prestart_gate_markers"] = list(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
@@ -10908,6 +10928,12 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "operator_sequence_supervised_prestart_gate_step": (
                 str(detail.get("operator_sequence_supervised_prestart_gate_step") or "")
             ),
+            "operator_sequence_supervised_prestart_gate_step_index": (
+                detail.get("operator_sequence_supervised_prestart_gate_step_index")
+            ),
+            "operator_sequence_supervised_prestart_gate_is_final": (
+                detail.get("operator_sequence_supervised_prestart_gate_is_final") is True
+            ),
             "required_supervised_prestart_gate_markers": (
                 list(detail.get("required_supervised_prestart_gate_markers"))
                 if isinstance(
@@ -14141,6 +14167,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_has_supervised_prestart_gate']).lower()}`",
                 "- operator_sequence_supervised_prestart_gate_step: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_step']}`",
+                "- operator_sequence_supervised_prestart_gate_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_step_index']}`",
+                "- operator_sequence_supervised_prestart_gate_is_final: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_is_final']).lower()}`",
                 "- required_supervised_prestart_gate_markers: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_markers'])}`",
                 "- violations: "
