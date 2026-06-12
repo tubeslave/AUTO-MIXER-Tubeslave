@@ -154,6 +154,11 @@ The same `supervised_prestart_gate` must show
 `supervised_prestart_gate.operator_sequence_step_index: 9` and
 `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
 
+It must also show
+`supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready`
+and
+`supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`.
+
 ## Autonomy Budget Rule
 
 Automated cycles may continue without asking "continue?", but they must be

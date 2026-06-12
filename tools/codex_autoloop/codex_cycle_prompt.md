@@ -146,19 +146,22 @@ blockers выше.
 9. verify `supervised_prestart_gate.grants_live_authority: false`;
 10. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
-11. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-12. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+11. verify `supervised_prestart_gate.requires_operator_decision_status:
+   accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
+   Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
+12. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+13. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-13. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+14. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-14. run dry-run recommendation;
-15. require explicit operator approval for the exact action;
-16. apply only bounded supervised fader/gain action;
-17. read back the result;
-18. test rollback;
-19. record proof artifact.
+15. run dry-run recommendation;
+16. require explicit operator approval for the exact action;
+17. apply only bounded supervised fader/gain action;
+18. read back the result;
+19. test rollback;
+20. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -229,6 +232,11 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `supervised_prestart_gate` must show
   `supervised_prestart_gate.operator_sequence_step_index: 9` and
   `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
+- Before any supervised fader/gain proof, the structured
+  `supervised_prestart_gate` must show
+  `supervised_prestart_gate.requires_operator_decision_status:
+  accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
+  Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `mvp_blocker_anchor_matches_current_first_open: true`,
   `mvp_blocker_anchor_sha256_matches_current_first_open: true`,

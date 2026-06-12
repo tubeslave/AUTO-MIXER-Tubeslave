@@ -102,6 +102,14 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_action"]
     )
     assert (
+        "supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+        in directive["selected_action"]
+    )
+    assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in directive["selected_action"]
     )
@@ -246,11 +254,23 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "supervised_prestart_gate.grants_live_authority: false" in prompt
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in prompt
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in prompt
+    assert (
+        "supervised_prestart_gate.requires_operator_decision_status:"
+        in prompt
+    )
+    assert "accepted_decision_ready" in prompt
+    assert "supervised_prestart_gate.unlocks_runbook:" in prompt
+    assert "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md" in prompt
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readme
     assert (
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in readme
     )
+    assert (
+        "supervised_prestart_gate.requires_operator_decision_status:"
+        in readme
+    )
+    assert "supervised_prestart_gate.unlocks_runbook:" in readme
     assert "mvp_blocker_anchor_matches_current_first_open: true" in prompt
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in prompt
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in prompt

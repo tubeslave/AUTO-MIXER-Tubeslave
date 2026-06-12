@@ -152,6 +152,13 @@ you want the background automation active.
   `supervised_prestart_gate.operator_sequence_step_index: 9` and
   `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
   These fields keep the supervised gate aligned with the final operator step.
+- Before any supervised fader/gain proof, the structured
+  `supervised_prestart_gate` must also show
+  `supervised_prestart_gate.requires_operator_decision_status:
+  accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
+  Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`.
+  These fields keep the gate tied to an accepted decision and the supervised
+  fader/gain proof runbook only.
 - Before any supervised fader/gain proof, the no-WING handoff summary must also
   show `mvp_blocker_anchor_matches_current_first_open: true`,
   `mvp_blocker_anchor_sha256_matches_current_first_open: true`,

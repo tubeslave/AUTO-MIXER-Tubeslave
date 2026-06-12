@@ -50,6 +50,14 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "supervised_prestart_gate.grants_live_authority: false" in text
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
+    assert (
+        "supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready"
+        in text
+    )
+    assert (
+        "supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+        in text
+    )
     assert "grants_live_authority: true" in text
     assert "Docs/CORRECTION_METHODS_ROADMAP.md" in text
 
@@ -138,6 +146,14 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["next action"]
     )
     assert (
+        "supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready"
+        in rows[0]["next action"]
+    )
+    assert (
+        "supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+        in rows[0]["next action"]
+    )
+    assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in rows[0]["next action"]
     )
@@ -218,6 +234,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in readonly
     )
+    assert "supervised_prestart_gate.requires_operator_decision_status:" in readonly
+    assert "accepted_decision_ready" in readonly
+    assert "supervised_prestart_gate.unlocks_runbook:" in readonly
+    assert "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md" in readonly
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in readonly
@@ -266,6 +286,14 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in report
     assert (
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
+        in report
+    )
+    assert (
+        "supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready"
+        in report
+    )
+    assert (
+        "supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
         in report
     )
     assert "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true" in report
@@ -328,6 +356,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "supervised_prestart_gate.grants_live_authority: false" in text
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
+    assert "supervised_prestart_gate.requires_operator_decision_status:" in text
+    assert "supervised_prestart_gate.unlocks_runbook:" in text
 
 
 def test_docs_index_points_to_current_wing_mvp_prestart_gate():
@@ -398,6 +428,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_SUPERVISED_GATE_FINAL_STEP_CONTRACT_NEXT_ACTION_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_SUPERVISED_GATE_DECISION_RUNBOOK_CONTRACT_NEXT_ACTION_20260612.md"
         in text
     )
     assert (
