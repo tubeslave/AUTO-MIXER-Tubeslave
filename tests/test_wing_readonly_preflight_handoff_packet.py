@@ -84,6 +84,13 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["operator_sequence"][0].startswith(
         "Before starting the intended backend/WING session"
     )
+    supervised_gate_step = packet["operator_sequence"][-1]
+    assert "accepted_decision_ready" in supervised_gate_step
+    assert "valid accepted-candidate prestart trace" in supervised_gate_step
+    assert "WING_SUPERVISED_FADER_GAIN_PROOF" in supervised_gate_step
+    rendered = handoff.render_markdown(packet)
+    assert "valid accepted-candidate prestart trace" in rendered
+    assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rendered
     assert "--decision-template-output" in packet["commands"][
         "review_artifact_and_write_pending_decision_template"
     ]
