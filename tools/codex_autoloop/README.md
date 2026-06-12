@@ -176,6 +176,10 @@ you want the background automation active.
   `live_write: false`.
   This keeps the handoff packet from being treated as a live-write artifact.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `mutates_console_state: false`.
+  This keeps the handoff packet from being treated as console mutation
+  evidence.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

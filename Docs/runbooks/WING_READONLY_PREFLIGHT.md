@@ -357,6 +357,7 @@ The handoff validation must report:
 - `readiness_closure_allowed_by_packet: false`
 - `read_only: true`
 - `live_write: false`
+- `mutates_console_state: false`
 - `execution_allowed_by_packet: false`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`

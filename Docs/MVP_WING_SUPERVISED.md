@@ -138,6 +138,8 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while the no-WING handoff summary does not show
   `live_write: false`.
 - A supervised proof is planned while the no-WING handoff summary does not show
+  `mutates_console_state: false`.
+- A supervised proof is planned while the no-WING handoff summary does not show
   `execution_allowed_by_packet: false`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `supervised_prestart_gate` exactly matching
@@ -212,6 +214,8 @@ The no-WING handoff summary must also show
 The no-WING handoff summary must also show `read_only: true`.
 
 The no-WING handoff summary must also show `live_write: false`.
+
+The no-WING handoff summary must also show `mutates_console_state: false`.
 
 The no-WING handoff summary must also show
 `execution_allowed_by_packet: false`.
