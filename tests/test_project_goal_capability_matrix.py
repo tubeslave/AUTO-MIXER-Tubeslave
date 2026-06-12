@@ -247,6 +247,17 @@ def test_full_autonomous_and_broad_console_writes_remain_blocked():
     assert scene.current_live_write_kinds == ()
 
 
+def test_supervised_automix_goal_requires_wing_candidate_prestart_trace():
+    row = get_project_goal_capability("mode_supervised_automix")
+
+    assert row is not None
+    assert row.autonomy_mode_ceiling == "supervised_narrow"
+    assert row.current_live_write_kinds == CURRENT_PROVEN_LIVE_WRITE_KINDS
+    assert "accepted-candidate prestart trace" in row.next_step
+    assert "read-only preflight review" in row.next_step
+    assert "before widening" in row.next_step
+
+
 def test_console_read_parameters_tracks_physical_readback_capture_plan():
     row = get_project_goal_capability("console_read_parameters")
 

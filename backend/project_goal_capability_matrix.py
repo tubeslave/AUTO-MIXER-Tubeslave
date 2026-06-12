@@ -110,7 +110,11 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         support_paths=("backend/operator_mode_policy.py", "backend/autofoh_safety.py"),
         current_live_write_kinds=CURRENT_PROVEN_LIVE_WRITE_KINDS,
         blocker="Only narrow fader/gain surfaces are allowed; broad processing families need proof.",
-        next_step="Add fake-mixer and physical proof one action family at a time before widening.",
+        next_step=(
+            "Add fake-mixer and physical proof one action family at a time "
+            "before widening; WING physical proof steps also require an "
+            "accepted-candidate prestart trace from read-only preflight review."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="mode_full_autonomous",
