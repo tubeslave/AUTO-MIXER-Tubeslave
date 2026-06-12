@@ -88,7 +88,25 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in supervised_gate_step
+    assert packet["supervised_prestart_gate"] == {
+        "required": True,
+        "operator_sequence_step_index": 8,
+        "operator_sequence_step_must_be_final": True,
+        "operator_sequence_step": supervised_gate_step,
+        "required_markers": [
+            "accepted_decision_ready",
+            "valid accepted-candidate prestart trace",
+            "WING_SUPERVISED_FADER_GAIN_PROOF",
+        ],
+        "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
+        "grants_live_authority": False,
+        "requires_operator_decision_status": "accepted_decision_ready",
+        "requires_accepted_candidate_prestart_trace": True,
+    }
     rendered = handoff.render_markdown(packet)
+    assert "## Supervised Prestart Gate" in rendered
+    assert "operator_sequence_step_must_be_final: `true`" in rendered
+    assert "grants_live_authority: `false`" in rendered
     assert "valid accepted-candidate prestart trace" in rendered
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rendered
     assert "--decision-template-output" in packet["commands"][

@@ -958,6 +958,24 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
         ],
+        "supervised_prestart_gate": {
+            "required": True,
+            "operator_sequence_step_index": 8,
+            "operator_sequence_step_must_be_final": True,
+            "operator_sequence_step": (
+                "Only after accepted_decision_ready and a valid accepted-candidate "
+                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+            ),
+            "required_markers": [
+                "accepted_decision_ready",
+                "valid accepted-candidate prestart trace",
+                "WING_SUPERVISED_FADER_GAIN_PROOF",
+            ],
+            "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
+            "grants_live_authority": False,
+            "requires_operator_decision_status": "accepted_decision_ready",
+            "requires_accepted_candidate_prestart_trace": True,
+        },
         "required_review_checklist_ids": [
             "confirm_artifact_paths",
             "confirm_operator_channel_scope",
@@ -2361,6 +2379,16 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     )
     assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 8
     assert result.detail["operator_sequence_supervised_prestart_gate_is_final"] is True
+    assert result.detail["supervised_prestart_gate"] == result.detail[
+        "expected_supervised_prestart_gate"
+    ]
+    assert result.detail["supervised_prestart_gate"][
+        "operator_sequence_step_index"
+    ] == 8
+    assert result.detail["supervised_prestart_gate"][
+        "operator_sequence_step_must_be_final"
+    ] is True
+    assert result.detail["supervised_prestart_gate"]["grants_live_authority"] is False
     assert result.detail["required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
@@ -2470,6 +2498,33 @@ def test_no_wing_release_check_rejects_handoff_packet_with_nonfinal_supervised_p
     assert result.detail["operator_sequence_supervised_prestart_gate_is_final"] is False
     assert (
         "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_without_structured_supervised_prestart_gate(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-without-structured-prestart-gate.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload.pop("supervised_prestart_gate")
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
+    assert result.detail["supervised_prestart_gate"] == {}
+    assert (
+        "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_contract_mismatch"
         in result.detail["violations"]
     )
 

@@ -198,6 +198,16 @@ def build_handoff_packet(
     generated_at: str | None = None,
 ) -> dict[str, Any]:
     channel_numbers = _validate_channels(channels)
+    supervised_gate_step_index = 8
+    supervised_gate_step = (
+        "Only after accepted_decision_ready and a valid accepted-candidate "
+        "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+    )
+    supervised_gate_markers = [
+        "accepted_decision_ready",
+        "valid accepted-candidate prestart trace",
+        "WING_SUPERVISED_FADER_GAIN_PROOF",
+    ]
     preview = plan_command(
         url=url,
         channels=channels,
@@ -278,11 +288,19 @@ def build_handoff_packet(
             "Run review_artifact_and_write_pending_decision_template.",
             "Edit the pending decision template into an accepted or rejected JSON record.",
             "Run review_edited_decision_json.",
-            (
-                "Only after accepted_decision_ready and a valid accepted-candidate "
-                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
-            ),
+            supervised_gate_step,
         ],
+        "supervised_prestart_gate": {
+            "required": True,
+            "operator_sequence_step_index": supervised_gate_step_index,
+            "operator_sequence_step_must_be_final": True,
+            "operator_sequence_step": supervised_gate_step,
+            "required_markers": supervised_gate_markers,
+            "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
+            "grants_live_authority": False,
+            "requires_operator_decision_status": "accepted_decision_ready",
+            "requires_accepted_candidate_prestart_trace": True,
+        },
         "required_review_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
         "forbidden_live_request_types": list(FORBIDDEN_LIVE_REQUEST_TYPES),
         "blockers_not_closed_by_packet": list(NOT_CLOSED_BLOCKERS),
@@ -334,6 +352,32 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
     ]
     for index, item in enumerate(packet.get("operator_sequence") or [], start=1):
         lines.append(f"{index}. {item}")
+    supervised_gate = (
+        packet.get("supervised_prestart_gate")
+        if isinstance(packet.get("supervised_prestart_gate"), Mapping)
+        else {}
+    )
+    if supervised_gate:
+        lines.extend(
+            [
+                "",
+                "## Supervised Prestart Gate",
+                "",
+                f"- required: `{str(supervised_gate.get('required')).lower()}`",
+                "- operator_sequence_step_index: "
+                f"`{supervised_gate.get('operator_sequence_step_index')}`",
+                "- operator_sequence_step_must_be_final: "
+                f"`{str(supervised_gate.get('operator_sequence_step_must_be_final')).lower()}`",
+                "- requires_operator_decision_status: "
+                f"`{supervised_gate.get('requires_operator_decision_status')}`",
+                "- requires_accepted_candidate_prestart_trace: "
+                f"`{str(supervised_gate.get('requires_accepted_candidate_prestart_trace')).lower()}`",
+                f"- unlocks_runbook: `{supervised_gate.get('unlocks_runbook')}`",
+                f"- grants_live_authority: `{str(supervised_gate.get('grants_live_authority')).lower()}`",
+                "- required_markers: "
+                f"`{json.dumps(supervised_gate.get('required_markers') or [])}`",
+            ]
+        )
     lines.extend(["", "## Commands", ""])
     for name in (
         "prestart_backend_port_check",
