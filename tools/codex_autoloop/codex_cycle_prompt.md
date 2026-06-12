@@ -136,25 +136,27 @@ blockers выше.
    matching `expected_backend_port_prestart_gate`;
 5. verify `backend_port_prestart_gate.grants_live_authority: false` and
    `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`;
-6. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+6. verify `backend_port_prestart_gate.operator_sequence_step_index: 0` and
+   `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`;
+7. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
-7. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+8. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-8. verify `supervised_prestart_gate.grants_live_authority: false`;
-9. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-10. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+9. verify `supervised_prestart_gate.grants_live_authority: false`;
+10. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+11. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-11. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+12. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-12. run dry-run recommendation;
-13. require explicit operator approval for the exact action;
-14. apply only bounded supervised fader/gain action;
-15. read back the result;
-16. test rollback;
-17. record proof artifact.
+13. run dry-run recommendation;
+14. require explicit operator approval for the exact action;
+15. apply only bounded supervised fader/gain action;
+16. read back the result;
+17. test rollback;
+18. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -209,6 +211,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `expected_backend_port_prestart_gate`,
   `backend_port_prestart_gate.grants_live_authority: false`, and
   `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`.
+- Before any supervised fader/gain proof, the structured
+  `backend_port_prestart_gate` must show
+  `backend_port_prestart_gate.operator_sequence_step_index: 0` and
+  `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_must_be_first_operator_step: true`, and

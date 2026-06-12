@@ -43,6 +43,13 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_gate.must_pass_before_backend_wing_session: true" in directive[
         "selected_action"
     ]
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in directive[
+        "selected_action"
+    ]
+    assert (
+        "backend_port_prestart_gate.operator_sequence_step_must_be_first: true"
+        in directive["selected_action"]
+    )
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
     ]
@@ -201,6 +208,8 @@ def test_prompt_and_readme_document_project_director_agent():
         "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
         in prompt
     )
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in prompt
+    assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in prompt
@@ -209,6 +218,11 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "backend_port_prestart_gate.grants_live_authority: false" in readme
     assert (
         "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in readme
+    )
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in readme
+    assert (
+        "backend_port_prestart_gate.operator_sequence_step_must_be_first: true"
         in readme
     )
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme

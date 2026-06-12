@@ -43,6 +43,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
         in text
     )
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in text
+    assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in text
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
@@ -75,6 +77,13 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_gate.must_pass_before_backend_wing_session: true" in rows[
         0
     ]["next action"]
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in rows[
+        0
+    ]["next action"]
+    assert (
+        "backend_port_prestart_gate.operator_sequence_step_must_be_first: true"
+        in rows[0]["next action"]
+    )
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in rows[0][
         "next action"
     ]
@@ -189,6 +198,11 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
         in readonly
     )
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in readonly
+    assert (
+        "backend_port_prestart_gate.operator_sequence_step_must_be_first: true"
+        in readonly
+    )
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
@@ -220,6 +234,11 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "backend_port_prestart_gate.grants_live_authority: false" in report
     assert (
         "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in report
+    )
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in report
+    assert (
+        "backend_port_prestart_gate.operator_sequence_step_must_be_first: true"
         in report
     )
     assert "mvp_blocker_anchor" in report
@@ -285,6 +304,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
         "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
         in text
     )
+    assert "backend_port_prestart_gate.operator_sequence_step_index: 0" in text
+    assert "backend_port_prestart_gate.operator_sequence_step_must_be_first: true" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
 
 
@@ -324,6 +345,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BLOCKER_BACKEND_PRESTART_NEXT_ACTION_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_GATE_STEP_CONTRACT_NEXT_ACTION_20260612.md"
         in text
     )
     assert (

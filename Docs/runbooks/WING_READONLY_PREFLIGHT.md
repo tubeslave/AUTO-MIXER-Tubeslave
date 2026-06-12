@@ -333,6 +333,8 @@ The handoff validation must report:
   `expected_backend_port_prestart_gate`
 - `backend_port_prestart_gate.grants_live_authority: false`
 - `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`
+- `backend_port_prestart_gate.operator_sequence_step_index: 0`
+- `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`
