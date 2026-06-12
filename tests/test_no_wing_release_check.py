@@ -7863,6 +7863,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "forbidden_live_request_types": ["apply_operator_proposal"],
             "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
             "operator_sequence_count": 9,
+            "operator_sequence_has_supervised_prestart_gate": True,
+            "required_supervised_prestart_gate_markers": [
+                "accepted_decision_ready",
+                "valid accepted-candidate prestart trace",
+                "WING_SUPERVISED_FADER_GAIN_PROOF",
+            ],
             "violations": [],
         },
     )
@@ -7905,6 +7911,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     ]
     assert artifact["review_command_writes_decision_template"] is True
     assert artifact["operator_sequence_count"] == 9
+    assert artifact["operator_sequence_has_supervised_prestart_gate"] is True
+    assert artifact["required_supervised_prestart_gate_markers"] == [
+        "accepted_decision_ready",
+        "valid accepted-candidate prestart trace",
+        "WING_SUPERVISED_FADER_GAIN_PROOF",
+    ]
     assert artifact["violations"] == []
     assert "## WING Read-Only Preflight Handoff Packet Artifact" in markdown_summary
     assert "expected_plan_required_for_real_run: `true`" in markdown_summary
@@ -7923,6 +7935,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "execution_allowed_by_packet: `false`" in markdown_summary
     assert "preview_command_uses_plan_only: `true`" in markdown_summary
     assert "capture_command_requires_physical_readback: `true`" in markdown_summary
+    assert "operator_sequence_has_supervised_prestart_gate: `true`" in markdown_summary
+    assert "required_supervised_prestart_gate_markers" in markdown_summary
+    assert "valid accepted-candidate prestart trace" in markdown_summary
     assert "physical_console_readback_proof" in markdown_summary
 
 
