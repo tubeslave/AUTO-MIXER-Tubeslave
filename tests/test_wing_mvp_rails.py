@@ -54,6 +54,11 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_READONLY_PREFLIGHT_OPERATOR_CONFIRMATION_20260607.md"
         in rows[0]["evidence"]
     )
+    assert "accepted-candidate prestart trace" in rows[0]["next action"]
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in rows[0]["next action"]
+    )
     assert all(row["status"] != "closed" for row in rows)
     assert progress.first_open_blocker(rows)["blocker"] == "WING read-only connection proof"
 
@@ -86,6 +91,11 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "Total blockers: 9" in report
     assert "Closed blockers: 0" in report
     assert "Current first open blocker: WING read-only connection proof" in report
+    assert "accepted-candidate prestart trace" in report
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in report
+    )
     assert "Offline tooling, shadow" in report
 
     output = tmp_path / "MVP_PROGRESS_LATEST.md"

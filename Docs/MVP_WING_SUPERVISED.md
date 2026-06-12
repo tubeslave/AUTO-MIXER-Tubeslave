@@ -99,6 +99,9 @@ Stop the current Codex work direction and return to the first open blocker if:
   available for manual review.
 - A supervised proof is planned before the clean read-only preflight candidate
   has an accepted review decision record.
+- A supervised proof is planned while accepted review source ids lack a valid
+  accepted-candidate prestart trace, or while the proof plan still carries
+  `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
 
 This is not a stop to development. Codex must continue uninterrupted Goal-mode
 work, but only on the first non-closed MVP blocker.
@@ -108,6 +111,12 @@ work, but only on the first non-closed MVP blocker.
 Run the read-only preflight runbook when WING Rack and backend are ready:
 
 `Docs/runbooks/WING_READONLY_PREFLIGHT.md`
+
+Before any supervised proof, accepted review source ids must have a valid
+accepted-candidate prestart trace from read-only preflight review. If that trace
+is missing or invalid, the proof plan must keep
+`accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
+as an operator blocker.
 
 ## Autonomy Budget Rule
 

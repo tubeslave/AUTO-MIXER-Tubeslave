@@ -35,6 +35,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "tools/no_wing_release_check.py --quick" in directive["selected_action"]
     assert "before starting the intended backend/WING session" in directive["selected_action"]
     assert "`Docs/runbooks/WING_READONLY_PREFLIGHT.md`" in directive["selected_action"]
+    assert "accepted-candidate prestart trace" in directive["selected_action"]
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in directive["selected_action"]
+    )
     assert directive["stop_broad_work"] is True
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]

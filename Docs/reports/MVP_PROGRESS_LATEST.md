@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-06-11T22:45:16Z`
+Generated: `2026-06-12T06:44:54Z`
 
 ## Current MVP
 
@@ -11,13 +11,13 @@ Supervised WING Rack proof.
 - Total blockers: 9
 - Closed blockers: 0
 - Current first open blocker: WING read-only connection proof
-- Next required action: Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`.
+- Next required action: Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, accepted review source ids must have a valid accepted-candidate prestart trace; otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers.
 
 ## Blockers
 
 | Blocker | Status | Next action |
 | --- | --- | --- |
-| WING read-only connection proof | tooling_ready_waits_real_wing | Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. |
+| WING read-only connection proof | tooling_ready_waits_real_wing | Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, accepted review source ids must have a valid accepted-candidate prestart trace; otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers. |
 | Physical console readback proof | tooling_ready_waits_real_wing | Run read-only preflight with `--require-physical-readback` and review summary plus `events.jsonl`. |
 | Supervised fader write proof | blocked_by_readonly_preflight | After clean read-only preflight review and an accepted decision JSON, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type fader`. |
 | Supervised gain-down / trim proof | blocked_by_readonly_preflight | After clean read-only preflight review and an accepted decision JSON, run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type gain` with a negative delta only. |
