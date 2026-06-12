@@ -170,6 +170,8 @@ you want the background automation active.
   These fields prove only that the offline handoff packet still points at the
   current first WING MVP blocker and keeps supervised proof planning behind a
   valid accepted-candidate prestart trace; they do not grant live authority.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `operator_sequence_count: 10`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
 - Before any supervised fader/gain proof, the
