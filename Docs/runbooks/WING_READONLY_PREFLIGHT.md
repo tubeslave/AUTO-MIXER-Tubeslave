@@ -352,6 +352,7 @@ The handoff validation must report:
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `fail_closed_reason`, and `operator_next_step`
+- `manual_review_required_before_readiness_update: true`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`

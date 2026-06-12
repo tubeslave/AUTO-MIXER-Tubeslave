@@ -157,6 +157,10 @@ you want the background automation active.
   `fail_closed_reason`, and `operator_next_step`.
   This preserves the fail-closed review evidence when the prestart check
   detects unexpected listeners.
+- Before any readiness update, the no-WING handoff summary must show
+  `manual_review_required_before_readiness_update: true`.
+  This keeps offline handoff packets from being treated as accepted real WING
+  proof.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
