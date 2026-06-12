@@ -87,6 +87,8 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "review_wing_readonly_preflight_artifacts.py" in readonly
     assert "--require-physical-readback" in readonly
     assert "--operator-confirm-channels" in readonly
+    assert "--value-types fader,gain,pan" in readonly
+    assert "--value-types fader,gain \\" not in readonly
     assert "--execute" not in readonly
     assert "write_request_sent: false" in readonly
     assert "operator_confirmed_channels == channels" in readonly

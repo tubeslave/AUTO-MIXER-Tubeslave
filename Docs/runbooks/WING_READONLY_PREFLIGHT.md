@@ -75,7 +75,7 @@ python3 tools/wing_readonly_preflight_runner.py \
   --channels 3 \
   --operator-confirm-channels 3 \
   --operator-confirm-session-ready \
-  --value-types fader,gain \
+  --value-types fader,gain,pan \
   --require-physical-readback \
   --artifact-root artifacts/wing_readonly_preflight \
   --plan-only \
@@ -94,7 +94,7 @@ python3 tools/wing_readonly_preflight_runner.py \
   --channels 3 \
   --operator-confirm-channels 3 \
   --operator-confirm-session-ready \
-  --value-types fader,gain \
+  --value-types fader,gain,pan \
   --require-physical-readback \
   --artifact-root artifacts/wing_readonly_preflight \
   --expected-plan artifacts/wing_readonly_preflight_plan/latest_plan.json
