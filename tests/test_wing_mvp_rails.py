@@ -88,6 +88,11 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in rows[0][
         "next action"
     ]
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in rows[0][
+        "next action"
+    ]
+    assert "mvp_blocker_anchor_sha256" in rows[0]["next action"]
+    assert "current first open blocker" in rows[0]["next action"]
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in rows[0][
         "next action"
     ]
