@@ -2962,6 +2962,13 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         else []
     )
     artifacts = evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
+    artifact_operator_next_steps: list[str] = []
+    for artifact in artifacts:
+        if not isinstance(artifact, Mapping):
+            continue
+        operator_next_step = str(artifact.get("operator_next_step") or "")
+        if operator_next_step and operator_next_step not in artifact_operator_next_steps:
+            artifact_operator_next_steps.append(operator_next_step)
     capture_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_RUNNER_TOOL).is_file()
     review_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL).is_file()
     handoff_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL).is_file()
@@ -3158,6 +3165,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["mvp_blocker_matrix_ids"] = matrix_ids
     detail["latest_valid_candidate_run_id"] = summary.get("latest_valid_candidate_run_id")
+    detail["artifact_operator_next_steps"] = artifact_operator_next_steps
     detail["capture_tool_path"] = WING_READONLY_PREFLIGHT_RUNNER_TOOL
     detail["capture_tool_available"] = capture_tool_available
     detail["plan_command"] = plan_command
@@ -10605,6 +10613,7 @@ def wing_readonly_preflight_evidence_summary(
         matrix_ids = detail.get("mvp_blocker_matrix_ids")
         closed_ids = detail.get("mvp_blockers_closed_by_evidence")
         violations = detail.get("violations")
+        artifact_operator_next_steps = detail.get("artifact_operator_next_steps")
         plan_command = detail.get("plan_command")
         capture_command = detail.get("capture_command_template")
         review_command = detail.get("review_command")
@@ -10662,6 +10671,11 @@ def wing_readonly_preflight_evidence_summary(
                 list(matrix_ids) if isinstance(matrix_ids, list) else []
             ),
             "latest_valid_candidate_run_id": detail.get("latest_valid_candidate_run_id"),
+            "artifact_operator_next_steps": (
+                list(artifact_operator_next_steps)
+                if isinstance(artifact_operator_next_steps, list)
+                else []
+            ),
             "capture_tool_path": detail.get("capture_tool_path"),
             "capture_tool_available": detail.get("capture_tool_available") is True,
             "plan_command": (
@@ -14034,6 +14048,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['mvp_blockers_closed_by_evidence'])}`",
                 "- latest_valid_candidate_run_id: "
                 f"`{wing_readonly_preflight['latest_valid_candidate_run_id']}`",
+                "- artifact_operator_next_steps: "
+                f"`{json.dumps(wing_readonly_preflight['artifact_operator_next_steps'])}`",
                 f"- capture_tool_path: `{wing_readonly_preflight['capture_tool_path']}`",
                 "- capture_tool_available: "
                 f"`{str(wing_readonly_preflight['capture_tool_available']).lower()}`",

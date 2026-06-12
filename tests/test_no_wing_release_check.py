@@ -572,6 +572,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["full_autonomous_ready"] is False
     assert result.detail["mvp_blocker_candidate_count"] == 0
     assert result.detail["mvp_blockers_closed_by_evidence"] == []
+    assert result.detail["artifact_operator_next_steps"] == []
     assert result.detail["mvp_blocker_matrix_ids"] == [
         "wing_readonly_connection_proof",
         "physical_console_readback_proof",
@@ -709,6 +710,55 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "operator_must_run_wing_readonly_preflight_runner"
     ]
     assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_surfaces_wing_preflight_artifact_operator_next_steps(
+    monkeypatch,
+):
+    evidence = release_check.build_wing_readonly_preflight_evidence()
+    evidence["artifacts"] = [
+        {
+            "source_id": "artifacts/wing_readonly_preflight/run/summary.json",
+            "status": "invalid_readonly_preflight_artifact",
+            "accepted_as_readonly_preflight_candidate": False,
+            "operator_next_step": (
+                "Regenerate the offline expected plan before opening the "
+                "backend/WING WebSocket."
+            ),
+            "violations": ["expected_plan_mismatch"],
+        },
+        {
+            "source_id": "artifacts/wing_readonly_preflight/run/retry-summary.json",
+            "status": "invalid_readonly_preflight_artifact",
+            "accepted_as_readonly_preflight_candidate": False,
+            "operator_next_step": (
+                "Regenerate the offline expected plan before opening the "
+                "backend/WING WebSocket."
+            ),
+            "violations": ["expected_plan_mismatch"],
+        },
+    ]
+    evidence["summary"]["artifact_count"] = 2
+    evidence["summary"]["invalid_candidate_count"] = 2
+    evidence["summary"]["blocked_by"] = [
+        "operator_must_replace_invalid_readonly_preflight_artifact"
+    ]
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_evidence",
+        lambda: evidence,
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["artifact_operator_next_steps"] == [
+        "Regenerate the offline expected plan before opening the "
+        "backend/WING WebSocket."
+    ]
+    assert "wing_readonly_preflight_invalid_artifacts_present" in result.detail[
+        "violations"
+    ]
 
 
 def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
@@ -7557,6 +7607,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "readiness_matrix_update_based_on_real_proof",
             ],
             "latest_valid_candidate_run_id": None,
+            "artifact_operator_next_steps": [
+                "Regenerate the offline expected plan before opening the backend/WING WebSocket."
+            ],
             "capture_tool_path": "tools/wing_readonly_preflight_runner.py",
             "capture_tool_available": True,
             "plan_command": [
@@ -7812,11 +7865,16 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert preflight["handoff_packet_channels"] == "3"
     assert preflight["handoff_packet_channel_matches_capture"] is True
+    assert preflight["artifact_operator_next_steps"] == [
+        "Regenerate the offline expected plan before opening the backend/WING WebSocket."
+    ]
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
     assert "## WING Read-Only Preflight Evidence" in markdown_summary
     assert "readiness_closure_allowed_by_evidence: `false`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
     assert "readiness_update_candidate_available: `false`" in markdown_summary
+    assert "artifact_operator_next_steps" in markdown_summary
+    assert "Regenerate the offline expected plan" in markdown_summary
     assert "capture_tool_path: `tools/wing_readonly_preflight_runner.py`" in markdown_summary
     assert "plan_command_uses_plan_only: `true`" in markdown_summary
     assert "wing_readonly_preflight_plan/latest_plan.json" in markdown_summary
