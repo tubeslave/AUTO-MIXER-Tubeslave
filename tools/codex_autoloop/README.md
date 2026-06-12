@@ -170,6 +170,9 @@ you want the background automation active.
   This keeps packet handoff review from being treated as blocker-closure
   authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `live_write: false`.
+  This keeps the handoff packet from being treated as a live-write artifact.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

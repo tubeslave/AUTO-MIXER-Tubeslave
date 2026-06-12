@@ -80,6 +80,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "readiness_closure_allowed_by_packet: false" in directive[
         "selected_action"
     ]
+    assert "live_write: false" in directive["selected_action"]
     assert "execution_allowed_by_packet: false" in directive["selected_action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
@@ -283,6 +284,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "manual_review_required_before_readiness_update: true" in prompt
     assert "readiness_matrix_update_allowed_by_packet: false" in prompt
     assert "readiness_closure_allowed_by_packet: false" in prompt
+    assert "live_write: false" in prompt
     assert "execution_allowed_by_packet: false" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_check_operator_sequence_step" in prompt
@@ -314,6 +316,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "manual_review_required_before_readiness_update: true" in readme
     assert "readiness_matrix_update_allowed_by_packet: false" in readme
     assert "readiness_closure_allowed_by_packet: false" in readme
+    assert "live_write: false" in readme
     assert "execution_allowed_by_packet: false" in readme
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme
     assert "backend_port_prestart_check_operator_sequence_step" in readme
