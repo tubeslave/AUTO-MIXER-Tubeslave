@@ -85,6 +85,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "operator_confirmed_channels == channels" in readonly
     assert "strict `send`/`recv` pairs" in readonly
     assert "channel, value type, and address" in readonly
+    assert "final handoff operator-sequence step" in readonly
+    assert "operator_sequence_has_supervised_prestart_gate" in readonly
+    assert "operator_sequence_supervised_prestart_gate_is_final" in readonly
+    assert "valid accepted-candidate prestart trace" in readonly
     assert "wing_operator_proposal_validation_runner.py" in supervised
     assert "--execute" in supervised
     assert "blocked until a clean read-only preflight" in supervised

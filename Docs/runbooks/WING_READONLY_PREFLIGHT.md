@@ -229,7 +229,9 @@ python3 tools/review_wing_readonly_preflight_decisions.py \
 
 Exit codes:
 
-- `0`: an accepted decision is ready for the next manual WING MVP step;
+- `0`: an accepted decision is ready for the next manual WING MVP step only
+  when the generated handoff keeps the supervised-proof transition behind a
+  final accepted-candidate prestart gate;
 - `2`: no clean preflight candidate exists yet;
 - `3`: the decision record is missing, incomplete, invalid, or unsafe;
 - `4`: the operator rejected the candidate, so supervised proof remains blocked.
@@ -292,7 +294,20 @@ Then update:
 
 ## Next Step
 
-Only after a clean artifact is manually reviewed and an accepted decision JSON
-is recorded, continue to:
+Only after a clean artifact is manually reviewed, an accepted decision JSON is
+recorded, and the no-WING release handoff proves the supervised prestart gate,
+continue to:
 
 `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`
+
+The handoff validation must report:
+
+- the final handoff operator-sequence step contains the supervised prestart gate
+- `operator_sequence_has_supervised_prestart_gate: true`
+- `operator_sequence_supervised_prestart_gate_is_final: true`
+- `operator_sequence_supervised_prestart_gate_step` includes
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `WING_SUPERVISED_FADER_GAIN_PROOF`
+
+Until those markers are present in the final operator step, the result remains a
+read-only proof artifact and grants no supervised write authority.
