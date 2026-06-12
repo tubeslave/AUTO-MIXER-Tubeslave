@@ -48,6 +48,19 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in directive["selected_action"]
     )
+    assert directive["selected_evidence_file_count"] == len(directive["selected_evidence_files"])
+    assert (
+        "tools/build_wing_readonly_preflight_handoff_packet.py"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "backend/wing_readonly_preflight_review_decision.py"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_PACKET_20260607.md"
+        in directive["selected_evidence_files"]
+    )
     assert directive["stop_broad_work"] is True
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]
@@ -72,6 +85,28 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert any("Develop correction methods" in item for item in directive["allowed_scope"])
 
 
+def test_project_director_derives_required_files_from_selected_blocker_evidence():
+    director = load_director_module()
+
+    evidence_files = director.extract_evidence_files(
+        "`tools/example.py`; `backend/example_contract.py`; "
+        "`Docs/runbooks/EXAMPLE.md`; `Docs/reports/example.md`; "
+        "`tools/example.py`; plain_text"
+    )
+
+    assert evidence_files == [
+        "tools/example.py",
+        "backend/example_contract.py",
+        "Docs/runbooks/EXAMPLE.md",
+        "Docs/reports/example.md",
+    ]
+    assert director.required_file_candidates_from_evidence(evidence_files) == [
+        "tools/example.py",
+        "backend/example_contract.py",
+        "Docs/runbooks/EXAMPLE.md",
+    ]
+
+
 def test_project_director_markdown_is_operator_readable():
     director = load_director_module()
     directive = {
@@ -84,6 +119,8 @@ def test_project_director_markdown_is_operator_readable():
         "selected_blocker": "WING read-only connection proof",
         "selected_blocker_status": "tooling_ready_waits_real_wing",
         "selected_action": "Run read-only preflight.",
+        "selected_evidence_file_count": 1,
+        "selected_evidence_files": ["tools/wing_readonly_preflight_runner.py"],
         "allowed_scope": ["Work only on the selected first non-closed MVP blocker."],
         "forbidden_scope": ["No queue-import chains."],
         "required_files": ["Docs/MVP_WING_SUPERVISED.md"],
@@ -94,6 +131,9 @@ def test_project_director_markdown_is_operator_readable():
     assert "# Project Director Agent Directive" in markdown
     assert "Selected blocker" in markdown
     assert "Continue Goal mode: `true`" in markdown
+    assert "Selected evidence file count: `1`" in markdown
+    assert "## Selected Evidence Files" in markdown
+    assert "tools/wing_readonly_preflight_runner.py" in markdown
     assert "No queue-import chains." in markdown
     assert "does not grant live readiness" in markdown
 

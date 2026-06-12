@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,10 +25,38 @@ import update_mvp_progress  # noqa: E402
 
 
 DEFAULT_OUTPUT = PROJECT_ROOT / ".paperclip" / "reports" / "project_director_latest.md"
+EVIDENCE_PATH_RE = re.compile(r"`([^`]+)`")
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def unique_ordered(items: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def extract_evidence_files(evidence_text: str) -> list[str]:
+    return unique_ordered(
+        match.group(1)
+        for match in EVIDENCE_PATH_RE.finditer(evidence_text)
+        if "/" in match.group(1)
+    )
+
+
+def required_file_candidates_from_evidence(evidence_files: Sequence[str]) -> list[str]:
+    return [
+        path
+        for path in evidence_files
+        if path.startswith(("backend/", "tools/", "Docs/runbooks/"))
+    ]
 
 
 def build_directive(*, project_root: Path, lookback_commits: int, report_limit: int) -> dict:
@@ -46,40 +75,16 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         selected_blocker = first_open["blocker"]
         selected_action = first_open["next action"]
         selected_status = first_open["status"]
+        selected_evidence_files = extract_evidence_files(first_open["evidence"])
     else:
         selected_blocker = "none"
         selected_action = "All MVP blockers are closed; prepare operator review before widening scope."
         selected_status = "closed"
+        selected_evidence_files = []
 
     stop_broad_work = bool(guard_report["stop_the_line"]) or selected_status != "closed"
-    return {
-        "type": "project_director_directive",
-        "generated_at": utc_now(),
-        "current_mvp": "supervised_wing_rack_proof",
-        "guard_status": guard_report["status"],
-        "guard_score": guard_report["score"],
-        "guard_stop_the_line": guard_report["stop_the_line"],
-        "continue_goal_mode": True,
-        "stop_scope": "broad_work_only",
-        "selected_blocker": selected_blocker,
-        "selected_blocker_status": selected_status,
-        "selected_action": selected_action,
-        "stop_broad_work": stop_broad_work,
-        "allowed_scope": [
-            "Continue uninterrupted Goal-mode development.",
-            "Work only on the selected first non-closed MVP blocker.",
-            "Develop correction methods only when they support that blocker or stay offline/proposal-only.",
-            "Use docs/runbooks and real WING artifacts when hardware is connected.",
-            "Keep all live writes behind explicit supervised operator approval.",
-        ],
-        "forbidden_scope": [
-            "No new memory-trust chains unless they close the selected blocker.",
-            "No new queue-import chains unless they close the selected blocker.",
-            "No new result-consumer/report-only/read-model work unless it closes the selected blocker.",
-            "No live EQ/dynamics/routing/mute/FX/scene/matrix/DCA/autonomous writes.",
-            "Do not close readiness from offline, shadow, or candidate evidence.",
-        ],
-        "required_files": [
+    required_files = unique_ordered(
+        [
             "Docs/MVP_WING_SUPERVISED.md",
             ".ai/project-layer/wing_mvp_blockers.md",
             "Docs/CORRECTION_METHODS_ROADMAP.md",
@@ -95,7 +100,39 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
             "tools/no_wing_release_check.py",
             "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
             "Docs/reports/MVP_PROGRESS_LATEST.md",
+            *required_file_candidates_from_evidence(selected_evidence_files),
+        ]
+    )
+    return {
+        "type": "project_director_directive",
+        "generated_at": utc_now(),
+        "current_mvp": "supervised_wing_rack_proof",
+        "guard_status": guard_report["status"],
+        "guard_score": guard_report["score"],
+        "guard_stop_the_line": guard_report["stop_the_line"],
+        "continue_goal_mode": True,
+        "stop_scope": "broad_work_only",
+        "selected_blocker": selected_blocker,
+        "selected_blocker_status": selected_status,
+        "selected_action": selected_action,
+        "selected_evidence_file_count": len(selected_evidence_files),
+        "selected_evidence_files": selected_evidence_files,
+        "stop_broad_work": stop_broad_work,
+        "allowed_scope": [
+            "Continue uninterrupted Goal-mode development.",
+            "Work only on the selected first non-closed MVP blocker.",
+            "Develop correction methods only when they support that blocker or stay offline/proposal-only.",
+            "Use docs/runbooks and real WING artifacts when hardware is connected.",
+            "Keep all live writes behind explicit supervised operator approval.",
         ],
+        "forbidden_scope": [
+            "No new memory-trust chains unless they close the selected blocker.",
+            "No new queue-import chains unless they close the selected blocker.",
+            "No new result-consumer/report-only/read-model work unless it closes the selected blocker.",
+            "No live EQ/dynamics/routing/mute/FX/scene/matrix/DCA/autonomous writes.",
+            "Do not close readiness from offline, shadow, or candidate evidence.",
+        ],
+        "required_files": required_files,
     }
 
 
@@ -115,6 +152,7 @@ def render_markdown(directive: dict) -> str:
         f"- Selected blocker: `{directive['selected_blocker']}`",
         f"- Blocker status: `{directive['selected_blocker_status']}`",
         f"- Selected action: {directive['selected_action']}",
+        f"- Selected evidence file count: `{directive.get('selected_evidence_file_count', 0)}`",
         "",
         "## Allowed Scope",
         "",
@@ -124,6 +162,9 @@ def render_markdown(directive: dict) -> str:
     lines.extend(f"- {item}" for item in directive["forbidden_scope"])
     lines.extend(["", "## Required Files", ""])
     lines.extend(f"- `{item}`" for item in directive["required_files"])
+    if directive.get("selected_evidence_files"):
+        lines.extend(["", "## Selected Evidence Files", ""])
+        lines.extend(f"- `{item}`" for item in directive["selected_evidence_files"])
     lines.extend(
         [
             "",

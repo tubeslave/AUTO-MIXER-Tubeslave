@@ -140,6 +140,39 @@ project_director_latest.md
     assert report["summary"]["mixed_item_count"] == 0
 
 
+def test_direction_guard_ignores_truncated_project_director_json_forbidden_scope():
+    guard = load_guard_module()
+
+    report = guard.analyze_evidence(
+        [
+            (
+                "report:.paperclip/reports/project_director_latest.md",
+                """
+project_director_latest.md
+{
+  "type": "project_director_directive",
+  "selected_blocker": "WING read-only connection proof",
+  "selected_action": "Run `Docs/runbooks/WING_READONLY_PREFLIGHT.md` before supervised fader proof.",
+  "forbidden_scope": [
+    "No new memory-trust chains unless they close the selected blocker.",
+    "No new queue-import chains unless they close the selected blocker.",
+    "No new result-consumer/report-only/read-model work unless it closes the selected blocker."
+  ],
+  "selected_evidence_files": [
+    "tools/wing_readonly_preflight_runner.py",
+    "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_RUNNER_20260606.md"
+""",
+            ),
+            ("git_log", "Add WING read-only preflight selected evidence files"),
+            ("report", "physical readback and timeout fail-closed proof context"),
+        ]
+    )
+
+    assert report["status"] == "on_target"
+    assert report["summary"]["drift_item_count"] == 0
+    assert report["summary"]["mixed_item_count"] == 0
+
+
 def test_direction_guard_ignores_generated_guard_evidence_sections_when_scoring_drift():
     guard = load_guard_module()
 

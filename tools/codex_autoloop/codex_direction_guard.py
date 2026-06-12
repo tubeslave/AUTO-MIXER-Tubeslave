@@ -183,6 +183,7 @@ def text_without_markdown_sections(text: str, section_titles: Iterable[str]) -> 
 
 
 def text_without_json_policy_fields(text: str) -> str:
+    line_filtered = text_without_json_policy_array_lines(text)
     stripped = text.lstrip()
     prefix = ""
     json_text = stripped
@@ -196,7 +197,7 @@ def text_without_json_policy_fields(text: str) -> str:
     try:
         payload = json.loads(json_text)
     except json.JSONDecodeError:
-        return text
+        return line_filtered
     if isinstance(payload, dict):
         payload = dict(payload)
         payload.pop("forbidden_scope", None)
@@ -204,6 +205,29 @@ def text_without_json_policy_fields(text: str) -> str:
         filtered = json.dumps(payload, ensure_ascii=False, sort_keys=True)
         return f"{prefix}\n{filtered}" if prefix else filtered
     return text
+
+
+def text_without_json_policy_array_lines(text: str) -> str:
+    lines: list[str] = []
+    skipping_policy_array = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not skipping_policy_array and (
+            stripped.startswith('"forbidden_scope":')
+            or stripped.startswith('"forbidden_next_actions":')
+        ):
+            skipping_policy_array = stripped.endswith("[") or stripped.endswith("[,")
+            if not skipping_policy_array and stripped.endswith("[]"):
+                continue
+            if not skipping_policy_array:
+                continue
+            continue
+        if skipping_policy_array:
+            if stripped in {"]", "],"}:
+                skipping_policy_array = False
+            continue
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def is_generated_direction_guard_report(source: str, text: str) -> bool:
