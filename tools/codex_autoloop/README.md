@@ -187,6 +187,9 @@ you want the background automation active.
   `executes_tests: false`.
   This keeps the no-WING packet from being treated as validation evidence.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `operator_required: true`.
+  This keeps the no-WING packet tied to explicit operator action.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
