@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import importlib.util
 import json
 import os
@@ -512,6 +513,11 @@ def _extract_backtick_paths(text: str) -> list[str]:
         seen.add(path)
         paths.append(path)
     return paths
+
+
+def wing_mvp_blocker_anchor_sha256(anchor: Mapping[str, object]) -> str:
+    canonical = json.dumps(anchor, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def wing_mvp_first_open_blocker_anchor(
@@ -3699,6 +3705,19 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         else {}
     )
     expected_mvp_blocker_anchor = wing_mvp_first_open_blocker_anchor()
+    mvp_blocker_anchor_sha256 = (
+        str(packet.get("mvp_blocker_anchor_sha256"))
+        if isinstance(packet.get("mvp_blocker_anchor_sha256"), str)
+        else ""
+    )
+    actual_mvp_blocker_anchor_sha256 = (
+        wing_mvp_blocker_anchor_sha256(mvp_blocker_anchor)
+        if mvp_blocker_anchor
+        else ""
+    )
+    expected_mvp_blocker_anchor_sha256 = wing_mvp_blocker_anchor_sha256(
+        expected_mvp_blocker_anchor
+    )
     required_checklist = (
         packet.get("required_review_checklist_ids")
         if isinstance(packet.get("required_review_checklist_ids"), list)
@@ -3996,6 +4015,14 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_closes_blocker"
         )
+    if not mvp_blocker_anchor_sha256:
+        violations.append("wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_sha256_missing")
+    elif mvp_blocker_anchor_sha256 != actual_mvp_blocker_anchor_sha256:
+        violations.append("wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_sha256_mismatch")
+    if mvp_blocker_anchor_sha256 != expected_mvp_blocker_anchor_sha256:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_mvp_blocker_anchor_sha256_mismatch"
+        )
 
     detail["packet_type"] = packet.get("type")
     detail["packet_status"] = packet.get("status")
@@ -4111,6 +4138,15 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["expected_mvp_blocker_anchor"] = dict(expected_mvp_blocker_anchor)
     detail["mvp_blocker_anchor_matches_current_first_open"] = (
         dict(mvp_blocker_anchor) == expected_mvp_blocker_anchor
+    )
+    detail["mvp_blocker_anchor_sha256"] = mvp_blocker_anchor_sha256
+    detail["actual_mvp_blocker_anchor_sha256"] = actual_mvp_blocker_anchor_sha256
+    detail["expected_mvp_blocker_anchor_sha256"] = expected_mvp_blocker_anchor_sha256
+    detail["mvp_blocker_anchor_sha256_matches_anchor"] = (
+        mvp_blocker_anchor_sha256 == actual_mvp_blocker_anchor_sha256
+    )
+    detail["mvp_blocker_anchor_sha256_matches_current_first_open"] = (
+        mvp_blocker_anchor_sha256 == expected_mvp_blocker_anchor_sha256
     )
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
@@ -11244,6 +11280,21 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "mvp_blocker_anchor_matches_current_first_open": (
                 detail.get("mvp_blocker_anchor_matches_current_first_open") is True
             ),
+            "mvp_blocker_anchor_sha256": str(
+                detail.get("mvp_blocker_anchor_sha256") or ""
+            ),
+            "actual_mvp_blocker_anchor_sha256": str(
+                detail.get("actual_mvp_blocker_anchor_sha256") or ""
+            ),
+            "expected_mvp_blocker_anchor_sha256": str(
+                detail.get("expected_mvp_blocker_anchor_sha256") or ""
+            ),
+            "mvp_blocker_anchor_sha256_matches_anchor": (
+                detail.get("mvp_blocker_anchor_sha256_matches_anchor") is True
+            ),
+            "mvp_blocker_anchor_sha256_matches_current_first_open": (
+                detail.get("mvp_blocker_anchor_sha256_matches_current_first_open") is True
+            ),
             "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
             "operator_sequence_has_supervised_prestart_gate": (
                 detail.get("operator_sequence_has_supervised_prestart_gate") is True
@@ -14521,6 +14572,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['blockers_not_closed_by_packet'])}`",
                 "- mvp_blocker_anchor_matches_current_first_open: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_matches_current_first_open']).lower()}`",
+                "- mvp_blocker_anchor_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_sha256']}`",
+                "- expected_mvp_blocker_anchor_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_mvp_blocker_anchor_sha256']}`",
+                "- mvp_blocker_anchor_sha256_matches_current_first_open: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_sha256_matches_current_first_open']).lower()}`",
                 "- mvp_blocker_anchor: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor'])}`",
                 "- expected_mvp_blocker_anchor: "

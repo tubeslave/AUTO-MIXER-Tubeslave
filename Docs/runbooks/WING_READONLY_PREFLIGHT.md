@@ -66,7 +66,9 @@ python3 tools/build_wing_readonly_preflight_handoff_packet.py \
 The packet must also render `mvp_blocker_anchor` for the current first open row
 in `.ai/project-layer/wing_mvp_blockers.md`. The no-WING validator must report
 `mvp_blocker_anchor_matches_current_first_open: true`; otherwise the handoff is
-stale and cannot gate supervised proof planning.
+stale and cannot gate supervised proof planning. The packet must also include a
+matching `mvp_blocker_anchor_sha256` so reviewers can compare the displayed
+anchor with the exact blocker-row digest.
 
 Replace channel `3` with the operator-approved channel:
 
@@ -330,6 +332,7 @@ The handoff validation must report:
 - `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
+- `mvp_blocker_anchor_sha256_matches_current_first_open: true`
 - `mvp_blocker_anchor.packet_does_not_close_blocker: true`
 - the final handoff operator-sequence step contains the supervised prestart gate
 - `operator_sequence_has_supervised_prestart_gate: true`

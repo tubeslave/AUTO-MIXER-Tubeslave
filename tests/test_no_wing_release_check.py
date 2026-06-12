@@ -1007,6 +1007,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             ],
         },
         "mvp_blocker_anchor": release_check.wing_mvp_first_open_blocker_anchor(),
+        "mvp_blocker_anchor_sha256": release_check.wing_mvp_blocker_anchor_sha256(
+            release_check.wing_mvp_first_open_blocker_anchor()
+        ),
         "operator_sequence": [
             (
                 "Before starting the intended backend/WING session, run "
@@ -2526,6 +2529,19 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         release_check.wing_mvp_first_open_blocker_anchor()
     )
     assert result.detail["mvp_blocker_anchor_matches_current_first_open"] is True
+    assert result.detail["mvp_blocker_anchor_sha256"] == (
+        release_check.wing_mvp_blocker_anchor_sha256(
+            result.detail["mvp_blocker_anchor"]
+        )
+    )
+    assert result.detail["actual_mvp_blocker_anchor_sha256"] == result.detail[
+        "mvp_blocker_anchor_sha256"
+    ]
+    assert result.detail["expected_mvp_blocker_anchor_sha256"] == result.detail[
+        "mvp_blocker_anchor_sha256"
+    ]
+    assert result.detail["mvp_blocker_anchor_sha256_matches_anchor"] is True
+    assert result.detail["mvp_blocker_anchor_sha256_matches_current_first_open"] is True
     assert (
         result.detail["mvp_blocker_anchor"]["selected_blocker"]
         == "WING read-only connection proof"
@@ -2592,6 +2608,41 @@ def test_no_wing_release_check_rejects_stale_handoff_packet_mvp_blocker_anchor(
     )
     assert (
         "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_closes_blocker"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_mvp_blocker_anchor_digest_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-anchor-digest-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["mvp_blocker_anchor_sha256"] = "0" * 64
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["mvp_blocker_anchor_matches_current_first_open"] is True
+    assert result.detail["mvp_blocker_anchor_sha256_matches_anchor"] is False
+    assert (
+        result.detail["mvp_blocker_anchor_sha256_matches_current_first_open"]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_sha256_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_expected_mvp_blocker_anchor_sha256_mismatch"
         in result.detail["violations"]
     )
 

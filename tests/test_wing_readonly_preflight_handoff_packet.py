@@ -86,6 +86,11 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["mvp_blocker_anchor"] == (
         no_wing_release_check.wing_mvp_first_open_blocker_anchor()
     )
+    assert packet["mvp_blocker_anchor_sha256"] == (
+        no_wing_release_check.wing_mvp_blocker_anchor_sha256(
+            packet["mvp_blocker_anchor"]
+        )
+    )
     assert (
         packet["mvp_blocker_anchor"]["selected_blocker"]
         == "WING read-only connection proof"
@@ -149,6 +154,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "## MVP Blocker Anchor" in rendered
     assert "WING read-only connection proof" in rendered
     assert "selected_evidence_file_count" in rendered
+    assert "mvp_blocker_anchor_sha256" in rendered
+    assert packet["mvp_blocker_anchor_sha256"] in rendered
     assert "tools/wing_readonly_preflight_runner.py" in rendered
     assert "actual_matches_expected: `true`" in rendered
     assert "operator_sequence_step_must_be_final: `true`" in rendered

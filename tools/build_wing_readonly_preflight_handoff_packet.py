@@ -279,6 +279,9 @@ def build_handoff_packet(
         decision_review_output=decision_review_output,
     )
     mvp_blocker_anchor = no_wing_release_check.wing_mvp_first_open_blocker_anchor()
+    mvp_blocker_anchor_sha256 = no_wing_release_check.wing_mvp_blocker_anchor_sha256(
+        mvp_blocker_anchor
+    )
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
@@ -325,6 +328,7 @@ def build_handoff_packet(
             "focused_validation": list(FOCUSED_VALIDATION_COMMAND),
         },
         "mvp_blocker_anchor": mvp_blocker_anchor,
+        "mvp_blocker_anchor_sha256": mvp_blocker_anchor_sha256,
         "operator_sequence": [
             prestart_step,
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
@@ -522,6 +526,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 f"`{blocker_anchor.get('selected_evidence_file_count')}`",
                 "- packet_does_not_close_blocker: "
                 f"`{str(blocker_anchor.get('packet_does_not_close_blocker')).lower()}`",
+                "- mvp_blocker_anchor_sha256: "
+                f"`{packet.get('mvp_blocker_anchor_sha256')}`",
                 "",
                 "### Selected Evidence Files",
                 "",
