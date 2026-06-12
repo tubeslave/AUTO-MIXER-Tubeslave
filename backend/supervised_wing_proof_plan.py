@@ -30,6 +30,17 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_wing_readonly_preflight_review_decision_ledger,
     )
 
+try:
+    from wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    )
+
 
 SUPERVISED_WING_PROOF_PLAN_METHOD_ID = "supervised_wing_proof_plan"
 READONLY_PREFLIGHT_CANDIDATE_BLOCKER = (
@@ -37,6 +48,9 @@ READONLY_PREFLIGHT_CANDIDATE_BLOCKER = (
 )
 READONLY_PREFLIGHT_REVIEW_DECISION_BLOCKER = (
     "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+)
+READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
+    "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
 )
 PLAN_STATUSES = {
     "operator_proof_required",
@@ -194,9 +208,12 @@ def _review_decision_summary(overlay: Mapping[str, Any]) -> Mapping[str, Any]:
 
 def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> bool:
     summary = _review_decision_summary(overlay)
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
     return (
         summary.get("manual_readiness_update_candidate_available") is True
         and int(summary.get("accepted_record_count") or 0) > 0
+        and bool(accepted_source_ids)
+        and _accepted_candidate_prestart_source_ids(summary) == accepted_source_ids
         and int(summary.get("invalid_record_count") or 0) == 0
         and int(summary.get("unreviewed_candidate_count") or 0) == 0
         and summary.get("readiness_matrix_update_allowed_by_decision") is not True
@@ -212,6 +229,39 @@ def _readonly_preflight_review_decision_status(overlay: Mapping[str, Any]) -> An
 
 def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
+
+
+def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[str]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    if not accepted_source_ids:
+        return []
+    rows = summary.get("candidate_reviews")
+    if not isinstance(rows, list):
+        return []
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in rows
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    valid_source_ids: list[str] = []
+    for source_id in accepted_source_ids:
+        row = rows_by_source.get(source_id)
+        if not isinstance(row, Mapping):
+            continue
+        if row.get("backend_port_prestart_check_required") is not True:
+            continue
+        if row.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
+            continue
+        if _string_list(row.get("backend_port_prestart_check_command")) != list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ):
+            continue
+        if _string_list(row.get("backend_port_prestart_check_failure_detail_fields")) != list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ):
+            continue
+        valid_source_ids.append(source_id)
+    return valid_source_ids
 
 
 def _row_by_value_type(evidence_snapshot: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
@@ -444,6 +494,14 @@ def build_supervised_wing_proof_plan(
     )
     review_summary = _review_decision_summary(review_decision)
     review_decision_accepted = _readonly_preflight_review_decision_accepted(review_decision)
+    accepted_candidate_prestart_source_ids = _accepted_candidate_prestart_source_ids(
+        review_summary
+    )
+    accepted_source_ids = _string_list(review_summary.get("accepted_source_ids"))
+    candidate_prestart_contract_valid = (
+        bool(accepted_source_ids)
+        and accepted_candidate_prestart_source_ids == accepted_source_ids
+    )
     preflight_steps: Tuple[WingReadonlyPreflightPlanStep, ...] = ()
     if invalid:
         steps: Tuple[WingProofPlanStep, ...] = ()
@@ -467,9 +525,15 @@ def build_supervised_wing_proof_plan(
     elif not review_decision_accepted:
         steps = ()
         status = "manual_review_ready"
+        review_blockers = _string_list(review_summary.get("blocked_by"))
+        if accepted_source_ids and not candidate_prestart_contract_valid:
+            review_blockers = [
+                READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+                *review_blockers,
+            ]
         global_blockers = [
             READONLY_PREFLIGHT_REVIEW_DECISION_BLOCKER,
-            *_string_list(review_summary.get("blocked_by")),
+            *review_blockers,
         ]
     else:
         steps = _build_steps(
@@ -537,6 +601,12 @@ def build_supervised_wing_proof_plan(
             ),
             "readonly_preflight_review_decision_accepted_source_ids": _string_list(
                 review_summary.get("accepted_source_ids")
+            ),
+            "readonly_preflight_review_decision_candidate_prestart_contract_valid": (
+                candidate_prestart_contract_valid
+            ),
+            "readonly_preflight_review_decision_candidate_prestart_source_ids": (
+                accepted_candidate_prestart_source_ids
             ),
             "readonly_preflight_review_decision_rejected_source_ids": _string_list(
                 review_summary.get("rejected_source_ids")

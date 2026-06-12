@@ -9156,6 +9156,8 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_review_decision_blocked_by: list[str] = []
     readonly_preflight_review_decision_accepted_record_count = 0
     readonly_preflight_review_decision_accepted_source_ids: list[str] = []
+    readonly_preflight_review_decision_candidate_prestart_contract_valid = False
+    readonly_preflight_review_decision_candidate_prestart_source_ids: list[str] = []
     readonly_preflight_review_decision_rejected_source_ids: list[str] = []
     readonly_preflight_review_decision_invalid_record_count = 0
     readonly_preflight_review_decision_invalid_record_ids: list[str] = []
@@ -9287,6 +9289,27 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             if isinstance(summary.get("readonly_preflight_review_decision_accepted_source_ids"), list)
             else []
         )
+        readonly_preflight_review_decision_candidate_prestart_contract_valid = (
+            summary.get(
+                "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+            )
+            is True
+        )
+        readonly_preflight_review_decision_candidate_prestart_source_ids = (
+            [
+                str(item)
+                for item in summary.get(
+                    "readonly_preflight_review_decision_candidate_prestart_source_ids",
+                    [],
+                )
+                if item
+            ]
+            if isinstance(
+                summary.get("readonly_preflight_review_decision_candidate_prestart_source_ids"),
+                list,
+            )
+            else []
+        )
         readonly_preflight_review_decision_rejected_source_ids = (
             [
                 str(item)
@@ -9400,9 +9423,64 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 violations.append("next_wing_proof_plan_review_decision_status_mismatch")
             if readonly_preflight_review_decision_blocked_by != _string_list(review_summary.get("blocked_by")):
                 violations.append("next_wing_proof_plan_review_decision_blockers_mismatch")
+            candidate_reviews = (
+                review_summary.get("candidate_reviews")
+                if isinstance(review_summary.get("candidate_reviews"), list)
+                else []
+            )
+            candidate_rows_by_source = {
+                str(row.get("source_id")): row
+                for row in candidate_reviews
+                if isinstance(row, Mapping) and row.get("source_id")
+            }
+            expected_candidate_prestart_source_ids = []
+            for source_id in _string_list(review_summary.get("accepted_source_ids")):
+                row = candidate_rows_by_source.get(source_id)
+                if not isinstance(row, Mapping):
+                    continue
+                if row.get("backend_port_prestart_check_required") is not True:
+                    continue
+                if (
+                    row.get(
+                        "backend_port_prestart_check_must_pass_before_starting_backend"
+                    )
+                    is not True
+                ):
+                    continue
+                if _string_list(row.get("backend_port_prestart_check_command")) != list(
+                    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+                ):
+                    continue
+                if _string_list(
+                    row.get("backend_port_prestart_check_failure_detail_fields")
+                ) != list(
+                    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                ):
+                    continue
+                expected_candidate_prestart_source_ids.append(source_id)
+            expected_candidate_prestart_contract_valid = (
+                bool(_string_list(review_summary.get("accepted_source_ids")))
+                and expected_candidate_prestart_source_ids
+                == _string_list(review_summary.get("accepted_source_ids"))
+            )
+            if (
+                readonly_preflight_review_decision_candidate_prestart_contract_valid
+                != expected_candidate_prestart_contract_valid
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_prestart_contract_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_prestart_source_ids
+                != expected_candidate_prestart_source_ids
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_prestart_sources_mismatch"
+                )
             expected_decision_accepted = (
                 review_summary.get("manual_readiness_update_candidate_available") is True
                 and int(review_summary.get("accepted_record_count") or 0) > 0
+                and expected_candidate_prestart_contract_valid
                 and int(review_summary.get("invalid_record_count") or 0) == 0
                 and int(review_summary.get("unreviewed_candidate_count") or 0) == 0
                 and review_summary.get("readiness_matrix_update_allowed_by_decision") is not True
@@ -9624,6 +9702,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_review_decision_accepted_source_ids"] = (
         readonly_preflight_review_decision_accepted_source_ids
+    )
+    detail["readonly_preflight_review_decision_candidate_prestart_contract_valid"] = (
+        readonly_preflight_review_decision_candidate_prestart_contract_valid
+    )
+    detail["readonly_preflight_review_decision_candidate_prestart_source_ids"] = (
+        readonly_preflight_review_decision_candidate_prestart_source_ids
     )
     detail["readonly_preflight_review_decision_rejected_source_ids"] = (
         readonly_preflight_review_decision_rejected_source_ids
@@ -13171,6 +13255,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         readonly_preflight_review_decision_blocked_by = detail.get(
             "readonly_preflight_review_decision_blocked_by"
         )
+        readonly_preflight_review_decision_candidate_prestart_source_ids = detail.get(
+            "readonly_preflight_review_decision_candidate_prestart_source_ids"
+        )
         global_blockers = detail.get("global_blockers")
         violations = detail.get("violations")
         return {
@@ -13244,6 +13331,20 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                 list(detail.get("readonly_preflight_review_decision_accepted_source_ids"))
                 if isinstance(
                     detail.get("readonly_preflight_review_decision_accepted_source_ids"),
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_candidate_prestart_contract_valid": (
+                detail.get(
+                    "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+                )
+                is True
+            ),
+            "readonly_preflight_review_decision_candidate_prestart_source_ids": (
+                list(readonly_preflight_review_decision_candidate_prestart_source_ids)
+                if isinstance(
+                    readonly_preflight_review_decision_candidate_prestart_source_ids,
                     list,
                 )
                 else []
@@ -15578,6 +15679,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{next_plan['readonly_preflight_review_decision_accepted_record_count']}`",
                 "- readonly_preflight_review_decision_accepted_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_source_ids'])}`",
+                "- readonly_preflight_review_decision_candidate_prestart_contract_valid: "
+                f"`{str(next_plan['readonly_preflight_review_decision_candidate_prestart_contract_valid']).lower()}`",
+                "- readonly_preflight_review_decision_candidate_prestart_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_candidate_prestart_source_ids'])}`",
                 "- readonly_preflight_review_decision_rejected_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_rejected_source_ids'])}`",
                 "- readonly_preflight_review_decision_invalid_record_count: "
