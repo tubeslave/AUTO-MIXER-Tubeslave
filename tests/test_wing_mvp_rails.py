@@ -67,6 +67,14 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["evidence"]
     )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
+    assert "backend_port_prestart_gate" in rows[0]["next action"]
+    assert "expected_backend_port_prestart_gate" in rows[0]["next action"]
+    assert "backend_port_prestart_gate.grants_live_authority: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_gate.must_pass_before_backend_wing_session: true" in rows[
+        0
+    ]["next action"]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in rows[0]["next action"]
@@ -78,6 +86,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     for row in (fader_row, gain_row):
         assert row["status"] == "blocked_by_readonly_preflight"
         assert "accepted decision JSON" in row["next action"]
+        assert "backend_port_prestart_gate" in row["next action"]
+        assert "expected_backend_port_prestart_gate" in row["next action"]
+        assert "without live authority" in row["next action"]
         assert "final handoff operator-sequence step" in row["next action"]
         assert "valid accepted-candidate prestart trace" in row["next action"]
         assert "supervised_prestart_gate" in row["next action"]
@@ -148,6 +159,13 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "Total blockers: 9" in report
     assert "Closed blockers: 0" in report
     assert "Current first open blocker: WING read-only connection proof" in report
+    assert "backend_port_prestart_gate" in report
+    assert "expected_backend_port_prestart_gate" in report
+    assert "backend_port_prestart_gate.grants_live_authority: false" in report
+    assert (
+        "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in report
+    )
     assert "accepted-candidate prestart trace" in report
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
@@ -229,6 +247,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_READONLY_HANDOFF_STRUCTURED_PRESTART_GATE_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BLOCKER_BACKEND_PRESTART_NEXT_ACTION_20260612.md"
         in text
     )
     assert (
