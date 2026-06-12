@@ -208,6 +208,17 @@ def build_handoff_packet(
         "valid accepted-candidate prestart trace",
         "WING_SUPERVISED_FADER_GAIN_PROOF",
     ]
+    expected_supervised_gate = {
+        "required": True,
+        "operator_sequence_step_index": supervised_gate_step_index,
+        "operator_sequence_step_must_be_final": True,
+        "operator_sequence_step": supervised_gate_step,
+        "required_markers": supervised_gate_markers,
+        "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
+        "grants_live_authority": False,
+        "requires_operator_decision_status": "accepted_decision_ready",
+        "requires_accepted_candidate_prestart_trace": True,
+    }
     preview = plan_command(
         url=url,
         channels=channels,
@@ -290,17 +301,8 @@ def build_handoff_packet(
             "Run review_edited_decision_json.",
             supervised_gate_step,
         ],
-        "supervised_prestart_gate": {
-            "required": True,
-            "operator_sequence_step_index": supervised_gate_step_index,
-            "operator_sequence_step_must_be_final": True,
-            "operator_sequence_step": supervised_gate_step,
-            "required_markers": supervised_gate_markers,
-            "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
-            "grants_live_authority": False,
-            "requires_operator_decision_status": "accepted_decision_ready",
-            "requires_accepted_candidate_prestart_trace": True,
-        },
+        "supervised_prestart_gate": dict(expected_supervised_gate),
+        "expected_supervised_prestart_gate": dict(expected_supervised_gate),
         "required_review_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
         "forbidden_live_request_types": list(FORBIDDEN_LIVE_REQUEST_TYPES),
         "blockers_not_closed_by_packet": list(NOT_CLOSED_BLOCKERS),
@@ -357,6 +359,11 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         if isinstance(packet.get("supervised_prestart_gate"), Mapping)
         else {}
     )
+    expected_supervised_gate = (
+        packet.get("expected_supervised_prestart_gate")
+        if isinstance(packet.get("expected_supervised_prestart_gate"), Mapping)
+        else {}
+    )
     if supervised_gate:
         lines.extend(
             [
@@ -376,6 +383,18 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 f"- grants_live_authority: `{str(supervised_gate.get('grants_live_authority')).lower()}`",
                 "- required_markers: "
                 f"`{json.dumps(supervised_gate.get('required_markers') or [])}`",
+            ]
+        )
+    if expected_supervised_gate:
+        lines.extend(
+            [
+                "",
+                "## Expected Supervised Prestart Gate",
+                "",
+                "- expected_supervised_prestart_gate: "
+                f"`{json.dumps(expected_supervised_gate, sort_keys=True)}`",
+                "- actual_matches_expected: "
+                f"`{str(supervised_gate == expected_supervised_gate).lower()}`",
             ]
         )
     lines.extend(["", "## Commands", ""])

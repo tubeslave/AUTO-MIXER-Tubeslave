@@ -3554,6 +3554,11 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("supervised_prestart_gate"), Mapping)
         else {}
     )
+    declared_expected_supervised_prestart_gate = (
+        packet.get("expected_supervised_prestart_gate")
+        if isinstance(packet.get("expected_supervised_prestart_gate"), Mapping)
+        else {}
+    )
     required_checklist = (
         packet.get("required_review_checklist_ids")
         if isinstance(packet.get("required_review_checklist_ids"), list)
@@ -3791,6 +3796,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_contract_mismatch"
         )
+    if declared_expected_supervised_prestart_gate != expected_supervised_prestart_gate:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_supervised_prestart_gate_contract_mismatch"
+        )
     if packet.get("next_manual_artifact_required") != (
         "real wing_readonly_preflight.v1 summary.json"
     ):
@@ -3881,6 +3890,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["supervised_prestart_gate"] = dict(supervised_prestart_gate)
     detail["expected_supervised_prestart_gate"] = dict(expected_supervised_prestart_gate)
+    detail["declared_expected_supervised_prestart_gate"] = dict(
+        declared_expected_supervised_prestart_gate
+    )
     detail["required_supervised_prestart_gate_markers"] = list(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
     )

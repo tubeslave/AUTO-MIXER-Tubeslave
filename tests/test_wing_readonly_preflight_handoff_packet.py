@@ -103,8 +103,14 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "requires_operator_decision_status": "accepted_decision_ready",
         "requires_accepted_candidate_prestart_trace": True,
     }
+    assert packet["expected_supervised_prestart_gate"] == packet[
+        "supervised_prestart_gate"
+    ]
     rendered = handoff.render_markdown(packet)
     assert "## Supervised Prestart Gate" in rendered
+    assert "## Expected Supervised Prestart Gate" in rendered
+    assert "expected_supervised_prestart_gate" in rendered
+    assert "actual_matches_expected: `true`" in rendered
     assert "operator_sequence_step_must_be_final: `true`" in rendered
     assert "grants_live_authority: `false`" in rendered
     assert "valid accepted-candidate prestart trace" in rendered
@@ -226,6 +232,8 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "--operator-confirm-session-ready" in markdown
     assert "capture_readonly_preflight" in markdown
     assert "review_edited_decision_json" in markdown
+    assert "Expected Supervised Prestart Gate" in markdown
+    assert "actual_matches_expected: `true`" in markdown
     assert "pending_review_decision_template.json" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "full_autonomous_ready: `false`" in markdown
