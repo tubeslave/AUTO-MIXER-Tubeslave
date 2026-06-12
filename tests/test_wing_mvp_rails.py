@@ -89,6 +89,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "--operator-confirm-channels" in readonly
     assert "--value-types fader,gain,pan" in readonly
     assert "--value-types fader,gain \\" not in readonly
+    assert "--plan-output artifacts/wing_readonly_preflight_plan/latest_plan.json" in readonly
     assert "--execute" not in readonly
     assert "write_request_sent: false" in readonly
     assert "operator_confirmed_channels == channels" in readonly
