@@ -190,6 +190,9 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "backend_port_prestart_check_required: `true`" in markdown
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
+    assert "backend_port_prestart_check_failure_detail_fields" in markdown
+    for field_name in WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS:
+        assert field_name in markdown
     assert "prestart_backend_port_check" in markdown
     assert "tools/no_wing_release_check.py" in markdown
     assert "manual_review_required_before_readiness_update: `true`" in markdown

@@ -313,6 +313,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
         "- backend_port_prestart_check_command: "
         f"`{_command_text(packet['backend_port_prestart_check_command'])}`",
+        "- backend_port_prestart_check_failure_detail_fields: "
+        f"`{json.dumps(packet['backend_port_prestart_check_failure_detail_fields'])}`",
         "- manual_review_required_before_readiness_update: "
         f"`{str(packet['manual_review_required_before_readiness_update']).lower()}`",
         "- execution_allowed_by_packet: "
