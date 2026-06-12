@@ -102,6 +102,11 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while accepted review source ids lack a valid
   accepted-candidate prestart trace, or while the proof plan still carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
+- A supervised proof is planned before the no-WING handoff summary shows
+  `supervised_prestart_gate` exactly matching
+  `expected_supervised_prestart_gate`.
+- A supervised proof is planned while `supervised_prestart_gate` claims
+  `grants_live_authority: true`.
 
 This is not a stop to development. Codex must continue uninterrupted Goal-mode
 work, but only on the first non-closed MVP blocker.
@@ -117,6 +122,11 @@ accepted-candidate prestart trace from read-only preflight review. If that trace
 is missing or invalid, the proof plan must keep
 `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
 as an operator blocker.
+
+The no-WING handoff summary must also show `supervised_prestart_gate` exactly
+matching `expected_supervised_prestart_gate`, with
+`supervised_prestart_gate.grants_live_authority: false`, before any supervised
+fader/gain proof runbook is used.
 
 ## Autonomy Budget Rule
 

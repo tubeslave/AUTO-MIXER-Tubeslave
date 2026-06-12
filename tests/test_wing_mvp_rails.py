@@ -36,6 +36,10 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "tools/review_wing_readonly_preflight_artifacts.py" in text
     assert "tools/no_wing_release_check.py" in text
     assert "readiness candidates are not enough" in text
+    assert "supervised_prestart_gate" in text
+    assert "expected_supervised_prestart_gate" in text
+    assert "supervised_prestart_gate.grants_live_authority: false" in text
+    assert "grants_live_authority: true" in text
     assert "Docs/CORRECTION_METHODS_ROADMAP.md" in text
 
 
