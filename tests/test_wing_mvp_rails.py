@@ -89,6 +89,13 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "final handoff operator-sequence step" in readonly
     assert "operator_sequence_has_supervised_prestart_gate" in readonly
     assert "operator_sequence_supervised_prestart_gate_is_final" in readonly
+    assert "supervised_prestart_gate" in readonly
+    assert "expected_supervised_prestart_gate" in readonly
+    assert "supervised_prestart_gate.grants_live_authority: false" in readonly
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
+        in readonly
+    )
     assert "valid accepted-candidate prestart trace" in readonly
     assert "wing_operator_proposal_validation_runner.py" in supervised
     assert "--execute" in supervised
