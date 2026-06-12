@@ -185,6 +185,24 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "supervised_prestart_gate" in prompt
     assert "expected_supervised_prestart_gate" in prompt
     assert "supervised_prestart_gate.grants_live_authority: false" in prompt
+    assert "mvp_blocker_anchor_matches_current_first_open: true" in prompt
+    assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in prompt
+    assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in prompt
+    assert "operator_sequence_has_supervised_prestart_gate: true" in prompt
+    assert "operator_sequence_supervised_prestart_gate_is_final: true" in prompt
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
+        in prompt
+    )
     assert "supervised_prestart_gate" in readme
     assert "expected_supervised_prestart_gate" in readme
     assert "supervised_prestart_gate.grants_live_authority: false" in readme
+    assert "mvp_blocker_anchor_matches_current_first_open: true" in readme
+    assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in readme
+    assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readme
+    assert "operator_sequence_has_supervised_prestart_gate: true" in readme
+    assert "operator_sequence_supervised_prestart_gate_is_final: true" in readme
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
+        in readme
+    )

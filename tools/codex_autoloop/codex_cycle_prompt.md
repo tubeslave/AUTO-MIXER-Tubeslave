@@ -203,6 +203,13 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate` and
   `supervised_prestart_gate.grants_live_authority: false`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `mvp_blocker_anchor_matches_current_first_open: true`,
+  `mvp_blocker_anchor_sha256_matches_current_first_open: true`,
+  `operator_sequence_has_mvp_blocker_anchor_digest_review: true`,
+  `operator_sequence_has_supervised_prestart_gate: true`,
+  `operator_sequence_supervised_prestart_gate_is_final: true`, and
+  `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит
   физический read-only/supervised proof и имеет тест.
 - Методы коррекций Gain/Trim, Pan, EQ, Comp, FX, Balance и другие продолжай

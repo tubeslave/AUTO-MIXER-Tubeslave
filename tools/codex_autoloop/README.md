@@ -136,6 +136,16 @@ you want the background automation active.
   `expected_supervised_prestart_gate` and
   `supervised_prestart_gate.grants_live_authority: false`. This structured gate
   is evidence for the proof boundary only and does not grant live authority.
+- Before any supervised fader/gain proof, the no-WING handoff summary must also
+  show `mvp_blocker_anchor_matches_current_first_open: true`,
+  `mvp_blocker_anchor_sha256_matches_current_first_open: true`,
+  `operator_sequence_has_mvp_blocker_anchor_digest_review: true`,
+  `operator_sequence_has_supervised_prestart_gate: true`,
+  `operator_sequence_supervised_prestart_gate_is_final: true`, and
+  `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`.
+  These fields prove only that the offline handoff packet still points at the
+  current first WING MVP blocker and keeps supervised proof planning behind a
+  valid accepted-candidate prestart trace; they do not grant live authority.
 - Project Director Agent activation is inside each Codex cycle after the
   direction guard. `tools/codex_autoloop/project_director_agent.py` reads
   `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, and
