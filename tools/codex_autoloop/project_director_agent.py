@@ -88,6 +88,7 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
             "backend/wing_readonly_preflight_contract.py",
             "tools/wing_readonly_preflight_runner.py",
             "tools/review_wing_readonly_preflight_artifacts.py",
+            "tools/build_wing_readonly_preflight_handoff_packet.py",
             "tools/no_wing_release_check.py",
             "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
             "Docs/reports/MVP_PROGRESS_LATEST.md",
