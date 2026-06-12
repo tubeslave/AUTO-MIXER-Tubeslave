@@ -184,6 +184,9 @@ you want the background automation active.
   This keeps the no-WING packet from being treated as proof that a console was
   queried.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `executes_tests: false`.
+  This keeps the no-WING packet from being treated as validation evidence.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
