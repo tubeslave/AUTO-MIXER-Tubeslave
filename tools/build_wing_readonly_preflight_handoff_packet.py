@@ -278,7 +278,10 @@ def build_handoff_packet(
             "Run review_artifact_and_write_pending_decision_template.",
             "Edit the pending decision template into an accepted or rejected JSON record.",
             "Run review_edited_decision_json.",
-            "Only after accepted_decision_ready, move to WING_SUPERVISED_FADER_GAIN_PROOF.",
+            (
+                "Only after accepted_decision_ready and a valid accepted-candidate "
+                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+            ),
         ],
         "required_review_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
         "forbidden_live_request_types": list(FORBIDDEN_LIVE_REQUEST_TYPES),

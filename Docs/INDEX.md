@@ -81,6 +81,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_READ_SURFACE_ACCEPTANCE_CANDIDATE_TRACE_20260607.md` | Acceptance records preserve and validate the review-queue candidate trace before any fixture-closure decision. |
 | `Docs/reports/AUTOMIXER_READ_SURFACE_FIXTURE_CLOSURE_PLAN_ARTIFACT_GATE_20260607.md` | No-WING release checks validate the generated fixture-closure plan JSON while keeping fixture updates manual-only. |
 | `Docs/reports/AUTOMIXER_WING_SUPERVISED_MVP_RAILS_20260606.md` | MVP contract, blocker table, runbooks, progress updater, and Project Director Agent. |
+| `Docs/reports/AUTOMIXER_WING_SUPERVISED_RUNBOOK_PRESTART_TRACE_GATE_20260612.md` | Supervised fader/gain proof runbook and read-only handoff packet require a valid accepted-candidate prestart trace before moving from accepted review decision to supervised proof. |
 | `Docs/reports/MVP_PROGRESS_LATEST.md` | Latest generated supervised WING MVP blocker status and first required action. |
 | `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md` | Read-only streaming telemetry alert artifacts for dashboards, QA, and future learning labels. |
 | `Docs/STRUCTURING_COMPLETION_20260518.md` | What was moved, what remains, and the next work boundary. |

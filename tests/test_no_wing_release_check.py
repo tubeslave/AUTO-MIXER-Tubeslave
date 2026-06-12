@@ -953,7 +953,10 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "Run review_artifact_and_write_pending_decision_template.",
             "Edit the pending decision template into an accepted or rejected JSON record.",
             "Run review_edited_decision_json.",
-            "Only after accepted_decision_ready, move to WING_SUPERVISED_FADER_GAIN_PROOF.",
+            (
+                "Only after accepted_decision_ready and a valid accepted-candidate "
+                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+            ),
         ],
         "required_review_checklist_ids": [
             "confirm_artifact_paths",

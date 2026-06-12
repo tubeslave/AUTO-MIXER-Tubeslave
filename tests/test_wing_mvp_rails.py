@@ -79,6 +79,11 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "wing_operator_proposal_validation_runner.py" in supervised
     assert "--execute" in supervised
     assert "blocked until a clean read-only preflight" in supervised
+    assert "valid accepted-candidate prestart trace" in supervised
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in supervised
+    )
     assert "negative delta" in supervised
     assert "Full autonomous" not in supervised
 
