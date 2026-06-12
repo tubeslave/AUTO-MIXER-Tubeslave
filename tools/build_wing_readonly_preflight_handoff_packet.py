@@ -228,6 +228,21 @@ def build_handoff_packet(
         "prestart_backend_port_check and resolve only confirmed "
         "unexpected listeners."
     )
+    prestart_gate_markers = [
+        "Before starting the intended backend/WING session",
+        "prestart_backend_port_check",
+        "unexpected listeners",
+    ]
+    expected_prestart_gate = {
+        "required": True,
+        "operator_sequence_step_index": prestart_step_index,
+        "operator_sequence_step_must_be_first": True,
+        "operator_sequence_step": prestart_step,
+        "required_markers": prestart_gate_markers,
+        "runs_command": "prestart_backend_port_check",
+        "must_pass_before_backend_wing_session": True,
+        "grants_live_authority": False,
+    }
     expected_supervised_gate = {
         "required": True,
         "operator_sequence_step_index": supervised_gate_step_index,
@@ -319,6 +334,8 @@ def build_handoff_packet(
             "Run review_edited_decision_json.",
             supervised_gate_step,
         ],
+        "backend_port_prestart_gate": dict(expected_prestart_gate),
+        "expected_backend_port_prestart_gate": dict(expected_prestart_gate),
         "supervised_prestart_gate": dict(expected_supervised_gate),
         "expected_supervised_prestart_gate": dict(expected_supervised_gate),
         "required_review_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
@@ -381,11 +398,53 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         if isinstance(packet.get("supervised_prestart_gate"), Mapping)
         else {}
     )
+    backend_port_prestart_gate = (
+        packet.get("backend_port_prestart_gate")
+        if isinstance(packet.get("backend_port_prestart_gate"), Mapping)
+        else {}
+    )
+    expected_backend_port_prestart_gate = (
+        packet.get("expected_backend_port_prestart_gate")
+        if isinstance(packet.get("expected_backend_port_prestart_gate"), Mapping)
+        else {}
+    )
     expected_supervised_gate = (
         packet.get("expected_supervised_prestart_gate")
         if isinstance(packet.get("expected_supervised_prestart_gate"), Mapping)
         else {}
     )
+    if backend_port_prestart_gate:
+        lines.extend(
+            [
+                "",
+                "## Backend Port Prestart Gate",
+                "",
+                f"- required: `{str(backend_port_prestart_gate.get('required')).lower()}`",
+                "- operator_sequence_step_index: "
+                f"`{backend_port_prestart_gate.get('operator_sequence_step_index')}`",
+                "- operator_sequence_step_must_be_first: "
+                f"`{str(backend_port_prestart_gate.get('operator_sequence_step_must_be_first')).lower()}`",
+                "- runs_command: "
+                f"`{backend_port_prestart_gate.get('runs_command')}`",
+                "- must_pass_before_backend_wing_session: "
+                f"`{str(backend_port_prestart_gate.get('must_pass_before_backend_wing_session')).lower()}`",
+                f"- grants_live_authority: `{str(backend_port_prestart_gate.get('grants_live_authority')).lower()}`",
+                "- required_markers: "
+                f"`{json.dumps(backend_port_prestart_gate.get('required_markers') or [])}`",
+            ]
+        )
+    if expected_backend_port_prestart_gate:
+        lines.extend(
+            [
+                "",
+                "## Expected Backend Port Prestart Gate",
+                "",
+                "- expected_backend_port_prestart_gate: "
+                f"`{json.dumps(expected_backend_port_prestart_gate, sort_keys=True)}`",
+                "- actual_matches_expected: "
+                f"`{str(backend_port_prestart_gate == expected_backend_port_prestart_gate).lower()}`",
+            ]
+        )
     if supervised_gate:
         lines.extend(
             [

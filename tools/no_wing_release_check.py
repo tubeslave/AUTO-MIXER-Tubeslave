@@ -3616,6 +3616,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("supervised_prestart_gate"), Mapping)
         else {}
     )
+    backend_port_prestart_gate = (
+        packet.get("backend_port_prestart_gate")
+        if isinstance(packet.get("backend_port_prestart_gate"), Mapping)
+        else {}
+    )
+    declared_expected_backend_port_prestart_gate = (
+        packet.get("expected_backend_port_prestart_gate")
+        if isinstance(packet.get("expected_backend_port_prestart_gate"), Mapping)
+        else {}
+    )
     declared_expected_supervised_prestart_gate = (
         packet.get("expected_supervised_prestart_gate")
         if isinstance(packet.get("expected_supervised_prestart_gate"), Mapping)
@@ -3829,6 +3839,28 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_not_first"
         )
+    expected_backend_port_prestart_gate = {
+        "required": True,
+        "operator_sequence_step_index": 0,
+        "operator_sequence_step_must_be_first": True,
+        "operator_sequence_step": backend_port_prestart_step,
+        "required_markers": [
+            "Before starting the intended backend/WING session",
+            "prestart_backend_port_check",
+            "unexpected listeners",
+        ],
+        "runs_command": "prestart_backend_port_check",
+        "must_pass_before_backend_wing_session": True,
+        "grants_live_authority": False,
+    }
+    if backend_port_prestart_gate != expected_backend_port_prestart_gate:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_port_prestart_gate_contract_mismatch"
+        )
+    if declared_expected_backend_port_prestart_gate != expected_backend_port_prestart_gate:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_backend_port_prestart_gate_contract_mismatch"
+        )
     operator_sequence_supervised_prestart_gate_step_index = next(
         (
             index
@@ -3922,6 +3954,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_check_operator_sequence_step_is_first"] = (
         backend_port_prestart_step_is_first
+    )
+    detail["backend_port_prestart_gate"] = dict(backend_port_prestart_gate)
+    detail["expected_backend_port_prestart_gate"] = dict(
+        expected_backend_port_prestart_gate
+    )
+    detail["declared_expected_backend_port_prestart_gate"] = dict(
+        declared_expected_backend_port_prestart_gate
     )
     detail["backend_port_prestart_check_command"] = packet.get(
         "backend_port_prestart_check_command"
@@ -10988,6 +11027,13 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         checklist_ids = detail.get("required_review_checklist_ids")
         forbidden_types = detail.get("forbidden_live_request_types")
         blockers = detail.get("blockers_not_closed_by_packet")
+        backend_port_prestart_gate = detail.get("backend_port_prestart_gate")
+        expected_backend_port_prestart_gate = detail.get(
+            "expected_backend_port_prestart_gate"
+        )
+        declared_expected_backend_port_prestart_gate = detail.get(
+            "declared_expected_backend_port_prestart_gate"
+        )
         supervised_prestart_gate = detail.get("supervised_prestart_gate")
         expected_supervised_prestart_gate = detail.get("expected_supervised_prestart_gate")
         return {
@@ -11025,6 +11071,21 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "backend_port_prestart_check_operator_sequence_step_is_first": (
                 detail.get("backend_port_prestart_check_operator_sequence_step_is_first")
                 is True
+            ),
+            "backend_port_prestart_gate": (
+                dict(backend_port_prestart_gate)
+                if isinstance(backend_port_prestart_gate, Mapping)
+                else {}
+            ),
+            "expected_backend_port_prestart_gate": (
+                dict(expected_backend_port_prestart_gate)
+                if isinstance(expected_backend_port_prestart_gate, Mapping)
+                else {}
+            ),
+            "declared_expected_backend_port_prestart_gate": (
+                dict(declared_expected_backend_port_prestart_gate)
+                if isinstance(declared_expected_backend_port_prestart_gate, Mapping)
+                else {}
             ),
             "backend_port_prestart_check_failure_detail_fields": (
                 list(detail.get("backend_port_prestart_check_failure_detail_fields"))
@@ -14352,6 +14413,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step']}`",
                 "- backend_port_prestart_check_operator_sequence_step_is_first: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step_is_first']).lower()}`",
+                "- backend_port_prestart_gate: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_gate'])}`",
+                "- expected_backend_port_prestart_gate: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_backend_port_prestart_gate'])}`",
                 "- backend_port_prestart_check_failure_detail_fields: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_failure_detail_fields'])}`",
                 "- review_command_writes_decision_template: "

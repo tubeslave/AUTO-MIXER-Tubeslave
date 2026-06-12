@@ -108,6 +108,13 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readonly
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in readonly
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in readonly
+    assert "backend_port_prestart_gate" in readonly
+    assert "expected_backend_port_prestart_gate" in readonly
+    assert "backend_port_prestart_gate.grants_live_authority: false" in readonly
+    assert (
+        "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in readonly
+    )
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"

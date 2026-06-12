@@ -86,6 +86,24 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["operator_sequence"][0].startswith(
         "Before starting the intended backend/WING session"
     )
+    first_gate_step = packet["operator_sequence"][0]
+    assert packet["backend_port_prestart_gate"] == {
+        "required": True,
+        "operator_sequence_step_index": 0,
+        "operator_sequence_step_must_be_first": True,
+        "operator_sequence_step": first_gate_step,
+        "required_markers": [
+            "Before starting the intended backend/WING session",
+            "prestart_backend_port_check",
+            "unexpected listeners",
+        ],
+        "runs_command": "prestart_backend_port_check",
+        "must_pass_before_backend_wing_session": True,
+        "grants_live_authority": False,
+    }
+    assert packet["expected_backend_port_prestart_gate"] == packet[
+        "backend_port_prestart_gate"
+    ]
     supervised_gate_step = packet["operator_sequence"][-1]
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step
@@ -109,6 +127,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "supervised_prestart_gate"
     ]
     rendered = handoff.render_markdown(packet)
+    assert "## Backend Port Prestart Gate" in rendered
+    assert "## Expected Backend Port Prestart Gate" in rendered
+    assert "expected_backend_port_prestart_gate" in rendered
     assert "## Supervised Prestart Gate" in rendered
     assert "## Expected Supervised Prestart Gate" in rendered
     assert "expected_supervised_prestart_gate" in rendered

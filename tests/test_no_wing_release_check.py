@@ -1024,6 +1024,42 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
         ],
+        "backend_port_prestart_gate": {
+            "required": True,
+            "operator_sequence_step_index": 0,
+            "operator_sequence_step_must_be_first": True,
+            "operator_sequence_step": (
+                "Before starting the intended backend/WING session, run "
+                "prestart_backend_port_check and resolve only confirmed "
+                "unexpected listeners."
+            ),
+            "required_markers": [
+                "Before starting the intended backend/WING session",
+                "prestart_backend_port_check",
+                "unexpected listeners",
+            ],
+            "runs_command": "prestart_backend_port_check",
+            "must_pass_before_backend_wing_session": True,
+            "grants_live_authority": False,
+        },
+        "expected_backend_port_prestart_gate": {
+            "required": True,
+            "operator_sequence_step_index": 0,
+            "operator_sequence_step_must_be_first": True,
+            "operator_sequence_step": (
+                "Before starting the intended backend/WING session, run "
+                "prestart_backend_port_check and resolve only confirmed "
+                "unexpected listeners."
+            ),
+            "required_markers": [
+                "Before starting the intended backend/WING session",
+                "prestart_backend_port_check",
+                "unexpected listeners",
+            ],
+            "runs_command": "prestart_backend_port_check",
+            "must_pass_before_backend_wing_session": True,
+            "grants_live_authority": False,
+        },
         "supervised_prestart_gate": {
             "required": True,
             "operator_sequence_step_index": 8,
@@ -2446,6 +2482,20 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "backend_port_prestart_check_operator_sequence_step"
     ]
     assert result.detail["backend_port_prestart_check_operator_sequence_step_is_first"] is True
+    assert result.detail["backend_port_prestart_gate"] == result.detail[
+        "expected_backend_port_prestart_gate"
+    ]
+    assert result.detail["declared_expected_backend_port_prestart_gate"] == result.detail[
+        "expected_backend_port_prestart_gate"
+    ]
+    assert result.detail["backend_port_prestart_gate"]["operator_sequence_step_index"] == 0
+    assert result.detail["backend_port_prestart_gate"][
+        "operator_sequence_step_must_be_first"
+    ] is True
+    assert result.detail["backend_port_prestart_gate"][
+        "must_pass_before_backend_wing_session"
+    ] is True
+    assert result.detail["backend_port_prestart_gate"]["grants_live_authority"] is False
     assert result.detail["review_command_writes_decision_template"] is True
     assert "prestart_backend_port_check" in result.detail["command_names"]
     assert "preview_readonly_request_plan" in result.detail["command_names"]
@@ -2551,6 +2601,44 @@ def test_no_wing_release_check_rejects_handoff_packet_without_first_prestart_gat
     )
     assert (
         "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_not_first"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_prestart_gate_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-prestart-gate-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["backend_port_prestart_gate"]["grants_live_authority"] = True
+    payload["expected_backend_port_prestart_gate"][
+        "operator_sequence_step_must_be_first"
+    ] = False
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["backend_port_prestart_gate"] != result.detail[
+        "expected_backend_port_prestart_gate"
+    ]
+    assert result.detail["declared_expected_backend_port_prestart_gate"] != result.detail[
+        "expected_backend_port_prestart_gate"
+    ]
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_port_prestart_gate_contract_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_expected_backend_port_prestart_gate_contract_mismatch"
         in result.detail["violations"]
     )
 
@@ -8202,6 +8290,60 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "unexpected listeners."
             ),
             "backend_port_prestart_check_operator_sequence_step_is_first": True,
+            "backend_port_prestart_gate": {
+                "required": True,
+                "operator_sequence_step_index": 0,
+                "operator_sequence_step_must_be_first": True,
+                "operator_sequence_step": (
+                    "Before starting the intended backend/WING session, run "
+                    "prestart_backend_port_check and resolve only confirmed "
+                    "unexpected listeners."
+                ),
+                "required_markers": [
+                    "Before starting the intended backend/WING session",
+                    "prestart_backend_port_check",
+                    "unexpected listeners",
+                ],
+                "runs_command": "prestart_backend_port_check",
+                "must_pass_before_backend_wing_session": True,
+                "grants_live_authority": False,
+            },
+            "expected_backend_port_prestart_gate": {
+                "required": True,
+                "operator_sequence_step_index": 0,
+                "operator_sequence_step_must_be_first": True,
+                "operator_sequence_step": (
+                    "Before starting the intended backend/WING session, run "
+                    "prestart_backend_port_check and resolve only confirmed "
+                    "unexpected listeners."
+                ),
+                "required_markers": [
+                    "Before starting the intended backend/WING session",
+                    "prestart_backend_port_check",
+                    "unexpected listeners",
+                ],
+                "runs_command": "prestart_backend_port_check",
+                "must_pass_before_backend_wing_session": True,
+                "grants_live_authority": False,
+            },
+            "declared_expected_backend_port_prestart_gate": {
+                "required": True,
+                "operator_sequence_step_index": 0,
+                "operator_sequence_step_must_be_first": True,
+                "operator_sequence_step": (
+                    "Before starting the intended backend/WING session, run "
+                    "prestart_backend_port_check and resolve only confirmed "
+                    "unexpected listeners."
+                ),
+                "required_markers": [
+                    "Before starting the intended backend/WING session",
+                    "prestart_backend_port_check",
+                    "unexpected listeners",
+                ],
+                "runs_command": "prestart_backend_port_check",
+                "must_pass_before_backend_wing_session": True,
+                "grants_live_authority": False,
+            },
             "backend_port_prestart_check_failure_detail_fields": list(
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
@@ -8310,6 +8452,20 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "prestart_backend_port_check and resolve only confirmed unexpected listeners."
     )
     assert artifact["backend_port_prestart_check_operator_sequence_step_is_first"] is True
+    assert artifact["backend_port_prestart_gate"] == artifact[
+        "expected_backend_port_prestart_gate"
+    ]
+    assert artifact["declared_expected_backend_port_prestart_gate"] == artifact[
+        "expected_backend_port_prestart_gate"
+    ]
+    assert artifact["backend_port_prestart_gate"]["operator_sequence_step_index"] == 0
+    assert artifact["backend_port_prestart_gate"][
+        "operator_sequence_step_must_be_first"
+    ] is True
+    assert artifact["backend_port_prestart_gate"][
+        "must_pass_before_backend_wing_session"
+    ] is True
+    assert artifact["backend_port_prestart_gate"]["grants_live_authority"] is False
     assert artifact["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
@@ -8373,6 +8529,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "backend_port_prestart_check_operator_sequence_step_is_first: `true`" in (
         markdown_summary
     )
+    assert "backend_port_prestart_gate" in markdown_summary
+    assert "expected_backend_port_prestart_gate" in markdown_summary
     assert "prestart_backend_port_check_command" in markdown_summary
     assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
     assert "listener_processes" in markdown_summary
