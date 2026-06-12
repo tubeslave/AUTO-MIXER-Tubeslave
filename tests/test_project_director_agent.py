@@ -85,3 +85,9 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "project_director_latest.md" in prompt
     assert "Project Director Agent" in readme
     assert "first non-closed MVP blocker" in readme
+    assert "supervised_prestart_gate" in prompt
+    assert "expected_supervised_prestart_gate" in prompt
+    assert "supervised_prestart_gate.grants_live_authority: false" in prompt
+    assert "supervised_prestart_gate" in readme
+    assert "expected_supervised_prestart_gate" in readme
+    assert "supervised_prestart_gate.grants_live_authority: false" in readme

@@ -168,6 +168,9 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert ".ai/project-layer/wing_mvp_blockers.md" in text
     assert "Docs/reports/MVP_PROGRESS_LATEST.md" in text
     assert "first non-closed row" in text
+    assert "supervised_prestart_gate" in text
+    assert "expected_supervised_prestart_gate" in text
+    assert "supervised_prestart_gate.grants_live_authority: false" in text
 
 
 def test_docs_index_points_to_current_wing_mvp_prestart_gate():

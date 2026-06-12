@@ -122,6 +122,11 @@ you want the background automation active.
   WING preflight or manual review of a real preflight artifact. This prestart
   gate is diagnostic only and does not stop processes, contact WING, or grant
   live authority.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `supervised_prestart_gate` exactly matching
+  `expected_supervised_prestart_gate` and
+  `supervised_prestart_gate.grants_live_authority: false`. This structured gate
+  is evidence for the proof boundary only and does not grant live authority.
 - Project Director Agent activation is inside each Codex cycle after the
   direction guard. `tools/codex_autoloop/project_director_agent.py` reads
   `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, and
