@@ -693,6 +693,8 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "tools/build_wing_readonly_preflight_handoff_packet.py",
         "--channels",
         "3",
+        "--value-types",
+        "fader,gain,pan",
         "--plan-output",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
         "--output",
@@ -705,7 +707,9 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
     assert result.detail["handoff_packet_channels"] == "3"
+    assert result.detail["handoff_packet_value_types"] == "fader,gain,pan"
     assert result.detail["handoff_packet_channel_matches_capture"] is True
+    assert result.detail["handoff_packet_value_types_match_capture"] is True
     assert result.detail["blocked_by"] == [
         "operator_must_run_wing_readonly_preflight_runner"
     ]
@@ -2862,6 +2866,10 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_channel_mismatch(
             "tools/build_wing_readonly_preflight_handoff_packet.py",
             "--channels",
             "4",
+            "--value-types",
+            "fader,gain,pan",
+            "--plan-output",
+            "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             "--output",
             "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
         ],
@@ -5000,6 +5008,8 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert "tools/build_wing_readonly_preflight_handoff_packet.py" in handoff_check.command
     assert "--channels" in handoff_check.command
     assert "3" in handoff_check.command
+    assert "--value-types" in handoff_check.command
+    assert "fader,gain,pan" in handoff_check.command
     assert "--plan-output" in handoff_check.command
     assert str(wing_readonly_preflight_plan_path_for_run(tmp_path)) in handoff_check.command
     assert "--format" in handoff_check.command
@@ -7727,6 +7737,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "tools/build_wing_readonly_preflight_handoff_packet.py",
                 "--channels",
                 "3",
+                "--value-types",
+                "fader,gain,pan",
                 "--plan-output",
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json",
                 "--output",
@@ -7739,7 +7751,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json"
             ),
             "handoff_packet_channels": "3",
+            "handoff_packet_value_types": "fader,gain,pan",
             "handoff_packet_channel_matches_capture": True,
+            "handoff_packet_value_types_match_capture": True,
             "blocked_by": [
                 "operator_must_run_wing_readonly_preflight_runner"
             ],
@@ -7864,7 +7878,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
     assert preflight["handoff_packet_channels"] == "3"
+    assert preflight["handoff_packet_value_types"] == "fader,gain,pan"
     assert preflight["handoff_packet_channel_matches_capture"] is True
+    assert preflight["handoff_packet_value_types_match_capture"] is True
     assert preflight["artifact_operator_next_steps"] == [
         "Regenerate the offline expected plan before opening the backend/WING WebSocket."
     ]
@@ -7912,7 +7928,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md" in markdown_summary
     assert "handoff_packet_plan_output" in markdown_summary
+    assert "handoff_packet_value_types: `fader,gain,pan`" in markdown_summary
     assert "handoff_packet_channel_matches_capture: `true`" in markdown_summary
+    assert "handoff_packet_value_types_match_capture: `true`" in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_path):

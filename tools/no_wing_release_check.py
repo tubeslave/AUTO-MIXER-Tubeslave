@@ -582,6 +582,8 @@ def wing_readonly_preflight_handoff_packet_command() -> list[str]:
         WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
         "--channels",
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--value-types",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         "--plan-output",
         WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
         "--output",
@@ -1005,6 +1007,8 @@ def build_checks(
                 WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL,
                 "--channels",
                 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+                "--value-types",
+                WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
                 "--plan-output",
                 str(wing_readonly_plan_output),
                 "--format",
@@ -3023,8 +3027,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         and plan_artifact_root == capture_artifact_root
     )
     handoff_channels = command_value_after_flag(handoff_command, "--channels")
+    handoff_value_types = command_value_after_flag(handoff_command, "--value-types")
     handoff_plan_output = command_value_after_flag(handoff_command, "--plan-output")
     handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
+    handoff_value_types_match_capture = (
+        bool(handoff_value_types) and handoff_value_types == capture_value_types
+    )
 
     if not capture_tool_available:
         violations.append("wing_readonly_preflight_runner_tool_missing")
@@ -3046,6 +3054,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_handoff_packet_plan_output_missing")
     if not handoff_channel_matches_capture:
         violations.append("wing_readonly_preflight_handoff_packet_channel_mismatch")
+    if not handoff_value_types_match_capture:
+        violations.append("wing_readonly_preflight_handoff_packet_value_types_mismatch")
     if not review_manual_checklist_complete:
         violations.append("wing_readonly_preflight_review_manual_checklist_incomplete")
     if not review_decision_template_contract_complete:
@@ -3223,7 +3233,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["handoff_packet_output"] = WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
     detail["handoff_packet_plan_output"] = handoff_plan_output
     detail["handoff_packet_channels"] = handoff_channels
+    detail["handoff_packet_value_types"] = handoff_value_types
     detail["handoff_packet_channel_matches_capture"] = handoff_channel_matches_capture
+    detail["handoff_packet_value_types_match_capture"] = handoff_value_types_match_capture
     detail["blocked_by"] = (
         list(summary.get("blocked_by"))
         if isinstance(summary.get("blocked_by"), list)
@@ -10779,8 +10791,12 @@ def wing_readonly_preflight_evidence_summary(
             "handoff_packet_output": detail.get("handoff_packet_output"),
             "handoff_packet_plan_output": detail.get("handoff_packet_plan_output"),
             "handoff_packet_channels": detail.get("handoff_packet_channels"),
+            "handoff_packet_value_types": detail.get("handoff_packet_value_types"),
             "handoff_packet_channel_matches_capture": (
                 detail.get("handoff_packet_channel_matches_capture") is True
+            ),
+            "handoff_packet_value_types_match_capture": (
+                detail.get("handoff_packet_value_types_match_capture") is True
             ),
             "blocked_by": list(blocked_by) if isinstance(blocked_by, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
@@ -14112,8 +14128,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- handoff_packet_output: `{wing_readonly_preflight['handoff_packet_output']}`",
                 f"- handoff_packet_plan_output: `{wing_readonly_preflight['handoff_packet_plan_output']}`",
                 f"- handoff_packet_channels: `{wing_readonly_preflight['handoff_packet_channels']}`",
+                "- handoff_packet_value_types: "
+                f"`{wing_readonly_preflight['handoff_packet_value_types']}`",
                 "- handoff_packet_channel_matches_capture: "
                 f"`{str(wing_readonly_preflight['handoff_packet_channel_matches_capture']).lower()}`",
+                "- handoff_packet_value_types_match_capture: "
+                f"`{str(wing_readonly_preflight['handoff_packet_value_types_match_capture']).lower()}`",
                 f"- blocked_by: `{json.dumps(wing_readonly_preflight['blocked_by'])}`",
                 f"- violations: `{json.dumps(wing_readonly_preflight['violations'])}`",
             ]
