@@ -347,6 +347,11 @@ The handoff validation must report:
   `prestart_backend_port_check`, and `unexpected listeners`
 - `backend_port_prestart_check_command` exactly matches
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
+- `backend_port_prestart_check_failure_detail_fields` exactly lists
+  `listener_processes`, `listener_confirmation_checklist`,
+  `preflight_blocked_until_listener_confirmed`,
+  `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+  `fail_closed_reason`, and `operator_next_step`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`

@@ -64,6 +64,13 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in directive[
         "selected_action"
     ]
+    assert "backend_port_prestart_check_failure_detail_fields" in directive[
+        "selected_action"
+    ]
+    assert "listener_processes" in directive["selected_action"]
+    assert "safe_to_stop_listener_by_gate" in directive["selected_action"]
+    assert "fail_closed_reason" in directive["selected_action"]
+    assert "operator_next_step" in directive["selected_action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
     ]
@@ -259,6 +266,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "Before starting the intended backend/WING session" in prompt
     assert "backend_port_prestart_check_command" in prompt
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in prompt
+    assert "backend_port_prestart_check_failure_detail_fields" in prompt
+    assert "listener_processes" in prompt
+    assert "safe_to_stop_listener_by_gate" in prompt
+    assert "operator_next_step" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_check_operator_sequence_step" in prompt
     assert "prestart_backend_port_check" in prompt
@@ -282,6 +293,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "Before starting the intended backend/WING session" in readme
     assert "backend_port_prestart_check_command" in readme
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in readme
+    assert "backend_port_prestart_check_failure_detail_fields" in readme
+    assert "listener_processes" in readme
+    assert "safe_to_stop_listener_by_gate" in readme
+    assert "operator_next_step" in readme
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme
     assert "backend_port_prestart_check_operator_sequence_step" in readme
     assert "prestart_backend_port_check" in readme

@@ -121,6 +121,12 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while the no-WING handoff summary does not show
   `backend_port_prestart_check_command` exactly matching
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `backend_port_prestart_check_failure_detail_fields` exactly listing
+  `listener_processes`, `listener_confirmation_checklist`,
+  `preflight_blocked_until_listener_confirmed`,
+  `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+  `fail_closed_reason`, and `operator_next_step`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate`.
@@ -174,6 +180,13 @@ The same `backend_port_prestart_gate` must also show
 The no-WING handoff summary must also show
 `backend_port_prestart_check_command` exactly matching
 `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
+
+The no-WING handoff summary must also show
+`backend_port_prestart_check_failure_detail_fields` exactly listing
+`listener_processes`, `listener_confirmation_checklist`,
+`preflight_blocked_until_listener_confirmed`,
+`intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+`fail_closed_reason`, and `operator_next_step`.
 
 It must also show `supervised_prestart_gate` exactly matching
 `expected_supervised_prestart_gate`, with

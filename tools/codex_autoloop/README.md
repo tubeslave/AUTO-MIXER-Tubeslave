@@ -150,6 +150,14 @@ you want the background automation active.
   This keeps the structured prestart command aligned with the required
   no-WING release check.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_check_failure_detail_fields` exactly listing
+  `listener_processes`, `listener_confirmation_checklist`,
+  `preflight_blocked_until_listener_confirmed`,
+  `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+  `fail_closed_reason`, and `operator_next_step`.
+  This preserves the fail-closed review evidence when the prestart check
+  detects unexpected listeners.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
   `prestart_backend_port_check` and `unexpected listeners`,
