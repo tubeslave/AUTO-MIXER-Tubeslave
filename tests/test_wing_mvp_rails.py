@@ -180,5 +180,23 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
         "Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_FINAL_PRESTART_GATE_20260612.md"
         in text
     )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_HANDOFF_STRUCTURED_PRESTART_GATE_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_HANDOFF_STRUCTURED_GATE_SUMMARY_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_STRUCTURED_GATE_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_PROJECT_GOAL_SUPERVISED_AUTOMIX_STRUCTURED_GATE_20260612.md"
+        in text
+    )
     assert "final handoff operator-sequence step" in text
     assert "accepted-candidate prestart gate" in text
+    assert "supervised_prestart_gate" in text
+    assert "expected_supervised_prestart_gate" in text

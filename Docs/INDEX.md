@@ -83,6 +83,10 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_SUPERVISED_MVP_RAILS_20260606.md` | MVP contract, blocker table, runbooks, progress updater, and Project Director Agent. |
 | `Docs/reports/AUTOMIXER_WING_SUPERVISED_RUNBOOK_PRESTART_TRACE_GATE_20260612.md` | Supervised fader/gain proof runbook and read-only handoff packet require a valid accepted-candidate prestart trace before moving from accepted review decision to supervised proof. |
 | `Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_FINAL_PRESTART_GATE_20260612.md` | Read-only preflight runbook requires the final handoff operator-sequence step to carry the accepted-candidate prestart gate before supervised fader/gain proof. |
+| `Docs/reports/AUTOMIXER_WING_HANDOFF_STRUCTURED_PRESTART_GATE_20260612.md` | WING read-only handoff packet carries a structured `supervised_prestart_gate` contract before supervised fader/gain proof. |
+| `Docs/reports/AUTOMIXER_WING_HANDOFF_STRUCTURED_GATE_SUMMARY_20260612.md` | No-WING release summaries expose `supervised_prestart_gate` and `expected_supervised_prestart_gate` for reviewer inspection. |
+| `Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_STRUCTURED_GATE_20260612.md` | Read-only preflight runbook requires `supervised_prestart_gate` to match `expected_supervised_prestart_gate` without granting live authority. |
+| `Docs/reports/AUTOMIXER_PROJECT_GOAL_SUPERVISED_AUTOMIX_STRUCTURED_GATE_20260612.md` | Project goal capability matrix aligns Supervised AutoMix widening with the structured WING handoff gate. |
 | `Docs/reports/MVP_PROGRESS_LATEST.md` | Latest generated supervised WING MVP blocker status and first required action. |
 | `Docs/reports/AUTOMIXER_STREAMING_ALERTS_20260601.md` | Read-only streaming telemetry alert artifacts for dashboards, QA, and future learning labels. |
 | `Docs/STRUCTURING_COMPLETION_20260518.md` | What was moved, what remains, and the next work boundary. |
@@ -114,7 +118,7 @@ paths, Product Layer, or cleanup policy.
 | Area | Documents |
 | --- | --- |
 | Product Layer plan | `Docs/PROJECT_IMPLEMENTATION_PLAN.md` |
-| Current WING MVP rails | `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, `Docs/runbooks/WING_READONLY_PREFLIGHT.md`, `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`, `Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_FINAL_PRESTART_GATE_20260612.md`, `Docs/reports/MVP_PROGRESS_LATEST.md` |
+| Current WING MVP rails | `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, `Docs/runbooks/WING_READONLY_PREFLIGHT.md`, `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`, `Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_FINAL_PRESTART_GATE_20260612.md`, `Docs/reports/AUTOMIXER_WING_READONLY_RUNBOOK_STRUCTURED_GATE_20260612.md`, `Docs/reports/AUTOMIXER_WING_HANDOFF_STRUCTURED_GATE_SUMMARY_20260612.md`, `Docs/reports/MVP_PROGRESS_LATEST.md` |
 | Correction method roadmap | `Docs/CORRECTION_METHODS_ROADMAP.md`, `.ai/project-layer/correction_methods_backlog.md` |
 | Processing pipeline selection | `Docs/PROCESSING_METHODS_INVENTORY.md`, `Docs/adr/processing-pipeline-selection.md` |
 | Automation foundation layer | `Docs/adr/automation-foundation-layer-20260527.md`, `Docs/reports/AUTOMIXER_AUTOMATION_FOUNDATION_LAYER_20260527.md` |
