@@ -109,6 +109,37 @@ def test_direction_guard_ignores_forbidden_policy_sections_when_scoring_drift():
     assert report["summary"]["mixed_item_count"] == 0
 
 
+def test_direction_guard_ignores_project_director_json_forbidden_scope():
+    guard = load_guard_module()
+
+    report = guard.analyze_evidence(
+        [
+            (
+                "report:.paperclip/reports/project_director_latest.md",
+                """
+project_director_latest.md
+{
+  "type": "project_director_directive",
+  "selected_blocker": "WING read-only connection proof",
+  "selected_action": "Run `Docs/runbooks/WING_READONLY_PREFLIGHT.md` before supervised fader proof.",
+  "forbidden_scope": [
+    "No new memory-trust chains unless they close the selected blocker.",
+    "No new queue-import chains unless they close the selected blocker.",
+    "No new result-consumer/report-only/read-model work unless it closes the selected blocker."
+  ]
+}
+""",
+            ),
+            ("git_log", "Add WING read-only preflight backend prestart gate"),
+            ("report", "physical readback and timeout fail-closed proof context"),
+        ]
+    )
+
+    assert report["status"] == "on_target"
+    assert report["summary"]["drift_item_count"] == 0
+    assert report["summary"]["mixed_item_count"] == 0
+
+
 def test_direction_guard_ignores_generated_guard_evidence_sections_when_scoring_drift():
     guard = load_guard_module()
 

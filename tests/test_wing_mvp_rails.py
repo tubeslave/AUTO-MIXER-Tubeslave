@@ -254,6 +254,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
         in text
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_AUTOLOOP_BACKEND_PRESTART_DIRECTOR_DOCS_20260612.md"
+        in text
+    )
+    assert (
         "Docs/reports/AUTOMIXER_PROJECT_GOAL_SUPERVISED_AUTOMIX_STRUCTURED_GATE_20260612.md"
         in text
     )

@@ -35,6 +35,14 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "tools/no_wing_release_check.py --quick" in directive["selected_action"]
     assert "before starting the intended backend/WING session" in directive["selected_action"]
     assert "`Docs/runbooks/WING_READONLY_PREFLIGHT.md`" in directive["selected_action"]
+    assert "backend_port_prestart_gate" in directive["selected_action"]
+    assert "expected_backend_port_prestart_gate" in directive["selected_action"]
+    assert "backend_port_prestart_gate.grants_live_authority: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_gate.must_pass_before_backend_wing_session: true" in directive[
+        "selected_action"
+    ]
     assert "accepted-candidate prestart trace" in directive["selected_action"]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
@@ -85,6 +93,20 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "project_director_latest.md" in prompt
     assert "Project Director Agent" in readme
     assert "first non-closed MVP blocker" in readme
+    assert "backend_port_prestart_gate" in prompt
+    assert "expected_backend_port_prestart_gate" in prompt
+    assert "backend_port_prestart_gate.grants_live_authority: false" in prompt
+    assert (
+        "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in prompt
+    )
+    assert "backend_port_prestart_gate" in readme
+    assert "expected_backend_port_prestart_gate" in readme
+    assert "backend_port_prestart_gate.grants_live_authority: false" in readme
+    assert (
+        "backend_port_prestart_gate.must_pass_before_backend_wing_session: true"
+        in readme
+    )
     assert "supervised_prestart_gate" in prompt
     assert "expected_supervised_prestart_gate" in prompt
     assert "supervised_prestart_gate.grants_live_authority: false" in prompt

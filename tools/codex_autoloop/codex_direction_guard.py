@@ -182,6 +182,30 @@ def text_without_markdown_sections(text: str, section_titles: Iterable[str]) -> 
     return "\n".join(lines)
 
 
+def text_without_json_policy_fields(text: str) -> str:
+    stripped = text.lstrip()
+    prefix = ""
+    json_text = stripped
+    if not stripped.startswith("{") and "\n" in stripped:
+        first_line, rest = stripped.split("\n", 1)
+        if rest.lstrip().startswith("{"):
+            prefix = first_line
+            json_text = rest.lstrip()
+    if not json_text.startswith("{"):
+        return text
+    try:
+        payload = json.loads(json_text)
+    except json.JSONDecodeError:
+        return text
+    if isinstance(payload, dict):
+        payload = dict(payload)
+        payload.pop("forbidden_scope", None)
+        payload.pop("forbidden_next_actions", None)
+        filtered = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        return f"{prefix}\n{filtered}" if prefix else filtered
+    return text
+
+
 def is_generated_direction_guard_report(source: str, text: str) -> bool:
     return source.startswith("report:") and (
         "codex_direction_guard_" in source
@@ -193,7 +217,8 @@ def text_for_drift_scoring(source: str, text: str) -> str:
     ignored_sections = set(DRIFT_POLICY_SECTION_TITLES)
     if is_generated_direction_guard_report(source, text):
         ignored_sections.update(DERIVATIVE_GUARD_SECTION_TITLES)
-    return text_without_markdown_sections(text, ignored_sections)
+    filtered = text_without_markdown_sections(text, ignored_sections)
+    return text_without_json_policy_fields(filtered)
 
 
 def classify_item(source: str, text: str) -> EvidenceItem:

@@ -123,6 +123,15 @@ you want the background automation active.
   gate is diagnostic only and does not stop processes, contact WING, or grant
   live authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_gate` exactly matching
+  `expected_backend_port_prestart_gate`,
+  `backend_port_prestart_gate.grants_live_authority: false`, and
+  `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`.
+  This first gate proves only that the backend-port prestart check is still
+  before the intended backend/WING session; it does not contact WING or grant
+  live authority.
+- Before any supervised fader/gain proof, the no-WING handoff summary must also
+  show
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate` and
   `supervised_prestart_gate.grants_live_authority: false`. This structured gate
