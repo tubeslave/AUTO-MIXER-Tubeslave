@@ -278,6 +278,8 @@ Then update:
 - a `query_mixer_parameter` response does not match its request identity;
 - a `query_mixer_parameter` response omits or mismatches the request id;
 - the real run omits the expected offline plan or does not match it;
+- the expected offline plan uses a stale backend-port prestart failure-detail
+  contract, including missing `listener_confirmation_checklist`;
 - the referenced offline plan file is missing or its SHA256 does not match
   `expected_plan_sha256`;
 - the referenced offline plan content does not match the captured summary or

@@ -608,6 +608,10 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
         in violations
     )
     assert (
+        "expected_plan_fail_closed_condition_missing:stale_backend_port_prestart_detail_contract"
+        in violations
+    )
+    assert (
         "expected_plan_fail_closed_condition_missing:manual_review_decision_missing_or_invalid"
         in violations
     )

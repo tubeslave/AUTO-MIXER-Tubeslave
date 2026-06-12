@@ -1130,6 +1130,10 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
     assert "expected_plan_missing_or_mismatch" in written["fail_closed_conditions"]
     assert (
+        "stale_backend_port_prestart_detail_contract"
+        in written["fail_closed_conditions"]
+    )
+    assert (
         "existing_backend_connection_boundary_missing"
         in written["fail_closed_conditions"]
     )
