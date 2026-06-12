@@ -130,6 +130,12 @@ you want the background automation active.
   This first gate proves only that the backend-port prestart check is still
   before the intended backend/WING session; it does not contact WING or grant
   live authority.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_check_operator_sequence_step_index: 0`,
+  `backend_port_prestart_check_must_be_first_operator_step: true`, and
+  `backend_port_prestart_check_operator_sequence_step_is_first: true`.
+  This proves the backend-port prestart check remains the first operator step
+  before any intended backend/WING session.
 - Before any supervised fader/gain proof, the no-WING handoff summary must also
   show
   `supervised_prestart_gate` exactly matching

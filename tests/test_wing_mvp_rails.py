@@ -75,6 +75,15 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_gate.must_pass_before_backend_wing_session: true" in rows[
         0
     ]["next action"]
+    assert "backend_port_prestart_check_operator_sequence_step_index: 0" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_check_must_be_first_operator_step: true" in rows[
+        0
+    ]["next action"]
+    assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in rows[
+        0
+    ]["next action"]
     assert "mvp_blocker_anchor" in rows[0]["next action"]
     assert "mvp_blocker_anchor_matches_current_first_open: true" in rows[0][
         "next action"
