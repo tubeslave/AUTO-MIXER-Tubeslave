@@ -135,6 +135,10 @@ you want the background automation active.
   `backend_port_prestart_gate.operator_sequence_step_index: 0` and
   `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`.
   These fields keep the structured gate aligned with the first operator step.
+- Before any supervised fader/gain proof, the structured
+  `backend_port_prestart_gate` must also show
+  `backend_port_prestart_gate.runs_command: prestart_backend_port_check`.
+  This binds the structured gate to the no-WING backend-port prestart command.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including

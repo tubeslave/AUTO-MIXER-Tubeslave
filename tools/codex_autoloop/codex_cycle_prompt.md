@@ -138,38 +138,40 @@ blockers выше.
    `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`;
 6. verify `backend_port_prestart_gate.operator_sequence_step_index: 0` and
    `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`;
-7. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+7. verify `backend_port_prestart_gate.runs_command:
+   prestart_backend_port_check`;
+8. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_operator_sequence_step` includes
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
-8. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+9. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-9. verify `supervised_prestart_gate.grants_live_authority: false`;
-10. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
+10. verify `supervised_prestart_gate.grants_live_authority: false`;
+11. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
-11. verify `supervised_prestart_gate.requires_operator_decision_status:
+12. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
-12. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-13. verify `operator_sequence_count: 10`;
-14. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-15. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+13. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+14. verify `operator_sequence_count: 10`;
+15. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+16. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-16. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-17. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+17. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+18. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-18. verify `required_supervised_prestart_gate_markers` exactly lists
+19. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-19. run dry-run recommendation;
-20. require explicit operator approval for the exact action;
-21. apply only bounded supervised fader/gain action;
-22. read back the result;
-23. test rollback;
-24. record proof artifact.
+20. run dry-run recommendation;
+21. require explicit operator approval for the exact action;
+22. apply only bounded supervised fader/gain action;
+23. read back the result;
+24. test rollback;
+25. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -228,6 +230,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_gate` must show
   `backend_port_prestart_gate.operator_sequence_step_index: 0` and
   `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`.
+- Before any supervised fader/gain proof, the structured
+  `backend_port_prestart_gate` must also show
+  `backend_port_prestart_gate.runs_command: prestart_backend_port_check`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
