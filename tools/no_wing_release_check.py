@@ -356,6 +356,11 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
 )
+WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
+    "accepted_decision_ready",
+    "valid accepted-candidate prestart trace",
+    "WING_SUPERVISED_FADER_GAIN_PROOF",
+)
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
@@ -3732,6 +3737,15 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             )
     if len(operator_sequence) < 8:
         violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
+    operator_sequence_text = "\n".join(str(item) for item in operator_sequence)
+    operator_sequence_has_supervised_prestart_gate = all(
+        marker in operator_sequence_text
+        for marker in WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
+    )
+    if not operator_sequence_has_supervised_prestart_gate:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_missing"
+        )
     if packet.get("next_manual_artifact_required") != (
         "real wing_readonly_preflight.v1 summary.json"
     ):
@@ -3808,6 +3822,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
     )
     detail["operator_sequence_count"] = len(operator_sequence)
+    detail["operator_sequence_has_supervised_prestart_gate"] = (
+        operator_sequence_has_supervised_prestart_gate
+    )
+    detail["required_supervised_prestart_gate_markers"] = list(
+        WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
+    )
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
     return CheckResult(

@@ -2351,6 +2351,12 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "blockers_not_closed_by_packet"
     ]
     assert result.detail["operator_sequence_count"] == 9
+    assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
+    assert result.detail["required_supervised_prestart_gate_markers"] == [
+        "accepted_decision_ready",
+        "valid accepted-candidate prestart trace",
+        "WING_SUPERVISED_FADER_GAIN_PROOF",
+    ]
     assert result.detail["violations"] == []
 
 
@@ -2366,6 +2372,34 @@ def test_no_wing_release_check_rejects_missing_wing_preflight_handoff_packet_art
     assert "wing_readonly_preflight_handoff_packet_missing_report" in result.detail[
         "violations"
     ]
+
+
+def test_no_wing_release_check_rejects_handoff_packet_without_supervised_prestart_gate(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-without-prestart-gate.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"][-1] = (
+        "Only after accepted_decision_ready, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+    )
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_has_supervised_prestart_gate"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_missing"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_artifact(
