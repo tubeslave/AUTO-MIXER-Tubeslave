@@ -294,6 +294,7 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert "backend_port_prestart_check_command" in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
     assert "listener_processes" in markdown
+    assert "listener_confirmation_checklist" in markdown
     assert str(summary_path) in markdown
     assert "does not contact WING" in markdown
 

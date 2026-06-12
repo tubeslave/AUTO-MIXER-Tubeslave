@@ -309,6 +309,7 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "backend_port_prestart_check_command" in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
     assert "listener_processes" in markdown
+    assert "listener_confirmation_checklist" in markdown
     assert "Manual Review Gate" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "confirm_event_log_readonly_sequence" in markdown

@@ -8376,6 +8376,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert "listener_processes" in decision["candidate_reviews"][0][
         "backend_port_prestart_check_failure_detail_fields"
     ]
+    assert "listener_confirmation_checklist" in decision["candidate_reviews"][0][
+        "backend_port_prestart_check_failure_detail_fields"
+    ]
     assert decision["decision_search_roots"] == [
         "artifacts/wing_readonly_preflight_review_decisions"
     ]
@@ -8391,6 +8394,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert "candidate_reviews:" in markdown_summary
     assert "backend_port_prestart_check_required" in markdown_summary
     assert "listener_processes" in markdown_summary
+    assert "listener_confirmation_checklist" in markdown_summary
     assert "wing_readonly_preflight_review_decisions" in markdown_summary
     assert "manual_readiness_update_candidate_available: `false`" in markdown_summary
 
