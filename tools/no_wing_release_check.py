@@ -528,6 +528,8 @@ WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS = (
     "readback_identity_mismatch",
     "readback_request_id_mismatch",
     "expected_plan_missing_or_mismatch",
+    "prestart_summary_missing_or_invalid",
+    "prestart_summary_sha256_mismatch",
     "stale_backend_port_prestart_detail_contract",
     "existing_backend_connection_boundary_missing",
     "forbidden_request_type_sent",
