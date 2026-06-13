@@ -49,6 +49,16 @@ def _valid_summary() -> dict:
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path": "artifacts/no_wing_release_check/run/summary.json",
+        "backend_port_prestart_summary_sha256": "2" * 64,
+        "backend_port_prestart_summary_type": "no_wing_release_check",
+        "backend_port_prestart_summary_status": "passed",
+        "backend_port_prestart_summary_connection_policy": (
+            "no_hardware_no_network_no_live_writes"
+        ),
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_check_status": "passed",
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -189,6 +199,30 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        "backend_port_prestart_summary_required": summary[
+            "backend_port_prestart_summary_required"
+        ],
+        "backend_port_prestart_summary_path": summary[
+            "backend_port_prestart_summary_path"
+        ],
+        "backend_port_prestart_summary_sha256": summary[
+            "backend_port_prestart_summary_sha256"
+        ],
+        "backend_port_prestart_summary_type": summary[
+            "backend_port_prestart_summary_type"
+        ],
+        "backend_port_prestart_summary_status": summary[
+            "backend_port_prestart_summary_status"
+        ],
+        "backend_port_prestart_summary_connection_policy": summary[
+            "backend_port_prestart_summary_connection_policy"
+        ],
+        "backend_port_prestart_summary_live_write": summary[
+            "backend_port_prestart_summary_live_write"
+        ],
+        "backend_port_prestart_check_status": summary[
+            "backend_port_prestart_check_status"
+        ],
         "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
@@ -214,9 +248,32 @@ def _write_artifact(
     summary_path = run_dir / "summary.json"
     events_path = run_dir / "events.jsonl"
     plan_path = run_dir / "expected_plan.json"
+    prestart_path = run_dir / "no_wing_prestart_summary.json"
     summary["summary_path"] = str(summary_path)
     summary["events_path"] = str(events_path)
     summary["expected_plan_path"] = str(plan_path)
+    summary["backend_port_prestart_summary_path"] = str(prestart_path)
+    prestart_payload = {
+        "type": "no_wing_release_check",
+        "status": "passed",
+        "connection_policy": "no_hardware_no_network_no_live_writes",
+        "live_write": False,
+        "results": [
+            {
+                "name": "backend_port_free",
+                "status": "passed",
+                "detail": {
+                    "safe_to_stop_listener_by_gate": False,
+                    "live_authority_granted": False,
+                },
+            }
+        ],
+    }
+    prestart_path.write_text(
+        json.dumps(prestart_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    summary["backend_port_prestart_summary_sha256"] = _sha256_file(prestart_path)
     plan_bytes = json.dumps(_valid_expected_plan(summary), sort_keys=True).encode("utf-8")
     plan_path.write_bytes(plan_bytes)
     summary["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
@@ -292,6 +349,20 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "backend_port_prestart_check_failure_detail_fields": list(
                 EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
+            "backend_port_prestart_summary_required": True,
+            "backend_port_prestart_summary_path": str(
+                summary_path.parent / "no_wing_prestart_summary.json"
+            ),
+            "backend_port_prestart_summary_sha256": _sha256_file(
+                summary_path.parent / "no_wing_prestart_summary.json"
+            ),
+            "backend_port_prestart_summary_type": "no_wing_release_check",
+            "backend_port_prestart_summary_status": "passed",
+            "backend_port_prestart_summary_connection_policy": (
+                "no_hardware_no_network_no_live_writes"
+            ),
+            "backend_port_prestart_summary_live_write": False,
+            "backend_port_prestart_check_status": "passed",
             "operator_next_step": None,
             "value_types": ["fader", "gain", "pan"],
             "readback_count": 3,
@@ -314,6 +385,10 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
+    assert "backend_port_prestart_summary_required: `true`" in markdown
+    assert "backend_port_prestart_summary_type: `no_wing_release_check`" in markdown
+    assert "backend_port_prestart_summary_status: `passed`" in markdown
+    assert "backend_port_prestart_check_status: `passed`" in markdown
     assert "listener_processes" in markdown
     assert "listener_confirmation_checklist" in markdown
     assert "operator_next_step: `None`" in markdown

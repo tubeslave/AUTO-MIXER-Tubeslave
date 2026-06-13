@@ -203,6 +203,30 @@ def _candidate_review_rows(
                     candidate.get("backend_port_prestart_check_failure_detail_fields")
                     or []
                 ),
+                "backend_port_prestart_summary_required": (
+                    candidate.get("backend_port_prestart_summary_required") is True
+                ),
+                "backend_port_prestart_summary_path": candidate.get(
+                    "backend_port_prestart_summary_path"
+                ),
+                "backend_port_prestart_summary_sha256": candidate.get(
+                    "backend_port_prestart_summary_sha256"
+                ),
+                "backend_port_prestart_summary_type": candidate.get(
+                    "backend_port_prestart_summary_type"
+                ),
+                "backend_port_prestart_summary_status": candidate.get(
+                    "backend_port_prestart_summary_status"
+                ),
+                "backend_port_prestart_summary_connection_policy": candidate.get(
+                    "backend_port_prestart_summary_connection_policy"
+                ),
+                "backend_port_prestart_summary_live_write": candidate.get(
+                    "backend_port_prestart_summary_live_write"
+                ),
+                "backend_port_prestart_check_status": candidate.get(
+                    "backend_port_prestart_check_status"
+                ),
             }
         )
     return rows
@@ -233,6 +257,25 @@ def _accepted_candidate_prestart_source_ids(
         if _string_list(row.get("backend_port_prestart_check_failure_detail_fields")) != (
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ):
+            continue
+        if row.get("backend_port_prestart_summary_required") is not True:
+            continue
+        if not _string(row.get("backend_port_prestart_summary_path")):
+            continue
+        if not _string(row.get("backend_port_prestart_summary_sha256")):
+            continue
+        if row.get("backend_port_prestart_summary_type") != "no_wing_release_check":
+            continue
+        if row.get("backend_port_prestart_summary_status") != "passed":
+            continue
+        if (
+            row.get("backend_port_prestart_summary_connection_policy")
+            != "no_hardware_no_network_no_live_writes"
+        ):
+            continue
+        if row.get("backend_port_prestart_summary_live_write") is not False:
+            continue
+        if row.get("backend_port_prestart_check_status") != "passed":
             continue
         valid_source_ids.append(source_id)
     return valid_source_ids

@@ -93,6 +93,18 @@ def accepted_review_decision_ledger() -> dict:
                     "backend_port_prestart_check_failure_detail_fields": list(
                         PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
                     ),
+                    "backend_port_prestart_summary_required": True,
+                    "backend_port_prestart_summary_path": (
+                        "artifacts/no_wing_release_check/run/summary.json"
+                    ),
+                    "backend_port_prestart_summary_sha256": "3" * 64,
+                    "backend_port_prestart_summary_type": "no_wing_release_check",
+                    "backend_port_prestart_summary_status": "passed",
+                    "backend_port_prestart_summary_connection_policy": (
+                        "no_hardware_no_network_no_live_writes"
+                    ),
+                    "backend_port_prestart_summary_live_write": False,
+                    "backend_port_prestart_check_status": "passed",
                 }
             ],
             "rejected_source_ids": [],
@@ -352,6 +364,18 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
             "backend_port_prestart_check_failure_detail_fields": list(
                 PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
             ),
+            "backend_port_prestart_summary_required": True,
+            "backend_port_prestart_summary_path": (
+                "artifacts/no_wing_release_check/run/summary.json"
+            ),
+            "backend_port_prestart_summary_sha256": "3" * 64,
+            "backend_port_prestart_summary_type": "no_wing_release_check",
+            "backend_port_prestart_summary_status": "passed",
+            "backend_port_prestart_summary_connection_policy": (
+                "no_hardware_no_network_no_live_writes"
+            ),
+            "backend_port_prestart_summary_live_write": False,
+            "backend_port_prestart_check_status": "passed",
         }
     ]
     readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
@@ -374,6 +398,34 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
         plan["summary"]["readonly_preflight_review_decision_candidate_prestart_source_ids"]
         == []
     )
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+
+
+def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart_summary_binding():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"]["candidate_reviews"][0]["backend_port_prestart_summary_path"] = ""
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+        ]
+        is False
+    )
+    assert plan["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_source_ids"
+    ] == []
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in plan["summary"]["global_blockers"]

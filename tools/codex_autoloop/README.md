@@ -192,6 +192,13 @@ you want the background automation active.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `expected_plan_required_for_real_run: true`.
   This keeps the real read-only preflight tied to the offline expected plan.
+- Before any supervised fader/gain proof, the accepted-candidate prestart trace
+  must show `backend_port_prestart_summary_required: true`,
+  `backend_port_prestart_summary_status: passed`,
+  `backend_port_prestart_summary_live_write: false`, and
+  `backend_port_prestart_check_status: passed`.
+  This keeps the read-only candidate tied to the actual passed no-WING
+  prestart `summary.json`, not only to prestart field names.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `physical_preflight_requires_existing_backend_connection: true`.
   This keeps the physical read-only preflight tied to the intended existing

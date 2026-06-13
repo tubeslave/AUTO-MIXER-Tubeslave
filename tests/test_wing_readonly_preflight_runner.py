@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -74,7 +75,47 @@ def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebS
     monkeypatch.setattr(runner.websockets, "connect", fake_connect)
 
 
+def prestart_summary_path(tmp_path: Path) -> Path:
+    return tmp_path / "no-wing-prestart-summary.json"
+
+
+def ensure_prestart_summary(tmp_path: Path) -> Path:
+    path = prestart_summary_path(tmp_path)
+    if path.exists():
+        return path
+    payload = {
+        "type": "no_wing_release_check",
+        "status": "passed",
+        "connection_policy": "no_hardware_no_network_no_live_writes",
+        "live_write": False,
+        "results": [
+            {
+                "name": "backend_port_free",
+                "status": "passed",
+                "detail": {
+                    "host": "127.0.0.1",
+                    "port": 8765,
+                    "safe_to_stop_listener_by_gate": False,
+                    "live_authority_granted": False,
+                },
+            }
+        ],
+    }
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def parse_args(tmp_path: Path, *argv: str):
+    extra = list(argv)
+    if "--prestart-summary" not in extra:
+        extra.extend(["--prestart-summary", str(ensure_prestart_summary(tmp_path))])
     return runner.build_parser().parse_args(
         [
             "--url",
@@ -83,7 +124,7 @@ def parse_args(tmp_path: Path, *argv: str):
             str(tmp_path),
             "--timeout",
             "0.2",
-            *argv,
+            *extra,
         ]
     )
 
@@ -126,6 +167,21 @@ def assert_summary_prestart_contract(summary: dict) -> None:
     assert summary["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    prestart_path = prestart_summary_path(Path(summary["backend_port_prestart_summary_path"]).parent)
+    assert summary["backend_port_prestart_summary_required"] is True
+    assert Path(summary["backend_port_prestart_summary_path"]).exists()
+    assert summary["backend_port_prestart_summary_sha256"] == sha256_file(
+        Path(summary["backend_port_prestart_summary_path"])
+    )
+    assert summary["backend_port_prestart_summary_path"] == str(prestart_path)
+    assert summary["backend_port_prestart_summary_type"] == "no_wing_release_check"
+    assert summary["backend_port_prestart_summary_status"] == "passed"
+    assert (
+        summary["backend_port_prestart_summary_connection_policy"]
+        == "no_hardware_no_network_no_live_writes"
+    )
+    assert summary["backend_port_prestart_summary_live_write"] is False
+    assert summary["backend_port_prestart_check_status"] == "passed"
 
 
 def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
@@ -1133,6 +1189,21 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    assert written["backend_port_prestart_summary_required"] is True
+    assert written["backend_port_prestart_summary_path"] == str(
+        prestart_summary_path(tmp_path)
+    )
+    assert written["backend_port_prestart_summary_sha256"] == sha256_file(
+        prestart_summary_path(tmp_path)
+    )
+    assert written["backend_port_prestart_summary_type"] == "no_wing_release_check"
+    assert written["backend_port_prestart_summary_status"] == "passed"
+    assert (
+        written["backend_port_prestart_summary_connection_policy"]
+        == "no_hardware_no_network_no_live_writes"
+    )
+    assert written["backend_port_prestart_summary_live_write"] is False
+    assert written["backend_port_prestart_check_status"] == "passed"
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert written["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
@@ -1182,6 +1253,8 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert "operator_session_confirmation_missing" in written["fail_closed_conditions"]
     assert "readback_request_id_mismatch" in written["fail_closed_conditions"]
     assert "expected_plan_missing_or_mismatch" in written["fail_closed_conditions"]
+    assert "prestart_summary_missing_or_invalid" in written["fail_closed_conditions"]
+    assert "prestart_summary_sha256_mismatch" in written["fail_closed_conditions"]
     assert (
         "stale_backend_port_prestart_detail_contract"
         in written["fail_closed_conditions"]
@@ -1193,6 +1266,48 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert "unexpected_response_type" in written["fail_closed_conditions"]
     assert "manual_review_decision_missing_or_invalid" in written["fail_closed_conditions"]
     assert not list(tmp_path.glob(f"*/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"))
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_missing_prestart_summary_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"missing prestart summary must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--expected-plan",
+            str(tmp_path / "expected-plan.json"),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert summary["backend_port_prestart_summary_required"] is True
+    assert summary["prestart_summary_violations"] == ["prestart_summary_missing"]
+    assert "tools/no_wing_release_check.py" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
 
 
 @pytest.mark.asyncio

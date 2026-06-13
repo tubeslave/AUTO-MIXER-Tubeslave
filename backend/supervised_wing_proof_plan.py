@@ -266,6 +266,25 @@ def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ):
             continue
+        if row.get("backend_port_prestart_summary_required") is not True:
+            continue
+        if not str(row.get("backend_port_prestart_summary_path") or ""):
+            continue
+        if not str(row.get("backend_port_prestart_summary_sha256") or ""):
+            continue
+        if row.get("backend_port_prestart_summary_type") != "no_wing_release_check":
+            continue
+        if row.get("backend_port_prestart_summary_status") != "passed":
+            continue
+        if (
+            row.get("backend_port_prestart_summary_connection_policy")
+            != "no_hardware_no_network_no_live_writes"
+        ):
+            continue
+        if row.get("backend_port_prestart_summary_live_write") is not False:
+            continue
+        if row.get("backend_port_prestart_check_status") != "passed":
+            continue
         valid_source_ids.append(source_id)
     return valid_source_ids
 

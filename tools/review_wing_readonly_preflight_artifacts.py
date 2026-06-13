@@ -144,6 +144,30 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                     )
                     else []
                 ),
+                "backend_port_prestart_summary_required": (
+                    item.get("backend_port_prestart_summary_required") is True
+                ),
+                "backend_port_prestart_summary_path": item.get(
+                    "backend_port_prestart_summary_path"
+                ),
+                "backend_port_prestart_summary_sha256": item.get(
+                    "backend_port_prestart_summary_sha256"
+                ),
+                "backend_port_prestart_summary_type": item.get(
+                    "backend_port_prestart_summary_type"
+                ),
+                "backend_port_prestart_summary_status": item.get(
+                    "backend_port_prestart_summary_status"
+                ),
+                "backend_port_prestart_summary_connection_policy": item.get(
+                    "backend_port_prestart_summary_connection_policy"
+                ),
+                "backend_port_prestart_summary_live_write": item.get(
+                    "backend_port_prestart_summary_live_write"
+                ),
+                "backend_port_prestart_check_status": item.get(
+                    "backend_port_prestart_check_status"
+                ),
                 "operator_next_step": (
                     str(item.get("operator_next_step"))
                     if item.get("operator_next_step")
@@ -438,6 +462,22 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
                     "  - backend_port_prestart_check_failure_detail_fields: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
+                    "  - backend_port_prestart_summary_required: "
+                    f"`{str(row.get('backend_port_prestart_summary_required') is True).lower()}`",
+                    "  - backend_port_prestart_summary_path: "
+                    f"`{row.get('backend_port_prestart_summary_path')}`",
+                    "  - backend_port_prestart_summary_sha256: "
+                    f"`{row.get('backend_port_prestart_summary_sha256')}`",
+                    "  - backend_port_prestart_summary_type: "
+                    f"`{row.get('backend_port_prestart_summary_type')}`",
+                    "  - backend_port_prestart_summary_status: "
+                    f"`{row.get('backend_port_prestart_summary_status')}`",
+                    "  - backend_port_prestart_summary_connection_policy: "
+                    f"`{row.get('backend_port_prestart_summary_connection_policy')}`",
+                    "  - backend_port_prestart_summary_live_write: "
+                    f"`{json.dumps(row.get('backend_port_prestart_summary_live_write'))}`",
+                    "  - backend_port_prestart_check_status: "
+                    f"`{row.get('backend_port_prestart_check_status')}`",
                     f"  - operator_next_step: `{row.get('operator_next_step')}`",
                     f"  - value_types: `{json.dumps(row.get('value_types') or [])}`",
                     f"  - readback_count: `{int(row.get('readback_count') or 0)}`",

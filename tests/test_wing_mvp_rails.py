@@ -65,6 +65,11 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "executes_tests: false" in text
     assert "operator_required: true" in text
     assert "expected_plan_required_for_real_run: true" in text
+    assert "backend_port_prestart_summary_required: true" in text
+    assert "backend_port_prestart_summary_type: no_wing_release_check" in text
+    assert "backend_port_prestart_summary_status: passed" in text
+    assert "backend_port_prestart_summary_live_write: false" in text
+    assert "backend_port_prestart_check_status: passed" in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
@@ -135,6 +140,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
+        in rows[0]["evidence"]
+    )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
     assert "backend_port_prestart_gate" in rows[0]["next action"]
     assert "expected_backend_port_prestart_gate" in rows[0]["next action"]
@@ -186,6 +195,16 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "executes_tests: false" in rows[0]["next action"]
     assert "operator_required: true" in rows[0]["next action"]
     assert "expected_plan_required_for_real_run: true" in rows[0]["next action"]
+    assert "backend_port_prestart_summary_required: true" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_status: passed" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_live_write: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_check_status: passed" in rows[0]["next action"]
     assert (
         "physical_preflight_requires_existing_backend_connection: true"
         in rows[0]["next action"]
@@ -582,6 +601,10 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "executes_tests: false" in text
     assert "operator_required: true" in text
     assert "expected_plan_required_for_real_run: true" in text
+    assert "backend_port_prestart_summary_required: true" in text
+    assert "backend_port_prestart_summary_status: passed" in text
+    assert "backend_port_prestart_summary_live_write: false" in text
+    assert "backend_port_prestart_check_status: passed" in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
@@ -622,6 +645,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_HANDOFF_STRUCTURED_GATE_SUMMARY_20260612.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in text
     )
     assert (

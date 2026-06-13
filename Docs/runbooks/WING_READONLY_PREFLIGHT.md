@@ -60,6 +60,10 @@ It does not approve live writes.
 
   A valid confirmation only clears the local backend-port prestart blocker; it
   does not contact WING, does not approve writes, and does not close readiness.
+  Keep the passed no-WING `summary.json` path. The read-only preflight plan and
+  real run must both use it with `--prestart-summary`; the runner records its
+  SHA256 and fails closed before WebSocket if the file is missing, stale, or not
+  a passed `backend_port_free` prestart result.
 - If the no-WING release summary includes
   `wing_readonly_preflight_evidence.artifact_operator_next_steps`, inspect and
   complete those repair instructions before opening a backend/WING WebSocket.
@@ -113,7 +117,8 @@ it does not open WebSocket, contact WING, query the console, or grant live
 authority. The plan also records the current MVP blocker, fail-closed
 conditions, and the offline review commands to run after the real artifact is
 captured. It must also show `expected_plan_required_for_real_run: true` and
-`physical_preflight_requires_existing_backend_connection: true`:
+`physical_preflight_requires_existing_backend_connection: true`. Replace
+`$PRESTART_SUMMARY` with the passed no-WING prestart `summary.json`:
 
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \
@@ -123,6 +128,7 @@ python3 tools/wing_readonly_preflight_runner.py \
   --operator-confirm-session-ready \
   --value-types fader,gain,pan \
   --require-physical-readback \
+  --prestart-summary "$PRESTART_SUMMARY" \
   --artifact-root artifacts/wing_readonly_preflight \
   --plan-only \
   --plan-output artifacts/wing_readonly_preflight_plan/latest_plan.json
@@ -132,7 +138,8 @@ Then run the real read-only preflight only when the intended backend/WING
 session is ready. The real run must point at the offline plan generated above
 with `--expected-plan`; if the flag is omitted, or if the runtime arguments or
 request sequence do not match that plan, the runner fails closed before opening
-WebSocket and writes `operator_next_step` in `summary.json`:
+WebSocket and writes `operator_next_step` in `summary.json`. It must also point
+at the same no-WING prestart summary used for the plan:
 
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \
@@ -142,6 +149,7 @@ python3 tools/wing_readonly_preflight_runner.py \
   --operator-confirm-session-ready \
   --value-types fader,gain,pan \
   --require-physical-readback \
+  --prestart-summary "$PRESTART_SUMMARY" \
   --artifact-root artifacts/wing_readonly_preflight \
   --expected-plan artifacts/wing_readonly_preflight_plan/latest_plan.json
 ```
@@ -175,6 +183,17 @@ The summary must show:
 - `expected_plan_violations: []`
 - `expected_plan_sha256` is non-empty and matches the referenced offline plan
   file during artifact review
+- `backend_port_prestart_summary_required: true`
+- `backend_port_prestart_summary_path` points to the passed no-WING prestart
+  `summary.json`
+- `backend_port_prestart_summary_sha256` is non-empty and matches that
+  `summary.json` during artifact review
+- `backend_port_prestart_summary_type: no_wing_release_check`
+- `backend_port_prestart_summary_status: passed`
+- `backend_port_prestart_summary_connection_policy:
+  no_hardware_no_network_no_live_writes`
+- `backend_port_prestart_summary_live_write: false`
+- `backend_port_prestart_check_status: passed`
 - referenced offline plan fields and `request_sequence` match the captured
   summary, operator-confirmed channels, value types, and readback identities
 - `physical_readback_count == readback_count`
@@ -332,6 +351,13 @@ Then update:
 - a `query_mixer_parameter` response does not match its request identity;
 - a `query_mixer_parameter` response omits or mismatches the request id;
 - the real run omits the expected offline plan or does not match it;
+- the real run omits `--prestart-summary`, the referenced no-WING summary is
+  missing, stale, not `status: passed`, not `type: no_wing_release_check`, not
+  `connection_policy: no_hardware_no_network_no_live_writes`, has
+  `live_write: true`, lacks `backend_port_free`, or has
+  `backend_port_free.status` other than `passed`;
+- the captured read-only summary's `backend_port_prestart_summary_sha256` does
+  not match the referenced no-WING prestart summary file;
 - the expected offline plan uses a stale backend-port prestart failure-detail
   contract, including missing `listener_confirmation_checklist`;
 - the referenced offline plan file is missing or its SHA256 does not match

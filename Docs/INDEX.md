@@ -180,6 +180,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING blocker listener-probe evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` |
 | Current WING no-WING busy-port fail-closed evidence | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` |
 | Current WING backend-listener confirmation artifact | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md` |
+| Current WING read-only prestart summary binding | `Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md` |
 | Current WING backend prestart owner diagnostics | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md` |
 | Correction method roadmap | `Docs/CORRECTION_METHODS_ROADMAP.md`, `.ai/project-layer/correction_methods_backlog.md` |
 | Processing pipeline selection | `Docs/PROCESSING_METHODS_INVENTORY.md`, `Docs/adr/processing-pipeline-selection.md` |

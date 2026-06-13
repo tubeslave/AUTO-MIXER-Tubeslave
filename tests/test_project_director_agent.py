@@ -88,6 +88,18 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "executes_tests: false" in directive["selected_action"]
     assert "operator_required: true" in directive["selected_action"]
     assert "expected_plan_required_for_real_run: true" in directive["selected_action"]
+    assert "backend_port_prestart_summary_required: true" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_summary_status: passed" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_summary_live_write: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_check_status: passed" in directive[
+        "selected_action"
+    ]
     assert (
         "physical_preflight_requires_existing_backend_connection: true"
         in directive["selected_action"]
@@ -220,6 +232,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in directive["selected_evidence_files"]
     )
     assert directive["stop_broad_work"] is True

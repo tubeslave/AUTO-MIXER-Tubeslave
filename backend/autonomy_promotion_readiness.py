@@ -351,6 +351,16 @@ def _wing_readonly_preflight_readiness_overlay(
         and not full_auto
     )
     matrix_rows = [row for row in matrix if isinstance(row, dict)]
+    artifacts = (
+        evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
+    )
+    valid_artifacts = [
+        row
+        for row in artifacts
+        if isinstance(row, dict)
+        and row.get("accepted_as_readonly_preflight_candidate") is True
+    ]
+    latest_candidate = valid_artifacts[0] if valid_artifacts else {}
     candidate_ids = [
         str(row.get("id"))
         for row in matrix_rows
@@ -393,6 +403,24 @@ def _wing_readonly_preflight_readiness_overlay(
         ),
         "prestart_backend_port_check_failure_detail_fields": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
+        "prestart_backend_port_summary_required": (
+            latest_candidate.get("backend_port_prestart_summary_required") is True
+        ),
+        "prestart_backend_port_summary_path": latest_candidate.get(
+            "backend_port_prestart_summary_path"
+        ),
+        "prestart_backend_port_summary_sha256": latest_candidate.get(
+            "backend_port_prestart_summary_sha256"
+        ),
+        "prestart_backend_port_summary_status": latest_candidate.get(
+            "backend_port_prestart_summary_status"
+        ),
+        "prestart_backend_port_summary_live_write": latest_candidate.get(
+            "backend_port_prestart_summary_live_write"
+        ),
+        "prestart_backend_port_check_status": latest_candidate.get(
+            "backend_port_prestart_check_status"
         ),
         "candidate_blocker_ids": candidate_ids,
         "closed_blocker_ids": closed_ids,

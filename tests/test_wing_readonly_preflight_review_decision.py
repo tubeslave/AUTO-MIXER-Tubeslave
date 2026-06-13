@@ -45,6 +45,16 @@ def _valid_summary() -> dict:
         "backend_port_prestart_check_failure_detail_fields": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path": "artifacts/no_wing_release_check/run/summary.json",
+        "backend_port_prestart_summary_sha256": "3" * 64,
+        "backend_port_prestart_summary_type": "no_wing_release_check",
+        "backend_port_prestart_summary_status": "passed",
+        "backend_port_prestart_summary_connection_policy": (
+            "no_hardware_no_network_no_live_writes"
+        ),
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_check_status": "passed",
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -170,6 +180,18 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
             "backend_port_prestart_check_failure_detail_fields": list(
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
+            "backend_port_prestart_summary_required": True,
+            "backend_port_prestart_summary_path": (
+                "artifacts/no_wing_release_check/run/summary.json"
+            ),
+            "backend_port_prestart_summary_sha256": "3" * 64,
+            "backend_port_prestart_summary_type": "no_wing_release_check",
+            "backend_port_prestart_summary_status": "passed",
+            "backend_port_prestart_summary_connection_policy": (
+                "no_hardware_no_network_no_live_writes"
+            ),
+            "backend_port_prestart_summary_live_write": False,
+            "backend_port_prestart_check_status": "passed",
         }
     ]
     assert "operator_must_record_readonly_preflight_review_decision" in ledger[
@@ -221,6 +243,26 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contr
     )
     assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["live_authority_granted"] is False
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_summary_binding():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["backend_port_prestart_summary_sha256"] = None
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
 
 
 def test_review_decision_ledger_loads_decision_record_from_json_file(tmp_path):

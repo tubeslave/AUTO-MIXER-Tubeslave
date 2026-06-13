@@ -55,6 +55,16 @@ def _valid_summary() -> dict:
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path": "artifacts/no_wing_release_check/run/summary.json",
+        "backend_port_prestart_summary_sha256": "2" * 64,
+        "backend_port_prestart_summary_type": "no_wing_release_check",
+        "backend_port_prestart_summary_status": "passed",
+        "backend_port_prestart_summary_connection_policy": (
+            "no_hardware_no_network_no_live_writes"
+        ),
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_check_status": "passed",
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -197,6 +207,30 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        "backend_port_prestart_summary_required": summary[
+            "backend_port_prestart_summary_required"
+        ],
+        "backend_port_prestart_summary_path": summary[
+            "backend_port_prestart_summary_path"
+        ],
+        "backend_port_prestart_summary_sha256": summary[
+            "backend_port_prestart_summary_sha256"
+        ],
+        "backend_port_prestart_summary_type": summary[
+            "backend_port_prestart_summary_type"
+        ],
+        "backend_port_prestart_summary_status": summary[
+            "backend_port_prestart_summary_status"
+        ],
+        "backend_port_prestart_summary_connection_policy": summary[
+            "backend_port_prestart_summary_connection_policy"
+        ],
+        "backend_port_prestart_summary_live_write": summary[
+            "backend_port_prestart_summary_live_write"
+        ],
+        "backend_port_prestart_check_status": summary[
+            "backend_port_prestart_check_status"
+        ],
         "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
@@ -220,15 +254,45 @@ def _write_expected_plan(summary_path: Path, plan: dict) -> None:
     summary_path.write_text(json.dumps(summary), encoding="utf-8")
 
 
+def _write_prestart_summary(path: Path, *, status: str = "passed") -> None:
+    payload = {
+        "type": "no_wing_release_check",
+        "status": status,
+        "connection_policy": "no_hardware_no_network_no_live_writes",
+        "live_write": False,
+        "results": [
+            {
+                "name": "backend_port_free",
+                "status": "passed",
+                "detail": {
+                    "safe_to_stop_listener_by_gate": False,
+                    "live_authority_granted": False,
+                },
+            }
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events: list[dict] | None = None) -> Path:
     artifact_dir.mkdir(parents=True)
     artifact_path = artifact_dir / "summary.json"
     events_path = artifact_dir / "events.jsonl"
     plan_path = artifact_dir / "expected_plan.json"
+    prestart_path = artifact_dir / "no_wing_prestart_summary.json"
     payload = copy.deepcopy(summary or _valid_summary())
     payload["events_path"] = str(events_path)
     payload["summary_path"] = str(artifact_path)
     payload["expected_plan_path"] = str(plan_path)
+    payload["backend_port_prestart_summary_path"] = str(prestart_path)
+    _write_prestart_summary(prestart_path)
+    payload["backend_port_prestart_summary_sha256"] = hashlib.sha256(
+        prestart_path.read_bytes()
+    ).hexdigest()
     plan_bytes = json.dumps(_valid_expected_plan(payload), sort_keys=True).encode("utf-8")
     plan_path.write_bytes(plan_bytes)
     payload["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
@@ -316,6 +380,13 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert evidence["artifacts"][0]["operator_confirmed_channels"] == [3]
     assert evidence["artifacts"][0]["operator_session_confirmation_required"] is True
     assert evidence["artifacts"][0]["operator_confirmed_session_ready"] is True
+    assert evidence["artifacts"][0]["backend_port_prestart_summary_required"] is True
+    assert (
+        evidence["artifacts"][0]["backend_port_prestart_summary_type"]
+        == "no_wing_release_check"
+    )
+    assert evidence["artifacts"][0]["backend_port_prestart_summary_status"] == "passed"
+    assert evidence["artifacts"][0]["backend_port_prestart_check_status"] == "passed"
     assert evidence["artifacts"][0]["violations"] == []
 
 
@@ -640,6 +711,39 @@ def test_file_preflight_artifact_requires_summary_prestart_contract(tmp_path):
     )
     assert "backend_port_prestart_check_command_mismatch" in violations
     assert "backend_port_prestart_check_failure_detail_fields_mismatch" in violations
+
+
+def test_file_preflight_artifact_requires_prestart_summary_file(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "missing-prestart")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    Path(summary["backend_port_prestart_summary_path"]).unlink()
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert "prestart_summary_file_missing" in evidence["summary"]["violations"]
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+
+
+def test_file_preflight_artifact_requires_matching_prestart_summary_sha(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "prestart-sha")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    Path(summary["backend_port_prestart_summary_path"]).write_text(
+        json.dumps({"type": "no_wing_release_check", "status": "passed"}),
+        encoding="utf-8",
+    )
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert "prestart_summary_sha256_mismatch" in evidence["summary"]["violations"]
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
 
 
 def test_file_preflight_artifact_requires_expected_plan_request_sequence_to_match_summary(tmp_path):

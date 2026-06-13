@@ -160,16 +160,20 @@ blockers выше.
 18. verify `executes_tests: false`;
 19. verify `operator_required: true`;
 20. verify `expected_plan_required_for_real_run: true`;
-21. verify `physical_preflight_requires_existing_backend_connection: true`;
-22. verify `backend_port_prestart_check_required: true`;
-23. verify
-   `backend_port_prestart_check_must_pass_before_starting_backend: true`;
-24. verify `execution_allowed_by_packet: false`;
-25. verify `live_authority_granted: false`;
-26. verify `full_autonomous_ready: false`;
+21. verify `backend_port_prestart_summary_required: true`;
+22. verify `backend_port_prestart_summary_status: passed`;
+23. verify `backend_port_prestart_summary_live_write: false`;
+24. verify `backend_port_prestart_check_status: passed`;
+25. verify `physical_preflight_requires_existing_backend_connection: true`;
+26. verify `backend_port_prestart_check_required: true`;
 27. verify
+   `backend_port_prestart_check_must_pass_before_starting_backend: true`;
+28. verify `execution_allowed_by_packet: false`;
+29. verify `live_authority_granted: false`;
+30. verify `full_autonomous_ready: false`;
+31. verify
    `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`;
-28. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+32. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_operator_sequence_step` includes
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
@@ -295,6 +299,11 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `operator_required: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `expected_plan_required_for_real_run: true`.
+- Before any supervised fader/gain proof, the accepted-candidate prestart trace
+  must show `backend_port_prestart_summary_required: true`,
+  `backend_port_prestart_summary_status: passed`,
+  `backend_port_prestart_summary_live_write: false`, and
+  `backend_port_prestart_check_status: passed`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `physical_preflight_requires_existing_backend_connection: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

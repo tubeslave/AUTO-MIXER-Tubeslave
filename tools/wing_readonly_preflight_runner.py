@@ -35,6 +35,9 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
 EXPECTED_MODE_EVENTS = {"operator_mode_status"}
 EXPECTED_STATE_EVENTS = {"state_update"}
 EXPECTED_PARAMETER_EVENTS = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
+PRESTART_SUMMARY_TYPE = "no_wing_release_check"
+PRESTART_SUMMARY_CONNECTION_POLICY = "no_hardware_no_network_no_live_writes"
+PRESTART_SUMMARY_BACKEND_CHECK_NAME = "backend_port_free"
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",
     "set_gain",
@@ -102,6 +105,14 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "backend_port_prestart_check_must_pass_before_starting_backend",
     "backend_port_prestart_check_command",
     "backend_port_prestart_check_failure_detail_fields",
+    "backend_port_prestart_summary_required",
+    "backend_port_prestart_summary_path",
+    "backend_port_prestart_summary_sha256",
+    "backend_port_prestart_summary_type",
+    "backend_port_prestart_summary_status",
+    "backend_port_prestart_summary_connection_policy",
+    "backend_port_prestart_summary_live_write",
+    "backend_port_prestart_check_status",
     "manual_review_required_before_readiness_update",
     "contacts_backend",
     "queries_console",
@@ -368,6 +379,15 @@ def build_parser() -> argparse.ArgumentParser:
             "this file is omitted or mismatched."
         ),
     )
+    parser.add_argument(
+        "--prestart-summary",
+        default="",
+        help=(
+            "Required no-WING prestart summary.json produced by "
+            "tools/no_wing_release_check.py --quick before the intended "
+            "backend/WING session."
+        ),
+    )
     parser.add_argument("--timeout", type=float, default=5.0, help="Timeout per WebSocket step")
     parser.add_argument("--artifact-root", default="artifacts/wing_readonly_preflight", help="Artifact root directory")
     return parser
@@ -433,11 +453,94 @@ def load_expected_plan(path: str) -> tuple[Dict[str, Any], str]:
     return payload, sha256_bytes(raw)
 
 
+def prestart_summary_operator_next_step(reason: str) -> str:
+    if reason == "prestart_summary_missing":
+        return (
+            "Run PYTHONPATH=backend python3 tools/no_wing_release_check.py "
+            "--quick before starting the intended backend/WING session, then "
+            "rerun the read-only plan and real preflight with --prestart-summary "
+            "pointing to that passed summary.json."
+        )
+    return (
+        "Use a passed no-WING prestart summary.json from the current intended "
+        "backend/WING session. Do not open the backend/WING WebSocket until "
+        "the prestart summary validates."
+    )
+
+
+def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[str]]:
+    detail: Dict[str, Any] = {"backend_port_prestart_summary_required": True}
+    violations: list[str] = []
+    if not path:
+        violations.append("prestart_summary_missing")
+        return detail, violations
+
+    summary_path = Path(path)
+    detail["backend_port_prestart_summary_path"] = str(summary_path)
+    try:
+        raw = summary_path.read_bytes()
+    except FileNotFoundError:
+        violations.append("prestart_summary_file_missing")
+        return detail, violations
+    except OSError as exc:
+        violations.append(f"prestart_summary_file_error:{type(exc).__name__}")
+        return detail, violations
+
+    detail["backend_port_prestart_summary_sha256"] = sha256_bytes(raw)
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        violations.append(f"prestart_summary_load_error:{type(exc).__name__}")
+        return detail, violations
+    if not isinstance(payload, dict):
+        violations.append("prestart_summary_root_not_object")
+        return detail, violations
+
+    detail["backend_port_prestart_summary_type"] = payload.get("type")
+    detail["backend_port_prestart_summary_status"] = payload.get("status")
+    detail["backend_port_prestart_summary_connection_policy"] = payload.get(
+        "connection_policy"
+    )
+    detail["backend_port_prestart_summary_live_write"] = payload.get("live_write")
+
+    if payload.get("type") != PRESTART_SUMMARY_TYPE:
+        violations.append("prestart_summary_type_mismatch")
+    if payload.get("status") != "passed":
+        violations.append("prestart_summary_status_not_passed")
+    if payload.get("connection_policy") != PRESTART_SUMMARY_CONNECTION_POLICY:
+        violations.append("prestart_summary_connection_policy_mismatch")
+    if payload.get("live_write") is not False:
+        violations.append("prestart_summary_live_write_not_false")
+
+    results = payload.get("results")
+    backend_check = None
+    if isinstance(results, list):
+        for item in results:
+            if isinstance(item, dict) and item.get("name") == PRESTART_SUMMARY_BACKEND_CHECK_NAME:
+                backend_check = item
+                break
+    if backend_check is None:
+        violations.append("prestart_summary_backend_port_check_missing")
+    else:
+        detail["backend_port_prestart_check_status"] = backend_check.get("status")
+        if backend_check.get("status") != "passed":
+            violations.append("prestart_summary_backend_port_check_not_passed")
+        check_detail = backend_check.get("detail")
+        if isinstance(check_detail, dict):
+            if check_detail.get("live_authority_granted") is True:
+                violations.append("prestart_summary_live_authority_granted")
+            if check_detail.get("safe_to_stop_listener_by_gate") is True:
+                violations.append("prestart_summary_safe_to_stop_listener_true")
+
+    return detail, violations
+
+
 def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
     channels = parse_csv_ints(args.channels)
     value_types = parse_csv_strings(args.value_types)
     read_requests = build_read_requests(channels, value_types)
     artifact_root = str(args.artifact_root)
+    prestart_detail, _ = load_backend_port_prestart_summary(args.prestart_summary)
     return {
         "type": "wing_readonly_preflight_offline_plan",
         "status": "ready_for_operator_review",
@@ -465,6 +568,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        **prestart_detail,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
         "queries_console": False,
@@ -512,6 +616,8 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             "readback_identity_mismatch",
             "readback_request_id_mismatch",
             "expected_plan_missing_or_mismatch",
+            "prestart_summary_missing_or_invalid",
+            "prestart_summary_sha256_mismatch",
             "stale_backend_port_prestart_detail_contract",
             "existing_backend_connection_boundary_missing",
             "forbidden_request_type_sent",
@@ -558,6 +664,9 @@ def expected_plan_operator_next_step(reason: str) -> str:
 
 async def run(args: argparse.Namespace) -> int:
     validation_error = validate_args(args)
+    prestart_detail, prestart_violations = load_backend_port_prestart_summary(
+        args.prestart_summary
+    )
     if args.plan_only:
         if validation_error:
             plan = {
@@ -574,6 +683,28 @@ async def run(args: argparse.Namespace) -> int:
                 "live_authority_granted": False,
                 "manual_review_required_before_readiness_update": True,
             }
+            print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
+            return 2
+        if prestart_violations:
+            plan = {
+                "type": "wing_readonly_preflight_offline_plan",
+                "status": "blocked",
+                "reason": "prestart_summary_missing_or_invalid",
+                "read_only": True,
+                "live_write": False,
+                "operator_required": True,
+                "selected_mvp_blocker": "WING read-only connection proof",
+                "contacts_backend": False,
+                "queries_console": False,
+                "execution_allowed_by_plan": False,
+                "live_authority_granted": False,
+                "manual_review_required_before_readiness_update": True,
+                "prestart_summary_violations": prestart_violations,
+                "operator_next_step": prestart_summary_operator_next_step(
+                    prestart_violations[0]
+                ),
+            }
+            plan.update(prestart_detail)
             print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
             return 2
         plan = build_offline_preflight_plan(args)
@@ -621,6 +752,8 @@ async def run(args: argparse.Namespace) -> int:
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        **prestart_detail,
+        "prestart_summary_violations": prestart_violations,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -628,6 +761,20 @@ async def run(args: argparse.Namespace) -> int:
 
     if validation_error:
         summary.update({"status": "blocked", "reason": validation_error})
+        recorder.write_summary(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 2
+
+    if prestart_violations:
+        summary.update(
+            {
+                "status": "blocked",
+                "reason": "prestart_summary_missing_or_invalid",
+                "operator_next_step": prestart_summary_operator_next_step(
+                    prestart_violations[0]
+                ),
+            }
+        )
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 2
