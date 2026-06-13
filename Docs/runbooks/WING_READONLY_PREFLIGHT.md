@@ -23,7 +23,7 @@ It does not approve live writes.
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` and confirm
   it does not fail `backend_port_free` against an unexpected local listener. If
   it does, inspect the generated summary fields `listener_processes`,
-  `listener_confirmation_checklist`,
+  `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `fail_closed_reason`, and `operator_next_step` before changing local
@@ -350,7 +350,7 @@ The handoff validation must report:
 - `backend_port_prestart_check_command` exactly matches
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
 - `backend_port_prestart_check_failure_detail_fields` exactly lists
-  `listener_processes`, `listener_confirmation_checklist`,
+  `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `fail_closed_reason`, and `operator_next_step`

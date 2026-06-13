@@ -135,6 +135,9 @@ def test_wing_readonly_preflight_prestart_contract_uses_shared_backend_constants
     assert list(
         release_check.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     ) == list(WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS)
+    assert "listener_process_error" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
 
 
 def test_wing_readonly_preflight_runbook_lists_prestart_failure_detail_fields():
@@ -11724,6 +11727,31 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
     )
     assert "operator_next_step" in result.detail
     assert "listener_process_error" not in result.detail
+
+
+def test_backend_port_check_records_listener_owner_probe_error(monkeypatch):
+    monkeypatch.setattr(
+        release_check,
+        "_listener_processes_for_port",
+        lambda port: ([], "lsof_not_available"),
+    )
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+
+        result = release_check.check_port_free(port=port)
+
+    assert result.status == "failed"
+    assert result.detail["listener_detected"] is True
+    assert result.detail["listener_processes"] == []
+    assert result.detail["listener_process_error"] == "lsof_not_available"
+    assert result.detail["preflight_blocked_until_listener_confirmed"] is True
+    assert result.detail["safe_to_stop_listener_by_gate"] is False
+    assert (
+        result.detail["fail_closed_reason"]
+        == "backend_port_listener_requires_operator_confirmation"
+    )
 
 
 def test_listener_processes_for_port_parses_lsof_field_output(monkeypatch):

@@ -68,6 +68,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "selected_action"
     ]
     assert "listener_processes" in directive["selected_action"]
+    assert "listener_process_error" in directive["selected_action"]
     assert "safe_to_stop_listener_by_gate" in directive["selected_action"]
     assert "fail_closed_reason" in directive["selected_action"]
     assert "operator_next_step" in directive["selected_action"]
@@ -310,6 +311,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in prompt
     assert "backend_port_prestart_check_failure_detail_fields" in prompt
     assert "listener_processes" in prompt
+    assert "listener_process_error" in prompt
     assert "safe_to_stop_listener_by_gate" in prompt
     assert "operator_next_step" in prompt
     assert "manual_review_required_before_readiness_update: true" in prompt
@@ -360,6 +362,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in readme
     assert "backend_port_prestart_check_failure_detail_fields" in readme
     assert "listener_processes" in readme
+    assert "listener_process_error" in readme
     assert "safe_to_stop_listener_by_gate" in readme
     assert "operator_next_step" in readme
     assert "manual_review_required_before_readiness_update: true" in readme

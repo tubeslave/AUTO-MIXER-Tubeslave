@@ -30,6 +30,7 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
 
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = (
     "listener_processes",
+    "listener_process_error",
     "listener_confirmation_checklist",
     "preflight_blocked_until_listener_confirmed",
     "intended_backend_confirmation_required",

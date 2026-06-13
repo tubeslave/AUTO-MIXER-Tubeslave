@@ -52,6 +52,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
     assert "listener_processes" in text
+    assert "listener_process_error" in text
     assert "safe_to_stop_listener_by_gate" in text
     assert "operator_next_step" in text
     assert "manual_review_required_before_readiness_update: true" in text
@@ -154,6 +155,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "next action"
     ]
     assert "listener_processes" in rows[0]["next action"]
+    assert "listener_process_error" in rows[0]["next action"]
     assert "safe_to_stop_listener_by_gate" in rows[0]["next action"]
     assert "operator_next_step" in rows[0]["next action"]
     assert "manual_review_required_before_readiness_update: true" in rows[0][
@@ -347,6 +349,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in readonly
     assert "backend_port_prestart_check_failure_detail_fields" in readonly
     assert "listener_processes" in readonly
+    assert "listener_process_error" in readonly
     assert "safe_to_stop_listener_by_gate" in readonly
     assert "operator_next_step" in readonly
     assert "manual_review_required_before_readiness_update: true" in readonly
@@ -424,6 +427,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in report
     assert "backend_port_prestart_check_failure_detail_fields" in report
     assert "listener_processes" in report
+    assert "listener_process_error" in report
     assert "safe_to_stop_listener_by_gate" in report
     assert "operator_next_step" in report
     assert "manual_review_required_before_readiness_update: true" in report
@@ -545,6 +549,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
     assert "listener_processes" in text
+    assert "listener_process_error" in text
     assert "safe_to_stop_listener_by_gate" in text
     assert "operator_next_step" in text
     assert "manual_review_required_before_readiness_update: true" in text

@@ -151,7 +151,7 @@ you want the background automation active.
   no-WING release check.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
-  `listener_processes`, `listener_confirmation_checklist`,
+  `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `fail_closed_reason`, and `operator_next_step`.
