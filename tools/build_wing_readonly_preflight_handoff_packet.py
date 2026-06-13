@@ -19,6 +19,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 from tools import no_wing_release_check
@@ -35,6 +36,7 @@ DEFAULT_DECISION_ROOT = "artifacts/wing_readonly_preflight_review_decisions"
 DEFAULT_DECISION_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
 DEFAULT_PACKET_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
 DEFAULT_PLAN_OUTPUT = "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+DEFAULT_PRESTART_SUMMARY = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
 MAX_WING_INPUT_CHANNEL = 48
 SUPPORTED_VALUE_TYPES = {"fader", "gain", "pan"}
 FOCUSED_VALIDATION_COMMAND = [
@@ -114,6 +116,7 @@ def capture_command(
     value_types: str,
     artifact_root: str,
     expected_plan: str,
+    prestart_summary: str,
 ) -> list[str]:
     return [
         "python3",
@@ -130,6 +133,8 @@ def capture_command(
         "--require-physical-readback",
         "--artifact-root",
         artifact_root,
+        "--prestart-summary",
+        prestart_summary,
         "--expected-plan",
         expected_plan,
     ]
@@ -142,6 +147,7 @@ def plan_command(
     value_types: str,
     artifact_root: str,
     plan_output: str,
+    prestart_summary: str,
 ) -> list[str]:
     return [
         "python3",
@@ -158,6 +164,8 @@ def plan_command(
         "--require-physical-readback",
         "--artifact-root",
         artifact_root,
+        "--prestart-summary",
+        prestart_summary,
         "--plan-only",
         "--plan-output",
         plan_output,
@@ -211,6 +219,7 @@ def build_handoff_packet(
     decision_root: str = DEFAULT_DECISION_ROOT,
     decision_review_output: str = DEFAULT_DECISION_REVIEW_OUTPUT,
     plan_output: str = DEFAULT_PLAN_OUTPUT,
+    prestart_summary: str = DEFAULT_PRESTART_SUMMARY,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
     channel_numbers = _validate_channels(channels)
@@ -267,6 +276,7 @@ def build_handoff_packet(
         value_types=value_types,
         artifact_root=artifact_root,
         plan_output=plan_output,
+        prestart_summary=prestart_summary,
     )
     capture = capture_command(
         url=url,
@@ -274,6 +284,7 @@ def build_handoff_packet(
         value_types=value_types,
         artifact_root=artifact_root,
         expected_plan=plan_output,
+        prestart_summary=prestart_summary,
     )
     review = artifact_review_command(
         artifact_root=artifact_root,
@@ -303,6 +314,8 @@ def build_handoff_packet(
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path_placeholder": prestart_summary,
         "backend_port_prestart_check_operator_sequence_step_index": prestart_step_index,
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
@@ -389,6 +402,10 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['backend_port_prestart_check_required']).lower()}`",
         "- backend_port_prestart_check_must_pass_before_starting_backend: "
         f"`{str(packet['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
+        "- backend_port_prestart_summary_required: "
+        f"`{str(packet['backend_port_prestart_summary_required']).lower()}`",
+        "- backend_port_prestart_summary_path_placeholder: "
+        f"`{packet['backend_port_prestart_summary_path_placeholder']}`",
         "- backend_port_prestart_check_operator_sequence_step_index: "
         f"`{packet['backend_port_prestart_check_operator_sequence_step_index']}`",
         "- backend_port_prestart_check_must_be_first_operator_step: "
@@ -590,6 +607,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--decision-root", default=DEFAULT_DECISION_ROOT)
     parser.add_argument("--decision-review-output", default=DEFAULT_DECISION_REVIEW_OUTPUT)
     parser.add_argument("--plan-output", default=DEFAULT_PLAN_OUTPUT)
+    parser.add_argument("--prestart-summary", default=DEFAULT_PRESTART_SUMMARY)
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     parser.add_argument("--output", default=DEFAULT_PACKET_OUTPUT)
     parser.add_argument("--quiet", action="store_true")
@@ -609,6 +627,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             decision_root=args.decision_root,
             decision_review_output=args.decision_review_output,
             plan_output=args.plan_output,
+            prestart_summary=args.prestart_summary,
         )
     except ValueError as exc:
         if not args.quiet:

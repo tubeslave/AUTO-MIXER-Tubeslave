@@ -20,6 +20,9 @@ WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED = (
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
 )
+WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
+    "artifacts/no_wing_release_check/<run_id>/summary.json"
+)
 
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
     "PYTHONPATH=backend",

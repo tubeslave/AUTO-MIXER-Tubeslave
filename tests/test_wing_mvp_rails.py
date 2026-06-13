@@ -66,6 +66,10 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "operator_required: true" in text
     assert "expected_plan_required_for_real_run: true" in text
     assert "backend_port_prestart_summary_required: true" in text
+    assert "backend_port_prestart_summary_path_placeholder" in text
+    assert "preview_command_prestart_summary" in text
+    assert "capture_command_prestart_summary" in text
+    assert "capture_command_prestart_summary_matches_plan: true" in text
     assert "backend_port_prestart_summary_type: no_wing_release_check" in text
     assert "backend_port_prestart_summary_status: passed" in text
     assert "backend_port_prestart_summary_live_write: false" in text
@@ -144,6 +148,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md"
+        in rows[0]["evidence"]
+    )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
     assert "backend_port_prestart_gate" in rows[0]["next action"]
     assert "expected_backend_port_prestart_gate" in rows[0]["next action"]
@@ -196,6 +204,14 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_required: true" in rows[0]["next action"]
     assert "expected_plan_required_for_real_run: true" in rows[0]["next action"]
     assert "backend_port_prestart_summary_required: true" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_path_placeholder" in rows[0][
+        "next action"
+    ]
+    assert "preview_command_prestart_summary" in rows[0]["next action"]
+    assert "capture_command_prestart_summary" in rows[0]["next action"]
+    assert "capture_command_prestart_summary_matches_plan: true" in rows[0][
         "next action"
     ]
     assert "backend_port_prestart_summary_status: passed" in rows[0][
@@ -602,6 +618,10 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "operator_required: true" in text
     assert "expected_plan_required_for_real_run: true" in text
     assert "backend_port_prestart_summary_required: true" in text
+    assert "backend_port_prestart_summary_path_placeholder" in text
+    assert "preview_command_prestart_summary" in text
+    assert "capture_command_prestart_summary" in text
+    assert "capture_command_prestart_summary_matches_plan: true" in text
     assert "backend_port_prestart_summary_status: passed" in text
     assert "backend_port_prestart_summary_live_write: false" in text
     assert "backend_port_prestart_check_status: passed" in text
@@ -649,6 +669,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md"
         in text
     )
     assert (

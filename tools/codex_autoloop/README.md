@@ -200,6 +200,14 @@ you want the background automation active.
   This keeps the read-only candidate tied to the actual passed no-WING
   prestart `summary.json`, not only to prestart field names.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_summary_path_placeholder` pointing to the passed
+  no-WING prestart `summary.json`, plus matching
+  `preview_command_prestart_summary`, matching
+  `capture_command_prestart_summary`, and
+  `capture_command_prestart_summary_matches_plan: true`.
+  This keeps the operator handoff commands aligned with the runner prestart
+  summary gate.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `physical_preflight_requires_existing_backend_connection: true`.
   This keeps the physical read-only preflight tied to the intended existing
   backend/WING session.

@@ -11,6 +11,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -114,6 +115,7 @@ from tools.no_wing_release_check import (
     validate_supervised_proof_report_gap_rollup,
     wing_readonly_preflight_handoff_packet_path_for_run,
     wing_readonly_preflight_plan_path_for_run,
+    wing_readonly_preflight_prestart_summary_path_for_run,
     write_summary,
 )
 
@@ -604,6 +606,8 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
+        "--prestart-summary",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--plan-only",
         "--plan-output",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
@@ -618,6 +622,9 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["plan_command_value_types"] == "fader,gain,pan"
     assert result.detail["plan_command_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
+    )
+    assert result.detail["plan_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
     assert result.detail["plan_command_matches_capture"] is True
     assert result.detail["capture_command_template"] == [
@@ -635,6 +642,8 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
+        "--prestart-summary",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--expected-plan",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
     ]
@@ -644,6 +653,10 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["capture_command_operator_confirmation_matches_channels"] is True
     assert result.detail["capture_command_confirms_session_ready"] is True
     assert result.detail["capture_command_requires_physical_readback"] is True
+    assert result.detail["capture_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert result.detail["capture_command_prestart_summary_matches_plan"] is True
     assert result.detail["capture_command_expected_plan"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
@@ -709,6 +722,8 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "artifacts/wing_readonly_preflight",
         "--plan-output",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+        "--prestart-summary",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--output",
         "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
     ]
@@ -722,10 +737,14 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["handoff_packet_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
     )
+    assert result.detail["handoff_packet_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
     assert result.detail["handoff_packet_channels"] == "3"
     assert result.detail["handoff_packet_value_types"] == "fader,gain,pan"
     assert result.detail["handoff_packet_url_matches_capture"] is True
     assert result.detail["handoff_packet_artifact_root_matches_capture"] is True
+    assert result.detail["handoff_packet_prestart_summary_matches_capture"] is True
     assert result.detail["handoff_packet_channel_matches_capture"] is True
     assert result.detail["handoff_packet_value_types_match_capture"] is True
     assert result.detail["blocked_by"] == [
@@ -816,6 +835,18 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "backend_port_prestart_check_failure_detail_fields": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+        ),
+        "backend_port_prestart_summary_sha256": "a" * 64,
+        "backend_port_prestart_summary_type": "no_wing_release_check",
+        "backend_port_prestart_summary_status": "passed",
+        "backend_port_prestart_summary_connection_policy": (
+            "no_hardware_no_network_no_live_writes"
+        ),
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_check_status": "passed",
         "manual_review_required_before_readiness_update": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "contacts_backend": False,
@@ -905,6 +936,10 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path_placeholder": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+        ),
         "backend_port_prestart_check_operator_sequence_step_index": 0,
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": [
@@ -966,6 +1001,8 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--prestart-summary",
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--plan-only",
                 "--plan-output",
                 str(plan_path),
@@ -985,6 +1022,8 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--prestart-summary",
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--expected-plan",
                 str(plan_path),
             ],
@@ -5411,6 +5450,10 @@ def test_no_wing_release_check_quick_mode_still_runs_write_surface_scan(tmp_path
     assert str(wing_readonly_preflight_plan_path_for_run(tmp_path)) in (
         wing_plan_check.command
     )
+    assert "--prestart-summary" in wing_plan_check.command
+    assert str(wing_readonly_preflight_prestart_summary_path_for_run(tmp_path)) in (
+        wing_plan_check.command
+    )
     assert "--operator-confirm-channels" in wing_plan_check.command
     assert "--operator-confirm-session-ready" in wing_plan_check.command
     assert "--require-physical-readback" in wing_plan_check.command
@@ -6125,6 +6168,8 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--prestart-summary",
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--expected-plan",
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             ],
@@ -8038,6 +8083,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--prestart-summary",
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--plan-only",
                 "--plan-output",
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json",
@@ -8049,6 +8096,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "plan_command_confirms_session_ready": True,
             "plan_command_value_types": "fader,gain,pan",
             "plan_command_artifact_root": "artifacts/wing_readonly_preflight",
+            "plan_command_prestart_summary": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+            ),
             "plan_command_matches_capture": True,
             "prestart_backend_port_check_required": True,
             "prestart_backend_port_check_must_pass_before_starting_backend": True,
@@ -8076,6 +8126,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
+                "--prestart-summary",
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--expected-plan",
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             ],
@@ -8085,6 +8137,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "capture_command_operator_confirmation_matches_channels": True,
             "capture_command_confirms_session_ready": True,
             "capture_command_requires_physical_readback": True,
+            "capture_command_prestart_summary": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+            ),
+            "capture_command_prestart_summary_matches_plan": True,
             "capture_command_expected_plan": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             "capture_command_expected_plan_matches_plan_output": True,
             "review_tool_path": "tools/review_wing_readonly_preflight_artifacts.py",
@@ -8146,6 +8202,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "artifacts/wing_readonly_preflight",
                 "--plan-output",
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+                "--prestart-summary",
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--output",
                 "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
             ],
@@ -8157,10 +8215,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             ),
             "handoff_packet_url": "ws://localhost:8765",
             "handoff_packet_artifact_root": "artifacts/wing_readonly_preflight",
+            "handoff_packet_prestart_summary": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+            ),
             "handoff_packet_channels": "3",
             "handoff_packet_value_types": "fader,gain,pan",
             "handoff_packet_url_matches_capture": True,
             "handoff_packet_artifact_root_matches_capture": True,
+            "handoff_packet_prestart_summary_matches_capture": True,
             "handoff_packet_channel_matches_capture": True,
             "handoff_packet_value_types_match_capture": True,
             "blocked_by": [
@@ -8208,6 +8270,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["plan_command_confirms_session_ready"] is True
     assert preflight["plan_command_value_types"] == "fader,gain,pan"
     assert preflight["plan_command_artifact_root"] == "artifacts/wing_readonly_preflight"
+    assert preflight["plan_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
     assert preflight["plan_command_matches_capture"] is True
     assert preflight["prestart_backend_port_check_required"] is True
     assert preflight["prestart_backend_port_check_must_pass_before_starting_backend"] is True
@@ -8226,11 +8291,16 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "--operator-confirm-channels" in preflight["capture_command_template"]
     assert "--operator-confirm-session-ready" in preflight["capture_command_template"]
     assert "--require-physical-readback" in preflight["capture_command_template"]
+    assert "--prestart-summary" in preflight["capture_command_template"]
     assert "--expected-plan" in preflight["capture_command_template"]
     assert preflight["capture_command_requires_operator_channel_confirmation"] is True
     assert preflight["capture_command_operator_confirmation_matches_channels"] is True
     assert preflight["capture_command_confirms_session_ready"] is True
     assert preflight["capture_command_requires_physical_readback"] is True
+    assert preflight["capture_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert preflight["capture_command_prestart_summary_matches_plan"] is True
     assert preflight["capture_command_expected_plan"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
@@ -8290,10 +8360,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["handoff_packet_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
     )
+    assert preflight["handoff_packet_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
     assert preflight["handoff_packet_channels"] == "3"
     assert preflight["handoff_packet_value_types"] == "fader,gain,pan"
     assert preflight["handoff_packet_url_matches_capture"] is True
     assert preflight["handoff_packet_artifact_root_matches_capture"] is True
+    assert preflight["handoff_packet_prestart_summary_matches_capture"] is True
     assert preflight["handoff_packet_channel_matches_capture"] is True
     assert preflight["handoff_packet_value_types_match_capture"] is True
     assert preflight["artifact_operator_next_steps"] == [
@@ -8325,6 +8399,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "--operator-confirm-channels" in markdown_summary
     assert "--operator-confirm-session-ready" in markdown_summary
     assert "--require-physical-readback" in markdown_summary
+    assert "--prestart-summary" in markdown_summary
+    assert "capture_command_prestart_summary_matches_plan: `true`" in markdown_summary
     assert (
         "review_tool_path: `tools/review_wing_readonly_preflight_artifacts.py`"
         in markdown_summary

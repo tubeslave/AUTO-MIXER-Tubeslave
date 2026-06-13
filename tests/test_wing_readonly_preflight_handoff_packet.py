@@ -8,6 +8,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 from tools import build_wing_readonly_preflight_handoff_packet as handoff
@@ -31,6 +32,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["physical_preflight_requires_existing_backend_connection"] is True
     assert packet["backend_port_prestart_check_required"] is True
     assert packet["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert packet["backend_port_prestart_summary_required"] is True
+    assert packet["backend_port_prestart_summary_path_placeholder"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
     assert packet["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert packet["backend_port_prestart_check_must_be_first_operator_step"] is True
     assert packet["backend_port_prestart_check_command"] == list(
@@ -70,6 +75,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
+        "--prestart-summary",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--plan-only",
         "--plan-output",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
@@ -89,6 +96,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "--require-physical-readback",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
+        "--prestart-summary",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--expected-plan",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json",
     ]
@@ -320,6 +329,9 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "physical_preflight_requires_existing_backend_connection: `true`" in markdown
     assert "backend_port_prestart_check_required: `true`" in markdown
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
+    assert "backend_port_prestart_summary_required: `true`" in markdown
+    assert "backend_port_prestart_summary_path_placeholder" in markdown
+    assert WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER in markdown
     assert "backend_port_prestart_check_operator_sequence_step_index: `0`" in markdown
     assert "backend_port_prestart_check_must_be_first_operator_step: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
@@ -332,6 +344,7 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "preview_readonly_request_plan" in markdown
     assert "--plan-only" in markdown
     assert "--operator-confirm-session-ready" in markdown
+    assert "--prestart-summary" in markdown
     assert "capture_readonly_preflight" in markdown
     assert "review_edited_decision_json" in markdown
     assert "Expected Supervised Prestart Gate" in markdown
@@ -361,6 +374,10 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["physical_preflight_requires_existing_backend_connection"] is True
     assert payload["backend_port_prestart_check_required"] is True
     assert payload["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert payload["backend_port_prestart_summary_required"] is True
+    assert payload["backend_port_prestart_summary_path_placeholder"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
     assert payload["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert payload["backend_port_prestart_check_must_be_first_operator_step"] is True
     assert payload["next_manual_artifact_required"] == (

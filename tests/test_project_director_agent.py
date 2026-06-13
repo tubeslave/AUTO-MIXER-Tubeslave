@@ -91,6 +91,14 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_summary_required: true" in directive[
         "selected_action"
     ]
+    assert "backend_port_prestart_summary_path_placeholder" in directive[
+        "selected_action"
+    ]
+    assert "preview_command_prestart_summary" in directive["selected_action"]
+    assert "capture_command_prestart_summary" in directive["selected_action"]
+    assert "capture_command_prestart_summary_matches_plan: true" in directive[
+        "selected_action"
+    ]
     assert "backend_port_prestart_summary_status: passed" in directive[
         "selected_action"
     ]
@@ -236,6 +244,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md"
         in directive["selected_evidence_files"]
     )
     assert directive["stop_broad_work"] is True

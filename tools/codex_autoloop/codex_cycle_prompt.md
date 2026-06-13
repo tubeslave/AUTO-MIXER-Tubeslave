@@ -161,19 +161,24 @@ blockers выше.
 19. verify `operator_required: true`;
 20. verify `expected_plan_required_for_real_run: true`;
 21. verify `backend_port_prestart_summary_required: true`;
-22. verify `backend_port_prestart_summary_status: passed`;
-23. verify `backend_port_prestart_summary_live_write: false`;
-24. verify `backend_port_prestart_check_status: passed`;
-25. verify `physical_preflight_requires_existing_backend_connection: true`;
-26. verify `backend_port_prestart_check_required: true`;
-27. verify
-   `backend_port_prestart_check_must_pass_before_starting_backend: true`;
-28. verify `execution_allowed_by_packet: false`;
-29. verify `live_authority_granted: false`;
-30. verify `full_autonomous_ready: false`;
+22. verify `backend_port_prestart_summary_path_placeholder` points to the
+   passed no-WING prestart `summary.json`;
+23. verify `preview_command_prestart_summary` matches that path;
+24. verify `capture_command_prestart_summary` matches that path;
+25. verify `capture_command_prestart_summary_matches_plan: true`;
+26. verify `backend_port_prestart_summary_status: passed`;
+27. verify `backend_port_prestart_summary_live_write: false`;
+28. verify `backend_port_prestart_check_status: passed`;
+29. verify `physical_preflight_requires_existing_backend_connection: true`;
+30. verify `backend_port_prestart_check_required: true`;
 31. verify
+   `backend_port_prestart_check_must_pass_before_starting_backend: true`;
+32. verify `execution_allowed_by_packet: false`;
+33. verify `live_authority_granted: false`;
+34. verify `full_autonomous_ready: false`;
+35. verify
    `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`;
-32. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+36. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_operator_sequence_step` includes
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
@@ -304,6 +309,12 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_summary_status: passed`,
   `backend_port_prestart_summary_live_write: false`, and
   `backend_port_prestart_check_status: passed`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_summary_path_placeholder` pointing to the passed
+  no-WING prestart `summary.json`, plus matching
+  `preview_command_prestart_summary`, matching
+  `capture_command_prestart_summary`, and
+  `capture_command_prestart_summary_matches_plan: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `physical_preflight_requires_existing_backend_connection: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
