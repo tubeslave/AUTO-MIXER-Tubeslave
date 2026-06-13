@@ -1277,6 +1277,16 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "artifacts/wing_readonly_preflight/<run_id>/"
             f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
         ),
+        "expected_artifacts": [
+            (
+                "artifacts/wing_readonly_preflight/<run_id>/"
+                f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+            ),
+            (
+                "artifacts/wing_readonly_preflight/<run_id>/"
+                f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+            ),
+        ],
         "plan_output": str(plan_path),
         "decision_template_output": (
             WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
@@ -2981,6 +2991,21 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         result.detail["plan_fail_closed_conditions"]
     )
     assert result.detail["fail_closed_conditions_match_plan"] is True
+    assert result.detail["expected_artifacts"] == result.detail[
+        "plan_expected_artifacts"
+    ]
+    assert result.detail["expected_artifacts"] == result.detail[
+        "expected_artifact_globs"
+    ]
+    assert result.detail["expected_artifacts_match_plan"] is True
+    assert result.detail["expected_run_artifact_glob"].endswith(
+        f"/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+    )
+    assert result.detail["expected_event_log_glob"].endswith(
+        f"/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+    )
+    assert result.detail["summary_glob_matches_plan"] is True
+    assert result.detail["event_log_glob_matches_plan"] is True
     assert result.detail["request_sequence"] == result.detail["plan_request_sequence"]
     assert result.detail["request_sequence"] == result.detail["expected_request_sequence"]
     assert result.detail["request_count"] == 5
@@ -3233,6 +3258,62 @@ def test_no_wing_release_check_rejects_handoff_fail_closed_condition_drift(
     )
     assert (
         "wing_readonly_preflight_handoff_packet_fail_closed_conditions_plan_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_expected_artifact_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "stale-expected-artifacts-handoff.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["expected_artifacts"] = [
+        "artifacts/wing_readonly_preflight/<run_id>/stale-summary.json"
+    ]
+    payload["expected_run_artifact_glob"] = (
+        "artifacts/wing_readonly_preflight/<run_id>/stale-summary.json"
+    )
+    payload["expected_event_log_glob"] = (
+        "artifacts/wing_readonly_preflight/<run_id>/events.json"
+    )
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["expected_artifacts_match_plan"] is False
+    assert result.detail["summary_glob_matches_plan"] is False
+    assert result.detail["event_log_glob_matches_plan"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_expected_artifacts_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_expected_artifacts_plan_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_summary_glob_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_summary_glob_plan_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_events_glob_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_events_glob_plan_mismatch"
         in result.detail["violations"]
     )
 
@@ -9958,6 +10039,16 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "request_count": 5,
             "expected_request_count": 5,
             "request_sequence_matches_expected": True,
+            "expected_artifacts": [
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+                ),
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+                ),
+            ],
             "read_only": True,
             "live_write": False,
             "contacts_backend": False,
@@ -10060,6 +10151,16 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["request_count"] == 5
     assert artifact["expected_request_count"] == 5
     assert artifact["request_sequence_matches_expected"] is True
+    assert artifact["expected_artifacts"] == [
+        (
+            "artifacts/wing_readonly_preflight/<run_id>/"
+            f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+        ),
+        (
+            "artifacts/wing_readonly_preflight/<run_id>/"
+            f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+        ),
+    ]
     assert artifact["forbidden_request_types"] == ["apply_operator_proposal", "set_gain"]
     assert artifact["fail_closed_conditions"] == [
         "backend_not_in_wing_mode",
@@ -10094,6 +10195,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert "physical_readback_missing" in markdown_summary
     assert "review_wing_readonly_preflight_decisions.py" in markdown_summary
     assert "request_sequence_matches_expected: `true`" in markdown_summary
+    assert "expected_artifacts" in markdown_summary
+    assert WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME in markdown_summary
+    assert WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME in markdown_summary
     assert "set_gain" in markdown_summary
 
 
@@ -10216,6 +10320,47 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
             ),
             "selected_mvp_blocker_status_matches_plan": True,
+            "expected_artifacts": [
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+                ),
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+                ),
+            ],
+            "expected_artifact_globs": [
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+                ),
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+                ),
+            ],
+            "plan_expected_artifacts": [
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+                ),
+                (
+                    "artifacts/wing_readonly_preflight/<run_id>/"
+                    f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+                ),
+            ],
+            "expected_artifacts_match_plan": True,
+            "expected_run_artifact_glob": (
+                "artifacts/wing_readonly_preflight/<run_id>/"
+                f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+            ),
+            "expected_event_log_glob": (
+                "artifacts/wing_readonly_preflight/<run_id>/"
+                f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+            ),
+            "summary_glob_matches_plan": True,
+            "event_log_glob_matches_plan": True,
             "request_sequence": [{"type": "get_operator_mode"}],
             "plan_request_sequence": [{"type": "get_operator_mode"}],
             "expected_request_sequence": [{"type": "get_operator_mode"}],
@@ -10398,6 +10543,17 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
     )
     assert artifact["selected_mvp_blocker_status_matches_plan"] is True
+    assert artifact["expected_artifacts"] == artifact["plan_expected_artifacts"]
+    assert artifact["expected_artifacts"] == artifact["expected_artifact_globs"]
+    assert artifact["expected_artifacts_match_plan"] is True
+    assert artifact["expected_run_artifact_glob"].endswith(
+        f"/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+    )
+    assert artifact["expected_event_log_glob"].endswith(
+        f"/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+    )
+    assert artifact["summary_glob_matches_plan"] is True
+    assert artifact["event_log_glob_matches_plan"] is True
     assert artifact["request_count"] == 1
     assert artifact["request_sequence"] == [{"type": "get_operator_mode"}]
     assert artifact["plan_request_sequence"] == [{"type": "get_operator_mode"}]
@@ -10508,6 +10664,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "proof_runner_matches_plan: `true`" in markdown_summary
     assert "selected_mvp_blocker_matches_plan: `true`" in markdown_summary
     assert "selected_mvp_blocker_status_matches_plan: `true`" in markdown_summary
+    assert "expected_artifacts_match_plan: `true`" in markdown_summary
+    assert "summary_glob_matches_plan: `true`" in markdown_summary
+    assert "event_log_glob_matches_plan: `true`" in markdown_summary
+    assert WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME in markdown_summary
+    assert WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME in markdown_summary
     assert WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA in markdown_summary
     assert WING_READONLY_PREFLIGHT_PROOF_RUNNER in markdown_summary
     assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER in markdown_summary

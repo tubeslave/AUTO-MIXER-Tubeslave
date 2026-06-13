@@ -98,6 +98,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["expected_event_log_glob"].endswith(
         f"/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
     )
+    assert packet["expected_artifacts"] == [
+        packet["expected_run_artifact_glob"],
+        packet["expected_event_log_glob"],
+    ]
     assert packet["channels"] == [3]
     assert packet["value_types"] == ["fader", "gain", "pan"]
     assert packet["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
@@ -530,6 +534,9 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "fail_closed_conditions" in markdown
     assert "unexpected_response_type" in markdown
     assert "manual_review_decision_missing_or_invalid" in markdown
+    assert "expected_artifacts" in markdown
+    assert WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME in markdown
+    assert WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME in markdown
     assert "Expected Supervised Prestart Gate" in markdown
     assert "actual_matches_expected: `true`" in markdown
     assert "Proof Identity" in markdown
@@ -596,6 +603,10 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
         [3],
         ["fader", "gain", "pan"],
     )
+    assert payload["expected_artifacts"] == [
+        payload["expected_run_artifact_glob"],
+        payload["expected_event_log_glob"],
+    ]
     assert payload["next_manual_artifact_required"] == (
         WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
     )

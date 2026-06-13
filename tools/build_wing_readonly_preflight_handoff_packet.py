@@ -345,6 +345,12 @@ def build_handoff_packet(
         decision_root=decision_root,
         decision_review_output=decision_review_output,
     )
+    expected_run_artifact_glob = (
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+    )
+    expected_event_log_glob = (
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+    )
     mvp_blocker_anchor = no_wing_release_check.wing_mvp_first_open_blocker_anchor()
     mvp_blocker_anchor_sha256 = no_wing_release_check.wing_mvp_blocker_anchor_sha256(
         mvp_blocker_anchor
@@ -394,12 +400,9 @@ def build_handoff_packet(
         "fail_closed_conditions": list(FAIL_CLOSED_CONDITIONS),
         "artifact_root": artifact_root,
         "decision_root": decision_root,
-        "expected_run_artifact_glob": (
-            f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
-        ),
-        "expected_event_log_glob": (
-            f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
-        ),
+        "expected_artifacts": [expected_run_artifact_glob, expected_event_log_glob],
+        "expected_run_artifact_glob": expected_run_artifact_glob,
+        "expected_event_log_glob": expected_event_log_glob,
         "plan_output": plan_output,
         "decision_template_output": decision_template_output,
         "decision_template_output_matches_contract": (
@@ -630,6 +633,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             "",
             "## Expected Artifacts",
             "",
+            "- expected_artifacts: "
+            f"`{json.dumps(packet['expected_artifacts'])}`",
             f"- summary: `{packet['expected_run_artifact_glob']}`",
             f"- events: `{packet['expected_event_log_glob']}`",
             f"- pending decision template: `{packet['decision_template_output']}`",

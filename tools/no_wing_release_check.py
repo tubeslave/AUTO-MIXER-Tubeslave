@@ -4603,6 +4603,9 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["request_sequence"] = list(request_sequence)
     detail["expected_request_sequence"] = list(expected_requests)
     detail["request_sequence_matches_expected"] = request_sequence == expected_requests
+    detail["expected_artifacts"] = (
+        list(expected_artifacts) if isinstance(expected_artifacts, list) else []
+    )
     detail["allowed_request_types"] = list(allowed_request_types)
     detail["request_id_policy"] = plan.get("request_id_policy")
     detail["proof_artifact_schema"] = plan.get("proof_artifact_schema")
@@ -4736,6 +4739,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     plan_fail_closed_conditions = plan_artifact_detail.get("fail_closed_conditions")
     plan_request_sequence = plan_artifact_detail.get("request_sequence")
     expected_request_sequence = plan_artifact_detail.get("expected_request_sequence")
+    plan_expected_artifacts = plan_artifact_detail.get("expected_artifacts")
     commands = packet.get("commands") if isinstance(packet.get("commands"), Mapping) else {}
     operator_sequence = (
         packet.get("operator_sequence")
@@ -4909,6 +4913,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         ),
         "review_edited_decision_json": wing_readonly_preflight_review_decision_command(),
     }
+    expected_artifact_globs = [
+        (
+            f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/"
+            f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+        ),
+        (
+            f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/"
+            f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+        ),
+    ]
 
     if load_error:
         violations.append(f"wing_readonly_preflight_handoff_packet_{load_error}")
@@ -5025,16 +5039,33 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_fail_closed_conditions_plan_mismatch"
         )
-    if packet.get("expected_run_artifact_glob") != (
-        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/"
-        f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
-    ):
+    packet_expected_artifacts = packet.get("expected_artifacts")
+    if packet_expected_artifacts != expected_artifact_globs:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_artifacts_mismatch"
+        )
+    if packet_expected_artifacts != plan_expected_artifacts:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_artifacts_plan_mismatch"
+        )
+    packet_expected_run_artifact_glob = packet.get("expected_run_artifact_glob")
+    packet_expected_event_log_glob = packet.get("expected_event_log_glob")
+    if packet_expected_run_artifact_glob != expected_artifact_globs[0]:
         violations.append("wing_readonly_preflight_handoff_packet_summary_glob_mismatch")
-    if packet.get("expected_event_log_glob") != (
-        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/"
-        f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
-    ):
+    if packet_expected_event_log_glob != expected_artifact_globs[1]:
         violations.append("wing_readonly_preflight_handoff_packet_events_glob_mismatch")
+    if packet_expected_run_artifact_glob not in (
+        plan_expected_artifacts if isinstance(plan_expected_artifacts, list) else []
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_summary_glob_plan_mismatch"
+        )
+    if packet_expected_event_log_glob not in (
+        plan_expected_artifacts if isinstance(plan_expected_artifacts, list) else []
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_events_glob_plan_mismatch"
+        )
 
     for key in (
         "read_only",
@@ -5422,6 +5453,22 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["plan_fail_closed_conditions"] = plan_fail_closed_conditions
     detail["fail_closed_conditions_match_plan"] = (
         packet.get("fail_closed_conditions") == plan_fail_closed_conditions
+    )
+    detail["expected_artifacts"] = packet_expected_artifacts
+    detail["expected_artifact_globs"] = list(expected_artifact_globs)
+    detail["plan_expected_artifacts"] = plan_expected_artifacts
+    detail["expected_artifacts_match_plan"] = (
+        packet_expected_artifacts == plan_expected_artifacts
+    )
+    detail["expected_run_artifact_glob"] = packet_expected_run_artifact_glob
+    detail["expected_event_log_glob"] = packet_expected_event_log_glob
+    detail["summary_glob_matches_plan"] = (
+        packet_expected_run_artifact_glob
+        in (plan_expected_artifacts if isinstance(plan_expected_artifacts, list) else [])
+    )
+    detail["event_log_glob_matches_plan"] = (
+        packet_expected_event_log_glob
+        in (plan_expected_artifacts if isinstance(plan_expected_artifacts, list) else [])
     )
     detail["command_names"] = sorted(commands)
     detail["preview_command_uses_plan_only"] = (
@@ -12761,6 +12808,11 @@ def wing_readonly_preflight_plan_artifact_summary(
             "request_sequence_matches_expected": (
                 detail.get("request_sequence_matches_expected") is True
             ),
+            "expected_artifacts": (
+                list(detail.get("expected_artifacts"))
+                if isinstance(detail.get("expected_artifacts"), list)
+                else []
+            ),
             "allowed_request_types": (
                 list(allowed_request_types)
                 if isinstance(allowed_request_types, list)
@@ -13006,6 +13058,36 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "fail_closed_conditions_match_plan": (
                 detail.get("fail_closed_conditions_match_plan") is True
+            ),
+            "expected_artifacts": (
+                list(detail.get("expected_artifacts"))
+                if isinstance(detail.get("expected_artifacts"), list)
+                else []
+            ),
+            "expected_artifact_globs": (
+                list(detail.get("expected_artifact_globs"))
+                if isinstance(detail.get("expected_artifact_globs"), list)
+                else []
+            ),
+            "plan_expected_artifacts": (
+                list(detail.get("plan_expected_artifacts"))
+                if isinstance(detail.get("plan_expected_artifacts"), list)
+                else []
+            ),
+            "expected_artifacts_match_plan": (
+                detail.get("expected_artifacts_match_plan") is True
+            ),
+            "expected_run_artifact_glob": str(
+                detail.get("expected_run_artifact_glob") or ""
+            ),
+            "expected_event_log_glob": str(
+                detail.get("expected_event_log_glob") or ""
+            ),
+            "summary_glob_matches_plan": (
+                detail.get("summary_glob_matches_plan") is True
+            ),
+            "event_log_glob_matches_plan": (
+                detail.get("event_log_glob_matches_plan") is True
             ),
             "command_names": list(command_names) if isinstance(command_names, list) else [],
             "preview_command_uses_plan_only": (
@@ -16460,6 +16542,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_plan_artifact['request_sequence_matches_expected']).lower()}`",
                 "- request_sequence: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['request_sequence'])}`",
+                "- expected_artifacts: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['expected_artifacts'])}`",
                 "- allowed_request_types: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['allowed_request_types'])}`",
                 "- request_id_policy: "
@@ -16583,6 +16667,22 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_fail_closed_conditions'])}`",
                 "- fail_closed_conditions_match_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['fail_closed_conditions_match_plan']).lower()}`",
+                "- expected_artifacts: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_artifacts'])}`",
+                "- expected_artifact_globs: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_artifact_globs'])}`",
+                "- plan_expected_artifacts: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_expected_artifacts'])}`",
+                "- expected_artifacts_match_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['expected_artifacts_match_plan']).lower()}`",
+                "- expected_run_artifact_glob: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_run_artifact_glob']}`",
+                "- expected_event_log_glob: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_event_log_glob']}`",
+                "- summary_glob_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['summary_glob_matches_plan']).lower()}`",
+                "- event_log_glob_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['event_log_glob_matches_plan']).lower()}`",
                 "- command_names: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['command_names'])}`",
                 "- preview_command_uses_plan_only: "
