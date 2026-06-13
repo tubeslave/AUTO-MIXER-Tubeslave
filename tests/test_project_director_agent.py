@@ -82,6 +82,12 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "listener_confirmation_template_live_authority_granted: false" in directive[
         "selected_action"
     ]
+    assert "listener_confirmation_template_accepted_by_template: false" in directive[
+        "selected_action"
+    ]
+    assert "listener_confirmation_template_operator_placeholder_fields" in directive[
+        "selected_action"
+    ]
     assert "listener_confirmation_template_required_edits" in directive[
         "selected_action"
     ]
@@ -273,6 +279,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_evidence_files"]
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_PENDING_SUMMARY_FIELDS_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in directive["selected_evidence_files"]
     )
@@ -384,6 +394,8 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_process_error" in prompt
     assert "safe_to_stop_listener_by_gate" in prompt
     assert "operator_next_step" in prompt
+    assert "listener_confirmation_template_accepted_by_template: false" in prompt
+    assert "listener_confirmation_template_operator_placeholder_fields" in prompt
     assert "listener_confirmation_template_required_edits" in prompt
     assert "set template_status to operator_reviewed_and_edited" in prompt
     assert "set accepted_by_template to true" in prompt
@@ -441,6 +453,8 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_process_error" in readme
     assert "safe_to_stop_listener_by_gate" in readme
     assert "operator_next_step" in readme
+    assert "listener_confirmation_template_accepted_by_template: false" in readme
+    assert "listener_confirmation_template_operator_placeholder_fields" in readme
     assert "listener_confirmation_template_required_edits" in readme
     assert "set template_status to operator_reviewed_and_edited" in readme
     assert "set accepted_by_template to true" in readme
