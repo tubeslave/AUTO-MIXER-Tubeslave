@@ -21,6 +21,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
@@ -59,6 +60,12 @@ DEFAULT_PLAN_OUTPUT = WING_READONLY_PREFLIGHT_PLAN_OUTPUT
 DEFAULT_PRESTART_SUMMARY = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
 MAX_WING_INPUT_CHANNEL = 48
 SUPPORTED_VALUE_TYPES = set(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES)
+EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE = {
+    request_type: list(response_types)
+    for request_type, response_types in (
+        WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+    )
+}
 FOCUSED_VALIDATION_COMMAND = [
     "PYTHONPATH=backend",
     "python3",
@@ -323,6 +330,9 @@ def build_handoff_packet(
         "url": url,
         "channels": channel_numbers,
         "value_types": value_type_names,
+        "expected_response_types_by_request_type": dict(
+            EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
+        ),
         "artifact_root": artifact_root,
         "decision_root": decision_root,
         "expected_run_artifact_glob": (
@@ -532,6 +542,11 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             lines.extend([f"### {name}", "", "```bash", _command_text(command), "```", ""])
     lines.extend(
         [
+            "## Expected Response Types",
+            "",
+            "- expected_response_types_by_request_type: "
+            f"`{json.dumps(packet['expected_response_types_by_request_type'], sort_keys=True)}`",
+            "",
             "## Expected Artifacts",
             "",
             f"- summary: `{packet['expected_run_artifact_glob']}`",

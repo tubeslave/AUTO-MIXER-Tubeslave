@@ -11,6 +11,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
@@ -92,6 +93,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     assert packet["channels"] == [3]
     assert packet["value_types"] == ["fader", "gain", "pan"]
+    assert packet["expected_response_types_by_request_type"] == {
+        request_type: list(response_types)
+        for request_type, response_types in (
+            WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+        )
+    }
     assert packet["commands"]["preview_readonly_request_plan"] == [
         "python3",
         "tools/wing_readonly_preflight_runner.py",
@@ -293,6 +300,20 @@ def test_handoff_packet_forbidden_live_request_types_matches_shared_contract():
     assert len(packet["forbidden_live_request_types"]) == len(packet_forbidden)
 
 
+def test_handoff_packet_response_type_map_matches_shared_contract():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["expected_response_types_by_request_type"] == {
+        request_type: list(response_types)
+        for request_type, response_types in (
+            WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+        )
+    }
+    assert handoff.EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE == packet[
+        "expected_response_types_by_request_type"
+    ]
+
+
 def test_handoff_packet_review_checklist_ids_match_shared_contract():
     packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
 
@@ -396,6 +417,9 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "--prestart-summary" in markdown
     assert "capture_readonly_preflight" in markdown
     assert "review_edited_decision_json" in markdown
+    assert "Expected Response Types" in markdown
+    assert "expected_response_types_by_request_type" in markdown
+    assert "mixer_parameter_read_blocked" in markdown
     assert "Expected Supervised Prestart Gate" in markdown
     assert "actual_matches_expected: `true`" in markdown
     assert "pending_review_decision_template.json" in markdown
@@ -432,6 +456,12 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     )
     assert payload["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert payload["backend_port_prestart_check_must_be_first_operator_step"] is True
+    assert payload["expected_response_types_by_request_type"] == {
+        request_type: list(response_types)
+        for request_type, response_types in (
+            WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+        )
+    }
     assert payload["next_manual_artifact_required"] == (
         WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
     )
