@@ -151,6 +151,11 @@ you want the background automation active.
   This keeps the structured prestart command aligned with the required
   no-WING release check.
 - The same summaries must also show
+  `backend_port_prestart_check_required: true` and
+  `backend_port_prestart_check_must_pass_before_starting_backend: true`.
+  This keeps the backend listener prestart check non-optional and before the
+  intended session.
+- The same summaries must also show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
@@ -244,12 +249,11 @@ you want the background automation active.
   `physical_preflight_requires_existing_backend_connection: true`.
   This keeps the physical read-only preflight tied to the intended existing
   backend/WING session.
-- Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `backend_port_prestart_check_required: true`.
-  This keeps the backend listener prestart check non-optional.
-- Before any supervised fader/gain proof, the no-WING handoff summary must show
+- Before any supervised fader/gain proof, the no-WING handoff summary must also
+  show the same `backend_port_prestart_check_required: true` and
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
-  This keeps the backend listener prestart check before the intended session.
+  This keeps the backend listener prestart check non-optional and before the
+  intended session.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.

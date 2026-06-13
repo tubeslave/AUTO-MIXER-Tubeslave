@@ -147,6 +147,8 @@ blockers выше.
    show `backend_port_prestart_check_command` exactly matching
    `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`;
 10. verify the same summaries expose
+   `backend_port_prestart_check_required: true` and
+   `backend_port_prestart_check_must_pass_before_starting_backend: true`, plus
    `backend_port_prestart_check_failure_detail_fields` exactly listing
    `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
    `preflight_blocked_until_listener_confirmed`,
@@ -310,6 +312,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_check_command` exactly matching
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 - The same summaries must also show
+  `backend_port_prestart_check_required: true` and
+  `backend_port_prestart_check_must_pass_before_starting_backend: true`.
+- The same summaries must also show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
@@ -377,9 +382,8 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `capture_command_prestart_summary_matches_plan: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `physical_preflight_requires_existing_backend_connection: true`.
-- Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `backend_port_prestart_check_required: true`.
-- Before any supervised fader/gain proof, the no-WING handoff summary must show
+- Before any supervised fader/gain proof, the no-WING handoff summary must also
+  show the same `backend_port_prestart_check_required: true` and
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.

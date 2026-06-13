@@ -144,6 +144,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md` | Backend-port prestart failure-detail contracts now require generated-template review fields for safe-to-stop, live authority, placeholders, and required edits. |
 | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md` | Failed busy-port no-WING summaries now surface the shared backend-port prestart failure-detail field list in JSON and Markdown. |
 | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_COMMAND_SUMMARY_20260613.md` | The failed busy-port no-WING summary and no-WING handoff summary must both show the shared backend-port prestart check command in JSON and Markdown. |
+| `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md` | The failed busy-port no-WING summary and no-WING handoff summary must both show the backend-port prestart required and must-pass flags. |
 | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_PENDING_SUMMARY_FIELDS_CANON_20260613.md` | The WING MVP blocker table, Project Director, generated progress report, MVP doc, and autoloop docs now require the pending listener-template summary fields. |
 | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md` | Backend-port prestart failure-detail contracts now require `listener_process_error` so owner-probe failures remain visible before WING read-only preflight. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md` | WING read-only handoff packets now carry the no-WING prestart summary placeholder and pass it to plan/capture commands. |
@@ -200,6 +201,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING backend prestart template review fields | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md` |
 | Current WING busy-port prestart detail fields summary | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md` |
 | Current WING busy-port prestart command summary | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_COMMAND_SUMMARY_20260613.md` |
+| Current WING busy-port prestart required flags summary | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md` |
 | Current WING backend-listener pending summary fields canon | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_PENDING_SUMMARY_FIELDS_CANON_20260613.md` |
 | Current WING read-only prestart summary binding | `Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md` |
 | Current WING handoff prestart summary placeholder | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md` |

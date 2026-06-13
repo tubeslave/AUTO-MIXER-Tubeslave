@@ -131,6 +131,10 @@ Stop the current Codex work direction and return to the first open blocker if:
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 - A supervised proof is planned while the failed busy-port no-WING summary or
   no-WING handoff summary does not show
+  `backend_port_prestart_check_required: true` and
+  `backend_port_prestart_check_must_pass_before_starting_backend: true`.
+- A supervised proof is planned while the failed busy-port no-WING summary or
+  no-WING handoff summary does not show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
@@ -187,10 +191,6 @@ Stop the current Codex work direction and return to the first open blocker if:
   `expected_plan_required_for_real_run: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `physical_preflight_requires_existing_backend_connection: true`.
-- A supervised proof is planned while the no-WING handoff summary does not show
-  `backend_port_prestart_check_required: true`.
-- A supervised proof is planned while the no-WING handoff summary does not show
-  `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `backend_port_prestart_summary_required: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
@@ -269,6 +269,10 @@ The failed busy-port no-WING summary and no-WING handoff summary must both show
 `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 
 The same summaries must also show
+`backend_port_prestart_check_required: true` and
+`backend_port_prestart_check_must_pass_before_starting_backend: true`.
+
+The same summaries must also show
 `backend_port_prestart_check_failure_detail_fields` exactly listing
 `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
 `preflight_blocked_until_listener_confirmed`,
@@ -330,10 +334,8 @@ The no-WING handoff summary must also show
 The no-WING handoff summary must also show
 `physical_preflight_requires_existing_backend_connection: true`.
 
-The no-WING handoff summary must also show
-`backend_port_prestart_check_required: true`.
-
-The no-WING handoff summary must also show
+The no-WING handoff summary must also show the same
+`backend_port_prestart_check_required: true` and
 `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 
 The no-WING handoff summary must also show

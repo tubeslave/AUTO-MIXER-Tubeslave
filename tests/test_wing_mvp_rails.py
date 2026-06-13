@@ -194,6 +194,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["evidence"]
     )
     assert (
+        "AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
         "AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in rows[0]["evidence"]
     )
@@ -231,6 +235,11 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     ]["next action"]
     assert (
         "failed busy-port no-WING summary and no-WING handoff summary must both show"
+        in rows[0]["next action"]
+    )
+    assert "backend_port_prestart_check_required: true" in rows[0]["next action"]
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in rows[0]["next action"]
     )
     assert "backend_port_prestart_check_failure_detail_fields" in rows[0][
@@ -487,6 +496,11 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "failed busy-port no-WING summary and no-WING handoff summary both show"
         in readonly
     )
+    assert "backend_port_prestart_check_required: true" in readonly
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
+        in readonly
+    )
     assert "backend_port_prestart_check_failure_detail_fields" in readonly
     assert "listener_processes" in readonly
     assert "listener_process_error" in readonly
@@ -586,6 +600,11 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in report
     assert (
         "failed busy-port no-WING summary and no-WING handoff summary must both show"
+        in report
+    )
+    assert "backend_port_prestart_check_required: true" in report
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in report
     )
     assert "backend_port_prestart_check_failure_detail_fields" in report
@@ -728,6 +747,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in text
     assert "failed busy-port no-WING summary and no-WING handoff summary" in text
     assert "must both show" in text
+    assert "backend_port_prestart_check_required: true" in text
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
     assert "listener_processes" in text
     assert "listener_process_error" in text
@@ -851,6 +872,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
         in text
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md"
+        in text
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_PENDING_SUMMARY_FIELDS_CANON_20260613.md"
         in text
     )
@@ -947,6 +972,8 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     assert "backend_port_prestart_check_command" in text
     assert "failed busy-port no-WING summary" in text
     assert "no-WING handoff summary must both show" in text
+    assert "backend_port_prestart_check_required: true" in text
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
     assert "manual_review_required_before_readiness_update" in text
     assert "readiness_matrix_update_allowed_by_packet" in text
