@@ -368,6 +368,7 @@ The handoff validation must report:
 - `execution_allowed_by_packet: false`
 - `live_authority_granted: false`
 - `full_autonomous_ready: false`
+- `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`

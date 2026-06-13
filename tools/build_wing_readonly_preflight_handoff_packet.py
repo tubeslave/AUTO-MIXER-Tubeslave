@@ -550,7 +550,16 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
     lines.extend(["", "## Blockers Not Closed By This Packet", ""])
     for item in packet.get("blockers_not_closed_by_packet") or []:
         lines.append(f"- `{item}`")
-    lines.extend(["", "## Next Required Artifact", "", str(packet["next_manual_artifact_required"]), ""])
+    lines.extend(
+        [
+            "",
+            "## Next Required Artifact",
+            "",
+            "- next_manual_artifact_required: "
+            f"`{packet['next_manual_artifact_required']}`",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 

@@ -8507,6 +8507,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "readiness_closure_allowed_by_packet": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "next_manual_artifact_required": (
+                "real wing_readonly_preflight.v1 summary.json"
+            ),
             "plan_output": "/tmp/wing_readonly_preflight_plan.json",
             "channels": [3],
             "value_types": ["fader", "gain", "pan"],
@@ -8635,6 +8638,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["readiness_closure_allowed_by_packet"] is False
     assert artifact["live_authority_granted"] is False
     assert artifact["full_autonomous_ready"] is False
+    assert (
+        artifact["next_manual_artifact_required"]
+        == "real wing_readonly_preflight.v1 summary.json"
+    )
     assert artifact["packet_status"] == "operator_hardware_step_required"
     assert artifact["plan_artifact_status"] == "passed"
     assert artifact["plan_artifact_violations"] == []
@@ -8702,6 +8709,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
+    assert (
+        "next_manual_artifact_required: "
+        "`real wing_readonly_preflight.v1 summary.json`"
+    ) in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
     assert "execution_allowed_by_packet: `false`" in markdown_summary
     assert "preview_command_uses_plan_only: `true`" in markdown_summary

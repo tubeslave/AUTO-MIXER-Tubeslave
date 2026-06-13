@@ -4105,6 +4105,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["live_authority_granted"] = packet.get("live_authority_granted")
     detail["full_autonomous_ready"] = packet.get("full_autonomous_ready")
+    detail["next_manual_artifact_required"] = packet.get(
+        "next_manual_artifact_required"
+    )
     detail["url"] = packet.get("url")
     detail["plan_output"] = packet.get("plan_output")
     detail["artifact_root"] = packet.get("artifact_root")
@@ -11253,6 +11256,9 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "readiness_closure_allowed_by_packet": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "next_manual_artifact_required": str(
+                detail.get("next_manual_artifact_required") or ""
+            ),
             "packet_path": detail.get("packet_path"),
             "packet_type": detail.get("packet_type"),
             "packet_status": detail.get("packet_status"),
@@ -14580,6 +14586,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['live_authority_granted']).lower()}`",
                 "- full_autonomous_ready: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['full_autonomous_ready']).lower()}`",
+                "- next_manual_artifact_required: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['next_manual_artifact_required']}`",
                 "- packet_path: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['packet_path']}`",
                 "- packet_status: "

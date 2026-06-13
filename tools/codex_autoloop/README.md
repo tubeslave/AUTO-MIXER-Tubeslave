@@ -212,6 +212,10 @@ you want the background automation active.
   `full_autonomous_ready: false`.
   This keeps the handoff packet from being treated as autonomous readiness.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`.
+  This keeps the next blocking artifact tied to a real WING read-only summary,
+  not to the offline handoff packet.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
   `prestart_backend_port_check` and `unexpected listeners`,

@@ -101,6 +101,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "execution_allowed_by_packet: false" in directive["selected_action"]
     assert "live_authority_granted: false" in directive["selected_action"]
     assert "full_autonomous_ready: false" in directive["selected_action"]
+    assert (
+        "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
+        in directive["selected_action"]
+    )
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
     ]
@@ -319,6 +323,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "execution_allowed_by_packet: false" in prompt
     assert "live_authority_granted: false" in prompt
     assert "full_autonomous_ready: false" in prompt
+    assert (
+        "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
+        in prompt
+    )
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_check_operator_sequence_step" in prompt
     assert "prestart_backend_port_check" in prompt
@@ -365,6 +373,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "execution_allowed_by_packet: false" in readme
     assert "live_authority_granted: false" in readme
     assert "full_autonomous_ready: false" in readme
+    assert (
+        "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
+        in readme
+    )
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme
     assert "backend_port_prestart_check_operator_sequence_step" in readme
     assert "prestart_backend_port_check" in readme

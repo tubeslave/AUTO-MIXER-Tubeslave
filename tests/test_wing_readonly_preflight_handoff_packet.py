@@ -41,6 +41,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["readiness_matrix_update_allowed_by_packet"] is False
     assert packet["live_authority_granted"] is False
     assert packet["full_autonomous_ready"] is False
+    assert (
+        packet["next_manual_artifact_required"]
+        == "real wing_readonly_preflight.v1 summary.json"
+    )
     assert packet["channels"] == [3]
     assert packet["value_types"] == ["fader", "gain", "pan"]
     assert packet["commands"]["preview_readonly_request_plan"] == [
@@ -168,6 +172,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "grants_live_authority: `false`" in rendered
     assert "valid accepted-candidate prestart trace" in rendered
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rendered
+    assert (
+        "next_manual_artifact_required: "
+        "`real wing_readonly_preflight.v1 summary.json`"
+    ) in rendered
     assert "--decision-template-output" in packet["commands"][
         "review_artifact_and_write_pending_decision_template"
     ]
@@ -323,6 +331,10 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "pending_review_decision_template.json" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "full_autonomous_ready: `false`" in markdown
+    assert (
+        "next_manual_artifact_required: "
+        "`real wing_readonly_preflight.v1 summary.json`"
+    ) in markdown
 
 
 def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
@@ -343,6 +355,10 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["backend_port_prestart_check_must_pass_before_starting_backend"] is True
     assert payload["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert payload["backend_port_prestart_check_must_be_first_operator_step"] is True
+    assert (
+        payload["next_manual_artifact_required"]
+        == "real wing_readonly_preflight.v1 summary.json"
+    )
     assert payload["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )

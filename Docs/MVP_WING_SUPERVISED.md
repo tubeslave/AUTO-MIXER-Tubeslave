@@ -159,6 +159,8 @@ Stop the current Codex work direction and return to the first open blocker if:
   `live_authority_granted: false`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `full_autonomous_ready: false`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate`.
@@ -261,6 +263,9 @@ The no-WING handoff summary must also show
 
 The no-WING handoff summary must also show
 `full_autonomous_ready: false`.
+
+The no-WING handoff summary must also show
+`next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`.
 
 It must also show `supervised_prestart_gate` exactly matching
 `expected_supervised_prestart_gate`, with
