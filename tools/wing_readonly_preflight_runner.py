@@ -27,9 +27,13 @@ if str(REPO_ROOT) not in sys.path:
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+    WING_READONLY_PREFLIGHT_RUNNER_URL,
+    WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -341,9 +345,9 @@ async def send_and_wait(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a read-only WING Rack preflight through backend WebSocket.")
-    parser.add_argument("--url", default="ws://localhost:8765", help="Backend WebSocket URL")
-    parser.add_argument("--channels", default="1", help="Comma-separated WING input channels, each 1..48")
-    parser.add_argument("--value-types", default="fader,gain,pan", help="Comma-separated read-only value types: fader,gain,pan")
+    parser.add_argument("--url", default=WING_READONLY_PREFLIGHT_RUNNER_URL, help="Backend WebSocket URL")
+    parser.add_argument("--channels", default=WING_READONLY_PREFLIGHT_RUNNER_CHANNELS, help="Comma-separated WING input channels, each 1..48")
+    parser.add_argument("--value-types", default=WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES, help="Comma-separated read-only value types: fader,gain,pan")
     parser.add_argument(
         "--require-physical-readback",
         action="store_true",
@@ -395,7 +399,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--timeout", type=float, default=5.0, help="Timeout per WebSocket step")
-    parser.add_argument("--artifact-root", default="artifacts/wing_readonly_preflight", help="Artifact root directory")
+    parser.add_argument("--artifact-root", default=WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT, help="Artifact root directory")
     return parser
 
 

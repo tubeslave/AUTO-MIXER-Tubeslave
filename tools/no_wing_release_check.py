@@ -614,6 +614,43 @@ def command_value_after_flag(command: Sequence[str], flag: str) -> str | None:
     return str(command[index + 1])
 
 
+def load_wing_readonly_preflight_runner_tool() -> object | None:
+    runner_tool_path = REPO_ROOT / WING_READONLY_PREFLIGHT_RUNNER_TOOL
+    if not runner_tool_path.is_file():
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_automixer_wing_readonly_preflight_runner_tool",
+            runner_tool_path,
+        )
+        if spec is None or spec.loader is None:
+            return None
+        runner_tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner_tool)
+    except Exception:
+        return None
+    return runner_tool
+
+
+def wing_readonly_preflight_runner_argparse_target_defaults() -> dict[str, str | None]:
+    runner_tool = load_wing_readonly_preflight_runner_tool()
+    if runner_tool is None:
+        return {}
+    try:
+        parser_factory = getattr(runner_tool, "build_parser", None)
+        if not callable(parser_factory):
+            return {}
+        args = parser_factory().parse_args([])
+    except (Exception, SystemExit):
+        return {}
+    return {
+        "url": getattr(args, "url", None),
+        "channels": getattr(args, "channels", None),
+        "value_types": getattr(args, "value_types", None),
+        "artifact_root": getattr(args, "artifact_root", None),
+    }
+
+
 def wing_readonly_preflight_review_command() -> list[str]:
     return [
         "python3",
@@ -3603,6 +3640,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         "value_types": WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         "artifact_root": WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     }
+    runner_argparse_target_defaults = (
+        wing_readonly_preflight_runner_argparse_target_defaults()
+    )
     plan_target_defaults = {
         "url": plan_url,
         "channels": plan_channels,
@@ -3629,6 +3669,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     handoff_target_defaults_match_contract = (
         handoff_target_defaults == expected_target_defaults
+    )
+    runner_argparse_target_defaults_match_contract = (
+        runner_argparse_target_defaults == expected_target_defaults
     )
     handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
     handoff_value_types_match_capture = (
@@ -3664,6 +3707,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     if not handoff_target_defaults_match_contract:
         violations.append(
             "wing_readonly_preflight_handoff_packet_target_defaults_mismatch"
+        )
+    if not runner_argparse_target_defaults_match_contract:
+        violations.append(
+            "wing_readonly_preflight_runner_argparse_target_defaults_mismatch"
         )
     if not plan_matches_capture:
         violations.append("wing_readonly_preflight_plan_command_mismatch")
@@ -3832,6 +3879,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["plan_command"] = plan_command
     detail["plan_command_uses_plan_only"] = "--plan-only" in plan_command
     detail["expected_target_defaults"] = dict(expected_target_defaults)
+    detail["runner_argparse_target_defaults"] = dict(
+        runner_argparse_target_defaults
+    )
+    detail["runner_argparse_target_defaults_match_contract"] = (
+        runner_argparse_target_defaults_match_contract
+    )
     detail["plan_command_target_defaults"] = dict(plan_target_defaults)
     detail["plan_command_target_defaults_match_contract"] = (
         plan_target_defaults_match_contract
@@ -11814,6 +11867,14 @@ def wing_readonly_preflight_evidence_summary(
                 if isinstance(detail.get("expected_target_defaults"), Mapping)
                 else {}
             ),
+            "runner_argparse_target_defaults": (
+                dict(detail.get("runner_argparse_target_defaults"))
+                if isinstance(detail.get("runner_argparse_target_defaults"), Mapping)
+                else {}
+            ),
+            "runner_argparse_target_defaults_match_contract": (
+                detail.get("runner_argparse_target_defaults_match_contract") is True
+            ),
             "plan_command_target_defaults": (
                 dict(detail.get("plan_command_target_defaults"))
                 if isinstance(detail.get("plan_command_target_defaults"), Mapping)
@@ -15462,6 +15523,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight['plan_command_uses_plan_only']).lower()}`",
                 "- expected_target_defaults: "
                 f"`{json.dumps(wing_readonly_preflight['expected_target_defaults'], sort_keys=True)}`",
+                "- runner_argparse_target_defaults: "
+                f"`{json.dumps(wing_readonly_preflight['runner_argparse_target_defaults'], sort_keys=True)}`",
+                "- runner_argparse_target_defaults_match_contract: "
+                f"`{str(wing_readonly_preflight['runner_argparse_target_defaults_match_contract']).lower()}`",
                 "- plan_command_target_defaults: "
                 f"`{json.dumps(wing_readonly_preflight['plan_command_target_defaults'], sort_keys=True)}`",
                 "- plan_command_target_defaults_match_contract: "

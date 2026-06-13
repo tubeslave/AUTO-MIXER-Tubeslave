@@ -3672,6 +3672,36 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_target_defaults_mi
     )
 
 
+def test_no_wing_release_check_rejects_wing_preflight_runner_argparse_target_defaults_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_runner_argparse_target_defaults",
+        lambda: {
+            "url": "ws://localhost:9999",
+            "channels": WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+            "value_types": WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+            "artifact_root": WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        },
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["runner_argparse_target_defaults"] == {
+        "url": "ws://localhost:9999",
+        "channels": WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "value_types": WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "artifact_root": WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+    }
+    assert result.detail["runner_argparse_target_defaults_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_runner_argparse_target_defaults_mismatch"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_rejects_wing_preflight_plan_command_mismatch(
     monkeypatch,
 ):
@@ -8654,6 +8684,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             ],
             "plan_command_uses_plan_only": True,
             "expected_target_defaults": expected_target_defaults,
+            "runner_argparse_target_defaults": expected_target_defaults,
+            "runner_argparse_target_defaults_match_contract": True,
             "plan_command_target_defaults": expected_target_defaults,
             "plan_command_target_defaults_match_contract": True,
             "plan_command_output": WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
@@ -8847,6 +8879,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "--plan-only" in preflight["plan_command"]
     assert preflight["plan_command_uses_plan_only"] is True
     assert preflight["expected_target_defaults"] == expected_target_defaults
+    assert preflight["runner_argparse_target_defaults"] == expected_target_defaults
+    assert preflight["runner_argparse_target_defaults_match_contract"] is True
     assert preflight["plan_command_target_defaults"] == expected_target_defaults
     assert preflight["plan_command_target_defaults_match_contract"] is True
     assert preflight["plan_command_output"] == (
@@ -8977,6 +9011,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "capture_tool_path: `tools/wing_readonly_preflight_runner.py`" in markdown_summary
     assert "plan_command_uses_plan_only: `true`" in markdown_summary
     assert "expected_target_defaults" in markdown_summary
+    assert "runner_argparse_target_defaults_match_contract: `true`" in markdown_summary
     assert "plan_command_target_defaults_match_contract: `true`" in markdown_summary
     assert "wing_readonly_preflight_plan/latest_plan.json" in markdown_summary
     assert "plan_command_output_matches_contract: `true`" in markdown_summary

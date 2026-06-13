@@ -13,9 +13,13 @@ import pytest
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+    WING_READONLY_PREFLIGHT_RUNNER_URL,
+    WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -144,6 +148,15 @@ def read_summary(artifact_root: Path) -> dict:
 def read_events(summary: dict) -> list[dict]:
     events_path = Path(summary["events_path"])
     return [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_parser_defaults_use_shared_target_contract() -> None:
+    args = runner.build_parser().parse_args([])
+
+    assert args.url == WING_READONLY_PREFLIGHT_RUNNER_URL
+    assert args.channels == WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+    assert args.value_types == WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+    assert args.artifact_root == WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 
 
 def write_expected_plan(tmp_path: Path, *argv: str) -> Path:
