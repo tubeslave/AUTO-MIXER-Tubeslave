@@ -14,6 +14,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
@@ -216,7 +217,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "confirm_no_live_authority" in packet["required_review_checklist_ids"]
     assert "confirm_operator_session_ready" in packet["required_review_checklist_ids"]
     assert packet["required_review_checklist_ids"] == list(
-        no_wing_release_check.WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+        WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
     )
     forbidden_request_types = set(packet["forbidden_live_request_types"])
     assert "apply_operator_proposal" in forbidden_request_types
@@ -257,6 +258,14 @@ def test_handoff_packet_forbidden_live_request_types_matches_shared_contract():
 
     assert packet_forbidden == expected_forbidden
     assert len(packet["forbidden_live_request_types"]) == len(packet_forbidden)
+
+
+def test_handoff_packet_review_checklist_ids_match_shared_contract():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["required_review_checklist_ids"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
 
 
 def test_handoff_packet_supports_custom_channel_confirmation():

@@ -18,6 +18,7 @@ try:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
@@ -25,6 +26,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     )
 
 
@@ -37,13 +39,8 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES = {
     "operator_review_decision_replacement_required",
 }
 REVIEW_DECISIONS = {"accepted", "rejected"}
-REQUIRED_REVIEW_CHECKLIST_IDS = (
-    "confirm_artifact_paths",
-    "confirm_operator_channel_scope",
-    "confirm_operator_session_ready",
-    "confirm_physical_readbacks",
-    "confirm_event_log_readonly_sequence",
-    "confirm_no_live_authority",
+REQUIRED_REVIEW_CHECKLIST_IDS = tuple(
+    WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
 )
 DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS = (
     "artifacts/wing_readonly_preflight_review_decisions",

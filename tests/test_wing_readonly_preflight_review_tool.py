@@ -11,11 +11,24 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_SELECTED_MVP_BLOCKER,
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
 )
+from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+)
 from backend.wing_readonly_preflight_review_decision import (
     REQUIRED_REVIEW_CHECKLIST_IDS,
     build_wing_readonly_preflight_review_decision_ledger,
 )
 from tools import review_wing_readonly_preflight_artifacts as review_tool
+
+
+def test_manual_review_checklist_ids_match_shared_contract():
+    checklist_ids = tuple(row["id"] for row in review_tool.manual_review_checklist())
+
+    assert checklist_ids == WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    assert (
+        REQUIRED_REVIEW_CHECKLIST_IDS
+        == WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
 
 
 def _valid_summary() -> dict:

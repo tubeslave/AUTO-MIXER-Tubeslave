@@ -6,12 +6,20 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
 )
 from backend.wing_readonly_preflight_review_decision import (
     REQUIRED_REVIEW_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
     build_wing_readonly_preflight_review_decision_ledger,
 )
+
+
+def test_review_decision_checklist_ids_match_shared_contract():
+    assert (
+        REQUIRED_REVIEW_CHECKLIST_IDS
+        == WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
 
 
 def _valid_summary() -> dict:

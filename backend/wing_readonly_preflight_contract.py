@@ -20,6 +20,14 @@ WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED = (
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
 )
+WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
+    "confirm_artifact_paths",
+    "confirm_operator_channel_scope",
+    "confirm_operator_session_ready",
+    "confirm_physical_readbacks",
+    "confirm_event_log_readonly_sequence",
+    "confirm_no_live_authority",
+)
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"
 )

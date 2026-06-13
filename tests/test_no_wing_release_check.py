@@ -17,6 +17,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -210,6 +211,17 @@ def test_wing_readonly_handoff_safety_contract_uses_shared_constants():
     )
     assert "readiness_matrix_update_based_on_real_proof" in (
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+    )
+
+
+def test_wing_readonly_review_checklist_contract_uses_shared_constants():
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+        == WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
+    assert "confirm_artifact_paths" in WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    assert "confirm_no_live_authority" in (
+        WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
     )
 
 
