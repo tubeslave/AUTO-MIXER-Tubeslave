@@ -4600,6 +4600,8 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     )
     detail["request_count"] = len(request_sequence)
     detail["expected_request_count"] = len(expected_requests)
+    detail["request_sequence"] = list(request_sequence)
+    detail["expected_request_sequence"] = list(expected_requests)
     detail["request_sequence_matches_expected"] = request_sequence == expected_requests
     detail["allowed_request_types"] = list(allowed_request_types)
     detail["request_id_policy"] = plan.get("request_id_policy")
@@ -4724,6 +4726,8 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     plan_allowed_request_types = plan_artifact_detail.get("allowed_request_types")
     plan_request_id_policy = plan_artifact_detail.get("request_id_policy")
     plan_fail_closed_conditions = plan_artifact_detail.get("fail_closed_conditions")
+    plan_request_sequence = plan_artifact_detail.get("request_sequence")
+    expected_request_sequence = plan_artifact_detail.get("expected_request_sequence")
     commands = packet.get("commands") if isinstance(packet.get("commands"), Mapping) else {}
     operator_sequence = (
         packet.get("operator_sequence")
@@ -4948,6 +4952,22 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if packet_response_types != plan_response_types:
         violations.append(
             "wing_readonly_preflight_handoff_packet_response_type_mapping_plan_mismatch"
+        )
+    packet_request_sequence = packet.get("request_sequence")
+    if packet_request_sequence != expected_request_sequence:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_request_sequence_mismatch"
+        )
+    if packet_request_sequence != plan_request_sequence:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_request_sequence_plan_mismatch"
+        )
+    packet_request_sequence_for_count = (
+        packet_request_sequence if isinstance(packet_request_sequence, list) else []
+    )
+    if packet.get("request_count") != len(packet_request_sequence_for_count):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_request_count_mismatch"
         )
     packet_fail_closed_conditions = packet.get("fail_closed_conditions")
     if packet_fail_closed_conditions != list(
@@ -5324,6 +5344,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["plan_expected_response_types_by_request_type"] = plan_response_types
     detail["response_type_mapping_matches_plan"] = (
         packet.get("expected_response_types_by_request_type") == plan_response_types
+    )
+    detail["request_sequence"] = packet.get("request_sequence")
+    detail["plan_request_sequence"] = plan_request_sequence
+    detail["expected_request_sequence"] = expected_request_sequence
+    detail["request_count"] = packet.get("request_count")
+    detail["request_sequence_matches_plan"] = (
+        packet.get("request_sequence") == plan_request_sequence
+    )
+    detail["request_sequence_matches_expected"] = (
+        packet.get("request_sequence") == expected_request_sequence
     )
     detail["fail_closed_conditions"] = packet.get("fail_closed_conditions")
     detail["plan_fail_closed_conditions"] = plan_fail_closed_conditions
@@ -12653,6 +12683,16 @@ def wing_readonly_preflight_plan_artifact_summary(
             ),
             "request_count": int(detail.get("request_count") or 0),
             "expected_request_count": int(detail.get("expected_request_count") or 0),
+            "request_sequence": (
+                list(detail.get("request_sequence"))
+                if isinstance(detail.get("request_sequence"), list)
+                else []
+            ),
+            "expected_request_sequence": (
+                list(detail.get("expected_request_sequence"))
+                if isinstance(detail.get("expected_request_sequence"), list)
+                else []
+            ),
             "request_sequence_matches_expected": (
                 detail.get("request_sequence_matches_expected") is True
             ),
@@ -12838,6 +12878,28 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "response_type_mapping_matches_plan": (
                 detail.get("response_type_mapping_matches_plan") is True
+            ),
+            "request_sequence": (
+                list(detail.get("request_sequence"))
+                if isinstance(detail.get("request_sequence"), list)
+                else []
+            ),
+            "plan_request_sequence": (
+                list(detail.get("plan_request_sequence"))
+                if isinstance(detail.get("plan_request_sequence"), list)
+                else []
+            ),
+            "expected_request_sequence": (
+                list(detail.get("expected_request_sequence"))
+                if isinstance(detail.get("expected_request_sequence"), list)
+                else []
+            ),
+            "request_count": int(detail.get("request_count") or 0),
+            "request_sequence_matches_plan": (
+                detail.get("request_sequence_matches_plan") is True
+            ),
+            "request_sequence_matches_expected": (
+                detail.get("request_sequence_matches_expected") is True
             ),
             "fail_closed_conditions": (
                 list(detail.get("fail_closed_conditions"))
@@ -16299,6 +16361,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_plan_artifact['expected_request_count']}`",
                 "- request_sequence_matches_expected: "
                 f"`{str(wing_readonly_preflight_plan_artifact['request_sequence_matches_expected']).lower()}`",
+                "- request_sequence: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['request_sequence'])}`",
                 "- allowed_request_types: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['allowed_request_types'])}`",
                 "- request_id_policy: "
@@ -16382,6 +16446,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_expected_response_types_by_request_type'])}`",
                 "- response_type_mapping_matches_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['response_type_mapping_matches_plan']).lower()}`",
+                "- request_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['request_count']}`",
+                "- request_sequence: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['request_sequence'])}`",
+                "- plan_request_sequence: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_request_sequence'])}`",
+                "- request_sequence_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['request_sequence_matches_plan']).lower()}`",
+                "- request_sequence_matches_expected: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['request_sequence_matches_expected']).lower()}`",
                 "- fail_closed_conditions: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['fail_closed_conditions'])}`",
                 "- plan_fail_closed_conditions: "

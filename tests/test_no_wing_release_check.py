@@ -1208,6 +1208,8 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
 
 
 def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dict:
+    plan_payload = valid_wing_readonly_preflight_plan_payload(plan_path)
+    request_sequence = list(plan_payload["request_sequence"])
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": "2026-06-07T00:00:00Z",
@@ -1257,6 +1259,8 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "fail_closed_conditions": list(
             WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
         ),
+        "request_sequence": request_sequence,
+        "request_count": len(request_sequence),
         "artifact_root": "artifacts/wing_readonly_preflight",
         "decision_root": WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
         "expected_run_artifact_glob": (
@@ -2947,6 +2951,11 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         result.detail["plan_fail_closed_conditions"]
     )
     assert result.detail["fail_closed_conditions_match_plan"] is True
+    assert result.detail["request_sequence"] == result.detail["plan_request_sequence"]
+    assert result.detail["request_sequence"] == result.detail["expected_request_sequence"]
+    assert result.detail["request_count"] == 5
+    assert result.detail["request_sequence_matches_plan"] is True
+    assert result.detail["request_sequence_matches_expected"] is True
     assert result.detail["preview_command_uses_plan_only"] is True
     assert result.detail["capture_command_requires_physical_readback"] is True
     assert result.detail["prestart_backend_port_check_command"] == [
@@ -3129,6 +3138,42 @@ def test_no_wing_release_check_rejects_handoff_response_type_map_drift(
     )
     assert (
         "wing_readonly_preflight_handoff_packet_response_type_mapping_plan_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_request_sequence_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "stale-request-sequence-handoff.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["request_sequence"] = [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+    ]
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_handoff_packet_request_sequence_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_request_sequence_plan_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_request_count_mismatch"
         in result.detail["violations"]
     )
 
@@ -10065,6 +10110,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "plan_output": "/tmp/wing_readonly_preflight_plan.json",
             "channels": [3],
             "value_types": ["fader", "gain", "pan"],
+            "request_sequence": [{"type": "get_operator_mode"}],
+            "plan_request_sequence": [{"type": "get_operator_mode"}],
+            "expected_request_sequence": [{"type": "get_operator_mode"}],
+            "request_count": 1,
+            "request_sequence_matches_plan": True,
+            "request_sequence_matches_expected": True,
             "command_names": [
                 "capture_readonly_preflight",
                 "focused_validation",
@@ -10217,6 +10268,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["packet_status"] == "operator_hardware_step_required"
     assert artifact["plan_artifact_status"] == "passed"
     assert artifact["plan_artifact_violations"] == []
+    assert artifact["request_count"] == 1
+    assert artifact["request_sequence"] == [{"type": "get_operator_mode"}]
+    assert artifact["plan_request_sequence"] == [{"type": "get_operator_mode"}]
+    assert artifact["request_sequence_matches_plan"] is True
+    assert artifact["request_sequence_matches_expected"] is True
     assert artifact["preview_command_uses_plan_only"] is True
     assert artifact["capture_command_requires_physical_readback"] is True
     assert artifact["prestart_backend_port_check_command"] == [
@@ -10318,6 +10374,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
+    assert "request_count: `1`" in markdown_summary
+    assert "request_sequence_matches_plan: `true`" in markdown_summary
+    assert "request_sequence_matches_expected: `true`" in markdown_summary
     assert "execution_allowed_by_packet: `false`" in markdown_summary
     assert "preview_command_uses_plan_only: `true`" in markdown_summary
     assert "capture_command_requires_physical_readback: `true`" in markdown_summary

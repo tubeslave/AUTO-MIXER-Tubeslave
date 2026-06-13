@@ -142,6 +142,41 @@ def _validate_channels(channels: str) -> list[int]:
     return parsed
 
 
+def request_address(channel: int, value_type: str) -> str:
+    if value_type == "fader":
+        return f"/ch/{channel}/fdr"
+    if value_type == "gain":
+        return f"/ch/{channel}/in/set/trim"
+    if value_type == "pan":
+        return f"/ch/{channel}/pan"
+    raise ValueError(f"value_types_unsupported:{value_type}")
+
+
+def request_id_for(channel: int, value_type: str) -> str:
+    return f"wing-readonly-preflight:ch{channel}:{value_type}"
+
+
+def build_request_sequence(
+    channels: Sequence[int],
+    value_types: Sequence[str],
+) -> list[dict[str, Any]]:
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            {
+                "type": "query_mixer_parameter",
+                "request_id": request_id_for(channel, value_type),
+                "channel": channel,
+                "value_type": value_type,
+                "address": request_address(channel, value_type),
+            }
+            for channel in channels
+            for value_type in value_types
+        ],
+    ]
+
+
 def capture_command(
     *,
     url: str,
@@ -275,6 +310,7 @@ def build_handoff_packet(
         operator_sequence_step=supervised_gate_step,
         operator_sequence_step_index=supervised_gate_step_index,
     )
+    request_sequence = build_request_sequence(channel_numbers, value_type_names)
     preview = plan_command(
         url=url,
         channels=channels,
@@ -341,6 +377,8 @@ def build_handoff_packet(
         "expected_response_types_by_request_type": dict(
             EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
         ),
+        "request_sequence": request_sequence,
+        "request_count": len(request_sequence),
         "fail_closed_conditions": list(FAIL_CLOSED_CONDITIONS),
         "artifact_root": artifact_root,
         "decision_root": decision_root,
@@ -558,6 +596,12 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             f"- request_id_policy: `{packet['request_id_policy']}`",
             "- expected_response_types_by_request_type: "
             f"`{json.dumps(packet['expected_response_types_by_request_type'], sort_keys=True)}`",
+            "",
+            "## Expected Request Sequence",
+            "",
+            f"- request_count: `{packet['request_count']}`",
+            "- request_sequence: "
+            f"`{json.dumps(packet['request_sequence'])}`",
             "",
             "## Fail-Closed Conditions",
             "",

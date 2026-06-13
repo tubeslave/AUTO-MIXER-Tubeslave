@@ -109,6 +109,32 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["fail_closed_conditions"] == list(
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
     )
+    assert packet["request_count"] == 5
+    assert packet["request_sequence"] == [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        {
+            "type": "query_mixer_parameter",
+            "request_id": "wing-readonly-preflight:ch3:fader",
+            "channel": 3,
+            "value_type": "fader",
+            "address": "/ch/3/fdr",
+        },
+        {
+            "type": "query_mixer_parameter",
+            "request_id": "wing-readonly-preflight:ch3:gain",
+            "channel": 3,
+            "value_type": "gain",
+            "address": "/ch/3/in/set/trim",
+        },
+        {
+            "type": "query_mixer_parameter",
+            "request_id": "wing-readonly-preflight:ch3:pan",
+            "channel": 3,
+            "value_type": "pan",
+            "address": "/ch/3/pan",
+        },
+    ]
     assert packet["commands"]["preview_readonly_request_plan"] == [
         "python3",
         "tools/wing_readonly_preflight_runner.py",
@@ -344,6 +370,18 @@ def test_handoff_packet_fail_closed_conditions_match_shared_contract():
     assert handoff.FAIL_CLOSED_CONDITIONS == packet["fail_closed_conditions"]
 
 
+def test_handoff_packet_request_sequence_uses_runner_shape():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["request_sequence"] == handoff.build_request_sequence(
+        [3],
+        ["fader", "gain", "pan"],
+    )
+    assert packet["request_count"] == len(packet["request_sequence"])
+    assert handoff.request_id_for(3, "gain") == "wing-readonly-preflight:ch3:gain"
+    assert handoff.request_address(3, "gain") == "/ch/3/in/set/trim"
+
+
 def test_handoff_packet_review_checklist_ids_match_shared_contract():
     packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
 
@@ -454,6 +492,10 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY in markdown
     assert "expected_response_types_by_request_type" in markdown
     assert "mixer_parameter_read_blocked" in markdown
+    assert "Expected Request Sequence" in markdown
+    assert "request_sequence" in markdown
+    assert "wing-readonly-preflight:ch3:fader" in markdown
+    assert "/ch/3/in/set/trim" in markdown
     assert "Fail-Closed Conditions" in markdown
     assert "fail_closed_conditions" in markdown
     assert "unexpected_response_type" in markdown
@@ -506,6 +548,11 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     }
     assert payload["fail_closed_conditions"] == list(
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
+    )
+    assert payload["request_count"] == 5
+    assert payload["request_sequence"] == handoff.build_request_sequence(
+        [3],
+        ["fader", "gain", "pan"],
     )
     assert payload["next_manual_artifact_required"] == (
         WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
