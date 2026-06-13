@@ -343,10 +343,18 @@ REPO_LOCAL_COMMAND_OUTPUT_FLAGS = {
     "--prestart-summary",
 }
 WING_READONLY_PREFLIGHT_RUNNER_TOOL = "tools/wing_readonly_preflight_runner.py"
-WING_READONLY_PREFLIGHT_RUNNER_URL = "ws://localhost:8765"
-WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = "3"
-WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = "fader,gain,pan"
-WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
+WING_READONLY_PREFLIGHT_RUNNER_URL = (
+    preflight_contract.WING_READONLY_PREFLIGHT_RUNNER_URL
+)
+WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = (
+    preflight_contract.WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+)
+WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = (
+    preflight_contract.WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+)
+WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = (
+    preflight_contract.WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+)
 WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
     preflight_contract.WING_READONLY_PREFLIGHT_PLAN_OUTPUT
 )
@@ -3533,11 +3541,13 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     capture_confirms_session_ready = (
         "--operator-confirm-session-ready" in capture_command
     )
+    capture_url = command_value_after_flag(capture_command, "--url")
     plan_channels = command_value_after_flag(plan_command, "--channels")
     plan_confirmed_channels = command_value_after_flag(
         plan_command,
         "--operator-confirm-channels",
     )
+    plan_url = command_value_after_flag(plan_command, "--url")
     plan_confirms_session_ready = "--operator-confirm-session-ready" in plan_command
     plan_value_types = command_value_after_flag(plan_command, "--value-types")
     plan_artifact_root = command_value_after_flag(plan_command, "--artifact-root")
@@ -3587,6 +3597,39 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     handoff_packet_output_matches_contract = (
         handoff_packet_output == WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
     )
+    expected_target_defaults = {
+        "url": WING_READONLY_PREFLIGHT_RUNNER_URL,
+        "channels": WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "value_types": WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "artifact_root": WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+    }
+    plan_target_defaults = {
+        "url": plan_url,
+        "channels": plan_channels,
+        "value_types": plan_value_types,
+        "artifact_root": plan_artifact_root,
+    }
+    capture_target_defaults = {
+        "url": capture_url,
+        "channels": capture_channels,
+        "value_types": capture_value_types,
+        "artifact_root": capture_artifact_root,
+    }
+    handoff_target_defaults = {
+        "url": handoff_url,
+        "channels": handoff_channels,
+        "value_types": handoff_value_types,
+        "artifact_root": handoff_artifact_root,
+    }
+    plan_target_defaults_match_contract = (
+        plan_target_defaults == expected_target_defaults
+    )
+    capture_target_defaults_match_contract = (
+        capture_target_defaults == expected_target_defaults
+    )
+    handoff_target_defaults_match_contract = (
+        handoff_target_defaults == expected_target_defaults
+    )
     handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
     handoff_value_types_match_capture = (
         bool(handoff_value_types) and handoff_value_types == capture_value_types
@@ -3614,6 +3657,14 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_plan_output_mismatch")
     if "--prestart-summary" not in plan_command or not plan_prestart_summary:
         violations.append("wing_readonly_preflight_plan_prestart_summary_missing")
+    if not plan_target_defaults_match_contract:
+        violations.append("wing_readonly_preflight_plan_target_defaults_mismatch")
+    if not capture_target_defaults_match_contract:
+        violations.append("wing_readonly_preflight_capture_target_defaults_mismatch")
+    if not handoff_target_defaults_match_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_target_defaults_mismatch"
+        )
     if not plan_matches_capture:
         violations.append("wing_readonly_preflight_plan_command_mismatch")
     if "--channels" not in handoff_command:
@@ -3780,6 +3831,11 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["capture_tool_available"] = capture_tool_available
     detail["plan_command"] = plan_command
     detail["plan_command_uses_plan_only"] = "--plan-only" in plan_command
+    detail["expected_target_defaults"] = dict(expected_target_defaults)
+    detail["plan_command_target_defaults"] = dict(plan_target_defaults)
+    detail["plan_command_target_defaults_match_contract"] = (
+        plan_target_defaults_match_contract
+    )
     detail["plan_command_output"] = plan_output
     detail["plan_command_output_matches_contract"] = plan_output_matches_contract
     detail["plan_command_channels"] = plan_channels
@@ -3798,6 +3854,11 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
     detail["capture_command_template"] = capture_command
+    detail["capture_command_url"] = capture_url
+    detail["capture_command_target_defaults"] = dict(capture_target_defaults)
+    detail["capture_command_target_defaults_match_contract"] = (
+        capture_target_defaults_match_contract
+    )
     detail["capture_command_channels"] = capture_channels
     detail["capture_command_operator_confirmed_channels"] = capture_confirmed_channels
     detail["capture_command_requires_operator_channel_confirmation"] = (
@@ -3860,6 +3921,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         handoff_plan_output_matches_plan_output
     )
     detail["handoff_packet_url"] = handoff_url
+    detail["handoff_packet_target_defaults"] = dict(handoff_target_defaults)
+    detail["handoff_packet_target_defaults_match_contract"] = (
+        handoff_target_defaults_match_contract
+    )
     detail["handoff_packet_artifact_root"] = handoff_artifact_root
     detail["handoff_packet_prestart_summary"] = handoff_prestart_summary
     detail["handoff_packet_channels"] = handoff_channels
@@ -11744,6 +11809,19 @@ def wing_readonly_preflight_evidence_summary(
             "plan_command_uses_plan_only": (
                 detail.get("plan_command_uses_plan_only") is True
             ),
+            "expected_target_defaults": (
+                dict(detail.get("expected_target_defaults"))
+                if isinstance(detail.get("expected_target_defaults"), Mapping)
+                else {}
+            ),
+            "plan_command_target_defaults": (
+                dict(detail.get("plan_command_target_defaults"))
+                if isinstance(detail.get("plan_command_target_defaults"), Mapping)
+                else {}
+            ),
+            "plan_command_target_defaults_match_contract": (
+                detail.get("plan_command_target_defaults_match_contract") is True
+            ),
             "plan_command_output": detail.get("plan_command_output"),
             "plan_command_output_matches_contract": (
                 detail.get("plan_command_output_matches_contract") is True
@@ -11785,6 +11863,15 @@ def wing_readonly_preflight_evidence_summary(
             ),
             "capture_command_template": (
                 list(capture_command) if isinstance(capture_command, list) else []
+            ),
+            "capture_command_url": detail.get("capture_command_url"),
+            "capture_command_target_defaults": (
+                dict(detail.get("capture_command_target_defaults"))
+                if isinstance(detail.get("capture_command_target_defaults"), Mapping)
+                else {}
+            ),
+            "capture_command_target_defaults_match_contract": (
+                detail.get("capture_command_target_defaults_match_contract") is True
             ),
             "capture_command_channels": detail.get("capture_command_channels"),
             "capture_command_operator_confirmed_channels": detail.get(
@@ -11875,6 +11962,14 @@ def wing_readonly_preflight_evidence_summary(
                 detail.get("handoff_packet_plan_output_matches_plan_command") is True
             ),
             "handoff_packet_url": detail.get("handoff_packet_url"),
+            "handoff_packet_target_defaults": (
+                dict(detail.get("handoff_packet_target_defaults"))
+                if isinstance(detail.get("handoff_packet_target_defaults"), Mapping)
+                else {}
+            ),
+            "handoff_packet_target_defaults_match_contract": (
+                detail.get("handoff_packet_target_defaults_match_contract") is True
+            ),
             "handoff_packet_artifact_root": detail.get("handoff_packet_artifact_root"),
             "handoff_packet_prestart_summary": detail.get(
                 "handoff_packet_prestart_summary"
@@ -15365,6 +15460,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['plan_command'])}`",
                 "- plan_command_uses_plan_only: "
                 f"`{str(wing_readonly_preflight['plan_command_uses_plan_only']).lower()}`",
+                "- expected_target_defaults: "
+                f"`{json.dumps(wing_readonly_preflight['expected_target_defaults'], sort_keys=True)}`",
+                "- plan_command_target_defaults: "
+                f"`{json.dumps(wing_readonly_preflight['plan_command_target_defaults'], sort_keys=True)}`",
+                "- plan_command_target_defaults_match_contract: "
+                f"`{str(wing_readonly_preflight['plan_command_target_defaults_match_contract']).lower()}`",
                 f"- plan_command_output: `{wing_readonly_preflight['plan_command_output']}`",
                 "- plan_command_output_matches_contract: "
                 f"`{str(wing_readonly_preflight['plan_command_output_matches_contract']).lower()}`",
@@ -15386,6 +15487,11 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['prestart_backend_port_check_failure_detail_fields'])}`",
                 "- capture_command_template: "
                 f"`{json.dumps(wing_readonly_preflight['capture_command_template'])}`",
+                f"- capture_command_url: `{wing_readonly_preflight['capture_command_url']}`",
+                "- capture_command_target_defaults: "
+                f"`{json.dumps(wing_readonly_preflight['capture_command_target_defaults'], sort_keys=True)}`",
+                "- capture_command_target_defaults_match_contract: "
+                f"`{str(wing_readonly_preflight['capture_command_target_defaults_match_contract']).lower()}`",
                 f"- capture_command_channels: `{wing_readonly_preflight['capture_command_channels']}`",
                 "- capture_command_operator_confirmed_channels: "
                 f"`{wing_readonly_preflight['capture_command_operator_confirmed_channels']}`",
@@ -15442,6 +15548,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- handoff_packet_plan_output_matches_plan_command: "
                 f"`{str(wing_readonly_preflight['handoff_packet_plan_output_matches_plan_command']).lower()}`",
                 f"- handoff_packet_url: `{wing_readonly_preflight['handoff_packet_url']}`",
+                "- handoff_packet_target_defaults: "
+                f"`{json.dumps(wing_readonly_preflight['handoff_packet_target_defaults'], sort_keys=True)}`",
+                "- handoff_packet_target_defaults_match_contract: "
+                f"`{str(wing_readonly_preflight['handoff_packet_target_defaults_match_contract']).lower()}`",
                 "- handoff_packet_artifact_root: "
                 f"`{wing_readonly_preflight['handoff_packet_artifact_root']}`",
                 "- handoff_packet_prestart_summary: "
