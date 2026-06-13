@@ -25,6 +25,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
@@ -73,6 +74,7 @@ SELECTED_MVP_BLOCKER_STATUS = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATU
 RUN_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
 RUN_SUMMARY_REASON = WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 REQUEST_ID_POLICY = WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+ALLOWED_REQUEST_TYPES = WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",
     "set_gain",
@@ -628,11 +630,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "queries_console": False,
         "execution_allowed_by_plan": False,
         "live_authority_granted": False,
-        "allowed_request_types": [
-            "get_operator_mode",
-            "get_state",
-            "query_mixer_parameter",
-        ],
+        "allowed_request_types": list(ALLOWED_REQUEST_TYPES),
         "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
         "request_sequence": [
             {"type": "get_operator_mode"},

@@ -379,6 +379,9 @@ WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON = (
 WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY = (
     preflight_contract.WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
 )
+WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES = tuple(
+    preflight_contract.WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
+)
 WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES = (
     preflight_contract.WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
 )
@@ -4494,11 +4497,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
             violations.append(f"wing_readonly_preflight_plan_{key}_not_false")
 
     allowed_request_types = plan.get("allowed_request_types")
-    if allowed_request_types != [
-        "get_operator_mode",
-        "get_state",
-        "query_mixer_parameter",
-    ]:
+    if allowed_request_types != list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES):
         violations.append("wing_readonly_preflight_plan_allowed_request_types_mismatch")
         if not isinstance(allowed_request_types, list):
             allowed_request_types = []

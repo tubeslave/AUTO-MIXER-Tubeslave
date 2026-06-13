@@ -7,6 +7,7 @@ import pytest
 
 from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_status
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
@@ -252,6 +253,10 @@ def test_wing_readonly_handoff_safety_contract_uses_shared_constants():
     assert (
         release_check.WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
         == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
+        == WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
     )
     assert (
         release_check.WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
@@ -1122,11 +1127,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "queries_console": False,
         "execution_allowed_by_plan": False,
         "live_authority_granted": False,
-        "allowed_request_types": [
-            "get_operator_mode",
-            "get_state",
-            "query_mixer_parameter",
-        ],
+        "allowed_request_types": list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES),
         "forbidden_request_types": [
             "apply_operator_proposal",
             "connect_mixer",

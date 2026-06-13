@@ -24,6 +24,7 @@ from backend.wing_readonly_preflight_evidence import (
     validate_wing_readonly_preflight_artifact,
 )
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -72,6 +73,13 @@ def test_preflight_evidence_uses_shared_run_summary_contract():
 
 def test_preflight_evidence_uses_shared_request_id_policy_contract():
     assert REQUEST_ID_POLICY == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+
+
+def test_preflight_evidence_uses_shared_allowed_request_types_contract():
+    assert (
+        EXPECTED_PLAN_ALLOWED_REQUEST_TYPES
+        == WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
+    )
 
 
 def _valid_summary() -> dict:
@@ -305,7 +313,7 @@ def _valid_expected_plan(summary: dict) -> dict:
         "queries_console": False,
         "execution_allowed_by_plan": False,
         "live_authority_granted": False,
-        "allowed_request_types": list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES),
+        "allowed_request_types": list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES),
         "forbidden_request_types": list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES),
         "request_id_policy": summary["request_id_policy"],
         "request_sequence": _expected_plan_request_sequence(summary),

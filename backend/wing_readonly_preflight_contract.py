@@ -103,6 +103,11 @@ WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON = "wing_readonly_preflight_passed"
 WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY = (
     "required_for_every_query_mixer_parameter_response"
 )
+WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES = (
+    "get_operator_mode",
+    "get_state",
+    "query_mixer_parameter",
+)
 
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
     "PYTHONPATH=backend",

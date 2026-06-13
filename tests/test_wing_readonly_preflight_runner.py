@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
@@ -93,6 +94,10 @@ def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebS
 
 def test_runner_uses_shared_request_id_policy_contract() -> None:
     assert runner.REQUEST_ID_POLICY == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+
+
+def test_runner_uses_shared_allowed_request_types_contract() -> None:
+    assert runner.ALLOWED_REQUEST_TYPES == WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
 
 
 def test_runner_uses_shared_run_summary_contract() -> None:
@@ -273,7 +278,7 @@ def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
     }
 
     assert expected <= runner.FORBIDDEN_REQUEST_TYPES
-    assert expected & {"get_operator_mode", "get_state", "query_mixer_parameter"} == set()
+    assert expected & set(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES) == set()
 
 
 @pytest.mark.parametrize(
