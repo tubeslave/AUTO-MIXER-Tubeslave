@@ -108,6 +108,12 @@ WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES = (
     "get_state",
     "query_mixer_parameter",
 )
+WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES = ("operator_mode_status",)
+WING_READONLY_PREFLIGHT_STATE_RESPONSE_TYPES = ("state_update",)
+WING_READONLY_PREFLIGHT_READBACK_RESPONSE_TYPES = (
+    "mixer_parameter_value",
+    "mixer_parameter_read_blocked",
+)
 
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
     "PYTHONPATH=backend",
