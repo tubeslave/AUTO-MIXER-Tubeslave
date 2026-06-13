@@ -197,6 +197,9 @@ you want the background automation active.
   This keeps the physical read-only preflight tied to the intended existing
   backend/WING session.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_check_required: true`.
+  This keeps the backend listener prestart check non-optional.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

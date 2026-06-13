@@ -363,6 +363,7 @@ The handoff validation must report:
 - `operator_required: true`
 - `expected_plan_required_for_real_run: true`
 - `physical_preflight_requires_existing_backend_connection: true`
+- `backend_port_prestart_check_required: true`
 - `execution_allowed_by_packet: false`
 - `live_authority_granted: false`
 - `full_autonomous_ready: false`
