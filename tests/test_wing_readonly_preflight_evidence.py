@@ -14,6 +14,7 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_MODE_EVENT_TYPES,
     EXPECTED_READBACK_EVENT_TYPES,
     EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
+    EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY,
     EXPECTED_SELECTED_MVP_BLOCKER,
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
     EXPECTED_STATE_EVENT_TYPES,
@@ -96,6 +97,10 @@ def test_preflight_evidence_uses_shared_response_type_contract():
         request_type: set(response_types)
         for request_type, response_types in contract_mapping.items()
     }
+    assert EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY == {
+        request_type: list(response_types)
+        for request_type, response_types in contract_mapping.items()
+    }
     assert EXPECTED_MODE_EVENT_TYPES == set(
         WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES
     )
@@ -124,6 +129,9 @@ def _valid_summary() -> dict:
         "value_types": ["fader", "gain", "pan"],
         "require_physical_readback": True,
         "request_id_policy": WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
+        "expected_response_types_by_request_type": dict(
+            EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+        ),
         "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
         "expected_plan_sha256": "0" * 64,
         "expected_plan_match": True,
@@ -341,6 +349,9 @@ def _valid_expected_plan(summary: dict) -> dict:
         "allowed_request_types": list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES),
         "forbidden_request_types": list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES),
         "request_id_policy": summary["request_id_policy"],
+        "expected_response_types_by_request_type": summary[
+            "expected_response_types_by_request_type"
+        ],
         "request_sequence": _expected_plan_request_sequence(summary),
         "fail_closed_conditions": list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS),
     }
@@ -743,6 +754,7 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
     plan["backend_port_prestart_check_command"] = ["python3", "other_check.py"]
     plan["backend_port_prestart_check_failure_detail_fields"] = ["other_field"]
     plan["allowed_request_types"] = ["get_operator_mode", "set_gain"]
+    plan["expected_response_types_by_request_type"] = {"get_operator_mode": ["wrong"]}
     plan["forbidden_request_types"] = ["set_fader"]
     plan["fail_closed_conditions"] = ["backend_not_in_wing_mode"]
     _write_expected_plan(artifact_path, plan)
@@ -775,6 +787,7 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
         in violations
     )
     assert "expected_plan_allowed_request_types_mismatch" in violations
+    assert "expected_plan_response_type_mapping_mismatch" in violations
     assert "expected_plan_forbidden_request_types_mismatch" in violations
     assert "expected_plan_forbidden_request_type_missing:set_gain" in violations
     assert "expected_plan_fail_closed_conditions_mismatch" in violations

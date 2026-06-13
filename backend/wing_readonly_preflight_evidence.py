@@ -82,6 +82,10 @@ EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE = {
     request_type: set(response_types)
     for request_type, response_types in _EXPECTED_RESPONSE_TYPES_CONTRACT.items()
 }
+EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY = {
+    request_type: list(response_types)
+    for request_type, response_types in _EXPECTED_RESPONSE_TYPES_CONTRACT.items()
+}
 EXPECTED_MODE_EVENT_TYPES = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE[
     "get_operator_mode"
 ]
@@ -202,6 +206,7 @@ EXPECTED_PLAN_SUMMARY_FIELDS = (
     "backend_port_prestart_summary_executes_tests",
     "backend_port_prestart_check_status",
     "request_id_policy",
+    "expected_response_types_by_request_type",
 )
 PRESTART_SUMMARY_TYPE = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
 PRESTART_SUMMARY_CONNECTION_POLICY = (
@@ -569,6 +574,11 @@ def _validate_expected_plan_payload(
         )
     if plan.get("allowed_request_types") != list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES):
         violations.append("expected_plan_allowed_request_types_mismatch")
+    if (
+        plan.get("expected_response_types_by_request_type")
+        != EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+    ):
+        violations.append("expected_plan_response_type_mapping_mismatch")
 
     forbidden_request_types = plan.get("forbidden_request_types")
     if forbidden_request_types != list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES):
@@ -982,6 +992,11 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("connection_mode_not_wing")
     if payload.get("request_id_policy") != REQUEST_ID_POLICY:
         violations.append("request_id_policy_missing_or_invalid")
+    if (
+        payload.get("expected_response_types_by_request_type")
+        != EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+    ):
+        violations.append("expected_response_type_mapping_missing_or_invalid")
     if not str(payload.get("expected_plan_path") or ""):
         violations.append("expected_plan_path_missing")
     if not str(payload.get("expected_plan_sha256") or ""):

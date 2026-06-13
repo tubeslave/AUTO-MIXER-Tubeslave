@@ -10,6 +10,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME,
@@ -257,6 +258,15 @@ def test_wing_readonly_handoff_safety_contract_uses_shared_constants():
     assert (
         release_check.WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
         == WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
+        == {
+            request_type: list(response_types)
+            for request_type, response_types in (
+                WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+            )
+        }
     )
     assert (
         release_check.WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
@@ -1128,6 +1138,12 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "execution_allowed_by_plan": False,
         "live_authority_granted": False,
         "allowed_request_types": list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES),
+        "expected_response_types_by_request_type": {
+            request_type: list(response_types)
+            for request_type, response_types in (
+                WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+            )
+        },
         "forbidden_request_types": [
             "apply_operator_proposal",
             "connect_mixer",
@@ -2618,6 +2634,12 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["request_count"] == 5
     assert result.detail["expected_request_count"] == 5
     assert result.detail["request_sequence_matches_expected"] is True
+    assert result.detail["expected_response_types_by_request_type"] == {
+        request_type: list(response_types)
+        for request_type, response_types in (
+            WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+        )
+    }
     assert result.detail["read_only"] is True
     assert result.detail["live_write"] is False
     assert result.detail["contacts_backend"] is False
@@ -2813,6 +2835,25 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     assert "wing_readonly_preflight_plan_unsafe_request_type_present" in result.detail[
         "violations"
     ]
+
+
+def test_no_wing_release_check_rejects_wing_preflight_plan_response_map_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "response-map-drift.json"
+    payload = valid_wing_readonly_preflight_plan_payload(plan_path)
+    payload["expected_response_types_by_request_type"] = {
+        "get_operator_mode": ["operator_mode_status"]
+    }
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_plan_response_type_mapping_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_wing_preflight_plan_with_unexpected_fail_closed_condition(

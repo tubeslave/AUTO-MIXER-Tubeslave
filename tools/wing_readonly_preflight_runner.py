@@ -62,6 +62,10 @@ EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE = {
     request_type: set(response_types)
     for request_type, response_types in _EXPECTED_RESPONSE_TYPES_CONTRACT.items()
 }
+EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY = {
+    request_type: list(response_types)
+    for request_type, response_types in _EXPECTED_RESPONSE_TYPES_CONTRACT.items()
+}
 EXPECTED_MODE_EVENTS = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE["get_operator_mode"]
 EXPECTED_STATE_EVENTS = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE["get_state"]
 EXPECTED_PARAMETER_EVENTS = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE[
@@ -170,6 +174,7 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "execution_allowed_by_plan",
     "live_authority_granted",
     "allowed_request_types",
+    "expected_response_types_by_request_type",
     "forbidden_request_types",
     "request_sequence",
     "request_id_policy",
@@ -641,6 +646,9 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "execution_allowed_by_plan": False,
         "live_authority_granted": False,
         "allowed_request_types": list(ALLOWED_REQUEST_TYPES),
+        "expected_response_types_by_request_type": dict(
+            EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+        ),
         "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
         "request_sequence": [
             {"type": "get_operator_mode"},
@@ -800,6 +808,9 @@ async def run(args: argparse.Namespace) -> int:
         **prestart_detail,
         "prestart_summary_violations": prestart_violations,
         "request_id_policy": REQUEST_ID_POLICY,
+        "expected_response_types_by_request_type": dict(
+            EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+        ),
         "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }

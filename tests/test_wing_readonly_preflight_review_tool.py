@@ -8,6 +8,7 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
     EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
     EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
+    EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY,
     EXPECTED_SELECTED_MVP_BLOCKER,
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
 )
@@ -72,6 +73,9 @@ def _valid_summary() -> dict:
         "value_types": ["fader", "gain", "pan"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "expected_response_types_by_request_type": dict(
+            EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+        ),
         "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
         "expected_plan_sha256": "0" * 64,
         "expected_plan_match": True,
@@ -281,6 +285,9 @@ def _valid_expected_plan(summary: dict) -> dict:
         "allowed_request_types": list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES),
         "forbidden_request_types": list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES),
         "request_id_policy": summary["request_id_policy"],
+        "expected_response_types_by_request_type": summary[
+            "expected_response_types_by_request_type"
+        ],
         "request_sequence": _expected_plan_request_sequence(summary),
         "fail_closed_conditions": list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS),
     }

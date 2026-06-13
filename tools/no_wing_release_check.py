@@ -382,6 +382,15 @@ WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY = (
 WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES = tuple(
     preflight_contract.WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
 )
+_WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_CONTRACT = (
+    preflight_contract.WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
+)
+WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE = {
+    request_type: list(response_types)
+    for request_type, response_types in (
+        _WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_CONTRACT.items()
+    )
+}
 WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES = (
     preflight_contract.WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
 )
@@ -4501,6 +4510,13 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append("wing_readonly_preflight_plan_allowed_request_types_mismatch")
         if not isinstance(allowed_request_types, list):
             allowed_request_types = []
+    if (
+        plan.get("expected_response_types_by_request_type")
+        != WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
+    ):
+        violations.append(
+            "wing_readonly_preflight_plan_response_type_mapping_mismatch"
+        )
     forbidden_request_types = plan.get("forbidden_request_types")
     if not isinstance(forbidden_request_types, list):
         forbidden_request_types = []
@@ -4586,6 +4602,9 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["expected_request_count"] = len(expected_requests)
     detail["request_sequence_matches_expected"] = request_sequence == expected_requests
     detail["request_id_policy"] = plan.get("request_id_policy")
+    detail["expected_response_types_by_request_type"] = plan.get(
+        "expected_response_types_by_request_type"
+    )
     detail["read_only"] = plan.get("read_only")
     detail["live_write"] = plan.get("live_write")
     detail["contacts_backend"] = plan.get("contacts_backend")

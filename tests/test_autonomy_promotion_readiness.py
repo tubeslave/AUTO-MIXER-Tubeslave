@@ -4,7 +4,10 @@ from backend.autonomy_promotion_readiness import (
     build_autonomy_promotion_readiness_snapshot,
     iter_promotion_readiness_rows,
 )
-from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
+from backend.wing_readonly_preflight_evidence import (
+    EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY,
+    build_wing_readonly_preflight_evidence,
+)
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
@@ -28,6 +31,9 @@ def _valid_wing_preflight_summary() -> dict:
         "value_types": ["fader", "gain", "pan"],
         "require_physical_readback": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "expected_response_types_by_request_type": dict(
+            EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+        ),
         "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
         "expected_plan_sha256": "0" * 64,
         "expected_plan_match": True,

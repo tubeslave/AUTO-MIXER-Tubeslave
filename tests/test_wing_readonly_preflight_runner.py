@@ -110,6 +110,10 @@ def test_runner_uses_shared_response_type_contract() -> None:
         request_type: set(response_types)
         for request_type, response_types in contract_mapping.items()
     }
+    assert runner.EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY == {
+        request_type: list(response_types)
+        for request_type, response_types in contract_mapping.items()
+    }
     assert runner.EXPECTED_MODE_EVENTS == set(
         WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES
     )
@@ -1294,6 +1298,12 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["backend_port_prestart_check_status"] == "passed"
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+    assert written["expected_response_types_by_request_type"] == {
+        request_type: list(response_types)
+        for request_type, response_types in (
+            WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
+        )
+    }
     assert written["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
     assert written["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
     assert written["expected_artifacts"] == [
