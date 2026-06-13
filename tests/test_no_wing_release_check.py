@@ -14,6 +14,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
+    WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
@@ -204,6 +205,10 @@ def test_wing_readonly_handoff_safety_contract_uses_shared_constants():
     )
     assert release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS == (
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
+        == WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
     )
     assert "apply_operator_proposal" in (
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
@@ -844,11 +849,12 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--prestart-summary",
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--output",
-        "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
+        WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     ]
     assert result.detail["handoff_packet_output"] == (
-        "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+        WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
     )
+    assert result.detail["handoff_packet_output_matches_contract"] is True
     assert result.detail["handoff_packet_plan_output"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
@@ -3527,7 +3533,7 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_channel_mismatch(
             "--plan-output",
             "artifacts/wing_readonly_preflight_plan/latest_plan.json",
             "--output",
-            "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
+            WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
         ],
     )
 
@@ -3538,6 +3544,31 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_channel_mismatch(
     assert result.detail["handoff_packet_channel_matches_capture"] is False
     assert (
         "wing_readonly_preflight_handoff_packet_channel_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_handoff_output_mismatch(
+    monkeypatch,
+):
+    handoff_command = release_check.wing_readonly_preflight_handoff_packet_command()
+    output_index = handoff_command.index("--output") + 1
+    handoff_command[output_index] = "Docs/reports/STALE_WING_HANDOFF_PACKET.md"
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_handoff_packet_command",
+        lambda: handoff_command,
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["handoff_packet_output"] == (
+        "Docs/reports/STALE_WING_HANDOFF_PACKET.md"
+    )
+    assert result.detail["handoff_packet_output_matches_contract"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_output_mismatch"
         in result.detail["violations"]
     )
 
@@ -8640,11 +8671,12 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--prestart-summary",
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--output",
-                "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
+                WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
             ],
             "handoff_packet_output": (
-                "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+                WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
             ),
+            "handoff_packet_output_matches_contract": True,
             "handoff_packet_plan_output": (
                 "artifacts/wing_readonly_preflight_plan/latest_plan.json"
             ),
@@ -8783,8 +8815,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "tools/build_wing_readonly_preflight_handoff_packet.py"
     )
     assert preflight["handoff_packet_output"] == (
-        "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+        WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
     )
+    assert preflight["handoff_packet_output_matches_contract"] is True
     assert preflight["handoff_packet_plan_output"] == (
         "artifacts/wing_readonly_preflight_plan/latest_plan.json"
     )
@@ -8864,6 +8897,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md" in markdown_summary
     assert "handoff_packet_plan_output" in markdown_summary
+    assert "handoff_packet_output_matches_contract: `true`" in markdown_summary
     assert "handoff_packet_url: `ws://localhost:8765`" in markdown_summary
     assert (
         "handoff_packet_artifact_root: `artifacts/wing_readonly_preflight`"

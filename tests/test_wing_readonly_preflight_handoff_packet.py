@@ -12,6 +12,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
+    WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
@@ -36,6 +37,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_handoff_packet_builds_readonly_operator_sequence():
     packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
 
+    assert handoff.DEFAULT_PACKET_OUTPUT == WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
     assert packet["type"] == "wing_readonly_preflight_handoff_packet"
     assert packet["status"] == "operator_hardware_step_required"
     assert packet["read_only"] is True
