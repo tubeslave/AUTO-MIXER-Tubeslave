@@ -30,6 +30,8 @@ from backend.wing_readonly_preflight_evidence import (
 )
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
+    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -44,6 +46,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_STATE_RESPONSE_TYPES,
 )
 from backend.processing_registry import (
@@ -113,8 +116,9 @@ def test_preflight_evidence_uses_shared_response_type_contract():
 
 
 def _valid_summary() -> dict:
+    run_id = "20260606T120000Z_wing_readonly_preflight"
     return {
-        "run_id": "20260606T120000Z_wing_readonly_preflight",
+        "run_id": run_id,
         "status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
         "reason": WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
         "captured_at": "2026-06-07T01:00:00Z",
@@ -205,8 +209,14 @@ def _valid_summary() -> dict:
                 "value": 0.0,
             },
         ],
-        "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
-        "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+        "events_path": (
+            f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/"
+            f"{run_id}/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+        ),
+        "summary_path": (
+            f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/"
+            f"{run_id}/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+        ),
     }
 
 
@@ -269,6 +279,18 @@ def _expected_plan_request_sequence(summary: dict) -> list[dict]:
     ]
 
 
+def _artifact_root_from_summary(summary: dict) -> str:
+    return str(Path(summary["summary_path"]).parent.parent)
+
+
+def _expected_artifacts_for_summary(summary: dict) -> list[str]:
+    artifact_root = _artifact_root_from_summary(summary)
+    return [
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+    ]
+
+
 def _valid_expected_plan(summary: dict) -> dict:
     return {
         "type": "wing_readonly_preflight_offline_plan",
@@ -278,6 +300,7 @@ def _valid_expected_plan(summary: dict) -> dict:
         "selected_mvp_blocker": EXPECTED_SELECTED_MVP_BLOCKER,
         "selected_mvp_blocker_status": EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
         "plan_output": summary["expected_plan_path"],
+        "artifact_root": _artifact_root_from_summary(summary),
         "channels": summary["channels"],
         "operator_channel_confirmation_required": summary[
             "operator_channel_confirmation_required"
@@ -353,6 +376,7 @@ def _valid_expected_plan(summary: dict) -> dict:
             "expected_response_types_by_request_type"
         ],
         "request_sequence": _expected_plan_request_sequence(summary),
+        "expected_artifacts": _expected_artifacts_for_summary(summary),
         "fail_closed_conditions": list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS),
     }
 
@@ -394,12 +418,17 @@ def _write_prestart_summary(path: Path, *, status: str = "passed") -> None:
 
 
 def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events: list[dict] | None = None) -> Path:
-    artifact_dir.mkdir(parents=True)
-    artifact_path = artifact_dir / "summary.json"
-    events_path = artifact_dir / "events.jsonl"
-    plan_path = artifact_dir / "expected_plan.json"
-    prestart_path = artifact_dir / "no_wing_prestart_summary.json"
     payload = copy.deepcopy(summary or _valid_summary())
+    run_dir = (
+        artifact_dir
+        if artifact_dir.name == payload["run_id"]
+        else artifact_dir / payload["run_id"]
+    )
+    run_dir.mkdir(parents=True)
+    artifact_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+    events_path = run_dir / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
+    plan_path = run_dir / "expected_plan.json"
+    prestart_path = run_dir / "no_wing_prestart_summary.json"
     payload["events_path"] = str(events_path)
     payload["summary_path"] = str(artifact_path)
     payload["expected_plan_path"] = str(plan_path)
@@ -488,8 +517,11 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert all(row["closed"] is False for row in evidence["mvp_blocker_matrix"])
     assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is True
     assert evidence["artifacts"][0]["captured_at"] == "2026-06-07T01:00:00Z"
-    assert evidence["artifacts"][0]["summary_path"] == "artifacts/wing_readonly_preflight/run/summary.json"
-    assert evidence["artifacts"][0]["events_path"] == "artifacts/wing_readonly_preflight/run/events.jsonl"
+    assert evidence["artifacts"][0]["summary_path"] == _valid_summary()["summary_path"]
+    assert evidence["artifacts"][0]["events_path"] == _valid_summary()["events_path"]
+    assert evidence["artifacts"][0]["expected_artifacts"] == []
+    assert evidence["artifacts"][0]["summary_path_matches_expected_artifact"] is None
+    assert evidence["artifacts"][0]["events_path_matches_expected_artifact"] is None
     assert evidence["artifacts"][0]["physical_readback_count"] == 3
     assert evidence["artifacts"][0]["channels"] == [3]
     assert evidence["artifacts"][0]["operator_confirmed_channels"] == [3]
@@ -668,6 +700,16 @@ def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path)
         "artifact_replacement_required"
     }
     assert any(row["source_id"] == str(artifact_path) for row in evidence["artifacts"])
+    valid_row = next(
+        row
+        for row in evidence["artifacts"]
+        if row["source_id"] == str(artifact_path)
+    )
+    assert valid_row["expected_artifacts"] == _expected_artifacts_for_summary(
+        json.loads(artifact_path.read_text(encoding="utf-8"))
+    )
+    assert valid_row["summary_path_matches_expected_artifact"] is True
+    assert valid_row["events_path_matches_expected_artifact"] is True
     assert any(
         "artifact_load_error:JSONDecodeError" in row["violations"]
         for row in evidence["artifacts"]
@@ -715,8 +757,7 @@ def test_file_preflight_artifact_requires_existing_expected_plan_file(tmp_path):
 
 def test_file_preflight_artifact_requires_matching_expected_plan_sha(tmp_path):
     artifact_dir = tmp_path / "preflight" / "tampered-plan"
-    _write_file_artifact(artifact_dir)
-    summary_path = artifact_dir / "summary.json"
+    summary_path = _write_file_artifact(artifact_dir)
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     Path(summary["expected_plan_path"]).write_text("tampered", encoding="utf-8")
 
@@ -739,6 +780,31 @@ def test_file_preflight_artifact_requires_expected_plan_metadata_to_match_summar
     assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert "expected_plan_channels_mismatch" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_expected_plan_artifacts_to_match_paths(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "artifact-path-mismatch")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    plan = _valid_expected_plan(summary)
+    stale_root = tmp_path / "other_preflight_root"
+    plan["expected_artifacts"] = [
+        f"{stale_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{stale_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+    ]
+    _write_expected_plan(artifact_path, plan)
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_roots=(tmp_path / "preflight",)
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    violations = evidence["summary"]["violations"]
+    assert "expected_plan_expected_artifacts_mismatch" in violations
+    assert "summary_path_expected_artifact_mismatch" in violations
+    assert "events_path_expected_artifact_mismatch" in violations
+    assert evidence["artifacts"][0]["summary_path_matches_expected_artifact"] is False
+    assert evidence["artifacts"][0]["events_path_matches_expected_artifact"] is False
 
 
 def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path):

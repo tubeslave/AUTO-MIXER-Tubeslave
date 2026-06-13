@@ -14,8 +14,10 @@ from backend.wing_readonly_preflight_evidence import (
 )
 from backend.wing_readonly_preflight_review_decision import REQUIRED_REVIEW_CHECKLIST_IDS
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     expected_supervised_prestart_gate,
 )
 from tools import review_wing_readonly_preflight_decisions as decision_tool
@@ -38,8 +40,9 @@ def test_decision_review_ready_status_matches_supervised_gate_contract():
 
 
 def _valid_summary() -> dict:
+    run_id = "20260606T120000Z_wing_readonly_preflight"
     return {
-        "run_id": "20260606T120000Z_wing_readonly_preflight",
+        "run_id": run_id,
         "status": "passed",
         "reason": "wing_readonly_preflight_passed",
         "captured_at": "2026-06-07T01:00:00Z",
@@ -186,6 +189,18 @@ def _expected_plan_request_sequence(summary: dict) -> list[dict]:
     ]
 
 
+def _artifact_root_from_summary(summary: dict) -> str:
+    return str(Path(summary["summary_path"]).parent.parent)
+
+
+def _expected_artifacts_for_summary(summary: dict) -> list[str]:
+    artifact_root = _artifact_root_from_summary(summary)
+    return [
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+    ]
+
+
 def _valid_expected_plan(summary: dict) -> dict:
     return {
         "type": "wing_readonly_preflight_offline_plan",
@@ -195,6 +210,7 @@ def _valid_expected_plan(summary: dict) -> dict:
         "selected_mvp_blocker": EXPECTED_SELECTED_MVP_BLOCKER,
         "selected_mvp_blocker_status": EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
         "plan_output": summary["expected_plan_path"],
+        "artifact_root": _artifact_root_from_summary(summary),
         "channels": summary["channels"],
         "operator_channel_confirmation_required": summary[
             "operator_channel_confirmation_required"
@@ -270,15 +286,17 @@ def _valid_expected_plan(summary: dict) -> dict:
             "expected_response_types_by_request_type"
         ],
         "request_sequence": _expected_plan_request_sequence(summary),
+        "expected_artifacts": _expected_artifacts_for_summary(summary),
         "fail_closed_conditions": list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS),
     }
 
 
 def _write_artifact(run_dir: Path) -> Path:
-    run_dir.mkdir(parents=True)
     summary = _valid_summary()
-    summary_path = run_dir / "summary.json"
-    events_path = run_dir / "events.jsonl"
+    run_dir = run_dir if run_dir.name == summary["run_id"] else run_dir / summary["run_id"]
+    run_dir.mkdir(parents=True)
+    summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+    events_path = run_dir / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
     plan_path = run_dir / "expected_plan.json"
     prestart_path = run_dir / "no_wing_prestart_summary.json"
     summary["summary_path"] = str(summary_path)

@@ -19,6 +19,8 @@ try:
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -43,6 +45,8 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -67,7 +71,9 @@ except ImportError:  # pragma: no cover - package import compatibility
 WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID = "wing_readonly_preflight_evidence"
 WING_READONLY_PREFLIGHT_SCHEMA_ID = WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
 WING_READONLY_PREFLIGHT_RUNNER = WING_READONLY_PREFLIGHT_PROOF_RUNNER
-DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS = ("artifacts/wing_readonly_preflight",)
+DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS = (
+    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+)
 EVIDENCE_STATUSES = {
     "operator_preflight_required",
     "readonly_preflight_candidate_available",
@@ -232,6 +238,11 @@ class WingReadonlyPreflightArtifactRecord:
     summary_sha256: str | None
     events_path: str | None
     events_sha256: str | None
+    expected_artifacts: Tuple[str, ...]
+    expected_summary_artifact: str | None
+    expected_events_artifact: str | None
+    summary_path_matches_expected_artifact: bool | None
+    events_path_matches_expected_artifact: bool | None
     connection_mode: str | None
     readback_count: int
     physical_readback_count: int
@@ -272,6 +283,7 @@ class WingReadonlyPreflightArtifactRecord:
         payload["sent_request_types"] = list(self.sent_request_types)
         payload["channels"] = list(self.channels)
         payload["operator_confirmed_channels"] = list(self.operator_confirmed_channels)
+        payload["expected_artifacts"] = list(self.expected_artifacts)
         payload["backend_port_prestart_check_command"] = list(
             self.backend_port_prestart_check_command
         )
@@ -501,6 +513,85 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _expected_artifact_globs(artifact_root: str) -> Tuple[str, str]:
+    return (
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+    )
+
+
+def _artifact_path_string(value: Any) -> str:
+    if not isinstance(value, str) or not value:
+        return ""
+    return Path(value).as_posix()
+
+
+def _expected_artifact_for_run(expected_artifact: str, run_id: str) -> str:
+    return _artifact_path_string(expected_artifact.replace("<run_id>", run_id))
+
+
+def _expected_plan_artifacts(plan: Mapping[str, Any] | None) -> Tuple[str, ...]:
+    if not isinstance(plan, Mapping):
+        return ()
+    return _string_tuple(plan.get("expected_artifacts"))
+
+
+def _artifact_path_matches_expected(
+    actual_path: Any,
+    expected_artifact: str | None,
+    run_id: str,
+) -> bool | None:
+    if not expected_artifact:
+        return None
+    expected_path = _expected_artifact_for_run(expected_artifact, run_id)
+    if not expected_path:
+        return None
+    return _artifact_path_string(actual_path) == expected_path
+
+
+def _expected_summary_artifact(
+    expected_artifacts: Tuple[str, ...],
+    run_id: str,
+) -> str | None:
+    if not expected_artifacts:
+        return None
+    return _expected_artifact_for_run(expected_artifacts[0], run_id)
+
+
+def _expected_events_artifact(
+    expected_artifacts: Tuple[str, ...],
+    run_id: str,
+) -> str | None:
+    if len(expected_artifacts) < 2:
+        return None
+    return _expected_artifact_for_run(expected_artifacts[1], run_id)
+
+
+def _validate_artifact_paths_match_expected_plan(
+    summary: Mapping[str, Any],
+    plan: Mapping[str, Any] | None,
+    violations: list[str],
+) -> None:
+    run_id = str(summary.get("run_id") or "")
+    expected_artifacts = _expected_plan_artifacts(plan)
+    if not expected_artifacts:
+        return
+    summary_matches = _artifact_path_matches_expected(
+        summary.get("summary_path"),
+        expected_artifacts[0] if expected_artifacts else None,
+        run_id,
+    )
+    events_matches = _artifact_path_matches_expected(
+        summary.get("events_path"),
+        expected_artifacts[1] if len(expected_artifacts) >= 2 else None,
+        run_id,
+    )
+    if summary_matches is not True:
+        violations.append("summary_path_expected_artifact_mismatch")
+    if events_matches is not True:
+        violations.append("events_path_expected_artifact_mismatch")
+
+
 def _expected_plan_request_sequence(payload: Mapping[str, Any]) -> list[Dict[str, Any]]:
     readbacks_raw = payload.get("readbacks")
     readbacks = (
@@ -541,6 +632,12 @@ def _validate_expected_plan_payload(
         violations.append("expected_plan_operator_required_not_true")
     if plan.get("plan_output") != summary.get("expected_plan_path"):
         violations.append("expected_plan_plan_output_mismatch")
+    artifact_root = plan.get("artifact_root")
+    if not isinstance(artifact_root, str) or not artifact_root:
+        violations.append("expected_plan_artifact_root_missing")
+        artifact_root = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+    if plan.get("expected_artifacts") != list(_expected_artifact_globs(artifact_root)):
+        violations.append("expected_plan_expected_artifacts_mismatch")
     for field in EXPECTED_PLAN_SUMMARY_FIELDS:
         if plan.get(field) != summary.get(field):
             violations.append(f"expected_plan_{field}_mismatch")
@@ -603,28 +700,29 @@ def _validate_expected_plan_file(
     payload: Mapping[str, Any],
     summary_path: Path,
     violations: list[str],
-) -> None:
+) -> Mapping[str, Any] | None:
     plan_path = _summary_expected_plan_path(payload, summary_path)
     if plan_path is None:
         violations.append("expected_plan_file_path_missing")
-        return
+        return None
     if not plan_path.exists():
         violations.append("expected_plan_file_missing")
-        return
+        return None
     expected_sha = str(payload.get("expected_plan_sha256") or "")
     try:
         actual_sha = _sha256_file(plan_path)
     except Exception as exc:
         violations.append(f"expected_plan_file_hash_error:{type(exc).__name__}")
-        return
+        return None
     if actual_sha != expected_sha:
         violations.append("expected_plan_sha256_mismatch")
     try:
         plan_payload = _load_json_artifact(plan_path)
     except Exception as exc:
         violations.append(f"expected_plan_file_load_error:{type(exc).__name__}")
-        return
+        return None
     _validate_expected_plan_payload(payload, plan_payload, violations)
+    return plan_payload
 
 
 def _backend_port_check_from_prestart_summary(
@@ -1119,8 +1217,18 @@ def validate_wing_readonly_preflight_artifact(
         if field in payload:
             violations.append(f"mutation_evidence_field_present:{field}")
 
+    expected_plan_payload: Mapping[str, Any] | None = None
     if summary_path is not None:
-        _validate_expected_plan_file(payload, summary_path, violations)
+        expected_plan_payload = _validate_expected_plan_file(
+            payload,
+            summary_path,
+            violations,
+        )
+        _validate_artifact_paths_match_expected_plan(
+            payload,
+            expected_plan_payload,
+            violations,
+        )
         _validate_prestart_summary_file(payload, summary_path, violations)
         _validate_event_log(payload, summary_path, violations)
     if any(
@@ -1130,6 +1238,10 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("event_log_missing_or_invalid")
 
     accepted = not violations
+    expected_artifacts = _expected_plan_artifacts(expected_plan_payload)
+    run_id = str(payload.get("run_id") or "")
+    expected_summary_artifact = _expected_summary_artifact(expected_artifacts, run_id)
+    expected_events_artifact = _expected_events_artifact(expected_artifacts, run_id)
     return {
         "status": (
             "valid_readonly_preflight_artifact"
@@ -1152,6 +1264,23 @@ def validate_wing_readonly_preflight_artifact(
                 payload.get("events_sha256")
                 if isinstance(payload.get("events_sha256"), str)
                 else None
+            ),
+            "expected_artifacts": list(expected_artifacts),
+            "expected_summary_artifact": expected_summary_artifact,
+            "expected_events_artifact": expected_events_artifact,
+            "summary_path_matches_expected_artifact": (
+                _artifact_path_matches_expected(
+                    payload.get("summary_path"),
+                    expected_artifacts[0] if expected_artifacts else None,
+                    run_id,
+                )
+            ),
+            "events_path_matches_expected_artifact": (
+                _artifact_path_matches_expected(
+                    payload.get("events_path"),
+                    expected_artifacts[1] if len(expected_artifacts) >= 2 else None,
+                    run_id,
+                )
             ),
             "connection_mode": payload.get("connection_mode"),
             "readback_count": readback_count,
@@ -1278,6 +1407,27 @@ def _record_from_validation(
         events_path=str(evidence.get("events_path")) if evidence.get("events_path") else None,
         events_sha256=events_sha256
         or (str(evidence.get("events_sha256")) if evidence.get("events_sha256") else None),
+        expected_artifacts=_string_tuple(evidence.get("expected_artifacts")),
+        expected_summary_artifact=(
+            str(evidence.get("expected_summary_artifact"))
+            if evidence.get("expected_summary_artifact")
+            else None
+        ),
+        expected_events_artifact=(
+            str(evidence.get("expected_events_artifact"))
+            if evidence.get("expected_events_artifact")
+            else None
+        ),
+        summary_path_matches_expected_artifact=(
+            evidence.get("summary_path_matches_expected_artifact")
+            if isinstance(evidence.get("summary_path_matches_expected_artifact"), bool)
+            else None
+        ),
+        events_path_matches_expected_artifact=(
+            evidence.get("events_path_matches_expected_artifact")
+            if isinstance(evidence.get("events_path_matches_expected_artifact"), bool)
+            else None
+        ),
         connection_mode=str(evidence.get("connection_mode")) if evidence.get("connection_mode") else None,
         readback_count=_safe_int(evidence.get("readback_count")),
         physical_readback_count=_safe_int(evidence.get("physical_readback_count")),
@@ -1383,6 +1533,11 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         summary_sha256=None,
         events_path=None,
         events_sha256=None,
+        expected_artifacts=(),
+        expected_summary_artifact=None,
+        expected_events_artifact=None,
+        summary_path_matches_expected_artifact=None,
+        events_path_matches_expected_artifact=None,
         connection_mode=None,
         readback_count=0,
         physical_readback_count=0,

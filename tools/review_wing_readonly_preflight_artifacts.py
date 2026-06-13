@@ -107,6 +107,19 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                 "summary_sha256": item.get("summary_sha256"),
                 "events_path": item.get("events_path"),
                 "events_sha256": item.get("events_sha256"),
+                "expected_artifacts": (
+                    item.get("expected_artifacts")
+                    if isinstance(item.get("expected_artifacts"), list)
+                    else []
+                ),
+                "expected_summary_artifact": item.get("expected_summary_artifact"),
+                "expected_events_artifact": item.get("expected_events_artifact"),
+                "summary_path_matches_expected_artifact": (
+                    item.get("summary_path_matches_expected_artifact") is True
+                ),
+                "events_path_matches_expected_artifact": (
+                    item.get("events_path_matches_expected_artifact") is True
+                ),
                 "channels": item.get("channels") if isinstance(item.get("channels"), list) else [],
                 "operator_confirmed_channels": (
                     item.get("operator_confirmed_channels")
@@ -451,6 +464,16 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"  - summary_sha256: `{row.get('summary_sha256')}`",
                     f"  - events_path: `{row.get('events_path')}`",
                     f"  - events_sha256: `{row.get('events_sha256')}`",
+                    "  - expected_artifacts: "
+                    f"`{json.dumps(row.get('expected_artifacts') or [])}`",
+                    "  - expected_summary_artifact: "
+                    f"`{row.get('expected_summary_artifact')}`",
+                    "  - expected_events_artifact: "
+                    f"`{row.get('expected_events_artifact')}`",
+                    "  - summary_path_matches_expected_artifact: "
+                    f"`{str(row.get('summary_path_matches_expected_artifact') is True).lower()}`",
+                    "  - events_path_matches_expected_artifact: "
+                    f"`{str(row.get('events_path_matches_expected_artifact') is True).lower()}`",
                     f"  - channels: `{json.dumps(row.get('channels') or [])}`",
                     "  - operator_confirmed_channels: "
                     f"`{json.dumps(row.get('operator_confirmed_channels') or [])}`",
