@@ -45,6 +45,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
     WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -65,6 +67,8 @@ PRESTART_SUMMARY_BACKEND_CHECK_STATUS = (
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
 )
 PROOF_RUNNER = WING_READONLY_PREFLIGHT_PROOF_RUNNER
+SELECTED_MVP_BLOCKER = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+SELECTED_MVP_BLOCKER_STATUS = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
 RUN_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
 RUN_SUMMARY_REASON = WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 LIVE_WRITE_REQUEST_TYPES = {
@@ -594,8 +598,8 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "status": "ready_for_operator_review",
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": PROOF_RUNNER,
-        "selected_mvp_blocker": "WING read-only connection proof",
-        "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
+        "selected_mvp_blocker": SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": SELECTED_MVP_BLOCKER_STATUS,
         "url": args.url,
         "artifact_root": artifact_root,
         "channels": list(channels),
@@ -707,7 +711,7 @@ async def run(args: argparse.Namespace) -> int:
                 "read_only": True,
                 "live_write": False,
                 "operator_required": True,
-                "selected_mvp_blocker": "WING read-only connection proof",
+                "selected_mvp_blocker": SELECTED_MVP_BLOCKER,
                 "contacts_backend": False,
                 "queries_console": False,
                 "execution_allowed_by_plan": False,
@@ -724,7 +728,7 @@ async def run(args: argparse.Namespace) -> int:
                 "read_only": True,
                 "live_write": False,
                 "operator_required": True,
-                "selected_mvp_blocker": "WING read-only connection proof",
+                "selected_mvp_blocker": SELECTED_MVP_BLOCKER,
                 "contacts_backend": False,
                 "queries_console": False,
                 "execution_allowed_by_plan": False,

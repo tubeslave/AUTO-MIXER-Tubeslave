@@ -364,6 +364,12 @@ WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = (
 WING_READONLY_PREFLIGHT_PROOF_RUNNER = (
     preflight_contract.WING_READONLY_PREFLIGHT_PROOF_RUNNER
 )
+WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER = (
+    preflight_contract.WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+)
+WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS = (
+    preflight_contract.WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+)
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS = (
     preflight_contract.WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
 )
@@ -4368,9 +4374,12 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append("wing_readonly_preflight_plan_session_not_confirmed_ready")
     if plan.get("require_physical_readback") is not True:
         violations.append("wing_readonly_preflight_plan_physical_readback_not_required")
-    if plan.get("selected_mvp_blocker") != "WING read-only connection proof":
+    if plan.get("selected_mvp_blocker") != WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER:
         violations.append("wing_readonly_preflight_plan_selected_mvp_blocker_mismatch")
-    if plan.get("selected_mvp_blocker_status") != "tooling_ready_waits_real_wing":
+    if (
+        plan.get("selected_mvp_blocker_status")
+        != WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    ):
         violations.append("wing_readonly_preflight_plan_selected_mvp_blocker_status_mismatch")
     if plan.get("operator_required") is not True:
         violations.append("wing_readonly_preflight_plan_operator_required_not_true")

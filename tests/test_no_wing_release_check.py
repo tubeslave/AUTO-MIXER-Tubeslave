@@ -43,6 +43,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
@@ -1059,8 +1061,10 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "status": "ready_for_operator_review",
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
-        "selected_mvp_blocker": "WING read-only connection proof",
-        "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
+        "selected_mvp_blocker": WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": (
+            WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+        ),
         "url": "ws://localhost:8765",
         "artifact_root": "artifacts/wing_readonly_preflight",
         "channels": [3],
@@ -2624,8 +2628,12 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["manual_review_required_before_readiness_update"] is True
     assert result.detail["execution_allowed_by_plan"] is False
     assert result.detail["live_authority_granted"] is False
-    assert result.detail["selected_mvp_blocker"] == "WING read-only connection proof"
-    assert result.detail["selected_mvp_blocker_status"] == "tooling_ready_waits_real_wing"
+    assert result.detail["selected_mvp_blocker"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    )
+    assert result.detail["selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
     assert "set_gain" in result.detail["forbidden_request_types"]
     assert result.detail["fail_closed_conditions"] == list(
         release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
@@ -2970,7 +2978,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["mvp_blocker_anchor_sha256_matches_current_first_open"] is True
     assert (
         result.detail["mvp_blocker_anchor"]["selected_blocker"]
-        == "WING read-only connection proof"
+        == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
     )
     assert result.detail["mvp_blocker_anchor"]["selected_evidence_file_count"] == len(
         result.detail["mvp_blocker_anchor"]["selected_evidence_files"]
@@ -9659,8 +9667,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_plan": False,
             "live_authority_granted": False,
-            "selected_mvp_blocker": "WING read-only connection proof",
-            "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
+            "selected_mvp_blocker": WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+            "selected_mvp_blocker_status": (
+                WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+            ),
             "forbidden_request_types": ["apply_operator_proposal", "set_gain"],
             "fail_closed_conditions": [
                 "backend_not_in_wing_mode",
@@ -9709,8 +9719,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["execution_allowed_by_plan"] is False
     assert artifact["live_authority_granted"] is False
     assert artifact["plan_status"] == "ready_for_operator_review"
-    assert artifact["selected_mvp_blocker"] == "WING read-only connection proof"
-    assert artifact["selected_mvp_blocker_status"] == "tooling_ready_waits_real_wing"
+    assert artifact["selected_mvp_blocker"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    )
+    assert artifact["selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
     assert artifact["channels"] == [3]
     assert artifact["operator_confirmed_channels"] == [3]
     assert artifact["operator_session_confirmation_required"] is True
@@ -9749,7 +9763,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert "operator_session_confirmation_required: `true`" in markdown_summary
     assert "operator_confirmed_session_ready: `true`" in markdown_summary
-    assert "WING read-only connection proof" in markdown_summary
+    assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER in markdown_summary
     assert "physical_readback_missing" in markdown_summary
     assert "review_wing_readonly_preflight_decisions.py" in markdown_summary
     assert "request_sequence_matches_expected: `true`" in markdown_summary

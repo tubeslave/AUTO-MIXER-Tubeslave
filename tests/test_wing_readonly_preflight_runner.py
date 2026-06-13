@@ -26,6 +26,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
     WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -90,6 +92,11 @@ def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebS
 
 def test_runner_uses_shared_run_summary_contract() -> None:
     assert runner.PROOF_RUNNER == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert runner.SELECTED_MVP_BLOCKER == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    assert (
+        runner.SELECTED_MVP_BLOCKER_STATUS
+        == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
     assert runner.RUN_SUMMARY_STATUS == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
     assert runner.RUN_SUMMARY_REASON == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 
@@ -1216,8 +1223,11 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert printed["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
     assert printed["plan_output"] == str(plan_output)
     assert written["plan_output"] == str(plan_output)
-    assert written["selected_mvp_blocker"] == "WING read-only connection proof"
-    assert written["selected_mvp_blocker_status"] == "tooling_ready_waits_real_wing"
+    assert written["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    assert (
+        written["selected_mvp_blocker_status"]
+        == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
     assert written["contacts_backend"] is False
     assert written["queries_console"] is False
     assert written["execution_allowed_by_plan"] is False
@@ -1394,7 +1404,7 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
     assert printed["type"] == "wing_readonly_preflight_offline_plan"
     assert printed["status"] == "blocked"
     assert printed["reason"] == "--operator-confirm-channels must exactly match --channels"
-    assert printed["selected_mvp_blocker"] == "WING read-only connection proof"
+    assert printed["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
     assert printed["operator_required"] is True
     assert printed["contacts_backend"] is False
     assert printed["queries_console"] is False
