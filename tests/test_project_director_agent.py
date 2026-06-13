@@ -201,6 +201,14 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_PACKET_20260607.md"
         in directive["selected_evidence_files"]
     )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_READONLY_ARTIFACT_CONTRACT_CONSTANTS_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_READY_GATE_20260613.md"
+        in directive["selected_evidence_files"]
+    )
     assert directive["stop_broad_work"] is True
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]

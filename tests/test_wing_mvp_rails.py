@@ -114,6 +114,14 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_READONLY_PREFLIGHT_OPERATOR_CONFIRMATION_20260607.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_READONLY_ARTIFACT_CONTRACT_CONSTANTS_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
+        "AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_READY_GATE_20260613.md"
+        in rows[0]["evidence"]
+    )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
     assert "backend_port_prestart_gate" in rows[0]["next action"]
     assert "expected_backend_port_prestart_gate" in rows[0]["next action"]
