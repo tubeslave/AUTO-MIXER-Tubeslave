@@ -182,6 +182,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["evidence"]
     )
     assert (
+        "AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
         "AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in rows[0]["evidence"]
     )
@@ -808,6 +812,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_FAILURE_DETAIL_FIELDS_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md"
         in text
     )
     assert (

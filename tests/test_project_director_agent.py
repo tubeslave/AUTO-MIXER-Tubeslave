@@ -302,6 +302,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_evidence_files"]
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in directive["selected_evidence_files"]
     )

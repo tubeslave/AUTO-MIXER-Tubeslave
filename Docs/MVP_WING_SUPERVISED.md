@@ -134,9 +134,13 @@ Stop the current Codex work direction and return to the first open blocker if:
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `listener_confirmation_template_status`,
+  `listener_confirmation_template_safe_to_stop_listener_by_gate`,
+  `listener_confirmation_template_live_authority_granted`,
   `listener_confirmation_template_accepted_by_template`,
+  `listener_confirmation_template_operator_placeholder_fields`,
   `listener_confirmation_template_execution_allowed_by_template`,
   `listener_confirmation_template_readiness_closure_allowed_by_template`,
+  `listener_confirmation_template_required_edits`,
   `fail_closed_reason`, and `operator_next_step`.
 - A WING read-only preflight is planned from an existing backend listener while
   the failed no-WING prestart summary lacks a pending
@@ -267,7 +271,15 @@ The no-WING handoff summary must also show
 `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
 `preflight_blocked_until_listener_confirmed`,
 `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
-`fail_closed_reason`, and `operator_next_step`.
+`listener_confirmation_template_status`,
+`listener_confirmation_template_safe_to_stop_listener_by_gate`,
+`listener_confirmation_template_live_authority_granted`,
+`listener_confirmation_template_accepted_by_template`,
+`listener_confirmation_template_operator_placeholder_fields`,
+`listener_confirmation_template_execution_allowed_by_template`,
+`listener_confirmation_template_readiness_closure_allowed_by_template`,
+`listener_confirmation_template_required_edits`, `fail_closed_reason`, and
+`operator_next_step`.
 
 When the prestart gate fails closed on an existing listener, the no-WING summary
 must expose the generated `listener_confirmation_template_path` and show

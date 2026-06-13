@@ -143,13 +143,25 @@ def test_wing_readonly_preflight_prestart_contract_uses_shared_backend_constants
     assert "listener_confirmation_template_status" in (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    assert "listener_confirmation_template_safe_to_stop_listener_by_gate" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    assert "listener_confirmation_template_live_authority_granted" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert "listener_confirmation_template_accepted_by_template" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    assert "listener_confirmation_template_operator_placeholder_fields" in (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
     assert "listener_confirmation_template_execution_allowed_by_template" in (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
     assert "listener_confirmation_template_readiness_closure_allowed_by_template" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    assert "listener_confirmation_template_required_edits" in (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
 
@@ -7473,6 +7485,14 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     )
     assert "listener_confirmation_template_acceptance_status" in markdown_summary
     assert "operator_review_required" in markdown_summary
+    assert (
+        "listener_confirmation_template_safe_to_stop_listener_by_gate: `False`"
+        in markdown_summary
+    )
+    assert (
+        "listener_confirmation_template_live_authority_granted: `False`"
+        in markdown_summary
+    )
     assert "listener_confirmation_template_accepted_by_template: `False`" in (
         markdown_summary
     )

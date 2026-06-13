@@ -1525,6 +1525,8 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
         "listener_confirmation_template_path",
         "listener_confirmation_template_status",
         "listener_confirmation_template_acceptance_status",
+        "listener_confirmation_template_safe_to_stop_listener_by_gate",
+        "listener_confirmation_template_live_authority_granted",
         "listener_confirmation_template_accepted_by_template",
         "listener_confirmation_template_execution_allowed_by_template",
         "listener_confirmation_template_readiness_closure_allowed_by_template",
