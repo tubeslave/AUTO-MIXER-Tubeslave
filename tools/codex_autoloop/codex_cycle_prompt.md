@@ -149,6 +149,10 @@ blockers выше.
    `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
    `preflight_blocked_until_listener_confirmed`,
    `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+   `listener_confirmation_template_status`,
+   `listener_confirmation_template_accepted_by_template`,
+   `listener_confirmation_template_execution_allowed_by_template`,
+   `listener_confirmation_template_readiness_closure_allowed_by_template`,
    `fail_closed_reason`, and `operator_next_step`;
 11. when a backend listener is already present, verify the failed no-WING
    summary exposes `listener_confirmation_template_path`, while the generated
@@ -303,6 +307,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+  `listener_confirmation_template_status`,
+  `listener_confirmation_template_accepted_by_template`,
+  `listener_confirmation_template_execution_allowed_by_template`,
+  `listener_confirmation_template_readiness_closure_allowed_by_template`,
   `fail_closed_reason`, and `operator_next_step`.
 - When the backend-port prestart check detects an existing listener, the failed
   no-WING summary must expose `listener_confirmation_template_path`, and the

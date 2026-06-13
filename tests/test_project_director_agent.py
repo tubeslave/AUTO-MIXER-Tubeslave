@@ -70,6 +70,17 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "listener_processes" in directive["selected_action"]
     assert "listener_process_error" in directive["selected_action"]
     assert "safe_to_stop_listener_by_gate" in directive["selected_action"]
+    assert "listener_confirmation_template_status" in directive["selected_action"]
+    assert "listener_confirmation_template_accepted_by_template" in directive[
+        "selected_action"
+    ]
+    assert "listener_confirmation_template_execution_allowed_by_template" in directive[
+        "selected_action"
+    ]
+    assert (
+        "listener_confirmation_template_readiness_closure_allowed_by_template"
+        in directive["selected_action"]
+    )
     assert "fail_closed_reason" in directive["selected_action"]
     assert "operator_next_step" in directive["selected_action"]
     assert "listener_confirmation_template_path" in directive["selected_action"]
@@ -284,6 +295,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_AUTHORITY_SUMMARY_FIELDS_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_FAILURE_DETAIL_FIELDS_20260613.md"
         in directive["selected_evidence_files"]
     )
     assert (

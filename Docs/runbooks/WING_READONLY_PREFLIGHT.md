@@ -425,6 +425,10 @@ The handoff validation must report:
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+  `listener_confirmation_template_status`,
+  `listener_confirmation_template_accepted_by_template`,
+  `listener_confirmation_template_execution_allowed_by_template`,
+  `listener_confirmation_template_readiness_closure_allowed_by_template`,
   `fail_closed_reason`, and `operator_next_step`
 - `manual_review_required_before_readiness_update: true`
 - `readiness_matrix_update_allowed_by_packet: false`

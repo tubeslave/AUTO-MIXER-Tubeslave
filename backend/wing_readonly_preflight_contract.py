@@ -38,6 +38,10 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = (
     "preflight_blocked_until_listener_confirmed",
     "intended_backend_confirmation_required",
     "safe_to_stop_listener_by_gate",
+    "listener_confirmation_template_status",
+    "listener_confirmation_template_accepted_by_template",
+    "listener_confirmation_template_execution_allowed_by_template",
+    "listener_confirmation_template_readiness_closure_allowed_by_template",
     "fail_closed_reason",
     "operator_next_step",
 )

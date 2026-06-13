@@ -154,6 +154,10 @@ you want the background automation active.
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
+  `listener_confirmation_template_status`,
+  `listener_confirmation_template_accepted_by_template`,
+  `listener_confirmation_template_execution_allowed_by_template`,
+  `listener_confirmation_template_readiness_closure_allowed_by_template`,
   `fail_closed_reason`, and `operator_next_step`.
   This preserves the fail-closed review evidence when the prestart check
   detects unexpected listeners.

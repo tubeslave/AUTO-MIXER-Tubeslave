@@ -140,6 +140,18 @@ def test_wing_readonly_preflight_prestart_contract_uses_shared_backend_constants
     assert "listener_process_error" in (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    assert "listener_confirmation_template_status" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    assert "listener_confirmation_template_accepted_by_template" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    assert "listener_confirmation_template_execution_allowed_by_template" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    assert "listener_confirmation_template_readiness_closure_allowed_by_template" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
 
 
 def test_wing_readonly_preflight_runbook_lists_prestart_failure_detail_fields():
