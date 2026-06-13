@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
@@ -28,6 +29,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
@@ -60,6 +62,7 @@ DEFAULT_PLAN_OUTPUT = WING_READONLY_PREFLIGHT_PLAN_OUTPUT
 DEFAULT_PRESTART_SUMMARY = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
 MAX_WING_INPUT_CHANNEL = 48
 SUPPORTED_VALUE_TYPES = set(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES)
+ALLOWED_REQUEST_TYPES = list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES)
 EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE = {
     request_type: list(response_types)
     for request_type, response_types in (
@@ -78,6 +81,7 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_wing_readonly_preflight_review_decision_tool.py",
     "tests/test_no_wing_release_check.py",
 ]
+REQUEST_ID_POLICY = WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
@@ -330,6 +334,8 @@ def build_handoff_packet(
         "url": url,
         "channels": channel_numbers,
         "value_types": value_type_names,
+        "allowed_request_types": list(ALLOWED_REQUEST_TYPES),
+        "request_id_policy": REQUEST_ID_POLICY,
         "expected_response_types_by_request_type": dict(
             EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
         ),
@@ -544,6 +550,9 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         [
             "## Expected Response Types",
             "",
+            "- allowed_request_types: "
+            f"`{json.dumps(packet['allowed_request_types'])}`",
+            f"- request_id_policy: `{packet['request_id_policy']}`",
             "- expected_response_types_by_request_type: "
             f"`{json.dumps(packet['expected_response_types_by_request_type'], sort_keys=True)}`",
             "",

@@ -1246,6 +1246,8 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "url": "ws://localhost:8765",
         "channels": [3],
         "value_types": ["fader", "gain", "pan"],
+        "allowed_request_types": list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES),
+        "request_id_policy": WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
         "expected_response_types_by_request_type": {
             request_type: list(response_types)
             for request_type, response_types in (
@@ -2926,6 +2928,14 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["artifact_root"] == "artifacts/wing_readonly_preflight"
     assert result.detail["channels"] == [3]
     assert result.detail["value_types"] == ["fader", "gain", "pan"]
+    assert result.detail["allowed_request_types"] == (
+        result.detail["plan_allowed_request_types"]
+    )
+    assert result.detail["allowed_request_types_match_plan"] is True
+    assert result.detail["request_id_policy"] == (
+        result.detail["plan_request_id_policy"]
+    )
+    assert result.detail["request_id_policy_matches_plan"] is True
     assert result.detail["expected_response_types_by_request_type"] == (
         result.detail["plan_expected_response_types_by_request_type"]
     )
@@ -3112,6 +3122,64 @@ def test_no_wing_release_check_rejects_handoff_response_type_map_drift(
     )
     assert (
         "wing_readonly_preflight_handoff_packet_response_type_mapping_plan_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_allowed_request_type_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "stale-allowed-requests-handoff.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["allowed_request_types"] = ["get_operator_mode"]
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_handoff_packet_allowed_request_types_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_allowed_request_types_plan_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_request_id_policy_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "stale-request-id-policy-handoff.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["request_id_policy"] = "optional"
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_handoff_packet_request_id_policy_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_request_id_policy_plan_mismatch"
         in result.detail["violations"]
     )
 

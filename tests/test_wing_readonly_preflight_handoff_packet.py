@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS,
@@ -18,6 +19,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
@@ -93,6 +95,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     assert packet["channels"] == [3]
     assert packet["value_types"] == ["fader", "gain", "pan"]
+    assert packet["allowed_request_types"] == list(
+        WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
+    )
+    assert packet["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     assert packet["expected_response_types_by_request_type"] == {
         request_type: list(response_types)
         for request_type, response_types in (
@@ -314,6 +320,17 @@ def test_handoff_packet_response_type_map_matches_shared_contract():
     ]
 
 
+def test_handoff_packet_allowed_requests_match_shared_contract():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["allowed_request_types"] == list(
+        WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
+    )
+    assert handoff.ALLOWED_REQUEST_TYPES == packet["allowed_request_types"]
+    assert packet["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+    assert handoff.REQUEST_ID_POLICY == packet["request_id_policy"]
+
+
 def test_handoff_packet_review_checklist_ids_match_shared_contract():
     packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
 
@@ -418,6 +435,10 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "capture_readonly_preflight" in markdown
     assert "review_edited_decision_json" in markdown
     assert "Expected Response Types" in markdown
+    assert "allowed_request_types" in markdown
+    assert "query_mixer_parameter" in markdown
+    assert "request_id_policy" in markdown
+    assert WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY in markdown
     assert "expected_response_types_by_request_type" in markdown
     assert "mixer_parameter_read_blocked" in markdown
     assert "Expected Supervised Prestart Gate" in markdown
@@ -456,6 +477,10 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     )
     assert payload["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert payload["backend_port_prestart_check_must_be_first_operator_step"] is True
+    assert payload["allowed_request_types"] == list(
+        WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
+    )
+    assert payload["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     assert payload["expected_response_types_by_request_type"] == {
         request_type: list(response_types)
         for request_type, response_types in (

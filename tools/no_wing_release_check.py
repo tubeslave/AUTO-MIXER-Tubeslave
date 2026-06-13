@@ -4601,6 +4601,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["request_count"] = len(request_sequence)
     detail["expected_request_count"] = len(expected_requests)
     detail["request_sequence_matches_expected"] = request_sequence == expected_requests
+    detail["allowed_request_types"] = list(allowed_request_types)
     detail["request_id_policy"] = plan.get("request_id_policy")
     detail["expected_response_types_by_request_type"] = plan.get(
         "expected_response_types_by_request_type"
@@ -4720,6 +4721,8 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     plan_response_types = plan_artifact_detail.get(
         "expected_response_types_by_request_type"
     )
+    plan_allowed_request_types = plan_artifact_detail.get("allowed_request_types")
+    plan_request_id_policy = plan_artifact_detail.get("request_id_policy")
     commands = packet.get("commands") if isinstance(packet.get("commands"), Mapping) else {}
     operator_sequence = (
         packet.get("operator_sequence")
@@ -4915,6 +4918,24 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append("wing_readonly_preflight_handoff_packet_channels_mismatch")
     if packet.get("value_types") != _csv_strings(WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES):
         violations.append("wing_readonly_preflight_handoff_packet_value_types_mismatch")
+    packet_allowed_request_types = packet.get("allowed_request_types")
+    if packet_allowed_request_types != list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_allowed_request_types_mismatch"
+        )
+    if packet_allowed_request_types != plan_allowed_request_types:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_allowed_request_types_plan_mismatch"
+        )
+    packet_request_id_policy = packet.get("request_id_policy")
+    if packet_request_id_policy != WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_request_id_policy_mismatch"
+        )
+    if packet_request_id_policy != plan_request_id_policy:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_request_id_policy_plan_mismatch"
+        )
     packet_response_types = packet.get("expected_response_types_by_request_type")
     if (
         packet_response_types
@@ -5274,6 +5295,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["channels"] = packet.get("channels") if isinstance(packet.get("channels"), list) else []
     detail["value_types"] = (
         packet.get("value_types") if isinstance(packet.get("value_types"), list) else []
+    )
+    detail["allowed_request_types"] = packet.get("allowed_request_types")
+    detail["plan_allowed_request_types"] = plan_allowed_request_types
+    detail["allowed_request_types_match_plan"] = (
+        packet.get("allowed_request_types") == plan_allowed_request_types
+    )
+    detail["request_id_policy"] = packet.get("request_id_policy")
+    detail["plan_request_id_policy"] = plan_request_id_policy
+    detail["request_id_policy_matches_plan"] = (
+        packet.get("request_id_policy") == plan_request_id_policy
     )
     detail["expected_response_types_by_request_type"] = packet.get(
         "expected_response_types_by_request_type"
@@ -12485,6 +12516,7 @@ def wing_readonly_preflight_plan_artifact_summary(
             continue
         detail = result.detail if isinstance(result.detail, Mapping) else {}
         violations = detail.get("violations")
+        allowed_request_types = detail.get("allowed_request_types")
         forbidden_request_types = detail.get("forbidden_request_types")
         fail_closed_conditions = detail.get("fail_closed_conditions")
         post_run_review_commands = detail.get("post_run_review_commands")
@@ -12607,6 +12639,12 @@ def wing_readonly_preflight_plan_artifact_summary(
             "request_sequence_matches_expected": (
                 detail.get("request_sequence_matches_expected") is True
             ),
+            "allowed_request_types": (
+                list(allowed_request_types)
+                if isinstance(allowed_request_types, list)
+                else []
+            ),
+            "request_id_policy": str(detail.get("request_id_policy") or ""),
             "forbidden_request_types": (
                 list(forbidden_request_types)
                 if isinstance(forbidden_request_types, list)
@@ -12746,6 +12784,24 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 list(detail.get("value_types"))
                 if isinstance(detail.get("value_types"), list)
                 else []
+            ),
+            "allowed_request_types": (
+                list(detail.get("allowed_request_types"))
+                if isinstance(detail.get("allowed_request_types"), list)
+                else []
+            ),
+            "plan_allowed_request_types": (
+                list(detail.get("plan_allowed_request_types"))
+                if isinstance(detail.get("plan_allowed_request_types"), list)
+                else []
+            ),
+            "allowed_request_types_match_plan": (
+                detail.get("allowed_request_types_match_plan") is True
+            ),
+            "request_id_policy": str(detail.get("request_id_policy") or ""),
+            "plan_request_id_policy": str(detail.get("plan_request_id_policy") or ""),
+            "request_id_policy_matches_plan": (
+                detail.get("request_id_policy_matches_plan") is True
             ),
             "expected_response_types_by_request_type": (
                 dict(detail.get("expected_response_types_by_request_type"))
@@ -16213,6 +16269,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_plan_artifact['expected_request_count']}`",
                 "- request_sequence_matches_expected: "
                 f"`{str(wing_readonly_preflight_plan_artifact['request_sequence_matches_expected']).lower()}`",
+                "- allowed_request_types: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['allowed_request_types'])}`",
+                "- request_id_policy: "
+                f"`{wing_readonly_preflight_plan_artifact['request_id_policy']}`",
                 "- forbidden_request_types: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['forbidden_request_types'])}`",
                 "- fail_closed_conditions: "
@@ -16274,6 +16334,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_violations'])}`",
                 "- plan_output: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_output']}`",
+                "- allowed_request_types: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['allowed_request_types'])}`",
+                "- plan_allowed_request_types: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_allowed_request_types'])}`",
+                "- allowed_request_types_match_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['allowed_request_types_match_plan']).lower()}`",
+                "- request_id_policy: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['request_id_policy']}`",
+                "- plan_request_id_policy: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_request_id_policy']}`",
+                "- request_id_policy_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['request_id_policy_matches_plan']).lower()}`",
                 "- expected_response_types_by_request_type: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_response_types_by_request_type'])}`",
                 "- plan_expected_response_types_by_request_type: "
