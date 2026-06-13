@@ -85,11 +85,14 @@ WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"
 )
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE = "no_wing_release_check"
+WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS = "passed"
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY = (
     "no_hardware_no_network_no_live_writes"
 )
 WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME = "backend_port_free"
-WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS = "passed"
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS = (
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+)
 
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
     "PYTHONPATH=backend",
@@ -312,7 +315,7 @@ def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
             continue
         if (
             row.get("backend_port_prestart_summary_status")
-            != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+            != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
         ):
             continue
         if (

@@ -23,7 +23,9 @@ try:
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
         WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -37,7 +39,9 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
         WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -172,8 +176,12 @@ PRESTART_SUMMARY_TYPE = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
 PRESTART_SUMMARY_CONNECTION_POLICY = (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
 )
+PRESTART_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
 PRESTART_SUMMARY_BACKEND_CHECK_NAME = (
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+)
+PRESTART_SUMMARY_BACKEND_CHECK_STATUS = (
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
 )
 
 
@@ -600,7 +608,7 @@ def _validate_prestart_summary_payload(
 ) -> None:
     if prestart.get("type") != PRESTART_SUMMARY_TYPE:
         violations.append("prestart_summary_type_mismatch")
-    if prestart.get("status") != "passed":
+    if prestart.get("status") != PRESTART_SUMMARY_STATUS:
         violations.append("prestart_summary_status_not_passed")
     if prestart.get("connection_policy") != PRESTART_SUMMARY_CONNECTION_POLICY:
         violations.append("prestart_summary_connection_policy_mismatch")
@@ -617,7 +625,7 @@ def _validate_prestart_summary_payload(
     if backend_check is None:
         violations.append("prestart_summary_backend_port_check_missing")
         return
-    if backend_check.get("status") != "passed":
+    if backend_check.get("status") != PRESTART_SUMMARY_BACKEND_CHECK_STATUS:
         violations.append("prestart_summary_backend_port_check_not_passed")
     check_detail = backend_check.get("detail")
     if isinstance(check_detail, Mapping):
@@ -984,7 +992,7 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("backend_port_prestart_summary_sha256_missing")
     if payload.get("backend_port_prestart_summary_type") != PRESTART_SUMMARY_TYPE:
         violations.append("backend_port_prestart_summary_type_mismatch")
-    if payload.get("backend_port_prestart_summary_status") != "passed":
+    if payload.get("backend_port_prestart_summary_status") != PRESTART_SUMMARY_STATUS:
         violations.append("backend_port_prestart_summary_status_not_passed")
     if (
         payload.get("backend_port_prestart_summary_connection_policy")
@@ -999,7 +1007,10 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("backend_port_prestart_summary_queries_console_not_false")
     if payload.get("backend_port_prestart_summary_executes_tests") is not False:
         violations.append("backend_port_prestart_summary_executes_tests_not_false")
-    if payload.get("backend_port_prestart_check_status") != "passed":
+    if (
+        payload.get("backend_port_prestart_check_status")
+        != PRESTART_SUMMARY_BACKEND_CHECK_STATUS
+    ):
         violations.append("backend_port_prestart_check_status_not_passed")
     if payload.get("require_physical_readback") is not True:
         violations.append("require_physical_readback_not_true")

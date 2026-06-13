@@ -372,6 +372,21 @@ WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY = (
     preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
 )
+WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+)
+WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+)
+WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+)
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+)
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+)
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
@@ -1543,7 +1558,7 @@ def _listener_processes_for_port(port: int) -> tuple[list[dict[str, object]], st
 
 
 def _backend_port_markdown_details(result: CheckResult) -> list[str]:
-    if result.name != "backend_port_free":
+    if result.name != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME:
         return []
     detail = result.detail or {}
     if not detail.get("listener_detected"):
@@ -1842,7 +1857,10 @@ def maybe_attach_backend_listener_confirmation_template(
     run_dir: Path,
     generated_at: str,
 ) -> CheckResult:
-    if result.name != "backend_port_free" or result.status == "passed":
+    if (
+        result.name != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+        or result.status == WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    ):
         return result
     detail = dict(result.detail or {})
     if detail.get("listener_detected") is not True:
@@ -1984,15 +2002,19 @@ def check_port_free(
         detail["listener_confirmation_status"] = "not_used_no_listener_detected"
         detail["safe_to_stop_listener_by_gate"] = False
         detail["live_authority_granted"] = False
-    status = "failed" if connected else "passed"
+    status = (
+        "failed"
+        if connected
+        else WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
     if (
         connected
         and listener_confirmation_path is not None
         and detail.get("listener_confirmation_status") == "accepted"
     ):
-        status = "passed"
+        status = WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
     return CheckResult(
-        name="backend_port_free",
+        name=WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
         status=status,
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -2013,10 +2035,12 @@ def write_wing_readonly_prestart_summary(
     backend_port_result: CheckResult,
 ) -> None:
     payload = {
-        "type": "no_wing_release_check",
+        "type": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         "generated_at": generated_at,
-        "status": "passed",
-        "connection_policy": "no_hardware_no_network_no_live_writes",
+        "status": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
+        "connection_policy": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ),
         "live_write": False,
         "contacts_backend": False,
         "queries_console": False,
@@ -4285,17 +4309,23 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_sha256_missing"
         )
-    if plan.get("backend_port_prestart_summary_type") != "no_wing_release_check":
+    if (
+        plan.get("backend_port_prestart_summary_type")
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    ):
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_type_mismatch"
         )
-    if plan.get("backend_port_prestart_summary_status") != "passed":
+    if (
+        plan.get("backend_port_prestart_summary_status")
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    ):
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_status_not_passed"
         )
     if (
         plan.get("backend_port_prestart_summary_connection_policy")
-        != "no_hardware_no_network_no_live_writes"
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
     ):
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_policy_mismatch"
@@ -4316,7 +4346,10 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_executes_tests_not_false"
         )
-    if plan.get("backend_port_prestart_check_status") != "passed":
+    if (
+        plan.get("backend_port_prestart_check_status")
+        != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    ):
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_check_status_not_passed"
         )
@@ -15271,10 +15304,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     )
     next_plan = next_wing_proof_plan_summary(results)
     summary = {
-        "type": "no_wing_release_check",
+        "type": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         "generated_at": generated_at,
         "status": "passed" if not failed else "failed",
-        "connection_policy": "no_hardware_no_network_no_live_writes",
+        "connection_policy": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ),
         "live_write": False,
         "failed_checks": failed,
         "results": [asdict(result) for result in results],

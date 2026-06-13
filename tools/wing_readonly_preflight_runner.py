@@ -33,7 +33,9 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
@@ -52,8 +54,12 @@ PRESTART_SUMMARY_TYPE = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
 PRESTART_SUMMARY_CONNECTION_POLICY = (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
 )
+PRESTART_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
 PRESTART_SUMMARY_BACKEND_CHECK_NAME = (
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+)
+PRESTART_SUMMARY_BACKEND_CHECK_STATUS = (
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
 )
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",
@@ -535,7 +541,7 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
 
     if payload.get("type") != PRESTART_SUMMARY_TYPE:
         violations.append("prestart_summary_type_mismatch")
-    if payload.get("status") != "passed":
+    if payload.get("status") != PRESTART_SUMMARY_STATUS:
         violations.append("prestart_summary_status_not_passed")
     if payload.get("connection_policy") != PRESTART_SUMMARY_CONNECTION_POLICY:
         violations.append("prestart_summary_connection_policy_mismatch")
@@ -559,7 +565,7 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         violations.append("prestart_summary_backend_port_check_missing")
     else:
         detail["backend_port_prestart_check_status"] = backend_check.get("status")
-        if backend_check.get("status") != "passed":
+        if backend_check.get("status") != PRESTART_SUMMARY_BACKEND_CHECK_STATUS:
             violations.append("prestart_summary_backend_port_check_not_passed")
         check_detail = backend_check.get("detail")
         if isinstance(check_detail, dict):

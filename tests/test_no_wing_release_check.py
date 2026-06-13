@@ -9,6 +9,8 @@ from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_st
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
@@ -21,7 +23,10 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
@@ -298,6 +303,74 @@ def test_wing_readonly_review_decision_template_contract_uses_shared_constants()
     )
     assert "checklist_ids" in (
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+
+
+def test_wing_readonly_prestart_summary_contract_uses_shared_constants():
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+        == WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+        == WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
+
+
+def test_wing_readonly_prestart_summary_writer_uses_shared_contract_constants(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE",
+        "contract_test_summary_type",
+    )
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS",
+        "contract_test_summary_status",
+    )
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY",
+        "contract_test_connection_policy",
+    )
+    backend_result = CheckResult(
+        name=WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+        status=WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
+        started_at="2026-06-13T00:00:00Z",
+        finished_at="2026-06-13T00:00:00Z",
+        duration_sec=0.0,
+        detail={"listener_detected": False},
+    )
+
+    output = tmp_path / "summary.json"
+    release_check.write_wing_readonly_prestart_summary(
+        output,
+        generated_at="2026-06-13T00:00:00Z",
+        backend_port_result=backend_result,
+    )
+
+    payload = json.loads(output.read_text())
+    assert payload["type"] == "contract_test_summary_type"
+    assert payload["status"] == "contract_test_summary_status"
+    assert payload["connection_policy"] == "contract_test_connection_policy"
+    assert (
+        payload["results"][0]["name"]
+        == WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
     )
 
 
@@ -1015,16 +1088,22 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
         ),
         "backend_port_prestart_summary_sha256": "a" * 64,
-        "backend_port_prestart_summary_type": "no_wing_release_check",
-        "backend_port_prestart_summary_status": "passed",
+        "backend_port_prestart_summary_type": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ),
+        "backend_port_prestart_summary_status": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+        ),
         "backend_port_prestart_summary_connection_policy": (
-            "no_hardware_no_network_no_live_writes"
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
         "backend_port_prestart_summary_live_write": False,
         "backend_port_prestart_summary_contacts_backend": False,
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
-        "backend_port_prestart_check_status": "passed",
+        "backend_port_prestart_check_status": (
+            WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+        ),
         "manual_review_required_before_readiness_update": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "contacts_backend": False,
@@ -2564,6 +2643,57 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
         " ".join(release_check.wing_readonly_preflight_review_decision_command()),
     ]
     assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_wing_preflight_plan_prestart_contract_drift(
+    monkeypatch,
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE",
+        "stale_summary_type",
+    )
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS",
+        "stale_summary_status",
+    )
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY",
+        "stale_connection_policy",
+    )
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS",
+        "stale_backend_check_status",
+    )
+
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_plan_backend_port_prestart_summary_type_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_backend_port_prestart_summary_status_not_passed"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_backend_port_prestart_summary_policy_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_backend_port_prestart_check_status_not_passed"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_missing_wing_preflight_plan_artifact(tmp_path):
