@@ -405,9 +405,13 @@ WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
 )
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
-    "accepted_decision_ready",
-    "valid accepted-candidate prestart trace",
-    "WING_SUPERVISED_FADER_GAIN_PROOF",
+    preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
+)
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
+    preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS
+)
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME = (
+    preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME
 )
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
@@ -4511,29 +4515,20 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if len(operator_sequence) < 8:
         violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
     backend_port_prestart_step = str(operator_sequence[0]) if operator_sequence else ""
-    backend_port_prestart_step_is_first = (
-        bool(backend_port_prestart_step)
-        and "Before starting the intended backend/WING session" in backend_port_prestart_step
-        and "prestart_backend_port_check" in backend_port_prestart_step
+    backend_port_prestart_step_is_first = bool(backend_port_prestart_step) and all(
+        marker in backend_port_prestart_step
+        for marker in WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS
     )
     if not backend_port_prestart_step_is_first:
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_not_first"
         )
-    expected_backend_port_prestart_gate = {
-        "required": True,
-        "operator_sequence_step_index": 0,
-        "operator_sequence_step_must_be_first": True,
-        "operator_sequence_step": backend_port_prestart_step,
-        "required_markers": [
-            "Before starting the intended backend/WING session",
-            "prestart_backend_port_check",
-            "unexpected listeners",
-        ],
-        "runs_command": "prestart_backend_port_check",
-        "must_pass_before_backend_wing_session": True,
-        "grants_live_authority": False,
-    }
+    expected_backend_port_prestart_gate = (
+        preflight_contract.expected_backend_port_prestart_gate(
+            operator_sequence_step=backend_port_prestart_step,
+            operator_sequence_step_index=0,
+        )
+    )
     if backend_port_prestart_gate != expected_backend_port_prestart_gate:
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_gate_contract_mismatch"
@@ -4596,19 +4591,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_step_missing"
         )
-    expected_supervised_prestart_gate = {
-        "required": True,
-        "operator_sequence_step_index": operator_sequence_supervised_prestart_gate_step_index,
-        "operator_sequence_step_must_be_final": True,
-        "operator_sequence_step": operator_sequence_supervised_prestart_gate_step,
-        "required_markers": list(
-            WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
-        ),
-        "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
-        "grants_live_authority": False,
-        "requires_operator_decision_status": "accepted_decision_ready",
-        "requires_accepted_candidate_prestart_trace": True,
-    }
+    expected_supervised_prestart_gate = (
+        preflight_contract.expected_supervised_prestart_gate(
+            operator_sequence_step=operator_sequence_supervised_prestart_gate_step,
+            operator_sequence_step_index=operator_sequence_supervised_prestart_gate_step_index,
+        )
+    )
     if supervised_prestart_gate != expected_supervised_prestart_gate:
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_contract_mismatch"

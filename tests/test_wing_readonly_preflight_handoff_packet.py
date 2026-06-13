@@ -6,10 +6,19 @@ from pathlib import Path
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
+    expected_backend_port_prestart_gate,
+    expected_supervised_prestart_gate,
 )
 from tools import build_wing_readonly_preflight_handoff_packet as handoff
 from tools import no_wing_release_check
@@ -122,25 +131,21 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "tools/wing_readonly_preflight_runner.py" in packet[
         "mvp_blocker_anchor"
     ]["selected_evidence_files"]
-    assert packet["operator_sequence"][0].startswith(
-        "Before starting the intended backend/WING session"
+    assert (
+        packet["operator_sequence"][0]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP
     )
     assert len(packet["operator_sequence"]) == 10
     first_gate_step = packet["operator_sequence"][0]
-    assert packet["backend_port_prestart_gate"] == {
-        "required": True,
-        "operator_sequence_step_index": 0,
-        "operator_sequence_step_must_be_first": True,
-        "operator_sequence_step": first_gate_step,
-        "required_markers": [
-            "Before starting the intended backend/WING session",
-            "prestart_backend_port_check",
-            "unexpected listeners",
-        ],
-        "runs_command": "prestart_backend_port_check",
-        "must_pass_before_backend_wing_session": True,
-        "grants_live_authority": False,
-    }
+    assert packet["backend_port_prestart_gate"] == expected_backend_port_prestart_gate(
+        operator_sequence_step=first_gate_step,
+        operator_sequence_step_index=(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX
+        ),
+    )
+    assert packet["backend_port_prestart_gate"]["required_markers"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS
+    )
     assert packet["expected_backend_port_prestart_gate"] == packet[
         "backend_port_prestart_gate"
     ]
@@ -153,21 +158,21 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in supervised_gate_step
-    assert packet["supervised_prestart_gate"] == {
-        "required": True,
-        "operator_sequence_step_index": 9,
-        "operator_sequence_step_must_be_final": True,
-        "operator_sequence_step": supervised_gate_step,
-        "required_markers": [
-            "accepted_decision_ready",
-            "valid accepted-candidate prestart trace",
-            "WING_SUPERVISED_FADER_GAIN_PROOF",
-        ],
-        "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
-        "grants_live_authority": False,
-        "requires_operator_decision_status": "accepted_decision_ready",
-        "requires_accepted_candidate_prestart_trace": True,
-    }
+    assert (
+        supervised_gate_step == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP
+    )
+    assert packet["supervised_prestart_gate"] == expected_supervised_prestart_gate(
+        operator_sequence_step=supervised_gate_step,
+        operator_sequence_step_index=(
+            WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+        ),
+    )
+    assert packet["supervised_prestart_gate"]["required_markers"] == list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
+    )
+    assert packet["supervised_prestart_gate"]["unlocks_runbook"] == (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK
+    )
     assert packet["expected_supervised_prestart_gate"] == packet[
         "supervised_prestart_gate"
     ]

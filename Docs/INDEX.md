@@ -152,6 +152,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md` | Accepted WING read-only prestart traces now require bound no-WING summary `contacts_backend`, `queries_console`, and `executes_tests` fields to be false. |
 | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_FAIL_CLOSED_CONDITION_SYNC_20260613.md` | The no-WING release-check validator now matches the WING readonly runner/evidence prestart summary fail-closed conditions. |
 | `Docs/reports/AUTOMIXER_WING_MVP_FAIL_CLOSED_CONTRACT_SOURCE_20260613.md` | WING readonly expected-plan fail-closed conditions now have one shared contract source consumed by runner, evidence, and release-check tooling. |
+| `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_GATE_CONTRACT_SOURCE_20260613.md` | WING read-only handoff structured prestart gates now have one shared contract source consumed by the handoff builder and no-WING validator. |
 | `Docs/reports/AUTOMIXER_WING_AUTOLOOP_HANDOFF_GATES_DOCS_20260612.md` | Codex autoloop prompt and README carry the current WING handoff blocker-anchor, digest-review, and supervised trace gate fields. |
 | `Docs/reports/AUTOMIXER_WING_AUTOLOOP_CURRENT_HANDOFF_GATES_DOCS_20260612.md` | Codex autoloop prompt and README carry the current handoff nonclosure and final supervised operator-step marker fields. |
 | `Docs/reports/AUTOMIXER_WING_AUTOLOOP_BACKEND_PRESTART_DIRECTOR_DOCS_20260612.md` | Codex autoloop README and Project Director tests carry the structured backend-port prestart gate before supervised proof planning. |

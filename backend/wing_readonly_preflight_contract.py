@@ -53,6 +53,38 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = (
     "operator_next_step",
 )
 
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME = (
+    "prestart_backend_port_check"
+)
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX = 0
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP = (
+    "Before starting the intended backend/WING session, run "
+    "prestart_backend_port_check and resolve only confirmed "
+    "unexpected listeners."
+)
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
+    "Before starting the intended backend/WING session",
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME,
+    "unexpected listeners",
+)
+
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = 9
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
+    "Only after accepted_decision_ready and a valid accepted-candidate "
+    "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+)
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS = (
+    "accepted_decision_ready",
+    "valid accepted-candidate prestart trace",
+    "WING_SUPERVISED_FADER_GAIN_PROOF",
+)
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK = (
+    "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+)
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS = (
+    "accepted_decision_ready"
+)
+
 WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
     "event_log_wing_mode_not_proven",
@@ -73,3 +105,48 @@ WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS = (
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",
 )
+
+
+def expected_backend_port_prestart_gate(
+    *,
+    operator_sequence_step: str = WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
+    operator_sequence_step_index: int = (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX
+    ),
+) -> dict[str, object]:
+    return {
+        "required": True,
+        "operator_sequence_step_index": operator_sequence_step_index,
+        "operator_sequence_step_must_be_first": True,
+        "operator_sequence_step": operator_sequence_step,
+        "required_markers": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS
+        ),
+        "runs_command": WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME,
+        "must_pass_before_backend_wing_session": True,
+        "grants_live_authority": False,
+    }
+
+
+def expected_supervised_prestart_gate(
+    *,
+    operator_sequence_step: str = WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
+    operator_sequence_step_index: int | None = (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    ),
+) -> dict[str, object]:
+    return {
+        "required": True,
+        "operator_sequence_step_index": operator_sequence_step_index,
+        "operator_sequence_step_must_be_final": True,
+        "operator_sequence_step": operator_sequence_step,
+        "required_markers": list(
+            WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
+        ),
+        "unlocks_runbook": WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
+        "grants_live_authority": False,
+        "requires_operator_decision_status": (
+            WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS
+        ),
+        "requires_accepted_candidate_prestart_trace": True,
+    }

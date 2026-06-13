@@ -17,10 +17,16 @@ if str(REPO_ROOT) not in sys.path:
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
+    expected_backend_port_prestart_gate,
+    expected_supervised_prestart_gate,
 )
 from tools import no_wing_release_check
 
@@ -224,52 +230,24 @@ def build_handoff_packet(
 ) -> dict[str, Any]:
     channel_numbers = _validate_channels(channels)
     value_type_names = _validate_value_types(value_types)
-    supervised_gate_step_index = 9
-    supervised_gate_step = (
-        "Only after accepted_decision_ready and a valid accepted-candidate "
-        "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+    supervised_gate_step_index = (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
     )
-    supervised_gate_markers = [
-        "accepted_decision_ready",
-        "valid accepted-candidate prestart trace",
-        "WING_SUPERVISED_FADER_GAIN_PROOF",
-    ]
-    prestart_step_index = 0
-    prestart_step = (
-        "Before starting the intended backend/WING session, run "
-        "prestart_backend_port_check and resolve only confirmed "
-        "unexpected listeners."
-    )
-    prestart_gate_markers = [
-        "Before starting the intended backend/WING session",
-        "prestart_backend_port_check",
-        "unexpected listeners",
-    ]
+    supervised_gate_step = WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP
+    prestart_step_index = WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX
+    prestart_step = WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP
     mvp_blocker_anchor_digest_review_step = (
         "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
         "current first open blocker before supervised proof planning."
     )
-    expected_prestart_gate = {
-        "required": True,
-        "operator_sequence_step_index": prestart_step_index,
-        "operator_sequence_step_must_be_first": True,
-        "operator_sequence_step": prestart_step,
-        "required_markers": prestart_gate_markers,
-        "runs_command": "prestart_backend_port_check",
-        "must_pass_before_backend_wing_session": True,
-        "grants_live_authority": False,
-    }
-    expected_supervised_gate = {
-        "required": True,
-        "operator_sequence_step_index": supervised_gate_step_index,
-        "operator_sequence_step_must_be_final": True,
-        "operator_sequence_step": supervised_gate_step,
-        "required_markers": supervised_gate_markers,
-        "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
-        "grants_live_authority": False,
-        "requires_operator_decision_status": "accepted_decision_ready",
-        "requires_accepted_candidate_prestart_trace": True,
-    }
+    expected_prestart_gate = expected_backend_port_prestart_gate(
+        operator_sequence_step=prestart_step,
+        operator_sequence_step_index=prestart_step_index,
+    )
+    expected_supervised_gate = expected_supervised_prestart_gate(
+        operator_sequence_step=supervised_gate_step,
+        operator_sequence_step_index=supervised_gate_step_index,
+    )
     preview = plan_command(
         url=url,
         channels=channels,
