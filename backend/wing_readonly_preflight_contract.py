@@ -42,6 +42,9 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
     "reviewed_at",
     "checklist_ids",
 )
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS = (
+    "operator_must_replace_placeholders_before_ledger_acceptance"
+)
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"
 )

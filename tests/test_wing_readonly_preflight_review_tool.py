@@ -13,6 +13,7 @@ from backend.wing_readonly_preflight_evidence import (
 )
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
 )
 from backend.wing_readonly_preflight_review_decision import (
@@ -38,6 +39,14 @@ def test_review_decision_template_required_fields_match_shared_contract():
     )
     assert review_tool.review_decision_template_required_fields() == list(
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert (
+        review_tool.REVIEW_DECISION_TEMPLATE_STATUS
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
+    assert (
+        review_tool.review_decision_template_status()
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
     )
 
 
@@ -446,7 +455,7 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     )
 
     assert template["template_status"] == (
-        "operator_must_replace_placeholders_before_ledger_acceptance"
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
     )
     assert template["template_generated_at"] == "2026-06-07T02:00:00Z"
     assert template["review_id"] == "review-wing-readonly-20260606T120000Z_wing_readonly_preflight"

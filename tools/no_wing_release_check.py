@@ -466,6 +466,9 @@ WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = tuple(
 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = tuple(
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
 )
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS = (
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+)
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES = tuple(
     preflight_contract.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
 )
@@ -705,6 +708,21 @@ def wing_readonly_preflight_review_decision_template_required_fields() -> list[s
     except Exception:
         return []
     return [str(item) for item in fields if isinstance(item, str) and item] if isinstance(fields, list) else []
+
+
+def wing_readonly_preflight_review_decision_template_status() -> str | None:
+    review_tool = load_wing_readonly_preflight_review_tool()
+    if review_tool is None:
+        return None
+    try:
+        status_factory = getattr(review_tool, "review_decision_template_status", None)
+        if callable(status_factory):
+            status = status_factory()
+        else:
+            status = getattr(review_tool, "REVIEW_DECISION_TEMPLATE_STATUS", None)
+    except Exception:
+        return None
+    return str(status) if isinstance(status, str) and status else None
 
 
 FORBIDDEN_COMMAND_TOKENS = (
@@ -3479,12 +3497,19 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     review_decision_template_required_fields = (
         wing_readonly_preflight_review_decision_template_required_fields()
     )
+    review_decision_template_status = (
+        wing_readonly_preflight_review_decision_template_status()
+    )
     review_manual_checklist_complete = tuple(review_manual_checklist_ids) == (
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
     )
     review_decision_template_contract_complete = tuple(
         review_decision_template_required_fields
     ) == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    review_decision_template_status_matches_contract = (
+        review_decision_template_status
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
     capture_channels = command_value_after_flag(capture_command, "--channels")
     capture_confirmed_channels = command_value_after_flag(
         capture_command,
@@ -3587,6 +3612,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_review_manual_checklist_incomplete")
     if not review_decision_template_contract_complete:
         violations.append("wing_readonly_preflight_review_decision_template_contract_incomplete")
+    if not review_decision_template_status_matches_contract:
+        violations.append("wing_readonly_preflight_review_decision_template_status_mismatch")
     if "--decision-template-output" not in review_command:
         violations.append("wing_readonly_preflight_review_decision_template_output_missing")
     if "--operator-confirm-channels" not in capture_command:
@@ -3763,6 +3790,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["review_decision_template_contract_complete"] = (
         review_decision_template_contract_complete
+    )
+    detail["review_decision_template_status"] = review_decision_template_status
+    detail["review_decision_template_status_matches_contract"] = (
+        review_decision_template_status_matches_contract
     )
     detail["handoff_packet_tool_path"] = WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL
     detail["handoff_packet_tool_available"] = handoff_tool_available
@@ -11624,6 +11655,12 @@ def wing_readonly_preflight_evidence_summary(
             "review_decision_template_contract_complete": (
                 detail.get("review_decision_template_contract_complete") is True
             ),
+            "review_decision_template_status": detail.get(
+                "review_decision_template_status"
+            ),
+            "review_decision_template_status_matches_contract": (
+                detail.get("review_decision_template_status_matches_contract") is True
+            ),
             "handoff_packet_tool_path": detail.get("handoff_packet_tool_path"),
             "handoff_packet_tool_available": (
                 detail.get("handoff_packet_tool_available") is True
@@ -15137,6 +15174,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['review_decision_template_required_fields'])}`",
                 "- review_decision_template_contract_complete: "
                 f"`{str(wing_readonly_preflight['review_decision_template_contract_complete']).lower()}`",
+                "- review_decision_template_status: "
+                f"`{wing_readonly_preflight['review_decision_template_status']}`",
+                "- review_decision_template_status_matches_contract: "
+                f"`{str(wing_readonly_preflight['review_decision_template_status_matches_contract']).lower()}`",
                 f"- handoff_packet_tool_path: `{wing_readonly_preflight['handoff_packet_tool_path']}`",
                 "- handoff_packet_tool_available: "
                 f"`{str(wing_readonly_preflight['handoff_packet_tool_available']).lower()}`",

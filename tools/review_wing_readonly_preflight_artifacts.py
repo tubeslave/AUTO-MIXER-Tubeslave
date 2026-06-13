@@ -24,6 +24,7 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
 )
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
 )
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     REQUIRED_REVIEW_CHECKLIST_IDS,
@@ -38,7 +39,7 @@ DEFAULT_DECISION_TEMPLATE_OUTPUT = (
     / "wing_readonly_preflight_review_decisions"
     / "pending_review_decision_template.json"
 )
-REVIEW_DECISION_TEMPLATE_STATUS = "operator_must_replace_placeholders_before_ledger_acceptance"
+REVIEW_DECISION_TEMPLATE_STATUS = WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
 REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = tuple(
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
 )
@@ -87,6 +88,10 @@ def manual_review_checklist() -> list[dict[str, str]]:
 
 def review_decision_template_required_fields() -> list[str]:
     return list(REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS)
+
+
+def review_decision_template_status() -> str:
+    return REVIEW_DECISION_TEMPLATE_STATUS
 
 
 def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:

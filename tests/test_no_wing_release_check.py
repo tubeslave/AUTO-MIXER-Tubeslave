@@ -18,6 +18,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
@@ -230,6 +231,10 @@ def test_wing_readonly_review_decision_template_contract_uses_shared_constants()
     assert (
         release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
         == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
     )
     assert "review_id" in (
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
@@ -791,6 +796,10 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
     )
     assert result.detail["review_decision_template_contract_complete"] is True
+    assert result.detail["review_decision_template_status"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
+    assert result.detail["review_decision_template_status_matches_contract"] is True
     assert result.detail["handoff_packet_tool_path"] == (
         "tools/build_wing_readonly_preflight_handoff_packet.py"
     )
@@ -3527,6 +3536,26 @@ def test_no_wing_release_check_rejects_incomplete_wing_preflight_decision_templa
     assert result.detail["review_decision_template_contract_complete"] is False
     assert (
         "wing_readonly_preflight_review_decision_template_contract_incomplete"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_stale_wing_preflight_decision_template_status(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_review_decision_template_status",
+        lambda: "accepted_decision_ready",
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["review_decision_template_status"] == "accepted_decision_ready"
+    assert result.detail["review_decision_template_status_matches_contract"] is False
+    assert (
+        "wing_readonly_preflight_review_decision_template_status_mismatch"
         in result.detail["violations"]
     )
 
@@ -8397,6 +8426,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "checklist_ids",
             ],
             "review_decision_template_contract_complete": True,
+            "review_decision_template_status": (
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+            ),
+            "review_decision_template_status_matches_contract": True,
             "handoff_packet_tool_path": (
                 "tools/build_wing_readonly_preflight_handoff_packet.py"
             ),
@@ -8544,6 +8577,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
     )
     assert preflight["review_decision_template_contract_complete"] is True
+    assert preflight["review_decision_template_status"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
+    assert preflight["review_decision_template_status_matches_contract"] is True
     assert preflight["handoff_packet_tool_path"] == (
         "tools/build_wing_readonly_preflight_handoff_packet.py"
     )
@@ -8613,6 +8650,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "review_manual_checklist_complete: `true`" in markdown_summary
     assert "confirm_event_log_readonly_sequence" in markdown_summary
     assert "review_decision_template_contract_complete: `true`" in markdown_summary
+    assert (
+        "review_decision_template_status: "
+        f"`{WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS}`"
+    ) in markdown_summary
+    assert (
+        "review_decision_template_status_matches_contract: `true`"
+        in markdown_summary
+    )
     assert "artifact_source_id" in markdown_summary
     assert (
         "handoff_packet_tool_path: `tools/build_wing_readonly_preflight_handoff_packet.py`"
