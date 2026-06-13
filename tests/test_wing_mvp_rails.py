@@ -127,6 +127,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md"
+        in rows[0]["evidence"]
+    )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
     assert "backend_port_prestart_gate" in rows[0]["next action"]
     assert "expected_backend_port_prestart_gate" in rows[0]["next action"]
