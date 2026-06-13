@@ -255,8 +255,9 @@ python3 tools/review_wing_readonly_preflight_decisions.py \
 Exit codes:
 
 - `0`: an accepted decision is ready for the next manual WING MVP step only
-  when the generated handoff keeps the supervised-proof transition behind a
-  final accepted-candidate prestart gate;
+  when the accepted source ids also have a valid accepted-candidate prestart
+  trace and the generated handoff keeps the supervised-proof transition behind
+  a final accepted-candidate prestart gate;
 - `2`: no clean preflight candidate exists yet;
 - `3`: the decision record is missing, incomplete, invalid, or unsafe;
 - `4`: the operator rejected the candidate, so supervised proof remains blocked.
@@ -317,7 +318,8 @@ Then update:
 - the review report omits the manual review checklist;
 - the review decision JSON is missing, malformed, not UTC stamped, linked to
   the wrong artifact/run, duplicated for the same candidate, conflicts with
-  another decision for the same candidate, or claims live/readiness authority.
+  another decision for the same candidate, lacks a valid accepted-candidate
+  prestart trace, or claims live/readiness authority.
 
 ## Next Step
 

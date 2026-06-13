@@ -373,7 +373,7 @@ BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST = [
     "rerun the no-WING gate after manual confirmation or after clearing an unexpected listener",
 ]
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
-    "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
 )
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
     "accepted_decision_ready",
@@ -4864,6 +4864,24 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     rejected_record_count = int(summary.get("rejected_record_count") or 0)
     invalid_record_count = int(summary.get("invalid_record_count") or 0)
     unreviewed_candidate_count = int(summary.get("unreviewed_candidate_count") or 0)
+    accepted_source_ids = (
+        list(summary.get("accepted_source_ids"))
+        if isinstance(summary.get("accepted_source_ids"), list)
+        else []
+    )
+    accepted_candidate_prestart_source_ids = (
+        list(summary.get("accepted_candidate_prestart_source_ids"))
+        if isinstance(summary.get("accepted_candidate_prestart_source_ids"), list)
+        else []
+    )
+    accepted_candidate_prestart_contract_valid = (
+        summary.get("accepted_candidate_prestart_contract_valid") is True
+    )
+    blocked_by = (
+        list(summary.get("blocked_by"))
+        if isinstance(summary.get("blocked_by"), list)
+        else []
+    )
     if decision_record_count != len(records):
         violations.append("wing_readonly_preflight_review_decision_record_count_mismatch")
     if invalid_record_count:
@@ -4878,6 +4896,21 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         violations.append("wing_readonly_preflight_review_decision_live_authority_not_false")
     if summary.get("full_autonomous_ready") is not False:
         violations.append("wing_readonly_preflight_review_decision_full_auto_not_false")
+    if accepted_candidate_prestart_contract_valid and (
+        accepted_candidate_prestart_source_ids != accepted_source_ids
+    ):
+        violations.append(
+            "wing_readonly_preflight_review_decision_prestart_sources_mismatch"
+        )
+    if accepted_source_ids and not accepted_candidate_prestart_contract_valid:
+        if WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER not in blocked_by:
+            violations.append(
+                "wing_readonly_preflight_review_decision_prestart_blocker_missing"
+            )
+        if summary.get("manual_readiness_update_candidate_available") is True:
+            violations.append(
+                "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_prestart"
+            )
 
     detail["ledger_status"] = ledger.get("status")
     detail["review_tool_path"] = WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL
@@ -4908,10 +4941,12 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     )
     detail["live_authority_granted"] = summary.get("live_authority_granted")
     detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
-    detail["accepted_source_ids"] = (
-        list(summary.get("accepted_source_ids"))
-        if isinstance(summary.get("accepted_source_ids"), list)
-        else []
+    detail["accepted_source_ids"] = accepted_source_ids
+    detail["accepted_candidate_prestart_contract_valid"] = (
+        accepted_candidate_prestart_contract_valid
+    )
+    detail["accepted_candidate_prestart_source_ids"] = (
+        accepted_candidate_prestart_source_ids
     )
     detail["rejected_source_ids"] = (
         list(summary.get("rejected_source_ids"))
@@ -4938,11 +4973,12 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         if isinstance(summary.get("unreviewed_candidate_source_ids"), list)
         else []
     )
-    detail["blocked_by"] = (
-        list(summary.get("blocked_by"))
-        if isinstance(summary.get("blocked_by"), list)
+    detail["candidate_reviews"] = (
+        list(summary.get("candidate_reviews"))
+        if isinstance(summary.get("candidate_reviews"), list)
         else []
     )
+    detail["blocked_by"] = blocked_by
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
     return CheckResult(
@@ -11411,6 +11447,9 @@ def wing_readonly_preflight_review_decision_summary(
         blocked_by = detail.get("blocked_by")
         violations = detail.get("violations")
         accepted_source_ids = detail.get("accepted_source_ids")
+        accepted_candidate_prestart_source_ids = detail.get(
+            "accepted_candidate_prestart_source_ids"
+        )
         rejected_source_ids = detail.get("rejected_source_ids")
         invalid_record_ids = detail.get("invalid_record_ids")
         duplicate_source_ids = detail.get("duplicate_source_ids")
@@ -11462,6 +11501,14 @@ def wing_readonly_preflight_review_decision_summary(
             "accepted_source_ids": (
                 list(accepted_source_ids)
                 if isinstance(accepted_source_ids, list)
+                else []
+            ),
+            "accepted_candidate_prestart_contract_valid": (
+                detail.get("accepted_candidate_prestart_contract_valid") is True
+            ),
+            "accepted_candidate_prestart_source_ids": (
+                list(accepted_candidate_prestart_source_ids)
+                if isinstance(accepted_candidate_prestart_source_ids, list)
                 else []
             ),
             "rejected_source_ids": (
@@ -14725,6 +14772,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_review_decision['manual_readiness_update_candidate_available']).lower()}`",
                 "- accepted_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_source_ids'])}`",
+                "- accepted_candidate_prestart_contract_valid: "
+                f"`{str(wing_readonly_preflight_review_decision['accepted_candidate_prestart_contract_valid']).lower()}`",
+                "- accepted_candidate_prestart_source_ids: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_candidate_prestart_source_ids'])}`",
                 "- rejected_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['rejected_source_ids'])}`",
                 "- invalid_record_ids: "

@@ -36,6 +36,7 @@ try:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_contract import (
@@ -43,6 +44,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     )
 
 
@@ -54,7 +56,7 @@ READONLY_PREFLIGHT_REVIEW_DECISION_BLOCKER = (
     "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
 )
 READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
-    "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
 )
 PLAN_STATUSES = {
     "operator_proof_required",

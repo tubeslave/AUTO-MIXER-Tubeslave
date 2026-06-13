@@ -5,6 +5,7 @@ from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflig
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
 )
 from backend.wing_readonly_preflight_review_decision import (
     REQUIRED_REVIEW_CHECKLIST_IDS,
@@ -186,6 +187,10 @@ def test_review_decision_ledger_records_accepted_candidate_without_live_authorit
     assert ledger["summary"]["accepted_record_count"] == 1
     assert ledger["summary"]["rejected_record_count"] == 0
     assert ledger["summary"]["manual_readiness_update_candidate_available"] is True
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is True
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == [
+        "inline_payload_0"
+    ]
     assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["readiness_closure_allowed_by_decision"] is False
     assert ledger["summary"]["live_authority_granted"] is False
@@ -194,6 +199,28 @@ def test_review_decision_ledger_records_accepted_candidate_without_live_authorit
     assert record["operator_accepted_readonly_preflight_candidate"] is True
     assert record["readiness_matrix_update_allowed_by_decision"] is False
     assert record["live_authority_granted"] is False
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contract():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["backend_port_prestart_check_required"] = False
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+    assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
+    assert ledger["summary"]["live_authority_granted"] is False
 
 
 def test_review_decision_ledger_loads_decision_record_from_json_file(tmp_path):

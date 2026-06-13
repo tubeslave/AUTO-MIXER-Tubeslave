@@ -14,8 +14,18 @@ from typing import Any, Dict, Iterable, Mapping, Tuple
 
 try:
     from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
+    from wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
+    from backend.wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    )
 
 
 WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID = (
@@ -196,6 +206,36 @@ def _candidate_review_rows(
             }
         )
     return rows
+
+
+def _accepted_candidate_prestart_source_ids(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> list[str]:
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    valid_source_ids: list[str] = []
+    for source_id in accepted_source_ids:
+        row = rows_by_source.get(source_id)
+        if not isinstance(row, Mapping):
+            continue
+        if row.get("backend_port_prestart_check_required") is not True:
+            continue
+        if row.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
+            continue
+        if _string_list(row.get("backend_port_prestart_check_command")) != (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ):
+            continue
+        if _string_list(row.get("backend_port_prestart_check_failure_detail_fields")) != (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ):
+            continue
+        valid_source_ids.append(source_id)
+    return valid_source_ids
 
 
 def _record_id(record: Mapping[str, Any], index: int) -> str:
@@ -442,6 +482,22 @@ def build_wing_readonly_preflight_review_decision_ledger(
         for source_id in candidates_by_source
         if source_id not in reviewed_source_ids
     )
+    accepted_source_ids = [record["artifact_source_id"] for record in accepted_records]
+    candidate_reviews = _candidate_review_rows(candidates_by_source)
+    accepted_candidate_prestart_source_ids = _accepted_candidate_prestart_source_ids(
+        accepted_source_ids,
+        candidate_reviews,
+    )
+    accepted_candidate_prestart_contract_valid = (
+        bool(accepted_source_ids)
+        and accepted_candidate_prestart_source_ids == accepted_source_ids
+    )
+    manual_readiness_update_candidate_available = (
+        bool(accepted_records)
+        and not invalid_records
+        and not unreviewed_candidate_source_ids
+        and accepted_candidate_prestart_contract_valid
+    )
 
     if invalid_records:
         status = "operator_review_decision_replacement_required"
@@ -451,7 +507,11 @@ def build_wing_readonly_preflight_review_decision_ledger(
         blocked_by = ("operator_must_record_readonly_preflight_review_decision",)
     elif accepted_records or rejected_records:
         status = "operator_review_decision_records_available"
-        blocked_by = ("readiness_matrix_update_still_requires_separate_manual_action",)
+        blocked_by_items = []
+        if accepted_records and not accepted_candidate_prestart_contract_valid:
+            blocked_by_items.append(WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER)
+        blocked_by_items.append("readiness_matrix_update_still_requires_separate_manual_action")
+        blocked_by = tuple(blocked_by_items)
     else:
         status = "operator_review_required"
         blocked_by = ("operator_must_capture_valid_readonly_preflight_candidate_first",)
@@ -487,18 +547,24 @@ def build_wing_readonly_preflight_review_decision_ledger(
             "rejected_record_count": len(rejected_records),
             "invalid_record_count": len(invalid_records),
             "unreviewed_candidate_count": len(unreviewed_candidate_source_ids),
-            "accepted_source_ids": [record["artifact_source_id"] for record in accepted_records],
+            "accepted_source_ids": accepted_source_ids,
             "rejected_source_ids": [record["artifact_source_id"] for record in rejected_records],
             "invalid_record_ids": [record["review_id"] for record in invalid_records],
             "duplicate_source_ids": list(duplicate_source_ids),
             "conflicting_source_ids": list(conflicting_source_ids),
             "unreviewed_candidate_source_ids": list(unreviewed_candidate_source_ids),
-            "candidate_reviews": _candidate_review_rows(candidates_by_source),
+            "candidate_reviews": candidate_reviews,
+            "accepted_candidate_prestart_contract_valid": (
+                accepted_candidate_prestart_contract_valid
+            ),
+            "accepted_candidate_prestart_source_ids": (
+                accepted_candidate_prestart_source_ids
+            ),
             "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
             "operator_review_required": True,
-            "manual_readiness_update_candidate_available": bool(accepted_records)
-            and not invalid_records
-            and not unreviewed_candidate_source_ids,
+            "manual_readiness_update_candidate_available": (
+                manual_readiness_update_candidate_available
+            ),
             "readiness_matrix_update_allowed_by_decision": False,
             "readiness_closure_allowed_by_decision": False,
             "live_authority_granted": False,

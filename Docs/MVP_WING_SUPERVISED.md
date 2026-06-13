@@ -192,6 +192,8 @@ accepted-candidate prestart trace from read-only preflight review. If that trace
 is missing or invalid, the proof plan must keep
 `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
 as an operator blocker.
+The decision-review CLI must not report `accepted_decision_ready` until the
+same accepted source ids have that valid accepted-candidate prestart trace.
 
 The no-WING handoff summary must also show `backend_port_prestart_gate` exactly
 matching `expected_backend_port_prestart_gate`, with

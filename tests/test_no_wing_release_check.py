@@ -3489,11 +3489,14 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     assert result.detail["invalid_record_count"] == 0
     assert result.detail["unreviewed_candidate_count"] == 0
     assert result.detail["manual_readiness_update_candidate_available"] is False
+    assert result.detail["accepted_candidate_prestart_contract_valid"] is False
+    assert result.detail["accepted_candidate_prestart_source_ids"] == []
     assert result.detail["operator_review_required"] is True
     assert result.detail["readiness_matrix_update_allowed_by_decision"] is False
     assert result.detail["readiness_closure_allowed_by_decision"] is False
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["candidate_reviews"] == []
     assert result.detail["violations"] == []
 
 
@@ -5655,6 +5658,10 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "accepted_record_count": 1,
                 "rejected_record_count": 0,
                 "accepted_source_ids": [
+                    "artifacts/wing_readonly_preflight/run/summary.json"
+                ],
+                "accepted_candidate_prestart_contract_valid": True,
+                "accepted_candidate_prestart_source_ids": [
                     "artifacts/wing_readonly_preflight/run/summary.json"
                 ],
                 "candidate_reviews": [
@@ -8881,6 +8888,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
             "live_authority_granted": False,
             "full_autonomous_ready": False,
             "accepted_source_ids": [],
+            "accepted_candidate_prestart_contract_valid": False,
+            "accepted_candidate_prestart_source_ids": [],
             "rejected_source_ids": [],
             "invalid_record_ids": [],
             "unreviewed_candidate_source_ids": [],
@@ -8943,6 +8952,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
         "artifacts/wing_readonly_preflight_review_decisions"
     ]
     assert decision["manual_readiness_update_candidate_available"] is False
+    assert decision["accepted_candidate_prestart_contract_valid"] is False
+    assert decision["accepted_candidate_prestart_source_ids"] == []
     assert decision["readiness_matrix_update_allowed_by_decision"] is False
     assert decision["readiness_closure_allowed_by_decision"] is False
     assert decision["live_authority_granted"] is False
@@ -8952,6 +8963,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert "WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md" in markdown_summary
     assert "accepted_decision_ready" in markdown_summary
     assert "candidate_reviews:" in markdown_summary
+    assert "accepted_candidate_prestart_contract_valid: `false`" in markdown_summary
     assert "backend_port_prestart_check_required" in markdown_summary
     assert "listener_processes" in markdown_summary
     assert "listener_confirmation_checklist" in markdown_summary

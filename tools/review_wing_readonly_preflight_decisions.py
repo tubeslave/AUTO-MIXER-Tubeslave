@@ -25,6 +25,9 @@ from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS,
     build_wing_readonly_preflight_review_decision_ledger,
 )
+from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+)
 
 
 DEFAULT_OUTPUT = (
@@ -67,9 +70,19 @@ def build_decision_review_report(
     )
     summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}
     safety = ledger.get("safety") if isinstance(ledger.get("safety"), Mapping) else {}
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    accepted_candidate_prestart_source_ids = _string_list(
+        summary.get("accepted_candidate_prestart_source_ids")
+    )
+    accepted_candidate_prestart_contract_valid = (
+        summary.get("accepted_candidate_prestart_contract_valid") is True
+    )
     accepted_ready = (
         summary.get("manual_readiness_update_candidate_available") is True
         and int(summary.get("accepted_record_count") or 0) > 0
+        and bool(accepted_source_ids)
+        and accepted_candidate_prestart_contract_valid
+        and accepted_candidate_prestart_source_ids == accepted_source_ids
         and int(summary.get("invalid_record_count") or 0) == 0
         and int(summary.get("unreviewed_candidate_count") or 0) == 0
     )
@@ -112,7 +125,11 @@ def build_decision_review_report(
         "rejected_record_count": int(summary.get("rejected_record_count") or 0),
         "invalid_record_count": int(summary.get("invalid_record_count") or 0),
         "unreviewed_candidate_count": int(summary.get("unreviewed_candidate_count") or 0),
-        "accepted_source_ids": _string_list(summary.get("accepted_source_ids")),
+        "accepted_source_ids": accepted_source_ids,
+        "accepted_candidate_prestart_contract_valid": (
+            accepted_candidate_prestart_contract_valid
+        ),
+        "accepted_candidate_prestart_source_ids": accepted_candidate_prestart_source_ids,
         "rejected_source_ids": _string_list(summary.get("rejected_source_ids")),
         "invalid_record_ids": _string_list(summary.get("invalid_record_ids")),
         "duplicate_source_ids": _string_list(summary.get("duplicate_source_ids")),
@@ -131,6 +148,11 @@ def build_decision_review_report(
         "next_required_action": (
             "Accepted review decision is ready for the next manual WING MVP step."
             if accepted_ready
+            else (
+                "Accepted review decision remains blocked until accepted source ids "
+                "have a valid accepted-candidate prestart trace."
+            )
+            if accepted_source_ids and not accepted_candidate_prestart_contract_valid
             else "Operator rejected the candidate; capture or review a replacement artifact."
             if rejected_only
             else str(summary.get("next_global_step") or "Capture and review WING preflight evidence.")
@@ -168,6 +190,10 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- unreviewed_candidate_count: `{report['unreviewed_candidate_count']}`",
         "- manual_readiness_update_candidate_available: "
         f"`{str(report['manual_readiness_update_candidate_available']).lower()}`",
+        "- accepted_candidate_prestart_contract_valid: "
+        f"`{str(report['accepted_candidate_prestart_contract_valid']).lower()}`",
+        "- accepted_candidate_prestart_source_ids: "
+        f"`{json.dumps(report['accepted_candidate_prestart_source_ids'])}`",
         "",
         "## Safety",
         "",
@@ -234,8 +260,15 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         ]
     )
     blocked_by = report.get("blocked_by") if isinstance(report.get("blocked_by"), list) else []
-    lines.extend(f"- `{item}`" for item in blocked_by)
-    if not blocked_by:
+    rendered_blockers = list(blocked_by)
+    if (
+        report.get("accepted_source_ids")
+        and report.get("accepted_candidate_prestart_contract_valid") is not True
+        and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER not in blocked_by
+    ):
+        rendered_blockers.append(WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER)
+    lines.extend(f"- `{item}`" for item in rendered_blockers)
+    if not rendered_blockers:
         lines.append("- none")
     lines.extend(
         [
