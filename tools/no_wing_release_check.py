@@ -348,7 +348,7 @@ WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = "3"
 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = "fader,gain,pan"
 WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
-    "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+    preflight_contract.WING_READONLY_PREFLIGHT_PLAN_OUTPUT
 )
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY = (
     preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
@@ -3543,6 +3543,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     plan_artifact_root = command_value_after_flag(plan_command, "--artifact-root")
     plan_prestart_summary = command_value_after_flag(plan_command, "--prestart-summary")
     plan_output = command_value_after_flag(plan_command, "--plan-output")
+    plan_output_matches_contract = (
+        plan_output == WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+    )
     capture_value_types = command_value_after_flag(capture_command, "--value-types")
     capture_artifact_root = command_value_after_flag(capture_command, "--artifact-root")
     capture_prestart_summary = command_value_after_flag(
@@ -3550,6 +3553,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         "--prestart-summary",
     )
     capture_expected_plan = command_value_after_flag(capture_command, "--expected-plan")
+    capture_expected_plan_matches_contract = (
+        capture_expected_plan == WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+    )
     plan_matches_capture = (
         bool(plan_channels)
         and bool(plan_confirmed_channels)
@@ -3565,6 +3571,14 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     handoff_url = command_value_after_flag(handoff_command, "--url")
     handoff_artifact_root = command_value_after_flag(handoff_command, "--artifact-root")
     handoff_plan_output = command_value_after_flag(handoff_command, "--plan-output")
+    handoff_plan_output_matches_contract = (
+        handoff_plan_output == WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+    )
+    handoff_plan_output_matches_plan_output = (
+        bool(handoff_plan_output)
+        and bool(plan_output)
+        and handoff_plan_output == plan_output
+    )
     handoff_prestart_summary = command_value_after_flag(
         handoff_command,
         "--prestart-summary",
@@ -3596,6 +3610,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_plan_only_missing")
     if "--plan-output" not in plan_command or not plan_output:
         violations.append("wing_readonly_preflight_plan_output_missing")
+    elif not plan_output_matches_contract:
+        violations.append("wing_readonly_preflight_plan_output_mismatch")
     if "--prestart-summary" not in plan_command or not plan_prestart_summary:
         violations.append("wing_readonly_preflight_plan_prestart_summary_missing")
     if not plan_matches_capture:
@@ -3612,6 +3628,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_handoff_packet_artifact_root_missing")
     if "--plan-output" not in handoff_command or not handoff_plan_output:
         violations.append("wing_readonly_preflight_handoff_packet_plan_output_missing")
+    elif not handoff_plan_output_matches_contract:
+        violations.append("wing_readonly_preflight_handoff_packet_plan_output_mismatch")
+    elif not handoff_plan_output_matches_plan_output:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_plan_output_not_matching_plan_command"
+        )
     if "--prestart-summary" not in handoff_command or not handoff_prestart_summary:
         violations.append("wing_readonly_preflight_handoff_packet_prestart_summary_missing")
     if not handoff_url_matches_capture:
@@ -3652,6 +3674,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_capture_physical_readback_missing")
     if "--expected-plan" not in capture_command or not capture_expected_plan:
         violations.append("wing_readonly_preflight_capture_expected_plan_missing")
+    elif not capture_expected_plan_matches_contract:
+        violations.append("wing_readonly_preflight_capture_expected_plan_output_mismatch")
     if capture_expected_plan != plan_output:
         violations.append("wing_readonly_preflight_capture_expected_plan_mismatch")
     if "--prestart-summary" not in capture_command or not capture_prestart_summary:
@@ -3757,6 +3781,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["plan_command"] = plan_command
     detail["plan_command_uses_plan_only"] = "--plan-only" in plan_command
     detail["plan_command_output"] = plan_output
+    detail["plan_command_output_matches_contract"] = plan_output_matches_contract
     detail["plan_command_channels"] = plan_channels
     detail["plan_command_operator_confirmed_channels"] = plan_confirmed_channels
     detail["plan_command_confirms_session_ready"] = plan_confirms_session_ready
@@ -3791,6 +3816,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         and capture_prestart_summary == plan_prestart_summary
     )
     detail["capture_command_expected_plan"] = capture_expected_plan
+    detail["capture_command_expected_plan_matches_contract"] = (
+        capture_expected_plan_matches_contract
+    )
     detail["capture_command_expected_plan_matches_plan_output"] = (
         bool(capture_expected_plan) and capture_expected_plan == plan_output
     )
@@ -3825,6 +3853,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         handoff_packet_output_matches_contract
     )
     detail["handoff_packet_plan_output"] = handoff_plan_output
+    detail["handoff_packet_plan_output_matches_contract"] = (
+        handoff_plan_output_matches_contract
+    )
+    detail["handoff_packet_plan_output_matches_plan_command"] = (
+        handoff_plan_output_matches_plan_output
+    )
     detail["handoff_packet_url"] = handoff_url
     detail["handoff_packet_artifact_root"] = handoff_artifact_root
     detail["handoff_packet_prestart_summary"] = handoff_prestart_summary
@@ -11711,6 +11745,9 @@ def wing_readonly_preflight_evidence_summary(
                 detail.get("plan_command_uses_plan_only") is True
             ),
             "plan_command_output": detail.get("plan_command_output"),
+            "plan_command_output_matches_contract": (
+                detail.get("plan_command_output_matches_contract") is True
+            ),
             "plan_command_channels": detail.get("plan_command_channels"),
             "plan_command_operator_confirmed_channels": detail.get(
                 "plan_command_operator_confirmed_channels"
@@ -11772,6 +11809,9 @@ def wing_readonly_preflight_evidence_summary(
                 detail.get("capture_command_prestart_summary_matches_plan") is True
             ),
             "capture_command_expected_plan": detail.get("capture_command_expected_plan"),
+            "capture_command_expected_plan_matches_contract": (
+                detail.get("capture_command_expected_plan_matches_contract") is True
+            ),
             "capture_command_expected_plan_matches_plan_output": (
                 detail.get("capture_command_expected_plan_matches_plan_output") is True
             ),
@@ -11828,6 +11868,12 @@ def wing_readonly_preflight_evidence_summary(
                 detail.get("handoff_packet_output_matches_contract") is True
             ),
             "handoff_packet_plan_output": detail.get("handoff_packet_plan_output"),
+            "handoff_packet_plan_output_matches_contract": (
+                detail.get("handoff_packet_plan_output_matches_contract") is True
+            ),
+            "handoff_packet_plan_output_matches_plan_command": (
+                detail.get("handoff_packet_plan_output_matches_plan_command") is True
+            ),
             "handoff_packet_url": detail.get("handoff_packet_url"),
             "handoff_packet_artifact_root": detail.get("handoff_packet_artifact_root"),
             "handoff_packet_prestart_summary": detail.get(
@@ -15320,6 +15366,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- plan_command_uses_plan_only: "
                 f"`{str(wing_readonly_preflight['plan_command_uses_plan_only']).lower()}`",
                 f"- plan_command_output: `{wing_readonly_preflight['plan_command_output']}`",
+                "- plan_command_output_matches_contract: "
+                f"`{str(wing_readonly_preflight['plan_command_output_matches_contract']).lower()}`",
                 f"- plan_command_channels: `{wing_readonly_preflight['plan_command_channels']}`",
                 "- plan_command_operator_confirmed_channels: "
                 f"`{wing_readonly_preflight['plan_command_operator_confirmed_channels']}`",
@@ -15351,6 +15399,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- capture_command_prestart_summary_matches_plan: "
                 f"`{str(wing_readonly_preflight['capture_command_prestart_summary_matches_plan']).lower()}`",
                 f"- capture_command_expected_plan: `{wing_readonly_preflight['capture_command_expected_plan']}`",
+                "- capture_command_expected_plan_matches_contract: "
+                f"`{str(wing_readonly_preflight['capture_command_expected_plan_matches_contract']).lower()}`",
                 "- capture_command_expected_plan_matches_plan_output: "
                 f"`{str(wing_readonly_preflight['capture_command_expected_plan_matches_plan_output']).lower()}`",
                 f"- review_tool_path: `{wing_readonly_preflight['review_tool_path']}`",
@@ -15387,6 +15437,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 "- handoff_packet_output_matches_contract: "
                 f"`{str(wing_readonly_preflight['handoff_packet_output_matches_contract']).lower()}`",
                 f"- handoff_packet_plan_output: `{wing_readonly_preflight['handoff_packet_plan_output']}`",
+                "- handoff_packet_plan_output_matches_contract: "
+                f"`{str(wing_readonly_preflight['handoff_packet_plan_output_matches_contract']).lower()}`",
+                "- handoff_packet_plan_output_matches_plan_command: "
+                f"`{str(wing_readonly_preflight['handoff_packet_plan_output_matches_plan_command']).lower()}`",
                 f"- handoff_packet_url: `{wing_readonly_preflight['handoff_packet_url']}`",
                 "- handoff_packet_artifact_root: "
                 f"`{wing_readonly_preflight['handoff_packet_artifact_root']}`",

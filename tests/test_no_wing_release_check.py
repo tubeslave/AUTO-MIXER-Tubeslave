@@ -16,6 +16,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
@@ -209,6 +210,10 @@ def test_wing_readonly_handoff_safety_contract_uses_shared_constants():
     assert (
         release_check.WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
         == WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+        == WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
     assert "apply_operator_proposal" in (
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
@@ -737,11 +742,11 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--plan-only",
         "--plan-output",
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     ]
     assert result.detail["plan_command_uses_plan_only"] is True
     assert result.detail["plan_command_output"] == (
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
     assert result.detail["plan_command_channels"] == "3"
     assert result.detail["plan_command_operator_confirmed_channels"] == "3"
@@ -772,8 +777,9 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--prestart-summary",
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--expected-plan",
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     ]
+    assert result.detail["plan_command_output_matches_contract"] is True
     assert result.detail["capture_command_channels"] == "3"
     assert result.detail["capture_command_operator_confirmed_channels"] == "3"
     assert result.detail["capture_command_requires_operator_channel_confirmation"] is True
@@ -785,8 +791,9 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     )
     assert result.detail["capture_command_prestart_summary_matches_plan"] is True
     assert result.detail["capture_command_expected_plan"] == (
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
+    assert result.detail["capture_command_expected_plan_matches_contract"] is True
     assert result.detail["capture_command_expected_plan_matches_plan_output"] is True
     assert result.detail["review_tool_path"] == (
         "tools/review_wing_readonly_preflight_artifacts.py"
@@ -845,7 +852,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
         "--plan-output",
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
         "--prestart-summary",
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         "--output",
@@ -856,8 +863,10 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     )
     assert result.detail["handoff_packet_output_matches_contract"] is True
     assert result.detail["handoff_packet_plan_output"] == (
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
+    assert result.detail["handoff_packet_plan_output_matches_contract"] is True
+    assert result.detail["handoff_packet_plan_output_matches_plan_command"] is True
     assert result.detail["handoff_packet_url"] == "ws://localhost:8765"
     assert result.detail["handoff_packet_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
@@ -3531,7 +3540,7 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_channel_mismatch(
             "--artifact-root",
             "artifacts/wing_readonly_preflight",
             "--plan-output",
-            "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+            WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
             "--output",
             WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
         ],
@@ -3569,6 +3578,34 @@ def test_no_wing_release_check_rejects_wing_preflight_handoff_output_mismatch(
     assert result.detail["handoff_packet_output_matches_contract"] is False
     assert (
         "wing_readonly_preflight_handoff_packet_output_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_handoff_plan_output_mismatch(
+    monkeypatch,
+):
+    handoff_command = release_check.wing_readonly_preflight_handoff_packet_command()
+    plan_output_index = handoff_command.index("--plan-output") + 1
+    handoff_command[plan_output_index] = (
+        "artifacts/wing_readonly_preflight_plan/stale_plan.json"
+    )
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_handoff_packet_command",
+        lambda: handoff_command,
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["handoff_packet_plan_output"] == (
+        "artifacts/wing_readonly_preflight_plan/stale_plan.json"
+    )
+    assert result.detail["handoff_packet_plan_output_matches_contract"] is False
+    assert result.detail["handoff_packet_plan_output_matches_plan_command"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_plan_output_mismatch"
         in result.detail["violations"]
     )
 
@@ -6538,7 +6575,7 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
                 "--prestart-summary",
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--expected-plan",
-                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+                WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
             ],
             "rationale": "read-only preflight required",
             "prerequisites": ["operator present"],
@@ -8545,10 +8582,11 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--plan-only",
                 "--plan-output",
-                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+                WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
             ],
             "plan_command_uses_plan_only": True,
-            "plan_command_output": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+            "plan_command_output": WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+            "plan_command_output_matches_contract": True,
             "plan_command_channels": "3",
             "plan_command_operator_confirmed_channels": "3",
             "plan_command_confirms_session_ready": True,
@@ -8587,7 +8625,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--prestart-summary",
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--expected-plan",
-                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+                WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
             ],
             "capture_command_channels": "3",
             "capture_command_operator_confirmed_channels": "3",
@@ -8599,7 +8637,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
             ),
             "capture_command_prestart_summary_matches_plan": True,
-            "capture_command_expected_plan": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+            "capture_command_expected_plan": WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+            "capture_command_expected_plan_matches_contract": True,
             "capture_command_expected_plan_matches_plan_output": True,
             "review_tool_path": "tools/review_wing_readonly_preflight_artifacts.py",
             "review_tool_available": True,
@@ -8667,7 +8706,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
                 "--plan-output",
-                "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+                WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
                 "--prestart-summary",
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
                 "--output",
@@ -8678,8 +8717,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             ),
             "handoff_packet_output_matches_contract": True,
             "handoff_packet_plan_output": (
-                "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+                WING_READONLY_PREFLIGHT_PLAN_OUTPUT
             ),
+            "handoff_packet_plan_output_matches_contract": True,
+            "handoff_packet_plan_output_matches_plan_command": True,
             "handoff_packet_url": "ws://localhost:8765",
             "handoff_packet_artifact_root": "artifacts/wing_readonly_preflight",
             "handoff_packet_prestart_summary": (
@@ -8730,8 +8771,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "--plan-only" in preflight["plan_command"]
     assert preflight["plan_command_uses_plan_only"] is True
     assert preflight["plan_command_output"] == (
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
+    assert preflight["plan_command_output_matches_contract"] is True
     assert preflight["plan_command_channels"] == "3"
     assert preflight["plan_command_operator_confirmed_channels"] == "3"
     assert preflight["plan_command_confirms_session_ready"] is True
@@ -8769,8 +8811,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert preflight["capture_command_prestart_summary_matches_plan"] is True
     assert preflight["capture_command_expected_plan"] == (
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
+    assert preflight["capture_command_expected_plan_matches_contract"] is True
     assert preflight["capture_command_expected_plan_matches_plan_output"] is True
     assert preflight["review_tool_path"] == (
         "tools/review_wing_readonly_preflight_artifacts.py"
@@ -8819,8 +8862,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert preflight["handoff_packet_output_matches_contract"] is True
     assert preflight["handoff_packet_plan_output"] == (
-        "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
+    assert preflight["handoff_packet_plan_output_matches_contract"] is True
+    assert preflight["handoff_packet_plan_output_matches_plan_command"] is True
     assert preflight["handoff_packet_url"] == "ws://localhost:8765"
     assert preflight["handoff_packet_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
@@ -8848,6 +8893,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "capture_tool_path: `tools/wing_readonly_preflight_runner.py`" in markdown_summary
     assert "plan_command_uses_plan_only: `true`" in markdown_summary
     assert "wing_readonly_preflight_plan/latest_plan.json" in markdown_summary
+    assert "plan_command_output_matches_contract: `true`" in markdown_summary
     assert "plan_command_matches_capture: `true`" in markdown_summary
     assert "prestart_backend_port_check_required: `true`" in markdown_summary
     assert (
@@ -8866,6 +8912,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "--require-physical-readback" in markdown_summary
     assert "--prestart-summary" in markdown_summary
     assert "capture_command_prestart_summary_matches_plan: `true`" in markdown_summary
+    assert (
+        "capture_command_expected_plan_matches_contract: `true`"
+        in markdown_summary
+    )
     assert (
         "review_tool_path: `tools/review_wing_readonly_preflight_artifacts.py`"
         in markdown_summary
@@ -8898,6 +8948,11 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md" in markdown_summary
     assert "handoff_packet_plan_output" in markdown_summary
     assert "handoff_packet_output_matches_contract: `true`" in markdown_summary
+    assert "handoff_packet_plan_output_matches_contract: `true`" in markdown_summary
+    assert (
+        "handoff_packet_plan_output_matches_plan_command: `true`"
+        in markdown_summary
+    )
     assert "handoff_packet_url: `ws://localhost:8765`" in markdown_summary
     assert (
         "handoff_packet_artifact_root: `artifacts/wing_readonly_preflight`"

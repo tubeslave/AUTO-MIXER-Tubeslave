@@ -60,6 +60,9 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT = (
 WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT = (
     "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
 )
+WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
+    "artifacts/wing_readonly_preflight_plan/latest_plan.json"
+)
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"
 )
