@@ -193,6 +193,10 @@ you want the background automation active.
   `expected_plan_required_for_real_run: true`.
   This keeps the real read-only preflight tied to the offline expected plan.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `physical_preflight_requires_existing_backend_connection: true`.
+  This keeps the physical read-only preflight tied to the intended existing
+  backend/WING session.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

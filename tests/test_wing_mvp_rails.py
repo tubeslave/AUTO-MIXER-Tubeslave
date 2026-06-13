@@ -64,6 +64,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "executes_tests: false" in text
     assert "operator_required: true" in text
     assert "expected_plan_required_for_real_run: true" in text
+    assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "execution_allowed_by_packet: false" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text
@@ -155,6 +156,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "executes_tests: false" in rows[0]["next action"]
     assert "operator_required: true" in rows[0]["next action"]
     assert "expected_plan_required_for_real_run: true" in rows[0]["next action"]
+    assert (
+        "physical_preflight_requires_existing_backend_connection: true"
+        in rows[0]["next action"]
+    )
     assert "execution_allowed_by_packet: false" in rows[0]["next action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in rows[0][
         "next action"
@@ -327,6 +332,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "executes_tests: false" in readonly
     assert "operator_required: true" in readonly
     assert "expected_plan_required_for_real_run: true" in readonly
+    assert "physical_preflight_requires_existing_backend_connection: true" in readonly
     assert "execution_allowed_by_packet: false" in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert "required_supervised_prestart_gate_markers" in readonly
@@ -392,6 +398,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "executes_tests: false" in report
     assert "operator_required: true" in report
     assert "expected_plan_required_for_real_run: true" in report
+    assert "physical_preflight_requires_existing_backend_connection: true" in report
     assert "execution_allowed_by_packet: false" in report
     assert "backend_port_prestart_check_operator_sequence_step" in report
     assert "prestart_backend_port_check" in report
@@ -501,6 +508,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "executes_tests: false" in text
     assert "operator_required: true" in text
     assert "expected_plan_required_for_real_run: true" in text
+    assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "execution_allowed_by_packet: false" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text

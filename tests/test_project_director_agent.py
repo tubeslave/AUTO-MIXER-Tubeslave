@@ -87,6 +87,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "executes_tests: false" in directive["selected_action"]
     assert "operator_required: true" in directive["selected_action"]
     assert "expected_plan_required_for_real_run: true" in directive["selected_action"]
+    assert (
+        "physical_preflight_requires_existing_backend_connection: true"
+        in directive["selected_action"]
+    )
     assert "execution_allowed_by_packet: false" in directive["selected_action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
@@ -297,6 +301,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "executes_tests: false" in prompt
     assert "operator_required: true" in prompt
     assert "expected_plan_required_for_real_run: true" in prompt
+    assert "physical_preflight_requires_existing_backend_connection: true" in prompt
     assert "execution_allowed_by_packet: false" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_check_operator_sequence_step" in prompt
@@ -335,6 +340,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "executes_tests: false" in readme
     assert "operator_required: true" in readme
     assert "expected_plan_required_for_real_run: true" in readme
+    assert "physical_preflight_requires_existing_backend_connection: true" in readme
     assert "execution_allowed_by_packet: false" in readme
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme
     assert "backend_port_prestart_check_operator_sequence_step" in readme
