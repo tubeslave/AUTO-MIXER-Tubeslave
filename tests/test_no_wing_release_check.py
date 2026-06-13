@@ -40,6 +40,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
@@ -3858,6 +3860,95 @@ def test_no_wing_release_check_rejects_wing_preflight_runner_supported_value_typ
     assert result.detail["runner_supported_value_types_match_contract"] is False
     assert (
         "wing_readonly_preflight_runner_supported_value_types_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_tracks_wing_preflight_run_summary_contract():
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["expected_run_summary_status"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    )
+    assert result.detail["expected_run_summary_reason"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+    )
+    assert result.detail["runner_run_summary_status"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    )
+    assert result.detail["runner_run_summary_reason"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+    )
+    assert result.detail["evidence_expected_run_summary_status"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    )
+    assert result.detail["evidence_expected_run_summary_reason"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+    )
+    assert result.detail["runner_run_summary_status_match_contract"] is True
+    assert result.detail["runner_run_summary_reason_match_contract"] is True
+    assert result.detail["evidence_run_summary_status_match_contract"] is True
+    assert result.detail["evidence_run_summary_reason_match_contract"] is True
+
+
+def test_no_wing_release_check_rejects_wing_preflight_runner_run_summary_contract_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_runner_run_summary_contract",
+        lambda: {"status": "blocked", "reason": "wing_readonly_preflight_blocked"},
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["runner_run_summary_status"] == "blocked"
+    assert result.detail["runner_run_summary_reason"] == (
+        "wing_readonly_preflight_blocked"
+    )
+    assert result.detail["runner_run_summary_status_match_contract"] is False
+    assert result.detail["runner_run_summary_reason_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_runner_run_summary_status_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_runner_run_summary_reason_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_evidence_run_summary_contract_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_EVIDENCE_EXPECTED_RUN_SUMMARY_STATUS",
+        "blocked",
+    )
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_EVIDENCE_EXPECTED_RUN_SUMMARY_REASON",
+        "wing_readonly_preflight_blocked",
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["evidence_expected_run_summary_status"] == "blocked"
+    assert result.detail["evidence_expected_run_summary_reason"] == (
+        "wing_readonly_preflight_blocked"
+    )
+    assert result.detail["evidence_run_summary_status_match_contract"] is False
+    assert result.detail["evidence_run_summary_reason_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_evidence_run_summary_status_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_evidence_run_summary_reason_mismatch"
         in result.detail["violations"]
     )
 
@@ -8938,6 +9029,20 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
             ),
             "runner_supported_value_types_match_contract": True,
+            "expected_run_summary_status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
+            "expected_run_summary_reason": WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+            "runner_run_summary_status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
+            "runner_run_summary_reason": WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+            "evidence_expected_run_summary_status": (
+                WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+            ),
+            "evidence_expected_run_summary_reason": (
+                WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+            ),
+            "runner_run_summary_status_match_contract": True,
+            "runner_run_summary_reason_match_contract": True,
+            "evidence_run_summary_status_match_contract": True,
+            "evidence_run_summary_reason_match_contract": True,
             "expected_physical_readback_statuses": sorted(
                 WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
             ),
@@ -9162,6 +9267,28 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
     )
     assert preflight["runner_supported_value_types_match_contract"] is True
+    assert preflight["expected_run_summary_status"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    )
+    assert preflight["expected_run_summary_reason"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+    )
+    assert preflight["runner_run_summary_status"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    )
+    assert preflight["runner_run_summary_reason"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+    )
+    assert preflight["evidence_expected_run_summary_status"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    )
+    assert preflight["evidence_expected_run_summary_reason"] == (
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+    )
+    assert preflight["runner_run_summary_status_match_contract"] is True
+    assert preflight["runner_run_summary_reason_match_contract"] is True
+    assert preflight["evidence_run_summary_status_match_contract"] is True
+    assert preflight["evidence_run_summary_reason_match_contract"] is True
     assert preflight["expected_physical_readback_statuses"] == sorted(
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
     )
@@ -9316,6 +9443,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "expected_target_defaults" in markdown_summary
     assert "runner_argparse_target_defaults_match_contract: `true`" in markdown_summary
     assert "runner_supported_value_types_match_contract: `true`" in markdown_summary
+    assert "runner_run_summary_status_match_contract: `true`" in markdown_summary
+    assert "runner_run_summary_reason_match_contract: `true`" in markdown_summary
+    assert "evidence_run_summary_status_match_contract: `true`" in markdown_summary
+    assert "evidence_run_summary_reason_match_contract: `true`" in markdown_summary
     assert "runner_physical_readback_statuses_match_contract: `true`" in markdown_summary
     assert "runner_physical_readback_sources_match_contract: `true`" in markdown_summary
     assert "evidence_physical_readback_statuses_match_contract: `true`" in markdown_summary

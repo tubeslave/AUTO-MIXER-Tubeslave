@@ -27,6 +27,8 @@ try:
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
@@ -43,6 +45,8 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+        WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
@@ -96,6 +100,8 @@ FORBIDDEN_REQUEST_TYPES = {
 }
 PHYSICAL_READBACK_STATUSES = set(WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES)
 PHYSICAL_READBACK_SOURCES = set(WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES)
+EXPECTED_RUN_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+EXPECTED_RUN_SUMMARY_REASON = WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 MUTATION_EVIDENCE_FIELDS = {
     "apply_result",
     "rollback_result",
@@ -940,9 +946,9 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("schema_not_wing_readonly_preflight_v1")
     if payload.get("proof_runner") != WING_READONLY_PREFLIGHT_RUNNER:
         violations.append("proof_runner_not_wing_readonly_preflight_runner")
-    if payload.get("status") != "passed":
+    if payload.get("status") != EXPECTED_RUN_SUMMARY_STATUS:
         violations.append("status_not_passed")
-    if payload.get("reason") != "wing_readonly_preflight_passed":
+    if payload.get("reason") != EXPECTED_RUN_SUMMARY_REASON:
         violations.append("reason_not_passed")
     captured_at = payload.get("captured_at")
     if not isinstance(captured_at, str) or not captured_at:

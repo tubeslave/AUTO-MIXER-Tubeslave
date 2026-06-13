@@ -38,6 +38,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
@@ -61,6 +63,8 @@ PRESTART_SUMMARY_BACKEND_CHECK_NAME = (
 PRESTART_SUMMARY_BACKEND_CHECK_STATUS = (
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
 )
+RUN_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+RUN_SUMMARY_REASON = WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",
     "set_gain",
@@ -937,9 +941,9 @@ async def run(args: argparse.Namespace) -> int:
             forbidden_sent = sorted(set(recorder.sent_request_types).intersection(FORBIDDEN_REQUEST_TYPES))
             if forbidden_sent:
                 blockers.append("forbidden_request_type_sent")
-            status = "passed" if not blockers else "blocked"
+            status = RUN_SUMMARY_STATUS if not blockers else "blocked"
             reason = (
-                "wing_readonly_preflight_passed"
+                RUN_SUMMARY_REASON
                 if not blockers
                 else "wing_readonly_preflight_blocked"
             )

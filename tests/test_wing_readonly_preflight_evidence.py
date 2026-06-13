@@ -13,6 +13,8 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
     EXPECTED_SELECTED_MVP_BLOCKER,
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
+    EXPECTED_RUN_SUMMARY_REASON,
+    EXPECTED_RUN_SUMMARY_STATUS,
     PHYSICAL_READBACK_SOURCES,
     PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
@@ -23,6 +25,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
 )
 from backend.processing_registry import (
@@ -48,11 +52,16 @@ def test_preflight_evidence_uses_shared_value_type_contract():
     )
 
 
+def test_preflight_evidence_uses_shared_run_summary_contract():
+    assert EXPECTED_RUN_SUMMARY_STATUS == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    assert EXPECTED_RUN_SUMMARY_REASON == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+
+
 def _valid_summary() -> dict:
     return {
         "run_id": "20260606T120000Z_wing_readonly_preflight",
-        "status": "passed",
-        "reason": "wing_readonly_preflight_passed",
+        "status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
+        "reason": WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
         "captured_at": "2026-06-07T01:00:00Z",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",

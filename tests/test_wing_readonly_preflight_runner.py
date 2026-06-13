@@ -19,6 +19,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+    WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
@@ -83,6 +85,11 @@ def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebS
         return FakeWebSocketConnect(websocket)
 
     monkeypatch.setattr(runner.websockets, "connect", fake_connect)
+
+
+def test_runner_uses_shared_run_summary_contract() -> None:
+    assert runner.RUN_SUMMARY_STATUS == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    assert runner.RUN_SUMMARY_REASON == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 
 
 def prestart_summary_path(tmp_path: Path) -> Path:
@@ -388,8 +395,8 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "query_mixer_parameter",
     ]
     summary = read_summary(tmp_path)
-    assert summary["status"] == "passed"
-    assert summary["reason"] == "wing_readonly_preflight_passed"
+    assert summary["status"] == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    assert summary["reason"] == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
     assert summary["captured_at"].endswith("Z")
     assert summary["connection_mode"] == "wing"
     assert summary["operator_channel_confirmation_required"] is True
@@ -507,8 +514,8 @@ async def test_readonly_preflight_passes_with_state_unavailable_but_readbacks(
         "query_mixer_parameter",
     ]
     summary = read_summary(tmp_path)
-    assert summary["status"] == "passed"
-    assert summary["reason"] == "wing_readonly_preflight_passed"
+    assert summary["status"] == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    assert summary["reason"] == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
     assert summary["captured_at"].endswith("Z")
     assert summary["connection_mode"] == "wing"
     assert summary["operator_channel_confirmation_required"] is True
