@@ -69,6 +69,15 @@ WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = ("fader", "gain", "pan")
 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = ",".join(
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
 )
+WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES = (
+    "verified_from_physical_readback",
+)
+WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES = (
+    "physical_readback",
+    "wing_physical_readback",
+    "physical_wing",
+    "wing",
+)
 WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"

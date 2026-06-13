@@ -12,11 +12,15 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
     EXPECTED_SELECTED_MVP_BLOCKER,
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
+    PHYSICAL_READBACK_SOURCES,
+    PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
     build_wing_readonly_preflight_evidence,
     validate_wing_readonly_preflight_artifact,
 )
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
+    WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
 )
 from backend.processing_registry import (
@@ -25,6 +29,15 @@ from backend.processing_registry import (
     get_processing_method,
 )
 from backend.project_goal_capability_matrix import get_project_goal_capability
+
+
+def test_preflight_evidence_uses_shared_physical_readback_contract():
+    assert PHYSICAL_READBACK_STATUSES == set(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+    )
+    assert PHYSICAL_READBACK_SOURCES == set(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
 
 
 def _valid_summary() -> dict:

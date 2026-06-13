@@ -291,6 +291,8 @@ from backend.user_presets_physical_readback_artifact_intake import (  # noqa: E4
 )
 from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     EVIDENCE_STATUSES as WING_READONLY_PREFLIGHT_EVIDENCE_STATUSES,
+    PHYSICAL_READBACK_SOURCES as WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_SOURCES,
+    PHYSICAL_READBACK_STATUSES as WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
     build_wing_readonly_preflight_evidence,
 )
@@ -354,6 +356,12 @@ WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = (
 )
 WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = (
     preflight_contract.WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+)
+WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+)
+WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
 )
 WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = (
     preflight_contract.WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
@@ -662,6 +670,26 @@ def wing_readonly_preflight_runner_supported_value_types() -> list[str]:
     if not isinstance(supported, (set, tuple, list)):
         return []
     return sorted(str(item) for item in supported if isinstance(item, str) and item)
+
+
+def wing_readonly_preflight_runner_physical_readback_contract() -> dict[str, list[str]]:
+    runner_tool = load_wing_readonly_preflight_runner_tool()
+    if runner_tool is None:
+        return {"statuses": [], "sources": []}
+    statuses = getattr(runner_tool, "PHYSICAL_READBACK_STATUSES", None)
+    sources = getattr(runner_tool, "PHYSICAL_READBACK_SOURCES", None)
+    if not isinstance(statuses, (set, tuple, list)):
+        statuses = []
+    if not isinstance(sources, (set, tuple, list)):
+        sources = []
+    return {
+        "statuses": sorted(
+            str(item) for item in statuses if isinstance(item, str) and item
+        ),
+        "sources": sorted(
+            str(item) for item in sources if isinstance(item, str) and item
+        ),
+    }
 
 
 def wing_readonly_preflight_review_command() -> list[str]:
@@ -3662,6 +3690,21 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     runner_supported_value_types = (
         wing_readonly_preflight_runner_supported_value_types()
     )
+    expected_physical_readback_statuses = sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+    )
+    expected_physical_readback_sources = sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
+    runner_physical_readback_contract = (
+        wing_readonly_preflight_runner_physical_readback_contract()
+    )
+    evidence_physical_readback_statuses = sorted(
+        WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_STATUSES
+    )
+    evidence_physical_readback_sources = sorted(
+        WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_SOURCES
+    )
     plan_target_defaults = {
         "url": plan_url,
         "channels": plan_channels,
@@ -3694,6 +3737,20 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     runner_supported_value_types_match_contract = (
         runner_supported_value_types == expected_supported_value_types
+    )
+    runner_physical_readback_statuses_match_contract = (
+        runner_physical_readback_contract.get("statuses")
+        == expected_physical_readback_statuses
+    )
+    runner_physical_readback_sources_match_contract = (
+        runner_physical_readback_contract.get("sources")
+        == expected_physical_readback_sources
+    )
+    evidence_physical_readback_statuses_match_contract = (
+        evidence_physical_readback_statuses == expected_physical_readback_statuses
+    )
+    evidence_physical_readback_sources_match_contract = (
+        evidence_physical_readback_sources == expected_physical_readback_sources
     )
     handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
     handoff_value_types_match_capture = (
@@ -3737,6 +3794,22 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     if not runner_supported_value_types_match_contract:
         violations.append(
             "wing_readonly_preflight_runner_supported_value_types_mismatch"
+        )
+    if not runner_physical_readback_statuses_match_contract:
+        violations.append(
+            "wing_readonly_preflight_runner_physical_readback_statuses_mismatch"
+        )
+    if not runner_physical_readback_sources_match_contract:
+        violations.append(
+            "wing_readonly_preflight_runner_physical_readback_sources_mismatch"
+        )
+    if not evidence_physical_readback_statuses_match_contract:
+        violations.append(
+            "wing_readonly_preflight_evidence_physical_readback_statuses_mismatch"
+        )
+    if not evidence_physical_readback_sources_match_contract:
+        violations.append(
+            "wing_readonly_preflight_evidence_physical_readback_sources_mismatch"
         )
     if not plan_matches_capture:
         violations.append("wing_readonly_preflight_plan_command_mismatch")
@@ -3915,6 +3988,36 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["runner_supported_value_types"] = list(runner_supported_value_types)
     detail["runner_supported_value_types_match_contract"] = (
         runner_supported_value_types_match_contract
+    )
+    detail["expected_physical_readback_statuses"] = list(
+        expected_physical_readback_statuses
+    )
+    detail["expected_physical_readback_sources"] = list(
+        expected_physical_readback_sources
+    )
+    detail["runner_physical_readback_statuses"] = list(
+        runner_physical_readback_contract.get("statuses", [])
+    )
+    detail["runner_physical_readback_sources"] = list(
+        runner_physical_readback_contract.get("sources", [])
+    )
+    detail["runner_physical_readback_statuses_match_contract"] = (
+        runner_physical_readback_statuses_match_contract
+    )
+    detail["runner_physical_readback_sources_match_contract"] = (
+        runner_physical_readback_sources_match_contract
+    )
+    detail["evidence_physical_readback_statuses"] = list(
+        evidence_physical_readback_statuses
+    )
+    detail["evidence_physical_readback_sources"] = list(
+        evidence_physical_readback_sources
+    )
+    detail["evidence_physical_readback_statuses_match_contract"] = (
+        evidence_physical_readback_statuses_match_contract
+    )
+    detail["evidence_physical_readback_sources_match_contract"] = (
+        evidence_physical_readback_sources_match_contract
     )
     detail["plan_command_target_defaults"] = dict(plan_target_defaults)
     detail["plan_command_target_defaults_match_contract"] = (
@@ -11919,6 +12022,48 @@ def wing_readonly_preflight_evidence_summary(
             "runner_supported_value_types_match_contract": (
                 detail.get("runner_supported_value_types_match_contract") is True
             ),
+            "expected_physical_readback_statuses": (
+                list(detail.get("expected_physical_readback_statuses"))
+                if isinstance(detail.get("expected_physical_readback_statuses"), list)
+                else []
+            ),
+            "expected_physical_readback_sources": (
+                list(detail.get("expected_physical_readback_sources"))
+                if isinstance(detail.get("expected_physical_readback_sources"), list)
+                else []
+            ),
+            "runner_physical_readback_statuses": (
+                list(detail.get("runner_physical_readback_statuses"))
+                if isinstance(detail.get("runner_physical_readback_statuses"), list)
+                else []
+            ),
+            "runner_physical_readback_sources": (
+                list(detail.get("runner_physical_readback_sources"))
+                if isinstance(detail.get("runner_physical_readback_sources"), list)
+                else []
+            ),
+            "runner_physical_readback_statuses_match_contract": (
+                detail.get("runner_physical_readback_statuses_match_contract") is True
+            ),
+            "runner_physical_readback_sources_match_contract": (
+                detail.get("runner_physical_readback_sources_match_contract") is True
+            ),
+            "evidence_physical_readback_statuses": (
+                list(detail.get("evidence_physical_readback_statuses"))
+                if isinstance(detail.get("evidence_physical_readback_statuses"), list)
+                else []
+            ),
+            "evidence_physical_readback_sources": (
+                list(detail.get("evidence_physical_readback_sources"))
+                if isinstance(detail.get("evidence_physical_readback_sources"), list)
+                else []
+            ),
+            "evidence_physical_readback_statuses_match_contract": (
+                detail.get("evidence_physical_readback_statuses_match_contract") is True
+            ),
+            "evidence_physical_readback_sources_match_contract": (
+                detail.get("evidence_physical_readback_sources_match_contract") is True
+            ),
             "plan_command_target_defaults": (
                 dict(detail.get("plan_command_target_defaults"))
                 if isinstance(detail.get("plan_command_target_defaults"), Mapping)
@@ -15577,6 +15722,26 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['runner_supported_value_types'])}`",
                 "- runner_supported_value_types_match_contract: "
                 f"`{str(wing_readonly_preflight['runner_supported_value_types_match_contract']).lower()}`",
+                "- expected_physical_readback_statuses: "
+                f"`{json.dumps(wing_readonly_preflight['expected_physical_readback_statuses'])}`",
+                "- expected_physical_readback_sources: "
+                f"`{json.dumps(wing_readonly_preflight['expected_physical_readback_sources'])}`",
+                "- runner_physical_readback_statuses: "
+                f"`{json.dumps(wing_readonly_preflight['runner_physical_readback_statuses'])}`",
+                "- runner_physical_readback_sources: "
+                f"`{json.dumps(wing_readonly_preflight['runner_physical_readback_sources'])}`",
+                "- runner_physical_readback_statuses_match_contract: "
+                f"`{str(wing_readonly_preflight['runner_physical_readback_statuses_match_contract']).lower()}`",
+                "- runner_physical_readback_sources_match_contract: "
+                f"`{str(wing_readonly_preflight['runner_physical_readback_sources_match_contract']).lower()}`",
+                "- evidence_physical_readback_statuses: "
+                f"`{json.dumps(wing_readonly_preflight['evidence_physical_readback_statuses'])}`",
+                "- evidence_physical_readback_sources: "
+                f"`{json.dumps(wing_readonly_preflight['evidence_physical_readback_sources'])}`",
+                "- evidence_physical_readback_statuses_match_contract: "
+                f"`{str(wing_readonly_preflight['evidence_physical_readback_statuses_match_contract']).lower()}`",
+                "- evidence_physical_readback_sources_match_contract: "
+                f"`{str(wing_readonly_preflight['evidence_physical_readback_sources_match_contract']).lower()}`",
                 "- plan_command_target_defaults: "
                 f"`{json.dumps(wing_readonly_preflight['plan_command_target_defaults'], sort_keys=True)}`",
                 "- plan_command_target_defaults_match_contract: "

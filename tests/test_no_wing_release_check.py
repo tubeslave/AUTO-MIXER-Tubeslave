@@ -17,6 +17,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
+    WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
@@ -3726,6 +3728,55 @@ def test_no_wing_release_check_rejects_wing_preflight_runner_supported_value_typ
     assert result.detail["runner_supported_value_types_match_contract"] is False
     assert (
         "wing_readonly_preflight_runner_supported_value_types_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_runner_physical_readback_contract_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_runner_physical_readback_contract",
+        lambda: {
+            "statuses": [],
+            "sources": sorted(WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES),
+        },
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["expected_physical_readback_statuses"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+    )
+    assert result.detail["runner_physical_readback_statuses"] == []
+    assert result.detail["runner_physical_readback_statuses_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_runner_physical_readback_statuses_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_evidence_physical_readback_contract_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_SOURCES",
+        {"physical_readback"},
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["expected_physical_readback_sources"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
+    assert result.detail["evidence_physical_readback_sources"] == ["physical_readback"]
+    assert result.detail["evidence_physical_readback_sources_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_evidence_physical_readback_sources_mismatch"
         in result.detail["violations"]
     )
 
@@ -8721,6 +8772,28 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
             ),
             "runner_supported_value_types_match_contract": True,
+            "expected_physical_readback_statuses": sorted(
+                WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+            ),
+            "expected_physical_readback_sources": sorted(
+                WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+            ),
+            "runner_physical_readback_statuses": sorted(
+                WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+            ),
+            "runner_physical_readback_sources": sorted(
+                WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+            ),
+            "runner_physical_readback_statuses_match_contract": True,
+            "runner_physical_readback_sources_match_contract": True,
+            "evidence_physical_readback_statuses": sorted(
+                WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+            ),
+            "evidence_physical_readback_sources": sorted(
+                WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+            ),
+            "evidence_physical_readback_statuses_match_contract": True,
+            "evidence_physical_readback_sources_match_contract": True,
             "plan_command_target_defaults": expected_target_defaults,
             "plan_command_target_defaults_match_contract": True,
             "plan_command_output": WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
@@ -8923,6 +8996,28 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
     )
     assert preflight["runner_supported_value_types_match_contract"] is True
+    assert preflight["expected_physical_readback_statuses"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+    )
+    assert preflight["expected_physical_readback_sources"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
+    assert preflight["runner_physical_readback_statuses"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+    )
+    assert preflight["runner_physical_readback_sources"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
+    assert preflight["runner_physical_readback_statuses_match_contract"] is True
+    assert preflight["runner_physical_readback_sources_match_contract"] is True
+    assert preflight["evidence_physical_readback_statuses"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
+    )
+    assert preflight["evidence_physical_readback_sources"] == sorted(
+        WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
+    assert preflight["evidence_physical_readback_statuses_match_contract"] is True
+    assert preflight["evidence_physical_readback_sources_match_contract"] is True
     assert preflight["plan_command_target_defaults"] == expected_target_defaults
     assert preflight["plan_command_target_defaults_match_contract"] is True
     assert preflight["plan_command_output"] == (
@@ -9055,6 +9150,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "expected_target_defaults" in markdown_summary
     assert "runner_argparse_target_defaults_match_contract: `true`" in markdown_summary
     assert "runner_supported_value_types_match_contract: `true`" in markdown_summary
+    assert "runner_physical_readback_statuses_match_contract: `true`" in markdown_summary
+    assert "runner_physical_readback_sources_match_contract: `true`" in markdown_summary
+    assert "evidence_physical_readback_statuses_match_contract: `true`" in markdown_summary
+    assert "evidence_physical_readback_sources_match_contract: `true`" in markdown_summary
     assert "plan_command_target_defaults_match_contract: `true`" in markdown_summary
     assert "wing_readonly_preflight_plan/latest_plan.json" in markdown_summary
     assert "plan_command_output_matches_contract: `true`" in markdown_summary
