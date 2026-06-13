@@ -244,6 +244,16 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"  - status: `{row.get('status')}`",
                     f"  - run_id: `{row.get('run_id')}`",
                     f"  - summary_path: `{row.get('summary_path')}`",
+                    "  - expected_artifacts: "
+                    f"`{json.dumps(row.get('expected_artifacts') or [])}`",
+                    "  - expected_summary_artifact: "
+                    f"`{row.get('expected_summary_artifact')}`",
+                    "  - expected_events_artifact: "
+                    f"`{row.get('expected_events_artifact')}`",
+                    "  - summary_path_matches_expected_artifact: "
+                    f"`{str(row.get('summary_path_matches_expected_artifact') is True).lower()}`",
+                    "  - events_path_matches_expected_artifact: "
+                    f"`{str(row.get('events_path_matches_expected_artifact') is True).lower()}`",
                     "  - backend_port_prestart_check_required: "
                     f"`{str(row.get('backend_port_prestart_check_required') is True).lower()}`",
                     "  - backend_port_prestart_check_must_pass_before_starting_backend: "

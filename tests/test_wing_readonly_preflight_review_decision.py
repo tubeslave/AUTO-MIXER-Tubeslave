@@ -8,10 +8,12 @@ from backend.wing_readonly_preflight_evidence import (
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
 from backend.wing_readonly_preflight_review_decision import (
@@ -32,6 +34,14 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
     source_id = "artifacts/wing_readonly_preflight/run/summary.json"
     candidate_review = {
         "source_id": source_id,
+        "expected_artifacts": [
+            f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+            f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+        ],
+        "expected_summary_artifact": source_id,
+        "expected_events_artifact": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "summary_path_matches_expected_artifact": True,
+        "events_path_matches_expected_artifact": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(
@@ -69,6 +79,17 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         wing_readonly_preflight_accepted_candidate_prestart_source_ids(
             [source_id],
             [forged_review],
+        )
+        == []
+    )
+    unbound_review = dict(
+        candidate_review,
+        summary_path_matches_expected_artifact=False,
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            [source_id],
+            [unbound_review],
         )
         == []
     )
@@ -166,10 +187,24 @@ def _valid_summary() -> dict:
 
 
 def _evidence_with_candidate() -> dict:
-    return build_wing_readonly_preflight_evidence(
+    evidence = build_wing_readonly_preflight_evidence(
         artifact_payloads=(_valid_summary(),),
         artifact_roots=(),
     )
+    candidate = evidence["artifacts"][0]
+    candidate["expected_artifacts"] = [
+        "artifacts/wing_readonly_preflight/<run_id>/summary.json",
+        "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
+    ]
+    candidate["expected_summary_artifact"] = (
+        "artifacts/wing_readonly_preflight/run/summary.json"
+    )
+    candidate["expected_events_artifact"] = (
+        "artifacts/wing_readonly_preflight/run/events.jsonl"
+    )
+    candidate["summary_path_matches_expected_artifact"] = True
+    candidate["events_path_matches_expected_artifact"] = True
+    return evidence
 
 
 def _accepted_record(**overrides) -> dict:
@@ -237,6 +272,18 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
             "summary_sha256": "1" * 64,
             "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
             "events_sha256": "2" * 64,
+            "expected_artifacts": [
+                "artifacts/wing_readonly_preflight/<run_id>/summary.json",
+                "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
+            ],
+            "expected_summary_artifact": (
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ),
+            "expected_events_artifact": (
+                "artifacts/wing_readonly_preflight/run/events.jsonl"
+            ),
+            "summary_path_matches_expected_artifact": True,
+            "events_path_matches_expected_artifact": True,
             "backend_port_prestart_check_required": True,
             "backend_port_prestart_check_must_pass_before_starting_backend": True,
             "backend_port_prestart_check_command": [
@@ -319,6 +366,26 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contr
 def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_summary_binding():
     evidence = _evidence_with_candidate()
     evidence["artifacts"][0]["backend_port_prestart_summary_sha256"] = None
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_without_expected_artifact_binding():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["summary_path_matches_expected_artifact"] = False
 
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=evidence,

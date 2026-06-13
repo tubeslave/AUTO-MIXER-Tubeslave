@@ -399,9 +399,20 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert report["accepted_source_ids"] == [str(summary_path)]
     assert report["accepted_candidate_prestart_contract_valid"] is True
     assert report["accepted_candidate_prestart_source_ids"] == [str(summary_path)]
-    assert report["candidate_reviews"][0]["backend_port_prestart_check_required"] is True
+    summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    candidate_review = report["candidate_reviews"][0]
+    assert candidate_review["expected_artifacts"] == _expected_artifacts_for_summary(
+        summary_payload
+    )
+    assert candidate_review["expected_summary_artifact"] == str(summary_path)
+    assert candidate_review["expected_events_artifact"] == str(
+        summary_path.parent / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
+    )
+    assert candidate_review["summary_path_matches_expected_artifact"] is True
+    assert candidate_review["events_path_matches_expected_artifact"] is True
+    assert candidate_review["backend_port_prestart_check_required"] is True
     assert (
-        report["candidate_reviews"][0][
+        candidate_review[
             "backend_port_prestart_check_must_pass_before_starting_backend"
         ]
         is True
@@ -412,6 +423,9 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert "accepted_candidate_prestart_contract_valid: `true`" in markdown
     assert "live_authority_granted: `false`" in markdown
     assert "Candidate Prestart Contract" in markdown
+    assert "expected_artifacts" in markdown
+    assert "summary_path_matches_expected_artifact: `true`" in markdown
+    assert "events_path_matches_expected_artifact: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
     assert "listener_processes" in markdown

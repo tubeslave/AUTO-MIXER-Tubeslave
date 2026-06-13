@@ -186,6 +186,19 @@ def _candidate_review_rows(
                 "summary_sha256": candidate.get("summary_sha256"),
                 "events_path": candidate.get("events_path"),
                 "events_sha256": candidate.get("events_sha256"),
+                "expected_artifacts": list(candidate.get("expected_artifacts") or []),
+                "expected_summary_artifact": candidate.get(
+                    "expected_summary_artifact"
+                ),
+                "expected_events_artifact": candidate.get(
+                    "expected_events_artifact"
+                ),
+                "summary_path_matches_expected_artifact": (
+                    candidate.get("summary_path_matches_expected_artifact") is True
+                ),
+                "events_path_matches_expected_artifact": (
+                    candidate.get("events_path_matches_expected_artifact") is True
+                ),
                 "backend_port_prestart_check_required": (
                     candidate.get("backend_port_prestart_check_required") is True
                 ),

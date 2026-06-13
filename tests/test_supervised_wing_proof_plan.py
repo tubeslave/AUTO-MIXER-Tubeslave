@@ -7,6 +7,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
 from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan
@@ -88,6 +89,18 @@ def accepted_review_decision_ledger() -> dict:
                 {
                     "source_id": "artifacts/wing_readonly_preflight/run/summary.json",
                     "status": "valid_readonly_preflight_artifact",
+                    "expected_artifacts": [
+                        f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+                        f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+                    ],
+                    "expected_summary_artifact": (
+                        "artifacts/wing_readonly_preflight/run/summary.json"
+                    ),
+                    "expected_events_artifact": (
+                        "artifacts/wing_readonly_preflight/run/events.jsonl"
+                    ),
+                    "summary_path_matches_expected_artifact": True,
+                    "events_path_matches_expected_artifact": True,
                     "backend_port_prestart_check_required": True,
                     "backend_port_prestart_check_must_pass_before_starting_backend": True,
                     "backend_port_prestart_check_command": list(
@@ -367,6 +380,18 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
         {
             "source_id": "artifacts/wing_readonly_preflight/run/summary.json",
             "status": "valid_readonly_preflight_artifact",
+            "expected_artifacts": [
+                f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+                f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+            ],
+            "expected_summary_artifact": (
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ),
+            "expected_events_artifact": (
+                "artifacts/wing_readonly_preflight/run/events.jsonl"
+            ),
+            "summary_path_matches_expected_artifact": True,
+            "events_path_matches_expected_artifact": True,
             "backend_port_prestart_check_required": False,
             "backend_port_prestart_check_must_pass_before_starting_backend": True,
             "backend_port_prestart_check_command": list(
@@ -424,6 +449,37 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
     ledger["summary"]["candidate_reviews"][0]["backend_port_prestart_summary_path"] = ""
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+        ]
+        is False
+    )
+    assert plan["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_source_ids"
+    ] == []
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_expected_artifact_binding():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"]["candidate_reviews"][0][
+        "summary_path_matches_expected_artifact"
+    ] = False
     readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
 
     plan = build_supervised_wing_proof_plan(

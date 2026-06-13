@@ -293,6 +293,21 @@ def _contract_string_list(value: Any) -> tuple[str, ...]:
     return tuple(str(item) for item in value if isinstance(item, str) and item)
 
 
+def _candidate_expected_artifact_binding_valid(row: Mapping[str, Any]) -> bool:
+    expected_artifacts = _contract_string_list(row.get("expected_artifacts"))
+    if len(expected_artifacts) != 2:
+        return False
+    if not str(row.get("expected_summary_artifact") or ""):
+        return False
+    if not str(row.get("expected_events_artifact") or ""):
+        return False
+    if row.get("summary_path_matches_expected_artifact") is not True:
+        return False
+    if row.get("events_path_matches_expected_artifact") is not True:
+        return False
+    return True
+
+
 def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
     accepted_source_ids: Iterable[str],
     candidate_reviews: Iterable[Mapping[str, Any]],
@@ -315,6 +330,8 @@ def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
             continue
         row = rows_by_source.get(str(source_id))
         if not isinstance(row, Mapping):
+            continue
+        if not _candidate_expected_artifact_binding_valid(row):
             continue
         if row.get("backend_port_prestart_check_required") is not True:
             continue
