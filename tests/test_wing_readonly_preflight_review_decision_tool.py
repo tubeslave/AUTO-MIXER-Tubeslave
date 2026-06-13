@@ -14,8 +14,26 @@ from backend.wing_readonly_preflight_evidence import (
 from backend.wing_readonly_preflight_review_decision import REQUIRED_REVIEW_CHECKLIST_IDS
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
+    expected_supervised_prestart_gate,
 )
 from tools import review_wing_readonly_preflight_decisions as decision_tool
+
+
+def test_decision_review_ready_status_matches_supervised_gate_contract():
+    assert decision_tool.ACCEPTED_DECISION_READY_STATUS == (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS
+    )
+    assert (
+        expected_supervised_prestart_gate()["requires_operator_decision_status"]
+        == decision_tool.ACCEPTED_DECISION_READY_STATUS
+    )
+    assert (
+        decision_tool.DECISION_REVIEW_EXIT_CODES[
+            decision_tool.ACCEPTED_DECISION_READY_STATUS
+        ]
+        == 0
+    )
 
 
 def _valid_summary() -> dict:
@@ -341,7 +359,7 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     )
 
     assert report["type"] == "wing_readonly_preflight_review_decision_report"
-    assert report["status"] == "accepted_decision_ready"
+    assert report["status"] == decision_tool.ACCEPTED_DECISION_READY_STATUS
     assert report["ledger_status"] == "operator_review_decision_records_available"
     assert report["read_only"] is True
     assert report["live_write"] is False
@@ -365,7 +383,7 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     )
     assert decision_tool.exit_code_for_report(report) == 0
     markdown = decision_tool.render_markdown(report)
-    assert "accepted_decision_ready" in markdown
+    assert decision_tool.ACCEPTED_DECISION_READY_STATUS in markdown
     assert "accepted_candidate_prestart_contract_valid: `true`" in markdown
     assert "live_authority_granted: `false`" in markdown
     assert "Candidate Prestart Contract" in markdown

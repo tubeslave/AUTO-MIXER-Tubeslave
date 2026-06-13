@@ -27,6 +27,7 @@ from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
 )
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
 )
 
 
@@ -36,8 +37,11 @@ DEFAULT_OUTPUT = (
     / "wing_readonly_preflight_review_decisions"
     / "latest_decision_review.md"
 )
+ACCEPTED_DECISION_READY_STATUS = (
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS
+)
 DECISION_REVIEW_EXIT_CODES = {
-    "accepted_decision_ready": 0,
+    ACCEPTED_DECISION_READY_STATUS: 0,
     "preflight_candidate_missing": 2,
     "decision_missing_or_invalid": 3,
     "candidate_rejected": 4,
@@ -96,7 +100,7 @@ def build_decision_review_report(
         "type": "wing_readonly_preflight_review_decision_report",
         "generated_at": utc_now(),
         "status": (
-            "accepted_decision_ready"
+            ACCEPTED_DECISION_READY_STATUS
             if accepted_ready
             else "candidate_rejected"
             if rejected_only
@@ -162,8 +166,8 @@ def build_decision_review_report(
 
 
 def exit_code_for_report(report: Mapping[str, Any]) -> int:
-    if report.get("status") == "accepted_decision_ready":
-        return DECISION_REVIEW_EXIT_CODES["accepted_decision_ready"]
+    if report.get("status") == ACCEPTED_DECISION_READY_STATUS:
+        return DECISION_REVIEW_EXIT_CODES[ACCEPTED_DECISION_READY_STATUS]
     if int(report.get("review_candidate_count") or 0) <= 0:
         return DECISION_REVIEW_EXIT_CODES["preflight_candidate_missing"]
     if report.get("status") == "candidate_rejected":
