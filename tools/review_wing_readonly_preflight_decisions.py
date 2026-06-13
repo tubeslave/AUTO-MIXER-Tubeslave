@@ -262,6 +262,28 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
                     "  - backend_port_prestart_check_failure_detail_fields: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
+                    "  - backend_port_prestart_summary_required: "
+                    f"`{str(row.get('backend_port_prestart_summary_required') is True).lower()}`",
+                    "  - backend_port_prestart_summary_path: "
+                    f"`{row.get('backend_port_prestart_summary_path') or ''}`",
+                    "  - backend_port_prestart_summary_sha256: "
+                    f"`{row.get('backend_port_prestart_summary_sha256') or ''}`",
+                    "  - backend_port_prestart_summary_type: "
+                    f"`{row.get('backend_port_prestart_summary_type') or ''}`",
+                    "  - backend_port_prestart_summary_status: "
+                    f"`{row.get('backend_port_prestart_summary_status') or ''}`",
+                    "  - backend_port_prestart_summary_connection_policy: "
+                    f"`{row.get('backend_port_prestart_summary_connection_policy') or ''}`",
+                    "  - backend_port_prestart_summary_live_write: "
+                    f"`{str(row.get('backend_port_prestart_summary_live_write') is True).lower()}`",
+                    "  - backend_port_prestart_summary_contacts_backend: "
+                    f"`{str(row.get('backend_port_prestart_summary_contacts_backend') is True).lower()}`",
+                    "  - backend_port_prestart_summary_queries_console: "
+                    f"`{str(row.get('backend_port_prestart_summary_queries_console') is True).lower()}`",
+                    "  - backend_port_prestart_summary_executes_tests: "
+                    f"`{str(row.get('backend_port_prestart_summary_executes_tests') is True).lower()}`",
+                    "  - backend_port_prestart_check_status: "
+                    f"`{row.get('backend_port_prestart_check_status') or ''}`",
                 ]
             )
     else:

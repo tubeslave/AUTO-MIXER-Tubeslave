@@ -428,6 +428,20 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert "events_path_matches_expected_artifact: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
+    assert "backend_port_prestart_summary_required: `true`" in markdown
+    assert "backend_port_prestart_summary_path" in markdown
+    assert "backend_port_prestart_summary_sha256" in markdown
+    assert "backend_port_prestart_summary_type: `no_wing_release_check`" in markdown
+    assert "backend_port_prestart_summary_status: `passed`" in markdown
+    assert (
+        "backend_port_prestart_summary_connection_policy: "
+        "`no_hardware_no_network_no_live_writes`"
+    ) in markdown
+    assert "backend_port_prestart_summary_live_write: `false`" in markdown
+    assert "backend_port_prestart_summary_contacts_backend: `false`" in markdown
+    assert "backend_port_prestart_summary_queries_console: `false`" in markdown
+    assert "backend_port_prestart_summary_executes_tests: `false`" in markdown
+    assert "backend_port_prestart_check_status: `passed`" in markdown
     assert "listener_processes" in markdown
     assert "listener_confirmation_checklist" in markdown
     assert str(summary_path) in markdown

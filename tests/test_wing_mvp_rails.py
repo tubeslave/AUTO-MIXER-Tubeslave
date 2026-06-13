@@ -167,6 +167,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["evidence"]
     )
     assert (
+        "AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_SUMMARY_FIELDS_20260614.md"
+        in rows[0]["evidence"]
+    )
+    assert (
         "AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md"
         in rows[0]["evidence"]
     )
@@ -1102,6 +1106,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_PRESTART_COMMAND_SUMMARY_20260614.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_SUMMARY_FIELDS_20260614.md"
         in text
     )
     assert (
