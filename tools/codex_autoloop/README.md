@@ -286,6 +286,12 @@ you want the background automation active.
   This keeps the next blocking artifact tied to a real WING read-only summary,
   not to the offline handoff packet.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_artifacts` exactly matching `expected_artifact_globs` and
+  `plan_expected_artifacts`, with `expected_artifacts_match_plan: true`,
+  `summary_glob_matches_plan: true`, and `event_log_glob_matches_plan: true`.
+  This keeps the packet artifact list, named summary/events globs, and expected
+  plan artifact list tied to the same real-run outputs.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
   `prestart_backend_port_check` and `unexpected listeners`,

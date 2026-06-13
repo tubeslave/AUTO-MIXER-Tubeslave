@@ -477,6 +477,11 @@ The handoff validation must report:
 - `live_authority_granted: false`
 - `full_autonomous_ready: false`
 - `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`
+- `expected_artifacts` exactly matches `expected_artifact_globs` and
+  `plan_expected_artifacts`
+- `expected_artifacts_match_plan: true`
+- `summary_glob_matches_plan: true`
+- `event_log_glob_matches_plan: true`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`

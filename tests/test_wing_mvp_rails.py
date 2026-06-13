@@ -107,6 +107,12 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in text
     )
+    assert "expected_artifacts" in text
+    assert "expected_artifact_globs" in text
+    assert "plan_expected_artifacts" in text
+    assert "expected_artifacts_match_plan: true" in text
+    assert "summary_glob_matches_plan: true" in text
+    assert "event_log_glob_matches_plan: true" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text
     assert "unexpected listeners" in text
@@ -213,6 +219,14 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     )
     assert (
         "AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
+        "AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_CONTRACT_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
+        "AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_NEXT_ACTION_20260613.md"
         in rows[0]["evidence"]
     )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
@@ -372,6 +386,12 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in rows[0]["next action"]
     )
+    assert "expected_artifacts" in rows[0]["next action"]
+    assert "expected_artifact_globs" in rows[0]["next action"]
+    assert "plan_expected_artifacts" in rows[0]["next action"]
+    assert "expected_artifacts_match_plan: true" in rows[0]["next action"]
+    assert "summary_glob_matches_plan: true" in rows[0]["next action"]
+    assert "event_log_glob_matches_plan: true" in rows[0]["next action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in rows[0][
         "next action"
     ]
@@ -583,6 +603,12 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in readonly
     )
+    assert "expected_artifacts" in readonly
+    assert "expected_artifact_globs" in readonly
+    assert "plan_expected_artifacts" in readonly
+    assert "expected_artifacts_match_plan: true" in readonly
+    assert "summary_glob_matches_plan: true" in readonly
+    assert "event_log_glob_matches_plan: true" in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert "required_supervised_prestart_gate_markers" in readonly
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readonly
@@ -700,6 +726,12 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in report
     )
+    assert "expected_artifacts" in report
+    assert "expected_artifact_globs" in report
+    assert "plan_expected_artifacts" in report
+    assert "expected_artifacts_match_plan: true" in report
+    assert "summary_glob_matches_plan: true" in report
+    assert "event_log_glob_matches_plan: true" in report
     assert "backend_port_prestart_check_operator_sequence_step" in report
     assert "prestart_backend_port_check" in report
     assert "unexpected listeners" in report
@@ -853,6 +885,12 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in text
     )
+    assert "expected_artifacts" in text
+    assert "expected_artifact_globs" in text
+    assert "plan_expected_artifacts" in text
+    assert "expected_artifacts_match_plan: true" in text
+    assert "summary_glob_matches_plan: true" in text
+    assert "event_log_glob_matches_plan: true" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text
     assert "unexpected listeners" in text
@@ -935,6 +973,14 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_GATE_AUTHORITY_SUMMARY_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_CONTRACT_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_NEXT_ACTION_20260613.md"
         in text
     )
     assert (

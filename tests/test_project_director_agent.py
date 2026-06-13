@@ -196,6 +196,12 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in directive["selected_action"]
     )
+    assert "expected_artifacts" in directive["selected_action"]
+    assert "expected_artifact_globs" in directive["selected_action"]
+    assert "plan_expected_artifacts" in directive["selected_action"]
+    assert "expected_artifacts_match_plan: true" in directive["selected_action"]
+    assert "summary_glob_matches_plan: true" in directive["selected_action"]
+    assert "event_log_glob_matches_plan: true" in directive["selected_action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in directive[
         "selected_action"
     ]
@@ -353,6 +359,14 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_evidence_files"]
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_CONTRACT_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_NEXT_ACTION_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in directive["selected_evidence_files"]
     )
@@ -501,6 +515,12 @@ def test_prompt_and_readme_document_project_director_agent():
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in prompt
     )
+    assert "expected_artifacts" in prompt
+    assert "expected_artifact_globs" in prompt
+    assert "plan_expected_artifacts" in prompt
+    assert "expected_artifacts_match_plan: true" in prompt
+    assert "summary_glob_matches_plan: true" in prompt
+    assert "event_log_glob_matches_plan: true" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in prompt
     assert "backend_port_prestart_check_operator_sequence_step" in prompt
     assert "prestart_backend_port_check" in prompt
@@ -567,6 +587,12 @@ def test_prompt_and_readme_document_project_director_agent():
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
         in readme
     )
+    assert "expected_artifacts" in readme
+    assert "expected_artifact_globs" in readme
+    assert "plan_expected_artifacts" in readme
+    assert "expected_artifacts_match_plan: true" in readme
+    assert "summary_glob_matches_plan: true" in readme
+    assert "event_log_glob_matches_plan: true" in readme
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readme
     assert "backend_port_prestart_check_operator_sequence_step" in readme
     assert "prestart_backend_port_check" in readme
