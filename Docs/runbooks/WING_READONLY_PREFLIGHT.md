@@ -364,6 +364,7 @@ The handoff validation must report:
 - `expected_plan_required_for_real_run: true`
 - `physical_preflight_requires_existing_backend_connection: true`
 - `execution_allowed_by_packet: false`
+- `live_authority_granted: false`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`
