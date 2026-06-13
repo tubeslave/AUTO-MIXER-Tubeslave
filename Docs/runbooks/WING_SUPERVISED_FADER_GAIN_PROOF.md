@@ -1,7 +1,8 @@
 # Runbook: WING Supervised Fader/Gain Proof
 
 Status: blocked until a clean read-only preflight candidate is manually reviewed
-and its accepted decision has a valid accepted-candidate prestart trace
+and its accepted decision has a valid accepted-candidate prestart trace with an
+expected-artifact-bound accepted source id
 
 ## Goal
 
@@ -42,7 +43,7 @@ Forbidden live writes:
 - The review decision ledger has exactly one accepted decision for the clean
   preflight candidate and no duplicate or conflicting decision records.
 - Accepted review source ids have a valid accepted-candidate prestart trace from
-  read-only preflight review.
+  read-only preflight review and are expected-artifact-bound accepted source ids.
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
 - The next supervised proof plan lists the accepted read-only preflight
@@ -117,7 +118,8 @@ The artifact must show:
 - read-only preflight was not reviewed first;
 - duplicate or conflicting read-only preflight review decision JSON files are
   still present;
-- accepted review source ids lack a valid accepted-candidate prestart trace;
+- accepted review source ids lack a valid accepted-candidate prestart trace or
+  expected-artifact-bound accepted source id;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`;
 - operator approval is not explicit;

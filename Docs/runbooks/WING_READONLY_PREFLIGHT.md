@@ -496,10 +496,12 @@ The handoff validation must report:
 - `operator_sequence_supervised_prestart_gate_is_final: true`
 - `operator_sequence_supervised_prestart_gate_step_index: 9`
 - `operator_sequence_supervised_prestart_gate_step` includes
-  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `required_supervised_prestart_gate_markers` exactly lists
-  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `supervised_prestart_gate` exactly matches
   `expected_supervised_prestart_gate`

@@ -443,6 +443,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "required_supervised_prestart_gate_markers" in rows[0]["next action"]
     assert "accepted_decision_ready" in rows[0]["next action"]
     assert "valid accepted-candidate prestart trace" in rows[0]["next action"]
+    assert "expected-artifact-bound accepted source id" in rows[0]["next action"]
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rows[0]["next action"]
     assert "supervised_prestart_gate" in rows[0]["next action"]
     assert "expected_supervised_prestart_gate" in rows[0]["next action"]
@@ -634,10 +635,12 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         in readonly
     )
     assert "valid accepted-candidate prestart trace" in readonly
+    assert "expected-artifact-bound accepted source id" in readonly
     assert "wing_operator_proposal_validation_runner.py" in supervised
     assert "--execute" in supervised
     assert "blocked until a clean read-only preflight" in supervised
     assert "valid accepted-candidate prestart trace" in supervised
+    assert "expected-artifact-bound accepted source id" in supervised
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in supervised
@@ -766,6 +769,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     assert "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true" in report
     assert "accepted-candidate prestart trace" in report
+    assert "expected-artifact-bound accepted source id" in report
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in report

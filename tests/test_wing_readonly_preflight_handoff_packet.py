@@ -237,6 +237,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     supervised_gate_step = packet["operator_sequence"][-1]
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step
+    assert "expected-artifact-bound accepted source id" in supervised_gate_step
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in supervised_gate_step
     assert (
         supervised_gate_step == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP
@@ -278,6 +279,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "operator_sequence_step_must_be_final: `true`" in rendered
     assert "grants_live_authority: `false`" in rendered
     assert "valid accepted-candidate prestart trace" in rendered
+    assert "expected-artifact-bound accepted source id" in rendered
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rendered
     assert (
         "next_manual_artifact_required: "

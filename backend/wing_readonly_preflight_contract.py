@@ -166,12 +166,14 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
 
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = 9
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
-    "Only after accepted_decision_ready and a valid accepted-candidate "
-    "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+    "Only after accepted_decision_ready, a valid accepted-candidate "
+    "prestart trace, and expected-artifact-bound accepted source id, move "
+    "to WING_SUPERVISED_FADER_GAIN_PROOF."
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS = (
     "accepted_decision_ready",
     "valid accepted-candidate prestart trace",
+    "expected-artifact-bound accepted source id",
     "WING_SUPERVISED_FADER_GAIN_PROOF",
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK = (

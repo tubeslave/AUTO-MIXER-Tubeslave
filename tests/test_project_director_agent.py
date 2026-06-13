@@ -255,6 +255,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     ]
     assert "accepted_decision_ready" in directive["selected_action"]
     assert "valid accepted-candidate prestart trace" in directive["selected_action"]
+    assert "expected-artifact-bound accepted source id" in directive["selected_action"]
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in directive["selected_action"]
     assert "supervised_prestart_gate" in directive["selected_action"]
     assert "expected_supervised_prestart_gate" in directive["selected_action"]
@@ -641,6 +642,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "required_supervised_prestart_gate_markers" in prompt
     assert "accepted_decision_ready" in prompt
     assert "valid accepted-candidate prestart trace" in prompt
+    assert "expected-artifact-bound accepted source id" in prompt
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in prompt
     assert "current first open blocker" in prompt
     assert (
@@ -664,6 +666,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "required_supervised_prestart_gate_markers" in readme
     assert "accepted_decision_ready" in readme
     assert "valid accepted-candidate prestart trace" in readme
+    assert "expected-artifact-bound accepted source id" in readme
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in readme
     assert "current first open blocker" in readme
     assert (

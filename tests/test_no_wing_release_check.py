@@ -1399,8 +1399,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "current first open blocker before supervised proof planning."
             ),
             (
-                "Only after accepted_decision_ready and a valid accepted-candidate "
-                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                "Only after accepted_decision_ready, a valid accepted-candidate "
+                "prestart trace, and expected-artifact-bound accepted source id, move "
+                "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
         ],
         "backend_port_prestart_gate": {
@@ -1444,12 +1445,14 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "operator_sequence_step_index": 9,
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
-                "Only after accepted_decision_ready and a valid accepted-candidate "
-                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                "Only after accepted_decision_ready, a valid accepted-candidate "
+                "prestart trace, and expected-artifact-bound accepted source id, move "
+                "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
             "required_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "expected-artifact-bound accepted source id",
                 "WING_SUPERVISED_FADER_GAIN_PROOF",
             ],
             "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
@@ -1462,12 +1465,14 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "operator_sequence_step_index": 9,
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
-                "Only after accepted_decision_ready and a valid accepted-candidate "
-                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                "Only after accepted_decision_ready, a valid accepted-candidate "
+                "prestart trace, and expected-artifact-bound accepted source id, move "
+                "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
             "required_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "expected-artifact-bound accepted source id",
                 "WING_SUPERVISED_FADER_GAIN_PROOF",
             ],
             "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
@@ -3139,8 +3144,9 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert (
         result.detail["operator_sequence_supervised_prestart_gate_step"]
         == (
-            "Only after accepted_decision_ready and a valid accepted-candidate "
-            "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+            "Only after accepted_decision_ready, a valid accepted-candidate "
+            "prestart trace, and expected-artifact-bound accepted source id, move "
+            "to WING_SUPERVISED_FADER_GAIN_PROOF."
         )
     )
     assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 9
@@ -3161,6 +3167,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
+        "expected-artifact-bound accepted source id",
         "WING_SUPERVISED_FADER_GAIN_PROOF",
     ]
     assert result.detail["violations"] == []
@@ -3751,6 +3758,35 @@ def test_no_wing_release_check_rejects_handoff_packet_without_supervised_prestar
     payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
     payload["operator_sequence"][-1] = (
         "Only after accepted_decision_ready, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+    )
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_has_supervised_prestart_gate"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_missing"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_without_expected_artifact_gate_marker(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-old-prestart-gate.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"][-1] = (
+        "Only after accepted_decision_ready and a valid accepted-candidate "
+        "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
     )
     packet_path.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -10417,8 +10453,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "operator_sequence_mvp_blocker_anchor_digest_review_step_index": 8,
             "operator_sequence_has_supervised_prestart_gate": True,
             "operator_sequence_supervised_prestart_gate_step": (
-                "Only after accepted_decision_ready and a valid accepted-candidate "
-                "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                "Only after accepted_decision_ready, a valid accepted-candidate "
+                "prestart trace, and expected-artifact-bound accepted source id, move "
+                "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
             "operator_sequence_supervised_prestart_gate_step_index": 9,
             "operator_sequence_supervised_prestart_gate_is_final": True,
@@ -10427,12 +10464,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "operator_sequence_step_index": 9,
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
-                    "Only after accepted_decision_ready and a valid accepted-candidate "
-                    "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                    "Only after accepted_decision_ready, a valid accepted-candidate "
+                    "prestart trace, and expected-artifact-bound accepted source id, move "
+                    "to WING_SUPERVISED_FADER_GAIN_PROOF."
                 ),
                 "required_markers": [
                     "accepted_decision_ready",
                     "valid accepted-candidate prestart trace",
+                    "expected-artifact-bound accepted source id",
                     "WING_SUPERVISED_FADER_GAIN_PROOF",
                 ],
                 "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
@@ -10445,12 +10484,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "operator_sequence_step_index": 9,
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
-                    "Only after accepted_decision_ready and a valid accepted-candidate "
-                    "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+                    "Only after accepted_decision_ready, a valid accepted-candidate "
+                    "prestart trace, and expected-artifact-bound accepted source id, move "
+                    "to WING_SUPERVISED_FADER_GAIN_PROOF."
                 ),
                 "required_markers": [
                     "accepted_decision_ready",
                     "valid accepted-candidate prestart trace",
+                    "expected-artifact-bound accepted source id",
                     "WING_SUPERVISED_FADER_GAIN_PROOF",
                 ],
                 "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
@@ -10461,6 +10502,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "required_supervised_prestart_gate_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "expected-artifact-bound accepted source id",
                 "WING_SUPERVISED_FADER_GAIN_PROOF",
             ],
             "violations": [],
@@ -10600,8 +10642,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["operator_sequence_mvp_blocker_anchor_digest_review_step_index"] == 8
     assert artifact["operator_sequence_has_supervised_prestart_gate"] is True
     assert artifact["operator_sequence_supervised_prestart_gate_step"] == (
-        "Only after accepted_decision_ready and a valid accepted-candidate "
-        "prestart trace, move to WING_SUPERVISED_FADER_GAIN_PROOF."
+        "Only after accepted_decision_ready, a valid accepted-candidate "
+        "prestart trace, and expected-artifact-bound accepted source id, move "
+        "to WING_SUPERVISED_FADER_GAIN_PROOF."
     )
     assert artifact["operator_sequence_supervised_prestart_gate_step_index"] == 9
     assert artifact["operator_sequence_supervised_prestart_gate_is_final"] is True
@@ -10619,6 +10662,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
+        "expected-artifact-bound accepted source id",
         "WING_SUPERVISED_FADER_GAIN_PROOF",
     ]
     assert artifact["violations"] == []
@@ -10698,6 +10742,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert '"grants_live_authority": false' in markdown_summary
     assert '"requires_accepted_candidate_prestart_trace": true' in markdown_summary
     assert "valid accepted-candidate prestart trace" in markdown_summary
+    assert "expected-artifact-bound accepted source id" in markdown_summary
     assert "physical_console_readback_proof" in markdown_summary
 
 

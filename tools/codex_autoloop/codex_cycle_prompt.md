@@ -244,10 +244,12 @@ blockers выше.
    `current first open blocker`;
 54. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
 55. verify the final `operator_sequence_supervised_prestart_gate_step` includes
-   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+   `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
 56. verify `required_supervised_prestart_gate_markers` exactly lists
-   `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+   `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
 57. run dry-run recommendation;
 58. require explicit operator approval for the exact action;
@@ -463,11 +465,13 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `operator_sequence_supervised_prestart_gate_step_index` must be `9`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
-  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Before any supervised fader/gain proof,
   `required_supervised_prestart_gate_markers` must exactly list
-  `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
+  `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит
   физический read-only/supervised proof и имеет тест.

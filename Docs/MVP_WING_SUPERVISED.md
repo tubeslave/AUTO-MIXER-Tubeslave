@@ -257,9 +257,11 @@ accepted-candidate prestart trace from read-only preflight review. If that trace
 is missing or invalid, the proof plan must keep
 `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
 as an operator blocker.
-That trace must include a path and matching SHA256 for the passed no-WING
-prestart `summary.json`; a candidate that only repeats the prestart field names
-without the bound artifact remains blocked.
+That trace must include `expected_artifacts`, `expected_summary_artifact`,
+`expected_events_artifact`, `summary_path_matches_expected_artifact: true`,
+`events_path_matches_expected_artifact: true`, and a path plus matching SHA256
+for the passed no-WING prestart `summary.json`; a candidate that only repeats
+the prestart field names without the bound artifacts remains blocked.
 The decision-review CLI must not report `accepted_decision_ready` until the
 same accepted source ids have that valid accepted-candidate prestart trace.
 
@@ -402,7 +404,8 @@ and
 
 The handoff summary must also show `required_supervised_prestart_gate_markers`
 exactly listing `accepted_decision_ready`,
-`valid accepted-candidate prestart trace`, and
+`valid accepted-candidate prestart trace`,
+`expected-artifact-bound accepted source id`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`.
 
 The operator sequence indexes must also remain explicit:
