@@ -31,6 +31,35 @@ It does not approve live writes.
   the real preflight remains blocked until the operator follows the checklist
   to confirm the listener is the intended backend or frees/reconfigures the
   unexpected listener. The gate is diagnostic only and does not stop processes.
+  If the existing listener is the intended backend, write a separate operator
+  confirmation JSON and rerun the gate with `--backend-listener-confirmation`.
+  The JSON must match the current listener PID and command line, keep
+  `safe_to_stop_listener_by_gate: false`, and keep
+  `live_authority_granted: false`:
+
+  ```json
+  {
+    "type": "wing_backend_port_listener_confirmation.v1",
+    "status": "operator_confirmed_intended_backend",
+    "host": "127.0.0.1",
+    "port": 8765,
+    "confirms_intended_backend": true,
+    "reviewed_listener_pid": 87210,
+    "reviewed_listener_command_line": "python3 backend/server.py --mode wing",
+    "operator_reviewed_at": "2026-06-13T09:15:00Z",
+    "operator_name": "operator",
+    "safe_to_stop_listener_by_gate": false,
+    "live_authority_granted": false
+  }
+  ```
+
+  ```bash
+  PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick \
+    --backend-listener-confirmation path/to/backend-listener-confirmation.json
+  ```
+
+  A valid confirmation only clears the local backend-port prestart blocker; it
+  does not contact WING, does not approve writes, and does not close readiness.
 - If the no-WING release summary includes
   `wing_readonly_preflight_evidence.artifact_operator_next_steps`, inspect and
   complete those repair instructions before opening a backend/WING WebSocket.

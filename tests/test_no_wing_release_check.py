@@ -6496,7 +6496,11 @@ def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims
 
 
 def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, monkeypatch):
-    def fake_free_port(port: int, host: str = "127.0.0.1") -> CheckResult:
+    def fake_free_port(
+        port: int,
+        host: str = "127.0.0.1",
+        listener_confirmation_path: Path | None = None,
+    ) -> CheckResult:
         return CheckResult(
             name="backend_port_free",
             status="passed",
@@ -7387,6 +7391,55 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     )
     assert "operator_next_step" in markdown_summary
     assert "WING read-only preflight" in markdown_summary
+
+
+def test_no_wing_release_check_summary_surfaces_confirmed_backend_listener(tmp_path):
+    result = CheckResult(
+        name="backend_port_free",
+        status="passed",
+        started_at="2026-06-13T00:00:00Z",
+        finished_at="2026-06-13T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "host": "127.0.0.1",
+            "port": 8765,
+            "policy": "port_must_be_free_or_operator_confirmed_intended_backend",
+            "listener_detected": True,
+            "listener_processes": [
+                {
+                    "pid": 87210,
+                    "command": "Python",
+                    "name": "TCP *:8765 (LISTEN)",
+                    "command_line": "python3 backend/server.py --mode wing",
+                }
+            ],
+            "listener_confirmation_path": "operator-confirmation.json",
+            "listener_confirmation_status": "accepted",
+            "intended_backend_confirmed": True,
+            "matched_listener_pid": 87210,
+            "preflight_blocked_until_listener_confirmed": False,
+            "intended_backend_confirmation_required": False,
+            "safe_to_stop_listener_by_gate": False,
+            "live_authority_granted": False,
+            "operator_next_step": (
+                "Proceed only with the operator-confirmed intended backend "
+                "session and WING read-only preflight; this gate still grants "
+                "no live authority."
+            ),
+        },
+    )
+
+    write_summary(tmp_path, [result], generated_at="2026-06-13T00:00:00Z")
+
+    markdown_summary = (tmp_path / "summary.md").read_text()
+    assert "`backend_port_free`: `passed`" in markdown_summary
+    assert "listener_confirmation_path: `operator-confirmation.json`" in markdown_summary
+    assert "listener_confirmation_status: `accepted`" in markdown_summary
+    assert "intended_backend_confirmed: `True`" in markdown_summary
+    assert "matched_listener_pid: `87210`" in markdown_summary
+    assert "preflight_blocked_until_listener_confirmed: `False`" in markdown_summary
+    assert "live_authority_granted: `False`" in markdown_summary
+    assert "fail_closed_reason" not in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
@@ -11729,6 +11782,129 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
     assert "listener_process_error" not in result.detail
 
 
+def test_backend_port_check_accepts_operator_confirmed_intended_listener(
+    tmp_path, monkeypatch
+):
+    command_line = "python3 backend/server.py --mode wing"
+    listener_processes = [
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line": command_line,
+        }
+    ]
+    monkeypatch.setattr(
+        release_check,
+        "_listener_processes_for_port",
+        lambda port: (listener_processes, None),
+    )
+    confirmation_path = tmp_path / "backend-listener-confirmation.json"
+    confirmation_path.write_text(
+        json.dumps(
+            {
+                "type": release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ARTIFACT_TYPE,
+                "status": release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS,
+                "host": "127.0.0.1",
+                "port": 8765,
+                "confirms_intended_backend": True,
+                "reviewed_listener_pid": 87210,
+                "reviewed_listener_command_line": command_line,
+                "operator_reviewed_at": "2026-06-13T09:15:00Z",
+                "operator_name": "operator",
+                "safe_to_stop_listener_by_gate": False,
+                "live_authority_granted": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+        payload = json.loads(confirmation_path.read_text(encoding="utf-8"))
+        payload["port"] = port
+        confirmation_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = release_check.check_port_free(
+            port=port,
+            listener_confirmation_path=confirmation_path,
+        )
+
+    assert result.status == "passed"
+    assert result.detail["listener_detected"] is True
+    assert result.detail["listener_confirmation_status"] == "accepted"
+    assert result.detail["intended_backend_confirmed"] is True
+    assert result.detail["preflight_blocked_until_listener_confirmed"] is False
+    assert result.detail["intended_backend_confirmation_required"] is False
+    assert result.detail["safe_to_stop_listener_by_gate"] is False
+    assert result.detail["live_authority_granted"] is False
+    assert result.detail["listener_confirmation_violations"] == []
+    assert "fail_closed_reason" not in result.detail
+
+
+def test_backend_port_check_rejects_mismatched_listener_confirmation(
+    tmp_path, monkeypatch
+):
+    listener_processes = [
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line": "python3 backend/server.py --mode wing",
+        }
+    ]
+    monkeypatch.setattr(
+        release_check,
+        "_listener_processes_for_port",
+        lambda port: (listener_processes, None),
+    )
+    confirmation_path = tmp_path / "backend-listener-confirmation.json"
+    confirmation_path.write_text(
+        json.dumps(
+            {
+                "type": release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ARTIFACT_TYPE,
+                "status": release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS,
+                "host": "127.0.0.1",
+                "port": 8765,
+                "confirms_intended_backend": True,
+                "reviewed_listener_pid": 87210,
+                "reviewed_listener_command_line": "python3 other.py",
+                "operator_reviewed_at": "2026-06-13T09:15:00Z",
+                "operator_name": "operator",
+                "safe_to_stop_listener_by_gate": False,
+                "live_authority_granted": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+        payload = json.loads(confirmation_path.read_text(encoding="utf-8"))
+        payload["port"] = port
+        confirmation_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = release_check.check_port_free(
+            port=port,
+            listener_confirmation_path=confirmation_path,
+        )
+
+    assert result.status == "failed"
+    assert result.detail["listener_confirmation_status"] == "invalid"
+    assert result.detail["preflight_blocked_until_listener_confirmed"] is True
+    assert result.detail["safe_to_stop_listener_by_gate"] is False
+    assert (
+        "listener_confirmation_reviewed_command_line_mismatch"
+        in result.detail["listener_confirmation_violations"]
+    )
+    assert (
+        result.detail["fail_closed_reason"]
+        == "backend_port_listener_requires_operator_confirmation"
+    )
+
+
 def test_backend_port_check_records_listener_owner_probe_error(monkeypatch):
     monkeypatch.setattr(
         release_check,
@@ -11834,7 +12010,11 @@ def test_listener_processes_for_port_records_command_line_probe_failure(monkeypa
 
 
 def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeypatch):
-    def fake_busy_port_check(port: int, host: str = "127.0.0.1") -> CheckResult:
+    def fake_busy_port_check(
+        port: int,
+        host: str = "127.0.0.1",
+        listener_confirmation_path: Path | None = None,
+    ) -> CheckResult:
         return CheckResult(
             name="backend_port_free",
             status="failed",
@@ -11889,3 +12069,58 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
     run_dir = Path(summary["run_dir"])
     assert (run_dir / "summary.json").exists()
     assert not (run_dir / "logs").exists()
+
+
+def test_no_wing_release_check_passes_backend_listener_confirmation(
+    tmp_path, monkeypatch
+):
+    confirmation_path = tmp_path / "backend-listener-confirmation.json"
+    seen_confirmation_paths = []
+
+    def fake_backend_check(
+        port: int,
+        host: str = "127.0.0.1",
+        listener_confirmation_path: Path | None = None,
+    ) -> CheckResult:
+        seen_confirmation_paths.append(listener_confirmation_path)
+        return CheckResult(
+            name="backend_port_free",
+            status="passed",
+            started_at="2026-06-13T00:00:00Z",
+            finished_at="2026-06-13T00:00:01Z",
+            duration_sec=1.0,
+            detail={
+                "host": host,
+                "port": port,
+                "listener_detected": True,
+                "listener_confirmation_path": str(listener_confirmation_path),
+                "listener_confirmation_status": "accepted",
+                "intended_backend_confirmed": True,
+                "preflight_blocked_until_listener_confirmed": False,
+                "intended_backend_confirmation_required": False,
+                "safe_to_stop_listener_by_gate": False,
+                "live_authority_granted": False,
+            },
+        )
+
+    monkeypatch.setattr(release_check, "check_port_free", fake_backend_check)
+    monkeypatch.setattr(
+        release_check,
+        "build_checks",
+        lambda **kwargs: [],
+    )
+
+    summary = run_release_checks(
+        artifact_root=tmp_path / "artifacts",
+        include_frontend=False,
+        quick=True,
+        backend_port=8765,
+        backend_listener_confirmation=confirmation_path,
+    )
+
+    assert summary["status"] == "passed"
+    assert seen_confirmation_paths == [confirmation_path]
+    assert (
+        summary["results"][0]["detail"]["listener_confirmation_path"]
+        == str(confirmation_path)
+    )

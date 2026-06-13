@@ -131,6 +131,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md"
+        in rows[0]["evidence"]
+    )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
     assert "backend_port_prestart_gate" in rows[0]["next action"]
     assert "expected_backend_port_prestart_gate" in rows[0]["next action"]
@@ -395,6 +399,14 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "accepted_decision_ready" in readonly
     assert "supervised_prestart_gate.unlocks_runbook:" in readonly
     assert "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md" in readonly
+    assert "--backend-listener-confirmation" in readonly
+    assert "wing_backend_port_listener_confirmation.v1" in readonly
+    assert "operator_confirmed_intended_backend" in readonly
+    assert "confirms_intended_backend" in readonly
+    assert "reviewed_listener_pid" in readonly
+    assert "reviewed_listener_command_line" in readonly
+    assert "safe_to_stop_listener_by_gate" in readonly
+    assert "live_authority_granted" in readonly
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in readonly

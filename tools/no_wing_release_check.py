@@ -372,6 +372,12 @@ BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST = [
     "do not stop or reconfigure the listener from this no-WING gate",
     "rerun the no-WING gate after manual confirmation or after clearing an unexpected listener",
 ]
+BACKEND_PORT_LISTENER_CONFIRMATION_ARTIFACT_TYPE = (
+    "wing_backend_port_listener_confirmation.v1"
+)
+BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS = (
+    "operator_confirmed_intended_backend"
+)
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
 )
@@ -1446,7 +1452,7 @@ def _listener_processes_for_port(port: int) -> tuple[list[dict[str, object]], st
 
 
 def _backend_port_markdown_details(result: CheckResult) -> list[str]:
-    if result.name != "backend_port_free" or result.status == "passed":
+    if result.name != "backend_port_free":
         return []
     detail = result.detail or {}
     if not detail.get("listener_detected"):
@@ -1468,9 +1474,27 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
             f"`{json.dumps(listener_confirmation_checklist, ensure_ascii=False)}`"
         )
     for field in (
+        "listener_confirmation_path",
+        "listener_confirmation_status",
+        "intended_backend_confirmed",
+        "matched_listener_pid",
+    ):
+        if field in detail:
+            lines.append(f"  - {field}: `{detail[field]}`")
+    listener_confirmation_violations = detail.get("listener_confirmation_violations")
+    if (
+        isinstance(listener_confirmation_violations, list)
+        and listener_confirmation_violations
+    ):
+        lines.append(
+            "  - listener_confirmation_violations: "
+            f"`{json.dumps(listener_confirmation_violations, ensure_ascii=False)}`"
+        )
+    for field in (
         "preflight_blocked_until_listener_confirmed",
         "intended_backend_confirmation_required",
         "safe_to_stop_listener_by_gate",
+        "live_authority_granted",
         "fail_closed_reason",
     ):
         if field in detail:
@@ -1481,7 +1505,92 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
     return lines
 
 
-def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -> CheckResult:
+def _normalize_listener_pid(value: object) -> int | str | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def _backend_listener_confirmation_detail(
+    *,
+    path: Path,
+    host: str,
+    port: int,
+    listener_processes: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    payload, error = _json_object_from_path(path)
+    detail: dict[str, object] = {
+        "listener_confirmation_path": str(path),
+        "listener_confirmation_status": "invalid",
+        "listener_confirmation_violations": [],
+        "safe_to_stop_listener_by_gate": False,
+        "live_authority_granted": False,
+    }
+    violations: list[str] = []
+    if error:
+        violations.append(f"listener_confirmation_{error}")
+        detail["listener_confirmation_violations"] = violations
+        return detail
+    assert payload is not None
+
+    if payload.get("type") != BACKEND_PORT_LISTENER_CONFIRMATION_ARTIFACT_TYPE:
+        violations.append("listener_confirmation_type_mismatch")
+    if payload.get("status") != BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS:
+        violations.append("listener_confirmation_status_not_accepted")
+    if payload.get("host") != host:
+        violations.append("listener_confirmation_host_mismatch")
+    if payload.get("port") != port:
+        violations.append("listener_confirmation_port_mismatch")
+    if payload.get("confirms_intended_backend") is not True:
+        violations.append("listener_confirmation_intended_backend_not_true")
+    if payload.get("safe_to_stop_listener_by_gate") is not False:
+        violations.append("listener_confirmation_safe_to_stop_not_false")
+    if payload.get("live_authority_granted") is not False:
+        violations.append("listener_confirmation_live_authority_not_false")
+    for field in ("operator_reviewed_at", "operator_name"):
+        if not str(payload.get(field) or "").strip():
+            violations.append(f"listener_confirmation_{field}_missing")
+
+    reviewed_pid = _normalize_listener_pid(payload.get("reviewed_listener_pid"))
+    reviewed_command_line = str(payload.get("reviewed_listener_command_line") or "")
+    if reviewed_pid is None:
+        violations.append("listener_confirmation_reviewed_listener_pid_missing")
+    if not reviewed_command_line:
+        violations.append("listener_confirmation_reviewed_listener_command_line_missing")
+
+    matching_process = None
+    for process in listener_processes:
+        if _normalize_listener_pid(process.get("pid")) == reviewed_pid:
+            matching_process = process
+            break
+    if matching_process is None:
+        violations.append("listener_confirmation_pid_not_current_listener")
+    else:
+        current_command_line = str(matching_process.get("command_line") or "")
+        if not current_command_line:
+            violations.append("listener_confirmation_current_command_line_missing")
+        elif current_command_line != reviewed_command_line:
+            violations.append("listener_confirmation_reviewed_command_line_mismatch")
+        detail["matched_listener_pid"] = reviewed_pid
+
+    if not violations:
+        detail["listener_confirmation_status"] = "accepted"
+        detail["intended_backend_confirmed"] = True
+    detail["listener_confirmation_violations"] = violations
+    return detail
+
+
+def check_port_free(
+    port: int = DEFAULT_BACKEND_PORT,
+    host: str = "127.0.0.1",
+    listener_confirmation_path: Path | None = None,
+) -> CheckResult:
     started = datetime.now(timezone.utc)
     detail: dict[str, object] = {"host": host, "port": port, "policy": "port_must_not_have_unexpected_listener"}
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -1506,9 +1615,47 @@ def check_port_free(port: int = DEFAULT_BACKEND_PORT, host: str = "127.0.0.1") -
         )
         if listener_process_error:
             detail["listener_process_error"] = listener_process_error
+        if listener_confirmation_path is not None:
+            confirmation_detail = _backend_listener_confirmation_detail(
+                path=listener_confirmation_path,
+                host=host,
+                port=port,
+                listener_processes=listener_processes,
+            )
+            detail.update(confirmation_detail)
+            if confirmation_detail.get("listener_confirmation_status") == "accepted":
+                detail["policy"] = (
+                    "port_must_be_free_or_operator_confirmed_intended_backend"
+                )
+                detail["preflight_blocked_until_listener_confirmed"] = False
+                detail["intended_backend_confirmation_required"] = False
+                detail.pop("fail_closed_reason", None)
+                detail["operator_next_step"] = (
+                    "Proceed only with the operator-confirmed intended backend "
+                    "session and WING read-only preflight; this gate still grants "
+                    "no live authority."
+                )
+            else:
+                detail["operator_next_step"] = (
+                    "Fix or replace the backend listener confirmation artifact, "
+                    "or clear the unexpected listener after operator review, then "
+                    "rerun the no-WING gate."
+                )
+    elif listener_confirmation_path is not None:
+        detail["listener_confirmation_path"] = str(listener_confirmation_path)
+        detail["listener_confirmation_status"] = "not_used_no_listener_detected"
+        detail["safe_to_stop_listener_by_gate"] = False
+        detail["live_authority_granted"] = False
+    status = "failed" if connected else "passed"
+    if (
+        connected
+        and listener_confirmation_path is not None
+        and detail.get("listener_confirmation_status") == "accepted"
+    ):
+        status = "passed"
     return CheckResult(
         name="backend_port_free",
-        status="failed" if connected else "passed",
+        status=status,
         started_at=started.isoformat(timespec="seconds").replace("+00:00", "Z"),
         finished_at=finished.isoformat(timespec="seconds").replace("+00:00", "Z"),
         duration_sec=round((finished - started).total_seconds(), 3),
@@ -16362,6 +16509,7 @@ def run_release_checks(
     quick: bool = False,
     continue_on_failure: bool = False,
     backend_port: int = DEFAULT_BACKEND_PORT,
+    backend_listener_confirmation: Path | None = None,
     command_timeout_sec: float | None = DEFAULT_COMMAND_TIMEOUT_SEC,
 ) -> dict[str, object]:
     generated_at = utc_now()
@@ -16379,7 +16527,12 @@ def run_release_checks(
     validate_repo_local_commands(checks)
     validate_no_live_commands(checks)
 
-    results: list[CheckResult] = [check_port_free(backend_port)]
+    results: list[CheckResult] = [
+        check_port_free(
+            backend_port,
+            listener_confirmation_path=backend_listener_confirmation,
+        )
+    ]
     if results[-1].status != "passed" and not continue_on_failure:
         summary = write_summary(run_dir, results, generated_at=generated_at)
         summary["run_dir"] = str(run_dir)
@@ -16776,6 +16929,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Local backend port that should be free before checks start.",
     )
     parser.add_argument(
+        "--backend-listener-confirmation",
+        type=Path,
+        default=None,
+        help=(
+            "Optional operator JSON confirming an existing listener is the "
+            "intended backend for this WING read-only preflight."
+        ),
+    )
+    parser.add_argument(
         "--command-timeout-sec",
         type=float,
         default=DEFAULT_COMMAND_TIMEOUT_SEC,
@@ -16793,6 +16955,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         quick=args.quick,
         continue_on_failure=args.continue_on_failure,
         backend_port=args.backend_port,
+        backend_listener_confirmation=args.backend_listener_confirmation,
         command_timeout_sec=args.command_timeout_sec if args.command_timeout_sec > 0 else None,
     )
     print(json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True))
