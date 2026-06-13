@@ -259,7 +259,7 @@ def analyze_evidence(raw_items: Iterable[tuple[str, str]]) -> dict:
     items = tuple(
         item
         for source, text in raw_items
-        if text.strip()
+        if text.strip() and not is_generated_direction_guard_report(source, text)
         for item in (classify_item(source, text),)
     )
     target_items = tuple(item for item in items if item.is_target)

@@ -536,6 +536,14 @@ def test_decision_review_report_blocks_accepted_decision_without_prestart_trace(
     markdown = decision_tool.render_markdown(report)
     assert "Status: `blocked`" in markdown
     assert "accepted_candidate_prestart_contract_valid: `false`" in markdown
+    assert "backend_port_prestart_check_required: `false`" in markdown
+    assert "summary_path_matches_expected_artifact: ``" in markdown
+    assert "events_path_matches_expected_artifact: ``" in markdown
+    assert "backend_port_prestart_summary_required: ``" in markdown
+    assert "backend_port_prestart_summary_live_write: ``" in markdown
+    assert "backend_port_prestart_summary_contacts_backend: ``" in markdown
+    assert "backend_port_prestart_summary_queries_console: ``" in markdown
+    assert "backend_port_prestart_summary_executes_tests: ``" in markdown
     assert WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER in markdown
     assert "- none" not in markdown
 

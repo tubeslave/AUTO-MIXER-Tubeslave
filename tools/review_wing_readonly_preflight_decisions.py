@@ -56,6 +56,10 @@ def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
 
 
+def _markdown_bool(value: Any) -> str:
+    return str(value).lower() if isinstance(value, bool) else ""
+
+
 def build_decision_review_report(
     *,
     artifact_roots: Iterable[str | Path] | None = None,
@@ -251,19 +255,19 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     "  - expected_events_artifact: "
                     f"`{row.get('expected_events_artifact')}`",
                     "  - summary_path_matches_expected_artifact: "
-                    f"`{str(row.get('summary_path_matches_expected_artifact') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('summary_path_matches_expected_artifact'))}`",
                     "  - events_path_matches_expected_artifact: "
-                    f"`{str(row.get('events_path_matches_expected_artifact') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('events_path_matches_expected_artifact'))}`",
                     "  - backend_port_prestart_check_required: "
-                    f"`{str(row.get('backend_port_prestart_check_required') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('backend_port_prestart_check_required'))}`",
                     "  - backend_port_prestart_check_must_pass_before_starting_backend: "
-                    f"`{str(row.get('backend_port_prestart_check_must_pass_before_starting_backend') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('backend_port_prestart_check_must_pass_before_starting_backend'))}`",
                     "  - backend_port_prestart_check_command: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
                     "  - backend_port_prestart_check_failure_detail_fields: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
                     "  - backend_port_prestart_summary_required: "
-                    f"`{str(row.get('backend_port_prestart_summary_required') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_required'))}`",
                     "  - backend_port_prestart_summary_path: "
                     f"`{row.get('backend_port_prestart_summary_path') or ''}`",
                     "  - backend_port_prestart_summary_sha256: "
@@ -275,13 +279,13 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     "  - backend_port_prestart_summary_connection_policy: "
                     f"`{row.get('backend_port_prestart_summary_connection_policy') or ''}`",
                     "  - backend_port_prestart_summary_live_write: "
-                    f"`{str(row.get('backend_port_prestart_summary_live_write') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_live_write'))}`",
                     "  - backend_port_prestart_summary_contacts_backend: "
-                    f"`{str(row.get('backend_port_prestart_summary_contacts_backend') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_contacts_backend'))}`",
                     "  - backend_port_prestart_summary_queries_console: "
-                    f"`{str(row.get('backend_port_prestart_summary_queries_console') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_queries_console'))}`",
                     "  - backend_port_prestart_summary_executes_tests: "
-                    f"`{str(row.get('backend_port_prestart_summary_executes_tests') is True).lower()}`",
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_executes_tests'))}`",
                     "  - backend_port_prestart_check_status: "
                     f"`{row.get('backend_port_prestart_check_status') or ''}`",
                 ]

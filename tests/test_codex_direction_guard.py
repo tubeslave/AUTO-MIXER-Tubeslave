@@ -101,6 +101,7 @@ def test_direction_guard_ignores_forbidden_policy_sections_when_scoring_drift():
             ),
             ("git_log", "Add WING read-only preflight readback identity gate"),
             ("report", "physical readback and timeout fail-closed proof context"),
+            ("report", "supervised fader rollback proof remains hardware-gated"),
         ]
     )
 
@@ -201,10 +202,50 @@ There is WING proof progress.
             ),
             ("git_log", "Add WING read-only preflight readback identity gate"),
             ("report", "physical readback and timeout fail-closed proof context"),
+            ("report", "supervised fader rollback proof remains hardware-gated"),
         ]
     )
 
     assert report["status"] == "on_target"
+    assert report["summary"]["drift_item_count"] == 0
+    assert report["summary"]["mixed_item_count"] == 0
+
+
+def test_direction_guard_ignores_generated_guard_json_reports_when_scoring_drift():
+    guard = load_guard_module()
+
+    report = guard.analyze_evidence(
+        [
+            (
+                "report:.paperclip/reports/codex_direction_guard_previous.md",
+                """
+codex_direction_guard_previous.md
+{
+  "type": "codex_direction_guard",
+  "status": "on_target",
+  "forbidden_next_actions": [
+    "Do not add memory-trust, queue-import, or result-consumer layers."
+  ],
+  "mixed_items": [
+    {
+      "text": "WING read-only preflight plus memory-trust queue-import result consumer"
+    }
+  ],
+  "target_items": [
+    {
+      "text": "read-only preflight and hardware proof"
+    }
+  ]
+""",
+            ),
+            ("git_log", "Add WING read-only preflight readback identity gate"),
+            ("report", "physical readback and timeout fail-closed proof context"),
+            ("report", "supervised fader rollback proof remains hardware-gated"),
+        ]
+    )
+
+    assert report["status"] == "on_target"
+    assert report["summary"]["target_item_count"] == 3
     assert report["summary"]["drift_item_count"] == 0
     assert report["summary"]["mixed_item_count"] == 0
 
