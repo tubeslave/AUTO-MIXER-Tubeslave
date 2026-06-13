@@ -7414,6 +7414,8 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
                 release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS
             ),
             "listener_confirmation_template_accepted_by_template": False,
+            "listener_confirmation_template_execution_allowed_by_template": False,
+            "listener_confirmation_template_readiness_closure_allowed_by_template": False,
             "listener_confirmation_template_operator_reviewed_at": (
                 "REPLACE_WITH_OPERATOR_REVIEW_UTC"
             ),
@@ -7461,6 +7463,14 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     assert "operator_review_required" in markdown_summary
     assert "listener_confirmation_template_accepted_by_template: `False`" in (
         markdown_summary
+    )
+    assert (
+        "listener_confirmation_template_execution_allowed_by_template: `False`"
+        in markdown_summary
+    )
+    assert (
+        "listener_confirmation_template_readiness_closure_allowed_by_template: `False`"
+        in markdown_summary
     )
     assert "listener_confirmation_template_operator_reviewed_at" in markdown_summary
     assert "REPLACE_WITH_OPERATOR_REVIEW_UTC" in markdown_summary
@@ -12417,6 +12427,18 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
     )
     assert (
         summary["results"][0]["detail"][
+            "listener_confirmation_template_execution_allowed_by_template"
+        ]
+        is False
+    )
+    assert (
+        summary["results"][0]["detail"][
+            "listener_confirmation_template_readiness_closure_allowed_by_template"
+        ]
+        is False
+    )
+    assert (
+        summary["results"][0]["detail"][
             "listener_confirmation_template_operator_reviewed_at"
         ]
         == "REPLACE_WITH_OPERATOR_REVIEW_UTC"
@@ -12452,6 +12474,8 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
     assert template_payload["confirms_intended_backend"] is False
     assert template_payload["safe_to_stop_listener_by_gate"] is False
     assert template_payload["live_authority_granted"] is False
+    assert template_payload["execution_allowed_by_template"] is False
+    assert template_payload["readiness_closure_allowed_by_template"] is False
     run_dir = Path(summary["run_dir"])
     assert (run_dir / "summary.json").exists()
     assert not (run_dir / "logs").exists()

@@ -41,7 +41,10 @@ It does not approve live writes.
   `listener_confirmation_template_live_authority_granted: false`. It must also
   expose `listener_confirmation_template_accepted_by_template: false` plus
   `listener_confirmation_template_operator_placeholder_fields` for the
-  generated `REPLACE_WITH_*` operator fields. The accepted JSON must match the
+  generated `REPLACE_WITH_*` operator fields. It must also expose
+  `listener_confirmation_template_execution_allowed_by_template: false` and
+  `listener_confirmation_template_readiness_closure_allowed_by_template: false`.
+  The accepted JSON must match the
   current listener PID and command line, keep
   `safe_to_stop_listener_by_gate: false`, and keep
   `live_authority_granted: false`. If it was edited from the generated

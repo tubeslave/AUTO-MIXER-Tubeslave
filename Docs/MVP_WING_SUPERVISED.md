@@ -142,7 +142,11 @@ Stop the current Codex work direction and return to the first open blocker if:
   `listener_confirmation_template_live_authority_granted: false`, or while the
   failed summary does not show
   `listener_confirmation_template_accepted_by_template: false` and
-  `listener_confirmation_template_operator_placeholder_fields`, or while
+  `listener_confirmation_template_operator_placeholder_fields`, or while it
+  does not show
+  `listener_confirmation_template_execution_allowed_by_template: false` and
+  `listener_confirmation_template_readiness_closure_allowed_by_template: false`,
+  or while
   `listener_confirmation_template_required_edits` does not include
   `set template_status to operator_reviewed_and_edited if using the generated
   template` and `set accepted_by_template to true if using the generated
@@ -269,6 +273,9 @@ must expose the generated `listener_confirmation_template_path` and show
 It must also show `listener_confirmation_template_accepted_by_template: false`
 and `listener_confirmation_template_operator_placeholder_fields` listing
 `operator_reviewed_at` and `operator_name`.
+It must also show
+`listener_confirmation_template_execution_allowed_by_template: false` and
+`listener_confirmation_template_readiness_closure_allowed_by_template: false`.
 `listener_confirmation_template_required_edits` must include
 `set template_status to operator_reviewed_and_edited if using the generated
 template` and `set accepted_by_template to true if using the generated

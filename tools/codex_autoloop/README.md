@@ -169,6 +169,10 @@ you want the background automation active.
   `listener_confirmation_template_accepted_by_template: false` and
   `listener_confirmation_template_operator_placeholder_fields` while the
   generated template remains pending.
+- The same failed no-WING summary must expose
+  `listener_confirmation_template_execution_allowed_by_template: false` and
+  `listener_confirmation_template_readiness_closure_allowed_by_template: false`
+  while the generated template remains pending.
 - The generated backend-listener template must also expose
   `listener_confirmation_template_required_edits` with
   `set template_status to operator_reviewed_and_edited if using the generated

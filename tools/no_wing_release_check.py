@@ -1526,6 +1526,8 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
         "listener_confirmation_template_status",
         "listener_confirmation_template_acceptance_status",
         "listener_confirmation_template_accepted_by_template",
+        "listener_confirmation_template_execution_allowed_by_template",
+        "listener_confirmation_template_readiness_closure_allowed_by_template",
         "listener_confirmation_template_operator_reviewed_at",
         "listener_confirmation_template_operator_name",
         "listener_confirmation_template_candidate_count",
@@ -1792,6 +1794,12 @@ def maybe_attach_backend_listener_confirmation_template(
     detail["listener_confirmation_template_accepted_by_template"] = payload[
         "accepted_by_template"
     ]
+    detail["listener_confirmation_template_execution_allowed_by_template"] = payload[
+        "execution_allowed_by_template"
+    ]
+    detail[
+        "listener_confirmation_template_readiness_closure_allowed_by_template"
+    ] = payload["readiness_closure_allowed_by_template"]
     detail["listener_confirmation_template_operator_reviewed_at"] = payload[
         "operator_reviewed_at"
     ]
