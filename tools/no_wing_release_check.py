@@ -13192,6 +13192,11 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 else []
             ),
+            "backend_port_prestart_check_command": (
+                list(detail.get("backend_port_prestart_check_command"))
+                if isinstance(detail.get("backend_port_prestart_check_command"), list)
+                else []
+            ),
             "manual_review_required_before_readiness_update": (
                 detail.get("manual_review_required_before_readiness_update") is True
             ),
@@ -17042,6 +17047,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_expected_plan_matches_packet']).lower()}`",
                 "- prestart_backend_port_check_command: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['prestart_backend_port_check_command'])}`",
+                "- backend_port_prestart_check_command: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_command'])}`",
                 "- backend_port_prestart_check_operator_sequence_step_index: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step_index']}`",
                 "- backend_port_prestart_check_must_be_first_operator_step: "

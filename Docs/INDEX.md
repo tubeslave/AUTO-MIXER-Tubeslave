@@ -152,6 +152,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md` | Backend-port prestart failure-detail contracts now require `listener_process_error` so owner-probe failures remain visible before WING read-only preflight. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md` | WING read-only handoff packets now carry the no-WING prestart summary placeholder and pass it to plan/capture commands. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_COMMAND_BINDING_20260614.md` | WING read-only handoff summaries now prove preview and capture commands use the validated plan prestart summary path. |
+| `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_PRESTART_COMMAND_SUMMARY_20260614.md` | WING read-only handoff summaries now expose the packet-declared backend-port prestart command beside the extracted command-map value. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md` | Failed WING read-only handoff summaries now preserve unsafe packet denial/live-authority flag values instead of hardcoding safe false values. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md` | Failed WING read-only handoff summaries now preserve unsafe packet safety flags instead of hardcoding safe false values. |
 | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md` | Accepted WING read-only prestart traces now require bound no-WING summary `contacts_backend`, `queries_console`, and `executes_tests` fields to be false. |
@@ -222,6 +223,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING read-only prestart summary binding | `Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md` |
 | Current WING handoff prestart summary placeholder | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md` |
 | Current WING handoff prestart summary command binding | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_COMMAND_BINDING_20260614.md` |
+| Current WING handoff backend prestart command summary | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_PRESTART_COMMAND_SUMMARY_20260614.md` |
 | Current WING handoff denial flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING handoff safety flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING prestart summary contact boundary | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md` |

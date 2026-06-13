@@ -4330,6 +4330,7 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     )
     summary = write_summary(tmp_path, [result], generated_at="2026-06-14T00:00:00Z")
     artifact = summary["wing_readonly_preflight_handoff_packet_artifact"]
+    assert artifact["backend_port_prestart_check_command"] == ["python3", "other_check.py"]
     assert artifact["live_write"] is True
     assert artifact["mutates_console_state"] is True
     assert artifact["queries_console"] is True
@@ -4340,6 +4341,9 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     assert artifact["live_authority_granted"] is True
     assert artifact["full_autonomous_ready"] is True
     markdown_summary = (tmp_path / "summary.md").read_text()
+    assert 'backend_port_prestart_check_command: `["python3", "other_check.py"]`' in (
+        markdown_summary
+    )
     assert "live_write: `true`" in markdown_summary
     assert "mutates_console_state: `true`" in markdown_summary
     assert "queries_console: `true`" in markdown_summary
@@ -10814,6 +10818,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "tools/no_wing_release_check.py",
                 "--quick",
             ],
+            "backend_port_prestart_check_command": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/no_wing_release_check.py",
+                "--quick",
+            ],
             "review_command_writes_decision_template": True,
             "review_decision_template_output": (
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
@@ -11060,6 +11070,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "tools/no_wing_release_check.py",
         "--quick",
     ]
+    assert artifact["backend_port_prestart_check_command"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/no_wing_release_check.py",
+        "--quick",
+    ]
     assert artifact["review_command_writes_decision_template"] is True
     assert artifact["review_decision_template_output"] == (
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
@@ -11160,6 +11176,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER}`"
         in markdown_summary
     )
+    assert "backend_port_prestart_check_command: " in markdown_summary
+    assert "prestart_backend_port_check_command: " in markdown_summary
     assert "preview_command_prestart_summary_matches_plan: `true`" in markdown_summary
     assert "preview_command_artifact_root_matches_packet: `true`" in markdown_summary
     assert "preview_command_plan_output_matches_packet: `true`" in markdown_summary
