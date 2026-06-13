@@ -38,8 +38,11 @@ It does not approve live writes.
   pending with `listener_confirmation_template_status: pending_operator_edit`
   until an operator edits it; it must keep
   `listener_confirmation_template_safe_to_stop_listener_by_gate: false` and
-  `listener_confirmation_template_live_authority_granted: false`. The accepted
-  JSON must match the current listener PID and command line, keep
+  `listener_confirmation_template_live_authority_granted: false`. It must also
+  expose `listener_confirmation_template_accepted_by_template: false` plus
+  `listener_confirmation_template_operator_placeholder_fields` for the
+  generated `REPLACE_WITH_*` operator fields. The accepted JSON must match the
+  current listener PID and command line, keep
   `safe_to_stop_listener_by_gate: false`, and keep
   `live_authority_granted: false`. If it was edited from the generated
   template, it must also replace placeholder operator fields, set

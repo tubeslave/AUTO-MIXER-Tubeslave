@@ -7413,6 +7413,15 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
             "listener_confirmation_template_acceptance_status": (
                 release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS
             ),
+            "listener_confirmation_template_accepted_by_template": False,
+            "listener_confirmation_template_operator_reviewed_at": (
+                "REPLACE_WITH_OPERATOR_REVIEW_UTC"
+            ),
+            "listener_confirmation_template_operator_name": "REPLACE_WITH_OPERATOR_NAME",
+            "listener_confirmation_template_operator_placeholder_fields": [
+                "operator_reviewed_at",
+                "operator_name",
+            ],
             "listener_confirmation_template_candidate_count": 1,
             "listener_confirmation_template_required_edits": list(
                 release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REQUIRED_EDITS
@@ -7446,6 +7455,18 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     assert "listener_confirmation_template_path" in markdown_summary
     assert "backend-listener-confirmation-template.json" in markdown_summary
     assert "listener_confirmation_template_status: `pending_operator_edit`" in (
+        markdown_summary
+    )
+    assert "listener_confirmation_template_acceptance_status" in markdown_summary
+    assert "operator_review_required" in markdown_summary
+    assert "listener_confirmation_template_accepted_by_template: `False`" in (
+        markdown_summary
+    )
+    assert "listener_confirmation_template_operator_reviewed_at" in markdown_summary
+    assert "REPLACE_WITH_OPERATOR_REVIEW_UTC" in markdown_summary
+    assert "listener_confirmation_template_operator_name" in markdown_summary
+    assert "REPLACE_WITH_OPERATOR_NAME" in markdown_summary
+    assert "listener_confirmation_template_operator_placeholder_fields" in (
         markdown_summary
     )
     assert "listener_confirmation_template_candidate_count: `1`" in markdown_summary
@@ -12388,6 +12409,25 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
         ]
         == release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS
     )
+    assert (
+        summary["results"][0]["detail"][
+            "listener_confirmation_template_accepted_by_template"
+        ]
+        is False
+    )
+    assert (
+        summary["results"][0]["detail"][
+            "listener_confirmation_template_operator_reviewed_at"
+        ]
+        == "REPLACE_WITH_OPERATOR_REVIEW_UTC"
+    )
+    assert (
+        summary["results"][0]["detail"]["listener_confirmation_template_operator_name"]
+        == "REPLACE_WITH_OPERATOR_NAME"
+    )
+    assert summary["results"][0]["detail"][
+        "listener_confirmation_template_operator_placeholder_fields"
+    ] == ["operator_reviewed_at", "operator_name"]
     assert (
         summary["results"][0]["detail"][
             "listener_confirmation_template_safe_to_stop_listener_by_gate"

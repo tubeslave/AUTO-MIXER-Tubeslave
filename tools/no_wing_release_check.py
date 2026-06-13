@@ -1524,10 +1524,25 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
         "matched_listener_pid",
         "listener_confirmation_template_path",
         "listener_confirmation_template_status",
+        "listener_confirmation_template_acceptance_status",
+        "listener_confirmation_template_accepted_by_template",
+        "listener_confirmation_template_operator_reviewed_at",
+        "listener_confirmation_template_operator_name",
         "listener_confirmation_template_candidate_count",
     ):
         if field in detail:
             lines.append(f"  - {field}: `{detail[field]}`")
+    listener_confirmation_template_operator_placeholder_fields = detail.get(
+        "listener_confirmation_template_operator_placeholder_fields"
+    )
+    if (
+        isinstance(listener_confirmation_template_operator_placeholder_fields, list)
+        and listener_confirmation_template_operator_placeholder_fields
+    ):
+        lines.append(
+            "  - listener_confirmation_template_operator_placeholder_fields: "
+            f"`{json.dumps(listener_confirmation_template_operator_placeholder_fields, ensure_ascii=False)}`"
+        )
     listener_confirmation_template_required_edits = detail.get(
         "listener_confirmation_template_required_edits"
     )
@@ -1774,6 +1789,20 @@ def maybe_attach_backend_listener_confirmation_template(
     detail["listener_confirmation_template_path"] = str(path)
     detail["listener_confirmation_template_status"] = payload["template_status"]
     detail["listener_confirmation_template_acceptance_status"] = payload["status"]
+    detail["listener_confirmation_template_accepted_by_template"] = payload[
+        "accepted_by_template"
+    ]
+    detail["listener_confirmation_template_operator_reviewed_at"] = payload[
+        "operator_reviewed_at"
+    ]
+    detail["listener_confirmation_template_operator_name"] = payload["operator_name"]
+    detail["listener_confirmation_template_operator_placeholder_fields"] = [
+        field
+        for field in ("operator_reviewed_at", "operator_name")
+        if str(payload.get(field) or "").startswith(
+            BACKEND_PORT_LISTENER_CONFIRMATION_PLACEHOLDER_PREFIX
+        )
+    ]
     detail["listener_confirmation_template_candidate_count"] = len(
         payload["listener_candidates"]
     )

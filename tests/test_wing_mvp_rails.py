@@ -437,6 +437,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "listener_process_error" in readonly
     assert "safe_to_stop_listener_by_gate" in readonly
     assert "operator_next_step" in readonly
+    assert "listener_confirmation_template_accepted_by_template: false" in readonly
+    assert "listener_confirmation_template_operator_placeholder_fields" in readonly
+    assert "REPLACE_WITH_*" in readonly
     assert "manual_review_required_before_readiness_update: true" in readonly
     assert "readiness_matrix_update_allowed_by_packet: false" in readonly
     assert "readiness_closure_allowed_by_packet: false" in readonly
@@ -735,6 +738,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_EDIT_REQUIREMENT_CANON_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_PENDING_SUMMARY_FIELDS_20260613.md"
         in text
     )
     assert (
