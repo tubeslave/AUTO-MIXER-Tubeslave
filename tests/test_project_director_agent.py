@@ -67,6 +67,8 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_check_failure_detail_fields" in directive[
         "selected_action"
     ]
+    assert "failed busy-port no-WING summary" in directive["selected_action"]
+    assert "no-WING handoff summary" in directive["selected_action"]
     assert "listener_processes" in directive["selected_action"]
     assert "listener_process_error" in directive["selected_action"]
     assert "safe_to_stop_listener_by_gate" in directive["selected_action"]
@@ -303,6 +305,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md"
         in directive["selected_evidence_files"]
     )
     assert (

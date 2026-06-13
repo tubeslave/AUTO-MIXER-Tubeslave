@@ -149,7 +149,8 @@ you want the background automation active.
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
   This keeps the structured prestart command aligned with the required
   no-WING release check.
-- Before any supervised fader/gain proof, the no-WING handoff summary must show
+- Before any supervised fader/gain proof, the failed busy-port no-WING summary
+  and no-WING handoff summary must show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,

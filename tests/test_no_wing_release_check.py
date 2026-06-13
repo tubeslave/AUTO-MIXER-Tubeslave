@@ -7427,6 +7427,9 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
             "listener_confirmation_checklist": list(
                 release_check.BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
             ),
+            "backend_port_prestart_check_failure_detail_fields": list(
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ),
             "preflight_blocked_until_listener_confirmed": True,
             "intended_backend_confirmation_required": True,
             "safe_to_stop_listener_by_gate": False,
@@ -7475,6 +7478,8 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     assert "do not stop or reconfigure the listener from this no-WING gate" in (
         markdown_summary
     )
+    assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
+    assert "listener_confirmation_template_required_edits" in markdown_summary
     assert "preflight_blocked_until_listener_confirmed: `True`" in markdown_summary
     assert "intended_backend_confirmation_required: `True`" in markdown_summary
     assert "safe_to_stop_listener_by_gate: `False`" in markdown_summary
@@ -12494,6 +12499,9 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
         ]
         is False
     )
+    assert summary["results"][0]["detail"][
+        "backend_port_prestart_check_failure_detail_fields"
+    ] == list(WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS)
     template_path = Path(
         summary["results"][0]["detail"]["listener_confirmation_template_path"]
     )

@@ -186,6 +186,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["evidence"]
     )
     assert (
+        "AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
         "AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in rows[0]["evidence"]
     )
@@ -224,6 +228,8 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_check_failure_detail_fields" in rows[0][
         "next action"
     ]
+    assert "failed busy-port no-WING summary" in rows[0]["next action"]
+    assert "no-WING handoff summary" in rows[0]["next action"]
     assert "listener_processes" in rows[0]["next action"]
     assert "listener_process_error" in rows[0]["next action"]
     assert "safe_to_stop_listener_by_gate" in rows[0]["next action"]
@@ -816,6 +822,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md"
         in text
     )
     assert (

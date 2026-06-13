@@ -24,6 +24,7 @@ It does not approve live writes.
   it does not fail `backend_port_free` against an unexpected local listener. If
   it does, inspect the generated summary fields `listener_processes`,
   `listener_process_error`, `listener_confirmation_checklist`,
+  `backend_port_prestart_check_failure_detail_fields`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `fail_closed_reason`, and `operator_next_step` before changing local
