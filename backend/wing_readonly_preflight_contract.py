@@ -85,6 +85,45 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS = (
     "accepted_decision_ready"
 )
 
+WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES = (
+    "create_operator_proposal",
+    "apply_operator_proposal",
+    "rollback_last_manual_write",
+    "emergency_stop",
+    "set_operator_mode",
+    "set_fader",
+    "set_gain",
+    "set_trim",
+    "set_input_trim",
+    "set_channel_trim",
+    "set_preamp_trim",
+    "set_preamp_gain",
+    "set_eq",
+    "set_compressor",
+    "route_output",
+    "load_snap",
+    "save_snap",
+    "reset",
+    "mute",
+    "unmute",
+    "set_insert",
+    "set_fx_model",
+    "set_fx_on",
+    "set_fx_mix",
+    "set_fx_parameter",
+    "connect_wing",
+    "disconnect_wing",
+    "connect_mixer",
+    "disconnect_mixer",
+)
+WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS = (
+    "wing_readonly_connection_proof",
+    "physical_console_readback_proof",
+    "supervised_fader_write_proof",
+    "supervised_gain_down_trim_proof",
+    "readiness_matrix_update_based_on_real_proof",
+)
+
 WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS = (
     "backend_not_in_wing_mode",
     "event_log_wing_mode_not_proven",

@@ -230,6 +230,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "tools/wing_readonly_preflight_runner.py",
             "tools/build_wing_readonly_preflight_handoff_packet.py",
             "tools/review_wing_readonly_preflight_artifacts.py",
+            "backend/wing_readonly_preflight_contract.py",
             "backend/wing_readonly_preflight_evidence.py",
         ),
         entrypoints=(
@@ -240,6 +241,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "read-only WING preflight runner",
             "read-only WING preflight handoff packet builder",
             "read-only WING preflight artifact review",
+            "read-only WING preflight safety contract",
             "read-only WING preflight evidence intake",
         ),
         write_kinds=("proof_fader", "proof_gain", "proof_eq", "forbidden_token_scan"),

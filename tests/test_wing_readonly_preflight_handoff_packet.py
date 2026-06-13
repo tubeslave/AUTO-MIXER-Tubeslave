@@ -10,6 +10,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
+    WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -238,18 +240,18 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "set_fx_parameter" in forbidden_request_types
     assert len(packet["forbidden_live_request_types"]) == len(forbidden_request_types)
     assert forbidden_request_types == set(
-        no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+        WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
     )
     assert "wing_readonly_connection_proof" in packet["blockers_not_closed_by_packet"]
     assert packet["blockers_not_closed_by_packet"] == list(
-        no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+        WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
     )
 
 
-def test_handoff_packet_forbidden_live_request_types_matches_release_check_contract():
+def test_handoff_packet_forbidden_live_request_types_matches_shared_contract():
     packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
     expected_forbidden = set(
-        no_wing_release_check.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
+        WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
     )
     packet_forbidden = set(packet["forbidden_live_request_types"])
 
