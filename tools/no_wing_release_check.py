@@ -3510,6 +3510,14 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         review_decision_template_status
         == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
     )
+    review_decision_template_output = command_value_after_flag(
+        review_command,
+        "--decision-template-output",
+    )
+    review_decision_template_output_matches_contract = (
+        review_decision_template_output
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
     capture_channels = command_value_after_flag(capture_command, "--channels")
     capture_confirmed_channels = command_value_after_flag(
         capture_command,
@@ -3616,6 +3624,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_review_decision_template_status_mismatch")
     if "--decision-template-output" not in review_command:
         violations.append("wing_readonly_preflight_review_decision_template_output_missing")
+    if not review_decision_template_output_matches_contract:
+        violations.append("wing_readonly_preflight_review_decision_template_output_mismatch")
     if "--operator-confirm-channels" not in capture_command:
         violations.append("wing_readonly_preflight_capture_operator_confirmation_missing")
     if "--operator-confirm-session-ready" not in capture_command:
@@ -3781,6 +3791,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["review_command"] = review_command
     detail["review_command_writes_decision_template"] = (
         "--decision-template-output" in review_command
+    )
+    detail["review_decision_template_output"] = review_decision_template_output
+    detail["review_decision_template_output_matches_contract"] = (
+        review_decision_template_output_matches_contract
     )
     detail["review_exit_codes"] = dict(WING_READONLY_PREFLIGHT_REVIEW_EXIT_CODES)
     detail["review_manual_checklist_ids"] = list(review_manual_checklist_ids)
@@ -11636,6 +11650,12 @@ def wing_readonly_preflight_evidence_summary(
             "review_command_writes_decision_template": (
                 review_command_writes_decision_template
             ),
+            "review_decision_template_output": detail.get(
+                "review_decision_template_output"
+            ),
+            "review_decision_template_output_matches_contract": (
+                detail.get("review_decision_template_output_matches_contract") is True
+            ),
             "review_exit_codes": (
                 dict(review_exit_codes) if isinstance(review_exit_codes, Mapping) else {}
             ),
@@ -15164,6 +15184,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['review_command'])}`",
                 "- review_command_writes_decision_template: "
                 f"`{str(wing_readonly_preflight['review_command_writes_decision_template']).lower()}`",
+                "- review_decision_template_output: "
+                f"`{wing_readonly_preflight['review_decision_template_output']}`",
+                "- review_decision_template_output_matches_contract: "
+                f"`{str(wing_readonly_preflight['review_decision_template_output_matches_contract']).lower()}`",
                 "- review_exit_codes: "
                 f"`{json.dumps(wing_readonly_preflight['review_exit_codes'], sort_keys=True)}`",
                 "- review_manual_checklist_ids: "

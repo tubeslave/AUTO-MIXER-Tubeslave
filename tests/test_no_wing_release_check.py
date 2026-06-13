@@ -788,6 +788,10 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     ]
     assert result.detail["review_command_writes_decision_template"] is True
+    assert result.detail["review_decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert result.detail["review_decision_template_output_matches_contract"] is True
     assert result.detail["review_exit_codes"] == {
         "candidate_ready": 0,
         "artifact_missing": 2,
@@ -3457,8 +3461,44 @@ def test_no_wing_release_check_rejects_review_command_without_decision_template_
 
     assert result.status == "failed"
     assert result.detail["review_command_writes_decision_template"] is False
+    assert result.detail["review_decision_template_output"] is None
+    assert result.detail["review_decision_template_output_matches_contract"] is False
     assert (
         "wing_readonly_preflight_review_decision_template_output_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_template_output_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_review_decision_template_output_mismatch(
+    monkeypatch,
+):
+    review_command = release_check.wing_readonly_preflight_review_command()
+    output_index = review_command.index("--decision-template-output") + 1
+    review_command[output_index] = (
+        "artifacts/wing_readonly_preflight_review_decisions/stale_template.json"
+    )
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_review_command",
+        lambda: review_command,
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["review_command_writes_decision_template"] is True
+    assert result.detail["review_decision_template_output"] == review_command[output_index]
+    assert result.detail["review_decision_template_output_matches_contract"] is False
+    assert (
+        "wing_readonly_preflight_review_decision_template_output_missing"
+        not in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_template_output_mismatch"
         in result.detail["violations"]
     )
 
@@ -8405,6 +8445,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
             ],
             "review_command_writes_decision_template": True,
+            "review_decision_template_output": (
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+            ),
+            "review_decision_template_output_matches_contract": True,
             "review_exit_codes": {
                 "candidate_ready": 0,
                 "artifact_missing": 2,
@@ -8567,6 +8611,10 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     )
     assert "--decision-template-output" in preflight["review_command"]
     assert preflight["review_command_writes_decision_template"] is True
+    assert preflight["review_decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert preflight["review_decision_template_output_matches_contract"] is True
     assert preflight["review_exit_codes"] == {
         "candidate_ready": 0,
         "artifact_missing": 2,
@@ -8655,6 +8703,11 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "pending_review_decision_template.json" in markdown_summary
     assert '"invalid_artifact": 3' in markdown_summary
     assert "review_command_writes_decision_template: `true`" in markdown_summary
+    assert "review_decision_template_output:" in markdown_summary
+    assert (
+        "review_decision_template_output_matches_contract: `true`"
+        in markdown_summary
+    )
     assert "review_manual_checklist_complete: `true`" in markdown_summary
     assert "confirm_event_log_readonly_sequence" in markdown_summary
     assert "review_decision_template_contract_complete: `true`" in markdown_summary
