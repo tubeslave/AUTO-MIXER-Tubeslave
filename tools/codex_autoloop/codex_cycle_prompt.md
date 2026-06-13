@@ -143,10 +143,11 @@ blockers выше.
 8. verify `backend_port_prestart_gate.required_markers` exactly lists
    `Before starting the intended backend/WING session`,
    `prestart_backend_port_check`, and `unexpected listeners`;
-9. verify `backend_port_prestart_check_command` exactly matches
+9. verify the failed busy-port no-WING summary and no-WING handoff summary both
+   show `backend_port_prestart_check_command` exactly matching
    `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`;
-10. verify the failed busy-port no-WING summary and no-WING handoff summary
-   expose `backend_port_prestart_check_failure_detail_fields` exactly listing
+10. verify the same summaries expose
+   `backend_port_prestart_check_failure_detail_fields` exactly listing
    `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
    `preflight_blocked_until_listener_confirmed`,
    `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
@@ -304,11 +305,11 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_gate.required_markers` must exactly list
   `Before starting the intended backend/WING session`,
   `prestart_backend_port_check`, and `unexpected listeners`.
-- Before any supervised fader/gain proof, the no-WING handoff summary must show
+- Before any supervised fader/gain proof, the failed busy-port no-WING summary
+  and no-WING handoff summary must both show
   `backend_port_prestart_check_command` exactly matching
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
-- Before any supervised fader/gain proof, the failed busy-port no-WING summary
-  and no-WING handoff summary must show
+- The same summaries must also show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,

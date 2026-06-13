@@ -24,6 +24,7 @@ It does not approve live writes.
   it does not fail `backend_port_free` against an unexpected local listener. If
   it does, inspect the generated summary fields `listener_processes`,
   `listener_process_error`, `listener_confirmation_checklist`,
+  `backend_port_prestart_check_command`,
   `backend_port_prestart_check_failure_detail_fields`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
@@ -420,9 +421,11 @@ The handoff validation must report:
 - `backend_port_prestart_gate.required_markers` exactly lists
   `Before starting the intended backend/WING session`,
   `prestart_backend_port_check`, and `unexpected listeners`
-- `backend_port_prestart_check_command` exactly matches
+- the failed busy-port no-WING summary and no-WING handoff summary both show
+  `backend_port_prestart_check_command` exactly matching
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
-- `backend_port_prestart_check_failure_detail_fields` exactly lists
+- the same summaries also show `backend_port_prestart_check_failure_detail_fields`
+  exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,

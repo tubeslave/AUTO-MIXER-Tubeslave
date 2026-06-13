@@ -125,7 +125,8 @@ Stop the current Codex work direction and return to the first open blocker if:
   exactly list `required_markers` for
   `Before starting the intended backend/WING session`,
   `prestart_backend_port_check`, and `unexpected listeners`.
-- A supervised proof is planned while the no-WING handoff summary does not show
+- A supervised proof is planned while the failed busy-port no-WING summary or
+  no-WING handoff summary does not show
   `backend_port_prestart_check_command` exactly matching
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 - A supervised proof is planned while the failed busy-port no-WING summary or
@@ -263,11 +264,11 @@ The same `backend_port_prestart_gate` must also show
 `Before starting the intended backend/WING session`,
 `prestart_backend_port_check`, and `unexpected listeners`.
 
-The no-WING handoff summary must also show
+The failed busy-port no-WING summary and no-WING handoff summary must both show
 `backend_port_prestart_check_command` exactly matching
 `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 
-The failed busy-port no-WING summary and no-WING handoff summary must also show
+The same summaries must also show
 `backend_port_prestart_check_failure_detail_fields` exactly listing
 `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
 `preflight_blocked_until_listener_confirmed`,

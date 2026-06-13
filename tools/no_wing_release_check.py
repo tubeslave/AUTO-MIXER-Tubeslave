@@ -1517,6 +1517,14 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
             "  - listener_confirmation_checklist: "
             f"`{json.dumps(listener_confirmation_checklist, ensure_ascii=False)}`"
         )
+    backend_port_prestart_check_command = detail.get(
+        "backend_port_prestart_check_command"
+    )
+    if isinstance(backend_port_prestart_check_command, list):
+        lines.append(
+            "  - backend_port_prestart_check_command: "
+            f"`{json.dumps(backend_port_prestart_check_command, ensure_ascii=False)}`"
+        )
     backend_port_prestart_check_failure_detail_fields = detail.get(
         "backend_port_prestart_check_failure_detail_fields"
     )
@@ -1785,6 +1793,9 @@ def maybe_attach_backend_listener_confirmation_template(
         return result
     if detail.get("listener_confirmation_status") == "accepted":
         return result
+    detail["backend_port_prestart_check_command"] = list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
     detail["backend_port_prestart_check_failure_detail_fields"] = list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
@@ -1858,6 +1869,9 @@ def check_port_free(
         detail["listener_processes"] = listener_processes
         detail["listener_confirmation_checklist"] = list(
             BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
+        )
+        detail["backend_port_prestart_check_command"] = list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
         )
         detail["backend_port_prestart_check_failure_detail_fields"] = list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
