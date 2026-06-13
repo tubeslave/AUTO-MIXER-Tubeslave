@@ -85,6 +85,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "backend_port_prestart_summary_required: true" in text
     assert "backend_port_prestart_summary_path_placeholder" in text
     assert "preview_command_prestart_summary" in text
+    assert "preview_command_prestart_summary_matches_plan: true" in text
     assert "capture_command_prestart_summary" in text
     assert "capture_command_prestart_summary_matches_plan: true" in text
     assert "backend_port_prestart_summary_type: no_wing_release_check" in text
@@ -341,6 +342,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "next action"
     ]
     assert "preview_command_prestart_summary" in rows[0]["next action"]
+    assert "preview_command_prestart_summary_matches_plan: true" in rows[0][
+        "next action"
+    ]
     assert "capture_command_prestart_summary" in rows[0]["next action"]
     assert "capture_command_prestart_summary_matches_plan: true" in rows[0][
         "next action"
@@ -948,6 +952,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "backend_port_prestart_summary_required: true" in text
     assert "backend_port_prestart_summary_path_placeholder" in text
     assert "preview_command_prestart_summary" in text
+    assert "preview_command_prestart_summary_matches_plan: true" in text
     assert "capture_command_prestart_summary" in text
     assert "capture_command_prestart_summary_matches_plan: true" in text
     assert "backend_port_prestart_summary_status: passed" in text

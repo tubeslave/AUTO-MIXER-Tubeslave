@@ -220,6 +220,7 @@ Stop the current Codex work direction and return to the first open blocker if:
   `preview_command_prestart_summary` and `capture_command_prestart_summary`
   matching that same passed no-WING prestart `summary.json`.
 - A supervised proof is planned while the no-WING handoff summary does not show
+  `preview_command_prestart_summary_matches_plan: true` and
   `capture_command_prestart_summary_matches_plan: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `execution_allowed_by_packet: false`.

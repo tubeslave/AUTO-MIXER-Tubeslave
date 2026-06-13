@@ -3024,6 +3024,13 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["request_sequence_matches_expected"] is True
     assert result.detail["preview_command_uses_plan_only"] is True
     assert result.detail["capture_command_requires_physical_readback"] is True
+    assert result.detail["plan_backend_port_prestart_summary_path"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert result.detail["preview_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert result.detail["preview_command_prestart_summary_matches_plan"] is True
     assert result.detail["preview_command_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
     )
@@ -3034,6 +3041,10 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "artifacts/wing_readonly_preflight"
     )
     assert result.detail["capture_command_artifact_root_matches_packet"] is True
+    assert result.detail["capture_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert result.detail["capture_command_prestart_summary_matches_plan"] is True
     assert result.detail["capture_command_expected_plan"] == str(plan_path)
     assert result.detail["capture_command_expected_plan_matches_packet"] is True
     assert result.detail["prestart_backend_port_check_command"] == [
@@ -3970,6 +3981,51 @@ def test_no_wing_release_check_rejects_handoff_packet_with_command_artifact_bind
         "wing_readonly_preflight_handoff_packet_review_artifact_root_mismatch",
         "wing_readonly_preflight_handoff_packet_decision_review_artifact_root_mismatch",
         "wing_readonly_preflight_handoff_packet_decision_review_decision_root_mismatch",
+    ):
+        assert violation in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_prestart_summary_binding_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-prestart-summary-binding-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    wrong_summary = "artifacts/no_wing_release_check/wrong-run/summary.json"
+    payload["backend_port_prestart_summary_path_placeholder"] = wrong_summary
+    payload["commands"]["preview_readonly_request_plan"][
+        payload["commands"]["preview_readonly_request_plan"].index("--prestart-summary")
+        + 1
+    ] = wrong_summary
+    payload["commands"]["capture_readonly_preflight"][
+        payload["commands"]["capture_readonly_preflight"].index("--prestart-summary")
+        + 1
+    ] = wrong_summary
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["plan_backend_port_prestart_summary_path"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert result.detail["preview_command_prestart_summary"] == wrong_summary
+    assert result.detail["preview_command_prestart_summary_matches_plan"] is False
+    assert result.detail["capture_command_prestart_summary"] == wrong_summary
+    assert result.detail["capture_command_prestart_summary_matches_plan"] is False
+    for violation in (
+        "wing_readonly_preflight_handoff_packet_prestart_summary_path_mismatch",
+        "wing_readonly_preflight_handoff_packet_preview_readonly_request_plan_mismatch",
+        "wing_readonly_preflight_handoff_packet_capture_readonly_preflight_mismatch",
+        "wing_readonly_preflight_handoff_packet_preview_prestart_summary_mismatch",
+        "wing_readonly_preflight_handoff_packet_capture_prestart_summary_mismatch",
     ):
         assert violation in result.detail["violations"]
 
@@ -10693,9 +10749,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "review_edited_decision_json",
             ],
             "preview_command_uses_plan_only": True,
+            "plan_backend_port_prestart_summary_path": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+            ),
             "preview_command_prestart_summary": (
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
             ),
+            "preview_command_prestart_summary_matches_plan": True,
             "preview_command_artifact_root": "artifacts/wing_readonly_preflight",
             "preview_command_artifact_root_matches_packet": True,
             "preview_command_plan_output": "/tmp/wing_readonly_preflight_plan.json",
@@ -10704,6 +10764,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "capture_command_prestart_summary": (
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
             ),
+            "capture_command_prestart_summary_matches_plan": True,
             "capture_command_artifact_root": "artifacts/wing_readonly_preflight",
             "capture_command_artifact_root_matches_packet": True,
             "capture_command_expected_plan": "/tmp/wing_readonly_preflight_plan.json",
@@ -10926,6 +10987,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["request_sequence_matches_plan"] is True
     assert artifact["request_sequence_matches_expected"] is True
     assert artifact["preview_command_uses_plan_only"] is True
+    assert artifact["plan_backend_port_prestart_summary_path"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert artifact["preview_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert artifact["preview_command_prestart_summary_matches_plan"] is True
     assert artifact["preview_command_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
     )
@@ -10935,6 +11003,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert artifact["preview_command_plan_output_matches_packet"] is True
     assert artifact["capture_command_requires_physical_readback"] is True
+    assert artifact["capture_command_prestart_summary"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
+    assert artifact["capture_command_prestart_summary_matches_plan"] is True
     assert artifact["capture_command_artifact_root"] == (
         "artifacts/wing_readonly_preflight"
     )
@@ -11044,8 +11116,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "expected_backend_connection_confirmation_step_index: `2`"
         in markdown_summary
     )
+    assert (
+        "plan_backend_port_prestart_summary_path: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER}`"
+        in markdown_summary
+    )
+    assert "preview_command_prestart_summary_matches_plan: `true`" in markdown_summary
     assert "preview_command_artifact_root_matches_packet: `true`" in markdown_summary
     assert "preview_command_plan_output_matches_packet: `true`" in markdown_summary
+    assert "capture_command_prestart_summary_matches_plan: `true`" in markdown_summary
     assert "capture_command_artifact_root_matches_packet: `true`" in markdown_summary
     assert "capture_command_expected_plan_matches_packet: `true`" in markdown_summary
     assert "review_command_artifact_root_matches_packet: `true`" in markdown_summary

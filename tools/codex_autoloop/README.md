@@ -252,7 +252,8 @@ you want the background automation active.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_summary_path_placeholder` pointing to the passed
   no-WING prestart `summary.json`, plus matching
-  `preview_command_prestart_summary`, matching
+  `preview_command_prestart_summary`,
+  `preview_command_prestart_summary_matches_plan: true`, matching
   `capture_command_prestart_summary`, and
   `capture_command_prestart_summary_matches_plan: true`.
   This keeps the operator handoff commands aligned with the runner prestart

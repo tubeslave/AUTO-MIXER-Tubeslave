@@ -473,6 +473,13 @@ The handoff validation must report:
   `backend_port_prestart_gate_execution_allowed: false`,
   `backend_port_prestart_gate_readiness_closure_allowed: false`, and
   `backend_port_prestart_gate_live_authority_granted: false`
+- the no-WING handoff summary also shows
+  `backend_port_prestart_summary_path_placeholder` pointing to the passed
+  no-WING prestart `summary.json`,
+  `preview_command_prestart_summary` matching that path,
+  `preview_command_prestart_summary_matches_plan: true`,
+  `capture_command_prestart_summary` matching that path, and
+  `capture_command_prestart_summary_matches_plan: true`
 - `execution_allowed_by_packet: false`
 - `live_authority_granted: false`
 - `full_autonomous_ready: false`

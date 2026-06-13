@@ -4791,10 +4791,11 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     expected_mvp_blocker_anchor_sha256 = wing_mvp_blocker_anchor_sha256(
         expected_mvp_blocker_anchor
     )
-    expected_prestart_summary = str(
-        packet.get("backend_port_prestart_summary_path_placeholder")
+    plan_backend_port_prestart_summary_path = str(
+        plan_artifact_detail.get("backend_port_prestart_summary_path")
         or WING_READONLY_PREFLIGHT_PRESTART_SUMMARY
     )
+    expected_prestart_summary = plan_backend_port_prestart_summary_path
     required_checklist = (
         packet.get("required_review_checklist_ids")
         if isinstance(packet.get("required_review_checklist_ids"), list)
@@ -4834,6 +4835,14 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         bool(preview_command_plan_output)
         and preview_command_plan_output == packet.get("plan_output")
     )
+    preview_command_prestart_summary = command_value_after_flag(
+        preview_command,
+        "--prestart-summary",
+    )
+    preview_command_prestart_summary_matches_plan = (
+        bool(preview_command_prestart_summary)
+        and preview_command_prestart_summary == expected_prestart_summary
+    )
     capture_command_artifact_root = command_value_after_flag(
         capture_command,
         "--artifact-root",
@@ -4849,6 +4858,14 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     capture_command_expected_plan_matches_packet = (
         bool(capture_command_expected_plan)
         and capture_command_expected_plan == packet.get("plan_output")
+    )
+    capture_command_prestart_summary = command_value_after_flag(
+        capture_command,
+        "--prestart-summary",
+    )
+    capture_command_prestart_summary_matches_plan = (
+        bool(capture_command_prestart_summary)
+        and capture_command_prestart_summary == expected_prestart_summary
     )
     review_command_artifact_root = command_value_after_flag(
         review_command,
@@ -5215,6 +5232,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_preview_plan_output_mismatch"
         )
+    if not preview_command_prestart_summary_matches_plan:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_preview_prestart_summary_mismatch"
+        )
     if commands.get("prestart_backend_port_check") != (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     ):
@@ -5240,6 +5261,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not capture_command_expected_plan_matches_packet:
         violations.append(
             "wing_readonly_preflight_handoff_packet_capture_expected_plan_mismatch"
+        )
+    if not capture_command_prestart_summary_matches_plan:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_capture_prestart_summary_mismatch"
         )
     if not review_command_artifact_root_matches_packet:
         violations.append(
@@ -5511,6 +5536,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["backend_port_prestart_summary_path_placeholder"] = packet.get(
         "backend_port_prestart_summary_path_placeholder"
     )
+    detail["plan_backend_port_prestart_summary_path"] = (
+        plan_backend_port_prestart_summary_path
+    )
     detail["backend_port_prestart_check_operator_sequence_step_index"] = packet.get(
         "backend_port_prestart_check_operator_sequence_step_index"
     )
@@ -5649,9 +5677,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["preview_command_uses_plan_only"] = (
         "--plan-only" in preview_command
     )
-    detail["preview_command_prestart_summary"] = command_value_after_flag(
-        preview_command,
-        "--prestart-summary",
+    detail["preview_command_prestart_summary"] = preview_command_prestart_summary
+    detail["preview_command_prestart_summary_matches_plan"] = (
+        preview_command_prestart_summary_matches_plan
     )
     detail["preview_command_artifact_root"] = preview_command_artifact_root
     detail["preview_command_artifact_root_matches_packet"] = (
@@ -5664,9 +5692,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["capture_command_requires_physical_readback"] = (
         "--require-physical-readback" in capture_command
     )
-    detail["capture_command_prestart_summary"] = command_value_after_flag(
-        capture_command,
-        "--prestart-summary",
+    detail["capture_command_prestart_summary"] = capture_command_prestart_summary
+    detail["capture_command_prestart_summary_matches_plan"] = (
+        capture_command_prestart_summary_matches_plan
     )
     detail["capture_command_artifact_root"] = capture_command_artifact_root
     detail["capture_command_artifact_root_matches_packet"] = (
@@ -13096,6 +13124,9 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "backend_port_prestart_summary_path_placeholder": str(
                 detail.get("backend_port_prestart_summary_path_placeholder") or ""
             ),
+            "plan_backend_port_prestart_summary_path": str(
+                detail.get("plan_backend_port_prestart_summary_path") or ""
+            ),
             "backend_port_prestart_check_operator_sequence_step_index": (
                 detail.get("backend_port_prestart_check_operator_sequence_step_index")
             ),
@@ -13330,6 +13361,9 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "preview_command_prestart_summary": str(
                 detail.get("preview_command_prestart_summary") or ""
             ),
+            "preview_command_prestart_summary_matches_plan": (
+                detail.get("preview_command_prestart_summary_matches_plan") is True
+            ),
             "preview_command_artifact_root": str(
                 detail.get("preview_command_artifact_root") or ""
             ),
@@ -13347,6 +13381,9 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "capture_command_prestart_summary": str(
                 detail.get("capture_command_prestart_summary") or ""
+            ),
+            "capture_command_prestart_summary_matches_plan": (
+                detail.get("capture_command_prestart_summary_matches_plan") is True
             ),
             "capture_command_artifact_root": str(
                 detail.get("capture_command_artifact_root") or ""
@@ -16861,6 +16898,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_required']).lower()}`",
                 "- backend_port_prestart_summary_path_placeholder: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_path_placeholder']}`",
+                "- plan_backend_port_prestart_summary_path: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_path']}`",
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- execution_allowed_by_packet: "
@@ -16965,6 +17004,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['preview_command_uses_plan_only']).lower()}`",
                 "- preview_command_prestart_summary: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['preview_command_prestart_summary']}`",
+                "- preview_command_prestart_summary_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['preview_command_prestart_summary_matches_plan']).lower()}`",
                 "- preview_command_artifact_root: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['preview_command_artifact_root']}`",
                 "- preview_command_artifact_root_matches_packet: "
@@ -16977,6 +17018,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_requires_physical_readback']).lower()}`",
                 "- capture_command_prestart_summary: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['capture_command_prestart_summary']}`",
+                "- capture_command_prestart_summary_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_prestart_summary_matches_plan']).lower()}`",
                 "- capture_command_artifact_root: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['capture_command_artifact_root']}`",
                 "- capture_command_artifact_root_matches_packet: "

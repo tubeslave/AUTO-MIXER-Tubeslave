@@ -156,6 +156,9 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "selected_action"
     ]
     assert "preview_command_prestart_summary" in directive["selected_action"]
+    assert "preview_command_prestart_summary_matches_plan: true" in directive[
+        "selected_action"
+    ]
     assert "capture_command_prestart_summary" in directive["selected_action"]
     assert "capture_command_prestart_summary_matches_plan: true" in directive[
         "selected_action"

@@ -201,7 +201,8 @@ blockers выше.
 26. verify `backend_port_prestart_summary_required: true`;
 27. verify `backend_port_prestart_summary_path_placeholder` points to the
    passed no-WING prestart `summary.json`;
-28. verify `preview_command_prestart_summary` matches that path;
+28. verify `preview_command_prestart_summary` matches that path and
+   `preview_command_prestart_summary_matches_plan: true`;
 29. verify `capture_command_prestart_summary` matches that path;
 30. verify `capture_command_prestart_summary_matches_plan: true`;
 31. verify `backend_port_prestart_summary_status: passed`;
@@ -429,7 +430,8 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_summary_path_placeholder` pointing to the passed
   no-WING prestart `summary.json`, plus matching
-  `preview_command_prestart_summary`, matching
+  `preview_command_prestart_summary`,
+  `preview_command_prestart_summary_matches_plan: true`, matching
   `capture_command_prestart_summary`, and
   `capture_command_prestart_summary_matches_plan: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
