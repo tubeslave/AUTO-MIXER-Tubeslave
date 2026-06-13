@@ -94,6 +94,9 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
+    assert "backend_port_prestart_gate_execution_allowed: false" in text
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in text
+    assert "backend_port_prestart_gate_live_authority_granted: false" in text
     assert "execution_allowed_by_packet: false" in text
     assert "live_authority_granted: false" in text
     assert "full_autonomous_ready: false" in text
@@ -198,6 +201,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["evidence"]
     )
     assert (
+        "AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_GATE_AUTHORITY_SUMMARY_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
         "AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in rows[0]["evidence"]
     )
@@ -242,6 +249,15 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in rows[0]["next action"]
     )
+    assert "backend_port_prestart_gate_execution_allowed: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_gate_live_authority_granted: false" in rows[0][
+        "next action"
+    ]
     assert "backend_port_prestart_check_failure_detail_fields" in rows[0][
         "next action"
     ]
@@ -328,6 +344,15 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in rows[0]["next action"]
     )
+    assert "backend_port_prestart_gate_execution_allowed: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_gate_live_authority_granted: false" in rows[0][
+        "next action"
+    ]
     assert "execution_allowed_by_packet: false" in rows[0]["next action"]
     assert "live_authority_granted: false" in rows[0]["next action"]
     assert "full_autonomous_ready: false" in rows[0]["next action"]
@@ -501,6 +526,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in readonly
     )
+    assert "backend_port_prestart_gate_execution_allowed: false" in readonly
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in readonly
+    assert "backend_port_prestart_gate_live_authority_granted: false" in readonly
     assert "backend_port_prestart_check_failure_detail_fields" in readonly
     assert "listener_processes" in readonly
     assert "listener_process_error" in readonly
@@ -533,6 +561,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in readonly
     )
+    assert "backend_port_prestart_gate_execution_allowed: false" in readonly
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in readonly
+    assert "backend_port_prestart_gate_live_authority_granted: false" in readonly
     assert "execution_allowed_by_packet: false" in readonly
     assert "live_authority_granted: false" in readonly
     assert "full_autonomous_ready: false" in readonly
@@ -607,6 +638,9 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in report
     )
+    assert "backend_port_prestart_gate_execution_allowed: false" in report
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in report
+    assert "backend_port_prestart_gate_live_authority_granted: false" in report
     assert "backend_port_prestart_check_failure_detail_fields" in report
     assert "listener_processes" in report
     assert "listener_process_error" in report
@@ -644,6 +678,9 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in report
     )
+    assert "backend_port_prestart_gate_execution_allowed: false" in report
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in report
+    assert "backend_port_prestart_gate_live_authority_granted: false" in report
     assert "execution_allowed_by_packet: false" in report
     assert "live_authority_granted: false" in report
     assert "full_autonomous_ready: false" in report
@@ -749,6 +786,9 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "must both show" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
+    assert "backend_port_prestart_gate_execution_allowed: false" in text
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in text
+    assert "backend_port_prestart_gate_live_authority_granted: false" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
     assert "listener_processes" in text
     assert "listener_process_error" in text
@@ -788,6 +828,9 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
+    assert "backend_port_prestart_gate_execution_allowed: false" in text
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in text
+    assert "backend_port_prestart_gate_live_authority_granted: false" in text
     assert "execution_allowed_by_packet: false" in text
     assert "live_authority_granted: false" in text
     assert "full_autonomous_ready: false" in text
@@ -873,6 +916,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_GATE_AUTHORITY_SUMMARY_20260613.md"
         in text
     )
     assert (
@@ -974,6 +1021,9 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     assert "no-WING handoff summary must both show" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
+    assert "backend_port_prestart_gate_execution_allowed: false" in text
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in text
+    assert "backend_port_prestart_gate_live_authority_granted: false" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
     assert "manual_review_required_before_readiness_update" in text
     assert "readiness_matrix_update_allowed_by_packet" in text

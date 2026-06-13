@@ -149,6 +149,9 @@ blockers выше.
 10. verify the same summaries expose
    `backend_port_prestart_check_required: true` and
    `backend_port_prestart_check_must_pass_before_starting_backend: true`, plus
+   `backend_port_prestart_gate_execution_allowed: false`,
+   `backend_port_prestart_gate_readiness_closure_allowed: false`,
+   `backend_port_prestart_gate_live_authority_granted: false`, and
    `backend_port_prestart_check_failure_detail_fields` exactly listing
    `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
    `preflight_blocked_until_listener_confirmed`,
@@ -161,6 +164,9 @@ blockers выше.
    `listener_confirmation_template_execution_allowed_by_template`,
    `listener_confirmation_template_readiness_closure_allowed_by_template`,
    `listener_confirmation_template_required_edits`,
+   `backend_port_prestart_gate_execution_allowed`,
+   `backend_port_prestart_gate_readiness_closure_allowed`,
+   `backend_port_prestart_gate_live_authority_granted`,
    `fail_closed_reason`, and `operator_next_step`;
 11. when a backend listener is already present, verify the failed no-WING
    summary exposes `listener_confirmation_template_path`, while the generated
@@ -315,6 +321,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_check_required: true` and
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 - The same summaries must also show
+  `backend_port_prestart_gate_execution_allowed: false`,
+  `backend_port_prestart_gate_readiness_closure_allowed: false`, and
+  `backend_port_prestart_gate_live_authority_granted: false`.
+- The same summaries must also show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
@@ -327,6 +337,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `listener_confirmation_template_execution_allowed_by_template`,
   `listener_confirmation_template_readiness_closure_allowed_by_template`,
   `listener_confirmation_template_required_edits`,
+  `backend_port_prestart_gate_execution_allowed`,
+  `backend_port_prestart_gate_readiness_closure_allowed`,
+  `backend_port_prestart_gate_live_authority_granted`,
   `fail_closed_reason`, and `operator_next_step`.
 - When the backend-port prestart check detects an existing listener, the failed
   no-WING summary must expose `listener_confirmation_template_path`, and the
@@ -385,6 +398,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the no-WING handoff summary must also
   show the same `backend_port_prestart_check_required: true` and
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must also
+  show `backend_port_prestart_gate_execution_allowed: false`,
+  `backend_port_prestart_gate_readiness_closure_allowed: false`, and
+  `backend_port_prestart_gate_live_authority_granted: false`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

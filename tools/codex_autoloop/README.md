@@ -156,6 +156,12 @@ you want the background automation active.
   This keeps the backend listener prestart check non-optional and before the
   intended session.
 - The same summaries must also show
+  `backend_port_prestart_gate_execution_allowed: false`,
+  `backend_port_prestart_gate_readiness_closure_allowed: false`, and
+  `backend_port_prestart_gate_live_authority_granted: false`.
+  This keeps the failed prestart gate from being treated as execution,
+  readiness, or live-console authority.
+- The same summaries must also show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
@@ -168,6 +174,9 @@ you want the background automation active.
   `listener_confirmation_template_execution_allowed_by_template`,
   `listener_confirmation_template_readiness_closure_allowed_by_template`,
   `listener_confirmation_template_required_edits`,
+  `backend_port_prestart_gate_execution_allowed`,
+  `backend_port_prestart_gate_readiness_closure_allowed`,
+  `backend_port_prestart_gate_live_authority_granted`,
   `fail_closed_reason`, and `operator_next_step`.
   This preserves the fail-closed review evidence when the prestart check
   detects unexpected listeners.
@@ -254,6 +263,12 @@ you want the background automation active.
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
   This keeps the backend listener prestart check non-optional and before the
   intended session.
+- Before any supervised fader/gain proof, the no-WING handoff summary must also
+  show `backend_port_prestart_gate_execution_allowed: false`,
+  `backend_port_prestart_gate_readiness_closure_allowed: false`, and
+  `backend_port_prestart_gate_live_authority_granted: false`.
+  This keeps the handoff prestart gate non-authorizing even when rendered as an
+  operator checklist.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
   This keeps the handoff packet from being treated as authority to execute.

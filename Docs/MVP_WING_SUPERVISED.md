@@ -135,6 +135,11 @@ Stop the current Codex work direction and return to the first open blocker if:
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 - A supervised proof is planned while the failed busy-port no-WING summary or
   no-WING handoff summary does not show
+  `backend_port_prestart_gate_execution_allowed: false`,
+  `backend_port_prestart_gate_readiness_closure_allowed: false`, and
+  `backend_port_prestart_gate_live_authority_granted: false`.
+- A supervised proof is planned while the failed busy-port no-WING summary or
+  no-WING handoff summary does not show
   `backend_port_prestart_check_failure_detail_fields` exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
   `preflight_blocked_until_listener_confirmed`,
@@ -147,6 +152,9 @@ Stop the current Codex work direction and return to the first open blocker if:
   `listener_confirmation_template_execution_allowed_by_template`,
   `listener_confirmation_template_readiness_closure_allowed_by_template`,
   `listener_confirmation_template_required_edits`,
+  `backend_port_prestart_gate_execution_allowed`,
+  `backend_port_prestart_gate_readiness_closure_allowed`,
+  `backend_port_prestart_gate_live_authority_granted`,
   `fail_closed_reason`, and `operator_next_step`.
 - A WING read-only preflight is planned from an existing backend listener while
   the failed no-WING prestart summary lacks a pending
@@ -273,6 +281,11 @@ The same summaries must also show
 `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 
 The same summaries must also show
+`backend_port_prestart_gate_execution_allowed: false`,
+`backend_port_prestart_gate_readiness_closure_allowed: false`, and
+`backend_port_prestart_gate_live_authority_granted: false`.
+
+The same summaries must also show
 `backend_port_prestart_check_failure_detail_fields` exactly listing
 `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
 `preflight_blocked_until_listener_confirmed`,
@@ -284,7 +297,10 @@ The same summaries must also show
 `listener_confirmation_template_operator_placeholder_fields`,
 `listener_confirmation_template_execution_allowed_by_template`,
 `listener_confirmation_template_readiness_closure_allowed_by_template`,
-`listener_confirmation_template_required_edits`, `fail_closed_reason`, and
+`listener_confirmation_template_required_edits`,
+`backend_port_prestart_gate_execution_allowed`,
+`backend_port_prestart_gate_readiness_closure_allowed`,
+`backend_port_prestart_gate_live_authority_granted`, `fail_closed_reason`, and
 `operator_next_step`.
 
 When the prestart gate fails closed on an existing listener, the no-WING summary
@@ -337,6 +353,11 @@ The no-WING handoff summary must also show
 The no-WING handoff summary must also show the same
 `backend_port_prestart_check_required: true` and
 `backend_port_prestart_check_must_pass_before_starting_backend: true`.
+
+The no-WING handoff summary must also show
+`backend_port_prestart_gate_execution_allowed: false`,
+`backend_port_prestart_gate_readiness_closure_allowed: false`, and
+`backend_port_prestart_gate_live_authority_granted: false`.
 
 The no-WING handoff summary must also show
 `execution_allowed_by_packet: false`.

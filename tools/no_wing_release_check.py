@@ -1520,6 +1520,9 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
     for field in (
         "backend_port_prestart_check_required",
         "backend_port_prestart_check_must_pass_before_starting_backend",
+        "backend_port_prestart_gate_execution_allowed",
+        "backend_port_prestart_gate_readiness_closure_allowed",
+        "backend_port_prestart_gate_live_authority_granted",
     ):
         if field in detail:
             lines.append(f"  - {field}: `{detail[field]}`")
@@ -1807,6 +1810,9 @@ def maybe_attach_backend_listener_confirmation_template(
     detail["backend_port_prestart_check_failure_detail_fields"] = list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    detail["backend_port_prestart_gate_execution_allowed"] = False
+    detail["backend_port_prestart_gate_readiness_closure_allowed"] = False
+    detail["backend_port_prestart_gate_live_authority_granted"] = False
     listener_processes = detail.get("listener_processes")
     if not isinstance(listener_processes, list):
         listener_processes = []
@@ -1886,6 +1892,9 @@ def check_port_free(
         detail["backend_port_prestart_check_failure_detail_fields"] = list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         )
+        detail["backend_port_prestart_gate_execution_allowed"] = False
+        detail["backend_port_prestart_gate_readiness_closure_allowed"] = False
+        detail["backend_port_prestart_gate_live_authority_granted"] = False
         detail["preflight_blocked_until_listener_confirmed"] = True
         detail["intended_backend_confirmation_required"] = True
         detail["safe_to_stop_listener_by_gate"] = False

@@ -75,6 +75,15 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "backend_port_prestart_check_must_pass_before_starting_backend: true"
         in directive["selected_action"]
     )
+    assert "backend_port_prestart_gate_execution_allowed: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_gate_live_authority_granted: false" in directive[
+        "selected_action"
+    ]
     assert "backend_port_prestart_check_failure_detail_fields" in directive[
         "selected_action"
     ]
@@ -331,6 +340,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_evidence_files"]
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_GATE_AUTHORITY_SUMMARY_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in directive["selected_evidence_files"]
     )
@@ -440,6 +453,9 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "failed busy-port no-WING summary and no-WING handoff summary both" in prompt
     assert "backend_port_prestart_check_required: true" in prompt
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in prompt
+    assert "backend_port_prestart_gate_execution_allowed: false" in prompt
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in prompt
+    assert "backend_port_prestart_gate_live_authority_granted: false" in prompt
     assert "backend_port_prestart_check_failure_detail_fields" in prompt
     assert "listener_processes" in prompt
     assert "listener_process_error" in prompt
@@ -503,6 +519,9 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "no-WING handoff summary must both show" in readme
     assert "backend_port_prestart_check_required: true" in readme
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in readme
+    assert "backend_port_prestart_gate_execution_allowed: false" in readme
+    assert "backend_port_prestart_gate_readiness_closure_allowed: false" in readme
+    assert "backend_port_prestart_gate_live_authority_granted: false" in readme
     assert "backend_port_prestart_check_failure_detail_fields" in readme
     assert "listener_processes" in readme
     assert "listener_process_error" in readme

@@ -46,6 +46,9 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = (
     "listener_confirmation_template_execution_allowed_by_template",
     "listener_confirmation_template_readiness_closure_allowed_by_template",
     "listener_confirmation_template_required_edits",
+    "backend_port_prestart_gate_execution_allowed",
+    "backend_port_prestart_gate_readiness_closure_allowed",
+    "backend_port_prestart_gate_live_authority_granted",
     "fail_closed_reason",
     "operator_next_step",
 )
