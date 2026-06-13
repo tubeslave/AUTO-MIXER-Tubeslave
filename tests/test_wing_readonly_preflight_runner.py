@@ -14,6 +14,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
@@ -1256,6 +1257,9 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         ),
     ]
     assert "physical_readback_missing" in written["fail_closed_conditions"]
+    assert written["fail_closed_conditions"] == list(
+        WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
+    )
     assert "event_log_wing_mode_not_proven" in written["fail_closed_conditions"]
     assert "transport_timeout_or_connection_loss" in written["fail_closed_conditions"]
     assert "ws_handshake_rejected" in written["fail_closed_conditions"]

@@ -52,3 +52,24 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = (
     "fail_closed_reason",
     "operator_next_step",
 )
+
+WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS = (
+    "backend_not_in_wing_mode",
+    "event_log_wing_mode_not_proven",
+    "transport_timeout_or_connection_loss",
+    "ws_handshake_rejected",
+    "operator_channel_confirmation_mismatch",
+    "operator_session_confirmation_missing",
+    "physical_readback_missing",
+    "readback_identity_mismatch",
+    "readback_request_id_mismatch",
+    "expected_plan_missing_or_mismatch",
+    "prestart_summary_missing_or_invalid",
+    "prestart_summary_sha256_mismatch",
+    "stale_backend_port_prestart_detail_contract",
+    "existing_backend_connection_boundary_missing",
+    "forbidden_request_type_sent",
+    "unexpected_response_type",
+    "event_log_missing_or_invalid",
+    "manual_review_decision_missing_or_invalid",
+)

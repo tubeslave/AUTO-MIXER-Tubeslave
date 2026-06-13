@@ -11,6 +11,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
@@ -1208,6 +1209,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
         ),
     }
+
+
+def test_no_wing_release_check_fail_closed_conditions_use_shared_contract():
+    assert release_check.WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS == (
+        WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
+    )
 
 
 def valid_read_surface_capture_packet_payload() -> dict:

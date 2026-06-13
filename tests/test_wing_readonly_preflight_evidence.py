@@ -16,6 +16,9 @@ from backend.wing_readonly_preflight_evidence import (
     build_wing_readonly_preflight_evidence,
     validate_wing_readonly_preflight_artifact,
 )
+from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+)
 from backend.processing_registry import (
     build_processing_registry_snapshot,
     get_pipeline_profile,
@@ -117,6 +120,12 @@ def _valid_summary() -> dict:
         "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
         "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
     }
+
+
+def test_expected_plan_fail_closed_conditions_use_shared_contract():
+    assert EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS == (
+        WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
+    )
 
 
 def _event(seq: int, event_type: str, payload: dict) -> dict:
