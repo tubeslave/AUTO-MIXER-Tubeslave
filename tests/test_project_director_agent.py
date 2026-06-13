@@ -166,6 +166,15 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_summary_live_write: false" in directive[
         "selected_action"
     ]
+    assert "backend_port_prestart_summary_contacts_backend: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_summary_queries_console: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_summary_executes_tests: false" in directive[
+        "selected_action"
+    ]
     assert "backend_port_prestart_check_status: passed" in directive[
         "selected_action"
     ]

@@ -283,6 +283,12 @@ def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[
             continue
         if row.get("backend_port_prestart_summary_live_write") is not False:
             continue
+        if row.get("backend_port_prestart_summary_contacts_backend") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_queries_console") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_executes_tests") is not False:
+            continue
         if row.get("backend_port_prestart_check_status") != "passed":
             continue
         valid_source_ids.append(source_id)

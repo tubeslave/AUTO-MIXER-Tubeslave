@@ -172,6 +172,9 @@ EXPECTED_PLAN_SUMMARY_FIELDS = (
     "backend_port_prestart_summary_status",
     "backend_port_prestart_summary_connection_policy",
     "backend_port_prestart_summary_live_write",
+    "backend_port_prestart_summary_contacts_backend",
+    "backend_port_prestart_summary_queries_console",
+    "backend_port_prestart_summary_executes_tests",
     "backend_port_prestart_check_status",
     "request_id_policy",
 )
@@ -209,6 +212,9 @@ class WingReadonlyPreflightArtifactRecord:
     backend_port_prestart_summary_status: str | None
     backend_port_prestart_summary_connection_policy: str | None
     backend_port_prestart_summary_live_write: bool | None
+    backend_port_prestart_summary_contacts_backend: bool | None
+    backend_port_prestart_summary_queries_console: bool | None
+    backend_port_prestart_summary_executes_tests: bool | None
     backend_port_prestart_check_status: str | None
     operator_next_step: str | None
     value_types: Tuple[str, ...]
@@ -253,6 +259,15 @@ class WingReadonlyPreflightArtifactRecord:
         )
         payload["backend_port_prestart_summary_live_write"] = (
             self.backend_port_prestart_summary_live_write
+        )
+        payload["backend_port_prestart_summary_contacts_backend"] = (
+            self.backend_port_prestart_summary_contacts_backend
+        )
+        payload["backend_port_prestart_summary_queries_console"] = (
+            self.backend_port_prestart_summary_queries_console
+        )
+        payload["backend_port_prestart_summary_executes_tests"] = (
+            self.backend_port_prestart_summary_executes_tests
         )
         payload["backend_port_prestart_check_status"] = (
             self.backend_port_prestart_check_status
@@ -593,6 +608,12 @@ def _validate_prestart_summary_payload(
         violations.append("prestart_summary_connection_policy_mismatch")
     if prestart.get("live_write") is not False:
         violations.append("prestart_summary_live_write_not_false")
+    if prestart.get("contacts_backend") is not False:
+        violations.append("prestart_summary_contacts_backend_not_false")
+    if prestart.get("queries_console") is not False:
+        violations.append("prestart_summary_queries_console_not_false")
+    if prestart.get("executes_tests") is not False:
+        violations.append("prestart_summary_executes_tests_not_false")
 
     backend_check = _backend_port_check_from_prestart_summary(prestart)
     if backend_check is None:
@@ -620,6 +641,18 @@ def _validate_prestart_summary_payload(
         "live_write"
     ):
         violations.append("prestart_summary_recorded_live_write_mismatch")
+    if summary.get("backend_port_prestart_summary_contacts_backend") != prestart.get(
+        "contacts_backend"
+    ):
+        violations.append("prestart_summary_recorded_contacts_backend_mismatch")
+    if summary.get("backend_port_prestart_summary_queries_console") != prestart.get(
+        "queries_console"
+    ):
+        violations.append("prestart_summary_recorded_queries_console_mismatch")
+    if summary.get("backend_port_prestart_summary_executes_tests") != prestart.get(
+        "executes_tests"
+    ):
+        violations.append("prestart_summary_recorded_executes_tests_mismatch")
     if summary.get("backend_port_prestart_check_status") != backend_check.get("status"):
         violations.append("prestart_summary_recorded_backend_port_status_mismatch")
 
@@ -962,6 +995,12 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("backend_port_prestart_summary_connection_policy_mismatch")
     if payload.get("backend_port_prestart_summary_live_write") is not False:
         violations.append("backend_port_prestart_summary_live_write_not_false")
+    if payload.get("backend_port_prestart_summary_contacts_backend") is not False:
+        violations.append("backend_port_prestart_summary_contacts_backend_not_false")
+    if payload.get("backend_port_prestart_summary_queries_console") is not False:
+        violations.append("backend_port_prestart_summary_queries_console_not_false")
+    if payload.get("backend_port_prestart_summary_executes_tests") is not False:
+        violations.append("backend_port_prestart_summary_executes_tests_not_false")
     if payload.get("backend_port_prestart_check_status") != "passed":
         violations.append("backend_port_prestart_check_status_not_passed")
     if payload.get("require_physical_readback") is not True:
@@ -1126,6 +1165,27 @@ def validate_wing_readonly_preflight_artifact(
                 if isinstance(payload.get("backend_port_prestart_summary_live_write"), bool)
                 else None
             ),
+            "backend_port_prestart_summary_contacts_backend": (
+                payload.get("backend_port_prestart_summary_contacts_backend")
+                if isinstance(
+                    payload.get("backend_port_prestart_summary_contacts_backend"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_queries_console": (
+                payload.get("backend_port_prestart_summary_queries_console")
+                if isinstance(
+                    payload.get("backend_port_prestart_summary_queries_console"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_executes_tests": (
+                payload.get("backend_port_prestart_summary_executes_tests")
+                if isinstance(
+                    payload.get("backend_port_prestart_summary_executes_tests"), bool
+                )
+                else None
+            ),
             "backend_port_prestart_check_status": (
                 str(payload.get("backend_port_prestart_check_status"))
                 if payload.get("backend_port_prestart_check_status")
@@ -1223,6 +1283,27 @@ def _record_from_validation(
             if isinstance(evidence.get("backend_port_prestart_summary_live_write"), bool)
             else None
         ),
+        backend_port_prestart_summary_contacts_backend=(
+            evidence.get("backend_port_prestart_summary_contacts_backend")
+            if isinstance(
+                evidence.get("backend_port_prestart_summary_contacts_backend"), bool
+            )
+            else None
+        ),
+        backend_port_prestart_summary_queries_console=(
+            evidence.get("backend_port_prestart_summary_queries_console")
+            if isinstance(
+                evidence.get("backend_port_prestart_summary_queries_console"), bool
+            )
+            else None
+        ),
+        backend_port_prestart_summary_executes_tests=(
+            evidence.get("backend_port_prestart_summary_executes_tests")
+            if isinstance(
+                evidence.get("backend_port_prestart_summary_executes_tests"), bool
+            )
+            else None
+        ),
         backend_port_prestart_check_status=(
             str(evidence.get("backend_port_prestart_check_status"))
             if evidence.get("backend_port_prestart_check_status")
@@ -1268,6 +1349,9 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         backend_port_prestart_summary_status=None,
         backend_port_prestart_summary_connection_policy=None,
         backend_port_prestart_summary_live_write=None,
+        backend_port_prestart_summary_contacts_backend=None,
+        backend_port_prestart_summary_queries_console=None,
+        backend_port_prestart_summary_executes_tests=None,
         backend_port_prestart_check_status=None,
         operator_next_step=None,
         value_types=(),

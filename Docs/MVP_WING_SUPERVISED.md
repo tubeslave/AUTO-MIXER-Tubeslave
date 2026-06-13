@@ -104,11 +104,14 @@ Stop the current Codex work direction and return to the first open blocker if:
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
 - A supervised proof is planned while the accepted-candidate prestart trace does
   not bind to a passed no-WING prestart `summary.json` by path and SHA256, with
-  `backend_port_prestart_summary_required: true`,
-  `backend_port_prestart_summary_type: no_wing_release_check`,
-  `backend_port_prestart_summary_status: passed`,
-  `backend_port_prestart_summary_live_write: false`, and
-  `backend_port_prestart_check_status: passed`.
+	  `backend_port_prestart_summary_required: true`,
+	  `backend_port_prestart_summary_type: no_wing_release_check`,
+	  `backend_port_prestart_summary_status: passed`,
+	  `backend_port_prestart_summary_live_write: false`,
+	  `backend_port_prestart_summary_contacts_backend: false`,
+	  `backend_port_prestart_summary_queries_console: false`,
+	  `backend_port_prestart_summary_executes_tests: false`, and
+	  `backend_port_prestart_check_status: passed`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `backend_port_prestart_gate` exactly matching
   `expected_backend_port_prestart_gate`.

@@ -51,6 +51,9 @@ def _valid_wing_preflight_summary() -> dict:
             "no_hardware_no_network_no_live_writes"
         ),
         "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
         "read_only": True,
         "live_write": False,
@@ -158,6 +161,9 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
     assert preflight["prestart_backend_port_summary_required"] is False
     assert preflight["prestart_backend_port_summary_status"] is None
     assert preflight["prestart_backend_port_summary_live_write"] is None
+    assert preflight["prestart_backend_port_summary_contacts_backend"] is None
+    assert preflight["prestart_backend_port_summary_queries_console"] is None
+    assert preflight["prestart_backend_port_summary_executes_tests"] is None
     assert preflight["prestart_backend_port_check_status"] is None
     assert preflight["candidate_blocker_ids"] == []
     assert preflight["closed_blocker_ids"] == []
@@ -427,6 +433,9 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
     assert preflight["prestart_backend_port_summary_required"] is True
     assert preflight["prestart_backend_port_summary_status"] == "passed"
     assert preflight["prestart_backend_port_summary_live_write"] is False
+    assert preflight["prestart_backend_port_summary_contacts_backend"] is False
+    assert preflight["prestart_backend_port_summary_queries_console"] is False
+    assert preflight["prestart_backend_port_summary_executes_tests"] is False
     assert preflight["prestart_backend_port_check_status"] == "passed"
     assert preflight["candidate_blocker_ids"] == [
         "wing_readonly_connection_proof",

@@ -419,6 +419,15 @@ def _wing_readonly_preflight_readiness_overlay(
         "prestart_backend_port_summary_live_write": latest_candidate.get(
             "backend_port_prestart_summary_live_write"
         ),
+        "prestart_backend_port_summary_contacts_backend": latest_candidate.get(
+            "backend_port_prestart_summary_contacts_backend"
+        ),
+        "prestart_backend_port_summary_queries_console": latest_candidate.get(
+            "backend_port_prestart_summary_queries_console"
+        ),
+        "prestart_backend_port_summary_executes_tests": latest_candidate.get(
+            "backend_port_prestart_summary_executes_tests"
+        ),
         "prestart_backend_port_check_status": latest_candidate.get(
             "backend_port_prestart_check_status"
         ),

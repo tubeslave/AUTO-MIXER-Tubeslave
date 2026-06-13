@@ -58,6 +58,9 @@ def _valid_summary() -> dict:
             "no_hardware_no_network_no_live_writes"
         ),
         "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
         "read_only": True,
         "live_write": False,
@@ -220,6 +223,15 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_summary_live_write": summary[
             "backend_port_prestart_summary_live_write"
         ],
+        "backend_port_prestart_summary_contacts_backend": summary[
+            "backend_port_prestart_summary_contacts_backend"
+        ],
+        "backend_port_prestart_summary_queries_console": summary[
+            "backend_port_prestart_summary_queries_console"
+        ],
+        "backend_port_prestart_summary_executes_tests": summary[
+            "backend_port_prestart_summary_executes_tests"
+        ],
         "backend_port_prestart_check_status": summary[
             "backend_port_prestart_check_status"
         ],
@@ -253,6 +265,9 @@ def _write_artifact(run_dir: Path) -> Path:
         "status": "passed",
         "connection_policy": "no_hardware_no_network_no_live_writes",
         "live_write": False,
+        "contacts_backend": False,
+        "queries_console": False,
+        "executes_tests": False,
         "results": [
             {
                 "name": "backend_port_free",

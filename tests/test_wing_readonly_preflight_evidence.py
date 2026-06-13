@@ -64,6 +64,9 @@ def _valid_summary() -> dict:
             "no_hardware_no_network_no_live_writes"
         ),
         "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
         "read_only": True,
         "live_write": False,
@@ -228,6 +231,15 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_summary_live_write": summary[
             "backend_port_prestart_summary_live_write"
         ],
+        "backend_port_prestart_summary_contacts_backend": summary[
+            "backend_port_prestart_summary_contacts_backend"
+        ],
+        "backend_port_prestart_summary_queries_console": summary[
+            "backend_port_prestart_summary_queries_console"
+        ],
+        "backend_port_prestart_summary_executes_tests": summary[
+            "backend_port_prestart_summary_executes_tests"
+        ],
         "backend_port_prestart_check_status": summary[
             "backend_port_prestart_check_status"
         ],
@@ -260,6 +272,9 @@ def _write_prestart_summary(path: Path, *, status: str = "passed") -> None:
         "status": status,
         "connection_policy": "no_hardware_no_network_no_live_writes",
         "live_write": False,
+        "contacts_backend": False,
+        "queries_console": False,
+        "executes_tests": False,
         "results": [
             {
                 "name": "backend_port_free",
@@ -744,6 +759,32 @@ def test_file_preflight_artifact_requires_matching_prestart_summary_sha(tmp_path
 
     assert "prestart_summary_sha256_mismatch" in evidence["summary"]["violations"]
     assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+
+
+def test_file_preflight_artifact_rejects_prestart_summary_contact_boundary(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "prestart-contact")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    prestart_path = Path(summary["backend_port_prestart_summary_path"])
+    prestart = json.loads(prestart_path.read_text(encoding="utf-8"))
+    prestart["contacts_backend"] = True
+    prestart_path.write_text(json.dumps(prestart), encoding="utf-8")
+    summary["backend_port_prestart_summary_sha256"] = hashlib.sha256(
+        prestart_path.read_bytes()
+    ).hexdigest()
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert "prestart_summary_contacts_backend_not_false" in evidence["summary"][
+        "violations"
+    ]
+    assert "prestart_summary_recorded_contacts_backend_mismatch" in evidence["summary"][
+        "violations"
+    ]
 
 
 def test_file_preflight_artifact_requires_expected_plan_request_sequence_to_match_summary(tmp_path):

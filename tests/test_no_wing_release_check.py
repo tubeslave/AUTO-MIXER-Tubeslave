@@ -870,6 +870,9 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
             "no_hardware_no_network_no_live_writes"
         ),
         "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
         "manual_review_required_before_readiness_update": True,
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
@@ -2371,6 +2374,9 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["live_write"] is False
     assert result.detail["contacts_backend"] is False
     assert result.detail["queries_console"] is False
+    assert result.detail["backend_port_prestart_summary_contacts_backend"] is False
+    assert result.detail["backend_port_prestart_summary_queries_console"] is False
+    assert result.detail["backend_port_prestart_summary_executes_tests"] is False
     assert result.detail["operator_required"] is True
     assert result.detail["expected_plan_required_for_real_run"] is True
     assert (
@@ -2420,6 +2426,9 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     payload = valid_wing_readonly_preflight_plan_payload(plan_path)
     payload["contacts_backend"] = True
     payload["live_authority_granted"] = True
+    payload["backend_port_prestart_summary_contacts_backend"] = True
+    payload["backend_port_prestart_summary_queries_console"] = True
+    payload["backend_port_prestart_summary_executes_tests"] = True
     payload["expected_plan_required_for_real_run"] = False
     payload["physical_preflight_requires_existing_backend_connection"] = False
     payload["manual_review_required_before_readiness_update"] = False
@@ -2434,6 +2443,18 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_plan_artifact(tmp_p
     assert "wing_readonly_preflight_plan_contacts_backend_not_false" in result.detail[
         "violations"
     ]
+    assert (
+        "wing_readonly_preflight_plan_backend_port_prestart_summary_contacts_backend_not_false"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_backend_port_prestart_summary_queries_console_not_false"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_backend_port_prestart_summary_executes_tests_not_false"
+        in result.detail["violations"]
+    )
     assert "wing_readonly_preflight_plan_live_authority_granted_not_false" in result.detail[
         "violations"
     ]
@@ -8585,6 +8606,21 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "backend_port_prestart_check_failure_detail_fields": list(
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
+            "backend_port_prestart_summary_required": True,
+            "backend_port_prestart_summary_path": (
+                "artifacts/no_wing_release_check/run/summary.json"
+            ),
+            "backend_port_prestart_summary_sha256": "a" * 64,
+            "backend_port_prestart_summary_type": "no_wing_release_check",
+            "backend_port_prestart_summary_status": "passed",
+            "backend_port_prestart_summary_connection_policy": (
+                "no_hardware_no_network_no_live_writes"
+            ),
+            "backend_port_prestart_summary_live_write": False,
+            "backend_port_prestart_summary_contacts_backend": False,
+            "backend_port_prestart_summary_queries_console": False,
+            "backend_port_prestart_summary_executes_tests": False,
+            "backend_port_prestart_check_status": "passed",
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_plan": False,
             "live_authority_granted": False,
@@ -8631,6 +8667,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    assert artifact["backend_port_prestart_summary_contacts_backend"] is False
+    assert artifact["backend_port_prestart_summary_queries_console"] is False
+    assert artifact["backend_port_prestart_summary_executes_tests"] is False
     assert artifact["manual_review_required_before_readiness_update"] is True
     assert artifact["execution_allowed_by_plan"] is False
     assert artifact["live_authority_granted"] is False
@@ -8666,6 +8705,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     )
     assert "backend_port_prestart_check_required: `true`" in markdown_summary
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown_summary
+    assert "backend_port_prestart_summary_contacts_backend: `false`" in markdown_summary
+    assert "backend_port_prestart_summary_queries_console: `false`" in markdown_summary
+    assert "backend_port_prestart_summary_executes_tests: `false`" in markdown_summary
     assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
     assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary

@@ -217,6 +217,9 @@ The summary must show:
 - `backend_port_prestart_summary_connection_policy:
   no_hardware_no_network_no_live_writes`
 - `backend_port_prestart_summary_live_write: false`
+- `backend_port_prestart_summary_contacts_backend: false`
+- `backend_port_prestart_summary_queries_console: false`
+- `backend_port_prestart_summary_executes_tests: false`
 - `backend_port_prestart_check_status: passed`
 - referenced offline plan fields and `request_sequence` match the captured
   summary, operator-confirmed channels, value types, and readback identities

@@ -88,6 +88,9 @@ def ensure_prestart_summary(tmp_path: Path) -> Path:
         "status": "passed",
         "connection_policy": "no_hardware_no_network_no_live_writes",
         "live_write": False,
+        "contacts_backend": False,
+        "queries_console": False,
+        "executes_tests": False,
         "results": [
             {
                 "name": "backend_port_free",
@@ -181,6 +184,9 @@ def assert_summary_prestart_contract(summary: dict) -> None:
         == "no_hardware_no_network_no_live_writes"
     )
     assert summary["backend_port_prestart_summary_live_write"] is False
+    assert summary["backend_port_prestart_summary_contacts_backend"] is False
+    assert summary["backend_port_prestart_summary_queries_console"] is False
+    assert summary["backend_port_prestart_summary_executes_tests"] is False
     assert summary["backend_port_prestart_check_status"] == "passed"
 
 
@@ -1203,6 +1209,9 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         == "no_hardware_no_network_no_live_writes"
     )
     assert written["backend_port_prestart_summary_live_write"] is False
+    assert written["backend_port_prestart_summary_contacts_backend"] is False
+    assert written["backend_port_prestart_summary_queries_console"] is False
+    assert written["backend_port_prestart_summary_executes_tests"] is False
     assert written["backend_port_prestart_check_status"] == "passed"
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"

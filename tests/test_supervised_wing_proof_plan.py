@@ -104,6 +104,9 @@ def accepted_review_decision_ledger() -> dict:
                         "no_hardware_no_network_no_live_writes"
                     ),
                     "backend_port_prestart_summary_live_write": False,
+                    "backend_port_prestart_summary_contacts_backend": False,
+                    "backend_port_prestart_summary_queries_console": False,
+                    "backend_port_prestart_summary_executes_tests": False,
                     "backend_port_prestart_check_status": "passed",
                 }
             ],
@@ -375,6 +378,9 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
                 "no_hardware_no_network_no_live_writes"
             ),
             "backend_port_prestart_summary_live_write": False,
+            "backend_port_prestart_summary_contacts_backend": False,
+            "backend_port_prestart_summary_queries_console": False,
+            "backend_port_prestart_summary_executes_tests": False,
             "backend_port_prestart_check_status": "passed",
         }
     ]

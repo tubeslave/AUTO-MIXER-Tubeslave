@@ -112,6 +112,9 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "backend_port_prestart_summary_status",
     "backend_port_prestart_summary_connection_policy",
     "backend_port_prestart_summary_live_write",
+    "backend_port_prestart_summary_contacts_backend",
+    "backend_port_prestart_summary_queries_console",
+    "backend_port_prestart_summary_executes_tests",
     "backend_port_prestart_check_status",
     "manual_review_required_before_readiness_update",
     "contacts_backend",
@@ -502,6 +505,15 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         "connection_policy"
     )
     detail["backend_port_prestart_summary_live_write"] = payload.get("live_write")
+    detail["backend_port_prestart_summary_contacts_backend"] = payload.get(
+        "contacts_backend"
+    )
+    detail["backend_port_prestart_summary_queries_console"] = payload.get(
+        "queries_console"
+    )
+    detail["backend_port_prestart_summary_executes_tests"] = payload.get(
+        "executes_tests"
+    )
 
     if payload.get("type") != PRESTART_SUMMARY_TYPE:
         violations.append("prestart_summary_type_mismatch")
@@ -511,6 +523,12 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         violations.append("prestart_summary_connection_policy_mismatch")
     if payload.get("live_write") is not False:
         violations.append("prestart_summary_live_write_not_false")
+    if payload.get("contacts_backend") is not False:
+        violations.append("prestart_summary_contacts_backend_not_false")
+    if payload.get("queries_console") is not False:
+        violations.append("prestart_summary_queries_console_not_false")
+    if payload.get("executes_tests") is not False:
+        violations.append("prestart_summary_executes_tests_not_false")
 
     results = payload.get("results")
     backend_check = None

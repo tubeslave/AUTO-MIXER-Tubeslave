@@ -1971,6 +1971,9 @@ def write_wing_readonly_prestart_summary(
         "status": "passed",
         "connection_policy": "no_hardware_no_network_no_live_writes",
         "live_write": False,
+        "contacts_backend": False,
+        "queries_console": False,
+        "executes_tests": False,
         "failed_checks": [],
         "results": [asdict(backend_port_result)],
     }
@@ -4018,6 +4021,18 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_live_write_not_false"
         )
+    if plan.get("backend_port_prestart_summary_contacts_backend") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_summary_contacts_backend_not_false"
+        )
+    if plan.get("backend_port_prestart_summary_queries_console") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_summary_queries_console_not_false"
+        )
+    if plan.get("backend_port_prestart_summary_executes_tests") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_summary_executes_tests_not_false"
+        )
     if plan.get("backend_port_prestart_check_status") != "passed":
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_check_status_not_passed"
@@ -4186,6 +4201,15 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     )
     detail["backend_port_prestart_summary_live_write"] = plan.get(
         "backend_port_prestart_summary_live_write"
+    )
+    detail["backend_port_prestart_summary_contacts_backend"] = plan.get(
+        "backend_port_prestart_summary_contacts_backend"
+    )
+    detail["backend_port_prestart_summary_queries_console"] = plan.get(
+        "backend_port_prestart_summary_queries_console"
+    )
+    detail["backend_port_prestart_summary_executes_tests"] = plan.get(
+        "backend_port_prestart_summary_executes_tests"
     )
     detail["backend_port_prestart_check_status"] = plan.get(
         "backend_port_prestart_check_status"
@@ -11782,6 +11806,27 @@ def wing_readonly_preflight_plan_artifact_summary(
                 if isinstance(detail.get("backend_port_prestart_summary_live_write"), bool)
                 else None
             ),
+            "backend_port_prestart_summary_contacts_backend": (
+                detail.get("backend_port_prestart_summary_contacts_backend")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_contacts_backend"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_queries_console": (
+                detail.get("backend_port_prestart_summary_queries_console")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_queries_console"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_executes_tests": (
+                detail.get("backend_port_prestart_summary_executes_tests")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_executes_tests"), bool
+                )
+                else None
+            ),
             "backend_port_prestart_check_status": str(
                 detail.get("backend_port_prestart_check_status") or ""
             ),
@@ -15235,6 +15280,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_connection_policy']}`",
                 "- backend_port_prestart_summary_live_write: "
                 f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_live_write']).lower()}`",
+                "- backend_port_prestart_summary_contacts_backend: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_contacts_backend']).lower()}`",
+                "- backend_port_prestart_summary_queries_console: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_queries_console']).lower()}`",
+                "- backend_port_prestart_summary_executes_tests: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_executes_tests']).lower()}`",
                 "- backend_port_prestart_check_status: "
                 f"`{wing_readonly_preflight_plan_artifact['backend_port_prestart_check_status']}`",
                 "- manual_review_required_before_readiness_update: "

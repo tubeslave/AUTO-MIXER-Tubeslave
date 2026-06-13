@@ -224,6 +224,15 @@ def _candidate_review_rows(
                 "backend_port_prestart_summary_live_write": candidate.get(
                     "backend_port_prestart_summary_live_write"
                 ),
+                "backend_port_prestart_summary_contacts_backend": candidate.get(
+                    "backend_port_prestart_summary_contacts_backend"
+                ),
+                "backend_port_prestart_summary_queries_console": candidate.get(
+                    "backend_port_prestart_summary_queries_console"
+                ),
+                "backend_port_prestart_summary_executes_tests": candidate.get(
+                    "backend_port_prestart_summary_executes_tests"
+                ),
                 "backend_port_prestart_check_status": candidate.get(
                     "backend_port_prestart_check_status"
                 ),
@@ -274,6 +283,12 @@ def _accepted_candidate_prestart_source_ids(
         ):
             continue
         if row.get("backend_port_prestart_summary_live_write") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_contacts_backend") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_queries_console") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_executes_tests") is not False:
             continue
         if row.get("backend_port_prestart_check_status") != "passed":
             continue

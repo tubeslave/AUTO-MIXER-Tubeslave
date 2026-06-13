@@ -165,6 +165,15 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                 "backend_port_prestart_summary_live_write": item.get(
                     "backend_port_prestart_summary_live_write"
                 ),
+                "backend_port_prestart_summary_contacts_backend": item.get(
+                    "backend_port_prestart_summary_contacts_backend"
+                ),
+                "backend_port_prestart_summary_queries_console": item.get(
+                    "backend_port_prestart_summary_queries_console"
+                ),
+                "backend_port_prestart_summary_executes_tests": item.get(
+                    "backend_port_prestart_summary_executes_tests"
+                ),
                 "backend_port_prestart_check_status": item.get(
                     "backend_port_prestart_check_status"
                 ),
@@ -476,6 +485,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{row.get('backend_port_prestart_summary_connection_policy')}`",
                     "  - backend_port_prestart_summary_live_write: "
                     f"`{json.dumps(row.get('backend_port_prestart_summary_live_write'))}`",
+                    "  - backend_port_prestart_summary_contacts_backend: "
+                    f"`{json.dumps(row.get('backend_port_prestart_summary_contacts_backend'))}`",
+                    "  - backend_port_prestart_summary_queries_console: "
+                    f"`{json.dumps(row.get('backend_port_prestart_summary_queries_console'))}`",
+                    "  - backend_port_prestart_summary_executes_tests: "
+                    f"`{json.dumps(row.get('backend_port_prestart_summary_executes_tests'))}`",
                     "  - backend_port_prestart_check_status: "
                     f"`{row.get('backend_port_prestart_check_status')}`",
                     f"  - operator_next_step: `{row.get('operator_next_step')}`",

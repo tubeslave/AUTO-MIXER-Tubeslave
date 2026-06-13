@@ -90,6 +90,9 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "backend_port_prestart_summary_type: no_wing_release_check" in text
     assert "backend_port_prestart_summary_status: passed" in text
     assert "backend_port_prestart_summary_live_write: false" in text
+    assert "backend_port_prestart_summary_contacts_backend: false" in text
+    assert "backend_port_prestart_summary_queries_console: false" in text
+    assert "backend_port_prestart_summary_executes_tests: false" in text
     assert "backend_port_prestart_check_status: passed" in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
@@ -332,6 +335,15 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "next action"
     ]
     assert "backend_port_prestart_summary_live_write: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_contacts_backend: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_queries_console: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_executes_tests: false" in rows[0][
         "next action"
     ]
     assert "backend_port_prestart_check_status: passed" in rows[0]["next action"]
@@ -824,6 +836,9 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "capture_command_prestart_summary_matches_plan: true" in text
     assert "backend_port_prestart_summary_status: passed" in text
     assert "backend_port_prestart_summary_live_write: false" in text
+    assert "backend_port_prestart_summary_contacts_backend: false" in text
+    assert "backend_port_prestart_summary_queries_console: false" in text
+    assert "backend_port_prestart_summary_executes_tests: false" in text
     assert "backend_port_prestart_check_status: passed" in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text

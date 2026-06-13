@@ -54,6 +54,9 @@ def _valid_summary() -> dict:
             "no_hardware_no_network_no_live_writes"
         ),
         "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
         "read_only": True,
         "live_write": False,
@@ -191,6 +194,9 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
                 "no_hardware_no_network_no_live_writes"
             ),
             "backend_port_prestart_summary_live_write": False,
+            "backend_port_prestart_summary_contacts_backend": False,
+            "backend_port_prestart_summary_queries_console": False,
+            "backend_port_prestart_summary_executes_tests": False,
             "backend_port_prestart_check_status": "passed",
         }
     ]
