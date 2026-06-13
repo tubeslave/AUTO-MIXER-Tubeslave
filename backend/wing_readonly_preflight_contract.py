@@ -6,6 +6,8 @@ transport or grant live-write authority.
 
 from __future__ import annotations
 
+from typing import Any, Iterable, Mapping
+
 
 WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA = "wing_readonly_preflight.v1"
 WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME = "summary.json"
@@ -82,6 +84,12 @@ WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = "artifacts/wing_readonly_preflig
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"
 )
+WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE = "no_wing_release_check"
+WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY = (
+    "no_hardware_no_network_no_live_writes"
+)
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME = "backend_port_free"
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS = "passed"
 
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
     "PYTHONPATH=backend",
@@ -248,3 +256,82 @@ def expected_supervised_prestart_gate(
         ),
         "requires_accepted_candidate_prestart_trace": True,
     }
+
+
+def _contract_string_list(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(str(item) for item in value if isinstance(item, str) and item)
+
+
+def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> list[str]:
+    """Return accepted source ids whose candidate rows bind a valid prestart trace.
+
+    This is a report-only gate. It does not inspect files, contact the backend,
+    or grant authority; it only checks that review/plan summaries agree on the
+    no-WING prestart contract already recorded in candidate review rows.
+    """
+
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    valid_source_ids: list[str] = []
+    for source_id in accepted_source_ids:
+        if not source_id:
+            continue
+        row = rows_by_source.get(str(source_id))
+        if not isinstance(row, Mapping):
+            continue
+        if row.get("backend_port_prestart_check_required") is not True:
+            continue
+        if row.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
+            continue
+        if _contract_string_list(row.get("backend_port_prestart_check_command")) != (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ):
+            continue
+        if _contract_string_list(
+            row.get("backend_port_prestart_check_failure_detail_fields")
+        ) != (WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS):
+            continue
+        if row.get("backend_port_prestart_summary_required") is not True:
+            continue
+        if not str(row.get("backend_port_prestart_summary_path") or ""):
+            continue
+        if not str(row.get("backend_port_prestart_summary_sha256") or ""):
+            continue
+        if (
+            row.get("backend_port_prestart_summary_type")
+            != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ):
+            continue
+        if (
+            row.get("backend_port_prestart_summary_status")
+            != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+        ):
+            continue
+        if (
+            row.get("backend_port_prestart_summary_connection_policy")
+            != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ):
+            continue
+        if row.get("backend_port_prestart_summary_live_write") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_contacts_backend") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_queries_console") is not False:
+            continue
+        if row.get("backend_port_prestart_summary_executes_tests") is not False:
+            continue
+        if (
+            row.get("backend_port_prestart_check_status")
+            != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+        ):
+            continue
+        valid_source_ids.append(str(source_id))
+    return valid_source_ids

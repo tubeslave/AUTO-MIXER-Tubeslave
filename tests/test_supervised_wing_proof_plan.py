@@ -4,7 +4,10 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+    wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
 from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan
 
@@ -98,10 +101,12 @@ def accepted_review_decision_ledger() -> dict:
                         "artifacts/no_wing_release_check/run/summary.json"
                     ),
                     "backend_port_prestart_summary_sha256": "3" * 64,
-                    "backend_port_prestart_summary_type": "no_wing_release_check",
+                    "backend_port_prestart_summary_type": (
+                        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+                    ),
                     "backend_port_prestart_summary_status": "passed",
                     "backend_port_prestart_summary_connection_policy": (
-                        "no_hardware_no_network_no_live_writes"
+                        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
                     ),
                     "backend_port_prestart_summary_live_write": False,
                     "backend_port_prestart_summary_contacts_backend": False,
@@ -281,7 +286,10 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     )
     assert plan["summary"][
         "readonly_preflight_review_decision_candidate_prestart_source_ids"
-    ] == ["artifacts/wing_readonly_preflight/run/summary.json"]
+    ] == wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+        plan["summary"]["readonly_preflight_review_decision_accepted_source_ids"],
+        accepted_review_decision_ledger()["summary"]["candidate_reviews"],
+    )
     assert plan["summary"]["readonly_preflight_review_decision_rejected_source_ids"] == []
     assert plan["readonly_preflight_steps"] == []
 
@@ -372,10 +380,12 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
                 "artifacts/no_wing_release_check/run/summary.json"
             ),
             "backend_port_prestart_summary_sha256": "3" * 64,
-            "backend_port_prestart_summary_type": "no_wing_release_check",
+            "backend_port_prestart_summary_type": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+            ),
             "backend_port_prestart_summary_status": "passed",
             "backend_port_prestart_summary_connection_policy": (
-                "no_hardware_no_network_no_live_writes"
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
             ),
             "backend_port_prestart_summary_live_write": False,
             "backend_port_prestart_summary_contacts_backend": False,

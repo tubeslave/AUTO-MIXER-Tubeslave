@@ -19,6 +19,7 @@ try:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
@@ -27,6 +28,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 
 
@@ -236,61 +238,6 @@ def _candidate_review_rows(
             }
         )
     return rows
-
-
-def _accepted_candidate_prestart_source_ids(
-    accepted_source_ids: Iterable[str],
-    candidate_reviews: Iterable[Mapping[str, Any]],
-) -> list[str]:
-    rows_by_source = {
-        str(row.get("source_id")): row
-        for row in candidate_reviews
-        if isinstance(row, Mapping) and row.get("source_id")
-    }
-    valid_source_ids: list[str] = []
-    for source_id in accepted_source_ids:
-        row = rows_by_source.get(source_id)
-        if not isinstance(row, Mapping):
-            continue
-        if row.get("backend_port_prestart_check_required") is not True:
-            continue
-        if row.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
-            continue
-        if _string_list(row.get("backend_port_prestart_check_command")) != (
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
-        ):
-            continue
-        if _string_list(row.get("backend_port_prestart_check_failure_detail_fields")) != (
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
-        ):
-            continue
-        if row.get("backend_port_prestart_summary_required") is not True:
-            continue
-        if not _string(row.get("backend_port_prestart_summary_path")):
-            continue
-        if not _string(row.get("backend_port_prestart_summary_sha256")):
-            continue
-        if row.get("backend_port_prestart_summary_type") != "no_wing_release_check":
-            continue
-        if row.get("backend_port_prestart_summary_status") != "passed":
-            continue
-        if (
-            row.get("backend_port_prestart_summary_connection_policy")
-            != "no_hardware_no_network_no_live_writes"
-        ):
-            continue
-        if row.get("backend_port_prestart_summary_live_write") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_contacts_backend") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_queries_console") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_executes_tests") is not False:
-            continue
-        if row.get("backend_port_prestart_check_status") != "passed":
-            continue
-        valid_source_ids.append(source_id)
-    return valid_source_ids
 
 
 def _record_id(record: Mapping[str, Any], index: int) -> str:
@@ -539,9 +486,11 @@ def build_wing_readonly_preflight_review_decision_ledger(
     )
     accepted_source_ids = [record["artifact_source_id"] for record in accepted_records]
     candidate_reviews = _candidate_review_rows(candidates_by_source)
-    accepted_candidate_prestart_source_ids = _accepted_candidate_prestart_source_ids(
-        accepted_source_ids,
-        candidate_reviews,
+    accepted_candidate_prestart_source_ids = (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            accepted_source_ids,
+            candidate_reviews,
+        )
     )
     accepted_candidate_prestart_contract_valid = (
         bool(accepted_source_ids)

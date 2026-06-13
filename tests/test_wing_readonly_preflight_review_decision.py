@@ -5,8 +5,11 @@ from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflig
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+    wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
 from backend.wing_readonly_preflight_review_decision import (
     REQUIRED_REVIEW_CHECKLIST_IDS,
@@ -19,6 +22,52 @@ def test_review_decision_checklist_ids_match_shared_contract():
     assert (
         REQUIRED_REVIEW_CHECKLIST_IDS
         == WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
+
+
+def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    candidate_review = {
+        "source_id": source_id,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path": (
+            "artifacts/no_wing_release_check/run/summary.json"
+        ),
+        "backend_port_prestart_summary_sha256": "3" * 64,
+        "backend_port_prestart_summary_type": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ),
+        "backend_port_prestart_summary_status": "passed",
+        "backend_port_prestart_summary_connection_policy": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ),
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
+        "backend_port_prestart_check_status": "passed",
+    }
+
+    assert wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+        [source_id],
+        [candidate_review],
+    ) == [source_id]
+
+    forged_review = dict(candidate_review, backend_port_prestart_summary_sha256="")
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            [source_id],
+            [forged_review],
+        )
+        == []
     )
 
 
@@ -56,10 +105,12 @@ def _valid_summary() -> dict:
         "backend_port_prestart_summary_required": True,
         "backend_port_prestart_summary_path": "artifacts/no_wing_release_check/run/summary.json",
         "backend_port_prestart_summary_sha256": "3" * 64,
-        "backend_port_prestart_summary_type": "no_wing_release_check",
+        "backend_port_prestart_summary_type": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ),
         "backend_port_prestart_summary_status": "passed",
         "backend_port_prestart_summary_connection_policy": (
-            "no_hardware_no_network_no_live_writes"
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
         "backend_port_prestart_summary_live_write": False,
         "backend_port_prestart_summary_contacts_backend": False,

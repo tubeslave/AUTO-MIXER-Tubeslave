@@ -37,6 +37,7 @@ try:
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_contract import (
@@ -45,6 +46,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 
 
@@ -244,55 +246,10 @@ def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[
     rows = summary.get("candidate_reviews")
     if not isinstance(rows, list):
         return []
-    rows_by_source = {
-        str(row.get("source_id")): row
-        for row in rows
-        if isinstance(row, Mapping) and row.get("source_id")
-    }
-    valid_source_ids: list[str] = []
-    for source_id in accepted_source_ids:
-        row = rows_by_source.get(source_id)
-        if not isinstance(row, Mapping):
-            continue
-        if row.get("backend_port_prestart_check_required") is not True:
-            continue
-        if row.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
-            continue
-        if _string_list(row.get("backend_port_prestart_check_command")) != list(
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
-        ):
-            continue
-        if _string_list(row.get("backend_port_prestart_check_failure_detail_fields")) != list(
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
-        ):
-            continue
-        if row.get("backend_port_prestart_summary_required") is not True:
-            continue
-        if not str(row.get("backend_port_prestart_summary_path") or ""):
-            continue
-        if not str(row.get("backend_port_prestart_summary_sha256") or ""):
-            continue
-        if row.get("backend_port_prestart_summary_type") != "no_wing_release_check":
-            continue
-        if row.get("backend_port_prestart_summary_status") != "passed":
-            continue
-        if (
-            row.get("backend_port_prestart_summary_connection_policy")
-            != "no_hardware_no_network_no_live_writes"
-        ):
-            continue
-        if row.get("backend_port_prestart_summary_live_write") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_contacts_backend") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_queries_console") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_executes_tests") is not False:
-            continue
-        if row.get("backend_port_prestart_check_status") != "passed":
-            continue
-        valid_source_ids.append(source_id)
-    return valid_source_ids
+    return wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+        accepted_source_ids,
+        tuple(row for row in rows if isinstance(row, Mapping)),
+    )
 
 
 def _row_by_value_type(evidence_snapshot: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
