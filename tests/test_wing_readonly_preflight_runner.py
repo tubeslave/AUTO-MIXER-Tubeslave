@@ -20,6 +20,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+    WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
@@ -88,6 +89,10 @@ def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebS
         return FakeWebSocketConnect(websocket)
 
     monkeypatch.setattr(runner.websockets, "connect", fake_connect)
+
+
+def test_runner_uses_shared_request_id_policy_contract() -> None:
+    assert runner.REQUEST_ID_POLICY == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
 
 
 def test_runner_uses_shared_run_summary_contract() -> None:
@@ -417,7 +422,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["expected_plan_sha256"]
     assert summary["expected_plan_violations"] == []
     assert_summary_prestart_contract(summary)
-    assert summary["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
+    assert summary["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     assert summary["read_only"] is True
     assert summary["live_write"] is False
     assert summary["write_request_sent"] is False
@@ -536,7 +541,7 @@ async def test_readonly_preflight_passes_with_state_unavailable_but_readbacks(
     assert summary["expected_plan_sha256"]
     assert summary["expected_plan_violations"] == []
     assert_summary_prestart_contract(summary)
-    assert summary["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
+    assert summary["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     assert summary["read_only"] is True
     assert summary["live_write"] is False
     assert summary["write_request_sent"] is False
@@ -1262,7 +1267,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["backend_port_prestart_summary_executes_tests"] is False
     assert written["backend_port_prestart_check_status"] == "passed"
     assert written["manual_review_required_before_readiness_update"] is True
-    assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
+    assert written["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     assert written["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
     assert written["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
     assert written["expected_artifacts"] == [

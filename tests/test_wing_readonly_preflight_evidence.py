@@ -13,6 +13,7 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
     EXPECTED_SELECTED_MVP_BLOCKER,
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
+    REQUEST_ID_POLICY,
     EXPECTED_RUN_SUMMARY_REASON,
     EXPECTED_RUN_SUMMARY_STATUS,
     PHYSICAL_READBACK_SOURCES,
@@ -30,6 +31,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+    WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
@@ -68,6 +70,10 @@ def test_preflight_evidence_uses_shared_run_summary_contract():
     assert EXPECTED_RUN_SUMMARY_REASON == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 
 
+def test_preflight_evidence_uses_shared_request_id_policy_contract():
+    assert REQUEST_ID_POLICY == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+
+
 def _valid_summary() -> dict:
     return {
         "run_id": "20260606T120000Z_wing_readonly_preflight",
@@ -84,7 +90,7 @@ def _valid_summary() -> dict:
         "operator_confirmed_session_ready": True,
         "value_types": ["fader", "gain", "pan"],
         "require_physical_readback": True,
-        "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "request_id_policy": WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
         "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
         "expected_plan_sha256": "0" * 64,
         "expected_plan_match": True,

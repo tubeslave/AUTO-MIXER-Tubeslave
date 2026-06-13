@@ -376,6 +376,9 @@ WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS = (
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON = (
     preflight_contract.WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 )
+WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY = (
+    preflight_contract.WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+)
 WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES = (
     preflight_contract.WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
 )
@@ -4472,7 +4475,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_manual_review_boundary_not_true"
         )
-    if plan.get("request_id_policy") != "required_for_every_query_mixer_parameter_response":
+    if plan.get("request_id_policy") != WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY:
         violations.append("wing_readonly_preflight_plan_request_id_policy_missing")
 
     for key in (

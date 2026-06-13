@@ -39,6 +39,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+    WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
@@ -71,6 +72,7 @@ SELECTED_MVP_BLOCKER = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
 SELECTED_MVP_BLOCKER_STATUS = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
 RUN_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
 RUN_SUMMARY_REASON = WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+REQUEST_ID_POLICY = WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",
     "set_gain",
@@ -637,7 +639,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
             {"type": "get_state"},
             *read_requests,
         ],
-        "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "request_id_policy": REQUEST_ID_POLICY,
         "expected_artifacts": [
             f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
             f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
@@ -789,7 +791,7 @@ async def run(args: argparse.Namespace) -> int:
         ),
         **prestart_detail,
         "prestart_summary_violations": prestart_violations,
-        "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "request_id_policy": REQUEST_ID_POLICY,
         "forbidden_request_types": sorted(FORBIDDEN_REQUEST_TYPES),
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }

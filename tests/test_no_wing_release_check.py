@@ -41,6 +41,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+    WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
@@ -247,6 +248,10 @@ def test_wing_readonly_handoff_safety_contract_uses_shared_constants():
     assert (
         release_check.WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
         == WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+        == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     )
     assert (
         release_check.WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
@@ -1112,7 +1117,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
             WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
         ),
         "manual_review_required_before_readiness_update": True,
-        "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "request_id_policy": WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
         "contacts_backend": False,
         "queries_console": False,
         "execution_allowed_by_plan": False,
