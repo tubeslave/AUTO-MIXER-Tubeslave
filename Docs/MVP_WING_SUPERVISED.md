@@ -112,6 +112,15 @@ Stop the current Codex work direction and return to the first open blocker if:
 	  `backend_port_prestart_summary_queries_console: false`,
 	  `backend_port_prestart_summary_executes_tests: false`, and
 	  `backend_port_prestart_check_status: passed`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  command bindings to the packet roots:
+  `preview_command_artifact_root_matches_packet: true`,
+  `preview_command_plan_output_matches_packet: true`,
+  `capture_command_artifact_root_matches_packet: true`,
+  `capture_command_expected_plan_matches_packet: true`,
+  `review_command_artifact_root_matches_packet: true`,
+  `decision_review_command_artifact_root_matches_packet: true`, and
+  `decision_review_command_decision_root_matches_packet: true`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `backend_port_prestart_gate` exactly matching
   `expected_backend_port_prestart_gate`.
@@ -388,6 +397,16 @@ matching `expected_artifact_globs` and `plan_expected_artifacts`.
 The no-WING handoff summary must also show
 `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`, and
 `event_log_glob_matches_plan: true`.
+
+The no-WING handoff summary must also show command binding to the same packet
+artifacts and roots before a real WING run:
+`preview_command_artifact_root_matches_packet: true`,
+`preview_command_plan_output_matches_packet: true`,
+`capture_command_artifact_root_matches_packet: true`,
+`capture_command_expected_plan_matches_packet: true`,
+`review_command_artifact_root_matches_packet: true`,
+`decision_review_command_artifact_root_matches_packet: true`, and
+`decision_review_command_decision_root_matches_packet: true`.
 
 It must also show `supervised_prestart_gate` exactly matching
 `expected_supervised_prestart_gate`, with

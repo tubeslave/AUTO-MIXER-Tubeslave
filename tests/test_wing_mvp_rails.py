@@ -392,6 +392,16 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "expected_artifacts_match_plan: true" in rows[0]["next action"]
     assert "summary_glob_matches_plan: true" in rows[0]["next action"]
     assert "event_log_glob_matches_plan: true" in rows[0]["next action"]
+    for marker in (
+        "preview_command_artifact_root_matches_packet: true",
+        "preview_command_plan_output_matches_packet: true",
+        "capture_command_artifact_root_matches_packet: true",
+        "capture_command_expected_plan_matches_packet: true",
+        "review_command_artifact_root_matches_packet: true",
+        "decision_review_command_artifact_root_matches_packet: true",
+        "decision_review_command_decision_root_matches_packet: true",
+    ):
+        assert marker in rows[0]["next action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in rows[0][
         "next action"
     ]
@@ -648,6 +658,16 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "expected_artifacts_match_plan: true" in readonly
     assert "summary_glob_matches_plan: true" in readonly
     assert "event_log_glob_matches_plan: true" in readonly
+    for marker in (
+        "preview_command_artifact_root_matches_packet: true",
+        "preview_command_plan_output_matches_packet: true",
+        "capture_command_artifact_root_matches_packet: true",
+        "capture_command_expected_plan_matches_packet: true",
+        "review_command_artifact_root_matches_packet: true",
+        "decision_review_command_artifact_root_matches_packet: true",
+        "decision_review_command_decision_root_matches_packet: true",
+    ):
+        assert marker in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert "required_supervised_prestart_gate_markers" in readonly
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readonly
@@ -773,6 +793,16 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "expected_artifacts_match_plan: true" in report
     assert "summary_glob_matches_plan: true" in report
     assert "event_log_glob_matches_plan: true" in report
+    for marker in (
+        "preview_command_artifact_root_matches_packet: true",
+        "preview_command_plan_output_matches_packet: true",
+        "capture_command_artifact_root_matches_packet: true",
+        "capture_command_expected_plan_matches_packet: true",
+        "review_command_artifact_root_matches_packet: true",
+        "decision_review_command_artifact_root_matches_packet: true",
+        "decision_review_command_decision_root_matches_packet: true",
+    ):
+        assert marker in report
     assert "backend_port_prestart_check_operator_sequence_step" in report
     assert "prestart_backend_port_check" in report
     assert "unexpected listeners" in report

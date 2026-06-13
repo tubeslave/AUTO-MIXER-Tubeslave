@@ -292,6 +292,16 @@ you want the background automation active.
   This keeps the packet artifact list, named summary/events globs, and expected
   plan artifact list tied to the same real-run outputs.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `preview_command_artifact_root_matches_packet: true`,
+  `preview_command_plan_output_matches_packet: true`,
+  `capture_command_artifact_root_matches_packet: true`,
+  `capture_command_expected_plan_matches_packet: true`,
+  `review_command_artifact_root_matches_packet: true`,
+  `decision_review_command_artifact_root_matches_packet: true`, and
+  `decision_review_command_decision_root_matches_packet: true`. This keeps
+  capture, review, and decision-review commands bound to the packet's expected
+  plan, artifact root, and decision root.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
   `prestart_backend_port_check` and `unexpected listeners`,

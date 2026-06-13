@@ -4812,8 +4812,70 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     declared_review_decision_template_output_matches_contract = (
         packet.get("decision_template_output_matches_contract") is True
     )
+    preview_command = commands.get("preview_readonly_request_plan", [])
+    capture_command = commands.get("capture_readonly_preflight", [])
+    review_command = commands.get(
+        "review_artifact_and_write_pending_decision_template", []
+    )
+    decision_review_command = commands.get("review_edited_decision_json", [])
+    preview_command_artifact_root = command_value_after_flag(
+        preview_command,
+        "--artifact-root",
+    )
+    preview_command_artifact_root_matches_packet = (
+        bool(preview_command_artifact_root)
+        and preview_command_artifact_root == packet.get("artifact_root")
+    )
+    preview_command_plan_output = command_value_after_flag(
+        preview_command,
+        "--plan-output",
+    )
+    preview_command_plan_output_matches_packet = (
+        bool(preview_command_plan_output)
+        and preview_command_plan_output == packet.get("plan_output")
+    )
+    capture_command_artifact_root = command_value_after_flag(
+        capture_command,
+        "--artifact-root",
+    )
+    capture_command_artifact_root_matches_packet = (
+        bool(capture_command_artifact_root)
+        and capture_command_artifact_root == packet.get("artifact_root")
+    )
+    capture_command_expected_plan = command_value_after_flag(
+        capture_command,
+        "--expected-plan",
+    )
+    capture_command_expected_plan_matches_packet = (
+        bool(capture_command_expected_plan)
+        and capture_command_expected_plan == packet.get("plan_output")
+    )
+    review_command_artifact_root = command_value_after_flag(
+        review_command,
+        "--artifact-root",
+    )
+    review_command_artifact_root_matches_packet = (
+        bool(review_command_artifact_root)
+        and review_command_artifact_root == packet.get("artifact_root")
+    )
+    decision_review_command_artifact_root = command_value_after_flag(
+        decision_review_command,
+        "--artifact-root",
+    )
+    decision_review_command_artifact_root_matches_packet = (
+        bool(decision_review_command_artifact_root)
+        and decision_review_command_artifact_root == packet.get("artifact_root")
+    )
+    decision_review_command_decision_root = command_value_after_flag(
+        decision_review_command,
+        "--decision-root",
+    )
+    decision_review_command_decision_root_matches_packet = (
+        bool(decision_review_command_decision_root)
+        and decision_review_command_decision_root == packet.get("decision_root")
+    )
     review_command_decision_template_output = command_value_after_flag(
-        commands.get("review_artifact_and_write_pending_decision_template", []),
+        review_command,
         "--decision-template-output",
     )
     review_command_decision_template_output_matches_packet = (
@@ -4832,7 +4894,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         packet.get("review_output_matches_contract") is True
     )
     review_command_output = command_value_after_flag(
-        commands.get("review_artifact_and_write_pending_decision_template", []),
+        review_command,
         "--output",
     )
     review_command_output_matches_packet = (
@@ -4850,7 +4912,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         packet.get("decision_review_output_matches_contract") is True
     )
     decision_review_command_output = command_value_after_flag(
-        commands.get("review_edited_decision_json", []),
+        decision_review_command,
         "--output",
     )
     decision_review_command_output_matches_packet = (
@@ -5143,33 +5205,55 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     focused_validation = commands.get("focused_validation")
     if not isinstance(focused_validation, list) or "tests/test_no_wing_release_check.py" not in focused_validation:
         violations.append("wing_readonly_preflight_handoff_packet_focused_validation_missing")
-    if "--plan-only" not in commands.get("preview_readonly_request_plan", []):
+    if "--plan-only" not in preview_command:
         violations.append("wing_readonly_preflight_handoff_packet_preview_plan_only_missing")
+    if not preview_command_artifact_root_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_preview_artifact_root_mismatch"
+        )
+    if not preview_command_plan_output_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_preview_plan_output_mismatch"
+        )
     if commands.get("prestart_backend_port_check") != (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     ):
         violations.append(
             "wing_readonly_preflight_handoff_packet_prestart_backend_port_check_mismatch"
         )
-    if "--operator-confirm-session-ready" not in commands.get(
-        "preview_readonly_request_plan", []
-    ):
+    if "--operator-confirm-session-ready" not in preview_command:
         violations.append(
             "wing_readonly_preflight_handoff_packet_preview_session_confirmation_missing"
         )
-    if "--require-physical-readback" not in commands.get("capture_readonly_preflight", []):
+    if "--require-physical-readback" not in capture_command:
         violations.append(
             "wing_readonly_preflight_handoff_packet_capture_physical_readback_missing"
         )
-    if "--operator-confirm-session-ready" not in commands.get(
-        "capture_readonly_preflight", []
-    ):
+    if "--operator-confirm-session-ready" not in capture_command:
         violations.append(
             "wing_readonly_preflight_handoff_packet_capture_session_confirmation_missing"
         )
-    if "--decision-template-output" not in commands.get(
-        "review_artifact_and_write_pending_decision_template", []
-    ):
+    if not capture_command_artifact_root_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_capture_artifact_root_mismatch"
+        )
+    if not capture_command_expected_plan_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_capture_expected_plan_mismatch"
+        )
+    if not review_command_artifact_root_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_review_artifact_root_mismatch"
+        )
+    if not decision_review_command_artifact_root_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_review_artifact_root_mismatch"
+        )
+    if not decision_review_command_decision_root_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_review_decision_root_mismatch"
+        )
+    if "--decision-template-output" not in review_command:
         violations.append(
             "wing_readonly_preflight_handoff_packet_decision_template_output_missing"
         )
@@ -5563,25 +5647,40 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["command_names"] = sorted(commands)
     detail["preview_command_uses_plan_only"] = (
-        "--plan-only" in commands.get("preview_readonly_request_plan", [])
+        "--plan-only" in preview_command
     )
     detail["preview_command_prestart_summary"] = command_value_after_flag(
-        commands.get("preview_readonly_request_plan", []),
+        preview_command,
         "--prestart-summary",
+    )
+    detail["preview_command_artifact_root"] = preview_command_artifact_root
+    detail["preview_command_artifact_root_matches_packet"] = (
+        preview_command_artifact_root_matches_packet
+    )
+    detail["preview_command_plan_output"] = preview_command_plan_output
+    detail["preview_command_plan_output_matches_packet"] = (
+        preview_command_plan_output_matches_packet
     )
     detail["capture_command_requires_physical_readback"] = (
-        "--require-physical-readback" in commands.get("capture_readonly_preflight", [])
+        "--require-physical-readback" in capture_command
     )
     detail["capture_command_prestart_summary"] = command_value_after_flag(
-        commands.get("capture_readonly_preflight", []),
+        capture_command,
         "--prestart-summary",
+    )
+    detail["capture_command_artifact_root"] = capture_command_artifact_root
+    detail["capture_command_artifact_root_matches_packet"] = (
+        capture_command_artifact_root_matches_packet
+    )
+    detail["capture_command_expected_plan"] = capture_command_expected_plan
+    detail["capture_command_expected_plan_matches_packet"] = (
+        capture_command_expected_plan_matches_packet
     )
     detail["prestart_backend_port_check_command"] = commands.get(
         "prestart_backend_port_check"
     )
     detail["review_command_writes_decision_template"] = (
-        "--decision-template-output"
-        in commands.get("review_artifact_and_write_pending_decision_template", [])
+        "--decision-template-output" in review_command
     )
     detail["review_decision_template_output"] = review_decision_template_output
     detail["review_decision_template_output_matches_contract"] = (
@@ -5601,6 +5700,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["review_output_contract_flag"] = declared_review_output_matches_contract
     detail["review_command_output"] = review_command_output
     detail["review_command_output_matches_packet"] = review_command_output_matches_packet
+    detail["review_command_artifact_root"] = review_command_artifact_root
+    detail["review_command_artifact_root_matches_packet"] = (
+        review_command_artifact_root_matches_packet
+    )
     detail["decision_review_output"] = decision_review_output
     detail["decision_review_output_matches_contract"] = (
         decision_review_output_matches_contract
@@ -5611,6 +5714,18 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["decision_review_command_output"] = decision_review_command_output
     detail["decision_review_command_output_matches_packet"] = (
         decision_review_command_output_matches_packet
+    )
+    detail["decision_review_command_artifact_root"] = (
+        decision_review_command_artifact_root
+    )
+    detail["decision_review_command_artifact_root_matches_packet"] = (
+        decision_review_command_artifact_root_matches_packet
+    )
+    detail["decision_review_command_decision_root"] = (
+        decision_review_command_decision_root
+    )
+    detail["decision_review_command_decision_root_matches_packet"] = (
+        decision_review_command_decision_root_matches_packet
     )
     detail["required_review_checklist_ids"] = list(required_checklist)
     detail["forbidden_live_request_types"] = list(forbidden_request_types)
@@ -13215,11 +13330,35 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "preview_command_prestart_summary": str(
                 detail.get("preview_command_prestart_summary") or ""
             ),
+            "preview_command_artifact_root": str(
+                detail.get("preview_command_artifact_root") or ""
+            ),
+            "preview_command_artifact_root_matches_packet": (
+                detail.get("preview_command_artifact_root_matches_packet") is True
+            ),
+            "preview_command_plan_output": str(
+                detail.get("preview_command_plan_output") or ""
+            ),
+            "preview_command_plan_output_matches_packet": (
+                detail.get("preview_command_plan_output_matches_packet") is True
+            ),
             "capture_command_requires_physical_readback": (
                 detail.get("capture_command_requires_physical_readback") is True
             ),
             "capture_command_prestart_summary": str(
                 detail.get("capture_command_prestart_summary") or ""
+            ),
+            "capture_command_artifact_root": str(
+                detail.get("capture_command_artifact_root") or ""
+            ),
+            "capture_command_artifact_root_matches_packet": (
+                detail.get("capture_command_artifact_root_matches_packet") is True
+            ),
+            "capture_command_expected_plan": str(
+                detail.get("capture_command_expected_plan") or ""
+            ),
+            "capture_command_expected_plan_matches_packet": (
+                detail.get("capture_command_expected_plan_matches_packet") is True
             ),
             "prestart_backend_port_check_command": (
                 list(detail.get("prestart_backend_port_check_command"))
@@ -13256,6 +13395,10 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "review_command_output_matches_packet": (
                 detail.get("review_command_output_matches_packet") is True
             ),
+            "review_command_artifact_root": detail.get("review_command_artifact_root"),
+            "review_command_artifact_root_matches_packet": (
+                detail.get("review_command_artifact_root_matches_packet") is True
+            ),
             "decision_review_output": detail.get("decision_review_output"),
             "decision_review_output_matches_contract": (
                 detail.get("decision_review_output_matches_contract") is True
@@ -13268,6 +13411,20 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "decision_review_command_output_matches_packet": (
                 detail.get("decision_review_command_output_matches_packet") is True
+            ),
+            "decision_review_command_artifact_root": detail.get(
+                "decision_review_command_artifact_root"
+            ),
+            "decision_review_command_artifact_root_matches_packet": (
+                detail.get("decision_review_command_artifact_root_matches_packet")
+                is True
+            ),
+            "decision_review_command_decision_root": detail.get(
+                "decision_review_command_decision_root"
+            ),
+            "decision_review_command_decision_root_matches_packet": (
+                detail.get("decision_review_command_decision_root_matches_packet")
+                is True
             ),
             "required_review_checklist_ids": (
                 list(checklist_ids) if isinstance(checklist_ids, list) else []
@@ -16808,10 +16965,26 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['preview_command_uses_plan_only']).lower()}`",
                 "- preview_command_prestart_summary: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['preview_command_prestart_summary']}`",
+                "- preview_command_artifact_root: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['preview_command_artifact_root']}`",
+                "- preview_command_artifact_root_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['preview_command_artifact_root_matches_packet']).lower()}`",
+                "- preview_command_plan_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['preview_command_plan_output']}`",
+                "- preview_command_plan_output_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['preview_command_plan_output_matches_packet']).lower()}`",
                 "- capture_command_requires_physical_readback: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_requires_physical_readback']).lower()}`",
                 "- capture_command_prestart_summary: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['capture_command_prestart_summary']}`",
+                "- capture_command_artifact_root: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['capture_command_artifact_root']}`",
+                "- capture_command_artifact_root_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_artifact_root_matches_packet']).lower()}`",
+                "- capture_command_expected_plan: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['capture_command_expected_plan']}`",
+                "- capture_command_expected_plan_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_expected_plan_matches_packet']).lower()}`",
                 "- prestart_backend_port_check_command: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['prestart_backend_port_check_command'])}`",
                 "- backend_port_prestart_check_operator_sequence_step_index: "
@@ -16864,6 +17037,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['review_command_output']}`",
                 "- review_command_output_matches_packet: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_output_matches_packet']).lower()}`",
+                "- review_command_artifact_root: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['review_command_artifact_root']}`",
+                "- review_command_artifact_root_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_artifact_root_matches_packet']).lower()}`",
                 "- decision_review_output: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['decision_review_output']}`",
                 "- decision_review_output_matches_contract: "
@@ -16874,6 +17051,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['decision_review_command_output']}`",
                 "- decision_review_command_output_matches_packet: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['decision_review_command_output_matches_packet']).lower()}`",
+                "- decision_review_command_artifact_root: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['decision_review_command_artifact_root']}`",
+                "- decision_review_command_artifact_root_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['decision_review_command_artifact_root_matches_packet']).lower()}`",
+                "- decision_review_command_decision_root: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['decision_review_command_decision_root']}`",
+                "- decision_review_command_decision_root_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['decision_review_command_decision_root_matches_packet']).lower()}`",
                 "- blockers_not_closed_by_packet: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['blockers_not_closed_by_packet'])}`",
                 "- mvp_blocker_anchor_matches_current_first_open: "

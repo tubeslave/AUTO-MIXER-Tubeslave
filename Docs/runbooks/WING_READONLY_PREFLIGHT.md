@@ -482,6 +482,13 @@ The handoff validation must report:
 - `expected_artifacts_match_plan: true`
 - `summary_glob_matches_plan: true`
 - `event_log_glob_matches_plan: true`
+- `preview_command_artifact_root_matches_packet: true`
+- `preview_command_plan_output_matches_packet: true`
+- `capture_command_artifact_root_matches_packet: true`
+- `capture_command_expected_plan_matches_packet: true`
+- `review_command_artifact_root_matches_packet: true`
+- `decision_review_command_artifact_root_matches_packet: true`
+- `decision_review_command_decision_root_matches_packet: true`
 - `mvp_blocker_anchor` exactly matches the current first open blocker row
 - `mvp_blocker_anchor_matches_current_first_open: true`
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`

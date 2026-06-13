@@ -219,6 +219,16 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_connection_confirmation_step_index: 2" in directive[
         "selected_action"
     ]
+    for marker in (
+        "preview_command_artifact_root_matches_packet: true",
+        "preview_command_plan_output_matches_packet: true",
+        "capture_command_artifact_root_matches_packet: true",
+        "capture_command_expected_plan_matches_packet: true",
+        "review_command_artifact_root_matches_packet: true",
+        "decision_review_command_artifact_root_matches_packet: true",
+        "decision_review_command_decision_root_matches_packet: true",
+    ):
+        assert marker in directive["selected_action"]
     assert "operator_sequence_has_backend_connection_confirmation: true" in directive[
         "selected_action"
     ]
@@ -550,6 +560,16 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in prompt
     assert "backend_connection_confirmation_step_index: 2" in prompt
+    for marker in (
+        "preview_command_artifact_root_matches_packet: true",
+        "preview_command_plan_output_matches_packet: true",
+        "capture_command_artifact_root_matches_packet: true",
+        "capture_command_expected_plan_matches_packet: true",
+        "review_command_artifact_root_matches_packet: true",
+        "decision_review_command_artifact_root_matches_packet: true",
+        "decision_review_command_decision_root_matches_packet: true",
+    ):
+        assert marker in prompt
     assert "operator_sequence_has_backend_connection_confirmation: true" in prompt
     assert "operator_sequence_backend_connection_confirmation_step_index: 2" in prompt
     assert (
@@ -640,6 +660,16 @@ def test_prompt_and_readme_document_project_director_agent():
         in readme
     )
     assert "backend_connection_confirmation_step_index: 2" in readme
+    for marker in (
+        "preview_command_artifact_root_matches_packet: true",
+        "preview_command_plan_output_matches_packet: true",
+        "capture_command_artifact_root_matches_packet: true",
+        "capture_command_expected_plan_matches_packet: true",
+        "review_command_artifact_root_matches_packet: true",
+        "decision_review_command_artifact_root_matches_packet: true",
+        "decision_review_command_decision_root_matches_packet: true",
+    ):
+        assert marker in readme
     assert "operator_sequence_has_backend_connection_confirmation: true" in readme
     assert "operator_sequence_backend_connection_confirmation_step_index: 2" in readme
     assert (

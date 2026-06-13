@@ -236,35 +236,42 @@ blockers выше.
    `plan_expected_artifacts`, and verify
    `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`,
    and `event_log_glob_matches_plan: true`;
-47. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+47. verify `preview_command_artifact_root_matches_packet: true`,
+   `preview_command_plan_output_matches_packet: true`,
+   `capture_command_artifact_root_matches_packet: true`,
+   `capture_command_expected_plan_matches_packet: true`,
+   `review_command_artifact_root_matches_packet: true`,
+   `decision_review_command_artifact_root_matches_packet: true`, and
+   `decision_review_command_decision_root_matches_packet: true`;
+48. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-48. verify `supervised_prestart_gate.grants_live_authority: false`;
-49. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
+49. verify `supervised_prestart_gate.grants_live_authority: false`;
+50. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
-50. verify `supervised_prestart_gate.requires_operator_decision_status:
+51. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
-51. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-52. verify `operator_sequence_count: 10`;
-53. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-54. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+52. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+53. verify `operator_sequence_count: 10`;
+54. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+55. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-55. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-56. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+56. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+57. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-57. verify `required_supervised_prestart_gate_markers` exactly lists
+58. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-57. run dry-run recommendation;
-58. require explicit operator approval for the exact action;
-59. apply only bounded supervised fader/gain action;
-60. read back the result;
-61. test rollback;
-62. record proof artifact.
+59. run dry-run recommendation;
+60. require explicit operator approval for the exact action;
+61. apply only bounded supervised fader/gain action;
+62. read back the result;
+63. test rollback;
+64. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -323,6 +330,14 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `expected_artifacts` exactly matching `expected_artifact_globs` and
   `plan_expected_artifacts`, with `expected_artifacts_match_plan: true`,
   `summary_glob_matches_plan: true`, and `event_log_glob_matches_plan: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `preview_command_artifact_root_matches_packet: true`,
+  `preview_command_plan_output_matches_packet: true`,
+  `capture_command_artifact_root_matches_packet: true`,
+  `capture_command_expected_plan_matches_packet: true`,
+  `review_command_artifact_root_matches_packet: true`,
+  `decision_review_command_artifact_root_matches_packet: true`, and
+  `decision_review_command_decision_root_matches_packet: true`.
 - Before any supervised fader/gain proof, the structured
   `backend_port_prestart_gate` must show
   `backend_port_prestart_gate.operator_sequence_step_index: 0` and
