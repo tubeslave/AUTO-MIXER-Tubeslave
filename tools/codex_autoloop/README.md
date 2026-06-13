@@ -157,6 +157,14 @@ you want the background automation active.
   `fail_closed_reason`, and `operator_next_step`.
   This preserves the fail-closed review evidence when the prestart check
   detects unexpected listeners.
+- When the backend-port prestart check detects an existing listener, the failed
+  no-WING summary must expose `listener_confirmation_template_path` and keep the
+  generated template pending with
+  `listener_confirmation_template_status: pending_operator_edit`,
+  `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
+  `listener_confirmation_template_live_authority_granted: false`. The template
+  is only an operator-edit starting point, not an accepted confirmation or live
+  authority.
 - Before any readiness update, the no-WING handoff summary must show
   `manual_review_required_before_readiness_update: true`.
   This keeps offline handoff packets from being treated as accepted real WING

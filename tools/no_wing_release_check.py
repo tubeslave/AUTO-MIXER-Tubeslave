@@ -386,6 +386,15 @@ BACKEND_PORT_LISTENER_CONFIRMATION_ARTIFACT_TYPE = (
 BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS = (
     "operator_confirmed_intended_backend"
 )
+BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS = "operator_review_required"
+BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REQUIRED_EDITS = [
+    "confirm the listener is the intended Automixer backend for this WING preflight",
+    "set status to operator_confirmed_intended_backend only after operator review",
+    "set confirms_intended_backend to true only after matching the PID and command line",
+    "replace operator_reviewed_at with the UTC review timestamp",
+    "replace operator_name with the reviewing operator name",
+    "rerun the no-WING gate with --backend-listener-confirmation pointing to the edited JSON",
+]
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
 )
@@ -1507,9 +1516,23 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
         "listener_confirmation_status",
         "intended_backend_confirmed",
         "matched_listener_pid",
+        "listener_confirmation_template_path",
+        "listener_confirmation_template_status",
+        "listener_confirmation_template_candidate_count",
     ):
         if field in detail:
             lines.append(f"  - {field}: `{detail[field]}`")
+    listener_confirmation_template_required_edits = detail.get(
+        "listener_confirmation_template_required_edits"
+    )
+    if (
+        isinstance(listener_confirmation_template_required_edits, list)
+        and listener_confirmation_template_required_edits
+    ):
+        lines.append(
+            "  - listener_confirmation_template_required_edits: "
+            f"`{json.dumps(listener_confirmation_template_required_edits, ensure_ascii=False)}`"
+        )
     listener_confirmation_violations = detail.get("listener_confirmation_violations")
     if (
         isinstance(listener_confirmation_violations, list)
@@ -1613,6 +1636,138 @@ def _backend_listener_confirmation_detail(
         detail["intended_backend_confirmed"] = True
     detail["listener_confirmation_violations"] = violations
     return detail
+
+
+def backend_listener_confirmation_template_path_for_run(run_dir: Path) -> Path:
+    return run_dir / "backend-listener-confirmation-template.json"
+
+
+def build_backend_listener_confirmation_template(
+    *,
+    host: str,
+    port: int,
+    listener_processes: Sequence[Mapping[str, object]],
+    generated_at: str,
+) -> dict[str, object]:
+    listener_candidates = [dict(process) for process in listener_processes]
+    primary_listener = next(
+        (
+            process
+            for process in listener_candidates
+            if str(process.get("command_line") or "").strip()
+        ),
+        listener_candidates[0] if listener_candidates else {},
+    )
+    reviewed_pid = _normalize_listener_pid(primary_listener.get("pid"))
+    reviewed_command_line = str(primary_listener.get("command_line") or "").strip()
+    payload: dict[str, object] = {
+        "type": BACKEND_PORT_LISTENER_CONFIRMATION_ARTIFACT_TYPE,
+        "status": BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS,
+        "host": host,
+        "port": port,
+        "confirms_intended_backend": False,
+        "reviewed_listener_pid": (
+            reviewed_pid
+            if reviewed_pid is not None
+            else "REPLACE_WITH_CURRENT_LISTENER_PID"
+        ),
+        "reviewed_listener_command_line": (
+            reviewed_command_line
+            if reviewed_command_line
+            else "REPLACE_WITH_CURRENT_LISTENER_COMMAND_LINE"
+        ),
+        "operator_reviewed_at": "REPLACE_WITH_OPERATOR_REVIEW_UTC",
+        "operator_name": "REPLACE_WITH_OPERATOR_NAME",
+        "safe_to_stop_listener_by_gate": False,
+        "live_authority_granted": False,
+        "template_generated_at": generated_at,
+        "template_status": "pending_operator_edit",
+        "accepted_by_template": False,
+        "execution_allowed_by_template": False,
+        "readiness_closure_allowed_by_template": False,
+        "required_operator_edits": list(
+            BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REQUIRED_EDITS
+        ),
+        "listener_candidates": listener_candidates,
+        "operator_next_step": (
+            "Edit this pending template only after confirming the listener is "
+            "the intended Automixer backend, then rerun the no-WING gate with "
+            "--backend-listener-confirmation. Do not stop or reconfigure the "
+            "listener from this template."
+        ),
+    }
+    command_line_error = primary_listener.get("command_line_error")
+    if command_line_error:
+        payload["reviewed_listener_command_line_error"] = command_line_error
+    return payload
+
+
+def write_backend_listener_confirmation_template(
+    path: Path,
+    *,
+    host: str,
+    port: int,
+    listener_processes: Sequence[Mapping[str, object]],
+    generated_at: str,
+) -> dict[str, object]:
+    payload = build_backend_listener_confirmation_template(
+        host=host,
+        port=port,
+        listener_processes=listener_processes,
+        generated_at=generated_at,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return payload
+
+
+def maybe_attach_backend_listener_confirmation_template(
+    result: CheckResult,
+    *,
+    run_dir: Path,
+    generated_at: str,
+) -> CheckResult:
+    if result.name != "backend_port_free" or result.status == "passed":
+        return result
+    detail = dict(result.detail or {})
+    if detail.get("listener_detected") is not True:
+        return result
+    if detail.get("listener_confirmation_status") == "accepted":
+        return result
+    listener_processes = detail.get("listener_processes")
+    if not isinstance(listener_processes, list):
+        listener_processes = []
+    path = backend_listener_confirmation_template_path_for_run(run_dir)
+    payload = write_backend_listener_confirmation_template(
+        path,
+        host=str(detail.get("host") or "127.0.0.1"),
+        port=int(detail.get("port") or DEFAULT_BACKEND_PORT),
+        listener_processes=[
+            process for process in listener_processes if isinstance(process, dict)
+        ],
+        generated_at=generated_at,
+    )
+    detail["listener_confirmation_template_path"] = str(path)
+    detail["listener_confirmation_template_status"] = payload["template_status"]
+    detail["listener_confirmation_template_acceptance_status"] = payload["status"]
+    detail["listener_confirmation_template_candidate_count"] = len(
+        payload["listener_candidates"]
+    )
+    detail["listener_confirmation_template_required_edits"] = list(
+        payload["required_operator_edits"]
+    )
+    detail["listener_confirmation_template_safe_to_stop_listener_by_gate"] = False
+    detail["listener_confirmation_template_live_authority_granted"] = False
+    detail["operator_next_step"] = (
+        "Inspect the generated backend listener confirmation template, edit it "
+        "only if the listener is the intended Automixer backend, then rerun the "
+        "no-WING gate with --backend-listener-confirmation. Otherwise clear the "
+        "unexpected listener after operator review."
+    )
+    return replace(result, detail=detail)
 
 
 def check_port_free(
@@ -16791,6 +16946,11 @@ def run_release_checks(
             listener_confirmation_path=backend_listener_confirmation,
         )
     ]
+    results[-1] = maybe_attach_backend_listener_confirmation_template(
+        results[-1],
+        run_dir=run_dir,
+        generated_at=generated_at,
+    )
     if results[-1].status != "passed" and not continue_on_failure:
         summary = write_summary(run_dir, results, generated_at=generated_at)
         summary["run_dir"] = str(run_dir)

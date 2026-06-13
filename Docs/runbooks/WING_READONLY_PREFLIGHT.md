@@ -31,9 +31,15 @@ It does not approve live writes.
   the real preflight remains blocked until the operator follows the checklist
   to confirm the listener is the intended backend or frees/reconfigures the
   unexpected listener. The gate is diagnostic only and does not stop processes.
-  If the existing listener is the intended backend, write a separate operator
-  confirmation JSON and rerun the gate with `--backend-listener-confirmation`.
-  The JSON must match the current listener PID and command line, keep
+  If the existing listener is the intended backend, use the generated
+  `listener_confirmation_template_path` from the failed no-WING summary as the
+  starting point for a separate operator confirmation JSON, then rerun the gate
+  with `--backend-listener-confirmation`. The generated template must remain
+  pending with `listener_confirmation_template_status: pending_operator_edit`
+  until an operator edits it; it must keep
+  `listener_confirmation_template_safe_to_stop_listener_by_gate: false` and
+  `listener_confirmation_template_live_authority_granted: false`. The accepted
+  JSON must match the current listener PID and command line, keep
   `safe_to_stop_listener_by_gate: false`, and keep
   `live_authority_granted: false`:
 

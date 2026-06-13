@@ -72,6 +72,16 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "safe_to_stop_listener_by_gate" in directive["selected_action"]
     assert "fail_closed_reason" in directive["selected_action"]
     assert "operator_next_step" in directive["selected_action"]
+    assert "listener_confirmation_template_path" in directive["selected_action"]
+    assert "listener_confirmation_template_status: pending_operator_edit" in directive[
+        "selected_action"
+    ]
+    assert "listener_confirmation_template_safe_to_stop_listener_by_gate: false" in directive[
+        "selected_action"
+    ]
+    assert "listener_confirmation_template_live_authority_granted: false" in directive[
+        "selected_action"
+    ]
     assert "manual_review_required_before_readiness_update: true" in directive[
         "selected_action"
     ]
@@ -240,6 +250,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_TEMPLATE_20260613.md"
         in directive["selected_evidence_files"]
     )
     assert (

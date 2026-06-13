@@ -150,33 +150,39 @@ blockers выше.
    `preflight_blocked_until_listener_confirmed`,
    `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
    `fail_closed_reason`, and `operator_next_step`;
-11. verify `manual_review_required_before_readiness_update: true`;
-12. verify `readiness_matrix_update_allowed_by_packet: false`;
-13. verify `readiness_closure_allowed_by_packet: false`;
-14. verify `read_only: true`;
-15. verify `live_write: false`;
-16. verify `mutates_console_state: false`;
-17. verify `queries_console: false`;
-18. verify `executes_tests: false`;
-19. verify `operator_required: true`;
-20. verify `expected_plan_required_for_real_run: true`;
-21. verify `backend_port_prestart_summary_required: true`;
-22. verify `backend_port_prestart_summary_path_placeholder` points to the
+11. when a backend listener is already present, verify the failed no-WING
+   summary exposes `listener_confirmation_template_path`, while the generated
+   template remains pending with
+   `listener_confirmation_template_status: pending_operator_edit`,
+   `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
+   `listener_confirmation_template_live_authority_granted: false`;
+12. verify `manual_review_required_before_readiness_update: true`;
+13. verify `readiness_matrix_update_allowed_by_packet: false`;
+14. verify `readiness_closure_allowed_by_packet: false`;
+15. verify `read_only: true`;
+16. verify `live_write: false`;
+17. verify `mutates_console_state: false`;
+18. verify `queries_console: false`;
+19. verify `executes_tests: false`;
+20. verify `operator_required: true`;
+21. verify `expected_plan_required_for_real_run: true`;
+22. verify `backend_port_prestart_summary_required: true`;
+23. verify `backend_port_prestart_summary_path_placeholder` points to the
    passed no-WING prestart `summary.json`;
-23. verify `preview_command_prestart_summary` matches that path;
-24. verify `capture_command_prestart_summary` matches that path;
-25. verify `capture_command_prestart_summary_matches_plan: true`;
-26. verify `backend_port_prestart_summary_status: passed`;
-27. verify `backend_port_prestart_summary_live_write: false`;
-28. verify `backend_port_prestart_check_status: passed`;
-29. verify `physical_preflight_requires_existing_backend_connection: true`;
-30. verify `backend_port_prestart_check_required: true`;
-31. verify
+24. verify `preview_command_prestart_summary` matches that path;
+25. verify `capture_command_prestart_summary` matches that path;
+26. verify `capture_command_prestart_summary_matches_plan: true`;
+27. verify `backend_port_prestart_summary_status: passed`;
+28. verify `backend_port_prestart_summary_live_write: false`;
+29. verify `backend_port_prestart_check_status: passed`;
+30. verify `physical_preflight_requires_existing_backend_connection: true`;
+31. verify `backend_port_prestart_check_required: true`;
+32. verify
    `backend_port_prestart_check_must_pass_before_starting_backend: true`;
-32. verify `execution_allowed_by_packet: false`;
-33. verify `live_authority_granted: false`;
-34. verify `full_autonomous_ready: false`;
-35. verify
+33. verify `execution_allowed_by_packet: false`;
+34. verify `live_authority_granted: false`;
+35. verify `full_autonomous_ready: false`;
+36. verify
    `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`;
 36. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_operator_sequence_step` includes
@@ -284,6 +290,12 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `fail_closed_reason`, and `operator_next_step`.
+- When the backend-port prestart check detects an existing listener, the failed
+  no-WING summary must expose `listener_confirmation_template_path`, and the
+  generated template must remain pending with
+  `listener_confirmation_template_status: pending_operator_edit`,
+  `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
+  `listener_confirmation_template_live_authority_granted: false`.
 - Before any readiness update, the no-WING handoff summary must show
   `manual_review_required_before_readiness_update: true`.
 - Before any readiness update, the no-WING handoff summary must show

@@ -7406,6 +7406,19 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
             "preflight_blocked_until_listener_confirmed": True,
             "intended_backend_confirmation_required": True,
             "safe_to_stop_listener_by_gate": False,
+            "listener_confirmation_template_path": (
+                "artifacts/no_wing_release_check/run/backend-listener-confirmation-template.json"
+            ),
+            "listener_confirmation_template_status": "pending_operator_edit",
+            "listener_confirmation_template_acceptance_status": (
+                release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS
+            ),
+            "listener_confirmation_template_candidate_count": 1,
+            "listener_confirmation_template_required_edits": list(
+                release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REQUIRED_EDITS
+            ),
+            "listener_confirmation_template_safe_to_stop_listener_by_gate": False,
+            "listener_confirmation_template_live_authority_granted": False,
             "fail_closed_reason": "backend_port_listener_requires_operator_confirmation",
             "operator_next_step": (
                 "Stop or reconfigure the unexpected local listener only after "
@@ -7430,6 +7443,16 @@ def test_no_wing_release_check_summary_surfaces_backend_port_owner(tmp_path):
     assert "preflight_blocked_until_listener_confirmed: `True`" in markdown_summary
     assert "intended_backend_confirmation_required: `True`" in markdown_summary
     assert "safe_to_stop_listener_by_gate: `False`" in markdown_summary
+    assert "listener_confirmation_template_path" in markdown_summary
+    assert "backend-listener-confirmation-template.json" in markdown_summary
+    assert "listener_confirmation_template_status: `pending_operator_edit`" in (
+        markdown_summary
+    )
+    assert "listener_confirmation_template_candidate_count: `1`" in markdown_summary
+    assert "listener_confirmation_template_required_edits" in markdown_summary
+    assert "rerun the no-WING gate with --backend-listener-confirmation" in (
+        markdown_summary
+    )
     assert (
         "fail_closed_reason: `backend_port_listener_requires_operator_confirmation`"
         in markdown_summary
@@ -11919,6 +11942,109 @@ def test_backend_port_check_accepts_operator_confirmed_intended_listener(
     assert "fail_closed_reason" not in result.detail
 
 
+def test_backend_listener_confirmation_template_requires_operator_edit(tmp_path):
+    command_line = "python3 backend/server.py --mode wing"
+    template_path = tmp_path / "backend-listener-confirmation-template.json"
+
+    payload = release_check.write_backend_listener_confirmation_template(
+        template_path,
+        host="127.0.0.1",
+        port=8765,
+        listener_processes=[
+            {
+                "pid": 87210,
+                "command": "Python",
+                "name": "TCP *:8765 (LISTEN)",
+                "command_line": command_line,
+            }
+        ],
+        generated_at="2026-06-13T10:30:00Z",
+    )
+
+    assert template_path.exists()
+    persisted = json.loads(template_path.read_text(encoding="utf-8"))
+    assert persisted == payload
+    assert payload["type"] == release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ARTIFACT_TYPE
+    assert (
+        payload["status"]
+        == release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS
+    )
+    assert payload["confirms_intended_backend"] is False
+    assert payload["reviewed_listener_pid"] == 87210
+    assert payload["reviewed_listener_command_line"] == command_line
+    assert payload["operator_reviewed_at"] == "REPLACE_WITH_OPERATOR_REVIEW_UTC"
+    assert payload["operator_name"] == "REPLACE_WITH_OPERATOR_NAME"
+    assert payload["safe_to_stop_listener_by_gate"] is False
+    assert payload["live_authority_granted"] is False
+    assert payload["accepted_by_template"] is False
+    assert payload["execution_allowed_by_template"] is False
+    assert payload["readiness_closure_allowed_by_template"] is False
+    assert "set status to operator_confirmed_intended_backend" in " ".join(
+        payload["required_operator_edits"]
+    )
+    assert payload["listener_candidates"] == [
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line": command_line,
+        }
+    ]
+
+
+def test_backend_listener_confirmation_template_stays_invalid_until_edited(
+    tmp_path, monkeypatch
+):
+    command_line = "python3 backend/server.py --mode wing"
+    listener_processes = [
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line": command_line,
+        }
+    ]
+    monkeypatch.setattr(
+        release_check,
+        "_listener_processes_for_port",
+        lambda port: (listener_processes, None),
+    )
+    confirmation_path = tmp_path / "backend-listener-confirmation-template.json"
+    release_check.write_backend_listener_confirmation_template(
+        confirmation_path,
+        host="127.0.0.1",
+        port=8765,
+        listener_processes=listener_processes,
+        generated_at="2026-06-13T10:30:00Z",
+    )
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+        payload = json.loads(confirmation_path.read_text(encoding="utf-8"))
+        payload["port"] = port
+        confirmation_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = release_check.check_port_free(
+            port=port,
+            listener_confirmation_path=confirmation_path,
+        )
+
+    assert result.status == "failed"
+    assert result.detail["listener_confirmation_status"] == "invalid"
+    assert (
+        "listener_confirmation_status_not_accepted"
+        in result.detail["listener_confirmation_violations"]
+    )
+    assert (
+        "listener_confirmation_intended_backend_not_true"
+        in result.detail["listener_confirmation_violations"]
+    )
+    assert result.detail["safe_to_stop_listener_by_gate"] is False
+    assert result.detail["live_authority_granted"] is False
+
+
 def test_backend_port_check_rejects_mismatched_listener_confirmation(
     tmp_path, monkeypatch
 ):
@@ -12142,6 +12268,40 @@ def test_no_wing_release_check_stops_when_backend_port_is_busy(tmp_path, monkeyp
         summary["results"][0]["detail"]["fail_closed_reason"]
         == "backend_port_listener_requires_operator_confirmation"
     )
+    assert (
+        summary["results"][0]["detail"]["listener_confirmation_template_status"]
+        == "pending_operator_edit"
+    )
+    assert (
+        summary["results"][0]["detail"][
+            "listener_confirmation_template_acceptance_status"
+        ]
+        == release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS
+    )
+    assert (
+        summary["results"][0]["detail"][
+            "listener_confirmation_template_safe_to_stop_listener_by_gate"
+        ]
+        is False
+    )
+    assert (
+        summary["results"][0]["detail"][
+            "listener_confirmation_template_live_authority_granted"
+        ]
+        is False
+    )
+    template_path = Path(
+        summary["results"][0]["detail"]["listener_confirmation_template_path"]
+    )
+    assert template_path.exists()
+    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    assert (
+        template_payload["status"]
+        == release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS
+    )
+    assert template_payload["confirms_intended_backend"] is False
+    assert template_payload["safe_to_stop_listener_by_gate"] is False
+    assert template_payload["live_authority_granted"] is False
     run_dir = Path(summary["run_dir"])
     assert (run_dir / "summary.json").exists()
     assert not (run_dir / "logs").exists()

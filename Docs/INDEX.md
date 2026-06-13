@@ -135,6 +135,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` | The current first WING MVP blocker evidence cites the backend-port listener-probe error field report for Project Director context. |
 | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` | The current no-WING quick gate failed closed on a busy backend port and requires operator confirmation before WING read-only preflight. |
 | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md` | The no-WING backend-port prestart gate accepts only a matching operator confirmation JSON for an intended backend listener. |
+| `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_TEMPLATE_20260613.md` | Busy backend-port fail-closed summaries now write a pending operator confirmation template without granting live authority. |
 | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md` | Backend-port prestart failure-detail contracts now require `listener_process_error` so owner-probe failures remain visible before WING read-only preflight. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md` | WING read-only handoff packets now carry the no-WING prestart summary placeholder and pass it to plan/capture commands. |
 | `Docs/reports/AUTOMIXER_WING_AUTOLOOP_HANDOFF_GATES_DOCS_20260612.md` | Codex autoloop prompt and README carry the current WING handoff blocker-anchor, digest-review, and supervised trace gate fields. |
@@ -181,6 +182,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING blocker listener-probe evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` |
 | Current WING no-WING busy-port fail-closed evidence | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` |
 | Current WING backend-listener confirmation artifact | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md` |
+| Current WING backend-listener confirmation template | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_TEMPLATE_20260613.md` |
 | Current WING read-only prestart summary binding | `Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md` |
 | Current WING handoff prestart summary placeholder | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md` |
 | Current WING backend prestart owner diagnostics | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md` |
