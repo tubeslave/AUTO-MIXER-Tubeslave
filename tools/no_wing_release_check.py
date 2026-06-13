@@ -4305,6 +4305,26 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("required_review_checklist_ids"), list)
         else []
     )
+    review_decision_template_output = (
+        str(packet.get("decision_template_output"))
+        if isinstance(packet.get("decision_template_output"), str)
+        else None
+    )
+    review_decision_template_output_matches_contract = (
+        review_decision_template_output
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    declared_review_decision_template_output_matches_contract = (
+        packet.get("decision_template_output_matches_contract") is True
+    )
+    review_command_decision_template_output = command_value_after_flag(
+        commands.get("review_artifact_and_write_pending_decision_template", []),
+        "--decision-template-output",
+    )
+    review_command_decision_template_output_matches_packet = (
+        bool(review_command_decision_template_output)
+        and review_command_decision_template_output == review_decision_template_output
+    )
     blockers = (
         packet.get("blockers_not_closed_by_packet")
         if isinstance(packet.get("blockers_not_closed_by_packet"), list)
@@ -4489,6 +4509,18 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     ):
         violations.append(
             "wing_readonly_preflight_handoff_packet_decision_template_output_missing"
+        )
+    if not review_decision_template_output_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_template_output_mismatch"
+        )
+    if not declared_review_decision_template_output_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_template_output_contract_flag_mismatch"
+        )
+    if not review_command_decision_template_output_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_template_output_command_mismatch"
         )
 
     if required_checklist != list(WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS):
@@ -4722,6 +4754,19 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["review_command_writes_decision_template"] = (
         "--decision-template-output"
         in commands.get("review_artifact_and_write_pending_decision_template", [])
+    )
+    detail["review_decision_template_output"] = review_decision_template_output
+    detail["review_decision_template_output_matches_contract"] = (
+        review_decision_template_output_matches_contract
+    )
+    detail["review_decision_template_output_contract_flag"] = (
+        declared_review_decision_template_output_matches_contract
+    )
+    detail["review_command_decision_template_output"] = (
+        review_command_decision_template_output
+    )
+    detail["review_command_decision_template_output_matches_packet"] = (
+        review_command_decision_template_output_matches_packet
     )
     detail["required_review_checklist_ids"] = list(required_checklist)
     detail["forbidden_live_request_types"] = list(forbidden_request_types)
@@ -12011,6 +12056,22 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "review_command_writes_decision_template": (
                 detail.get("review_command_writes_decision_template") is True
             ),
+            "review_decision_template_output": detail.get(
+                "review_decision_template_output"
+            ),
+            "review_decision_template_output_matches_contract": (
+                detail.get("review_decision_template_output_matches_contract") is True
+            ),
+            "review_decision_template_output_contract_flag": (
+                detail.get("review_decision_template_output_contract_flag") is True
+            ),
+            "review_command_decision_template_output": detail.get(
+                "review_command_decision_template_output"
+            ),
+            "review_command_decision_template_output_matches_packet": (
+                detail.get("review_command_decision_template_output_matches_packet")
+                is True
+            ),
             "required_review_checklist_ids": (
                 list(checklist_ids) if isinstance(checklist_ids, list) else []
             ),
@@ -15395,6 +15456,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_failure_detail_fields'])}`",
                 "- review_command_writes_decision_template: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_writes_decision_template']).lower()}`",
+                "- review_decision_template_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['review_decision_template_output']}`",
+                "- review_decision_template_output_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_decision_template_output_matches_contract']).lower()}`",
+                "- review_decision_template_output_contract_flag: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_decision_template_output_contract_flag']).lower()}`",
+                "- review_command_decision_template_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['review_command_decision_template_output']}`",
+                "- review_command_decision_template_output_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_decision_template_output_matches_packet']).lower()}`",
                 "- blockers_not_closed_by_packet: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['blockers_not_closed_by_packet'])}`",
                 "- mvp_blocker_anchor_matches_current_first_open: "

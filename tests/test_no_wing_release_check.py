@@ -1086,6 +1086,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "decision_template_output": (
             WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
         ),
+        "decision_template_output_matches_contract": True,
         "review_output": "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
         "decision_review_output": (
             "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
@@ -2704,6 +2705,15 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     ] is True
     assert result.detail["backend_port_prestart_gate"]["grants_live_authority"] is False
     assert result.detail["review_command_writes_decision_template"] is True
+    assert result.detail["review_decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert result.detail["review_decision_template_output_matches_contract"] is True
+    assert result.detail["review_decision_template_output_contract_flag"] is True
+    assert result.detail["review_command_decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert result.detail["review_command_decision_template_output_matches_packet"] is True
     assert "prestart_backend_port_check" in result.detail["command_names"]
     assert "preview_readonly_request_plan" in result.detail["command_names"]
     assert "confirm_no_live_authority" in result.detail[
@@ -2859,6 +2869,48 @@ def test_no_wing_release_check_rejects_handoff_packet_mvp_blocker_anchor_digest_
     )
     assert (
         "wing_readonly_preflight_handoff_packet_expected_mvp_blocker_anchor_sha256_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_decision_template_output_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-template-output-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    stale_output = "artifacts/wing_readonly_preflight_review_decisions/stale_template.json"
+    payload["decision_template_output"] = stale_output
+    payload["decision_template_output_matches_contract"] = False
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["review_decision_template_output"] == stale_output
+    assert result.detail["review_decision_template_output_matches_contract"] is False
+    assert result.detail["review_decision_template_output_contract_flag"] is False
+    assert result.detail["review_command_decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert result.detail["review_command_decision_template_output_matches_packet"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_decision_template_output_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_decision_template_output_contract_flag_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_decision_template_output_command_mismatch"
         in result.detail["violations"]
     )
 
@@ -9012,6 +9064,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "--quick",
             ],
             "review_command_writes_decision_template": True,
+            "review_decision_template_output": (
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+            ),
+            "review_decision_template_output_matches_contract": True,
+            "review_decision_template_output_contract_flag": True,
+            "review_command_decision_template_output": (
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+            ),
+            "review_command_decision_template_output_matches_packet": True,
             "required_review_checklist_ids": ["confirm_no_live_authority"],
             "forbidden_live_request_types": ["apply_operator_proposal"],
             "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
@@ -9135,6 +9196,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "--quick",
     ]
     assert artifact["review_command_writes_decision_template"] is True
+    assert artifact["review_decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert artifact["review_decision_template_output_matches_contract"] is True
+    assert artifact["review_decision_template_output_contract_flag"] is True
+    assert artifact["review_command_decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert artifact["review_command_decision_template_output_matches_packet"] is True
     assert artifact["operator_sequence_count"] == 10
     assert artifact["operator_sequence_has_mvp_blocker_anchor_digest_review"] is True
     assert artifact["operator_sequence_mvp_blocker_anchor_digest_review_step"] == (
@@ -9189,6 +9259,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
     assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
+    assert "review_decision_template_output:" in markdown_summary
+    assert "review_decision_template_output_matches_contract: `true`" in markdown_summary
+    assert "review_command_decision_template_output_matches_packet: `true`" in (
+        markdown_summary
+    )
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert (
         "next_manual_artifact_required: "

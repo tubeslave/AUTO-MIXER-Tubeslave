@@ -209,6 +209,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["decision_template_output"] == (
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
     )
+    assert packet["decision_template_output_matches_contract"] is True
     assert WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT in packet[
         "commands"
     ]["review_artifact_and_write_pending_decision_template"]
@@ -374,6 +375,7 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "Expected Supervised Prestart Gate" in markdown
     assert "actual_matches_expected: `true`" in markdown
     assert "pending_review_decision_template.json" in markdown
+    assert "pending decision template matches contract: `true`" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "full_autonomous_ready: `false`" in markdown
     assert (

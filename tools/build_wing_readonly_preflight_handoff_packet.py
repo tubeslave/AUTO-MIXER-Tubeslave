@@ -324,6 +324,10 @@ def build_handoff_packet(
         ),
         "plan_output": plan_output,
         "decision_template_output": decision_template_output,
+        "decision_template_output_matches_contract": (
+            decision_template_output
+            == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+        ),
         "review_output": review_output,
         "decision_review_output": decision_review_output,
         "commands": {
@@ -517,6 +521,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             f"- summary: `{packet['expected_run_artifact_glob']}`",
             f"- events: `{packet['expected_event_log_glob']}`",
             f"- pending decision template: `{packet['decision_template_output']}`",
+            "- pending decision template matches contract: "
+            f"`{str(packet['decision_template_output_matches_contract']).lower()}`",
             f"- artifact review report: `{packet['review_output']}`",
             f"- decision review report: `{packet['decision_review_output']}`",
         ]
