@@ -139,7 +139,15 @@ Stop the current Codex work direction and return to the first open blocker if:
   `listener_confirmation_template_path`, or while the generated template does
   not show `listener_confirmation_template_status: pending_operator_edit`,
   `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
-  `listener_confirmation_template_live_authority_granted: false`.
+  `listener_confirmation_template_live_authority_granted: false`, or while
+  `listener_confirmation_template_required_edits` does not include
+  `set template_status to operator_reviewed_and_edited if using the generated
+  template` and `set accepted_by_template to true if using the generated
+  template`.
+- A WING read-only preflight is planned from a template-derived accepted
+  backend-listener confirmation while `REPLACE_WITH_*` operator placeholders
+  remain, `template_status: operator_reviewed_and_edited` is missing, or
+  `accepted_by_template: true` is missing.
 - A readiness update is planned while the no-WING handoff summary does not show
   `manual_review_required_before_readiness_update: true`.
 - A readiness update is planned while the no-WING handoff summary does not show
@@ -254,8 +262,15 @@ When the prestart gate fails closed on an existing listener, the no-WING summary
 must expose the generated `listener_confirmation_template_path` and show
 `listener_confirmation_template_status: pending_operator_edit`,
 `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
-`listener_confirmation_template_live_authority_granted: false`. That pending
-template is not an accepted confirmation and cannot close readiness.
+`listener_confirmation_template_live_authority_granted: false`.
+`listener_confirmation_template_required_edits` must include
+`set template_status to operator_reviewed_and_edited if using the generated
+template` and `set accepted_by_template to true if using the generated
+template`, and any template-derived accepted confirmation must replace
+`REPLACE_WITH_*` operator placeholders, set
+`template_status: operator_reviewed_and_edited`, and set
+`accepted_by_template: true`. That pending template is not an accepted
+confirmation and cannot close readiness.
 
 The no-WING handoff summary must also show
 `manual_review_required_before_readiness_update: true`.

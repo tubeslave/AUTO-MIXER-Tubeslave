@@ -165,6 +165,14 @@ you want the background automation active.
   `listener_confirmation_template_live_authority_granted: false`. The template
   is only an operator-edit starting point, not an accepted confirmation or live
   authority.
+- The generated backend-listener template must also expose
+  `listener_confirmation_template_required_edits` with
+  `set template_status to operator_reviewed_and_edited if using the generated
+  template` and `set accepted_by_template to true if using the generated
+  template`; any template-derived accepted confirmation must replace
+  `REPLACE_WITH_*` operator placeholders, set
+  `template_status: operator_reviewed_and_edited`, and set
+  `accepted_by_template: true`.
 - Before any readiness update, the no-WING handoff summary must show
   `manual_review_required_before_readiness_update: true`.
   This keeps offline handoff packets from being treated as accepted real WING

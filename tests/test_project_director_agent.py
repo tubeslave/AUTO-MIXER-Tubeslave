@@ -82,6 +82,18 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "listener_confirmation_template_live_authority_granted: false" in directive[
         "selected_action"
     ]
+    assert "listener_confirmation_template_required_edits" in directive[
+        "selected_action"
+    ]
+    assert "set template_status to operator_reviewed_and_edited" in directive[
+        "selected_action"
+    ]
+    assert "set accepted_by_template to true" in directive["selected_action"]
+    assert "REPLACE_WITH_*" in directive["selected_action"]
+    assert "template_status: operator_reviewed_and_edited" in directive[
+        "selected_action"
+    ]
+    assert "accepted_by_template: true" in directive["selected_action"]
     assert "manual_review_required_before_readiness_update: true" in directive[
         "selected_action"
     ]
@@ -257,6 +269,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_evidence_files"]
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_EDIT_GATE_20260613.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in directive["selected_evidence_files"]
     )
@@ -368,6 +384,12 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_process_error" in prompt
     assert "safe_to_stop_listener_by_gate" in prompt
     assert "operator_next_step" in prompt
+    assert "listener_confirmation_template_required_edits" in prompt
+    assert "set template_status to operator_reviewed_and_edited" in prompt
+    assert "set accepted_by_template to true" in prompt
+    assert "REPLACE_WITH_*" in prompt
+    assert "template_status: operator_reviewed_and_edited" in prompt
+    assert "accepted_by_template: true" in prompt
     assert "manual_review_required_before_readiness_update: true" in prompt
     assert "readiness_matrix_update_allowed_by_packet: false" in prompt
     assert "readiness_closure_allowed_by_packet: false" in prompt
@@ -419,6 +441,12 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_process_error" in readme
     assert "safe_to_stop_listener_by_gate" in readme
     assert "operator_next_step" in readme
+    assert "listener_confirmation_template_required_edits" in readme
+    assert "set template_status to operator_reviewed_and_edited" in readme
+    assert "set accepted_by_template to true" in readme
+    assert "REPLACE_WITH_*" in readme
+    assert "template_status: operator_reviewed_and_edited" in readme
+    assert "accepted_by_template: true" in readme
     assert "manual_review_required_before_readiness_update: true" in readme
     assert "readiness_matrix_update_allowed_by_packet: false" in readme
     assert "readiness_closure_allowed_by_packet: false" in readme

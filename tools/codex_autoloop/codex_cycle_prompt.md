@@ -156,66 +156,74 @@ blockers выше.
    `listener_confirmation_template_status: pending_operator_edit`,
    `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
    `listener_confirmation_template_live_authority_granted: false`;
-12. verify `manual_review_required_before_readiness_update: true`;
-13. verify `readiness_matrix_update_allowed_by_packet: false`;
-14. verify `readiness_closure_allowed_by_packet: false`;
-15. verify `read_only: true`;
-16. verify `live_write: false`;
-17. verify `mutates_console_state: false`;
-18. verify `queries_console: false`;
-19. verify `executes_tests: false`;
-20. verify `operator_required: true`;
-21. verify `expected_plan_required_for_real_run: true`;
-22. verify `backend_port_prestart_summary_required: true`;
-23. verify `backend_port_prestart_summary_path_placeholder` points to the
+12. verify `listener_confirmation_template_required_edits` includes
+   `set template_status to operator_reviewed_and_edited if using the generated
+   template` and `set accepted_by_template to true if using the generated
+   template`;
+13. verify any template-derived accepted confirmation replaces
+   `REPLACE_WITH_*` operator placeholders, sets
+   `template_status: operator_reviewed_and_edited`, and sets
+   `accepted_by_template: true`;
+14. verify `manual_review_required_before_readiness_update: true`;
+15. verify `readiness_matrix_update_allowed_by_packet: false`;
+16. verify `readiness_closure_allowed_by_packet: false`;
+17. verify `read_only: true`;
+18. verify `live_write: false`;
+19. verify `mutates_console_state: false`;
+20. verify `queries_console: false`;
+21. verify `executes_tests: false`;
+22. verify `operator_required: true`;
+23. verify `expected_plan_required_for_real_run: true`;
+24. verify `backend_port_prestart_summary_required: true`;
+25. verify `backend_port_prestart_summary_path_placeholder` points to the
    passed no-WING prestart `summary.json`;
-24. verify `preview_command_prestart_summary` matches that path;
-25. verify `capture_command_prestart_summary` matches that path;
-26. verify `capture_command_prestart_summary_matches_plan: true`;
-27. verify `backend_port_prestart_summary_status: passed`;
-28. verify `backend_port_prestart_summary_live_write: false`;
-29. verify `backend_port_prestart_check_status: passed`;
-30. verify `physical_preflight_requires_existing_backend_connection: true`;
-31. verify `backend_port_prestart_check_required: true`;
-32. verify
+26. verify `preview_command_prestart_summary` matches that path;
+27. verify `capture_command_prestart_summary` matches that path;
+28. verify `capture_command_prestart_summary_matches_plan: true`;
+29. verify `backend_port_prestart_summary_status: passed`;
+30. verify `backend_port_prestart_summary_live_write: false`;
+31. verify `backend_port_prestart_check_status: passed`;
+32. verify `physical_preflight_requires_existing_backend_connection: true`;
+33. verify `backend_port_prestart_check_required: true`;
+34. verify
    `backend_port_prestart_check_must_pass_before_starting_backend: true`;
-33. verify `execution_allowed_by_packet: false`;
-34. verify `live_authority_granted: false`;
-35. verify `full_autonomous_ready: false`;
-36. verify
+35. verify `execution_allowed_by_packet: false`;
+36. verify `live_authority_granted: false`;
+37. verify `full_autonomous_ready: false`;
+38. verify
    `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`;
-36. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+39. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_operator_sequence_step` includes
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
-29. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+40. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-30. verify `supervised_prestart_gate.grants_live_authority: false`;
-31. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
+41. verify `supervised_prestart_gate.grants_live_authority: false`;
+42. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
-32. verify `supervised_prestart_gate.requires_operator_decision_status:
+43. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
-33. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-34. verify `operator_sequence_count: 10`;
-35. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-36. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+44. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+45. verify `operator_sequence_count: 10`;
+46. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+47. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-37. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-38. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+48. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+49. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-39. verify `required_supervised_prestart_gate_markers` exactly lists
+50. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-40. run dry-run recommendation;
-41. require explicit operator approval for the exact action;
-42. apply only bounded supervised fader/gain action;
-43. read back the result;
-44. test rollback;
-45. record proof artifact.
+51. run dry-run recommendation;
+52. require explicit operator approval for the exact action;
+53. apply only bounded supervised fader/gain action;
+54. read back the result;
+55. test rollback;
+56. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -296,6 +304,14 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `listener_confirmation_template_status: pending_operator_edit`,
   `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
   `listener_confirmation_template_live_authority_granted: false`.
+- The generated backend-listener template must also expose
+  `listener_confirmation_template_required_edits` with
+  `set template_status to operator_reviewed_and_edited if using the generated
+  template` and `set accepted_by_template to true if using the generated
+  template`; any template-derived accepted confirmation must replace
+  `REPLACE_WITH_*` operator placeholders, set
+  `template_status: operator_reviewed_and_edited`, and set
+  `accepted_by_template: true`.
 - Before any readiness update, the no-WING handoff summary must show
   `manual_review_required_before_readiness_update: true`.
 - Before any readiness update, the no-WING handoff summary must show

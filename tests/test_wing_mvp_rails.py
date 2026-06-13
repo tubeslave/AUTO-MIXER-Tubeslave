@@ -59,6 +59,12 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "listener_confirmation_template_status: pending_operator_edit" in text
     assert "listener_confirmation_template_safe_to_stop_listener_by_gate: false" in text
     assert "listener_confirmation_template_live_authority_granted: false" in text
+    assert "listener_confirmation_template_required_edits" in text
+    assert "set template_status to operator_reviewed_and_edited" in text
+    assert "set accepted_by_template to true" in text
+    assert "REPLACE_WITH_*" in text
+    assert "template_status: operator_reviewed_and_edited" in text
+    assert "accepted_by_template: true" in text
     assert "manual_review_required_before_readiness_update: true" in text
     assert "readiness_matrix_update_allowed_by_packet: false" in text
     assert "readiness_closure_allowed_by_packet: false" in text
@@ -153,6 +159,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["evidence"]
     )
     assert (
+        "AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_EDIT_GATE_20260613.md"
+        in rows[0]["evidence"]
+    )
+    assert (
         "AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md"
         in rows[0]["evidence"]
     )
@@ -205,6 +215,16 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "listener_confirmation_template_live_authority_granted: false" in rows[0][
         "next action"
     ]
+    assert "listener_confirmation_template_required_edits" in rows[0]["next action"]
+    assert "set template_status to operator_reviewed_and_edited" in rows[0][
+        "next action"
+    ]
+    assert "set accepted_by_template to true" in rows[0]["next action"]
+    assert "REPLACE_WITH_*" in rows[0]["next action"]
+    assert "template_status: operator_reviewed_and_edited" in rows[0][
+        "next action"
+    ]
+    assert "accepted_by_template: true" in rows[0]["next action"]
     assert "manual_review_required_before_readiness_update: true" in rows[0][
         "next action"
     ]
@@ -503,6 +523,12 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "listener_process_error" in report
     assert "safe_to_stop_listener_by_gate" in report
     assert "operator_next_step" in report
+    assert "listener_confirmation_template_required_edits" in report
+    assert "set template_status to operator_reviewed_and_edited" in report
+    assert "set accepted_by_template to true" in report
+    assert "REPLACE_WITH_*" in report
+    assert "template_status: operator_reviewed_and_edited" in report
+    assert "accepted_by_template: true" in report
     assert "manual_review_required_before_readiness_update: true" in report
     assert "readiness_matrix_update_allowed_by_packet: false" in report
     assert "readiness_closure_allowed_by_packet: false" in report
@@ -625,6 +651,12 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "listener_process_error" in text
     assert "safe_to_stop_listener_by_gate" in text
     assert "operator_next_step" in text
+    assert "listener_confirmation_template_required_edits" in text
+    assert "set template_status to operator_reviewed_and_edited" in text
+    assert "set accepted_by_template to true" in text
+    assert "REPLACE_WITH_*" in text
+    assert "template_status: operator_reviewed_and_edited" in text
+    assert "accepted_by_template: true" in text
     assert "manual_review_required_before_readiness_update: true" in text
     assert "readiness_matrix_update_allowed_by_packet: false" in text
     assert "readiness_closure_allowed_by_packet: false" in text
@@ -699,6 +731,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_EDIT_GATE_20260613.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_EDIT_REQUIREMENT_CANON_20260613.md"
         in text
     )
     assert (
