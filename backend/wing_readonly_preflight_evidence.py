@@ -15,7 +15,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Tuple
 try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
     from wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
@@ -28,10 +27,10 @@ try:
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
 except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
     from backend.wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
@@ -44,6 +43,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
 
@@ -58,7 +58,7 @@ EVIDENCE_STATUSES = {
     "readonly_preflight_artifact_replacement_required",
 }
 ALLOWED_SENT_REQUEST_TYPES = {"get_operator_mode", "get_state", "query_mixer_parameter"}
-ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+ALLOWED_VALUE_TYPES = set(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES)
 EXPECTED_READBACK_EVENT_TYPES = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",

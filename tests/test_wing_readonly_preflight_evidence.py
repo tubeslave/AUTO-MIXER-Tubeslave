@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from backend.wing_readonly_preflight_evidence import (
+    ALLOWED_VALUE_TYPES,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS,
@@ -22,6 +23,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
 )
 from backend.processing_registry import (
     build_processing_registry_snapshot,
@@ -37,6 +39,12 @@ def test_preflight_evidence_uses_shared_physical_readback_contract():
     )
     assert PHYSICAL_READBACK_SOURCES == set(
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
+
+
+def test_preflight_evidence_uses_shared_value_type_contract():
+    assert ALLOWED_VALUE_TYPES == set(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
     )
 
 

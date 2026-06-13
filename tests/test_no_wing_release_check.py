@@ -3862,6 +3862,42 @@ def test_no_wing_release_check_rejects_wing_preflight_runner_supported_value_typ
     )
 
 
+def test_no_wing_release_check_tracks_wing_preflight_evidence_allowed_value_types():
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["expected_supported_value_types"] == sorted(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    assert result.detail["evidence_allowed_value_types"] == sorted(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    assert result.detail["evidence_allowed_value_types_match_contract"] is True
+
+
+def test_no_wing_release_check_rejects_wing_preflight_evidence_allowed_value_types_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_EVIDENCE_ALLOWED_VALUE_TYPES",
+        {"fader", "gain"},
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["expected_supported_value_types"] == sorted(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    assert result.detail["evidence_allowed_value_types"] == ["fader", "gain"]
+    assert result.detail["evidence_allowed_value_types_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_evidence_allowed_value_types_mismatch"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_rejects_wing_preflight_runner_physical_readback_contract_mismatch(
     monkeypatch,
 ):

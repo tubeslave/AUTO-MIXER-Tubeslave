@@ -290,6 +290,7 @@ from backend.user_presets_physical_readback_artifact_intake import (  # noqa: E4
     build_user_presets_physical_readback_artifact_intake,
 )
 from backend.wing_readonly_preflight_evidence import (  # noqa: E402
+    ALLOWED_VALUE_TYPES as WING_READONLY_PREFLIGHT_EVIDENCE_ALLOWED_VALUE_TYPES,
     EVIDENCE_STATUSES as WING_READONLY_PREFLIGHT_EVIDENCE_STATUSES,
     PHYSICAL_READBACK_SOURCES as WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_SOURCES,
     PHYSICAL_READBACK_STATUSES as WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_STATUSES,
@@ -3714,6 +3715,11 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     runner_supported_value_types = (
         wing_readonly_preflight_runner_supported_value_types()
     )
+    evidence_allowed_value_types = sorted(
+        str(item)
+        for item in WING_READONLY_PREFLIGHT_EVIDENCE_ALLOWED_VALUE_TYPES
+        if isinstance(item, str) and item
+    )
     expected_physical_readback_statuses = sorted(
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES
     )
@@ -3761,6 +3767,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     runner_supported_value_types_match_contract = (
         runner_supported_value_types == expected_supported_value_types
+    )
+    evidence_allowed_value_types_match_contract = (
+        evidence_allowed_value_types == expected_supported_value_types
     )
     runner_physical_readback_statuses_match_contract = (
         runner_physical_readback_contract.get("statuses")
@@ -3818,6 +3827,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     if not runner_supported_value_types_match_contract:
         violations.append(
             "wing_readonly_preflight_runner_supported_value_types_mismatch"
+        )
+    if not evidence_allowed_value_types_match_contract:
+        violations.append(
+            "wing_readonly_preflight_evidence_allowed_value_types_mismatch"
         )
     if not runner_physical_readback_statuses_match_contract:
         violations.append(
@@ -4010,8 +4023,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["expected_supported_value_types"] = list(expected_supported_value_types)
     detail["runner_supported_value_types"] = list(runner_supported_value_types)
+    detail["evidence_allowed_value_types"] = list(evidence_allowed_value_types)
     detail["runner_supported_value_types_match_contract"] = (
         runner_supported_value_types_match_contract
+    )
+    detail["evidence_allowed_value_types_match_contract"] = (
+        evidence_allowed_value_types_match_contract
     )
     detail["expected_physical_readback_statuses"] = list(
         expected_physical_readback_statuses
@@ -12052,8 +12069,16 @@ def wing_readonly_preflight_evidence_summary(
                 if isinstance(detail.get("runner_supported_value_types"), list)
                 else []
             ),
+            "evidence_allowed_value_types": (
+                list(detail.get("evidence_allowed_value_types"))
+                if isinstance(detail.get("evidence_allowed_value_types"), list)
+                else []
+            ),
             "runner_supported_value_types_match_contract": (
                 detail.get("runner_supported_value_types_match_contract") is True
+            ),
+            "evidence_allowed_value_types_match_contract": (
+                detail.get("evidence_allowed_value_types_match_contract") is True
             ),
             "expected_physical_readback_statuses": (
                 list(detail.get("expected_physical_readback_statuses"))
@@ -15755,8 +15780,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['expected_supported_value_types'])}`",
                 "- runner_supported_value_types: "
                 f"`{json.dumps(wing_readonly_preflight['runner_supported_value_types'])}`",
+                "- evidence_allowed_value_types: "
+                f"`{json.dumps(wing_readonly_preflight['evidence_allowed_value_types'])}`",
                 "- runner_supported_value_types_match_contract: "
                 f"`{str(wing_readonly_preflight['runner_supported_value_types_match_contract']).lower()}`",
+                "- evidence_allowed_value_types_match_contract: "
+                f"`{str(wing_readonly_preflight['evidence_allowed_value_types_match_contract']).lower()}`",
                 "- expected_physical_readback_statuses: "
                 f"`{json.dumps(wing_readonly_preflight['expected_physical_readback_statuses'])}`",
                 "- expected_physical_readback_sources: "
