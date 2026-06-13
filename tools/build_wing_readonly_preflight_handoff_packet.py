@@ -30,6 +30,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
@@ -40,6 +42,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
@@ -83,6 +87,10 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_no_wing_release_check.py",
 ]
 REQUEST_ID_POLICY = WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+PROOF_ARTIFACT_SCHEMA = WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+PROOF_RUNNER = WING_READONLY_PREFLIGHT_PROOF_RUNNER
+SELECTED_MVP_BLOCKER = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+SELECTED_MVP_BLOCKER_STATUS = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
 FAIL_CLOSED_CONDITIONS = list(WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS)
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
@@ -372,6 +380,10 @@ def build_handoff_packet(
         "url": url,
         "channels": channel_numbers,
         "value_types": value_type_names,
+        "proof_artifact_schema": PROOF_ARTIFACT_SCHEMA,
+        "proof_runner": PROOF_RUNNER,
+        "selected_mvp_blocker": SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": SELECTED_MVP_BLOCKER_STATUS,
         "allowed_request_types": list(ALLOWED_REQUEST_TYPES),
         "request_id_policy": REQUEST_ID_POLICY,
         "expected_response_types_by_request_type": dict(
@@ -484,6 +496,14 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['readiness_closure_allowed_by_packet']).lower()}`",
         f"- live_authority_granted: `{str(packet['live_authority_granted']).lower()}`",
         f"- full_autonomous_ready: `{str(packet['full_autonomous_ready']).lower()}`",
+        "",
+        "## Proof Identity",
+        "",
+        f"- proof_artifact_schema: `{packet['proof_artifact_schema']}`",
+        f"- proof_runner: `{packet['proof_runner']}`",
+        f"- selected_mvp_blocker: `{packet['selected_mvp_blocker']}`",
+        "- selected_mvp_blocker_status: "
+        f"`{packet['selected_mvp_blocker_status']}`",
         "",
         "## Operator Sequence",
         "",

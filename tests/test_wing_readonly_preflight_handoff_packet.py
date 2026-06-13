@@ -20,6 +20,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
@@ -30,6 +32,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+    WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
@@ -96,6 +100,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     assert packet["channels"] == [3]
     assert packet["value_types"] == ["fader", "gain", "pan"]
+    assert packet["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    assert packet["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert packet["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    assert packet["selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
     assert packet["allowed_request_types"] == list(
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
     )
@@ -249,6 +259,11 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "## Supervised Prestart Gate" in rendered
     assert "## Expected Supervised Prestart Gate" in rendered
     assert "expected_supervised_prestart_gate" in rendered
+    assert "## Proof Identity" in rendered
+    assert WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA in rendered
+    assert WING_READONLY_PREFLIGHT_PROOF_RUNNER in rendered
+    assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER in rendered
+    assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS in rendered
     assert "## MVP Blocker Anchor" in rendered
     assert "WING read-only connection proof" in rendered
     assert "selected_evidence_file_count" in rendered
@@ -359,6 +374,21 @@ def test_handoff_packet_allowed_requests_match_shared_contract():
     assert handoff.ALLOWED_REQUEST_TYPES == packet["allowed_request_types"]
     assert packet["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     assert handoff.REQUEST_ID_POLICY == packet["request_id_policy"]
+
+
+def test_handoff_packet_proof_identity_matches_shared_contract():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    assert packet["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert packet["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    assert packet["selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
+    assert handoff.PROOF_ARTIFACT_SCHEMA == packet["proof_artifact_schema"]
+    assert handoff.PROOF_RUNNER == packet["proof_runner"]
+    assert handoff.SELECTED_MVP_BLOCKER == packet["selected_mvp_blocker"]
+    assert handoff.SELECTED_MVP_BLOCKER_STATUS == packet["selected_mvp_blocker_status"]
 
 
 def test_handoff_packet_fail_closed_conditions_match_shared_contract():
@@ -502,6 +532,12 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "manual_review_decision_missing_or_invalid" in markdown
     assert "Expected Supervised Prestart Gate" in markdown
     assert "actual_matches_expected: `true`" in markdown
+    assert "Proof Identity" in markdown
+    assert "proof_artifact_schema" in markdown
+    assert WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA in markdown
+    assert WING_READONLY_PREFLIGHT_PROOF_RUNNER in markdown
+    assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER in markdown
+    assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS in markdown
     assert "pending_review_decision_template.json" in markdown
     assert "pending decision template matches contract: `true`" in markdown
     assert "artifact review report matches contract: `true`" in markdown
@@ -540,6 +576,12 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES
     )
     assert payload["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+    assert payload["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    assert payload["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert payload["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    assert payload["selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
     assert payload["expected_response_types_by_request_type"] == {
         request_type: list(response_types)
         for request_type, response_types in (

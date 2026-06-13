@@ -4605,6 +4605,8 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["request_sequence_matches_expected"] = request_sequence == expected_requests
     detail["allowed_request_types"] = list(allowed_request_types)
     detail["request_id_policy"] = plan.get("request_id_policy")
+    detail["proof_artifact_schema"] = plan.get("proof_artifact_schema")
+    detail["proof_runner"] = plan.get("proof_runner")
     detail["expected_response_types_by_request_type"] = plan.get(
         "expected_response_types_by_request_type"
     )
@@ -4725,6 +4727,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     plan_allowed_request_types = plan_artifact_detail.get("allowed_request_types")
     plan_request_id_policy = plan_artifact_detail.get("request_id_policy")
+    plan_proof_artifact_schema = plan_artifact_detail.get("proof_artifact_schema")
+    plan_proof_runner = plan_artifact_detail.get("proof_runner")
+    plan_selected_mvp_blocker = plan_artifact_detail.get("selected_mvp_blocker")
+    plan_selected_mvp_blocker_status = plan_artifact_detail.get(
+        "selected_mvp_blocker_status"
+    )
     plan_fail_closed_conditions = plan_artifact_detail.get("fail_closed_conditions")
     plan_request_sequence = plan_artifact_detail.get("request_sequence")
     expected_request_sequence = plan_artifact_detail.get("expected_request_sequence")
@@ -4923,6 +4931,43 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append("wing_readonly_preflight_handoff_packet_channels_mismatch")
     if packet.get("value_types") != _csv_strings(WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES):
         violations.append("wing_readonly_preflight_handoff_packet_value_types_mismatch")
+    packet_proof_artifact_schema = packet.get("proof_artifact_schema")
+    if packet_proof_artifact_schema != WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_proof_artifact_schema_mismatch"
+        )
+    if packet_proof_artifact_schema != plan_proof_artifact_schema:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_proof_artifact_schema_plan_mismatch"
+        )
+    packet_proof_runner = packet.get("proof_runner")
+    if packet_proof_runner != WING_READONLY_PREFLIGHT_PROOF_RUNNER:
+        violations.append("wing_readonly_preflight_handoff_packet_proof_runner_mismatch")
+    if packet_proof_runner != plan_proof_runner:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_proof_runner_plan_mismatch"
+        )
+    packet_selected_mvp_blocker = packet.get("selected_mvp_blocker")
+    if packet_selected_mvp_blocker != WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_mismatch"
+        )
+    if packet_selected_mvp_blocker != plan_selected_mvp_blocker:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_plan_mismatch"
+        )
+    packet_selected_mvp_blocker_status = packet.get("selected_mvp_blocker_status")
+    if (
+        packet_selected_mvp_blocker_status
+        != WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_status_mismatch"
+        )
+    if packet_selected_mvp_blocker_status != plan_selected_mvp_blocker_status:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_status_plan_mismatch"
+        )
     packet_allowed_request_types = packet.get("allowed_request_types")
     if packet_allowed_request_types != list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES):
         violations.append(
@@ -5327,6 +5372,24 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["channels"] = packet.get("channels") if isinstance(packet.get("channels"), list) else []
     detail["value_types"] = (
         packet.get("value_types") if isinstance(packet.get("value_types"), list) else []
+    )
+    detail["proof_artifact_schema"] = packet_proof_artifact_schema
+    detail["plan_proof_artifact_schema"] = plan_proof_artifact_schema
+    detail["proof_artifact_schema_matches_plan"] = (
+        packet_proof_artifact_schema == plan_proof_artifact_schema
+    )
+    detail["proof_runner"] = packet_proof_runner
+    detail["plan_proof_runner"] = plan_proof_runner
+    detail["proof_runner_matches_plan"] = packet_proof_runner == plan_proof_runner
+    detail["selected_mvp_blocker"] = packet_selected_mvp_blocker
+    detail["plan_selected_mvp_blocker"] = plan_selected_mvp_blocker
+    detail["selected_mvp_blocker_matches_plan"] = (
+        packet_selected_mvp_blocker == plan_selected_mvp_blocker
+    )
+    detail["selected_mvp_blocker_status"] = packet_selected_mvp_blocker_status
+    detail["plan_selected_mvp_blocker_status"] = plan_selected_mvp_blocker_status
+    detail["selected_mvp_blocker_status_matches_plan"] = (
+        packet_selected_mvp_blocker_status == plan_selected_mvp_blocker_status
     )
     detail["allowed_request_types"] = packet.get("allowed_request_types")
     detail["plan_allowed_request_types"] = plan_allowed_request_types
@@ -12658,6 +12721,8 @@ def wing_readonly_preflight_plan_artifact_summary(
             "plan_status": detail.get("plan_status"),
             "plan_output": detail.get("plan_output"),
             "expected_plan_output": detail.get("expected_plan_output"),
+            "proof_artifact_schema": detail.get("proof_artifact_schema"),
+            "proof_runner": detail.get("proof_runner"),
             "selected_mvp_blocker": detail.get("selected_mvp_blocker"),
             "selected_mvp_blocker_status": detail.get("selected_mvp_blocker_status"),
             "channels": (
@@ -12841,6 +12906,34 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 list(detail.get("value_types"))
                 if isinstance(detail.get("value_types"), list)
                 else []
+            ),
+            "proof_artifact_schema": str(detail.get("proof_artifact_schema") or ""),
+            "plan_proof_artifact_schema": str(
+                detail.get("plan_proof_artifact_schema") or ""
+            ),
+            "proof_artifact_schema_matches_plan": (
+                detail.get("proof_artifact_schema_matches_plan") is True
+            ),
+            "proof_runner": str(detail.get("proof_runner") or ""),
+            "plan_proof_runner": str(detail.get("plan_proof_runner") or ""),
+            "proof_runner_matches_plan": (
+                detail.get("proof_runner_matches_plan") is True
+            ),
+            "selected_mvp_blocker": str(detail.get("selected_mvp_blocker") or ""),
+            "plan_selected_mvp_blocker": str(
+                detail.get("plan_selected_mvp_blocker") or ""
+            ),
+            "selected_mvp_blocker_matches_plan": (
+                detail.get("selected_mvp_blocker_matches_plan") is True
+            ),
+            "selected_mvp_blocker_status": str(
+                detail.get("selected_mvp_blocker_status") or ""
+            ),
+            "plan_selected_mvp_blocker_status": str(
+                detail.get("plan_selected_mvp_blocker_status") or ""
+            ),
+            "selected_mvp_blocker_status_matches_plan": (
+                detail.get("selected_mvp_blocker_status_matches_plan") is True
             ),
             "allowed_request_types": (
                 list(detail.get("allowed_request_types"))
@@ -16346,6 +16439,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- plan_path: `{wing_readonly_preflight_plan_artifact['plan_path']}`",
                 f"- plan_status: `{wing_readonly_preflight_plan_artifact['plan_status']}`",
                 f"- plan_output: `{wing_readonly_preflight_plan_artifact['plan_output']}`",
+                "- proof_artifact_schema: "
+                f"`{wing_readonly_preflight_plan_artifact['proof_artifact_schema']}`",
+                "- proof_runner: "
+                f"`{wing_readonly_preflight_plan_artifact['proof_runner']}`",
                 "- selected_mvp_blocker: "
                 f"`{wing_readonly_preflight_plan_artifact['selected_mvp_blocker']}`",
                 "- selected_mvp_blocker_status: "
@@ -16428,6 +16525,30 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_violations'])}`",
                 "- plan_output: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_output']}`",
+                "- proof_artifact_schema: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['proof_artifact_schema']}`",
+                "- plan_proof_artifact_schema: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_proof_artifact_schema']}`",
+                "- proof_artifact_schema_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['proof_artifact_schema_matches_plan']).lower()}`",
+                "- proof_runner: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['proof_runner']}`",
+                "- plan_proof_runner: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_proof_runner']}`",
+                "- proof_runner_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['proof_runner_matches_plan']).lower()}`",
+                "- selected_mvp_blocker: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['selected_mvp_blocker']}`",
+                "- plan_selected_mvp_blocker: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_selected_mvp_blocker']}`",
+                "- selected_mvp_blocker_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['selected_mvp_blocker_matches_plan']).lower()}`",
+                "- selected_mvp_blocker_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['selected_mvp_blocker_status']}`",
+                "- plan_selected_mvp_blocker_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_selected_mvp_blocker_status']}`",
+                "- selected_mvp_blocker_status_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['selected_mvp_blocker_status_matches_plan']).lower()}`",
                 "- allowed_request_types: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['allowed_request_types'])}`",
                 "- plan_allowed_request_types: "

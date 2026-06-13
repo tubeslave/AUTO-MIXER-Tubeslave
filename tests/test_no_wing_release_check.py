@@ -1248,6 +1248,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "url": "ws://localhost:8765",
         "channels": [3],
         "value_types": ["fader", "gain", "pan"],
+        "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        "proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+        "selected_mvp_blocker": WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": (
+            WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+        ),
         "allowed_request_types": list(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES),
         "request_id_policy": WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
         "expected_response_types_by_request_type": {
@@ -2935,6 +2941,30 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["artifact_root"] == "artifacts/wing_readonly_preflight"
     assert result.detail["channels"] == [3]
     assert result.detail["value_types"] == ["fader", "gain", "pan"]
+    assert result.detail["proof_artifact_schema"] == (
+        WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    )
+    assert result.detail["plan_proof_artifact_schema"] == (
+        WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    )
+    assert result.detail["proof_artifact_schema_matches_plan"] is True
+    assert result.detail["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert result.detail["plan_proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert result.detail["proof_runner_matches_plan"] is True
+    assert result.detail["selected_mvp_blocker"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    )
+    assert result.detail["plan_selected_mvp_blocker"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    )
+    assert result.detail["selected_mvp_blocker_matches_plan"] is True
+    assert result.detail["selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
+    assert result.detail["plan_selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
+    assert result.detail["selected_mvp_blocker_status_matches_plan"] is True
     assert result.detail["allowed_request_types"] == (
         result.detail["plan_allowed_request_types"]
     )
@@ -3261,6 +3291,66 @@ def test_no_wing_release_check_rejects_handoff_request_id_policy_drift(
     )
     assert (
         "wing_readonly_preflight_handoff_packet_request_id_policy_plan_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_proof_identity_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "stale-proof-identity-handoff.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["proof_artifact_schema"] = "wing_readonly_preflight.v0"
+    payload["proof_runner"] = "manual_packet_builder"
+    payload["selected_mvp_blocker"] = "WING supervised write proof"
+    payload["selected_mvp_blocker_status"] = "closed"
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["proof_artifact_schema_matches_plan"] is False
+    assert result.detail["proof_runner_matches_plan"] is False
+    assert result.detail["selected_mvp_blocker_matches_plan"] is False
+    assert result.detail["selected_mvp_blocker_status_matches_plan"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_proof_artifact_schema_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_proof_artifact_schema_plan_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_proof_runner_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_proof_runner_plan_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_plan_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_status_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_selected_mvp_blocker_status_plan_mismatch"
         in result.detail["violations"]
     )
 
@@ -10110,6 +10200,22 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "plan_output": "/tmp/wing_readonly_preflight_plan.json",
             "channels": [3],
             "value_types": ["fader", "gain", "pan"],
+            "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+            "plan_proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+            "proof_artifact_schema_matches_plan": True,
+            "proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+            "plan_proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+            "proof_runner_matches_plan": True,
+            "selected_mvp_blocker": WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+            "plan_selected_mvp_blocker": WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
+            "selected_mvp_blocker_matches_plan": True,
+            "selected_mvp_blocker_status": (
+                WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+            ),
+            "plan_selected_mvp_blocker_status": (
+                WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+            ),
+            "selected_mvp_blocker_status_matches_plan": True,
             "request_sequence": [{"type": "get_operator_mode"}],
             "plan_request_sequence": [{"type": "get_operator_mode"}],
             "expected_request_sequence": [{"type": "get_operator_mode"}],
@@ -10268,6 +10374,30 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["packet_status"] == "operator_hardware_step_required"
     assert artifact["plan_artifact_status"] == "passed"
     assert artifact["plan_artifact_violations"] == []
+    assert artifact["proof_artifact_schema"] == (
+        WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    )
+    assert artifact["plan_proof_artifact_schema"] == (
+        WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    )
+    assert artifact["proof_artifact_schema_matches_plan"] is True
+    assert artifact["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert artifact["plan_proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert artifact["proof_runner_matches_plan"] is True
+    assert artifact["selected_mvp_blocker"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    )
+    assert artifact["plan_selected_mvp_blocker"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    )
+    assert artifact["selected_mvp_blocker_matches_plan"] is True
+    assert artifact["selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
+    assert artifact["plan_selected_mvp_blocker_status"] == (
+        WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
+    assert artifact["selected_mvp_blocker_status_matches_plan"] is True
     assert artifact["request_count"] == 1
     assert artifact["request_sequence"] == [{"type": "get_operator_mode"}]
     assert artifact["plan_request_sequence"] == [{"type": "get_operator_mode"}]
@@ -10374,6 +10504,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
+    assert "proof_artifact_schema_matches_plan: `true`" in markdown_summary
+    assert "proof_runner_matches_plan: `true`" in markdown_summary
+    assert "selected_mvp_blocker_matches_plan: `true`" in markdown_summary
+    assert "selected_mvp_blocker_status_matches_plan: `true`" in markdown_summary
+    assert WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA in markdown_summary
+    assert WING_READONLY_PREFLIGHT_PROOF_RUNNER in markdown_summary
+    assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER in markdown_summary
+    assert WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS in markdown_summary
     assert "request_count: `1`" in markdown_summary
     assert "request_sequence_matches_plan: `true`" in markdown_summary
     assert "request_sequence_matches_expected: `true`" in markdown_summary
