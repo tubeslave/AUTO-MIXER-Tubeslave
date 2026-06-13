@@ -14,6 +14,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
@@ -204,13 +206,19 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "--decision-template-output" in packet["commands"][
         "review_artifact_and_write_pending_decision_template"
     ]
+    assert packet["decision_template_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT in packet[
+        "commands"
+    ]["review_artifact_and_write_pending_decision_template"]
     assert packet["commands"]["review_edited_decision_json"] == [
         "python3",
         "tools/review_wing_readonly_preflight_decisions.py",
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
         "--decision-root",
-        "artifacts/wing_readonly_preflight_review_decisions",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
         "--output",
         "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
     ]

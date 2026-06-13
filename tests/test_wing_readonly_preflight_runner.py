@@ -16,6 +16,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 
@@ -1247,12 +1249,12 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
             f"--artifact-root {tmp_path} "
             "--output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md "
             "--decision-template-output "
-            "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"
+            f"{WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT}"
         ),
         (
             "python3 tools/review_wing_readonly_preflight_decisions.py "
             f"--artifact-root {tmp_path} "
-            "--decision-root artifacts/wing_readonly_preflight_review_decisions "
+            f"--decision-root {WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT} "
             "--output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
         ),
     ]

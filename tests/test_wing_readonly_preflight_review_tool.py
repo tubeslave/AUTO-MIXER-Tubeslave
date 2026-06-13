@@ -12,6 +12,7 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
 )
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
@@ -47,6 +48,10 @@ def test_review_decision_template_required_fields_match_shared_contract():
     assert (
         review_tool.review_decision_template_status()
         == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
+    assert review_tool.DEFAULT_DECISION_TEMPLATE_OUTPUT == (
+        Path(__file__).resolve().parents[1]
+        / WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
     )
 
 

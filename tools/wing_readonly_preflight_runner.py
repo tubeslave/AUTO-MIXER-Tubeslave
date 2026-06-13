@@ -30,6 +30,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 
@@ -615,12 +617,12 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
                 f"--artifact-root {artifact_root} "
                 "--output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md "
                 "--decision-template-output "
-                "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"
+                f"{WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT}"
             ),
             (
                 "python3 tools/review_wing_readonly_preflight_decisions.py "
                 f"--artifact-root {artifact_root} "
-                "--decision-root artifacts/wing_readonly_preflight_review_decisions "
+                f"--decision-root {WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT} "
                 "--output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
             ),
         ],

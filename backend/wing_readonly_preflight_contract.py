@@ -45,6 +45,12 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS = (
     "operator_must_replace_placeholders_before_ledger_acceptance"
 )
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT = (
+    "artifacts/wing_readonly_preflight_review_decisions"
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT = (
+    f"{WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT}/pending_review_decision_template.json"
+)
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"
 )

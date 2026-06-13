@@ -23,6 +23,7 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     build_wing_readonly_preflight_evidence,
 )
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
 )
@@ -34,10 +35,7 @@ from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
 
 DEFAULT_OUTPUT = REPO_ROOT / "artifacts" / "wing_readonly_preflight_review" / "latest_review.md"
 DEFAULT_DECISION_TEMPLATE_OUTPUT = (
-    REPO_ROOT
-    / "artifacts"
-    / "wing_readonly_preflight_review_decisions"
-    / "pending_review_decision_template.json"
+    REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
 )
 REVIEW_DECISION_TEMPLATE_STATUS = WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
 REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = tuple(

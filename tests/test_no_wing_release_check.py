@@ -17,6 +17,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
@@ -235,6 +237,14 @@ def test_wing_readonly_review_decision_template_contract_uses_shared_constants()
     assert (
         release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
         == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
     )
     assert "review_id" in (
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
@@ -775,7 +785,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--output",
         "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
         "--decision-template-output",
-        "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     ]
     assert result.detail["review_command_writes_decision_template"] is True
     assert result.detail["review_exit_codes"] == {
@@ -1059,7 +1069,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "channels": [3],
         "value_types": ["fader", "gain", "pan"],
         "artifact_root": "artifacts/wing_readonly_preflight",
-        "decision_root": "artifacts/wing_readonly_preflight_review_decisions",
+        "decision_root": WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
         "expected_run_artifact_glob": (
             "artifacts/wing_readonly_preflight/<run_id>/"
             f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
@@ -1070,8 +1080,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         ),
         "plan_output": str(plan_path),
         "decision_template_output": (
-            "artifacts/wing_readonly_preflight_review_decisions/"
-            "pending_review_decision_template.json"
+            WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
         ),
         "review_output": "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
         "decision_review_output": (
@@ -1133,8 +1142,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--output",
                 "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
                 "--decision-template-output",
-                "artifacts/wing_readonly_preflight_review_decisions/"
-                "pending_review_decision_template.json",
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
             ],
             "review_edited_decision_json": [
                 "python3",
@@ -1142,7 +1150,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
                 "--decision-root",
-                "artifacts/wing_readonly_preflight_review_decisions",
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
                 "--output",
                 "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
             ],
@@ -3660,7 +3668,7 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
         "--decision-root",
-        "artifacts/wing_readonly_preflight_review_decisions",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
         "--output",
         "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
     ]
@@ -3672,7 +3680,7 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     }
     assert result.detail["preflight_evidence_status"] == "operator_preflight_required"
     assert result.detail["decision_search_roots"] == [
-        "artifacts/wing_readonly_preflight_review_decisions"
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
     ]
     assert result.detail["review_candidate_count"] == 0
     assert result.detail["decision_record_count"] == 0
@@ -8394,7 +8402,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--output",
                 "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
                 "--decision-template-output",
-                "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json",
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
             ],
             "review_command_writes_decision_template": True,
             "review_exit_codes": {
@@ -9260,7 +9268,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
                 "--decision-root",
-                "artifacts/wing_readonly_preflight_review_decisions",
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
                 "--output",
                 "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
             ],
@@ -9272,7 +9280,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
             },
             "preflight_evidence_status": "operator_preflight_required",
             "decision_search_roots": [
-                "artifacts/wing_readonly_preflight_review_decisions"
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
             ],
             "review_candidate_count": 0,
             "decision_record_count": 0,
@@ -9348,7 +9356,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
         "backend_port_prestart_check_failure_detail_fields"
     ]
     assert decision["decision_search_roots"] == [
-        "artifacts/wing_readonly_preflight_review_decisions"
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
     ]
     assert decision["manual_readiness_update_candidate_available"] is False
     assert decision["accepted_candidate_prestart_contract_valid"] is False
