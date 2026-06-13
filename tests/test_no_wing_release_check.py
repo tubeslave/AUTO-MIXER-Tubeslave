@@ -21,6 +21,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+    WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
     WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
@@ -230,6 +231,10 @@ def test_wing_readonly_handoff_safety_contract_uses_shared_constants():
     assert (
         release_check.WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
         == WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+        == WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
     )
     assert (
         release_check.WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
@@ -3698,6 +3703,29 @@ def test_no_wing_release_check_rejects_wing_preflight_runner_argparse_target_def
     assert result.detail["runner_argparse_target_defaults_match_contract"] is False
     assert (
         "wing_readonly_preflight_runner_argparse_target_defaults_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_runner_supported_value_types_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_runner_supported_value_types",
+        lambda: ["fader", "gain"],
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["expected_supported_value_types"] == sorted(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    assert result.detail["runner_supported_value_types"] == ["fader", "gain"]
+    assert result.detail["runner_supported_value_types_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_runner_supported_value_types_mismatch"
         in result.detail["violations"]
     )
 
@@ -8686,6 +8714,13 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "expected_target_defaults": expected_target_defaults,
             "runner_argparse_target_defaults": expected_target_defaults,
             "runner_argparse_target_defaults_match_contract": True,
+            "expected_supported_value_types": sorted(
+                WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+            ),
+            "runner_supported_value_types": sorted(
+                WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+            ),
+            "runner_supported_value_types_match_contract": True,
             "plan_command_target_defaults": expected_target_defaults,
             "plan_command_target_defaults_match_contract": True,
             "plan_command_output": WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
@@ -8881,6 +8916,13 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["expected_target_defaults"] == expected_target_defaults
     assert preflight["runner_argparse_target_defaults"] == expected_target_defaults
     assert preflight["runner_argparse_target_defaults_match_contract"] is True
+    assert preflight["expected_supported_value_types"] == sorted(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    assert preflight["runner_supported_value_types"] == sorted(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    assert preflight["runner_supported_value_types_match_contract"] is True
     assert preflight["plan_command_target_defaults"] == expected_target_defaults
     assert preflight["plan_command_target_defaults_match_contract"] is True
     assert preflight["plan_command_output"] == (
@@ -9012,6 +9054,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "plan_command_uses_plan_only: `true`" in markdown_summary
     assert "expected_target_defaults" in markdown_summary
     assert "runner_argparse_target_defaults_match_contract: `true`" in markdown_summary
+    assert "runner_supported_value_types_match_contract: `true`" in markdown_summary
     assert "plan_command_target_defaults_match_contract: `true`" in markdown_summary
     assert "wing_readonly_preflight_plan/latest_plan.json" in markdown_summary
     assert "plan_command_output_matches_contract: `true`" in markdown_summary

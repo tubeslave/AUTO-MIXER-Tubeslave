@@ -32,6 +32,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+    WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
     WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
@@ -81,6 +82,7 @@ FORBIDDEN_REQUEST_TYPES = {
 }
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 PHYSICAL_READBACK_SOURCES = {"physical_readback", "wing_physical_readback", "physical_wing", "wing"}
+SUPPORTED_VALUE_TYPES = set(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES)
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
@@ -419,7 +421,7 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
         return "--value-types must include at least one value type"
     if len(set(value_types)) != len(value_types):
         return "--value-types must not contain duplicates"
-    unsupported = sorted(set(value_types) - {"fader", "gain", "pan"})
+    unsupported = sorted(set(value_types) - SUPPORTED_VALUE_TYPES)
     if unsupported:
         return f"--value-types unsupported: {','.join(unsupported)}"
     if args.require_physical_readback:

@@ -352,6 +352,9 @@ WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = (
 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = (
     preflight_contract.WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
 )
+WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = (
+    preflight_contract.WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+)
 WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT = (
     preflight_contract.WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 )
@@ -649,6 +652,16 @@ def wing_readonly_preflight_runner_argparse_target_defaults() -> dict[str, str |
         "value_types": getattr(args, "value_types", None),
         "artifact_root": getattr(args, "artifact_root", None),
     }
+
+
+def wing_readonly_preflight_runner_supported_value_types() -> list[str]:
+    runner_tool = load_wing_readonly_preflight_runner_tool()
+    if runner_tool is None:
+        return []
+    supported = getattr(runner_tool, "SUPPORTED_VALUE_TYPES", None)
+    if not isinstance(supported, (set, tuple, list)):
+        return []
+    return sorted(str(item) for item in supported if isinstance(item, str) and item)
 
 
 def wing_readonly_preflight_review_command() -> list[str]:
@@ -3643,6 +3656,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     runner_argparse_target_defaults = (
         wing_readonly_preflight_runner_argparse_target_defaults()
     )
+    expected_supported_value_types = sorted(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
+    runner_supported_value_types = (
+        wing_readonly_preflight_runner_supported_value_types()
+    )
     plan_target_defaults = {
         "url": plan_url,
         "channels": plan_channels,
@@ -3672,6 +3691,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     runner_argparse_target_defaults_match_contract = (
         runner_argparse_target_defaults == expected_target_defaults
+    )
+    runner_supported_value_types_match_contract = (
+        runner_supported_value_types == expected_supported_value_types
     )
     handoff_channel_matches_capture = bool(handoff_channels) and handoff_channels == capture_channels
     handoff_value_types_match_capture = (
@@ -3711,6 +3733,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     if not runner_argparse_target_defaults_match_contract:
         violations.append(
             "wing_readonly_preflight_runner_argparse_target_defaults_mismatch"
+        )
+    if not runner_supported_value_types_match_contract:
+        violations.append(
+            "wing_readonly_preflight_runner_supported_value_types_mismatch"
         )
     if not plan_matches_capture:
         violations.append("wing_readonly_preflight_plan_command_mismatch")
@@ -3884,6 +3910,11 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["runner_argparse_target_defaults_match_contract"] = (
         runner_argparse_target_defaults_match_contract
+    )
+    detail["expected_supported_value_types"] = list(expected_supported_value_types)
+    detail["runner_supported_value_types"] = list(runner_supported_value_types)
+    detail["runner_supported_value_types_match_contract"] = (
+        runner_supported_value_types_match_contract
     )
     detail["plan_command_target_defaults"] = dict(plan_target_defaults)
     detail["plan_command_target_defaults_match_contract"] = (
@@ -11875,6 +11906,19 @@ def wing_readonly_preflight_evidence_summary(
             "runner_argparse_target_defaults_match_contract": (
                 detail.get("runner_argparse_target_defaults_match_contract") is True
             ),
+            "expected_supported_value_types": (
+                list(detail.get("expected_supported_value_types"))
+                if isinstance(detail.get("expected_supported_value_types"), list)
+                else []
+            ),
+            "runner_supported_value_types": (
+                list(detail.get("runner_supported_value_types"))
+                if isinstance(detail.get("runner_supported_value_types"), list)
+                else []
+            ),
+            "runner_supported_value_types_match_contract": (
+                detail.get("runner_supported_value_types_match_contract") is True
+            ),
             "plan_command_target_defaults": (
                 dict(detail.get("plan_command_target_defaults"))
                 if isinstance(detail.get("plan_command_target_defaults"), Mapping)
@@ -15527,6 +15571,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['runner_argparse_target_defaults'], sort_keys=True)}`",
                 "- runner_argparse_target_defaults_match_contract: "
                 f"`{str(wing_readonly_preflight['runner_argparse_target_defaults_match_contract']).lower()}`",
+                "- expected_supported_value_types: "
+                f"`{json.dumps(wing_readonly_preflight['expected_supported_value_types'])}`",
+                "- runner_supported_value_types: "
+                f"`{json.dumps(wing_readonly_preflight['runner_supported_value_types'])}`",
+                "- runner_supported_value_types_match_contract: "
+                f"`{str(wing_readonly_preflight['runner_supported_value_types_match_contract']).lower()}`",
                 "- plan_command_target_defaults: "
                 f"`{json.dumps(wing_readonly_preflight['plan_command_target_defaults'], sort_keys=True)}`",
                 "- plan_command_target_defaults_match_contract: "

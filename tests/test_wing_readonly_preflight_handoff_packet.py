@@ -18,6 +18,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+    WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_RUNNER_URL,
     WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
@@ -48,6 +49,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert handoff.DEFAULT_CHANNELS == WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
     assert handoff.DEFAULT_VALUE_TYPES == WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
     assert handoff.DEFAULT_ARTIFACT_ROOT == WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+    assert handoff.SUPPORTED_VALUE_TYPES == set(
+        WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    )
     assert packet["type"] == "wing_readonly_preflight_handoff_packet"
     assert packet["status"] == "operator_hardware_step_required"
     assert packet["read_only"] is True
