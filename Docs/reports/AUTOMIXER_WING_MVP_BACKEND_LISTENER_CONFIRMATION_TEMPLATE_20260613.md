@@ -31,6 +31,11 @@ The generated template stays pending and invalid until operator edit:
 - `execution_allowed_by_template: false`
 - `readiness_closure_allowed_by_template: false`
 
+Template-derived accepted confirmations must also replace all
+`REPLACE_WITH_*` operator placeholders, set
+`template_status: operator_reviewed_and_edited`, and set
+`accepted_by_template: true`.
+
 The no-WING summary exposes:
 
 - `listener_confirmation_template_path`

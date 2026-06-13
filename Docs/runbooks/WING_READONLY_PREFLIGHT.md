@@ -41,7 +41,10 @@ It does not approve live writes.
   `listener_confirmation_template_live_authority_granted: false`. The accepted
   JSON must match the current listener PID and command line, keep
   `safe_to_stop_listener_by_gate: false`, and keep
-  `live_authority_granted: false`:
+  `live_authority_granted: false`. If it was edited from the generated
+  template, it must also replace placeholder operator fields, set
+  `template_status: operator_reviewed_and_edited`, and set
+  `accepted_by_template: true`:
 
   ```json
   {
@@ -55,7 +58,9 @@ It does not approve live writes.
     "operator_reviewed_at": "2026-06-13T09:15:00Z",
     "operator_name": "operator",
     "safe_to_stop_listener_by_gate": false,
-    "live_authority_granted": false
+    "live_authority_granted": false,
+    "template_status": "operator_reviewed_and_edited",
+    "accepted_by_template": true
   }
   ```
 

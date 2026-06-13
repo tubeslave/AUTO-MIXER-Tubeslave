@@ -12045,6 +12045,116 @@ def test_backend_listener_confirmation_template_stays_invalid_until_edited(
     assert result.detail["live_authority_granted"] is False
 
 
+def test_backend_listener_confirmation_rejects_partially_edited_template(
+    tmp_path, monkeypatch
+):
+    command_line = "python3 backend/server.py --mode wing"
+    listener_processes = [
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line": command_line,
+        }
+    ]
+    monkeypatch.setattr(
+        release_check,
+        "_listener_processes_for_port",
+        lambda port: (listener_processes, None),
+    )
+    confirmation_path = tmp_path / "backend-listener-confirmation-template.json"
+    payload = release_check.write_backend_listener_confirmation_template(
+        confirmation_path,
+        host="127.0.0.1",
+        port=8765,
+        listener_processes=listener_processes,
+        generated_at="2026-06-13T10:30:00Z",
+    )
+    payload["status"] = release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS
+    payload["confirms_intended_backend"] = True
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+        payload["port"] = port
+        confirmation_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = release_check.check_port_free(
+            port=port,
+            listener_confirmation_path=confirmation_path,
+        )
+
+    assert result.status == "failed"
+    assert result.detail["listener_confirmation_status"] == "invalid"
+    violations = result.detail["listener_confirmation_violations"]
+    assert "listener_confirmation_operator_reviewed_at_placeholder" in violations
+    assert "listener_confirmation_operator_name_placeholder" in violations
+    assert "listener_confirmation_template_status_still_pending" in violations
+    assert "listener_confirmation_accepted_by_template_not_true" in violations
+    assert result.detail["preflight_blocked_until_listener_confirmed"] is True
+    assert result.detail["safe_to_stop_listener_by_gate"] is False
+    assert result.detail["live_authority_granted"] is False
+
+
+def test_backend_listener_confirmation_accepts_fully_edited_template(
+    tmp_path, monkeypatch
+):
+    command_line = "python3 backend/server.py --mode wing"
+    listener_processes = [
+        {
+            "pid": 87210,
+            "command": "Python",
+            "name": "TCP *:8765 (LISTEN)",
+            "command_line": command_line,
+        }
+    ]
+    monkeypatch.setattr(
+        release_check,
+        "_listener_processes_for_port",
+        lambda port: (listener_processes, None),
+    )
+    confirmation_path = tmp_path / "backend-listener-confirmation-template.json"
+    payload = release_check.write_backend_listener_confirmation_template(
+        confirmation_path,
+        host="127.0.0.1",
+        port=8765,
+        listener_processes=listener_processes,
+        generated_at="2026-06-13T10:30:00Z",
+    )
+    payload.update(
+        {
+            "status": release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS,
+            "confirms_intended_backend": True,
+            "operator_reviewed_at": "2026-06-13T10:35:00Z",
+            "operator_name": "operator",
+            "template_status": (
+                release_check.BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REVIEWED_STATUS
+            ),
+            "accepted_by_template": True,
+        }
+    )
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        port = server.getsockname()[1]
+        payload["port"] = port
+        confirmation_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = release_check.check_port_free(
+            port=port,
+            listener_confirmation_path=confirmation_path,
+        )
+
+    assert result.status == "passed"
+    assert result.detail["listener_confirmation_status"] == "accepted"
+    assert result.detail["intended_backend_confirmed"] is True
+    assert result.detail["listener_confirmation_violations"] == []
+    assert result.detail["safe_to_stop_listener_by_gate"] is False
+    assert result.detail["live_authority_granted"] is False
+
+
 def test_backend_port_check_rejects_mismatched_listener_confirmation(
     tmp_path, monkeypatch
 ):

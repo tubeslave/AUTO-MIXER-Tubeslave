@@ -387,12 +387,18 @@ BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS = (
     "operator_confirmed_intended_backend"
 )
 BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_STATUS = "operator_review_required"
+BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REVIEWED_STATUS = (
+    "operator_reviewed_and_edited"
+)
+BACKEND_PORT_LISTENER_CONFIRMATION_PLACEHOLDER_PREFIX = "REPLACE_WITH_"
 BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REQUIRED_EDITS = [
     "confirm the listener is the intended Automixer backend for this WING preflight",
     "set status to operator_confirmed_intended_backend only after operator review",
     "set confirms_intended_backend to true only after matching the PID and command line",
     "replace operator_reviewed_at with the UTC review timestamp",
     "replace operator_name with the reviewing operator name",
+    "set template_status to operator_reviewed_and_edited if using the generated template",
+    "set accepted_by_template to true if using the generated template",
     "rerun the no-WING gate with --backend-listener-confirmation pointing to the edited JSON",
 ]
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
@@ -1606,8 +1612,23 @@ def _backend_listener_confirmation_detail(
     if payload.get("live_authority_granted") is not False:
         violations.append("listener_confirmation_live_authority_not_false")
     for field in ("operator_reviewed_at", "operator_name"):
-        if not str(payload.get(field) or "").strip():
+        value = str(payload.get(field) or "").strip()
+        if not value:
             violations.append(f"listener_confirmation_{field}_missing")
+        elif value.startswith(BACKEND_PORT_LISTENER_CONFIRMATION_PLACEHOLDER_PREFIX):
+            violations.append(f"listener_confirmation_{field}_placeholder")
+
+    template_status = payload.get("template_status")
+    if template_status == "pending_operator_edit":
+        violations.append("listener_confirmation_template_status_still_pending")
+    elif (
+        template_status is not None
+        and template_status
+        != BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REVIEWED_STATUS
+    ):
+        violations.append("listener_confirmation_template_status_not_reviewed")
+    if "accepted_by_template" in payload and payload.get("accepted_by_template") is not True:
+        violations.append("listener_confirmation_accepted_by_template_not_true")
 
     reviewed_pid = _normalize_listener_pid(payload.get("reviewed_listener_pid"))
     reviewed_command_line = str(payload.get("reviewed_listener_command_line") or "")
