@@ -458,6 +458,9 @@ The handoff validation must report:
 - `manual_review_required_before_readiness_update: true`
 - `readiness_matrix_update_allowed_by_packet: false`
 - `readiness_closure_allowed_by_packet: false`
+- If validation fails because a handoff packet set execution, readiness,
+  live-authority, or full-autonomous flags to `true`, the no-WING summary must
+  preserve those unsafe `true` values so the failed handoff is auditable.
 - `read_only: true`
 - `live_write: false`
 - `mutates_console_state: false`

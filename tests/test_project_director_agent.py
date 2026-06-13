@@ -409,6 +409,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md"
         in directive["selected_evidence_files"]
     )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md"
+        in directive["selected_evidence_files"]
+    )
     assert directive["stop_broad_work"] is True
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]

@@ -218,6 +218,10 @@ blockers выше.
 40. verify `execution_allowed_by_packet: false`;
 41. verify `live_authority_granted: false`;
 42. verify `full_autonomous_ready: false`;
+42a. if handoff validation fails because execution, readiness,
+   live-authority, or full-autonomous packet flags are `true`, verify the
+   no-WING summary preserves those unsafe `true` values so the failed handoff is
+   auditable;
 43. verify
    `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`;
 44. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
@@ -449,6 +453,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `live_authority_granted: false`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `full_autonomous_ready: false`.
+- If handoff validation fails because execution, readiness, live-authority, or
+  full-autonomous packet flags are `true`, the no-WING summary must preserve
+  those unsafe `true` values so the failed handoff is auditable.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

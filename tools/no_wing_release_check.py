@@ -13195,11 +13195,21 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "manual_review_required_before_readiness_update": (
                 detail.get("manual_review_required_before_readiness_update") is True
             ),
-            "execution_allowed_by_packet": False,
-            "readiness_matrix_update_allowed_by_packet": False,
-            "readiness_closure_allowed_by_packet": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
+            "execution_allowed_by_packet": (
+                detail.get("execution_allowed_by_packet") is True
+            ),
+            "readiness_matrix_update_allowed_by_packet": (
+                detail.get("readiness_matrix_update_allowed_by_packet") is True
+            ),
+            "readiness_closure_allowed_by_packet": (
+                detail.get("readiness_closure_allowed_by_packet") is True
+            ),
+            "live_authority_granted": (
+                detail.get("live_authority_granted") is True
+            ),
+            "full_autonomous_ready": (
+                detail.get("full_autonomous_ready") is True
+            ),
             "next_manual_artifact_required": str(
                 detail.get("next_manual_artifact_required") or ""
             ),
