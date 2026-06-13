@@ -9,6 +9,11 @@ from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_st
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 from tools import no_wing_release_check as release_check
 from tools.no_wing_release_check import (
@@ -779,7 +784,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
     return {
         "type": "wing_readonly_preflight_offline_plan",
         "status": "ready_for_operator_review",
-        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": "wing_readonly_preflight_runner",
         "selected_mvp_blocker": "WING read-only connection proof",
         "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
@@ -858,8 +863,14 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
             },
         ],
         "expected_artifacts": [
-            "artifacts/wing_readonly_preflight/<run_id>/summary.json",
-            "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
+            (
+                "artifacts/wing_readonly_preflight/<run_id>/"
+                f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+            ),
+            (
+                "artifacts/wing_readonly_preflight/<run_id>/"
+                f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+            ),
         ],
         "post_run_review_commands": [
             " ".join(release_check.wing_readonly_preflight_review_command()),
@@ -914,10 +925,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "artifact_root": "artifacts/wing_readonly_preflight",
         "decision_root": "artifacts/wing_readonly_preflight_review_decisions",
         "expected_run_artifact_glob": (
-            "artifacts/wing_readonly_preflight/<run_id>/summary.json"
+            "artifacts/wing_readonly_preflight/<run_id>/"
+            f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
         ),
         "expected_event_log_glob": (
-            "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"
+            "artifacts/wing_readonly_preflight/<run_id>/"
+            f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
         ),
         "plan_output": str(plan_path),
         "decision_template_output": (
@@ -1122,7 +1135,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "supervised_gain_down_trim_proof",
             "readiness_matrix_update_based_on_real_proof",
         ],
-        "next_manual_artifact_required": "real wing_readonly_preflight.v1 summary.json",
+        "next_manual_artifact_required": (
+            WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
+        ),
     }
 
 
@@ -6106,7 +6121,7 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
             "rationale": "read-only preflight required",
             "prerequisites": ["operator present"],
             "abort_conditions": ["backend not wing"],
-            "expected_artifacts": ["wing_readonly_preflight.v1 summary.json"],
+            "expected_artifacts": [WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT],
         }
     ]
     plan["steps"] = []
@@ -8508,7 +8523,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "live_authority_granted": False,
             "full_autonomous_ready": False,
             "next_manual_artifact_required": (
-                "real wing_readonly_preflight.v1 summary.json"
+                WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
             ),
             "plan_output": "/tmp/wing_readonly_preflight_plan.json",
             "channels": [3],
@@ -8638,9 +8653,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["readiness_closure_allowed_by_packet"] is False
     assert artifact["live_authority_granted"] is False
     assert artifact["full_autonomous_ready"] is False
-    assert (
-        artifact["next_manual_artifact_required"]
-        == "real wing_readonly_preflight.v1 summary.json"
+    assert artifact["next_manual_artifact_required"] == (
+        WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
     )
     assert artifact["packet_status"] == "operator_hardware_step_required"
     assert artifact["plan_artifact_status"] == "passed"
@@ -8711,7 +8725,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert (
         "next_manual_artifact_required: "
-        "`real wing_readonly_preflight.v1 summary.json`"
+        f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
     assert "execution_allowed_by_packet: `false`" in markdown_summary

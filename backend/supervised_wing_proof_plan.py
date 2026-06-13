@@ -34,11 +34,15 @@ try:
     from wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+        WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+        WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
     )
 
 
@@ -372,8 +376,11 @@ def _readonly_preflight_step(
             *blockers,
         ),
         expected_artifacts=(
-            "wing_readonly_preflight.v1 summary.json",
-            "events.jsonl with get_operator_mode/get_state/query_mixer_parameter only",
+            WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+            (
+                f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME} with "
+                "get_operator_mode/get_state/query_mixer_parameter only"
+            ),
             *next_actions,
         ),
     )

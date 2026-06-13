@@ -3,6 +3,8 @@ from pathlib import Path
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
 )
 from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan
 
@@ -505,7 +507,14 @@ def test_plan_blocks_physical_proof_steps_until_readonly_preflight_candidate_exi
     assert "--require-physical-readback" in preflight_step["command"]
     assert "--execute" not in preflight_step["command"]
     assert "tools/wing_operator_proposal_validation_runner.py" not in preflight_step["command"]
-    assert "wing_readonly_preflight.v1 summary.json" in preflight_step["expected_artifacts"]
+    assert (
+        WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT
+        in preflight_step["expected_artifacts"]
+    )
+    assert (
+        f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME} with "
+        "get_operator_mode/get_state/query_mixer_parameter only"
+    ) in preflight_step["expected_artifacts"]
     assert plan["steps"] == []
 
 

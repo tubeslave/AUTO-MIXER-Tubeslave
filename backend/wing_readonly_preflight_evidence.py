@@ -19,17 +19,21 @@ try:
     from wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
     from backend.wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
 
 
 WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID = "wing_readonly_preflight_evidence"
-WING_READONLY_PREFLIGHT_SCHEMA_ID = "wing_readonly_preflight.v1"
+WING_READONLY_PREFLIGHT_SCHEMA_ID = WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
 WING_READONLY_PREFLIGHT_RUNNER = "wing_readonly_preflight_runner"
 DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS = ("artifacts/wing_readonly_preflight",)
 EVIDENCE_STATUSES = {
@@ -277,11 +281,15 @@ def _artifact_roots(artifact_roots: Iterable[str | Path] | None) -> Tuple[Path, 
 def _discover_artifact_paths(artifact_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
     paths: list[Path] = []
     for root in _artifact_roots(artifact_roots):
-        if root.is_file() and root.name == "summary.json":
+        if root.is_file() and root.name == WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME:
             paths.append(root)
         if not root.is_dir():
             continue
-        paths.extend(path for path in root.rglob("summary.json") if path.is_file())
+        paths.extend(
+            path
+            for path in root.rglob(WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME)
+            if path.is_file()
+        )
     return tuple(sorted(dict.fromkeys(paths), key=lambda path: str(path)))
 
 

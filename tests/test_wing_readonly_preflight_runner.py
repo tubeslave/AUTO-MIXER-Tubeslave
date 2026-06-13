@@ -12,6 +12,9 @@ import pytest
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 
 
@@ -86,7 +89,7 @@ def parse_args(tmp_path: Path, *argv: str):
 
 
 def read_summary(artifact_root: Path) -> dict:
-    summaries = list(artifact_root.glob("*/summary.json"))
+    summaries = list(artifact_root.glob(f"*/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"))
     assert len(summaries) == 1
     return json.loads(summaries[0].read_text(encoding="utf-8"))
 
@@ -1110,6 +1113,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     written = json.loads(plan_output.read_text(encoding="utf-8"))
     assert printed["type"] == "wing_readonly_preflight_offline_plan"
     assert printed["status"] == "ready_for_operator_review"
+    assert printed["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
     assert printed["plan_output"] == str(plan_output)
     assert written["plan_output"] == str(plan_output)
     assert written["selected_mvp_blocker"] == "WING read-only connection proof"
@@ -1131,6 +1135,11 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     )
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
+    assert written["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    assert written["expected_artifacts"] == [
+        f"{tmp_path}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{tmp_path}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+    ]
     assert written["read_only"] is True
     assert written["live_write"] is False
     assert written["channels"] == [3]
@@ -1183,7 +1192,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     )
     assert "unexpected_response_type" in written["fail_closed_conditions"]
     assert "manual_review_decision_missing_or_invalid" in written["fail_closed_conditions"]
-    assert not list(tmp_path.glob("*/summary.json"))
+    assert not list(tmp_path.glob(f"*/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"))
 
 
 @pytest.mark.asyncio

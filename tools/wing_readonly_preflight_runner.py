@@ -27,6 +27,9 @@ if str(REPO_ROOT) not in sys.path:
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 
 EXPECTED_MODE_EVENTS = {"operator_mode_status"}
@@ -245,8 +248,8 @@ def transport_failure_classification(exc: Exception) -> tuple[str, list[str], Di
 class EventRecorder:
     def __init__(self, run_dir: Path):
         self.run_dir = run_dir
-        self.events_path = run_dir / "events.jsonl"
-        self.summary_path = run_dir / "summary.json"
+        self.events_path = run_dir / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
+        self.summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
         self.seq = 0
         self.sent_request_types: list[str] = []
 
@@ -438,7 +441,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
     return {
         "type": "wing_readonly_preflight_offline_plan",
         "status": "ready_for_operator_review",
-        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": "wing_readonly_preflight_runner",
         "selected_mvp_blocker": "WING read-only connection proof",
         "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
@@ -480,8 +483,8 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         ],
         "request_id_policy": "required_for_every_query_mixer_parameter_response",
         "expected_artifacts": [
-            f"{artifact_root}/<run_id>/summary.json",
-            f"{artifact_root}/<run_id>/events.jsonl",
+            f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+            f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
         ],
         "post_run_review_commands": [
             (
@@ -594,7 +597,7 @@ async def run(args: argparse.Namespace) -> int:
     summary: Dict[str, Any] = {
         "run_id": run_id,
         "status": "started",
-        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": "wing_readonly_preflight_runner",
         "url": args.url,
         "channels": list(channels),

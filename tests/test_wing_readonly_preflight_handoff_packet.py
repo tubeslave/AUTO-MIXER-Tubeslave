@@ -6,6 +6,9 @@ from pathlib import Path
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 from tools import build_wing_readonly_preflight_handoff_packet as handoff
 from tools import no_wing_release_check
@@ -41,9 +44,14 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["readiness_matrix_update_allowed_by_packet"] is False
     assert packet["live_authority_granted"] is False
     assert packet["full_autonomous_ready"] is False
-    assert (
-        packet["next_manual_artifact_required"]
-        == "real wing_readonly_preflight.v1 summary.json"
+    assert packet["next_manual_artifact_required"] == (
+        WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
+    )
+    assert packet["expected_run_artifact_glob"].endswith(
+        f"/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+    )
+    assert packet["expected_event_log_glob"].endswith(
+        f"/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
     )
     assert packet["channels"] == [3]
     assert packet["value_types"] == ["fader", "gain", "pan"]
@@ -174,7 +182,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rendered
     assert (
         "next_manual_artifact_required: "
-        "`real wing_readonly_preflight.v1 summary.json`"
+        f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in rendered
     assert "--decision-template-output" in packet["commands"][
         "review_artifact_and_write_pending_decision_template"
@@ -333,7 +341,7 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "full_autonomous_ready: `false`" in markdown
     assert (
         "next_manual_artifact_required: "
-        "`real wing_readonly_preflight.v1 summary.json`"
+        f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in markdown
 
 
@@ -355,9 +363,8 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["backend_port_prestart_check_must_pass_before_starting_backend"] is True
     assert payload["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert payload["backend_port_prestart_check_must_be_first_operator_step"] is True
-    assert (
-        payload["next_manual_artifact_required"]
-        == "real wing_readonly_preflight.v1 summary.json"
+    assert payload["next_manual_artifact_required"] == (
+        WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
     )
     assert payload["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND

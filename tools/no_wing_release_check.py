@@ -354,6 +354,18 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list
         "WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS",
     )
 )
+WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+)
+WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME = (
+    preflight_contract.WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+)
+WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME = (
+    preflight_contract.WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
+)
+WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED = (
+    preflight_contract.WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
+)
 BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST = [
     "confirm whether the listener is the intended Automixer backend for this WING preflight",
     "confirm the listener command line and PID match the operator-started backend session",
@@ -3419,7 +3431,10 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append("wing_readonly_preflight_plan_type_mismatch")
     if plan.get("status") != "ready_for_operator_review":
         violations.append("wing_readonly_preflight_plan_status_mismatch")
-    if plan.get("proof_artifact_schema") != "wing_readonly_preflight.v1":
+    if (
+        plan.get("proof_artifact_schema")
+        != WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    ):
         violations.append("wing_readonly_preflight_plan_schema_mismatch")
     if plan.get("proof_runner") != "wing_readonly_preflight_runner":
         violations.append("wing_readonly_preflight_plan_runner_mismatch")
@@ -3541,8 +3556,8 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
 
     expected_artifacts = plan.get("expected_artifacts")
     expected_artifact_paths = [
-        f"{expected_artifact_root}/<run_id>/summary.json",
-        f"{expected_artifact_root}/<run_id>/events.jsonl",
+        f"{expected_artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{expected_artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
     ]
     if expected_artifacts != expected_artifact_paths:
         violations.append("wing_readonly_preflight_plan_expected_artifacts_mismatch")
@@ -3804,11 +3819,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if packet.get("value_types") != _csv_strings(WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES):
         violations.append("wing_readonly_preflight_handoff_packet_value_types_mismatch")
     if packet.get("expected_run_artifact_glob") != (
-        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/summary.json"
+        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/"
+        f"{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
     ):
         violations.append("wing_readonly_preflight_handoff_packet_summary_glob_mismatch")
     if packet.get("expected_event_log_glob") != (
-        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/events.jsonl"
+        f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/"
+        f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
     ):
         violations.append("wing_readonly_preflight_handoff_packet_events_glob_mismatch")
 
@@ -4023,8 +4040,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_expected_supervised_prestart_gate_contract_mismatch"
         )
-    if packet.get("next_manual_artifact_required") != (
-        "real wing_readonly_preflight.v1 summary.json"
+    if (
+        packet.get("next_manual_artifact_required")
+        != WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
     ):
         violations.append(
             "wing_readonly_preflight_handoff_packet_next_manual_artifact_mismatch"
@@ -14093,7 +14111,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         )
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
-    summary_path = run_dir / "summary.json"
+    summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
     _write_text(summary_path, json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
 
     lines = [
