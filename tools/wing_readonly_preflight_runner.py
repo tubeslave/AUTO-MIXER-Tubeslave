@@ -38,6 +38,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
@@ -63,6 +64,7 @@ PRESTART_SUMMARY_BACKEND_CHECK_NAME = (
 PRESTART_SUMMARY_BACKEND_CHECK_STATUS = (
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
 )
+PROOF_RUNNER = WING_READONLY_PREFLIGHT_PROOF_RUNNER
 RUN_SUMMARY_STATUS = WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
 RUN_SUMMARY_REASON = WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 LIVE_WRITE_REQUEST_TYPES = {
@@ -591,7 +593,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "type": "wing_readonly_preflight_offline_plan",
         "status": "ready_for_operator_review",
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
-        "proof_runner": "wing_readonly_preflight_runner",
+        "proof_runner": PROOF_RUNNER,
         "selected_mvp_blocker": "WING read-only connection proof",
         "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
         "url": args.url,
@@ -758,7 +760,7 @@ async def run(args: argparse.Namespace) -> int:
         "run_id": run_id,
         "status": "started",
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
-        "proof_runner": "wing_readonly_preflight_runner",
+        "proof_runner": PROOF_RUNNER,
         "url": args.url,
         "channels": list(channels),
         "operator_channel_confirmation_required": bool(args.require_physical_readback),

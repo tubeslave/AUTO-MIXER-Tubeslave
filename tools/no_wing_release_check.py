@@ -297,6 +297,7 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     PHYSICAL_READBACK_SOURCES as WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_SOURCES,
     PHYSICAL_READBACK_STATUSES as WING_READONLY_PREFLIGHT_EVIDENCE_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
+    WING_READONLY_PREFLIGHT_RUNNER as WING_READONLY_PREFLIGHT_EVIDENCE_PROOF_RUNNER,
     build_wing_readonly_preflight_evidence,
 )
 from backend.safety_coverage_matrix import get_safety_coverage_row  # noqa: E402
@@ -359,6 +360,9 @@ WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = (
 )
 WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = (
     preflight_contract.WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+)
+WING_READONLY_PREFLIGHT_PROOF_RUNNER = (
+    preflight_contract.WING_READONLY_PREFLIGHT_PROOF_RUNNER
 )
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS = (
     preflight_contract.WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
@@ -699,8 +703,9 @@ def wing_readonly_preflight_runner_supported_value_types() -> list[str]:
 def wing_readonly_preflight_runner_run_summary_contract() -> dict[str, str | None]:
     runner_tool = load_wing_readonly_preflight_runner_tool()
     if runner_tool is None:
-        return {"status": None, "reason": None}
+        return {"proof_runner": None, "status": None, "reason": None}
     return {
+        "proof_runner": getattr(runner_tool, "PROOF_RUNNER", None),
         "status": getattr(runner_tool, "RUN_SUMMARY_STATUS", None),
         "reason": getattr(runner_tool, "RUN_SUMMARY_REASON", None),
     }
@@ -3735,9 +3740,11 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     expected_run_summary_status = WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
     expected_run_summary_reason = WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
+    expected_proof_runner = WING_READONLY_PREFLIGHT_PROOF_RUNNER
     runner_run_summary_contract = (
         wing_readonly_preflight_runner_run_summary_contract()
     )
+    evidence_proof_runner = WING_READONLY_PREFLIGHT_EVIDENCE_PROOF_RUNNER
     evidence_expected_run_summary_status = (
         WING_READONLY_PREFLIGHT_EVIDENCE_EXPECTED_RUN_SUMMARY_STATUS
     )
@@ -3796,6 +3803,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     runner_supported_value_types_match_contract = (
         runner_supported_value_types == expected_supported_value_types
+    )
+    runner_proof_runner_match_contract = (
+        runner_run_summary_contract.get("proof_runner") == expected_proof_runner
+    )
+    evidence_proof_runner_match_contract = (
+        evidence_proof_runner == expected_proof_runner
     )
     runner_run_summary_status_match_contract = (
         runner_run_summary_contract.get("status") == expected_run_summary_status
@@ -3869,6 +3882,10 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append(
             "wing_readonly_preflight_runner_supported_value_types_mismatch"
         )
+    if not runner_proof_runner_match_contract:
+        violations.append("wing_readonly_preflight_runner_proof_runner_mismatch")
+    if not evidence_proof_runner_match_contract:
+        violations.append("wing_readonly_preflight_evidence_proof_runner_mismatch")
     if not runner_run_summary_status_match_contract:
         violations.append("wing_readonly_preflight_runner_run_summary_status_mismatch")
     if not runner_run_summary_reason_match_contract:
@@ -4072,6 +4089,11 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     )
     detail["expected_supported_value_types"] = list(expected_supported_value_types)
     detail["runner_supported_value_types"] = list(runner_supported_value_types)
+    detail["expected_proof_runner"] = expected_proof_runner
+    detail["runner_proof_runner"] = runner_run_summary_contract.get("proof_runner")
+    detail["evidence_proof_runner"] = evidence_proof_runner
+    detail["runner_proof_runner_match_contract"] = runner_proof_runner_match_contract
+    detail["evidence_proof_runner_match_contract"] = evidence_proof_runner_match_contract
     detail["expected_run_summary_status"] = expected_run_summary_status
     detail["expected_run_summary_reason"] = expected_run_summary_reason
     detail["runner_run_summary_status"] = runner_run_summary_contract.get("status")
@@ -4324,7 +4346,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         != WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
     ):
         violations.append("wing_readonly_preflight_plan_schema_mismatch")
-    if plan.get("proof_runner") != "wing_readonly_preflight_runner":
+    if plan.get("proof_runner") != WING_READONLY_PREFLIGHT_PROOF_RUNNER:
         violations.append("wing_readonly_preflight_plan_runner_mismatch")
     if plan.get("artifact_root") != expected_artifact_root:
         violations.append("wing_readonly_preflight_plan_artifact_root_mismatch")
@@ -12136,6 +12158,15 @@ def wing_readonly_preflight_evidence_summary(
                 if isinstance(detail.get("runner_supported_value_types"), list)
                 else []
             ),
+            "expected_proof_runner": detail.get("expected_proof_runner"),
+            "runner_proof_runner": detail.get("runner_proof_runner"),
+            "evidence_proof_runner": detail.get("evidence_proof_runner"),
+            "runner_proof_runner_match_contract": (
+                detail.get("runner_proof_runner_match_contract") is True
+            ),
+            "evidence_proof_runner_match_contract": (
+                detail.get("evidence_proof_runner_match_contract") is True
+            ),
             "expected_run_summary_status": detail.get("expected_run_summary_status"),
             "expected_run_summary_reason": detail.get("expected_run_summary_reason"),
             "runner_run_summary_status": detail.get("runner_run_summary_status"),
@@ -15869,6 +15900,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight['expected_supported_value_types'])}`",
                 "- runner_supported_value_types: "
                 f"`{json.dumps(wing_readonly_preflight['runner_supported_value_types'])}`",
+                "- expected_proof_runner: "
+                f"`{wing_readonly_preflight['expected_proof_runner']}`",
+                "- runner_proof_runner: "
+                f"`{wing_readonly_preflight['runner_proof_runner']}`",
+                "- evidence_proof_runner: "
+                f"`{wing_readonly_preflight['evidence_proof_runner']}`",
+                "- runner_proof_runner_match_contract: "
+                f"`{str(wing_readonly_preflight['runner_proof_runner_match_contract']).lower()}`",
+                "- evidence_proof_runner_match_contract: "
+                f"`{str(wing_readonly_preflight['evidence_proof_runner_match_contract']).lower()}`",
                 "- expected_run_summary_status: "
                 f"`{wing_readonly_preflight['expected_run_summary_status']}`",
                 "- expected_run_summary_reason: "

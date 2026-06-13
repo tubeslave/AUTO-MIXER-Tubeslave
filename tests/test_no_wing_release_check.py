@@ -39,6 +39,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
@@ -1057,7 +1058,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "type": "wing_readonly_preflight_offline_plan",
         "status": "ready_for_operator_review",
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
-        "proof_runner": "wing_readonly_preflight_runner",
+        "proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
         "selected_mvp_blocker": "WING read-only connection proof",
         "selected_mvp_blocker_status": "tooling_ready_waits_real_wing",
         "url": "ws://localhost:8765",
@@ -3860,6 +3861,67 @@ def test_no_wing_release_check_rejects_wing_preflight_runner_supported_value_typ
     assert result.detail["runner_supported_value_types_match_contract"] is False
     assert (
         "wing_readonly_preflight_runner_supported_value_types_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_tracks_wing_preflight_proof_runner_contract():
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "passed"
+    assert result.detail["expected_proof_runner"] == (
+        WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    )
+    assert result.detail["runner_proof_runner"] == (
+        WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    )
+    assert result.detail["evidence_proof_runner"] == (
+        WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    )
+    assert result.detail["runner_proof_runner_match_contract"] is True
+    assert result.detail["evidence_proof_runner_match_contract"] is True
+
+
+def test_no_wing_release_check_rejects_wing_preflight_runner_proof_runner_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "wing_readonly_preflight_runner_run_summary_contract",
+        lambda: {
+            "proof_runner": "unexpected_runner",
+            "status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
+            "reason": WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
+        },
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["runner_proof_runner"] == "unexpected_runner"
+    assert result.detail["runner_proof_runner_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_runner_proof_runner_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_evidence_proof_runner_mismatch(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        release_check,
+        "WING_READONLY_PREFLIGHT_EVIDENCE_PROOF_RUNNER",
+        "unexpected_runner",
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+
+    assert result.status == "failed"
+    assert result.detail["evidence_proof_runner"] == "unexpected_runner"
+    assert result.detail["evidence_proof_runner_match_contract"] is False
+    assert (
+        "wing_readonly_preflight_evidence_proof_runner_mismatch"
         in result.detail["violations"]
     )
 
@@ -9029,6 +9091,11 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
             ),
             "runner_supported_value_types_match_contract": True,
+            "expected_proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+            "runner_proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+            "evidence_proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+            "runner_proof_runner_match_contract": True,
+            "evidence_proof_runner_match_contract": True,
             "expected_run_summary_status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
             "expected_run_summary_reason": WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
             "runner_run_summary_status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
@@ -9267,6 +9334,11 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
     )
     assert preflight["runner_supported_value_types_match_contract"] is True
+    assert preflight["expected_proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert preflight["runner_proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert preflight["evidence_proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
+    assert preflight["runner_proof_runner_match_contract"] is True
+    assert preflight["evidence_proof_runner_match_contract"] is True
     assert preflight["expected_run_summary_status"] == (
         WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
     )
@@ -9443,6 +9515,8 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "expected_target_defaults" in markdown_summary
     assert "runner_argparse_target_defaults_match_contract: `true`" in markdown_summary
     assert "runner_supported_value_types_match_contract: `true`" in markdown_summary
+    assert "runner_proof_runner_match_contract: `true`" in markdown_summary
+    assert "evidence_proof_runner_match_contract: `true`" in markdown_summary
     assert "runner_run_summary_status_match_contract: `true`" in markdown_summary
     assert "runner_run_summary_reason_match_contract: `true`" in markdown_summary
     assert "evidence_run_summary_status_match_contract: `true`" in markdown_summary

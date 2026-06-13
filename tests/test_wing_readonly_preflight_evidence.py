@@ -18,6 +18,7 @@ from backend.wing_readonly_preflight_evidence import (
     PHYSICAL_READBACK_SOURCES,
     PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_EVIDENCE_METHOD_ID,
+    WING_READONLY_PREFLIGHT_RUNNER,
     build_wing_readonly_preflight_evidence,
     validate_wing_readonly_preflight_artifact,
 )
@@ -27,6 +28,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
+    WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
 )
 from backend.processing_registry import (
@@ -53,6 +56,7 @@ def test_preflight_evidence_uses_shared_value_type_contract():
 
 
 def test_preflight_evidence_uses_shared_run_summary_contract():
+    assert WING_READONLY_PREFLIGHT_RUNNER == WING_READONLY_PREFLIGHT_PROOF_RUNNER
     assert EXPECTED_RUN_SUMMARY_STATUS == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
     assert EXPECTED_RUN_SUMMARY_REASON == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 
@@ -63,8 +67,8 @@ def _valid_summary() -> dict:
         "status": WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
         "reason": WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
         "captured_at": "2026-06-07T01:00:00Z",
-        "proof_artifact_schema": "wing_readonly_preflight.v1",
-        "proof_runner": "wing_readonly_preflight_runner",
+        "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+        "proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
         "connection_mode": "wing",
         "channels": [3],
         "operator_channel_confirmation_required": True,

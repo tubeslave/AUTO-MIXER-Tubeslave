@@ -19,6 +19,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
+    WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
@@ -88,6 +89,7 @@ def patch_websocket_connect(monkeypatch: pytest.MonkeyPatch, websocket: FakeWebS
 
 
 def test_runner_uses_shared_run_summary_contract() -> None:
+    assert runner.PROOF_RUNNER == WING_READONLY_PREFLIGHT_PROOF_RUNNER
     assert runner.RUN_SUMMARY_STATUS == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
     assert runner.RUN_SUMMARY_REASON == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 
@@ -1211,6 +1213,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert printed["type"] == "wing_readonly_preflight_offline_plan"
     assert printed["status"] == "ready_for_operator_review"
     assert printed["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    assert printed["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
     assert printed["plan_output"] == str(plan_output)
     assert written["plan_output"] == str(plan_output)
     assert written["selected_mvp_blocker"] == "WING read-only connection proof"
@@ -1251,6 +1254,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert written["proof_artifact_schema"] == WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
+    assert written["proof_runner"] == WING_READONLY_PREFLIGHT_PROOF_RUNNER
     assert written["expected_artifacts"] == [
         f"{tmp_path}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
         f"{tmp_path}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
