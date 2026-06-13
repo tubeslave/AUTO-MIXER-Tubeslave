@@ -419,6 +419,17 @@ The first operator step text must also be explicit:
 `backend_port_prestart_check_operator_sequence_step` must include
 `prestart_backend_port_check` and `unexpected listeners`.
 
+The handoff summary must also prove the backend/WING connection confirmation
+step is explicit and occurs before capture:
+`backend_connection_confirmation_step_index: 2`,
+`operator_sequence_has_backend_connection_confirmation: true`,
+`operator_sequence_backend_connection_confirmation_step_index: 2`,
+`operator_sequence_backend_connection_confirmation_before_capture: true`,
+`operator_sequence_backend_connection_confirmation_step` includes
+`existing backend connection`, `intended WING Rack`, and
+`read-only inspection`, and
+`operator_sequence_capture_readonly_preflight_step_index: 4`.
+
 ## Autonomy Budget Rule
 
 Automated cycles may continue without asking "continue?", but they must be

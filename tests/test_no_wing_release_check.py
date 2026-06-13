@@ -10,6 +10,9 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX,
     WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
@@ -1229,6 +1232,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
         ),
         "backend_port_prestart_check_operator_sequence_step_index": 0,
+        "backend_connection_confirmation_step_index": (
+            WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+        ),
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": [
             "PYTHONPATH=backend",
@@ -1388,7 +1394,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "unexpected listeners."
             ),
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
-            "Confirm backend is connected to the intended WING Rack.",
+            WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
             "Confirm the selected channel numbers are safe to inspect.",
             "Run capture_readonly_preflight.",
             "Run review_artifact_and_write_pending_decision_template.",
@@ -3040,6 +3046,31 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "backend_port_prestart_check_operator_sequence_step"
     ]
     assert result.detail["backend_port_prestart_check_operator_sequence_step_is_first"] is True
+    assert (
+        result.detail["backend_connection_confirmation_step_index"]
+        == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
+    assert (
+        result.detail["expected_backend_connection_confirmation_step_index"]
+        == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
+    assert result.detail["operator_sequence_has_backend_connection_confirmation"] is True
+    assert result.detail["operator_sequence_backend_connection_confirmation_step"] == (
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+    )
+    assert result.detail[
+        "operator_sequence_backend_connection_confirmation_step_index"
+    ] == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    assert (
+        result.detail["operator_sequence_backend_connection_confirmation_before_capture"]
+        is True
+    )
+    assert result.detail["operator_sequence_capture_readonly_preflight_step_index"] == 4
+    for marker in WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS:
+        assert (
+            marker
+            in result.detail["operator_sequence_backend_connection_confirmation_step"]
+        )
     assert result.detail["backend_port_prestart_gate"] == result.detail[
         "expected_backend_port_prestart_gate"
     ]
@@ -3704,6 +3735,125 @@ def test_no_wing_release_check_rejects_handoff_packet_without_first_prestart_gat
     )
     assert (
         "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_not_first"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_without_backend_connection_confirmation(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-without-backend-connection-confirmation.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"] = [
+        item
+        for item in payload["operator_sequence"]
+        if item != WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+    ]
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_has_backend_connection_confirmation"] is False
+    assert result.detail["operator_sequence_backend_connection_confirmation_step"] == ""
+    assert (
+        result.detail["operator_sequence_backend_connection_confirmation_step_index"]
+        is None
+    )
+    assert (
+        result.detail["operator_sequence_backend_connection_confirmation_before_capture"]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_not_before_capture"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_declared_backend_connection_index_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-backend-connection-index-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["backend_connection_confirmation_step_index"] = 1
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["backend_connection_confirmation_step_index"] == 1
+    assert (
+        result.detail["expected_backend_connection_confirmation_step_index"]
+        == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
+    assert result.detail[
+        "operator_sequence_backend_connection_confirmation_step_index"
+    ] == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_declared_step_index_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_late_backend_connection_confirmation(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-late-backend-connection-confirmation.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"].remove(
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+    )
+    payload["operator_sequence"].insert(
+        payload["operator_sequence"].index("Run capture_readonly_preflight.") + 1,
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
+    )
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_has_backend_connection_confirmation"] is True
+    assert result.detail[
+        "operator_sequence_backend_connection_confirmation_step_index"
+    ] > result.detail["operator_sequence_capture_readonly_preflight_step_index"]
+    assert (
+        result.detail["operator_sequence_backend_connection_confirmation_before_capture"]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_index_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_not_before_capture"
         in result.detail["violations"]
     )
 
@@ -10271,6 +10421,21 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "unexpected listeners."
             ),
             "backend_port_prestart_check_operator_sequence_step_is_first": True,
+            "backend_connection_confirmation_step_index": (
+                WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+            ),
+            "expected_backend_connection_confirmation_step_index": (
+                WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+            ),
+            "operator_sequence_has_backend_connection_confirmation": True,
+            "operator_sequence_backend_connection_confirmation_step": (
+                WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+            ),
+            "operator_sequence_backend_connection_confirmation_step_index": (
+                WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+            ),
+            "operator_sequence_backend_connection_confirmation_before_capture": True,
+            "operator_sequence_capture_readonly_preflight_step_index": 4,
             "backend_port_prestart_gate": {
                 "required": True,
                 "operator_sequence_step_index": 0,
@@ -10532,6 +10697,25 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "prestart_backend_port_check and resolve only confirmed unexpected listeners."
     )
     assert artifact["backend_port_prestart_check_operator_sequence_step_is_first"] is True
+    assert (
+        artifact["backend_connection_confirmation_step_index"]
+        == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
+    assert (
+        artifact["expected_backend_connection_confirmation_step_index"]
+        == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
+    assert artifact["operator_sequence_has_backend_connection_confirmation"] is True
+    assert artifact["operator_sequence_backend_connection_confirmation_step"] == (
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+    )
+    assert artifact[
+        "operator_sequence_backend_connection_confirmation_step_index"
+    ] == WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    assert artifact[
+        "operator_sequence_backend_connection_confirmation_before_capture"
+    ] is True
+    assert artifact["operator_sequence_capture_readonly_preflight_step_index"] == 4
     assert artifact["backend_port_prestart_gate"] == artifact[
         "expected_backend_port_prestart_gate"
     ]
@@ -10681,6 +10865,29 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         markdown_summary
     )
     assert "backend_port_prestart_check_operator_sequence_step_is_first: `true`" in (
+        markdown_summary
+    )
+    assert (
+        "operator_sequence_has_backend_connection_confirmation: `true`"
+        in markdown_summary
+    )
+    assert "backend_connection_confirmation_step_index: `2`" in markdown_summary
+    assert (
+        "expected_backend_connection_confirmation_step_index: `2`"
+        in markdown_summary
+    )
+    assert WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP in (
+        markdown_summary
+    )
+    assert (
+        "operator_sequence_backend_connection_confirmation_step_index: `2`"
+        in markdown_summary
+    )
+    assert (
+        "operator_sequence_backend_connection_confirmation_before_capture: `true`"
+        in markdown_summary
+    )
+    assert "operator_sequence_capture_readonly_preflight_step_index: `4`" in (
         markdown_summary
     )
     assert "backend_port_prestart_gate" in markdown_summary

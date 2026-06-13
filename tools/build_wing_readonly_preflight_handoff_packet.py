@@ -18,6 +18,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
@@ -306,6 +308,10 @@ def build_handoff_packet(
     supervised_gate_step = WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP
     prestart_step_index = WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX
     prestart_step = WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP
+    backend_connection_step_index = (
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
+    backend_connection_step = WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
     mvp_blocker_anchor_digest_review_step = (
         "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
         "current first open blocker before supervised proof planning."
@@ -431,7 +437,7 @@ def build_handoff_packet(
         "operator_sequence": [
             prestart_step,
             "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
-            "Confirm backend is connected to the intended WING Rack and ready for read-only inspection.",
+            backend_connection_step,
             "Confirm the selected channel numbers are safe to inspect.",
             "Run capture_readonly_preflight.",
             "Run review_artifact_and_write_pending_decision_template.",
@@ -440,6 +446,7 @@ def build_handoff_packet(
             mvp_blocker_anchor_digest_review_step,
             supervised_gate_step,
         ],
+        "backend_connection_confirmation_step_index": backend_connection_step_index,
         "backend_port_prestart_gate": dict(expected_prestart_gate),
         "expected_backend_port_prestart_gate": dict(expected_prestart_gate),
         "supervised_prestart_gate": dict(expected_supervised_gate),

@@ -224,30 +224,38 @@ blockers выше.
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
-45. verify `expected_artifacts` exactly matches `expected_artifact_globs` and
+45. verify `backend_connection_confirmation_step_index: 2`,
+   `operator_sequence_has_backend_connection_confirmation: true`,
+   `operator_sequence_backend_connection_confirmation_step_index: 2`,
+   `operator_sequence_backend_connection_confirmation_before_capture: true`,
+   `operator_sequence_backend_connection_confirmation_step` includes
+   `existing backend connection`, `intended WING Rack`, and
+   `read-only inspection`, and
+   `operator_sequence_capture_readonly_preflight_step_index: 4`;
+46. verify `expected_artifacts` exactly matches `expected_artifact_globs` and
    `plan_expected_artifacts`, and verify
    `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`,
    and `event_log_glob_matches_plan: true`;
-46. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+47. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-47. verify `supervised_prestart_gate.grants_live_authority: false`;
-48. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
+48. verify `supervised_prestart_gate.grants_live_authority: false`;
+49. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
-49. verify `supervised_prestart_gate.requires_operator_decision_status:
+50. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
-50. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-51. verify `operator_sequence_count: 10`;
-52. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-53. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+51. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+52. verify `operator_sequence_count: 10`;
+53. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+54. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-54. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-55. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+55. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+56. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-56. verify `required_supervised_prestart_gate_markers` exactly lists
+57. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
@@ -432,6 +440,15 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `prestart_backend_port_check` and `unexpected listeners`,
   `backend_port_prestart_check_must_be_first_operator_step: true`, and
   `backend_port_prestart_check_operator_sequence_step_is_first: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_connection_confirmation_step_index: 2`,
+  `operator_sequence_has_backend_connection_confirmation: true`,
+  `operator_sequence_backend_connection_confirmation_step_index: 2`,
+  `operator_sequence_backend_connection_confirmation_before_capture: true`,
+  `operator_sequence_backend_connection_confirmation_step` including
+  `existing backend connection`, `intended WING Rack`, and
+  `read-only inspection`, and
+  `operator_sequence_capture_readonly_preflight_step_index: 4`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate` and

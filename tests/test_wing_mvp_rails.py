@@ -406,6 +406,32 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in rows[
         0
     ]["next action"]
+    assert (
+        "backend_connection_confirmation_step_index: 2"
+        in rows[0]["next action"]
+    )
+    assert (
+        "operator_sequence_has_backend_connection_confirmation: true"
+        in rows[0]["next action"]
+    )
+    assert (
+        "operator_sequence_backend_connection_confirmation_step_index: 2"
+        in rows[0]["next action"]
+    )
+    assert (
+        "operator_sequence_backend_connection_confirmation_before_capture: true"
+        in rows[0]["next action"]
+    )
+    assert "operator_sequence_backend_connection_confirmation_step" in rows[0][
+        "next action"
+    ]
+    assert "existing backend connection" in rows[0]["next action"]
+    assert "intended WING Rack" in rows[0]["next action"]
+    assert "read-only inspection" in rows[0]["next action"]
+    assert (
+        "operator_sequence_capture_readonly_preflight_step_index: 4"
+        in rows[0]["next action"]
+    )
     assert "mvp_blocker_anchor" in rows[0]["next action"]
     assert "mvp_blocker_anchor_matches_current_first_open: true" in rows[0][
         "next action"
@@ -523,6 +549,18 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "unexpected listeners" in readonly
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in readonly
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in readonly
+    assert "backend_connection_confirmation_step_index: 2" in readonly
+    assert "operator_sequence_has_backend_connection_confirmation: true" in readonly
+    assert "operator_sequence_backend_connection_confirmation_step_index: 2" in readonly
+    assert (
+        "operator_sequence_backend_connection_confirmation_before_capture: true"
+        in readonly
+    )
+    assert "operator_sequence_backend_connection_confirmation_step" in readonly
+    assert "existing backend connection" in readonly
+    assert "intended WING Rack" in readonly
+    assert "read-only inspection" in readonly
+    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in readonly
     assert "mvp_blocker_anchor" in readonly
     assert "mvp_blocker_anchor_matches_current_first_open: true" in readonly
     assert "mvp_blocker_anchor_sha256" in readonly
@@ -738,6 +776,18 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "backend_port_prestart_check_operator_sequence_step" in report
     assert "prestart_backend_port_check" in report
     assert "unexpected listeners" in report
+    assert "backend_connection_confirmation_step_index: 2" in report
+    assert "operator_sequence_has_backend_connection_confirmation: true" in report
+    assert "operator_sequence_backend_connection_confirmation_step_index: 2" in report
+    assert (
+        "operator_sequence_backend_connection_confirmation_before_capture: true"
+        in report
+    )
+    assert "operator_sequence_backend_connection_confirmation_step" in report
+    assert "existing backend connection" in report
+    assert "intended WING Rack" in report
+    assert "read-only inspection" in report
+    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in report
     assert (
         "backend_port_prestart_gate.operator_sequence_step_must_be_first: true"
         in report

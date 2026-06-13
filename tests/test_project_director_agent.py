@@ -216,6 +216,27 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in directive[
         "selected_action"
     ]
+    assert "backend_connection_confirmation_step_index: 2" in directive[
+        "selected_action"
+    ]
+    assert "operator_sequence_has_backend_connection_confirmation: true" in directive[
+        "selected_action"
+    ]
+    assert "operator_sequence_backend_connection_confirmation_step_index: 2" in directive[
+        "selected_action"
+    ]
+    assert "operator_sequence_backend_connection_confirmation_before_capture: true" in directive[
+        "selected_action"
+    ]
+    assert "operator_sequence_backend_connection_confirmation_step" in directive[
+        "selected_action"
+    ]
+    assert "existing backend connection" in directive["selected_action"]
+    assert "intended WING Rack" in directive["selected_action"]
+    assert "read-only inspection" in directive["selected_action"]
+    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in directive[
+        "selected_action"
+    ]
     assert "mvp_blocker_anchor" in directive["selected_action"]
     assert "mvp_blocker_anchor_matches_current_first_open: true" in directive[
         "selected_action"
@@ -528,6 +549,18 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "unexpected listeners" in prompt
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in prompt
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in prompt
+    assert "backend_connection_confirmation_step_index: 2" in prompt
+    assert "operator_sequence_has_backend_connection_confirmation: true" in prompt
+    assert "operator_sequence_backend_connection_confirmation_step_index: 2" in prompt
+    assert (
+        "operator_sequence_backend_connection_confirmation_before_capture: true"
+        in prompt
+    )
+    assert "operator_sequence_backend_connection_confirmation_step" in prompt
+    assert "existing backend connection" in prompt
+    assert "intended WING Rack" in prompt
+    assert "read-only inspection" in prompt
+    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in prompt
     assert "backend_port_prestart_gate" in readme
     assert "expected_backend_port_prestart_gate" in readme
     assert "backend_port_prestart_gate.grants_live_authority: false" in readme
@@ -606,6 +639,18 @@ def test_prompt_and_readme_document_project_director_agent():
         "backend_port_prestart_check_operator_sequence_step_is_first: true"
         in readme
     )
+    assert "backend_connection_confirmation_step_index: 2" in readme
+    assert "operator_sequence_has_backend_connection_confirmation: true" in readme
+    assert "operator_sequence_backend_connection_confirmation_step_index: 2" in readme
+    assert (
+        "operator_sequence_backend_connection_confirmation_before_capture: true"
+        in readme
+    )
+    assert "operator_sequence_backend_connection_confirmation_step" in readme
+    assert "existing backend connection" in readme
+    assert "intended WING Rack" in readme
+    assert "read-only inspection" in readme
+    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in readme
     assert "supervised_prestart_gate" in prompt
     assert "expected_supervised_prestart_gate" in prompt
     assert "supervised_prestart_gate.grants_live_authority: false" in prompt

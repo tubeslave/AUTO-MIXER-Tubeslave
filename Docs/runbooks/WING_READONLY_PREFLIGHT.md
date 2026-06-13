@@ -491,6 +491,14 @@ The handoff validation must report:
 - `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
   `current first open blocker`
+- `backend_connection_confirmation_step_index: 2`
+- `operator_sequence_has_backend_connection_confirmation: true`
+- `operator_sequence_backend_connection_confirmation_step_index: 2`
+- `operator_sequence_backend_connection_confirmation_before_capture: true`
+- `operator_sequence_backend_connection_confirmation_step` includes
+  `existing backend connection`, `intended WING Rack`, and
+  `read-only inspection`
+- `operator_sequence_capture_readonly_preflight_step_index: 4`
 - the final handoff operator-sequence step contains the supervised prestart gate
 - `operator_sequence_has_supervised_prestart_gate: true`
 - `operator_sequence_supervised_prestart_gate_is_final: true`

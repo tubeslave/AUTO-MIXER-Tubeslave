@@ -7,6 +7,9 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
+    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
@@ -78,6 +81,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     assert packet["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert packet["backend_port_prestart_check_must_be_first_operator_step"] is True
+    assert packet["backend_connection_confirmation_step_index"] == (
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
     assert packet["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )
@@ -234,6 +240,17 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "mvp_blocker_anchor_sha256" in anchor_digest_review_step
     assert "current first open blocker" in anchor_digest_review_step
     assert "supervised proof planning" in anchor_digest_review_step
+    backend_connection_step = packet["operator_sequence"][
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    ]
+    assert backend_connection_step == (
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+    )
+    for marker in WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS:
+        assert marker in backend_connection_step
+    assert packet["operator_sequence"].index(backend_connection_step) < packet[
+        "operator_sequence"
+    ].index("Run capture_readonly_preflight.")
     supervised_gate_step = packet["operator_sequence"][-1]
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step

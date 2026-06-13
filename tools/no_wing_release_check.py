@@ -481,6 +481,12 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME = (
     preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME
 )
+WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX = (
+    preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+)
+WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS = (
+    preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS
+)
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = (
@@ -5093,6 +5099,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_index_mismatch"
         )
+    backend_connection_confirmation_step_index = packet.get(
+        "backend_connection_confirmation_step_index"
+    )
+    if (
+        backend_connection_confirmation_step_index
+        != WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_declared_step_index_mismatch"
+        )
     if packet.get("backend_port_prestart_check_failure_detail_fields") != list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     ):
@@ -5222,6 +5238,60 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not backend_port_prestart_step_is_first:
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_step_not_first"
+        )
+    operator_sequence_backend_connection_confirmation_step_index = next(
+        (
+            index
+            for index, item in enumerate(operator_sequence)
+            if all(
+                marker in str(item)
+                for marker in (
+                    WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS
+                )
+            )
+        ),
+        None,
+    )
+    operator_sequence_backend_connection_confirmation_step = (
+        str(
+            operator_sequence[
+                operator_sequence_backend_connection_confirmation_step_index
+            ]
+        )
+        if operator_sequence_backend_connection_confirmation_step_index is not None
+        else ""
+    )
+    operator_sequence_has_backend_connection_confirmation = bool(
+        operator_sequence_backend_connection_confirmation_step
+    )
+    capture_step_index = next(
+        (
+            index
+            for index, item in enumerate(operator_sequence)
+            if "Run capture_readonly_preflight" in str(item)
+        ),
+        None,
+    )
+    operator_sequence_backend_connection_confirmation_before_capture = (
+        operator_sequence_backend_connection_confirmation_step_index is not None
+        and capture_step_index is not None
+        and operator_sequence_backend_connection_confirmation_step_index
+        < capture_step_index
+    )
+    if not operator_sequence_has_backend_connection_confirmation:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_missing"
+        )
+    elif (
+        operator_sequence_backend_connection_confirmation_step_index
+        != WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_index_mismatch"
+        )
+    if not operator_sequence_backend_connection_confirmation_before_capture:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_not_before_capture"
         )
     expected_backend_port_prestart_gate = (
         preflight_contract.expected_backend_port_prestart_gate(
@@ -5368,6 +5438,27 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_check_operator_sequence_step_is_first"] = (
         backend_port_prestart_step_is_first
+    )
+    detail["backend_connection_confirmation_step_index"] = (
+        backend_connection_confirmation_step_index
+    )
+    detail["expected_backend_connection_confirmation_step_index"] = (
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
+    )
+    detail["operator_sequence_has_backend_connection_confirmation"] = (
+        operator_sequence_has_backend_connection_confirmation
+    )
+    detail["operator_sequence_backend_connection_confirmation_step"] = (
+        operator_sequence_backend_connection_confirmation_step
+    )
+    detail["operator_sequence_backend_connection_confirmation_step_index"] = (
+        operator_sequence_backend_connection_confirmation_step_index
+    )
+    detail["operator_sequence_backend_connection_confirmation_before_capture"] = (
+        operator_sequence_backend_connection_confirmation_before_capture
+    )
+    detail["operator_sequence_capture_readonly_preflight_step_index"] = (
+        capture_step_index
     )
     detail["backend_port_prestart_gate"] = dict(backend_port_prestart_gate)
     detail["expected_backend_port_prestart_gate"] = dict(
@@ -12904,6 +12995,34 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 detail.get("backend_port_prestart_check_operator_sequence_step_is_first")
                 is True
             ),
+            "backend_connection_confirmation_step_index": (
+                detail.get("backend_connection_confirmation_step_index")
+            ),
+            "expected_backend_connection_confirmation_step_index": (
+                detail.get("expected_backend_connection_confirmation_step_index")
+            ),
+            "operator_sequence_has_backend_connection_confirmation": (
+                detail.get("operator_sequence_has_backend_connection_confirmation")
+                is True
+            ),
+            "operator_sequence_backend_connection_confirmation_step": str(
+                detail.get("operator_sequence_backend_connection_confirmation_step")
+                or ""
+            ),
+            "operator_sequence_backend_connection_confirmation_step_index": (
+                detail.get(
+                    "operator_sequence_backend_connection_confirmation_step_index"
+                )
+            ),
+            "operator_sequence_backend_connection_confirmation_before_capture": (
+                detail.get(
+                    "operator_sequence_backend_connection_confirmation_before_capture"
+                )
+                is True
+            ),
+            "operator_sequence_capture_readonly_preflight_step_index": (
+                detail.get("operator_sequence_capture_readonly_preflight_step_index")
+            ),
             "backend_port_prestart_gate": (
                 dict(backend_port_prestart_gate)
                 if isinstance(backend_port_prestart_gate, Mapping)
@@ -16703,6 +16822,20 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step']}`",
                 "- backend_port_prestart_check_operator_sequence_step_is_first: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step_is_first']).lower()}`",
+                "- backend_connection_confirmation_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_connection_confirmation_step_index']}`",
+                "- expected_backend_connection_confirmation_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_backend_connection_confirmation_step_index']}`",
+                "- operator_sequence_has_backend_connection_confirmation: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_has_backend_connection_confirmation']).lower()}`",
+                "- operator_sequence_backend_connection_confirmation_step: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_backend_connection_confirmation_step']}`",
+                "- operator_sequence_backend_connection_confirmation_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_backend_connection_confirmation_step_index']}`",
+                "- operator_sequence_backend_connection_confirmation_before_capture: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_backend_connection_confirmation_before_capture']).lower()}`",
+                "- operator_sequence_capture_readonly_preflight_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_capture_readonly_preflight_step_index']}`",
                 "- backend_port_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_gate'])}`",
                 "- expected_backend_port_prestart_gate: "

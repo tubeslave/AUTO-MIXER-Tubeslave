@@ -299,6 +299,16 @@ you want the background automation active.
   `backend_port_prestart_check_operator_sequence_step_is_first: true`.
   This proves the backend-port prestart check remains the first operator step
   before any intended backend/WING session.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_connection_confirmation_step_index: 2`,
+  `operator_sequence_has_backend_connection_confirmation: true`,
+  `operator_sequence_backend_connection_confirmation_step_index: 2`,
+  `operator_sequence_backend_connection_confirmation_before_capture: true`,
+  `operator_sequence_backend_connection_confirmation_step` including
+  `existing backend connection`, `intended WING Rack`, and
+  `read-only inspection`, and
+  `operator_sequence_capture_readonly_preflight_step_index: 4`. This proves
+  the intended backend/WING confirmation is explicit before capture starts.
 - Before any supervised fader/gain proof, the no-WING handoff summary must also
   show
   `supervised_prestart_gate` exactly matching

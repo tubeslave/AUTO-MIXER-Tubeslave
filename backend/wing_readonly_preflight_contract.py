@@ -164,6 +164,17 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
     "unexpected listeners",
 )
 
+WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX = 2
+WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP = (
+    "Confirm existing backend connection is the intended WING Rack and ready "
+    "for read-only inspection."
+)
+WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS = (
+    "existing backend connection",
+    "intended WING Rack",
+    "read-only inspection",
+)
+
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = 9
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
     "Only after accepted_decision_ready, a valid accepted-candidate "
