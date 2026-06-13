@@ -162,41 +162,43 @@ blockers выше.
 20. verify `expected_plan_required_for_real_run: true`;
 21. verify `physical_preflight_requires_existing_backend_connection: true`;
 22. verify `backend_port_prestart_check_required: true`;
-23. verify `execution_allowed_by_packet: false`;
-24. verify `live_authority_granted: false`;
-25. verify `full_autonomous_ready: false`;
-26. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
+23. verify
+   `backend_port_prestart_check_must_pass_before_starting_backend: true`;
+24. verify `execution_allowed_by_packet: false`;
+25. verify `live_authority_granted: false`;
+26. verify `full_autonomous_ready: false`;
+27. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
    `backend_port_prestart_check_operator_sequence_step` includes
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
-27. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
+28. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
    matching `expected_supervised_prestart_gate`;
-28. verify `supervised_prestart_gate.grants_live_authority: false`;
-29. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
+29. verify `supervised_prestart_gate.grants_live_authority: false`;
+30. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
-30. verify `supervised_prestart_gate.requires_operator_decision_status:
+31. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
-31. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-32. verify `operator_sequence_count: 10`;
-33. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-34. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+32. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
+33. verify `operator_sequence_count: 10`;
+34. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+35. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-35. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-36. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+36. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+37. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-37. verify `required_supervised_prestart_gate_markers` exactly lists
+38. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-38. run dry-run recommendation;
-39. require explicit operator approval for the exact action;
-40. apply only bounded supervised fader/gain action;
-41. read back the result;
-42. test rollback;
-43. record proof artifact.
+39. run dry-run recommendation;
+40. require explicit operator approval for the exact action;
+41. apply only bounded supervised fader/gain action;
+42. read back the result;
+43. test rollback;
+44. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -295,6 +297,8 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `physical_preflight_requires_existing_backend_connection: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_required: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `execution_allowed_by_packet: false`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

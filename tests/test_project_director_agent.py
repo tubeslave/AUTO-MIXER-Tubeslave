@@ -94,6 +94,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_check_required: true" in directive[
         "selected_action"
     ]
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
+        in directive["selected_action"]
+    )
     assert "execution_allowed_by_packet: false" in directive["selected_action"]
     assert "live_authority_granted: false" in directive["selected_action"]
     assert "full_autonomous_ready: false" in directive["selected_action"]
@@ -308,6 +312,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "expected_plan_required_for_real_run: true" in prompt
     assert "physical_preflight_requires_existing_backend_connection: true" in prompt
     assert "backend_port_prestart_check_required: true" in prompt
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
+        in prompt
+    )
     assert "execution_allowed_by_packet: false" in prompt
     assert "live_authority_granted: false" in prompt
     assert "full_autonomous_ready: false" in prompt
@@ -350,6 +358,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "expected_plan_required_for_real_run: true" in readme
     assert "physical_preflight_requires_existing_backend_connection: true" in readme
     assert "backend_port_prestart_check_required: true" in readme
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
+        in readme
+    )
     assert "execution_allowed_by_packet: false" in readme
     assert "live_authority_granted: false" in readme
     assert "full_autonomous_ready: false" in readme

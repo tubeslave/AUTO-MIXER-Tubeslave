@@ -66,6 +66,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "expected_plan_required_for_real_run: true" in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
     assert "execution_allowed_by_packet: false" in text
     assert "live_authority_granted: false" in text
     assert "full_autonomous_ready: false" in text
@@ -164,6 +165,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["next action"]
     )
     assert "backend_port_prestart_check_required: true" in rows[0]["next action"]
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
+        in rows[0]["next action"]
+    )
     assert "execution_allowed_by_packet: false" in rows[0]["next action"]
     assert "live_authority_granted: false" in rows[0]["next action"]
     assert "full_autonomous_ready: false" in rows[0]["next action"]
@@ -340,6 +345,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "expected_plan_required_for_real_run: true" in readonly
     assert "physical_preflight_requires_existing_backend_connection: true" in readonly
     assert "backend_port_prestart_check_required: true" in readonly
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
+        in readonly
+    )
     assert "execution_allowed_by_packet: false" in readonly
     assert "live_authority_granted: false" in readonly
     assert "full_autonomous_ready: false" in readonly
@@ -409,6 +418,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "expected_plan_required_for_real_run: true" in report
     assert "physical_preflight_requires_existing_backend_connection: true" in report
     assert "backend_port_prestart_check_required: true" in report
+    assert (
+        "backend_port_prestart_check_must_pass_before_starting_backend: true"
+        in report
+    )
     assert "execution_allowed_by_packet: false" in report
     assert "live_authority_granted: false" in report
     assert "full_autonomous_ready: false" in report
@@ -522,6 +535,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "expected_plan_required_for_real_run: true" in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
+    assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
     assert "execution_allowed_by_packet: false" in text
     assert "live_authority_granted: false" in text
     assert "full_autonomous_ready: false" in text
