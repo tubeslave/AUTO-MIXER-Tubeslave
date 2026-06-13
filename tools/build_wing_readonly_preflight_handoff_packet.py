@@ -27,6 +27,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
+    WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
@@ -39,12 +41,12 @@ DEFAULT_URL = "ws://localhost:8765"
 DEFAULT_CHANNELS = "3"
 DEFAULT_VALUE_TYPES = "fader,gain,pan"
 DEFAULT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
-DEFAULT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
+DEFAULT_REVIEW_OUTPUT = WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
 DEFAULT_DECISION_TEMPLATE_OUTPUT = (
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
 )
 DEFAULT_DECISION_ROOT = WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
-DEFAULT_DECISION_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+DEFAULT_DECISION_REVIEW_OUTPUT = WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
 DEFAULT_PACKET_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
 DEFAULT_PLAN_OUTPUT = "artifacts/wing_readonly_preflight_plan/latest_plan.json"
 DEFAULT_PRESTART_SUMMARY = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
@@ -329,7 +331,14 @@ def build_handoff_packet(
             == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
         ),
         "review_output": review_output,
+        "review_output_matches_contract": (
+            review_output == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+        ),
         "decision_review_output": decision_review_output,
+        "decision_review_output_matches_contract": (
+            decision_review_output
+            == WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+        ),
         "commands": {
             "preview_readonly_request_plan": preview,
             "capture_readonly_preflight": capture,
@@ -524,7 +533,11 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             "- pending decision template matches contract: "
             f"`{str(packet['decision_template_output_matches_contract']).lower()}`",
             f"- artifact review report: `{packet['review_output']}`",
+            "- artifact review report matches contract: "
+            f"`{str(packet['review_output_matches_contract']).lower()}`",
             f"- decision review report: `{packet['decision_review_output']}`",
+            "- decision review report matches contract: "
+            f"`{str(packet['decision_review_output_matches_contract']).lower()}`",
         ]
     )
     blocker_anchor = (

@@ -15,8 +15,10 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+    WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
@@ -221,8 +223,14 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "--decision-root",
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
         "--output",
-        "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
     ]
+    assert packet["review_output"] == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+    assert packet["review_output_matches_contract"] is True
+    assert packet["decision_review_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+    )
+    assert packet["decision_review_output_matches_contract"] is True
     assert "confirm_no_live_authority" in packet["required_review_checklist_ids"]
     assert "confirm_operator_session_ready" in packet["required_review_checklist_ids"]
     assert packet["required_review_checklist_ids"] == list(
@@ -376,6 +384,8 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "actual_matches_expected: `true`" in markdown
     assert "pending_review_decision_template.json" in markdown
     assert "pending decision template matches contract: `true`" in markdown
+    assert "artifact review report matches contract: `true`" in markdown
+    assert "decision review report matches contract: `true`" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "full_autonomous_ready: `false`" in markdown
     assert (

@@ -415,7 +415,9 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME = (
 )
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
-WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
+WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = (
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+)
 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT = (
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
 )
@@ -426,7 +428,7 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT = (
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
 )
 WING_READONLY_PREFLIGHT_REVIEW_DECISION_OUTPUT = (
-    "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
 )
 WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL = (
     "tools/build_wing_readonly_preflight_handoff_packet.py"
@@ -4325,6 +4327,43 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         bool(review_command_decision_template_output)
         and review_command_decision_template_output == review_decision_template_output
     )
+    review_output = (
+        str(packet.get("review_output"))
+        if isinstance(packet.get("review_output"), str)
+        else None
+    )
+    review_output_matches_contract = (
+        review_output == WING_READONLY_PREFLIGHT_REVIEW_OUTPUT
+    )
+    declared_review_output_matches_contract = (
+        packet.get("review_output_matches_contract") is True
+    )
+    review_command_output = command_value_after_flag(
+        commands.get("review_artifact_and_write_pending_decision_template", []),
+        "--output",
+    )
+    review_command_output_matches_packet = (
+        bool(review_command_output) and review_command_output == review_output
+    )
+    decision_review_output = (
+        str(packet.get("decision_review_output"))
+        if isinstance(packet.get("decision_review_output"), str)
+        else None
+    )
+    decision_review_output_matches_contract = (
+        decision_review_output == WING_READONLY_PREFLIGHT_REVIEW_DECISION_OUTPUT
+    )
+    declared_decision_review_output_matches_contract = (
+        packet.get("decision_review_output_matches_contract") is True
+    )
+    decision_review_command_output = command_value_after_flag(
+        commands.get("review_edited_decision_json", []),
+        "--output",
+    )
+    decision_review_command_output_matches_packet = (
+        bool(decision_review_command_output)
+        and decision_review_command_output == decision_review_output
+    )
     blockers = (
         packet.get("blockers_not_closed_by_packet")
         if isinstance(packet.get("blockers_not_closed_by_packet"), list)
@@ -4521,6 +4560,30 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not review_command_decision_template_output_matches_packet:
         violations.append(
             "wing_readonly_preflight_handoff_packet_decision_template_output_command_mismatch"
+        )
+    if not review_output_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_review_output_mismatch"
+        )
+    if not declared_review_output_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_review_output_contract_flag_mismatch"
+        )
+    if not review_command_output_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_review_output_command_mismatch"
+        )
+    if not decision_review_output_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_review_output_mismatch"
+        )
+    if not declared_decision_review_output_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_review_output_contract_flag_mismatch"
+        )
+    if not decision_review_command_output_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_decision_review_output_command_mismatch"
         )
 
     if required_checklist != list(WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS):
@@ -4767,6 +4830,22 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["review_command_decision_template_output_matches_packet"] = (
         review_command_decision_template_output_matches_packet
+    )
+    detail["review_output"] = review_output
+    detail["review_output_matches_contract"] = review_output_matches_contract
+    detail["review_output_contract_flag"] = declared_review_output_matches_contract
+    detail["review_command_output"] = review_command_output
+    detail["review_command_output_matches_packet"] = review_command_output_matches_packet
+    detail["decision_review_output"] = decision_review_output
+    detail["decision_review_output_matches_contract"] = (
+        decision_review_output_matches_contract
+    )
+    detail["decision_review_output_contract_flag"] = (
+        declared_decision_review_output_matches_contract
+    )
+    detail["decision_review_command_output"] = decision_review_command_output
+    detail["decision_review_command_output_matches_packet"] = (
+        decision_review_command_output_matches_packet
     )
     detail["required_review_checklist_ids"] = list(required_checklist)
     detail["forbidden_live_request_types"] = list(forbidden_request_types)
@@ -12072,6 +12151,30 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 detail.get("review_command_decision_template_output_matches_packet")
                 is True
             ),
+            "review_output": detail.get("review_output"),
+            "review_output_matches_contract": (
+                detail.get("review_output_matches_contract") is True
+            ),
+            "review_output_contract_flag": (
+                detail.get("review_output_contract_flag") is True
+            ),
+            "review_command_output": detail.get("review_command_output"),
+            "review_command_output_matches_packet": (
+                detail.get("review_command_output_matches_packet") is True
+            ),
+            "decision_review_output": detail.get("decision_review_output"),
+            "decision_review_output_matches_contract": (
+                detail.get("decision_review_output_matches_contract") is True
+            ),
+            "decision_review_output_contract_flag": (
+                detail.get("decision_review_output_contract_flag") is True
+            ),
+            "decision_review_command_output": detail.get(
+                "decision_review_command_output"
+            ),
+            "decision_review_command_output_matches_packet": (
+                detail.get("decision_review_command_output_matches_packet") is True
+            ),
             "required_review_checklist_ids": (
                 list(checklist_ids) if isinstance(checklist_ids, list) else []
             ),
@@ -15466,6 +15569,26 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['review_command_decision_template_output']}`",
                 "- review_command_decision_template_output_matches_packet: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_decision_template_output_matches_packet']).lower()}`",
+                "- review_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['review_output']}`",
+                "- review_output_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_output_matches_contract']).lower()}`",
+                "- review_output_contract_flag: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_output_contract_flag']).lower()}`",
+                "- review_command_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['review_command_output']}`",
+                "- review_command_output_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_output_matches_packet']).lower()}`",
+                "- decision_review_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['decision_review_output']}`",
+                "- decision_review_output_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['decision_review_output_matches_contract']).lower()}`",
+                "- decision_review_output_contract_flag: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['decision_review_output_contract_flag']).lower()}`",
+                "- decision_review_command_output: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['decision_review_command_output']}`",
+                "- decision_review_command_output_matches_packet: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['decision_review_command_output_matches_packet']).lower()}`",
                 "- blockers_not_closed_by_packet: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['blockers_not_closed_by_packet'])}`",
                 "- mvp_blocker_anchor_matches_current_first_open: "

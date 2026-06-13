@@ -18,10 +18,12 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+    WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -245,6 +247,14 @@ def test_wing_readonly_review_decision_template_contract_uses_shared_constants()
     assert (
         release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
         == WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REVIEW_OUTPUT
+        == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+    )
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_OUTPUT
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
     )
     assert "review_id" in (
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
@@ -783,7 +793,7 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "--artifact-root",
         "artifacts/wing_readonly_preflight",
         "--output",
-        "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+        WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
         "--decision-template-output",
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     ]
@@ -1087,10 +1097,10 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
         ),
         "decision_template_output_matches_contract": True,
-        "review_output": "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
-        "decision_review_output": (
-            "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
-        ),
+        "review_output": WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
+        "review_output_matches_contract": True,
+        "decision_review_output": WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
+        "decision_review_output_matches_contract": True,
         "commands": {
             "prestart_backend_port_check": [
                 "PYTHONPATH=backend",
@@ -1145,7 +1155,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
                 "--output",
-                "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+                WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
                 "--decision-template-output",
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
             ],
@@ -1157,7 +1167,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--decision-root",
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
                 "--output",
-                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
             ],
             "focused_validation": [
                 "PYTHONPATH=backend",
@@ -2714,6 +2724,20 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
     )
     assert result.detail["review_command_decision_template_output_matches_packet"] is True
+    assert result.detail["review_output"] == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+    assert result.detail["review_output_matches_contract"] is True
+    assert result.detail["review_output_contract_flag"] is True
+    assert result.detail["review_command_output"] == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+    assert result.detail["review_command_output_matches_packet"] is True
+    assert result.detail["decision_review_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+    )
+    assert result.detail["decision_review_output_matches_contract"] is True
+    assert result.detail["decision_review_output_contract_flag"] is True
+    assert result.detail["decision_review_command_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+    )
+    assert result.detail["decision_review_command_output_matches_packet"] is True
     assert "prestart_backend_port_check" in result.detail["command_names"]
     assert "preview_readonly_request_plan" in result.detail["command_names"]
     assert "confirm_no_live_authority" in result.detail[
@@ -2911,6 +2935,68 @@ def test_no_wing_release_check_rejects_handoff_packet_decision_template_output_m
     )
     assert (
         "wing_readonly_preflight_handoff_packet_decision_template_output_command_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_review_output_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-review-output-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    stale_review_output = "Docs/reports/STALE_WING_READONLY_PREFLIGHT_REVIEW.md"
+    stale_decision_output = "Docs/reports/STALE_WING_READONLY_DECISION_REVIEW.md"
+    payload["review_output"] = stale_review_output
+    payload["review_output_matches_contract"] = False
+    payload["decision_review_output"] = stale_decision_output
+    payload["decision_review_output_matches_contract"] = False
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["review_output"] == stale_review_output
+    assert result.detail["review_output_matches_contract"] is False
+    assert result.detail["review_output_contract_flag"] is False
+    assert result.detail["review_command_output"] == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+    assert result.detail["review_command_output_matches_packet"] is False
+    assert result.detail["decision_review_output"] == stale_decision_output
+    assert result.detail["decision_review_output_matches_contract"] is False
+    assert result.detail["decision_review_output_contract_flag"] is False
+    assert result.detail["decision_review_command_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+    )
+    assert result.detail["decision_review_command_output_matches_packet"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_review_output_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_review_output_contract_flag_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_review_output_command_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_decision_review_output_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_decision_review_output_contract_flag_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_decision_review_output_command_mismatch"
         in result.detail["violations"]
     )
 
@@ -3505,7 +3591,7 @@ def test_no_wing_release_check_rejects_review_command_without_decision_template_
             "--artifact-root",
             "artifacts/wing_readonly_preflight",
             "--output",
-            "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+            WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
         ],
     )
 
@@ -3762,7 +3848,7 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         "--decision-root",
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
         "--output",
-        "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
     ]
     assert result.detail["review_exit_codes"] == {
         "accepted_decision_ready": 0,
@@ -8492,7 +8578,7 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
                 "--output",
-                "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+                WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
                 "--decision-template-output",
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
             ],
@@ -9073,6 +9159,18 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
             ),
             "review_command_decision_template_output_matches_packet": True,
+            "review_output": WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
+            "review_output_matches_contract": True,
+            "review_output_contract_flag": True,
+            "review_command_output": WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
+            "review_command_output_matches_packet": True,
+            "decision_review_output": WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
+            "decision_review_output_matches_contract": True,
+            "decision_review_output_contract_flag": True,
+            "decision_review_command_output": (
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+            ),
+            "decision_review_command_output_matches_packet": True,
             "required_review_checklist_ids": ["confirm_no_live_authority"],
             "forbidden_live_request_types": ["apply_operator_proposal"],
             "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
@@ -9205,6 +9303,20 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
     )
     assert artifact["review_command_decision_template_output_matches_packet"] is True
+    assert artifact["review_output"] == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+    assert artifact["review_output_matches_contract"] is True
+    assert artifact["review_output_contract_flag"] is True
+    assert artifact["review_command_output"] == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
+    assert artifact["review_command_output_matches_packet"] is True
+    assert artifact["decision_review_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+    )
+    assert artifact["decision_review_output_matches_contract"] is True
+    assert artifact["decision_review_output_contract_flag"] is True
+    assert artifact["decision_review_command_output"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT
+    )
+    assert artifact["decision_review_command_output_matches_packet"] is True
     assert artifact["operator_sequence_count"] == 10
     assert artifact["operator_sequence_has_mvp_blocker_anchor_digest_review"] is True
     assert artifact["operator_sequence_mvp_blocker_anchor_digest_review_step"] == (
@@ -9264,6 +9376,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "review_command_decision_template_output_matches_packet: `true`" in (
         markdown_summary
     )
+    assert "review_output_matches_contract: `true`" in markdown_summary
+    assert "review_command_output_matches_packet: `true`" in markdown_summary
+    assert "decision_review_output_matches_contract: `true`" in markdown_summary
+    assert "decision_review_command_output_matches_packet: `true`" in markdown_summary
     assert "manual_review_required_before_readiness_update: `true`" in markdown_summary
     assert (
         "next_manual_artifact_required: "
@@ -9398,7 +9514,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
                 "--decision-root",
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
                 "--output",
-                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
             ],
             "review_exit_codes": {
                 "accepted_decision_ready": 0,
