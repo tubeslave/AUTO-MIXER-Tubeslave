@@ -13099,10 +13099,10 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         return {
             "status": result.status,
             "read_only": detail.get("read_only") is True,
-            "live_write": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "executes_tests": False,
+            "live_write": detail.get("live_write") is True,
+            "mutates_console_state": detail.get("mutates_console_state") is True,
+            "queries_console": detail.get("queries_console") is True,
+            "executes_tests": detail.get("executes_tests") is True,
             "operator_required": detail.get("operator_required") is True,
             "expected_plan_required_for_real_run": (
                 detail.get("expected_plan_required_for_real_run") is True
@@ -16892,6 +16892,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['read_only']).lower()}`",
                 "- live_write: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['live_write']).lower()}`",
+                "- mutates_console_state: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['mutates_console_state']).lower()}`",
                 "- queries_console: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['queries_console']).lower()}`",
                 "- executes_tests: "

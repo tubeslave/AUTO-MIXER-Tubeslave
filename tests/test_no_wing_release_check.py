@@ -4261,7 +4261,10 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     payload["readiness_matrix_update_allowed_by_packet"] = True
     payload["readiness_closure_allowed_by_packet"] = True
     payload["full_autonomous_ready"] = True
+    payload["live_write"] = True
+    payload["mutates_console_state"] = True
     payload["queries_console"] = True
+    payload["executes_tests"] = True
     payload["url"] = "ws://localhost:9999"
     payload["expected_plan_required_for_real_run"] = False
     payload["physical_preflight_requires_existing_backend_connection"] = False
@@ -4278,9 +4281,13 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     )
 
     assert result.status == "failed"
-    assert "wing_readonly_preflight_handoff_packet_queries_console_not_false" in result.detail[
-        "violations"
-    ]
+    for violation in (
+        "wing_readonly_preflight_handoff_packet_live_write_not_false",
+        "wing_readonly_preflight_handoff_packet_mutates_console_state_not_false",
+        "wing_readonly_preflight_handoff_packet_queries_console_not_false",
+        "wing_readonly_preflight_handoff_packet_executes_tests_not_false",
+    ):
+        assert violation in result.detail["violations"]
     assert "wing_readonly_preflight_handoff_packet_live_authority_granted_not_false" in result.detail[
         "violations"
     ]
@@ -4323,12 +4330,20 @@ def test_no_wing_release_check_rejects_unsafe_wing_preflight_handoff_packet_arti
     )
     summary = write_summary(tmp_path, [result], generated_at="2026-06-14T00:00:00Z")
     artifact = summary["wing_readonly_preflight_handoff_packet_artifact"]
+    assert artifact["live_write"] is True
+    assert artifact["mutates_console_state"] is True
+    assert artifact["queries_console"] is True
+    assert artifact["executes_tests"] is True
     assert artifact["execution_allowed_by_packet"] is True
     assert artifact["readiness_matrix_update_allowed_by_packet"] is True
     assert artifact["readiness_closure_allowed_by_packet"] is True
     assert artifact["live_authority_granted"] is True
     assert artifact["full_autonomous_ready"] is True
     markdown_summary = (tmp_path / "summary.md").read_text()
+    assert "live_write: `true`" in markdown_summary
+    assert "mutates_console_state: `true`" in markdown_summary
+    assert "queries_console: `true`" in markdown_summary
+    assert "executes_tests: `true`" in markdown_summary
     assert "execution_allowed_by_packet: `true`" in markdown_summary
     assert "readiness_matrix_update_allowed_by_packet: `true`" in markdown_summary
     assert "readiness_closure_allowed_by_packet: `true`" in markdown_summary

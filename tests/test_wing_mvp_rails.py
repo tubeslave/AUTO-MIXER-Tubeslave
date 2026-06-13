@@ -76,7 +76,9 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "readiness_matrix_update_allowed_by_packet: false" in text
     assert "readiness_closure_allowed_by_packet: false" in text
     assert "unsafe packet values" in text
+    assert "unsafe safety flags" in text
     assert "full_autonomous_ready" in text
+    assert "mutates_console_state" in text
     assert "read_only: true" in text
     assert "live_write: false" in text
     assert "mutates_console_state: false" in text
@@ -234,6 +236,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     )
     assert (
         "AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md"
+        in rows[0]["evidence"]
+    )
+    assert (
+        "AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md"
         in rows[0]["evidence"]
     )
     assert "accepted-candidate prestart trace" in rows[0]["next action"]
@@ -950,6 +956,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "readiness_closure_allowed_by_packet: false" in text
     assert "unsafe `true` values" in text
     assert "failed handoff is auditable" in text
+    assert "packet safety flags" in text
+    assert "mutates_console_state" in text
     assert "read_only: true" in text
     assert "live_write: false" in text
     assert "mutates_console_state: false" in text
@@ -1082,6 +1090,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md"
         in text
     )
     assert (

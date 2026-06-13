@@ -222,6 +222,9 @@ blockers выше.
    live-authority, or full-autonomous packet flags are `true`, verify the
    no-WING summary preserves those unsafe `true` values so the failed handoff is
    auditable;
+42b. if handoff validation fails because packet safety flags such as
+   `live_write`, `mutates_console_state`, `queries_console`, or `executes_tests`
+   are `true`, verify the no-WING summary preserves those unsafe `true` values;
 43. verify
    `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`;
 44. verify `backend_port_prestart_check_operator_sequence_step_index: 0`,
@@ -456,6 +459,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - If handoff validation fails because execution, readiness, live-authority, or
   full-autonomous packet flags are `true`, the no-WING summary must preserve
   those unsafe `true` values so the failed handoff is auditable.
+- If handoff validation fails because packet safety flags such as `live_write`,
+  `mutates_console_state`, `queries_console`, or `executes_tests` are `true`,
+  the no-WING summary must preserve those unsafe `true` values.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

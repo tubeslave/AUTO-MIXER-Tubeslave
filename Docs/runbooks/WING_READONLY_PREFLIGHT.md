@@ -461,6 +461,10 @@ The handoff validation must report:
 - If validation fails because a handoff packet set execution, readiness,
   live-authority, or full-autonomous flags to `true`, the no-WING summary must
   preserve those unsafe `true` values so the failed handoff is auditable.
+- If validation fails because a handoff packet set `live_write`,
+  `mutates_console_state`, `queries_console`, or `executes_tests` to `true`, the
+  no-WING summary must preserve those unsafe `true` values so the failed handoff
+  is auditable.
 - `read_only: true`
 - `live_write: false`
 - `mutates_console_state: false`

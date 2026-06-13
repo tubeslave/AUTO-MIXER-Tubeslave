@@ -199,6 +199,9 @@ Stop the current Codex work direction and return to the first open blocker if:
   `execution_allowed_by_packet`, `readiness_matrix_update_allowed_by_packet`,
   `readiness_closure_allowed_by_packet`, `live_authority_granted`, or
   `full_autonomous_ready` as `false` when the failed packet set them to `true`.
+- A failed no-WING handoff summary hides unsafe safety flags by rendering
+  `live_write`, `mutates_console_state`, `queries_console`, or `executes_tests`
+  as `false` when the failed packet set them to `true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `read_only: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
