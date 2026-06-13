@@ -203,6 +203,9 @@ you want the background automation active.
   `live_authority_granted: false`.
   This keeps the handoff packet from granting live console authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `full_autonomous_ready: false`.
+  This keeps the handoff packet from being treated as autonomous readiness.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_check_operator_sequence_step_index: 0`,
   `backend_port_prestart_check_operator_sequence_step` including
   `prestart_backend_port_check` and `unexpected listeners`,

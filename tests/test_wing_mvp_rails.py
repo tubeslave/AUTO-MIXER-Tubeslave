@@ -67,6 +67,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "execution_allowed_by_packet: false" in text
     assert "live_authority_granted: false" in text
+    assert "full_autonomous_ready: false" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text
     assert "unexpected listeners" in text
@@ -163,6 +164,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     )
     assert "execution_allowed_by_packet: false" in rows[0]["next action"]
     assert "live_authority_granted: false" in rows[0]["next action"]
+    assert "full_autonomous_ready: false" in rows[0]["next action"]
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in rows[0][
         "next action"
     ]
@@ -337,6 +339,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "physical_preflight_requires_existing_backend_connection: true" in readonly
     assert "execution_allowed_by_packet: false" in readonly
     assert "live_authority_granted: false" in readonly
+    assert "full_autonomous_ready: false" in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert "required_supervised_prestart_gate_markers" in readonly
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readonly
@@ -404,6 +407,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "physical_preflight_requires_existing_backend_connection: true" in report
     assert "execution_allowed_by_packet: false" in report
     assert "live_authority_granted: false" in report
+    assert "full_autonomous_ready: false" in report
     assert "backend_port_prestart_check_operator_sequence_step" in report
     assert "prestart_backend_port_check" in report
     assert "unexpected listeners" in report
@@ -515,6 +519,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "execution_allowed_by_packet: false" in text
     assert "live_authority_granted: false" in text
+    assert "full_autonomous_ready: false" in text
     assert "backend_port_prestart_check_operator_sequence_step" in text
     assert "prestart_backend_port_check" in text
     assert "unexpected listeners" in text
