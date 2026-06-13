@@ -12,6 +12,7 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
 )
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
 )
 from backend.wing_readonly_preflight_review_decision import (
@@ -28,6 +29,15 @@ def test_manual_review_checklist_ids_match_shared_contract():
     assert (
         REQUIRED_REVIEW_CHECKLIST_IDS
         == WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
+
+
+def test_review_decision_template_required_fields_match_shared_contract():
+    assert review_tool.REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert review_tool.review_decision_template_required_fields() == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
     )
 
 
@@ -332,20 +342,9 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert report["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
     assert report["request_id_correlation_required"] is True
     assert report["review_decision_template_available"] is True
-    assert report["review_decision_template_required_fields"] == [
-        "review_id",
-        "artifact_source_id",
-        "run_id",
-        "artifact_captured_at",
-        "summary_path",
-        "summary_sha256",
-        "events_path",
-        "events_sha256",
-        "decision",
-        "reviewed_by",
-        "reviewed_at",
-        "checklist_ids",
-    ]
+    assert report["review_decision_template_required_fields"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
     assert [row["id"] for row in report["manual_review_checklist"]] == [
         "confirm_artifact_paths",
         "confirm_operator_channel_scope",

@@ -17,6 +17,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
@@ -222,6 +223,19 @@ def test_wing_readonly_review_checklist_contract_uses_shared_constants():
     assert "confirm_artifact_paths" in WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
     assert "confirm_no_live_authority" in (
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
+    )
+
+
+def test_wing_readonly_review_decision_template_contract_uses_shared_constants():
+    assert (
+        release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert "review_id" in (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert "checklist_ids" in (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
     )
 
 
@@ -773,20 +787,9 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
         "confirm_no_live_authority",
     ]
     assert result.detail["review_manual_checklist_complete"] is True
-    assert result.detail["review_decision_template_required_fields"] == [
-        "review_id",
-        "artifact_source_id",
-        "run_id",
-        "artifact_captured_at",
-        "summary_path",
-        "summary_sha256",
-        "events_path",
-        "events_sha256",
-        "decision",
-        "reviewed_by",
-        "reviewed_at",
-        "checklist_ids",
-    ]
+    assert result.detail["review_decision_template_required_fields"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
     assert result.detail["review_decision_template_contract_complete"] is True
     assert result.detail["handoff_packet_tool_path"] == (
         "tools/build_wing_readonly_preflight_handoff_packet.py"
@@ -8537,20 +8540,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
         "confirm_no_live_authority",
     ]
     assert preflight["review_manual_checklist_complete"] is True
-    assert preflight["review_decision_template_required_fields"] == [
-        "review_id",
-        "artifact_source_id",
-        "run_id",
-        "artifact_captured_at",
-        "summary_path",
-        "summary_sha256",
-        "events_path",
-        "events_sha256",
-        "decision",
-        "reviewed_by",
-        "reviewed_at",
-        "checklist_ids",
-    ]
+    assert preflight["review_decision_template_required_fields"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
     assert preflight["review_decision_template_contract_complete"] is True
     assert preflight["handoff_packet_tool_path"] == (
         "tools/build_wing_readonly_preflight_handoff_packet.py"

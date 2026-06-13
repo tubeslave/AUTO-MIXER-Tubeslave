@@ -463,19 +463,8 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_EXIT_CODES = {
 WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = tuple(
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
 )
-WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
-    "review_id",
-    "artifact_source_id",
-    "run_id",
-    "artifact_captured_at",
-    "summary_path",
-    "summary_sha256",
-    "events_path",
-    "events_sha256",
-    "decision",
-    "reviewed_by",
-    "reviewed_at",
-    "checklist_ids",
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = tuple(
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
 )
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES = tuple(
     preflight_contract.WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES

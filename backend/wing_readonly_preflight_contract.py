@@ -28,6 +28,20 @@ WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_event_log_readonly_sequence",
     "confirm_no_live_authority",
 )
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
+    "review_id",
+    "artifact_source_id",
+    "run_id",
+    "artifact_captured_at",
+    "summary_path",
+    "summary_sha256",
+    "events_path",
+    "events_sha256",
+    "decision",
+    "reviewed_by",
+    "reviewed_at",
+    "checklist_ids",
+)
 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER = (
     "artifacts/no_wing_release_check/<run_id>/summary.json"
 )

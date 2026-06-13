@@ -22,6 +22,9 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
     REQUEST_ID_POLICY,
     build_wing_readonly_preflight_evidence,
 )
+from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
+)
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     REQUIRED_REVIEW_CHECKLIST_IDS,
     UNSAFE_DECISION_FLAGS,
@@ -36,19 +39,8 @@ DEFAULT_DECISION_TEMPLATE_OUTPUT = (
     / "pending_review_decision_template.json"
 )
 REVIEW_DECISION_TEMPLATE_STATUS = "operator_must_replace_placeholders_before_ledger_acceptance"
-REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
-    "review_id",
-    "artifact_source_id",
-    "run_id",
-    "artifact_captured_at",
-    "summary_path",
-    "summary_sha256",
-    "events_path",
-    "events_sha256",
-    "decision",
-    "reviewed_by",
-    "reviewed_at",
-    "checklist_ids",
+REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
 )
 MANUAL_REVIEW_CHECKLIST = (
     {
