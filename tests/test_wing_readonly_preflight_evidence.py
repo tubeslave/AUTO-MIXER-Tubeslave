@@ -13,6 +13,7 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
     EXPECTED_MODE_EVENT_TYPES,
     EXPECTED_READBACK_EVENT_TYPES,
+    EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     EXPECTED_SELECTED_MVP_BLOCKER,
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
     EXPECTED_STATE_EVENT_TYPES,
@@ -35,6 +36,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+    WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES,
     WING_READONLY_PREFLIGHT_READBACK_RESPONSE_TYPES,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
@@ -89,6 +91,11 @@ def test_preflight_evidence_uses_shared_allowed_request_types_contract():
 
 
 def test_preflight_evidence_uses_shared_response_type_contract():
+    contract_mapping = WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
+    assert EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE == {
+        request_type: set(response_types)
+        for request_type, response_types in contract_mapping.items()
+    }
     assert EXPECTED_MODE_EVENT_TYPES == set(
         WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES
     )

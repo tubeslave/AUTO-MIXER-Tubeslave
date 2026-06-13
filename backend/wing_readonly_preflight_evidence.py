@@ -29,15 +29,13 @@ try:
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         WING_READONLY_PREFLIGHT_PROOF_RUNNER,
-        WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES,
-        WING_READONLY_PREFLIGHT_READBACK_RESPONSE_TYPES,
+        WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
         WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
         WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
         WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
         WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
-        WING_READONLY_PREFLIGHT_STATE_RESPONSE_TYPES,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
 except ImportError:  # pragma: no cover - package import compatibility
@@ -55,15 +53,13 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         WING_READONLY_PREFLIGHT_PROOF_RUNNER,
-        WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES,
-        WING_READONLY_PREFLIGHT_READBACK_RESPONSE_TYPES,
+        WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
         WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
         WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON,
         WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS,
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
         WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
-        WING_READONLY_PREFLIGHT_STATE_RESPONSE_TYPES,
         WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     )
 
@@ -79,9 +75,20 @@ EVIDENCE_STATUSES = {
 }
 ALLOWED_SENT_REQUEST_TYPES = set(WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES)
 ALLOWED_VALUE_TYPES = set(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES)
-EXPECTED_MODE_EVENT_TYPES = set(WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES)
-EXPECTED_STATE_EVENT_TYPES = set(WING_READONLY_PREFLIGHT_STATE_RESPONSE_TYPES)
-EXPECTED_READBACK_EVENT_TYPES = set(WING_READONLY_PREFLIGHT_READBACK_RESPONSE_TYPES)
+_EXPECTED_RESPONSE_TYPES_CONTRACT = (
+    WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
+)
+EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE = {
+    request_type: set(response_types)
+    for request_type, response_types in _EXPECTED_RESPONSE_TYPES_CONTRACT.items()
+}
+EXPECTED_MODE_EVENT_TYPES = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE[
+    "get_operator_mode"
+]
+EXPECTED_STATE_EVENT_TYPES = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE["get_state"]
+EXPECTED_READBACK_EVENT_TYPES = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE[
+    "query_mixer_parameter"
+]
 LIVE_WRITE_REQUEST_TYPES = {
     "set_fader",
     "set_gain",
@@ -883,11 +890,6 @@ def _validate_event_log(
         if query_identity != readback_identity:
             violations.append(f"event_log_query_readback_identity_mismatch:{index}")
 
-    expected_recv_by_request_type = {
-        "get_operator_mode": EXPECTED_MODE_EVENT_TYPES,
-        "get_state": EXPECTED_STATE_EVENT_TYPES,
-        "query_mixer_parameter": EXPECTED_READBACK_EVENT_TYPES,
-    }
     for index in range(0, len(events), 2):
         if index + 1 >= len(events):
             break
@@ -895,7 +897,10 @@ def _validate_event_log(
         response = _event_payload(events[index + 1])
         request_type = str(request.get("type") or "")
         response_type = str(response.get("type") or "")
-        expected_response_types = expected_recv_by_request_type.get(request_type, set())
+        expected_response_types = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.get(
+            request_type,
+            set(),
+        )
         if response_type not in expected_response_types:
             violations.append(f"event_log_response_type_mismatch:{index // 2}")
 

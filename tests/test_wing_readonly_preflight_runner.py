@@ -21,6 +21,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+    WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES,
     WING_READONLY_PREFLIGHT_READBACK_RESPONSE_TYPES,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
@@ -104,6 +105,11 @@ def test_runner_uses_shared_allowed_request_types_contract() -> None:
 
 
 def test_runner_uses_shared_response_type_contract() -> None:
+    contract_mapping = WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
+    assert runner.EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE == {
+        request_type: set(response_types)
+        for request_type, response_types in contract_mapping.items()
+    }
     assert runner.EXPECTED_MODE_EVENTS == set(
         WING_READONLY_PREFLIGHT_OPERATOR_MODE_RESPONSE_TYPES
     )
