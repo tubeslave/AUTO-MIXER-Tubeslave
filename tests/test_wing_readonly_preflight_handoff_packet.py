@@ -18,6 +18,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+    WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
@@ -105,6 +106,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
             WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
         )
     }
+    assert packet["fail_closed_conditions"] == list(
+        WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
+    )
     assert packet["commands"]["preview_readonly_request_plan"] == [
         "python3",
         "tools/wing_readonly_preflight_runner.py",
@@ -331,6 +335,15 @@ def test_handoff_packet_allowed_requests_match_shared_contract():
     assert handoff.REQUEST_ID_POLICY == packet["request_id_policy"]
 
 
+def test_handoff_packet_fail_closed_conditions_match_shared_contract():
+    packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
+
+    assert packet["fail_closed_conditions"] == list(
+        WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
+    )
+    assert handoff.FAIL_CLOSED_CONDITIONS == packet["fail_closed_conditions"]
+
+
 def test_handoff_packet_review_checklist_ids_match_shared_contract():
     packet = handoff.build_handoff_packet(generated_at="2026-06-07T00:00:00Z")
 
@@ -441,6 +454,10 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY in markdown
     assert "expected_response_types_by_request_type" in markdown
     assert "mixer_parameter_read_blocked" in markdown
+    assert "Fail-Closed Conditions" in markdown
+    assert "fail_closed_conditions" in markdown
+    assert "unexpected_response_type" in markdown
+    assert "manual_review_decision_missing_or_invalid" in markdown
     assert "Expected Supervised Prestart Gate" in markdown
     assert "actual_matches_expected: `true`" in markdown
     assert "pending_review_decision_template.json" in markdown
@@ -487,6 +504,9 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
             WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE.items()
         )
     }
+    assert payload["fail_closed_conditions"] == list(
+        WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS
+    )
     assert payload["next_manual_artifact_required"] == (
         WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
     )

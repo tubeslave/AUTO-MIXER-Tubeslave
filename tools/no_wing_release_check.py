@@ -4723,6 +4723,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     plan_allowed_request_types = plan_artifact_detail.get("allowed_request_types")
     plan_request_id_policy = plan_artifact_detail.get("request_id_policy")
+    plan_fail_closed_conditions = plan_artifact_detail.get("fail_closed_conditions")
     commands = packet.get("commands") if isinstance(packet.get("commands"), Mapping) else {}
     operator_sequence = (
         packet.get("operator_sequence")
@@ -4947,6 +4948,17 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if packet_response_types != plan_response_types:
         violations.append(
             "wing_readonly_preflight_handoff_packet_response_type_mapping_plan_mismatch"
+        )
+    packet_fail_closed_conditions = packet.get("fail_closed_conditions")
+    if packet_fail_closed_conditions != list(
+        WING_READONLY_PREFLIGHT_PLAN_REQUIRED_FAIL_CLOSED_CONDITIONS
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_fail_closed_conditions_mismatch"
+        )
+    if packet_fail_closed_conditions != plan_fail_closed_conditions:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_fail_closed_conditions_plan_mismatch"
         )
     if packet.get("expected_run_artifact_glob") != (
         f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT}/<run_id>/"
@@ -5312,6 +5324,11 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["plan_expected_response_types_by_request_type"] = plan_response_types
     detail["response_type_mapping_matches_plan"] = (
         packet.get("expected_response_types_by_request_type") == plan_response_types
+    )
+    detail["fail_closed_conditions"] = packet.get("fail_closed_conditions")
+    detail["plan_fail_closed_conditions"] = plan_fail_closed_conditions
+    detail["fail_closed_conditions_match_plan"] = (
+        packet.get("fail_closed_conditions") == plan_fail_closed_conditions
     )
     detail["command_names"] = sorted(commands)
     detail["preview_command_uses_plan_only"] = (
@@ -12822,6 +12839,19 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "response_type_mapping_matches_plan": (
                 detail.get("response_type_mapping_matches_plan") is True
             ),
+            "fail_closed_conditions": (
+                list(detail.get("fail_closed_conditions"))
+                if isinstance(detail.get("fail_closed_conditions"), list)
+                else []
+            ),
+            "plan_fail_closed_conditions": (
+                list(detail.get("plan_fail_closed_conditions"))
+                if isinstance(detail.get("plan_fail_closed_conditions"), list)
+                else []
+            ),
+            "fail_closed_conditions_match_plan": (
+                detail.get("fail_closed_conditions_match_plan") is True
+            ),
             "command_names": list(command_names) if isinstance(command_names, list) else [],
             "preview_command_uses_plan_only": (
                 detail.get("preview_command_uses_plan_only") is True
@@ -16352,6 +16382,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_expected_response_types_by_request_type'])}`",
                 "- response_type_mapping_matches_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['response_type_mapping_matches_plan']).lower()}`",
+                "- fail_closed_conditions: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['fail_closed_conditions'])}`",
+                "- plan_fail_closed_conditions: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_fail_closed_conditions'])}`",
+                "- fail_closed_conditions_match_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['fail_closed_conditions_match_plan']).lower()}`",
                 "- command_names: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['command_names'])}`",
                 "- preview_command_uses_plan_only: "

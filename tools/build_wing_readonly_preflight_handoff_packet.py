@@ -28,6 +28,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+    WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
     WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
@@ -82,6 +83,7 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_no_wing_release_check.py",
 ]
 REQUEST_ID_POLICY = WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
+FAIL_CLOSED_CONDITIONS = list(WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS)
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
@@ -339,6 +341,7 @@ def build_handoff_packet(
         "expected_response_types_by_request_type": dict(
             EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
         ),
+        "fail_closed_conditions": list(FAIL_CLOSED_CONDITIONS),
         "artifact_root": artifact_root,
         "decision_root": decision_root,
         "expected_run_artifact_glob": (
@@ -555,6 +558,11 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             f"- request_id_policy: `{packet['request_id_policy']}`",
             "- expected_response_types_by_request_type: "
             f"`{json.dumps(packet['expected_response_types_by_request_type'], sort_keys=True)}`",
+            "",
+            "## Fail-Closed Conditions",
+            "",
+            "- fail_closed_conditions: "
+            f"`{json.dumps(packet['fail_closed_conditions'])}`",
             "",
             "## Expected Artifacts",
             "",
