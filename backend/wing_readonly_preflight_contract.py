@@ -204,6 +204,13 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK = (
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS = (
     "accepted_decision_ready"
 )
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS = (
+    "readonly_preflight_review_decision_candidate_prestart_contract_valid",
+    "readonly_preflight_review_decision_candidate_prestart_source_ids",
+    "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source",
+    "readonly_preflight_review_decision_expected_candidate_prestart_source_ids",
+    "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source",
+)
 WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP = (
     "Run preview_readonly_request_plan and confirm the request sequence is read-only."
 )

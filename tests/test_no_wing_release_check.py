@@ -58,6 +58,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS,
     expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
 )
@@ -1512,6 +1513,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "requires_operator_decision_status": "accepted_decision_ready",
             "requires_accepted_candidate_prestart_trace": True,
         },
+        "required_supervised_proof_plan_summary_fields": list(
+            WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+        ),
         "required_review_checklist_ids": [
             "confirm_artifact_paths",
             "confirm_operator_channel_scope",
@@ -3396,6 +3400,18 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "expected-artifact-bound accepted source id",
         "WING_SUPERVISED_FADER_GAIN_PROOF",
     ]
+    assert result.detail["required_supervised_proof_plan_summary_fields"] == list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
+    assert result.detail[
+        "expected_required_supervised_proof_plan_summary_fields"
+    ] == list(WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS)
+    assert (
+        result.detail[
+            "required_supervised_proof_plan_summary_fields_match_contract"
+        ]
+        is True
+    )
     assert result.detail["violations"] == []
 
 
@@ -3426,6 +3442,45 @@ def test_no_wing_release_check_rejects_handoff_response_type_map_drift(
     )
     assert (
         "wing_readonly_preflight_handoff_packet_response_type_mapping_plan_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_without_required_supervised_proof_plan_summary_fields(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "stale-supervised-summary-fields-handoff.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["required_supervised_proof_plan_summary_fields"] = [
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+    ]
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["required_supervised_proof_plan_summary_fields"] == [
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+    ]
+    assert result.detail[
+        "expected_required_supervised_proof_plan_summary_fields"
+    ] == list(WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS)
+    assert (
+        result.detail[
+            "required_supervised_proof_plan_summary_fields_match_contract"
+        ]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_supervised_proof_plan_summary_fields_mismatch"
         in result.detail["violations"]
     )
 

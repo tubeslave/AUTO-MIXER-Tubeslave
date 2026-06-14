@@ -478,6 +478,9 @@ WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
 )
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS = list(
+    preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+)
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = (
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
 )
@@ -4833,6 +4836,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("expected_supervised_prestart_gate"), Mapping)
         else {}
     )
+    required_supervised_proof_plan_summary_fields = (
+        _string_list(packet.get("required_supervised_proof_plan_summary_fields"))
+    )
     mvp_blocker_anchor = (
         packet.get("mvp_blocker_anchor")
         if isinstance(packet.get("mvp_blocker_anchor"), Mapping)
@@ -5700,6 +5706,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             "wing_readonly_preflight_handoff_packet_expected_supervised_prestart_gate_contract_mismatch"
         )
     if (
+        required_supervised_proof_plan_summary_fields
+        != WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_supervised_proof_plan_summary_fields_mismatch"
+        )
+    if (
         packet.get("next_manual_artifact_required")
         != WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
     ):
@@ -6110,6 +6123,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["required_supervised_prestart_gate_markers"] = list(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
+    )
+    detail["required_supervised_proof_plan_summary_fields"] = list(
+        required_supervised_proof_plan_summary_fields
+    )
+    detail["expected_required_supervised_proof_plan_summary_fields"] = list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
+    detail["required_supervised_proof_plan_summary_fields_match_contract"] = (
+        required_supervised_proof_plan_summary_fields
+        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
     detail["mvp_blocker_anchor"] = dict(mvp_blocker_anchor)
     detail["expected_mvp_blocker_anchor"] = dict(expected_mvp_blocker_anchor)
@@ -13677,6 +13700,12 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         )
         supervised_prestart_gate = detail.get("supervised_prestart_gate")
         expected_supervised_prestart_gate = detail.get("expected_supervised_prestart_gate")
+        required_supervised_proof_plan_summary_fields = detail.get(
+            "required_supervised_proof_plan_summary_fields"
+        )
+        expected_required_supervised_proof_plan_summary_fields = detail.get(
+            "expected_required_supervised_proof_plan_summary_fields"
+        )
         mvp_blocker_anchor = detail.get("mvp_blocker_anchor")
         expected_mvp_blocker_anchor = detail.get("expected_mvp_blocker_anchor")
         return {
@@ -14272,6 +14301,25 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                     list,
                 )
                 else []
+            ),
+            "required_supervised_proof_plan_summary_fields": (
+                list(required_supervised_proof_plan_summary_fields)
+                if isinstance(required_supervised_proof_plan_summary_fields, list)
+                else []
+            ),
+            "expected_required_supervised_proof_plan_summary_fields": (
+                list(expected_required_supervised_proof_plan_summary_fields)
+                if isinstance(
+                    expected_required_supervised_proof_plan_summary_fields,
+                    list,
+                )
+                else []
+            ),
+            "required_supervised_proof_plan_summary_fields_match_contract": (
+                detail.get(
+                    "required_supervised_proof_plan_summary_fields_match_contract"
+                )
+                is True
             ),
             "supervised_prestart_gate": (
                 dict(supervised_prestart_gate)
@@ -18023,6 +18071,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_is_final']).lower()}`",
                 "- required_supervised_prestart_gate_markers: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_markers'])}`",
+                "- required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields'])}`",
+                "- expected_required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_required_supervised_proof_plan_summary_fields'])}`",
+                "- required_supervised_proof_plan_summary_fields_match_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields_match_contract']).lower()}`",
                 "- supervised_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate'])}`",
                 "- expected_supervised_prestart_gate: "

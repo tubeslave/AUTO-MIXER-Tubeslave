@@ -54,6 +54,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS,
     expected_backend_port_prestart_gate,
     expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
@@ -507,6 +508,9 @@ def build_handoff_packet(
         "expected_backend_port_prestart_gate": dict(expected_prestart_gate),
         "supervised_prestart_gate": dict(expected_supervised_gate),
         "expected_supervised_prestart_gate": dict(expected_supervised_gate),
+        "required_supervised_proof_plan_summary_fields": list(
+            WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+        ),
         "mvp_blocker_anchor_digest_review_step_index": (
             mvp_blocker_anchor_digest_review_step_index
         ),
@@ -673,6 +677,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 f"- grants_live_authority: `{str(supervised_gate.get('grants_live_authority')).lower()}`",
                 "- required_markers: "
                 f"`{json.dumps(supervised_gate.get('required_markers') or [])}`",
+                "- required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(packet.get('required_supervised_proof_plan_summary_fields') or [])}`",
             ]
         )
     if expected_supervised_gate:

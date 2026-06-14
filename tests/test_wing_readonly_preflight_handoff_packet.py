@@ -44,6 +44,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS,
     expected_backend_port_prestart_gate,
     expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
@@ -296,6 +297,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["expected_supervised_prestart_gate"] == packet[
         "supervised_prestart_gate"
     ]
+    assert packet["required_supervised_proof_plan_summary_fields"] == list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
     rendered = handoff.render_markdown(packet)
     assert "## Backend Port Prestart Gate" in rendered
     assert "## Expected Backend Port Prestart Gate" in rendered
@@ -326,6 +330,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "valid accepted-candidate prestart trace" in rendered
     assert "expected-artifact-bound accepted source id" in rendered
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rendered
+    assert "required_supervised_proof_plan_summary_fields" in rendered
+    assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in rendered
     assert (
         "next_manual_artifact_required: "
         f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
