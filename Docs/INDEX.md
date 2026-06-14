@@ -245,6 +245,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING backend-listener template authority summary fields | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_AUTHORITY_SUMMARY_FIELDS_20260613.md` |
 | Current WING backend prestart template failure detail fields | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_FAILURE_DETAIL_FIELDS_20260613.md` |
 | Current WING backend prestart template review fields | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md` |
+| Current WING backend-port local socket test helper | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PORT_LOCAL_SOCKET_TEST_HELPER_20260614.md` keeps no-WING backend-port listener tests meaningful in environments where local socket bind is unavailable. |
 | Current WING busy-port prestart detail fields summary | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md` |
 | Current WING busy-port prestart command summary | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_COMMAND_SUMMARY_20260613.md` |
 | Current WING busy-port prestart required flags summary | `Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md` |

@@ -62,6 +62,7 @@ from backend.wing_readonly_preflight_contract import (
     expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
 )
+
 from tools import no_wing_release_check as release_check
 from tools.no_wing_release_check import (
     CheckResult,
@@ -164,6 +165,16 @@ from tools.no_wing_release_check import (
     wing_readonly_preflight_prestart_summary_path_for_run,
     write_summary,
 )
+
+
+def bind_local_test_server_or_skip() -> socket.socket:
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        server.bind(("127.0.0.1", 0))
+    except PermissionError as exc:
+        server.close()
+        pytest.skip(f"local socket bind unavailable in this environment: {exc}")
+    return server
 
 GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
     "physical_pre_read",
@@ -16253,8 +16264,7 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
         "_listener_processes_for_port",
         lambda port: (listener_processes, None),
     )
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(("127.0.0.1", 0))
+    with bind_local_test_server_or_skip() as server:
         server.listen(1)
         port = server.getsockname()[1]
 
@@ -16333,8 +16343,7 @@ def test_backend_port_check_accepts_operator_confirmed_intended_listener(
         ),
         encoding="utf-8",
     )
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(("127.0.0.1", 0))
+    with bind_local_test_server_or_skip() as server:
         server.listen(1)
         port = server.getsockname()[1]
         payload = json.loads(confirmation_path.read_text(encoding="utf-8"))
@@ -16434,8 +16443,7 @@ def test_backend_listener_confirmation_template_stays_invalid_until_edited(
         generated_at="2026-06-13T10:30:00Z",
     )
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(("127.0.0.1", 0))
+    with bind_local_test_server_or_skip() as server:
         server.listen(1)
         port = server.getsockname()[1]
         payload = json.loads(confirmation_path.read_text(encoding="utf-8"))
@@ -16489,8 +16497,7 @@ def test_backend_listener_confirmation_rejects_partially_edited_template(
     payload["status"] = release_check.BACKEND_PORT_LISTENER_CONFIRMATION_ACCEPTED_STATUS
     payload["confirms_intended_backend"] = True
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(("127.0.0.1", 0))
+    with bind_local_test_server_or_skip() as server:
         server.listen(1)
         port = server.getsockname()[1]
         payload["port"] = port
@@ -16551,8 +16558,7 @@ def test_backend_listener_confirmation_accepts_fully_edited_template(
         }
     )
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(("127.0.0.1", 0))
+    with bind_local_test_server_or_skip() as server:
         server.listen(1)
         port = server.getsockname()[1]
         payload["port"] = port
@@ -16606,8 +16612,7 @@ def test_backend_port_check_rejects_mismatched_listener_confirmation(
         ),
         encoding="utf-8",
     )
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(("127.0.0.1", 0))
+    with bind_local_test_server_or_skip() as server:
         server.listen(1)
         port = server.getsockname()[1]
         payload = json.loads(confirmation_path.read_text(encoding="utf-8"))
@@ -16639,8 +16644,7 @@ def test_backend_port_check_records_listener_owner_probe_error(monkeypatch):
         "_listener_processes_for_port",
         lambda port: ([], "lsof_not_available"),
     )
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        server.bind(("127.0.0.1", 0))
+    with bind_local_test_server_or_skip() as server:
         server.listen(1)
         port = server.getsockname()[1]
 
