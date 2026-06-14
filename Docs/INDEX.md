@@ -258,6 +258,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING listener template acceptance status field | `Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_ACCEPTANCE_STATUS_FIELD_20260614.md` requires `listener_confirmation_template_acceptance_status` in backend-port prestart failure details. |
 | Current WING listener template path failure field | `Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_PATH_FAILURE_FIELD_20260614.md` requires `listener_confirmation_template_path` in backend-port prestart failure details. |
 | Current WING proof-plan prestart violations map summary | `Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PRESTART_VIOLATIONS_MAP_SUMMARY_20260614.md` requires the no-WING `next_wing_proof_plan` summary to expose the accepted-candidate prestart violations map. |
+| Current WING proof-plan preflight command bindings | `Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PREFLIGHT_COMMAND_BINDINGS_20260614.md` requires the supervised proof plan fallback read-only preflight step to bind `--prestart-summary` and `--expected-plan`. |
 | Current WING handoff denial flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING handoff safety flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING prestart summary contact boundary | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md` |

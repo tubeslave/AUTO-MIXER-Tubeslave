@@ -5,6 +5,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
@@ -22,6 +24,10 @@ PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT = (
 )
 PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+)
+READONLY_PREFLIGHT_EXPECTED_PLAN = WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+READONLY_PREFLIGHT_PRESTART_SUMMARY = (
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
 )
 GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
     "physical_pre_read",
@@ -51,6 +57,32 @@ def assert_prestart_check(summary: dict) -> None:
     assert (
         summary["readonly_preflight_prestart_check_failure_detail_fields"]
         == PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    assert summary["readonly_preflight_expected_plan_required_for_real_run"] is True
+    assert summary["readonly_preflight_prestart_summary_required"] is True
+    assert (
+        summary["readonly_preflight_command_expected_plan"]
+        == READONLY_PREFLIGHT_EXPECTED_PLAN
+    )
+    assert (
+        summary["readonly_preflight_command_prestart_summary"]
+        == READONLY_PREFLIGHT_PRESTART_SUMMARY
+    )
+
+
+def assert_readonly_preflight_command_bindings(step: dict) -> None:
+    command = step["command"]
+    assert step["expected_plan_required_for_real_run"] is True
+    assert step["prestart_summary_required"] is True
+    assert step["expected_plan"] == READONLY_PREFLIGHT_EXPECTED_PLAN
+    assert step["prestart_summary"] == READONLY_PREFLIGHT_PRESTART_SUMMARY
+    assert "--prestart-summary" in command
+    assert command[command.index("--prestart-summary") + 1] == (
+        READONLY_PREFLIGHT_PRESTART_SUMMARY
+    )
+    assert "--expected-plan" in command
+    assert command[command.index("--expected-plan") + 1] == (
+        READONLY_PREFLIGHT_EXPECTED_PLAN
     )
 
 
@@ -678,6 +710,7 @@ def test_plan_blocks_physical_proof_steps_until_readonly_preflight_candidate_exi
         "tools/wing_readonly_preflight_runner.py",
     ]
     assert "--require-physical-readback" in preflight_step["command"]
+    assert_readonly_preflight_command_bindings(preflight_step)
     assert "--execute" not in preflight_step["command"]
     assert "tools/wing_operator_proposal_validation_runner.py" not in preflight_step["command"]
     assert (
@@ -748,6 +781,7 @@ def test_plan_blocks_physical_proof_steps_for_mixed_preflight_artifacts():
     assert preflight_step["execution_allowed_by_plan"] is False
     assert "operator_must_replace_invalid_readonly_preflight_artifact" in preflight_step["abort_conditions"]
     assert "--require-physical-readback" in preflight_step["command"]
+    assert_readonly_preflight_command_bindings(preflight_step)
     assert "--execute" not in preflight_step["command"]
 
 

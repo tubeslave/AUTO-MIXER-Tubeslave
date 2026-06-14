@@ -8065,6 +8065,14 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "Manually review the read-only preflight candidate before updating readiness rows."
                 ],
                 "readonly_preflight_step_count": 0,
+                "readonly_preflight_expected_plan_required_for_real_run": True,
+                "readonly_preflight_prestart_summary_required": True,
+                "readonly_preflight_command_expected_plan": (
+                    WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+                ),
+                "readonly_preflight_command_prestart_summary": (
+                    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+                ),
                 "readonly_preflight_review_decision_required": True,
                 "readonly_preflight_review_decision_accepted": True,
                 "readonly_preflight_review_decision_status": "operator_review_decision_records_available",
@@ -8478,6 +8486,10 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
             "live_execution_required": False,
             "execution_allowed_by_plan": False,
             "operator_approval_required": True,
+            "expected_plan_required_for_real_run": True,
+            "prestart_summary_required": True,
+            "expected_plan": WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+            "prestart_summary": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
             "command": [
                 "python3",
                 "tools/wing_readonly_preflight_runner.py",
@@ -14908,6 +14920,14 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
             "readonly_preflight_step_count": 0,
+            "readonly_preflight_expected_plan_required_for_real_run": True,
+            "readonly_preflight_prestart_summary_required": True,
+            "readonly_preflight_command_expected_plan": (
+                WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+            ),
+            "readonly_preflight_command_prestart_summary": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+            ),
             "readonly_preflight_review_decision_required": True,
             "readonly_preflight_review_decision_accepted": True,
             "readonly_preflight_review_decision_status": "operator_review_decision_records_available",
@@ -14979,6 +14999,30 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         == list(WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS)
     )
     assert json_summary["next_wing_proof_plan"]["readonly_preflight_step_count"] == 0
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_expected_plan_required_for_real_run"
+        ]
+        is True
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_prestart_summary_required"
+        ]
+        is True
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_command_expected_plan"
+        ]
+        == WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_command_prestart_summary"
+        ]
+        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+    )
     assert (
         json_summary["next_wing_proof_plan"][
             "readonly_preflight_review_decision_required"
@@ -15058,6 +15102,15 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
     assert "readonly_preflight_step_count: `0`" in markdown_summary
+    assert (
+        "readonly_preflight_expected_plan_required_for_real_run: `true`"
+        in markdown_summary
+    )
+    assert "readonly_preflight_prestart_summary_required: `true`" in markdown_summary
+    assert "readonly_preflight_command_expected_plan" in markdown_summary
+    assert WING_READONLY_PREFLIGHT_PLAN_OUTPUT in markdown_summary
+    assert "readonly_preflight_command_prestart_summary" in markdown_summary
+    assert WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER in markdown_summary
     assert "readonly_preflight_review_decision_accepted: `true`" in markdown_summary
     assert (
         'readonly_preflight_review_decision_accepted_source_ids: '

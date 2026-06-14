@@ -11518,6 +11518,10 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_prestart_check_command_text = ""
     readonly_preflight_prestart_check_failure_detail_fields: list[str] = []
     readonly_preflight_step_count = 0
+    readonly_preflight_expected_plan_required_for_real_run = False
+    readonly_preflight_prestart_summary_required = False
+    readonly_preflight_command_expected_plan = ""
+    readonly_preflight_command_prestart_summary = ""
     readonly_preflight_review_decision_required = False
     readonly_preflight_review_decision_accepted = False
     readonly_preflight_review_decision_status: object = None
@@ -11628,6 +11632,18 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             else []
         )
         readonly_preflight_step_count = int(summary.get("readonly_preflight_step_count") or 0)
+        readonly_preflight_expected_plan_required_for_real_run = (
+            summary.get("readonly_preflight_expected_plan_required_for_real_run") is True
+        )
+        readonly_preflight_prestart_summary_required = (
+            summary.get("readonly_preflight_prestart_summary_required") is True
+        )
+        readonly_preflight_command_expected_plan = str(
+            summary.get("readonly_preflight_command_expected_plan") or ""
+        )
+        readonly_preflight_command_prestart_summary = str(
+            summary.get("readonly_preflight_command_prestart_summary") or ""
+        )
         readonly_preflight_review_decision_required = (
             summary.get("readonly_preflight_review_decision_required") is True
         )
@@ -11739,6 +11755,25 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             violations.append("next_wing_proof_plan_readonly_preflight_required_not_true")
         if not readonly_preflight_review_decision_required:
             violations.append("next_wing_proof_plan_review_decision_required_not_true")
+        if not readonly_preflight_expected_plan_required_for_real_run:
+            violations.append(
+                "next_wing_proof_plan_preflight_expected_plan_not_required"
+            )
+        if not readonly_preflight_prestart_summary_required:
+            violations.append(
+                "next_wing_proof_plan_preflight_prestart_summary_not_required"
+            )
+        if readonly_preflight_command_expected_plan != WING_READONLY_PREFLIGHT_PLAN_OUTPUT:
+            violations.append(
+                "next_wing_proof_plan_preflight_expected_plan_path_mismatch"
+            )
+        if (
+            readonly_preflight_command_prestart_summary
+            != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY
+        ):
+            violations.append(
+                "next_wing_proof_plan_preflight_prestart_summary_path_mismatch"
+            )
         if preflight:
             if readonly_preflight_evidence_status != preflight.get("evidence_status"):
                 violations.append("next_wing_proof_plan_preflight_status_mismatch")
@@ -11993,6 +12028,39 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 violations.append(f"next_wing_proof_plan_preflight_step_{index}_runner_missing")
             if "--require-physical-readback" not in command:
                 violations.append(f"next_wing_proof_plan_preflight_step_{index}_physical_flag_missing")
+            if step.get("expected_plan_required_for_real_run") is not True:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_expected_plan_not_required"
+                )
+            if step.get("prestart_summary_required") is not True:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_prestart_summary_not_required"
+                )
+            expected_plan = str(step.get("expected_plan") or "")
+            prestart_summary = str(step.get("prestart_summary") or "")
+            if expected_plan != readonly_preflight_command_expected_plan:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_expected_plan_mismatch"
+                )
+            if prestart_summary != readonly_preflight_command_prestart_summary:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_prestart_summary_mismatch"
+                )
+
+            def preflight_command_value(flag: str) -> str | None:
+                try:
+                    return command[command.index(flag) + 1]
+                except (ValueError, IndexError):
+                    return None
+
+            if preflight_command_value("--expected-plan") != expected_plan:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_expected_plan_flag_mismatch"
+                )
+            if preflight_command_value("--prestart-summary") != prestart_summary:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_prestart_summary_flag_mismatch"
+                )
             forbidden_tokens = (
                 "--execute",
                 "tools/wing_operator_proposal_validation_runner.py",
@@ -12114,6 +12182,18 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         readonly_preflight_prestart_check_failure_detail_fields
     )
     detail["readonly_preflight_step_count"] = readonly_preflight_step_count
+    detail["readonly_preflight_expected_plan_required_for_real_run"] = (
+        readonly_preflight_expected_plan_required_for_real_run
+    )
+    detail["readonly_preflight_prestart_summary_required"] = (
+        readonly_preflight_prestart_summary_required
+    )
+    detail["readonly_preflight_command_expected_plan"] = (
+        readonly_preflight_command_expected_plan
+    )
+    detail["readonly_preflight_command_prestart_summary"] = (
+        readonly_preflight_command_prestart_summary
+    )
     detail["readonly_preflight_review_decision_required"] = (
         readonly_preflight_review_decision_required
     )
@@ -16575,6 +16655,19 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_step_count": int(
                 detail.get("readonly_preflight_step_count") or 0
             ),
+            "readonly_preflight_expected_plan_required_for_real_run": (
+                detail.get("readonly_preflight_expected_plan_required_for_real_run")
+                is True
+            ),
+            "readonly_preflight_prestart_summary_required": (
+                detail.get("readonly_preflight_prestart_summary_required") is True
+            ),
+            "readonly_preflight_command_expected_plan": str(
+                detail.get("readonly_preflight_command_expected_plan") or ""
+            ),
+            "readonly_preflight_command_prestart_summary": str(
+                detail.get("readonly_preflight_command_prestart_summary") or ""
+            ),
             "readonly_preflight_review_decision_required": (
                 detail.get("readonly_preflight_review_decision_required") is True
             ),
@@ -19377,6 +19470,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(next_plan['readonly_preflight_prestart_check_failure_detail_fields'])}`",
                 "- readonly_preflight_step_count: "
                 f"`{next_plan['readonly_preflight_step_count']}`",
+                "- readonly_preflight_expected_plan_required_for_real_run: "
+                f"`{str(next_plan['readonly_preflight_expected_plan_required_for_real_run']).lower()}`",
+                "- readonly_preflight_prestart_summary_required: "
+                f"`{str(next_plan['readonly_preflight_prestart_summary_required']).lower()}`",
+                "- readonly_preflight_command_expected_plan: "
+                f"`{next_plan['readonly_preflight_command_expected_plan']}`",
+                "- readonly_preflight_command_prestart_summary: "
+                f"`{next_plan['readonly_preflight_command_prestart_summary']}`",
                 "- readonly_preflight_review_decision_required: "
                 f"`{str(next_plan['readonly_preflight_review_decision_required']).lower()}`",
                 "- readonly_preflight_review_decision_accepted: "

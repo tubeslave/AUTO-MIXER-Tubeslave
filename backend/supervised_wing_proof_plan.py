@@ -35,6 +35,8 @@ try:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
@@ -45,6 +47,8 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
@@ -78,6 +82,10 @@ DEFAULT_DELTA_DB_BY_VALUE_TYPE = {
 }
 DEFAULT_ARTIFACT_ROOT = "artifacts/wing_telemetry"
 DEFAULT_READONLY_PREFLIGHT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
+DEFAULT_READONLY_PREFLIGHT_EXPECTED_PLAN = WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+DEFAULT_READONLY_PREFLIGHT_PRESTART_SUMMARY = (
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+)
 DEFAULT_BACKEND_URL = "ws://localhost:8765"
 
 
@@ -127,6 +135,10 @@ class WingReadonlyPreflightPlanStep:
     execution_allowed_by_plan: bool
     operator_approval_required: bool
     read_only: bool
+    expected_plan_required_for_real_run: bool
+    prestart_summary_required: bool
+    expected_plan: str
+    prestart_summary: str
     command: Tuple[str, ...]
     rationale: str
     prerequisites: Tuple[str, ...]
@@ -140,6 +152,15 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError("The proof plan must not authorize read-only preflight execution")
         if not self.operator_approval_required:
             raise ValueError("Read-only WING preflight still requires operator presence")
+        if not self.expected_plan_required_for_real_run:
+            raise ValueError("Read-only preflight plan must require an expected plan")
+        if not self.prestart_summary_required:
+            raise ValueError("Read-only preflight plan must require a prestart summary")
+        command = tuple(self.command)
+        if "--expected-plan" not in command or self.expected_plan not in command:
+            raise ValueError("Read-only preflight step must bind --expected-plan")
+        if "--prestart-summary" not in command or self.prestart_summary not in command:
+            raise ValueError("Read-only preflight step must bind --prestart-summary")
         forbidden = {
             "--execute",
             "tools/wing_operator_proposal_validation_runner.py",
@@ -335,6 +356,8 @@ def _readonly_preflight_command(
     *,
     backend_url: str,
     artifact_root: str,
+    expected_plan: str,
+    prestart_summary: str,
 ) -> Tuple[str, ...]:
     return (
         "python3",
@@ -348,6 +371,10 @@ def _readonly_preflight_command(
         "--require-physical-readback",
         "--artifact-root",
         artifact_root,
+        "--prestart-summary",
+        prestart_summary,
+        "--expected-plan",
+        expected_plan,
     )
 
 
@@ -355,6 +382,8 @@ def _readonly_preflight_step(
     *,
     backend_url: str,
     artifact_root: str,
+    expected_plan: str,
+    prestart_summary: str,
     blockers: Tuple[str, ...],
     next_actions: Tuple[str, ...],
 ) -> WingReadonlyPreflightPlanStep:
@@ -370,9 +399,15 @@ def _readonly_preflight_step(
         execution_allowed_by_plan=False,
         operator_approval_required=True,
         read_only=True,
+        expected_plan_required_for_real_run=True,
+        prestart_summary_required=True,
+        expected_plan=expected_plan,
+        prestart_summary=prestart_summary,
         command=_readonly_preflight_command(
             backend_url=backend_url,
             artifact_root=artifact_root,
+            expected_plan=expected_plan,
+            prestart_summary=prestart_summary,
         ),
         rationale=(
             "Read-only WING connection and physical readback evidence is required before "
@@ -492,6 +527,8 @@ def build_supervised_wing_proof_plan(
     channels_by_value_type: Mapping[str, Tuple[int, ...]] | None = None,
     delta_db_by_value_type: Mapping[str, float] | None = None,
     readonly_preflight_artifact_root: str = DEFAULT_READONLY_PREFLIGHT_ARTIFACT_ROOT,
+    readonly_preflight_expected_plan: str = DEFAULT_READONLY_PREFLIGHT_EXPECTED_PLAN,
+    readonly_preflight_prestart_summary: str = DEFAULT_READONLY_PREFLIGHT_PRESTART_SUMMARY,
 ) -> Dict[str, Any]:
     """Build a non-executing proof checklist from promotion evidence rows."""
 
@@ -536,6 +573,8 @@ def build_supervised_wing_proof_plan(
             _readonly_preflight_step(
                 backend_url=backend_url,
                 artifact_root=readonly_preflight_artifact_root,
+                expected_plan=readonly_preflight_expected_plan,
+                prestart_summary=readonly_preflight_prestart_summary,
                 blockers=tuple(_string_list(preflight.get("blocked_by"))),
                 next_actions=tuple(_string_list(preflight.get("next_required_actions"))),
             ),
@@ -615,6 +654,12 @@ def build_supervised_wing_proof_plan(
                 preflight.get("next_required_actions")
             ),
             "readonly_preflight_step_count": len(preflight_steps),
+            "readonly_preflight_expected_plan_required_for_real_run": True,
+            "readonly_preflight_prestart_summary_required": True,
+            "readonly_preflight_command_expected_plan": readonly_preflight_expected_plan,
+            "readonly_preflight_command_prestart_summary": (
+                readonly_preflight_prestart_summary
+            ),
             "readonly_preflight_review_decision_required": True,
             "readonly_preflight_review_decision_accepted": review_decision_accepted,
             "readonly_preflight_review_decision_status": _readonly_preflight_review_decision_status(review_decision),
