@@ -22,6 +22,7 @@ try:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+        wing_readonly_preflight_candidate_prestart_contract_violations,
     )
     from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from write_surface_inventory import get_write_surface
@@ -35,6 +36,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+        wing_readonly_preflight_candidate_prestart_contract_violations,
     )
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from backend.write_surface_inventory import get_write_surface
@@ -377,6 +379,11 @@ def _wing_readonly_preflight_readiness_overlay(
         for row in matrix_rows
         if row.get("closed") is True and row.get("id")
     ]
+    prestart_summary_contract_violations = (
+        wing_readonly_preflight_candidate_prestart_contract_violations(latest_candidate)
+        if latest_candidate
+        else ["no_valid_readonly_preflight_candidate"]
+    )
     next_actions = (
         [
             "Manually review the read-only preflight candidate before updating readiness rows.",
@@ -438,6 +445,12 @@ def _wing_readonly_preflight_readiness_overlay(
         "prestart_backend_port_summary_connection_policy_matches_contract": (
             latest_candidate.get("backend_port_prestart_summary_connection_policy")
             == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ),
+        "prestart_backend_port_summary_contract_valid": (
+            bool(latest_candidate) and not prestart_summary_contract_violations
+        ),
+        "prestart_backend_port_summary_contract_violations": list(
+            prestart_summary_contract_violations
         ),
         "prestart_backend_port_summary_live_write": latest_candidate.get(
             "backend_port_prestart_summary_live_write"

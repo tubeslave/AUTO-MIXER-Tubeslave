@@ -117,6 +117,51 @@ def _valid_wing_preflight_summary() -> dict:
     }
 
 
+def _artifact_bound_preflight_candidate_row() -> dict:
+    summary = _valid_wing_preflight_summary()
+    return {
+        **summary,
+        "source_id": summary["summary_path"],
+        "accepted_as_readonly_preflight_candidate": True,
+        "expected_artifacts": [
+            summary["summary_path"],
+            summary["events_path"],
+        ],
+        "expected_summary_artifact": summary["summary_path"],
+        "expected_events_artifact": summary["events_path"],
+        "summary_path_matches_expected_artifact": True,
+        "events_path_matches_expected_artifact": True,
+    }
+
+
+def _readiness_evidence_snapshot_with_candidate(candidate: dict) -> dict:
+    return {
+        "status": "readonly_preflight_candidate_available",
+        "summary": {
+            "artifact_count": 1,
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "readiness_matrix_update_allowed": True,
+            "readiness_closure_allowed_by_evidence": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "latest_valid_candidate_run_id": candidate["run_id"],
+            "blocked_by": [],
+            "violations": [],
+        },
+        "artifacts": [candidate],
+        "mvp_blocker_matrix": [
+            {"id": "wing_readonly_connection_proof", "status": "candidate_available"},
+            {"id": "physical_console_readback_proof", "status": "candidate_available"},
+            {"id": "operator_visible_evidence_report", "status": "candidate_available"},
+            {
+                "id": "readiness_matrix_update_based_on_real_proof",
+                "status": "candidate_available",
+            },
+        ],
+    }
+
+
 def test_autonomy_promotion_readiness_module_is_read_only_and_transport_free():
     source = Path("backend/autonomy_promotion_readiness.py").read_text()
 
@@ -467,6 +512,14 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
         ]
         is True
     )
+    assert preflight["prestart_backend_port_summary_contract_valid"] is False
+    assert preflight["prestart_backend_port_summary_contract_violations"] == [
+        "expected_artifacts_count_mismatch",
+        "expected_summary_artifact_missing",
+        "expected_events_artifact_missing",
+        "summary_path_not_bound_to_expected_artifact",
+        "events_path_not_bound_to_expected_artifact",
+    ]
     assert preflight["prestart_backend_port_summary_live_write"] is False
     assert preflight["prestart_backend_port_summary_contacts_backend"] is False
     assert preflight["prestart_backend_port_summary_queries_console"] is False
@@ -489,3 +542,42 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
     rows = {row["id"]: row for row in snapshot["rows"]}
     assert rows["fader_supervised_promotion"]["autonomous_ready"] is False
     assert rows["gain_trim_supervised_promotion"]["supervised_live_allowed"] is False
+
+
+def test_readiness_snapshot_accepts_artifact_bound_prestart_summary_contract():
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        wing_readonly_preflight_evidence_snapshot=(
+            _readiness_evidence_snapshot_with_candidate(
+                _artifact_bound_preflight_candidate_row()
+            )
+        ),
+    )
+    preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
+
+    assert preflight["readiness_update_candidate_available"] is True
+    assert preflight["prestart_backend_port_summary_contract_valid"] is True
+    assert preflight["prestart_backend_port_summary_contract_violations"] == []
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
+
+
+def test_readiness_snapshot_fails_closed_without_valid_prestart_summary_contract():
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(),
+        artifact_roots=(),
+    )
+
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        wing_readonly_preflight_evidence_snapshot=evidence,
+    )
+    preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
+
+    assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["prestart_backend_port_summary_contract_valid"] is False
+    assert preflight["prestart_backend_port_summary_contract_violations"] == [
+        "no_valid_readonly_preflight_candidate"
+    ]
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
