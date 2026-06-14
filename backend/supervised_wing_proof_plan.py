@@ -721,6 +721,12 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source": (
                 accepted_candidate_prestart_violations_by_source
             ),
+            "readonly_preflight_review_decision_expected_candidate_prestart_source_ids": (
+                accepted_candidate_prestart_source_ids
+            ),
+            "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source": (
+                accepted_candidate_prestart_violations_by_source
+            ),
             "readonly_preflight_review_decision_rejected_source_ids": _string_list(
                 review_summary.get("rejected_source_ids")
             ),
