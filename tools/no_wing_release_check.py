@@ -4895,6 +4895,14 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     required_supervised_proof_plan_summary_fields = (
         _string_list(packet.get("required_supervised_proof_plan_summary_fields"))
     )
+    declared_expected_required_supervised_proof_plan_summary_fields = (
+        _string_list(
+            packet.get("expected_required_supervised_proof_plan_summary_fields")
+        )
+    )
+    declared_required_supervised_proof_plan_summary_fields_match_contract = (
+        packet.get("required_supervised_proof_plan_summary_fields_match_contract")
+    )
     mvp_blocker_anchor = (
         packet.get("mvp_blocker_anchor")
         if isinstance(packet.get("mvp_blocker_anchor"), Mapping)
@@ -5852,6 +5860,27 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_proof_plan_summary_fields_mismatch"
         )
+    expected_required_supervised_proof_plan_summary_fields = list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
+    required_supervised_proof_plan_summary_fields_match_contract = (
+        required_supervised_proof_plan_summary_fields
+        == expected_required_supervised_proof_plan_summary_fields
+    )
+    if (
+        declared_expected_required_supervised_proof_plan_summary_fields
+        != expected_required_supervised_proof_plan_summary_fields
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_supervised_proof_plan_summary_fields_mismatch"
+        )
+    if (
+        declared_required_supervised_proof_plan_summary_fields_match_contract
+        is not required_supervised_proof_plan_summary_fields_match_contract
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_supervised_proof_plan_summary_fields_match_flag_mismatch"
+        )
     if (
         packet.get("next_manual_artifact_required")
         != WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
@@ -6418,11 +6447,18 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         required_supervised_proof_plan_summary_fields
     )
     detail["expected_required_supervised_proof_plan_summary_fields"] = list(
-        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+        expected_required_supervised_proof_plan_summary_fields
+    )
+    detail["declared_expected_required_supervised_proof_plan_summary_fields"] = list(
+        declared_expected_required_supervised_proof_plan_summary_fields
     )
     detail["required_supervised_proof_plan_summary_fields_match_contract"] = (
-        required_supervised_proof_plan_summary_fields
-        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+        required_supervised_proof_plan_summary_fields_match_contract
+    )
+    detail[
+        "declared_required_supervised_proof_plan_summary_fields_match_contract"
+    ] = (
+        declared_required_supervised_proof_plan_summary_fields_match_contract
     )
     detail["mvp_blocker_anchor"] = dict(mvp_blocker_anchor)
     detail["expected_mvp_blocker_anchor"] = dict(expected_mvp_blocker_anchor)

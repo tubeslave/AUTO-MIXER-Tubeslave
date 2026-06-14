@@ -424,6 +424,12 @@ def build_handoff_packet(
     operator_sequence_sha256_matches_contract = (
         operator_sequence_sha256 == expected_operator_sequence_sha256
     )
+    required_supervised_proof_plan_summary_fields = list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
+    expected_required_supervised_proof_plan_summary_fields = list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
@@ -577,8 +583,15 @@ def build_handoff_packet(
         "expected_backend_port_prestart_gate": dict(expected_prestart_gate),
         "supervised_prestart_gate": dict(expected_supervised_gate),
         "expected_supervised_prestart_gate": dict(expected_supervised_gate),
-        "required_supervised_proof_plan_summary_fields": list(
-            WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+        "required_supervised_proof_plan_summary_fields": (
+            required_supervised_proof_plan_summary_fields
+        ),
+        "expected_required_supervised_proof_plan_summary_fields": list(
+            expected_required_supervised_proof_plan_summary_fields
+        ),
+        "required_supervised_proof_plan_summary_fields_match_contract": (
+            required_supervised_proof_plan_summary_fields
+            == expected_required_supervised_proof_plan_summary_fields
         ),
         "mvp_blocker_anchor_digest_review_step_index": (
             mvp_blocker_anchor_digest_review_step_index
@@ -780,6 +793,10 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 f"`{json.dumps(supervised_gate.get('required_markers') or [])}`",
                 "- required_supervised_proof_plan_summary_fields: "
                 f"`{json.dumps(packet.get('required_supervised_proof_plan_summary_fields') or [])}`",
+                "- expected_required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(packet.get('expected_required_supervised_proof_plan_summary_fields') or [])}`",
+                "- required_supervised_proof_plan_summary_fields_match_contract: "
+                f"`{str(packet.get('required_supervised_proof_plan_summary_fields_match_contract')).lower()}`",
             ]
         )
     if expected_supervised_gate:
