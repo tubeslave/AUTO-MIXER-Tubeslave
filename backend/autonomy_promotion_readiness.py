@@ -20,6 +20,8 @@ try:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     )
     from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from write_surface_inventory import get_write_surface
@@ -31,6 +33,8 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     )
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from backend.write_surface_inventory import get_write_surface
@@ -418,8 +422,22 @@ def _wing_readonly_preflight_readiness_overlay(
         "prestart_backend_port_summary_sha256": latest_candidate.get(
             "backend_port_prestart_summary_sha256"
         ),
+        "prestart_backend_port_summary_type": latest_candidate.get(
+            "backend_port_prestart_summary_type"
+        ),
+        "prestart_backend_port_summary_type_matches_contract": (
+            latest_candidate.get("backend_port_prestart_summary_type")
+            == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ),
         "prestart_backend_port_summary_status": latest_candidate.get(
             "backend_port_prestart_summary_status"
+        ),
+        "prestart_backend_port_summary_connection_policy": latest_candidate.get(
+            "backend_port_prestart_summary_connection_policy"
+        ),
+        "prestart_backend_port_summary_connection_policy_matches_contract": (
+            latest_candidate.get("backend_port_prestart_summary_connection_policy")
+            == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
         "prestart_backend_port_summary_live_write": latest_candidate.get(
             "backend_port_prestart_summary_live_write"

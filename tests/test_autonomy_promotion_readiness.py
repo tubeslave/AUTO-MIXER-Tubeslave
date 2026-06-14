@@ -12,6 +12,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
 )
 
 
@@ -449,7 +451,22 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
     assert preflight["prestart_backend_port_summary_required"] is True
+    assert (
+        preflight["prestart_backend_port_summary_type"]
+        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert preflight["prestart_backend_port_summary_type_matches_contract"] is True
     assert preflight["prestart_backend_port_summary_status"] == "passed"
+    assert (
+        preflight["prestart_backend_port_summary_connection_policy"]
+        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert (
+        preflight[
+            "prestart_backend_port_summary_connection_policy_matches_contract"
+        ]
+        is True
+    )
     assert preflight["prestart_backend_port_summary_live_write"] is False
     assert preflight["prestart_backend_port_summary_contacts_backend"] is False
     assert preflight["prestart_backend_port_summary_queries_console"] is False
