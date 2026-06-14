@@ -269,6 +269,27 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "operator_sequence_count_matches_contract: true"
         in directive["selected_action"]
     )
+    assert "declared_operator_sequence_count: 10" in directive["selected_action"]
+    assert "declared_expected_operator_sequence_count: 10" in directive[
+        "selected_action"
+    ]
+    assert "declared_operator_sequence_count_contract_flag: true" in directive[
+        "selected_action"
+    ]
+    assert "declared_operator_sequence_count_matches_actual: true" in directive[
+        "selected_action"
+    ]
+    assert "declared_operator_sequence_count_matches_contract: true" in directive[
+        "selected_action"
+    ]
+    assert (
+        "declared_expected_operator_sequence_count_matches_contract: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "declared_operator_sequence_count_contract_flag_matches_declared_count: true"
+        in directive["selected_action"]
+    )
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in directive[
         "selected_action"
     ]
@@ -483,6 +504,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_ANCHOR_DIGEST_REVIEW_INDEX_20260614.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_OPERATOR_SEQUENCE_COUNT_20260614.md"
         in directive["selected_evidence_files"]
     )
     assert (
@@ -793,6 +818,16 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_count: 10" in prompt
     assert "expected_operator_sequence_count: 10" in prompt
     assert "operator_sequence_count_matches_contract: true" in prompt
+    assert "declared_operator_sequence_count: 10" in prompt
+    assert "declared_expected_operator_sequence_count: 10" in prompt
+    assert "declared_operator_sequence_count_contract_flag: true" in prompt
+    assert "declared_operator_sequence_count_matches_actual: true" in prompt
+    assert "declared_operator_sequence_count_matches_contract: true" in prompt
+    assert "declared_expected_operator_sequence_count_matches_contract: true" in prompt
+    assert (
+        "declared_operator_sequence_count_contract_flag_matches_declared_count: true"
+        in prompt
+    )
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in prompt
     assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in prompt
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in prompt
@@ -839,6 +874,16 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_count: 10" in readme
     assert "expected_operator_sequence_count: 10" in readme
     assert "operator_sequence_count_matches_contract: true" in readme
+    assert "declared_operator_sequence_count: 10" in readme
+    assert "declared_expected_operator_sequence_count: 10" in readme
+    assert "declared_operator_sequence_count_contract_flag: true" in readme
+    assert "declared_operator_sequence_count_matches_actual: true" in readme
+    assert "declared_operator_sequence_count_matches_contract: true" in readme
+    assert "declared_expected_operator_sequence_count_matches_contract: true" in readme
+    assert (
+        "declared_operator_sequence_count_contract_flag_matches_declared_count: true"
+        in readme
+    )
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in readme
     assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in readme
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in readme

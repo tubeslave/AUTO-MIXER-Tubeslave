@@ -420,6 +420,13 @@ continue to:
 The handoff validation must report:
 
 - `operator_sequence_count: 10`
+- `declared_operator_sequence_count: 10`
+- `declared_expected_operator_sequence_count: 10`
+- `declared_operator_sequence_count_contract_flag: true`
+- `declared_operator_sequence_count_matches_actual: true`
+- `declared_operator_sequence_count_matches_contract: true`
+- `declared_expected_operator_sequence_count_matches_contract: true`
+- `declared_operator_sequence_count_contract_flag_matches_declared_count: true`
 - `backend_port_prestart_check_operator_sequence_step_index: 0`
 - `backend_port_prestart_check_operator_sequence_step` includes
   `prestart_backend_port_check` and `unexpected listeners`

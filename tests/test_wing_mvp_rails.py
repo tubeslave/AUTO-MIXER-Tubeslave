@@ -14,6 +14,20 @@ DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
 PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
 
+DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS = (
+    "declared_operator_sequence_count: 10",
+    "declared_expected_operator_sequence_count: 10",
+    "declared_operator_sequence_count_contract_flag: true",
+    "declared_operator_sequence_count_matches_actual: true",
+    "declared_operator_sequence_count_matches_contract: true",
+    "declared_expected_operator_sequence_count_matches_contract: true",
+    "declared_operator_sequence_count_contract_flag_matches_declared_count: true",
+)
+
+DECLARED_OPERATOR_SEQUENCE_COUNT_FIELD_MARKERS = tuple(
+    marker.split(":", 1)[0] for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS
+)
+
 
 def load_progress_module():
     spec = importlib.util.spec_from_file_location("update_mvp_progress", PROGRESS_TOOL)
@@ -56,6 +70,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     )
     assert "expected_operator_sequence_count: 10" in text
     assert "operator_sequence_count_matches_contract: true" in text
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
+        assert marker in text
     assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in text
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in text
     assert (
@@ -158,6 +174,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
     assert "operator_sequence_count: 10" in text
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
+        assert marker in text
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in text
     assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in text
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in text
@@ -243,6 +261,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_HANDOFF_DECLARED_ANCHOR_DIGEST_REVIEW_INDEX_20260614.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_HANDOFF_DECLARED_OPERATOR_SEQUENCE_COUNT_20260614.md"
+        in rows[0]["evidence"]
+    )
     assert "backend_port_prestart_summary_sha256_matches_plan: true" in rows[0][
         "next action"
     ]
@@ -256,6 +278,8 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_count_matches_contract: true" in rows[0][
         "next action"
     ]
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
+        assert marker in rows[0]["next action"]
     assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in rows[0][
         "next action"
     ]
@@ -591,6 +615,8 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "next action"
     ]
     assert "operator_sequence_count: 10" in rows[0]["next action"]
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
+        assert marker in rows[0]["next action"]
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in rows[0][
         "next action"
     ]
@@ -733,6 +759,8 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in readonly
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readonly
     assert "operator_sequence_count: 10" in readonly
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
+        assert marker in readonly
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in readonly
     assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in readonly
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in readonly
@@ -997,6 +1025,8 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in report
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in report
     assert "operator_sequence_count: 10" in report
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
+        assert marker in report
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in report
     assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in report
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in report
@@ -1172,6 +1202,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
     assert "operator_sequence_count: 10" in text
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
+        assert marker in text
     assert "mvp_blocker_anchor_digest_review_step_index" in text
     assert "expected_mvp_blocker_anchor_digest_review_step_index" in text
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract" in text
@@ -1311,6 +1343,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
         in text
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_OPERATOR_SEQUENCE_COUNT_20260614.md"
+        in text
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_PENDING_SUMMARY_FIELDS_CANON_20260613.md"
         in text
     )
@@ -1422,6 +1458,8 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
     assert "operator_sequence_count" in text
+    for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_FIELD_MARKERS:
+        assert marker in text
     assert "mvp_blocker_anchor_digest_review_step_index" in text
     assert "expected_mvp_blocker_anchor_digest_review_step_index" in text
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract" in text

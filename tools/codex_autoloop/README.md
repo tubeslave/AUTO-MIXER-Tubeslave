@@ -360,6 +360,14 @@ you want the background automation active.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `expected_operator_sequence_count: 10` and
   `operator_sequence_count_matches_contract: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `declared_operator_sequence_count: 10`,
+  `declared_expected_operator_sequence_count: 10`,
+  `declared_operator_sequence_count_contract_flag: true`,
+  `declared_operator_sequence_count_matches_actual: true`,
+  `declared_operator_sequence_count_matches_contract: true`,
+  `declared_expected_operator_sequence_count_matches_contract: true`, and
+  `declared_operator_sequence_count_contract_flag_matches_declared_count: true`.
 - Before any supervised fader/gain proof, the
   `mvp_blocker_anchor_digest_review_step_index` must be `8`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show

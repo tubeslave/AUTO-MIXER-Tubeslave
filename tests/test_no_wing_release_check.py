@@ -1421,6 +1421,13 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
         ],
+        "operator_sequence_count": (
+            WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+        ),
+        "expected_operator_sequence_count": (
+            WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+        ),
+        "operator_sequence_count_matches_contract": True,
         "backend_port_prestart_gate": {
             "required": True,
             "operator_sequence_step_index": 0,
@@ -3225,6 +3232,27 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     )
     assert result.detail["operator_sequence_count_matches_contract"] is True
     assert (
+        result.detail["declared_operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert (
+        result.detail["declared_expected_operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert result.detail["declared_operator_sequence_count_contract_flag"] is True
+    assert result.detail["declared_operator_sequence_count_matches_actual"] is True
+    assert result.detail["declared_operator_sequence_count_matches_contract"] is True
+    assert (
+        result.detail["declared_expected_operator_sequence_count_matches_contract"]
+        is True
+    )
+    assert (
+        result.detail[
+            "declared_operator_sequence_count_contract_flag_matches_declared_count"
+        ]
+        is True
+    )
+    assert (
         result.detail["mvp_blocker_anchor_digest_review_step_index"]
         == WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
     )
@@ -4392,6 +4420,61 @@ def test_no_wing_release_check_rejects_handoff_packet_with_extra_step_before_sup
     )
     assert (
         "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_step_index_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_declared_operator_sequence_count_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-declared-operator-sequence-count-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence_count"] = (
+        WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT - 1
+    )
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        result.detail["operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert result.detail["operator_sequence_count_matches_contract"] is True
+    assert result.detail["declared_operator_sequence_count"] == (
+        WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT - 1
+    )
+    assert result.detail["declared_operator_sequence_count_matches_actual"] is False
+    assert result.detail["declared_operator_sequence_count_matches_contract"] is False
+    assert (
+        result.detail["declared_expected_operator_sequence_count_matches_contract"]
+        is True
+    )
+    assert (
+        result.detail[
+            "declared_operator_sequence_count_contract_flag_matches_declared_count"
+        ]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_declared_operator_sequence_count_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_declared_operator_sequence_count_contract_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_declared_operator_sequence_count_contract_flag_mismatch"
         in result.detail["violations"]
     )
 
@@ -11199,6 +11282,19 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
             ),
             "operator_sequence_count_matches_contract": True,
+            "declared_operator_sequence_count": (
+                WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+            ),
+            "declared_expected_operator_sequence_count": (
+                WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+            ),
+            "declared_operator_sequence_count_contract_flag": True,
+            "declared_operator_sequence_count_matches_actual": True,
+            "declared_operator_sequence_count_matches_contract": True,
+            "declared_expected_operator_sequence_count_matches_contract": True,
+            "declared_operator_sequence_count_contract_flag_matches_declared_count": (
+                True
+            ),
             "mvp_blocker_anchor_digest_review_step_index": (
                 WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
             ),
@@ -11495,6 +11591,22 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert artifact["operator_sequence_count_matches_contract"] is True
     assert (
+        artifact["declared_operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert (
+        artifact["declared_expected_operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert artifact["declared_operator_sequence_count_contract_flag"] is True
+    assert artifact["declared_operator_sequence_count_matches_actual"] is True
+    assert artifact["declared_operator_sequence_count_matches_contract"] is True
+    assert artifact["declared_expected_operator_sequence_count_matches_contract"] is True
+    assert (
+        artifact["declared_operator_sequence_count_contract_flag_matches_declared_count"]
+        is True
+    )
+    assert (
         artifact["mvp_blocker_anchor_digest_review_step_index"]
         == WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
     )
@@ -11684,6 +11796,28 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "operator_sequence_count: `10`" in markdown_summary
     assert "expected_operator_sequence_count: `10`" in markdown_summary
     assert "operator_sequence_count_matches_contract: `true`" in markdown_summary
+    assert "declared_operator_sequence_count: `10`" in markdown_summary
+    assert "declared_expected_operator_sequence_count: `10`" in markdown_summary
+    assert (
+        "declared_operator_sequence_count_contract_flag: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_operator_sequence_count_matches_actual: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_operator_sequence_count_matches_contract: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_expected_operator_sequence_count_matches_contract: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_operator_sequence_count_contract_flag_matches_declared_count: `true`"
+        in markdown_summary
+    )
     assert (
         "mvp_blocker_anchor_digest_review_step_index: `8`" in markdown_summary
     )

@@ -28,6 +28,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
+    WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
@@ -379,6 +380,19 @@ def build_handoff_packet(
         mvp_blocker_anchor
     )
     prestart_summary_sha256 = _sha256_existing_file(prestart_summary)
+    operator_sequence = [
+        prestart_step,
+        "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
+        backend_connection_step,
+        "Confirm the selected channel numbers are safe to inspect.",
+        "Run capture_readonly_preflight.",
+        "Run review_artifact_and_write_pending_decision_template.",
+        "Edit the pending decision template into an accepted or rejected JSON record.",
+        "Run review_edited_decision_json.",
+        mvp_blocker_anchor_digest_review_step,
+        supervised_gate_step,
+    ]
+    operator_sequence_count = len(operator_sequence)
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
@@ -456,18 +470,15 @@ def build_handoff_packet(
         },
         "mvp_blocker_anchor": mvp_blocker_anchor,
         "mvp_blocker_anchor_sha256": mvp_blocker_anchor_sha256,
-        "operator_sequence": [
-            prestart_step,
-            "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
-            backend_connection_step,
-            "Confirm the selected channel numbers are safe to inspect.",
-            "Run capture_readonly_preflight.",
-            "Run review_artifact_and_write_pending_decision_template.",
-            "Edit the pending decision template into an accepted or rejected JSON record.",
-            "Run review_edited_decision_json.",
-            mvp_blocker_anchor_digest_review_step,
-            supervised_gate_step,
-        ],
+        "operator_sequence": operator_sequence,
+        "operator_sequence_count": operator_sequence_count,
+        "expected_operator_sequence_count": (
+            WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+        ),
+        "operator_sequence_count_matches_contract": (
+            operator_sequence_count
+            == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+        ),
         "backend_connection_confirmation_step_index": backend_connection_step_index,
         "backend_port_prestart_gate": dict(expected_prestart_gate),
         "expected_backend_port_prestart_gate": dict(expected_prestart_gate),
@@ -546,6 +557,12 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         "",
         "## Operator Sequence",
         "",
+        "- operator_sequence_count: "
+        f"`{packet['operator_sequence_count']}`",
+        "- expected_operator_sequence_count: "
+        f"`{packet['expected_operator_sequence_count']}`",
+        "- operator_sequence_count_matches_contract: "
+        f"`{str(packet['operator_sequence_count_matches_contract']).lower()}`",
         "- mvp_blocker_anchor_digest_review_step_index: "
         f"`{packet['mvp_blocker_anchor_digest_review_step_index']}`",
         "",

@@ -129,6 +129,13 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while the no-WING handoff summary does not show
   `expected_operator_sequence_count: 10`,
   `operator_sequence_count_matches_contract: true`,
+  `declared_operator_sequence_count: 10`,
+  `declared_expected_operator_sequence_count: 10`,
+  `declared_operator_sequence_count_contract_flag: true`,
+  `declared_operator_sequence_count_matches_actual: true`,
+  `declared_operator_sequence_count_matches_contract: true`,
+  `declared_expected_operator_sequence_count_matches_contract: true`,
+  `declared_operator_sequence_count_contract_flag_matches_declared_count: true`,
   `expected_mvp_blocker_anchor_digest_review_step_index: 8`,
   `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
   `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`,
@@ -278,6 +285,14 @@ Stop the current Codex work direction and return to the first open blocker if:
   `operator_sequence_supervised_prestart_gate_step_index: 9`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `operator_sequence_count: 10`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `declared_operator_sequence_count: 10`,
+  `declared_expected_operator_sequence_count: 10`,
+  `declared_operator_sequence_count_contract_flag: true`,
+  `declared_operator_sequence_count_matches_actual: true`,
+  `declared_operator_sequence_count_matches_contract: true`,
+  `declared_expected_operator_sequence_count_matches_contract: true`, and
+  `declared_operator_sequence_count_contract_flag_matches_declared_count: true`.
 - A supervised proof is planned while
   `backend_port_prestart_check_operator_sequence_step` does not include
   `prestart_backend_port_check` and `unexpected listeners`.
@@ -470,6 +485,13 @@ and
 
 The handoff summary must also show `operator_sequence_count: 10` so reviewers
 can reject packets with missing or extra operator steps.
+It must also show `declared_operator_sequence_count: 10`,
+`declared_expected_operator_sequence_count: 10`,
+`declared_operator_sequence_count_contract_flag: true`,
+`declared_operator_sequence_count_matches_actual: true`,
+`declared_operator_sequence_count_matches_contract: true`,
+`declared_expected_operator_sequence_count_matches_contract: true`, and
+`declared_operator_sequence_count_contract_flag_matches_declared_count: true`.
 
 The first operator step text must also be explicit:
 `backend_port_prestart_check_operator_sequence_step` must include

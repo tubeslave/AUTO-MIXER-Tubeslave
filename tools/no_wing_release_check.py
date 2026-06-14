@@ -4761,6 +4761,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("operator_sequence"), list)
         else []
     )
+    declared_operator_sequence_count = packet.get("operator_sequence_count")
+    declared_expected_operator_sequence_count = packet.get(
+        "expected_operator_sequence_count"
+    )
+    declared_operator_sequence_count_contract_flag = (
+        packet.get("operator_sequence_count_matches_contract") is True
+    )
     supervised_prestart_gate = (
         packet.get("supervised_prestart_gate")
         if isinstance(packet.get("supervised_prestart_gate"), Mapping)
@@ -5389,11 +5396,42 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     operator_sequence_count_matches_contract = (
         operator_sequence_count == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
     )
+    declared_operator_sequence_count_matches_actual = (
+        declared_operator_sequence_count == operator_sequence_count
+    )
+    declared_operator_sequence_count_matches_contract = (
+        declared_operator_sequence_count
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    declared_expected_operator_sequence_count_matches_contract = (
+        declared_expected_operator_sequence_count
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    declared_operator_sequence_count_contract_flag_matches_declared_count = (
+        declared_operator_sequence_count_contract_flag
+        == declared_operator_sequence_count_matches_contract
+    )
     if len(operator_sequence) < 8:
         violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
     if not operator_sequence_count_matches_contract:
         violations.append(
             "wing_readonly_preflight_handoff_packet_operator_sequence_count_mismatch"
+        )
+    if not declared_operator_sequence_count_matches_actual:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_declared_operator_sequence_count_mismatch"
+        )
+    if not declared_operator_sequence_count_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_declared_operator_sequence_count_contract_mismatch"
+        )
+    if not declared_expected_operator_sequence_count_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_declared_expected_operator_sequence_count_mismatch"
+        )
+    if not declared_operator_sequence_count_contract_flag_matches_declared_count:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_declared_operator_sequence_count_contract_flag_mismatch"
         )
     backend_port_prestart_step = str(operator_sequence[0]) if operator_sequence else ""
     backend_port_prestart_step_is_first = bool(backend_port_prestart_step) and all(
@@ -5868,6 +5906,25 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["operator_sequence_count_matches_contract"] = (
         operator_sequence_count_matches_contract
     )
+    detail["declared_operator_sequence_count"] = declared_operator_sequence_count
+    detail["declared_expected_operator_sequence_count"] = (
+        declared_expected_operator_sequence_count
+    )
+    detail["declared_operator_sequence_count_contract_flag"] = (
+        declared_operator_sequence_count_contract_flag
+    )
+    detail["declared_operator_sequence_count_matches_actual"] = (
+        declared_operator_sequence_count_matches_actual
+    )
+    detail["declared_operator_sequence_count_matches_contract"] = (
+        declared_operator_sequence_count_matches_contract
+    )
+    detail["declared_expected_operator_sequence_count_matches_contract"] = (
+        declared_expected_operator_sequence_count_matches_contract
+    )
+    detail[
+        "declared_operator_sequence_count_contract_flag_matches_declared_count"
+    ] = declared_operator_sequence_count_contract_flag_matches_declared_count
     detail["mvp_blocker_anchor_digest_review_step_index"] = (
         mvp_blocker_anchor_digest_review_step_index
     )
@@ -13671,6 +13728,31 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "operator_sequence_count_matches_contract": (
                 detail.get("operator_sequence_count_matches_contract") is True
             ),
+            "declared_operator_sequence_count": int(
+                detail.get("declared_operator_sequence_count") or 0
+            ),
+            "declared_expected_operator_sequence_count": int(
+                detail.get("declared_expected_operator_sequence_count") or 0
+            ),
+            "declared_operator_sequence_count_contract_flag": (
+                detail.get("declared_operator_sequence_count_contract_flag") is True
+            ),
+            "declared_operator_sequence_count_matches_actual": (
+                detail.get("declared_operator_sequence_count_matches_actual") is True
+            ),
+            "declared_operator_sequence_count_matches_contract": (
+                detail.get("declared_operator_sequence_count_matches_contract") is True
+            ),
+            "declared_expected_operator_sequence_count_matches_contract": (
+                detail.get("declared_expected_operator_sequence_count_matches_contract")
+                is True
+            ),
+            "declared_operator_sequence_count_contract_flag_matches_declared_count": (
+                detail.get(
+                    "declared_operator_sequence_count_contract_flag_matches_declared_count"
+                )
+                is True
+            ),
             "mvp_blocker_anchor_digest_review_step_index": detail.get(
                 "mvp_blocker_anchor_digest_review_step_index"
             ),
@@ -17346,6 +17428,20 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_count']}`",
                 "- operator_sequence_count_matches_contract: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count_matches_contract']).lower()}`",
+                "- declared_operator_sequence_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_count']}`",
+                "- declared_expected_operator_sequence_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['declared_expected_operator_sequence_count']}`",
+                "- declared_operator_sequence_count_contract_flag: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_count_contract_flag']).lower()}`",
+                "- declared_operator_sequence_count_matches_actual: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_count_matches_actual']).lower()}`",
+                "- declared_operator_sequence_count_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_count_matches_contract']).lower()}`",
+                "- declared_expected_operator_sequence_count_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_expected_operator_sequence_count_matches_contract']).lower()}`",
+                "- declared_operator_sequence_count_contract_flag_matches_declared_count: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_count_contract_flag_matches_declared_count']).lower()}`",
                 "- mvp_blocker_anchor_digest_review_step_index: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_digest_review_step_index']}`",
                 "- expected_mvp_blocker_anchor_digest_review_step_index: "
