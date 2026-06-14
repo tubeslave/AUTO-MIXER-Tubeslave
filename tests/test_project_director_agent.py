@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -8,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DIRECTOR_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "project_director_agent.py"
 PROMPT_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
 README_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "README.md"
+DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
 
 
 def load_director_module():
@@ -18,6 +20,18 @@ def load_director_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def current_wing_mvp_20260614_index_reports():
+    index_text = DOCS_INDEX.read_text(encoding="utf-8")
+    return sorted(
+        set(
+            re.findall(
+                r"`(Docs/reports/AUTOMIXER_WING_MVP_[^`]+_20260614\.md)`",
+                index_text,
+            )
+        )
+    )
 
 
 def test_project_director_selects_first_non_closed_mvp_blocker():
@@ -545,6 +559,12 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_action"]
     )
     assert directive["selected_evidence_file_count"] == len(directive["selected_evidence_files"])
+    missing_index_reports = [
+        report
+        for report in current_wing_mvp_20260614_index_reports()
+        if report not in directive["selected_evidence_files"]
+    ]
+    assert missing_index_reports == []
     assert (
         "tools/build_wing_readonly_preflight_handoff_packet.py"
         in directive["selected_evidence_files"]

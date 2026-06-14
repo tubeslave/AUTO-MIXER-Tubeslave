@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -54,6 +55,15 @@ def load_progress_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def current_wing_mvp_20260614_index_report_names():
+    index_text = DOCS_INDEX.read_text(encoding="utf-8")
+    report_paths = re.findall(
+        r"`(Docs/reports/AUTOMIXER_WING_MVP_[^`]+_20260614\.md)`",
+        index_text,
+    )
+    return sorted({Path(path).name for path in report_paths})
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
@@ -255,6 +265,12 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert len(rows) == 9
     assert rows[0]["blocker"] == "WING read-only connection proof"
     assert rows[0]["status"] == "tooling_ready_waits_real_wing"
+    missing_index_reports = [
+        report_name
+        for report_name in current_wing_mvp_20260614_index_report_names()
+        if report_name not in rows[0]["evidence"]
+    ]
+    assert missing_index_reports == []
     assert "tools/no_wing_release_check.py" in rows[0]["evidence"]
     assert (
         "AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_RELEASE_GATE_20260607.md"
