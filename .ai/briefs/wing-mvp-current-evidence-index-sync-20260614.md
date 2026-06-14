@@ -19,6 +19,8 @@ evidence trail.
 - Add rail tests that compare `Docs/INDEX.md` current WING MVP 2026-06-14
   reports against the first blocker evidence and Project Director selected
   evidence.
+- Keep the index-sync evidence trail current after the backend-port local socket
+  helper report is added to the active WING blocker evidence.
 - Record the decision and validation.
 
 ## Non-goals

@@ -19,6 +19,9 @@ Add the missing indexed 2026-06-14 WING MVP report paths to
 expected report set from `Docs/INDEX.md` and assert both blocker evidence and
 Project Director `selected_evidence_files` contain all of it.
 
+Also keep the indexed report set synchronized after the backend-port local
+socket helper report is added to the active WING blocker evidence.
+
 ## Likely files to touch
 
 - `.ai/project-layer/wing_mvp_blockers.md`

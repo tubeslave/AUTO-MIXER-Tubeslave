@@ -38,6 +38,8 @@ index entries.
   `Docs/INDEX.md`.
 - Assert the first blocker evidence and Project Director selected evidence
   contain the full current indexed set.
+- Keep the current indexed report set synchronized after follow-up WING evidence
+  reports are added to the active blocker row.
 - Record validation in the task report.
 
 ## Test plan

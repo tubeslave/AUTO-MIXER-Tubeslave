@@ -25,6 +25,9 @@ appearing on target.
 - `tests/test_project_director_agent.py` derives current WING MVP report paths
   from `Docs/INDEX.md` and asserts Project Director selected evidence includes
   all of them.
+- The index-sync rail remains current after
+  `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PORT_LOCAL_SOCKET_TEST_HELPER_20260614.md`
+  was added to the first blocker evidence trail.
 
 ## Safety Boundary
 
@@ -39,25 +42,35 @@ appearing on target.
 - Focused WING rails and Project Director tests:
   `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest -q
   tests/test_project_director_agent.py tests/test_wing_mvp_rails.py
-  --tb=short -x`: 11 passed in 0.39s.
+  --tb=short -x`: 11 passed in 0.11s.
 - Project Director JSON check selected `WING read-only connection proof`,
   reported `guard_status: on_target`, `guard_score: 90`,
   `guard_stop_the_line: false`, baseline coverage passed with 99 markers,
-  exposed `selected_evidence_file_count: 97`, and found 46 indexed current
+  exposed `selected_evidence_file_count: 98`, and found 47 indexed current
   reports with `missing_indexed_current_reports: []`.
 - Direction guard JSON check reported `status: on_target`, `score: 90`, and
   `stop_the_line: false`.
+- Backend-port no-WING subset:
+  `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest -q
+  tests/test_no_wing_release_check.py::test_backend_port_check_records_listener_owner_when_busy
+  tests/test_no_wing_release_check.py::test_backend_port_check_accepts_operator_confirmed_intended_listener
+  tests/test_no_wing_release_check.py::test_backend_listener_confirmation_template_stays_invalid_until_edited
+  tests/test_no_wing_release_check.py::test_backend_listener_confirmation_rejects_partially_edited_template
+  tests/test_no_wing_release_check.py::test_backend_listener_confirmation_accepts_fully_edited_template
+  tests/test_no_wing_release_check.py::test_backend_port_check_rejects_mismatched_listener_confirmation
+  tests/test_no_wing_release_check.py::test_backend_port_check_records_listener_owner_probe_error
+  --tb=short`: 7 passed in 0.08s.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m py_compile
-  tools/codex_autoloop/project_director_agent.py
+  tools/no_wing_release_check.py tools/codex_autoloop/project_director_agent.py
   tools/codex_autoloop/update_mvp_progress.py`: passed.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 tools/memory/memory_lint.py`:
   PASS.
 - `/opt/homebrew/bin/git diff --check`: passed.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3
   tools/no_wing_release_check.py --quick --artifact-root
-  /tmp/automixer_current_evidence_index_sync_nowing`: exited 1 fail-closed on
+  /tmp/automixer_backend_port_socket_helper_nowing`: exited 1 fail-closed on
   existing listener `127.0.0.1:8765`, with
   `connection_policy: no_hardware_no_network_no_live_writes`,
   `live_write: false`, and no live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: 3310 passed, 1 skipped, 1 warning in 174.74s (0:02:54).
+  --tb=short -q`: 3310 passed, 1 skipped, 1 warning in 162.66s (0:02:42).
