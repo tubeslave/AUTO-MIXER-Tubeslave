@@ -98,6 +98,9 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "listener_process_error" in directive["selected_action"]
     assert "safe_to_stop_listener_by_gate" in directive["selected_action"]
     assert "listener_confirmation_template_status" in directive["selected_action"]
+    assert "listener_confirmation_template_acceptance_status" in directive[
+        "selected_action"
+    ]
     assert "listener_confirmation_template_accepted_by_template" in directive[
         "selected_action"
     ]
@@ -673,6 +676,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_processes" in prompt
     assert "listener_process_error" in prompt
     assert "safe_to_stop_listener_by_gate" in prompt
+    assert "listener_confirmation_template_acceptance_status" in prompt
     assert "operator_next_step" in prompt
     assert "listener_confirmation_template_accepted_by_template: false" in prompt
     assert "listener_confirmation_template_operator_placeholder_fields" in prompt
@@ -768,6 +772,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_processes" in readme
     assert "listener_process_error" in readme
     assert "safe_to_stop_listener_by_gate" in readme
+    assert "listener_confirmation_template_acceptance_status" in readme
     assert "operator_next_step" in readme
     assert "listener_confirmation_template_accepted_by_template: false" in readme
     assert "listener_confirmation_template_operator_placeholder_fields" in readme

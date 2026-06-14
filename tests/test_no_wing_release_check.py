@@ -188,6 +188,9 @@ def test_wing_readonly_preflight_prestart_contract_uses_shared_backend_constants
     assert "listener_confirmation_template_status" in (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    assert "listener_confirmation_template_acceptance_status" in (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
     assert "listener_confirmation_template_safe_to_stop_listener_by_gate" in (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
