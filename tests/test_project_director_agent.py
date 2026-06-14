@@ -280,6 +280,18 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in directive[
         "selected_action"
     ]
+    assert "backend_port_prestart_gate_matches_expected: true" in directive[
+        "selected_action"
+    ]
+    assert "declared_backend_port_prestart_gate_matches_expected: true" in directive[
+        "selected_action"
+    ]
+    assert "supervised_prestart_gate_matches_expected: true" in directive[
+        "selected_action"
+    ]
+    assert "declared_supervised_prestart_gate_matches_expected: true" in directive[
+        "selected_action"
+    ]
     assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in directive[
         "selected_action"
     ]
@@ -1089,6 +1101,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "required_supervised_proof_plan_summary_fields" in prompt
     assert "expected_required_supervised_proof_plan_summary_fields" in prompt
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in prompt
+    assert "backend_port_prestart_gate_matches_expected: true" in prompt
+    assert "declared_backend_port_prestart_gate_matches_expected: true" in prompt
+    assert "supervised_prestart_gate_matches_expected: true" in prompt
+    assert "declared_supervised_prestart_gate_matches_expected: true" in prompt
     assert (
         "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
         in prompt
@@ -1222,6 +1238,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "required_supervised_proof_plan_summary_fields" in readme
     assert "expected_required_supervised_proof_plan_summary_fields" in readme
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in readme
+    assert "backend_port_prestart_gate_matches_expected: true" in readme
+    assert "declared_backend_port_prestart_gate_matches_expected: true" in readme
+    assert "supervised_prestart_gate_matches_expected: true" in readme
+    assert "declared_supervised_prestart_gate_matches_expected: true" in readme
     assert (
         "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
         in readme

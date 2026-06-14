@@ -1524,6 +1524,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "must_pass_before_backend_wing_session": True,
             "grants_live_authority": False,
         },
+        "backend_port_prestart_gate_matches_expected": True,
         "supervised_prestart_gate": {
             "required": True,
             "operator_sequence_step_index": 9,
@@ -1564,6 +1565,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "requires_operator_decision_status": "accepted_decision_ready",
             "requires_accepted_candidate_prestart_trace": True,
         },
+        "supervised_prestart_gate_matches_expected": True,
         "required_supervised_proof_plan_summary_fields": list(
             WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
         ),
@@ -3216,6 +3218,11 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["declared_expected_backend_port_prestart_gate"] == result.detail[
         "expected_backend_port_prestart_gate"
     ]
+    assert result.detail["backend_port_prestart_gate_matches_expected"] is True
+    assert (
+        result.detail["declared_backend_port_prestart_gate_matches_expected"]
+        is True
+    )
     assert result.detail["backend_port_prestart_gate"]["operator_sequence_step_index"] == 0
     assert result.detail["backend_port_prestart_gate"][
         "operator_sequence_step_must_be_first"
@@ -3508,6 +3515,11 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["declared_expected_supervised_prestart_gate"] == result.detail[
         "expected_supervised_prestart_gate"
     ]
+    assert result.detail["supervised_prestart_gate_matches_expected"] is True
+    assert (
+        result.detail["declared_supervised_prestart_gate_matches_expected"]
+        is True
+    )
     assert result.detail["supervised_prestart_gate"][
         "operator_sequence_step_index"
     ] == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
@@ -4626,6 +4638,10 @@ def test_no_wing_release_check_rejects_handoff_packet_with_prestart_gate_mismatc
         "wing_readonly_preflight_handoff_packet_expected_backend_port_prestart_gate_contract_mismatch"
         in result.detail["violations"]
     )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_port_prestart_gate_match_flag_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_handoff_packet_without_supervised_prestart_gate(
@@ -5136,6 +5152,46 @@ def test_no_wing_release_check_rejects_handoff_packet_with_declared_expected_gat
     ]
     assert (
         "wing_readonly_preflight_handoff_packet_expected_supervised_prestart_gate_contract_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_stale_gate_match_flags(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-stale-gate-match-flags.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["backend_port_prestart_gate_matches_expected"] = False
+    payload["supervised_prestart_gate_matches_expected"] = False
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["backend_port_prestart_gate_matches_expected"] is True
+    assert result.detail["supervised_prestart_gate_matches_expected"] is True
+    assert (
+        result.detail["declared_backend_port_prestart_gate_matches_expected"]
+        is False
+    )
+    assert (
+        result.detail["declared_supervised_prestart_gate_matches_expected"]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_backend_port_prestart_gate_match_flag_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_match_flag_mismatch"
         in result.detail["violations"]
     )
 
@@ -11859,6 +11915,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "must_pass_before_backend_wing_session": True,
                 "grants_live_authority": False,
             },
+            "backend_port_prestart_gate_matches_expected": True,
+            "declared_backend_port_prestart_gate_matches_expected": True,
             "backend_port_prestart_check_failure_detail_fields": list(
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
@@ -12178,6 +12236,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "requires_operator_decision_status": "accepted_decision_ready",
                 "requires_accepted_candidate_prestart_trace": True,
             },
+            "supervised_prestart_gate_matches_expected": True,
+            "declared_supervised_prestart_gate_matches_expected": True,
             "required_supervised_prestart_gate_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
@@ -12236,6 +12296,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["declared_expected_backend_port_prestart_gate"] == artifact[
         "expected_backend_port_prestart_gate"
     ]
+    assert artifact["backend_port_prestart_gate_matches_expected"] is True
+    assert artifact[
+        "declared_backend_port_prestart_gate_matches_expected"
+    ] is True
     assert artifact["backend_port_prestart_gate"]["operator_sequence_step_index"] == 0
     assert artifact["backend_port_prestart_gate"][
         "operator_sequence_step_must_be_first"
@@ -12816,6 +12880,16 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "required_supervised_prestart_gate_markers" in markdown_summary
     assert "supervised_prestart_gate" in markdown_summary
     assert "expected_supervised_prestart_gate" in markdown_summary
+    assert "backend_port_prestart_gate_matches_expected: `true`" in markdown_summary
+    assert (
+        "declared_backend_port_prestart_gate_matches_expected: `true`"
+        in markdown_summary
+    )
+    assert "supervised_prestart_gate_matches_expected: `true`" in markdown_summary
+    assert (
+        "declared_supervised_prestart_gate_matches_expected: `true`"
+        in markdown_summary
+    )
     assert '"grants_live_authority": false' in markdown_summary
     assert '"requires_accepted_candidate_prestart_trace": true' in markdown_summary
     assert "valid accepted-candidate prestart trace" in markdown_summary

@@ -257,8 +257,13 @@ blockers выше.
    `review_command_artifact_root_matches_packet: true`,
    `decision_review_command_artifact_root_matches_packet: true`, and
    `decision_review_command_decision_root_matches_packet: true`;
-48. verify the no-WING handoff summary has `supervised_prestart_gate` exactly
-   matching `expected_supervised_prestart_gate`;
+48. verify the no-WING handoff summary has
+   `backend_port_prestart_gate_matches_expected: true`,
+   `declared_backend_port_prestart_gate_matches_expected: true`,
+   `supervised_prestart_gate` exactly matching
+   `expected_supervised_prestart_gate`,
+   `supervised_prestart_gate_matches_expected: true`, and
+   `declared_supervised_prestart_gate_matches_expected: true`;
 49. verify `supervised_prestart_gate.grants_live_authority: false`;
 50. verify `supervised_prestart_gate.operator_sequence_step_index: 9` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;

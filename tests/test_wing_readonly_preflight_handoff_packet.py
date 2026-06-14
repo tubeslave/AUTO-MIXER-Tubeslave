@@ -318,6 +318,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["expected_backend_port_prestart_gate"] == packet[
         "backend_port_prestart_gate"
     ]
+    assert packet["backend_port_prestart_gate_matches_expected"] is True
     anchor_digest_review_step = packet["operator_sequence"][-2]
     assert "mvp_blocker_anchor" in anchor_digest_review_step
     assert "mvp_blocker_anchor_sha256" in anchor_digest_review_step
@@ -357,6 +358,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["expected_supervised_prestart_gate"] == packet[
         "supervised_prestart_gate"
     ]
+    assert packet["supervised_prestart_gate_matches_expected"] is True
     assert packet["required_supervised_proof_plan_summary_fields"] == list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
@@ -371,9 +373,11 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "## Backend Port Prestart Gate" in rendered
     assert "## Expected Backend Port Prestart Gate" in rendered
     assert "expected_backend_port_prestart_gate" in rendered
+    assert "backend_port_prestart_gate_matches_expected: `true`" in rendered
     assert "## Supervised Prestart Gate" in rendered
     assert "## Expected Supervised Prestart Gate" in rendered
     assert "expected_supervised_prestart_gate" in rendered
+    assert "supervised_prestart_gate_matches_expected: `true`" in rendered
     assert "## Proof Identity" in rendered
     assert WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA in rendered
     assert WING_READONLY_PREFLIGHT_PROOF_RUNNER in rendered

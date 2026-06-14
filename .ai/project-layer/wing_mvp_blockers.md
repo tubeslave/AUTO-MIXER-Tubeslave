@@ -61,6 +61,8 @@ it must also show `backend_port_prestart_gate` exactly
 matching `expected_backend_port_prestart_gate`, with
 `backend_port_prestart_gate.grants_live_authority: false` and
 `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`;
+it must also show `backend_port_prestart_gate_matches_expected: true`;
+it must also show `declared_backend_port_prestart_gate_matches_expected: true`;
 it must also show `backend_port_prestart_gate.operator_sequence_step_index: 0`;
 it must also show
 `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`;
@@ -234,6 +236,10 @@ the no-WING handoff summary must also show
 `WING_SUPERVISED_FADER_GAIN_PROOF`;
 the no-WING handoff summary must show `supervised_prestart_gate` exactly
 matching `expected_supervised_prestart_gate`;
+the no-WING handoff summary must also show
+`supervised_prestart_gate_matches_expected: true`;
+the no-WING handoff summary must also show
+`declared_supervised_prestart_gate_matches_expected: true`;
 the no-WING handoff summary must also show
 `supervised_prestart_gate.grants_live_authority: false`;
 the no-WING handoff summary must also show

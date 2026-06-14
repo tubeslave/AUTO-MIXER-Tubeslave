@@ -430,6 +430,10 @@ def build_handoff_packet(
     expected_required_supervised_proof_plan_summary_fields = list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
+    backend_port_prestart_gate = dict(expected_prestart_gate)
+    expected_backend_port_prestart_gate_dict = dict(expected_prestart_gate)
+    supervised_prestart_gate = dict(expected_supervised_gate)
+    expected_supervised_prestart_gate_dict = dict(expected_supervised_gate)
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
@@ -579,10 +583,16 @@ def build_handoff_packet(
             == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
         ),
         "backend_connection_confirmation_step_index": backend_connection_step_index,
-        "backend_port_prestart_gate": dict(expected_prestart_gate),
-        "expected_backend_port_prestart_gate": dict(expected_prestart_gate),
-        "supervised_prestart_gate": dict(expected_supervised_gate),
-        "expected_supervised_prestart_gate": dict(expected_supervised_gate),
+        "backend_port_prestart_gate": backend_port_prestart_gate,
+        "expected_backend_port_prestart_gate": expected_backend_port_prestart_gate_dict,
+        "backend_port_prestart_gate_matches_expected": (
+            backend_port_prestart_gate == expected_backend_port_prestart_gate_dict
+        ),
+        "supervised_prestart_gate": supervised_prestart_gate,
+        "expected_supervised_prestart_gate": expected_supervised_prestart_gate_dict,
+        "supervised_prestart_gate_matches_expected": (
+            supervised_prestart_gate == expected_supervised_prestart_gate_dict
+        ),
         "required_supervised_proof_plan_summary_fields": (
             required_supervised_proof_plan_summary_fields
         ),
@@ -768,6 +778,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 "",
                 "- expected_backend_port_prestart_gate: "
                 f"`{json.dumps(expected_backend_port_prestart_gate, sort_keys=True)}`",
+                "- backend_port_prestart_gate_matches_expected: "
+                f"`{str(packet.get('backend_port_prestart_gate_matches_expected')).lower()}`",
                 "- actual_matches_expected: "
                 f"`{str(backend_port_prestart_gate == expected_backend_port_prestart_gate).lower()}`",
             ]
@@ -807,6 +819,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 "",
                 "- expected_supervised_prestart_gate: "
                 f"`{json.dumps(expected_supervised_gate, sort_keys=True)}`",
+                "- supervised_prestart_gate_matches_expected: "
+                f"`{str(packet.get('supervised_prestart_gate_matches_expected')).lower()}`",
                 "- actual_matches_expected: "
                 f"`{str(supervised_gate == expected_supervised_gate).lower()}`",
             ]

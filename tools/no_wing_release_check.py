@@ -4887,10 +4887,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("expected_backend_port_prestart_gate"), Mapping)
         else {}
     )
+    declared_backend_port_prestart_gate_matches_expected = packet.get(
+        "backend_port_prestart_gate_matches_expected"
+    )
     declared_expected_supervised_prestart_gate = (
         packet.get("expected_supervised_prestart_gate")
         if isinstance(packet.get("expected_supervised_prestart_gate"), Mapping)
         else {}
+    )
+    declared_supervised_prestart_gate_matches_expected = packet.get(
+        "supervised_prestart_gate_matches_expected"
     )
     required_supervised_proof_plan_summary_fields = (
         _string_list(packet.get("required_supervised_proof_plan_summary_fields"))
@@ -5751,13 +5757,23 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             operator_sequence_step_index=0,
         )
     )
-    if backend_port_prestart_gate != expected_backend_port_prestart_gate:
+    backend_port_prestart_gate_matches_expected = (
+        backend_port_prestart_gate == expected_backend_port_prestart_gate
+    )
+    if not backend_port_prestart_gate_matches_expected:
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_port_prestart_gate_contract_mismatch"
         )
     if declared_expected_backend_port_prestart_gate != expected_backend_port_prestart_gate:
         violations.append(
             "wing_readonly_preflight_handoff_packet_expected_backend_port_prestart_gate_contract_mismatch"
+        )
+    if (
+        declared_backend_port_prestart_gate_matches_expected
+        is not backend_port_prestart_gate_matches_expected
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_backend_port_prestart_gate_match_flag_mismatch"
         )
     operator_sequence_supervised_prestart_gate_step_index = next(
         (
@@ -5845,13 +5861,23 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             operator_sequence_step_index=operator_sequence_supervised_prestart_gate_step_index,
         )
     )
-    if supervised_prestart_gate != expected_supervised_prestart_gate:
+    supervised_prestart_gate_matches_expected = (
+        supervised_prestart_gate == expected_supervised_prestart_gate
+    )
+    if not supervised_prestart_gate_matches_expected:
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_contract_mismatch"
         )
     if declared_expected_supervised_prestart_gate != expected_supervised_prestart_gate:
         violations.append(
             "wing_readonly_preflight_handoff_packet_expected_supervised_prestart_gate_contract_mismatch"
+        )
+    if (
+        declared_supervised_prestart_gate_matches_expected
+        is not supervised_prestart_gate_matches_expected
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_match_flag_mismatch"
         )
     if (
         required_supervised_proof_plan_summary_fields
@@ -6140,6 +6166,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["declared_expected_backend_port_prestart_gate"] = dict(
         declared_expected_backend_port_prestart_gate
+    )
+    detail["backend_port_prestart_gate_matches_expected"] = (
+        backend_port_prestart_gate_matches_expected
+    )
+    detail["declared_backend_port_prestart_gate_matches_expected"] = (
+        declared_backend_port_prestart_gate_matches_expected
     )
     detail["backend_port_prestart_check_command"] = packet.get(
         "backend_port_prestart_check_command"
@@ -6439,6 +6471,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["expected_supervised_prestart_gate"] = dict(expected_supervised_prestart_gate)
     detail["declared_expected_supervised_prestart_gate"] = dict(
         declared_expected_supervised_prestart_gate
+    )
+    detail["supervised_prestart_gate_matches_expected"] = (
+        supervised_prestart_gate_matches_expected
+    )
+    detail["declared_supervised_prestart_gate_matches_expected"] = (
+        declared_supervised_prestart_gate_matches_expected
     )
     detail["required_supervised_prestart_gate_markers"] = list(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
@@ -14090,8 +14128,20 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         declared_expected_backend_port_prestart_gate = detail.get(
             "declared_expected_backend_port_prestart_gate"
         )
+        backend_port_prestart_gate_matches_expected = detail.get(
+            "backend_port_prestart_gate_matches_expected"
+        )
+        declared_backend_port_prestart_gate_matches_expected = detail.get(
+            "declared_backend_port_prestart_gate_matches_expected"
+        )
         supervised_prestart_gate = detail.get("supervised_prestart_gate")
         expected_supervised_prestart_gate = detail.get("expected_supervised_prestart_gate")
+        supervised_prestart_gate_matches_expected = detail.get(
+            "supervised_prestart_gate_matches_expected"
+        )
+        declared_supervised_prestart_gate_matches_expected = detail.get(
+            "declared_supervised_prestart_gate_matches_expected"
+        )
         required_supervised_proof_plan_summary_fields = detail.get(
             "required_supervised_proof_plan_summary_fields"
         )
@@ -14212,6 +14262,12 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 dict(declared_expected_backend_port_prestart_gate)
                 if isinstance(declared_expected_backend_port_prestart_gate, Mapping)
                 else {}
+            ),
+            "backend_port_prestart_gate_matches_expected": (
+                backend_port_prestart_gate_matches_expected is True
+            ),
+            "declared_backend_port_prestart_gate_matches_expected": (
+                declared_backend_port_prestart_gate_matches_expected is True
             ),
             "backend_port_prestart_check_failure_detail_fields": (
                 list(detail.get("backend_port_prestart_check_failure_detail_fields"))
@@ -14820,6 +14876,12 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 dict(expected_supervised_prestart_gate)
                 if isinstance(expected_supervised_prestart_gate, Mapping)
                 else {}
+            ),
+            "supervised_prestart_gate_matches_expected": (
+                supervised_prestart_gate_matches_expected is True
+            ),
+            "declared_supervised_prestart_gate_matches_expected": (
+                declared_supervised_prestart_gate_matches_expected is True
             ),
             "violations": list(violations) if isinstance(violations, list) else [],
         }
@@ -18425,6 +18487,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_gate'])}`",
                 "- expected_backend_port_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_backend_port_prestart_gate'])}`",
+                "- backend_port_prestart_gate_matches_expected: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_gate_matches_expected']).lower()}`",
+                "- declared_backend_port_prestart_gate_matches_expected: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_backend_port_prestart_gate_matches_expected']).lower()}`",
                 "- backend_port_prestart_check_failure_detail_fields: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_failure_detail_fields'])}`",
                 "- review_command_writes_decision_template: "
@@ -18607,6 +18673,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate'])}`",
                 "- expected_supervised_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_supervised_prestart_gate'])}`",
+                "- supervised_prestart_gate_matches_expected: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_matches_expected']).lower()}`",
+                "- declared_supervised_prestart_gate_matches_expected: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_supervised_prestart_gate_matches_expected']).lower()}`",
                 "- violations: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['violations'])}`",
             ]

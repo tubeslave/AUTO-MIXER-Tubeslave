@@ -163,6 +163,9 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned before the no-WING handoff summary shows
   `backend_port_prestart_gate` exactly matching
   `expected_backend_port_prestart_gate`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `backend_port_prestart_gate_matches_expected: true` and
+  `declared_backend_port_prestart_gate_matches_expected: true`.
 - A supervised proof is planned while `backend_port_prestart_gate` claims
   `grants_live_authority: true`, or while
   `backend_port_prestart_gate.must_pass_before_backend_wing_session` is not
@@ -291,6 +294,9 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned before the no-WING handoff summary shows
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `supervised_prestart_gate_matches_expected: true` and
+  `declared_supervised_prestart_gate_matches_expected: true`.
 - A supervised proof is planned while `supervised_prestart_gate` claims
   `grants_live_authority: true`.
 - A supervised proof is planned while `supervised_prestart_gate` does not show

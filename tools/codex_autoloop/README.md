@@ -429,6 +429,11 @@ you want the background automation active.
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_gate_matches_expected: true`,
+  `declared_backend_port_prestart_gate_matches_expected: true`,
+  `supervised_prestart_gate_matches_expected: true`, and
+  `declared_supervised_prestart_gate_matches_expected: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `required_supervised_proof_plan_summary_fields`,
   `expected_required_supervised_proof_plan_summary_fields`, and
   `required_supervised_proof_plan_summary_fields_match_contract: true`.

@@ -994,6 +994,16 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "required_supervised_proof_plan_summary_fields_match_contract: true"
         in current_command
     )
+    assert "backend_port_prestart_gate_matches_expected: true" in current_command
+    assert (
+        "declared_backend_port_prestart_gate_matches_expected: true"
+        in current_command
+    )
+    assert "supervised_prestart_gate_matches_expected: true" in current_command
+    assert (
+        "declared_supervised_prestart_gate_matches_expected: true"
+        in current_command
+    )
     assert (
         "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
         in current_command
@@ -1481,6 +1491,10 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "required_supervised_proof_plan_summary_fields" in text
     assert "expected_required_supervised_proof_plan_summary_fields" in text
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in text
+    assert "backend_port_prestart_gate_matches_expected: true" in text
+    assert "declared_backend_port_prestart_gate_matches_expected: true" in text
+    assert "supervised_prestart_gate_matches_expected: true" in text
+    assert "declared_supervised_prestart_gate_matches_expected: true" in text
     assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in text
     assert (
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
