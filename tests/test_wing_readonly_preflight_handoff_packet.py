@@ -225,6 +225,11 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP
     )
     assert len(packet["operator_sequence"]) == 10
+    assert packet["operator_sequence_sha256"] == (
+        no_wing_release_check.wing_readonly_operator_sequence_sha256(
+            packet["operator_sequence"]
+        )
+    )
     first_gate_step = packet["operator_sequence"][0]
     assert packet["backend_port_prestart_gate"] == expected_backend_port_prestart_gate(
         operator_sequence_step=first_gate_step,
@@ -294,6 +299,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "selected_evidence_file_count" in rendered
     assert "mvp_blocker_anchor_sha256" in rendered
     assert packet["mvp_blocker_anchor_sha256"] in rendered
+    assert "operator_sequence_sha256" in rendered
+    assert packet["operator_sequence_sha256"] in rendered
     assert "tools/wing_readonly_preflight_runner.py" in rendered
     assert "actual_matches_expected: `true`" in rendered
     assert "operator_sequence_step_must_be_final: `true`" in rendered

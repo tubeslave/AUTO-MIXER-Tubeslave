@@ -420,6 +420,9 @@ continue to:
 The handoff validation must report:
 
 - `operator_sequence_count: 10`
+- `operator_sequence_sha256`
+- `actual_operator_sequence_sha256`
+- `operator_sequence_sha256_matches_actual: true`
 - `declared_operator_sequence_count: 10`
 - `declared_expected_operator_sequence_count: 10`
 - `declared_operator_sequence_count_contract_flag: true`

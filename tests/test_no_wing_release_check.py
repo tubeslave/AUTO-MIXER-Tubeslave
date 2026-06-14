@@ -1217,7 +1217,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
 def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dict:
     plan_payload = valid_wing_readonly_preflight_plan_payload(plan_path)
     request_sequence = list(plan_payload["request_sequence"])
-    return {
+    payload = {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": "2026-06-07T00:00:00Z",
         "status": "operator_hardware_step_required",
@@ -1526,6 +1526,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
         ),
     }
+    payload["operator_sequence_sha256"] = (
+        release_check.wing_readonly_operator_sequence_sha256(
+            payload["operator_sequence"]
+        )
+    )
+    return payload
 
 
 def test_no_wing_release_check_fail_closed_conditions_use_shared_contract():
@@ -3231,6 +3237,15 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
     )
     assert result.detail["operator_sequence_count_matches_contract"] is True
+    assert result.detail["operator_sequence_sha256"] == (
+        release_check.wing_readonly_operator_sequence_sha256(
+            result.detail["operator_sequence"]
+        )
+    )
+    assert result.detail["actual_operator_sequence_sha256"] == result.detail[
+        "operator_sequence_sha256"
+    ]
+    assert result.detail["operator_sequence_sha256_matches_actual"] is True
     assert (
         result.detail["declared_operator_sequence_count"]
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
@@ -4475,6 +4490,43 @@ def test_no_wing_release_check_rejects_handoff_packet_with_declared_operator_seq
     )
     assert (
         "wing_readonly_preflight_handoff_packet_declared_operator_sequence_count_contract_flag_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_operator_sequence_sha256_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-operator-sequence-sha-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"][3] = "Skip selected-channel safety confirmation."
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        result.detail["operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert result.detail["operator_sequence_count_matches_contract"] is True
+    assert result.detail["operator_sequence_sha256"] == payload[
+        "operator_sequence_sha256"
+    ]
+    assert result.detail["actual_operator_sequence_sha256"] != payload[
+        "operator_sequence_sha256"
+    ]
+    assert result.detail["operator_sequence_sha256_matches_actual"] is False
+    assert (
+        "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_mismatch"
         in result.detail["violations"]
     )
 
@@ -11282,6 +11334,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
             ),
             "operator_sequence_count_matches_contract": True,
+            "operator_sequence_sha256": "b" * 64,
+            "actual_operator_sequence_sha256": "b" * 64,
+            "operator_sequence_sha256_matches_actual": True,
             "declared_operator_sequence_count": (
                 WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
             ),
@@ -11590,6 +11645,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
     )
     assert artifact["operator_sequence_count_matches_contract"] is True
+    assert artifact["operator_sequence_sha256"] == "b" * 64
+    assert artifact["actual_operator_sequence_sha256"] == "b" * 64
+    assert artifact["operator_sequence_sha256_matches_actual"] is True
     assert (
         artifact["declared_operator_sequence_count"]
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
@@ -11753,6 +11811,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "operator_sequence_capture_readonly_preflight_step_index: `4`" in (
         markdown_summary
     )
+    assert "operator_sequence_sha256: `" in markdown_summary
+    assert "actual_operator_sequence_sha256: `" in markdown_summary
+    assert "operator_sequence_sha256_matches_actual: `true`" in markdown_summary
     assert "backend_port_prestart_gate" in markdown_summary
     assert "expected_backend_port_prestart_gate" in markdown_summary
     assert "prestart_backend_port_check_command" in markdown_summary

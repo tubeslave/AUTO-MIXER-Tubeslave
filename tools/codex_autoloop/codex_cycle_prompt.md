@@ -263,45 +263,46 @@ blockers выше.
 53. verify `operator_sequence_count: 10`;
 54. verify `expected_operator_sequence_count: 10`;
 55. verify `operator_sequence_count_matches_contract: true`;
-56. verify `declared_operator_sequence_count: 10`;
-57. verify `declared_expected_operator_sequence_count: 10`;
-58. verify `declared_operator_sequence_count_contract_flag: true`;
-59. verify `declared_operator_sequence_count_matches_actual: true`;
-60. verify `declared_operator_sequence_count_matches_contract: true`;
-61. verify `declared_expected_operator_sequence_count_matches_contract: true`;
-62. verify
+56. verify `operator_sequence_sha256_matches_actual: true`;
+57. verify `declared_operator_sequence_count: 10`;
+58. verify `declared_expected_operator_sequence_count: 10`;
+59. verify `declared_operator_sequence_count_contract_flag: true`;
+60. verify `declared_operator_sequence_count_matches_actual: true`;
+61. verify `declared_operator_sequence_count_matches_contract: true`;
+62. verify `declared_expected_operator_sequence_count_matches_contract: true`;
+63. verify
    `declared_operator_sequence_count_contract_flag_matches_declared_count: true`;
-63. verify `mvp_blocker_anchor_digest_review_step_index: 8`;
-64. verify `expected_mvp_blocker_anchor_digest_review_step_index: 8`;
-65. verify `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`;
-66. verify
+64. verify `mvp_blocker_anchor_digest_review_step_index: 8`;
+65. verify `expected_mvp_blocker_anchor_digest_review_step_index: 8`;
+66. verify `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`;
+67. verify
    `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`;
-67. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-68. verify
-   `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+68. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
 69. verify
+   `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+70. verify
    `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`;
-70. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+71. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-71. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-72. verify `expected_operator_sequence_supervised_prestart_gate_step_index: 9`;
-73. verify
+72. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+73. verify `expected_operator_sequence_supervised_prestart_gate_step_index: 9`;
+74. verify
    `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`;
-74. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+75. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-75. verify `required_supervised_prestart_gate_markers` exactly lists
+76. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-76. run dry-run recommendation;
-77. require explicit operator approval for the exact action;
-78. apply only bounded supervised fader/gain action;
-79. read back the result;
-80. test rollback;
-81. record proof artifact.
+77. run dry-run recommendation;
+78. require explicit operator approval for the exact action;
+79. apply only bounded supervised fader/gain action;
+80. read back the result;
+81. test rollback;
+82. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -527,6 +528,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `expected_operator_sequence_count: 10` and
   `operator_sequence_count_matches_contract: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `operator_sequence_sha256`, `actual_operator_sequence_sha256`, and
+  `operator_sequence_sha256_matches_actual: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `declared_operator_sequence_count: 10`,
   `declared_expected_operator_sequence_count: 10`,

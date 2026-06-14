@@ -590,6 +590,15 @@ def wing_mvp_blocker_anchor_sha256(anchor: Mapping[str, object]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def wing_readonly_operator_sequence_sha256(operator_sequence: Sequence[object]) -> str:
+    canonical = json.dumps(
+        list(operator_sequence),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def wing_mvp_first_open_blocker_anchor(
     blockers_path: Path | None = None,
 ) -> dict[str, object]:
@@ -4768,6 +4777,11 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     declared_operator_sequence_count_contract_flag = (
         packet.get("operator_sequence_count_matches_contract") is True
     )
+    declared_operator_sequence_sha256 = (
+        str(packet.get("operator_sequence_sha256"))
+        if isinstance(packet.get("operator_sequence_sha256"), str)
+        else ""
+    )
     supervised_prestart_gate = (
         packet.get("supervised_prestart_gate")
         if isinstance(packet.get("supervised_prestart_gate"), Mapping)
@@ -5396,6 +5410,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     operator_sequence_count_matches_contract = (
         operator_sequence_count == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
     )
+    actual_operator_sequence_sha256 = wing_readonly_operator_sequence_sha256(
+        operator_sequence
+    )
+    operator_sequence_sha256_matches_actual = (
+        bool(declared_operator_sequence_sha256)
+        and declared_operator_sequence_sha256 == actual_operator_sequence_sha256
+    )
     declared_operator_sequence_count_matches_actual = (
         declared_operator_sequence_count == operator_sequence_count
     )
@@ -5416,6 +5437,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not operator_sequence_count_matches_contract:
         violations.append(
             "wing_readonly_preflight_handoff_packet_operator_sequence_count_mismatch"
+        )
+    if not operator_sequence_sha256_matches_actual:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_mismatch"
         )
     if not declared_operator_sequence_count_matches_actual:
         violations.append(
@@ -5900,11 +5925,17 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
     )
     detail["operator_sequence_count"] = len(operator_sequence)
+    detail["operator_sequence"] = list(operator_sequence)
     detail["expected_operator_sequence_count"] = (
         WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
     )
     detail["operator_sequence_count_matches_contract"] = (
         operator_sequence_count_matches_contract
+    )
+    detail["operator_sequence_sha256"] = declared_operator_sequence_sha256
+    detail["actual_operator_sequence_sha256"] = actual_operator_sequence_sha256
+    detail["operator_sequence_sha256_matches_actual"] = (
+        operator_sequence_sha256_matches_actual
     )
     detail["declared_operator_sequence_count"] = declared_operator_sequence_count
     detail["declared_expected_operator_sequence_count"] = (
@@ -13728,6 +13759,15 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "operator_sequence_count_matches_contract": (
                 detail.get("operator_sequence_count_matches_contract") is True
             ),
+            "operator_sequence_sha256": str(
+                detail.get("operator_sequence_sha256") or ""
+            ),
+            "actual_operator_sequence_sha256": str(
+                detail.get("actual_operator_sequence_sha256") or ""
+            ),
+            "operator_sequence_sha256_matches_actual": (
+                detail.get("operator_sequence_sha256_matches_actual") is True
+            ),
             "declared_operator_sequence_count": int(
                 detail.get("declared_operator_sequence_count") or 0
             ),
@@ -17428,6 +17468,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_count']}`",
                 "- operator_sequence_count_matches_contract: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count_matches_contract']).lower()}`",
+                "- operator_sequence_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_sha256']}`",
+                "- actual_operator_sequence_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['actual_operator_sequence_sha256']}`",
+                "- operator_sequence_sha256_matches_actual: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_sha256_matches_actual']).lower()}`",
                 "- declared_operator_sequence_count: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_count']}`",
                 "- declared_expected_operator_sequence_count: "

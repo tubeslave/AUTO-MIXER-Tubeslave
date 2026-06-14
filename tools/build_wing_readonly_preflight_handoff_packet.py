@@ -393,6 +393,11 @@ def build_handoff_packet(
         supervised_gate_step,
     ]
     operator_sequence_count = len(operator_sequence)
+    operator_sequence_sha256 = (
+        no_wing_release_check.wing_readonly_operator_sequence_sha256(
+            operator_sequence
+        )
+    )
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
@@ -471,6 +476,7 @@ def build_handoff_packet(
         "mvp_blocker_anchor": mvp_blocker_anchor,
         "mvp_blocker_anchor_sha256": mvp_blocker_anchor_sha256,
         "operator_sequence": operator_sequence,
+        "operator_sequence_sha256": operator_sequence_sha256,
         "operator_sequence_count": operator_sequence_count,
         "expected_operator_sequence_count": (
             WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
@@ -563,6 +569,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{packet['expected_operator_sequence_count']}`",
         "- operator_sequence_count_matches_contract: "
         f"`{str(packet['operator_sequence_count_matches_contract']).lower()}`",
+        "- operator_sequence_sha256: "
+        f"`{packet['operator_sequence_sha256']}`",
         "- mvp_blocker_anchor_digest_review_step_index: "
         f"`{packet['mvp_blocker_anchor_digest_review_step_index']}`",
         "",
