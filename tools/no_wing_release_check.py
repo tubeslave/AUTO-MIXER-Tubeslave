@@ -302,6 +302,7 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
 )
 from backend.safety_coverage_matrix import get_safety_coverage_row  # noqa: E402
 from backend import wing_readonly_preflight_contract as preflight_contract  # noqa: E402
+from tools.codex_autoloop import update_mvp_progress  # noqa: E402
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES,
@@ -596,6 +597,10 @@ def wing_mvp_blocker_anchor_sha256(anchor: Mapping[str, object]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def wing_mvp_selected_action_sha256(action: str) -> str:
+    return hashlib.sha256(action.encode("utf-8")).hexdigest()
+
+
 def wing_readonly_operator_sequence_sha256(operator_sequence: Sequence[object]) -> str:
     canonical = json.dumps(
         list(operator_sequence),
@@ -643,6 +648,57 @@ def wing_mvp_first_open_blocker_anchor(
         "selected_action": first_open["next_action"],
         "selected_evidence_file_count": len(evidence_files),
         "selected_evidence_files": evidence_files,
+        "packet_does_not_close_blocker": True,
+    }
+
+
+def wing_mvp_project_director_selected_action_anchor(
+    blockers_path: Path | None = None,
+) -> dict[str, object]:
+    path = blockers_path or (REPO_ROOT / WING_MVP_BLOCKERS_TABLE)
+    rows = update_mvp_progress.parse_blocker_table(path)
+    first_open = update_mvp_progress.first_open_blocker(rows)
+    current_first_command = update_mvp_progress.current_first_command(path)
+    missing_markers = update_mvp_progress.current_first_command_missing_baseline_markers(
+        current_first_command
+    )
+    if first_open:
+        selected_blocker = first_open["blocker"]
+        selected_status = first_open["status"]
+        selected_action, selected_action_source = update_mvp_progress.selected_action_text(
+            blocker_next_action=first_open["next action"],
+            current_first_command=current_first_command,
+        )
+        baseline_coverage_required = bool(
+            current_first_command and current_first_command != first_open["next action"]
+        )
+    else:
+        selected_blocker = "none"
+        selected_status = "closed"
+        selected_action = (
+            "All MVP blockers are closed; prepare operator review before widening scope."
+        )
+        selected_action_source = "all_blockers_closed"
+        baseline_coverage_required = False
+    return {
+        "anchor_schema": "project_director_selected_action.v1",
+        "blocker_table": WING_MVP_BLOCKERS_TABLE,
+        "selected_blocker": selected_blocker,
+        "selected_blocker_status": selected_status,
+        "selected_action": selected_action,
+        "selected_action_source": selected_action_source,
+        "selected_action_sha256": wing_mvp_selected_action_sha256(selected_action),
+        "current_first_command_present": bool(current_first_command),
+        "current_first_command_baseline_coverage_required": (
+            baseline_coverage_required
+        ),
+        "current_first_command_baseline_coverage_passed": (
+            bool(current_first_command) and not missing_markers
+        ),
+        "current_first_command_baseline_coverage_marker_count": len(
+            update_mvp_progress.CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS
+        ),
+        "current_first_command_baseline_missing_markers": missing_markers,
         "packet_does_not_close_blocker": True,
     }
 
@@ -4845,6 +4901,58 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         else {}
     )
     expected_mvp_blocker_anchor = wing_mvp_first_open_blocker_anchor()
+    project_director_action_anchor = (
+        packet.get("project_director_selected_action_anchor")
+        if isinstance(packet.get("project_director_selected_action_anchor"), Mapping)
+        else {}
+    )
+    expected_project_director_action_anchor = (
+        wing_mvp_project_director_selected_action_anchor()
+    )
+    project_director_selected_action_source = str(
+        packet.get("project_director_selected_action_source") or ""
+    )
+    project_director_selected_action_sha256 = str(
+        packet.get("project_director_selected_action_sha256") or ""
+    )
+    project_director_selected_action_sha256_available = (
+        packet.get("project_director_selected_action_sha256_available") is True
+    )
+    expected_project_director_selected_action_sha256 = str(
+        expected_project_director_action_anchor.get("selected_action_sha256") or ""
+    )
+    actual_project_director_selected_action_sha256 = (
+        wing_mvp_selected_action_sha256(
+            str(project_director_action_anchor.get("selected_action") or "")
+        )
+        if project_director_action_anchor
+        else ""
+    )
+    project_director_anchor_declared_action_sha256 = str(
+        project_director_action_anchor.get("selected_action_sha256") or ""
+    )
+    project_director_selected_action_sha256_matches_anchor = (
+        bool(project_director_selected_action_sha256)
+        and project_director_selected_action_sha256
+        == project_director_anchor_declared_action_sha256
+    )
+    project_director_selected_action_sha256_matches_text = (
+        bool(project_director_anchor_declared_action_sha256)
+        and project_director_anchor_declared_action_sha256
+        == actual_project_director_selected_action_sha256
+    )
+    project_director_selected_action_sha256_matches_current_directive = (
+        bool(project_director_selected_action_sha256)
+        and project_director_selected_action_sha256
+        == expected_project_director_selected_action_sha256
+    )
+    project_director_selected_action_sha256_available_matches_digest = (
+        project_director_selected_action_sha256_available
+        == bool(project_director_selected_action_sha256)
+    )
+    project_director_anchor_matches_current_directive = (
+        dict(project_director_action_anchor) == expected_project_director_action_anchor
+    )
     mvp_blocker_anchor_sha256 = (
         str(packet.get("mvp_blocker_anchor_sha256"))
         if isinstance(packet.get("mvp_blocker_anchor_sha256"), str)
@@ -5735,6 +5843,85 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_expected_mvp_blocker_anchor_sha256_mismatch"
         )
+    if not project_director_action_anchor:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_anchor_missing"
+        )
+    elif not project_director_anchor_matches_current_directive:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_anchor_mismatch"
+        )
+    if project_director_action_anchor.get("packet_does_not_close_blocker") is not True:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_anchor_closes_blocker"
+        )
+    if (
+        project_director_selected_action_source
+        != expected_project_director_action_anchor.get("selected_action_source")
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_source_mismatch"
+        )
+    if not project_director_selected_action_sha256:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_missing"
+        )
+    elif not project_director_selected_action_sha256_matches_anchor:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_anchor_mismatch"
+        )
+    if not project_director_selected_action_sha256_matches_text:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_text_mismatch"
+        )
+    if not project_director_selected_action_sha256_matches_current_directive:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_current_directive_mismatch"
+        )
+    if not project_director_selected_action_sha256_available_matches_digest:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_available_mismatch"
+        )
+    if (
+        packet.get(
+            "project_director_current_first_command_baseline_coverage_required"
+        )
+        != expected_project_director_action_anchor[
+            "current_first_command_baseline_coverage_required"
+        ]
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_baseline_coverage_required_mismatch"
+        )
+    if (
+        packet.get("project_director_current_first_command_baseline_coverage_passed")
+        != expected_project_director_action_anchor[
+            "current_first_command_baseline_coverage_passed"
+        ]
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_baseline_coverage_passed_mismatch"
+        )
+    if (
+        packet.get(
+            "project_director_current_first_command_baseline_coverage_marker_count"
+        )
+        != expected_project_director_action_anchor[
+            "current_first_command_baseline_coverage_marker_count"
+        ]
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_baseline_coverage_marker_count_mismatch"
+        )
+    if (
+        packet.get("project_director_current_first_command_baseline_missing_markers")
+        != expected_project_director_action_anchor[
+            "current_first_command_baseline_missing_markers"
+        ]
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_baseline_missing_markers_mismatch"
+        )
 
     detail["packet_type"] = packet.get("type")
     detail["packet_status"] = packet.get("status")
@@ -6147,6 +6334,72 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["mvp_blocker_anchor_sha256_matches_current_first_open"] = (
         mvp_blocker_anchor_sha256 == expected_mvp_blocker_anchor_sha256
+    )
+    detail["project_director_selected_action_anchor"] = dict(
+        project_director_action_anchor
+    )
+    detail["expected_project_director_selected_action_anchor"] = dict(
+        expected_project_director_action_anchor
+    )
+    detail["project_director_selected_action_anchor_matches_current_directive"] = (
+        project_director_anchor_matches_current_directive
+    )
+    detail["project_director_selected_action_source"] = (
+        project_director_selected_action_source
+    )
+    detail["expected_project_director_selected_action_source"] = str(
+        expected_project_director_action_anchor.get("selected_action_source") or ""
+    )
+    detail["project_director_selected_action_source_matches_current_directive"] = (
+        project_director_selected_action_source
+        == expected_project_director_action_anchor.get("selected_action_source")
+    )
+    detail["project_director_selected_action_sha256"] = (
+        project_director_selected_action_sha256
+    )
+    detail["actual_project_director_selected_action_sha256"] = (
+        actual_project_director_selected_action_sha256
+    )
+    detail["expected_project_director_selected_action_sha256"] = (
+        expected_project_director_selected_action_sha256
+    )
+    detail["project_director_selected_action_sha256_available"] = (
+        project_director_selected_action_sha256_available
+    )
+    detail["project_director_selected_action_sha256_available_matches_digest"] = (
+        project_director_selected_action_sha256_available_matches_digest
+    )
+    detail["project_director_selected_action_sha256_matches_anchor"] = (
+        project_director_selected_action_sha256_matches_anchor
+    )
+    detail["project_director_selected_action_sha256_matches_text"] = (
+        project_director_selected_action_sha256_matches_text
+    )
+    detail[
+        "project_director_selected_action_sha256_matches_current_directive"
+    ] = project_director_selected_action_sha256_matches_current_directive
+    detail["project_director_current_first_command_baseline_coverage_required"] = (
+        packet.get(
+            "project_director_current_first_command_baseline_coverage_required"
+        )
+    )
+    detail["project_director_current_first_command_baseline_coverage_passed"] = (
+        packet.get("project_director_current_first_command_baseline_coverage_passed")
+    )
+    detail["project_director_current_first_command_baseline_coverage_marker_count"] = (
+        packet.get(
+            "project_director_current_first_command_baseline_coverage_marker_count"
+        )
+    )
+    detail["project_director_current_first_command_baseline_missing_markers"] = (
+        packet.get("project_director_current_first_command_baseline_missing_markers")
+        if isinstance(
+            packet.get(
+                "project_director_current_first_command_baseline_missing_markers"
+            ),
+            list,
+        )
+        else []
     )
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
@@ -13708,6 +13961,12 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         )
         mvp_blocker_anchor = detail.get("mvp_blocker_anchor")
         expected_mvp_blocker_anchor = detail.get("expected_mvp_blocker_anchor")
+        project_director_action_anchor = detail.get(
+            "project_director_selected_action_anchor"
+        )
+        expected_project_director_action_anchor = detail.get(
+            "expected_project_director_selected_action_anchor"
+        )
         return {
             "status": result.status,
             "read_only": detail.get("read_only") is True,
@@ -14148,6 +14407,98 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "mvp_blocker_anchor_sha256_matches_current_first_open": (
                 detail.get("mvp_blocker_anchor_sha256_matches_current_first_open") is True
+            ),
+            "project_director_selected_action_anchor": (
+                dict(project_director_action_anchor)
+                if isinstance(project_director_action_anchor, Mapping)
+                else {}
+            ),
+            "expected_project_director_selected_action_anchor": (
+                dict(expected_project_director_action_anchor)
+                if isinstance(expected_project_director_action_anchor, Mapping)
+                else {}
+            ),
+            "project_director_selected_action_anchor_matches_current_directive": (
+                detail.get(
+                    "project_director_selected_action_anchor_matches_current_directive"
+                )
+                is True
+            ),
+            "project_director_selected_action_source": str(
+                detail.get("project_director_selected_action_source") or ""
+            ),
+            "expected_project_director_selected_action_source": str(
+                detail.get("expected_project_director_selected_action_source") or ""
+            ),
+            "project_director_selected_action_source_matches_current_directive": (
+                detail.get(
+                    "project_director_selected_action_source_matches_current_directive"
+                )
+                is True
+            ),
+            "project_director_selected_action_sha256": str(
+                detail.get("project_director_selected_action_sha256") or ""
+            ),
+            "actual_project_director_selected_action_sha256": str(
+                detail.get("actual_project_director_selected_action_sha256") or ""
+            ),
+            "expected_project_director_selected_action_sha256": str(
+                detail.get("expected_project_director_selected_action_sha256") or ""
+            ),
+            "project_director_selected_action_sha256_available": (
+                detail.get("project_director_selected_action_sha256_available") is True
+            ),
+            "project_director_selected_action_sha256_available_matches_digest": (
+                detail.get(
+                    "project_director_selected_action_sha256_available_matches_digest"
+                )
+                is True
+            ),
+            "project_director_selected_action_sha256_matches_anchor": (
+                detail.get("project_director_selected_action_sha256_matches_anchor")
+                is True
+            ),
+            "project_director_selected_action_sha256_matches_text": (
+                detail.get("project_director_selected_action_sha256_matches_text")
+                is True
+            ),
+            "project_director_selected_action_sha256_matches_current_directive": (
+                detail.get(
+                    "project_director_selected_action_sha256_matches_current_directive"
+                )
+                is True
+            ),
+            "project_director_current_first_command_baseline_coverage_required": (
+                detail.get(
+                    "project_director_current_first_command_baseline_coverage_required"
+                )
+                is True
+            ),
+            "project_director_current_first_command_baseline_coverage_passed": (
+                detail.get(
+                    "project_director_current_first_command_baseline_coverage_passed"
+                )
+                is True
+            ),
+            "project_director_current_first_command_baseline_coverage_marker_count": int(
+                detail.get(
+                    "project_director_current_first_command_baseline_coverage_marker_count"
+                )
+                or 0
+            ),
+            "project_director_current_first_command_baseline_missing_markers": (
+                list(
+                    detail.get(
+                        "project_director_current_first_command_baseline_missing_markers"
+                    )
+                )
+                if isinstance(
+                    detail.get(
+                        "project_director_current_first_command_baseline_missing_markers"
+                    ),
+                    list,
+                )
+                else []
             ),
             "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
             "expected_operator_sequence_count": int(
@@ -17995,6 +18346,42 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor'])}`",
                 "- expected_mvp_blocker_anchor: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_mvp_blocker_anchor'])}`",
+                "- project_director_selected_action_source: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_source']}`",
+                "- expected_project_director_selected_action_source: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_project_director_selected_action_source']}`",
+                "- project_director_selected_action_source_matches_current_directive: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_source_matches_current_directive']).lower()}`",
+                "- project_director_selected_action_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_sha256']}`",
+                "- actual_project_director_selected_action_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['actual_project_director_selected_action_sha256']}`",
+                "- expected_project_director_selected_action_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_project_director_selected_action_sha256']}`",
+                "- project_director_selected_action_sha256_available: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_sha256_available']).lower()}`",
+                "- project_director_selected_action_sha256_available_matches_digest: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_sha256_available_matches_digest']).lower()}`",
+                "- project_director_selected_action_sha256_matches_anchor: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_sha256_matches_anchor']).lower()}`",
+                "- project_director_selected_action_sha256_matches_text: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_sha256_matches_text']).lower()}`",
+                "- project_director_selected_action_sha256_matches_current_directive: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_sha256_matches_current_directive']).lower()}`",
+                "- project_director_selected_action_anchor_matches_current_directive: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_anchor_matches_current_directive']).lower()}`",
+                "- project_director_current_first_command_baseline_coverage_required: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_current_first_command_baseline_coverage_required']).lower()}`",
+                "- project_director_current_first_command_baseline_coverage_passed: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_current_first_command_baseline_coverage_passed']).lower()}`",
+                "- project_director_current_first_command_baseline_coverage_marker_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['project_director_current_first_command_baseline_coverage_marker_count']}`",
+                "- project_director_current_first_command_baseline_missing_markers: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['project_director_current_first_command_baseline_missing_markers'])}`",
+                "- project_director_selected_action_anchor: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_anchor'])}`",
+                "- expected_project_director_selected_action_anchor: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_project_director_selected_action_anchor'])}`",
                 "- operator_sequence_count: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count']}`",
                 "- expected_operator_sequence_count: "

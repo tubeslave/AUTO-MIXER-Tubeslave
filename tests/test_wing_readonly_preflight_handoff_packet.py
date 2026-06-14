@@ -217,6 +217,42 @@ def test_handoff_packet_builds_readonly_operator_sequence():
             packet["mvp_blocker_anchor"]
         )
     )
+    assert packet["project_director_selected_action_anchor"] == (
+        no_wing_release_check.wing_mvp_project_director_selected_action_anchor()
+    )
+    assert packet["project_director_selected_action_source"] == (
+        packet["project_director_selected_action_anchor"]["selected_action_source"]
+    )
+    assert packet["project_director_selected_action_source"] == "Current First Command"
+    assert packet["project_director_selected_action_sha256"] == (
+        packet["project_director_selected_action_anchor"]["selected_action_sha256"]
+    )
+    assert packet["project_director_selected_action_sha256"] == hashlib.sha256(
+        packet["project_director_selected_action_anchor"]["selected_action"].encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    assert packet["project_director_selected_action_sha256_available"] is True
+    assert (
+        packet["project_director_current_first_command_baseline_coverage_required"]
+        is True
+    )
+    assert (
+        packet["project_director_current_first_command_baseline_coverage_passed"]
+        is True
+    )
+    assert (
+        packet[
+            "project_director_current_first_command_baseline_coverage_marker_count"
+        ]
+        == packet["project_director_selected_action_anchor"][
+            "current_first_command_baseline_coverage_marker_count"
+        ]
+    )
+    assert (
+        packet["project_director_current_first_command_baseline_missing_markers"]
+        == []
+    )
     assert (
         packet["mvp_blocker_anchor"]["selected_blocker"]
         == "WING read-only connection proof"
@@ -317,6 +353,22 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "selected_evidence_file_count" in rendered
     assert "mvp_blocker_anchor_sha256" in rendered
     assert packet["mvp_blocker_anchor_sha256"] in rendered
+    assert "## Project Director Selected Action Anchor" in rendered
+    assert "project_director_selected_action_source: `Current First Command`" in rendered
+    assert "project_director_selected_action_sha256" in rendered
+    assert packet["project_director_selected_action_sha256"] in rendered
+    assert (
+        "project_director_current_first_command_baseline_coverage_required: `true`"
+        in rendered
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_passed: `true`"
+        in rendered
+    )
+    assert (
+        "current_first_command_baseline_missing_markers: `[]`"
+        in rendered
+    )
     assert "operator_sequence_sha256" in rendered
     assert packet["operator_sequence_sha256"] in rendered
     assert "expected_operator_sequence_sha256" in rendered

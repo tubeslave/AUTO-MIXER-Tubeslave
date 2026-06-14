@@ -1226,6 +1226,9 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
 def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dict:
     plan_payload = valid_wing_readonly_preflight_plan_payload(plan_path)
     request_sequence = list(plan_payload["request_sequence"])
+    project_director_action_anchor = (
+        release_check.wing_mvp_project_director_selected_action_anchor()
+    )
     payload = {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": "2026-06-07T00:00:00Z",
@@ -1406,6 +1409,34 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "mvp_blocker_anchor": release_check.wing_mvp_first_open_blocker_anchor(),
         "mvp_blocker_anchor_sha256": release_check.wing_mvp_blocker_anchor_sha256(
             release_check.wing_mvp_first_open_blocker_anchor()
+        ),
+        "project_director_selected_action_anchor": project_director_action_anchor,
+        "project_director_selected_action_source": (
+            project_director_action_anchor["selected_action_source"]
+        ),
+        "project_director_selected_action_sha256": (
+            project_director_action_anchor["selected_action_sha256"]
+        ),
+        "project_director_selected_action_sha256_available": True,
+        "project_director_current_first_command_baseline_coverage_required": (
+            project_director_action_anchor[
+                "current_first_command_baseline_coverage_required"
+            ]
+        ),
+        "project_director_current_first_command_baseline_coverage_passed": (
+            project_director_action_anchor[
+                "current_first_command_baseline_coverage_passed"
+            ]
+        ),
+        "project_director_current_first_command_baseline_coverage_marker_count": (
+            project_director_action_anchor[
+                "current_first_command_baseline_coverage_marker_count"
+            ]
+        ),
+        "project_director_current_first_command_baseline_missing_markers": (
+            project_director_action_anchor[
+                "current_first_command_baseline_missing_markers"
+            ]
         ),
         "operator_sequence": [
             (
@@ -3253,6 +3284,72 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["mvp_blocker_anchor"]["selected_evidence_file_count"] == len(
         result.detail["mvp_blocker_anchor"]["selected_evidence_files"]
     )
+    assert result.detail["project_director_selected_action_anchor"] == (
+        release_check.wing_mvp_project_director_selected_action_anchor()
+    )
+    assert result.detail["expected_project_director_selected_action_anchor"] == (
+        release_check.wing_mvp_project_director_selected_action_anchor()
+    )
+    assert (
+        result.detail[
+            "project_director_selected_action_anchor_matches_current_directive"
+        ]
+        is True
+    )
+    assert (
+        result.detail["project_director_selected_action_source"]
+        == "Current First Command"
+    )
+    assert (
+        result.detail[
+            "project_director_selected_action_source_matches_current_directive"
+        ]
+        is True
+    )
+    assert result.detail["project_director_selected_action_sha256"] == (
+        result.detail["project_director_selected_action_anchor"][
+            "selected_action_sha256"
+        ]
+    )
+    assert result.detail["actual_project_director_selected_action_sha256"] == (
+        result.detail["project_director_selected_action_sha256"]
+    )
+    assert result.detail["expected_project_director_selected_action_sha256"] == (
+        result.detail["project_director_selected_action_sha256"]
+    )
+    assert result.detail["project_director_selected_action_sha256_available"] is True
+    assert (
+        result.detail[
+            "project_director_selected_action_sha256_available_matches_digest"
+        ]
+        is True
+    )
+    assert result.detail["project_director_selected_action_sha256_matches_anchor"] is True
+    assert result.detail["project_director_selected_action_sha256_matches_text"] is True
+    assert (
+        result.detail[
+            "project_director_selected_action_sha256_matches_current_directive"
+        ]
+        is True
+    )
+    assert (
+        result.detail[
+            "project_director_current_first_command_baseline_coverage_required"
+        ]
+        is True
+    )
+    assert (
+        result.detail[
+            "project_director_current_first_command_baseline_coverage_passed"
+        ]
+        is True
+    )
+    assert (
+        result.detail[
+            "project_director_current_first_command_baseline_missing_markers"
+        ]
+        == []
+    )
     assert (
         result.detail["operator_sequence_count"]
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
@@ -3786,6 +3883,49 @@ def test_no_wing_release_check_rejects_handoff_packet_mvp_blocker_anchor_digest_
     )
     assert (
         "wing_readonly_preflight_handoff_packet_expected_mvp_blocker_anchor_sha256_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_project_director_action_digest_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "project-director-action-digest-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["project_director_selected_action_sha256"] = "0" * 64
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        result.detail[
+            "project_director_selected_action_anchor_matches_current_directive"
+        ]
+        is True
+    )
+    assert result.detail["project_director_selected_action_sha256_matches_anchor"] is False
+    assert result.detail["project_director_selected_action_sha256_matches_text"] is True
+    assert (
+        result.detail[
+            "project_director_selected_action_sha256_matches_current_directive"
+        ]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_project_director_action_sha256_anchor_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_project_director_action_sha256_current_directive_mismatch"
         in result.detail["violations"]
     )
 
@@ -11483,6 +11623,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
 def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_artifact(
     tmp_path,
 ):
+    project_director_action_anchor = (
+        release_check.wing_mvp_project_director_selected_action_anchor()
+    )
     result = CheckResult(
         name="wing_readonly_preflight_handoff_packet_artifact_schema",
         status="passed",
@@ -11614,6 +11757,52 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
             ),
             "selected_mvp_blocker_status_matches_plan": True,
+            "project_director_selected_action_anchor": project_director_action_anchor,
+            "expected_project_director_selected_action_anchor": (
+                project_director_action_anchor
+            ),
+            "project_director_selected_action_anchor_matches_current_directive": True,
+            "project_director_selected_action_source": (
+                project_director_action_anchor["selected_action_source"]
+            ),
+            "expected_project_director_selected_action_source": (
+                project_director_action_anchor["selected_action_source"]
+            ),
+            "project_director_selected_action_source_matches_current_directive": True,
+            "project_director_selected_action_sha256": (
+                project_director_action_anchor["selected_action_sha256"]
+            ),
+            "actual_project_director_selected_action_sha256": (
+                project_director_action_anchor["selected_action_sha256"]
+            ),
+            "expected_project_director_selected_action_sha256": (
+                project_director_action_anchor["selected_action_sha256"]
+            ),
+            "project_director_selected_action_sha256_available": True,
+            "project_director_selected_action_sha256_available_matches_digest": True,
+            "project_director_selected_action_sha256_matches_anchor": True,
+            "project_director_selected_action_sha256_matches_text": True,
+            "project_director_selected_action_sha256_matches_current_directive": True,
+            "project_director_current_first_command_baseline_coverage_required": (
+                project_director_action_anchor[
+                    "current_first_command_baseline_coverage_required"
+                ]
+            ),
+            "project_director_current_first_command_baseline_coverage_passed": (
+                project_director_action_anchor[
+                    "current_first_command_baseline_coverage_passed"
+                ]
+            ),
+            "project_director_current_first_command_baseline_coverage_marker_count": (
+                project_director_action_anchor[
+                    "current_first_command_baseline_coverage_marker_count"
+                ]
+            ),
+            "project_director_current_first_command_baseline_missing_markers": (
+                project_director_action_anchor[
+                    "current_first_command_baseline_missing_markers"
+                ]
+            ),
             "expected_artifacts": [
                 (
                     "artifacts/wing_readonly_preflight/<run_id>/"
@@ -11961,6 +12150,67 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
     )
     assert artifact["selected_mvp_blocker_status_matches_plan"] is True
+    assert artifact["project_director_selected_action_anchor"] == (
+        project_director_action_anchor
+    )
+    assert artifact["expected_project_director_selected_action_anchor"] == (
+        project_director_action_anchor
+    )
+    assert (
+        artifact[
+            "project_director_selected_action_anchor_matches_current_directive"
+        ]
+        is True
+    )
+    assert artifact["project_director_selected_action_source"] == (
+        "Current First Command"
+    )
+    assert (
+        artifact[
+            "project_director_selected_action_source_matches_current_directive"
+        ]
+        is True
+    )
+    assert artifact["project_director_selected_action_sha256"] == (
+        project_director_action_anchor["selected_action_sha256"]
+    )
+    assert artifact["actual_project_director_selected_action_sha256"] == (
+        project_director_action_anchor["selected_action_sha256"]
+    )
+    assert artifact["expected_project_director_selected_action_sha256"] == (
+        project_director_action_anchor["selected_action_sha256"]
+    )
+    assert artifact["project_director_selected_action_sha256_available"] is True
+    assert (
+        artifact["project_director_selected_action_sha256_available_matches_digest"]
+        is True
+    )
+    assert artifact["project_director_selected_action_sha256_matches_anchor"] is True
+    assert artifact["project_director_selected_action_sha256_matches_text"] is True
+    assert (
+        artifact[
+            "project_director_selected_action_sha256_matches_current_directive"
+        ]
+        is True
+    )
+    assert (
+        artifact[
+            "project_director_current_first_command_baseline_coverage_required"
+        ]
+        is True
+    )
+    assert (
+        artifact[
+            "project_director_current_first_command_baseline_coverage_passed"
+        ]
+        is True
+    )
+    assert (
+        artifact[
+            "project_director_current_first_command_baseline_missing_markers"
+        ]
+        == []
+    )
     assert artifact["expected_artifacts"] == artifact["plan_expected_artifacts"]
     assert artifact["expected_artifacts"] == artifact["expected_artifact_globs"]
     assert artifact["expected_artifacts_match_plan"] is True
@@ -12309,6 +12559,43 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "proof_runner_matches_plan: `true`" in markdown_summary
     assert "selected_mvp_blocker_matches_plan: `true`" in markdown_summary
     assert "selected_mvp_blocker_status_matches_plan: `true`" in markdown_summary
+    assert (
+        "project_director_selected_action_source: `Current First Command`"
+        in markdown_summary
+    )
+    assert "project_director_selected_action_sha256: `" in markdown_summary
+    assert (
+        "project_director_selected_action_sha256_available: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_anchor: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_text: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_current_directive: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_anchor_matches_current_directive: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_passed: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_current_first_command_baseline_missing_markers: `[]`"
+        in markdown_summary
+    )
     assert "expected_artifacts_match_plan: `true`" in markdown_summary
     assert "summary_glob_matches_plan: `true`" in markdown_summary
     assert "event_log_glob_matches_plan: `true`" in markdown_summary

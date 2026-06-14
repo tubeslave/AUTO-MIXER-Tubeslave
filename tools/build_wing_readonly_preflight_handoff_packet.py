@@ -385,6 +385,12 @@ def build_handoff_packet(
     mvp_blocker_anchor_sha256 = no_wing_release_check.wing_mvp_blocker_anchor_sha256(
         mvp_blocker_anchor
     )
+    project_director_action_anchor = (
+        no_wing_release_check.wing_mvp_project_director_selected_action_anchor()
+    )
+    project_director_selected_action_sha256 = str(
+        project_director_action_anchor["selected_action_sha256"]
+    )
     prestart_summary_sha256 = _sha256_existing_file(prestart_summary)
     expected_operator_sequence = expected_handoff_operator_sequence(
         backend_port_prestart_step=prestart_step,
@@ -488,6 +494,36 @@ def build_handoff_packet(
         },
         "mvp_blocker_anchor": mvp_blocker_anchor,
         "mvp_blocker_anchor_sha256": mvp_blocker_anchor_sha256,
+        "project_director_selected_action_anchor": project_director_action_anchor,
+        "project_director_selected_action_source": (
+            project_director_action_anchor["selected_action_source"]
+        ),
+        "project_director_selected_action_sha256": (
+            project_director_selected_action_sha256
+        ),
+        "project_director_selected_action_sha256_available": bool(
+            project_director_selected_action_sha256
+        ),
+        "project_director_current_first_command_baseline_coverage_required": (
+            project_director_action_anchor[
+                "current_first_command_baseline_coverage_required"
+            ]
+        ),
+        "project_director_current_first_command_baseline_coverage_passed": (
+            project_director_action_anchor[
+                "current_first_command_baseline_coverage_passed"
+            ]
+        ),
+        "project_director_current_first_command_baseline_coverage_marker_count": (
+            project_director_action_anchor[
+                "current_first_command_baseline_coverage_marker_count"
+            ]
+        ),
+        "project_director_current_first_command_baseline_missing_markers": (
+            project_director_action_anchor[
+                "current_first_command_baseline_missing_markers"
+            ]
+        ),
         "operator_sequence": operator_sequence,
         "operator_sequence_sha256": operator_sequence_sha256,
         "expected_operator_sequence_sha256": expected_operator_sequence_sha256,
@@ -583,6 +619,20 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"- selected_mvp_blocker: `{packet['selected_mvp_blocker']}`",
         "- selected_mvp_blocker_status: "
         f"`{packet['selected_mvp_blocker_status']}`",
+        "- project_director_selected_action_source: "
+        f"`{packet['project_director_selected_action_source']}`",
+        "- project_director_selected_action_sha256: "
+        f"`{packet['project_director_selected_action_sha256']}`",
+        "- project_director_selected_action_sha256_available: "
+        f"`{str(packet['project_director_selected_action_sha256_available']).lower()}`",
+        "- project_director_current_first_command_baseline_coverage_required: "
+        f"`{str(packet['project_director_current_first_command_baseline_coverage_required']).lower()}`",
+        "- project_director_current_first_command_baseline_coverage_passed: "
+        f"`{str(packet['project_director_current_first_command_baseline_coverage_passed']).lower()}`",
+        "- project_director_current_first_command_baseline_coverage_marker_count: "
+        f"`{packet['project_director_current_first_command_baseline_coverage_marker_count']}`",
+        "- project_director_current_first_command_baseline_missing_markers: "
+        f"`{json.dumps(packet['project_director_current_first_command_baseline_missing_markers'])}`",
         "",
         "## Operator Sequence",
         "",
@@ -772,6 +822,39 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         for item in blocker_anchor.get("selected_evidence_files") or []:
             lines.append(f"- `{item}`")
         lines.append("")
+    project_director_anchor = (
+        packet.get("project_director_selected_action_anchor")
+        if isinstance(packet.get("project_director_selected_action_anchor"), Mapping)
+        else {}
+    )
+    if project_director_anchor:
+        lines.extend(
+            [
+                "## Project Director Selected Action Anchor",
+                "",
+                f"- anchor_schema: `{project_director_anchor.get('anchor_schema')}`",
+                f"- blocker_table: `{project_director_anchor.get('blocker_table')}`",
+                f"- selected_blocker: `{project_director_anchor.get('selected_blocker')}`",
+                "- selected_blocker_status: "
+                f"`{project_director_anchor.get('selected_blocker_status')}`",
+                "- selected_action_source: "
+                f"`{project_director_anchor.get('selected_action_source')}`",
+                "- selected_action_sha256: "
+                f"`{project_director_anchor.get('selected_action_sha256')}`",
+                "- current_first_command_baseline_coverage_required: "
+                f"`{str(project_director_anchor.get('current_first_command_baseline_coverage_required')).lower()}`",
+                "- current_first_command_baseline_coverage_passed: "
+                f"`{str(project_director_anchor.get('current_first_command_baseline_coverage_passed')).lower()}`",
+                "- current_first_command_baseline_coverage_marker_count: "
+                f"`{project_director_anchor.get('current_first_command_baseline_coverage_marker_count')}`",
+                "- current_first_command_baseline_missing_markers: "
+                f"`{json.dumps(project_director_anchor.get('current_first_command_baseline_missing_markers') or [])}`",
+                "- packet_does_not_close_blocker: "
+                f"`{str(project_director_anchor.get('packet_does_not_close_blocker')).lower()}`",
+                f"- selected_action: {project_director_anchor.get('selected_action')}",
+                "",
+            ]
+        )
     lines.extend(["## Required Checklist", ""])
     for item in packet.get("required_review_checklist_ids") or []:
         lines.append(f"- `{item}`")
