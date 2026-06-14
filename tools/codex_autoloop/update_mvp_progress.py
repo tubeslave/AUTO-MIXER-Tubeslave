@@ -19,6 +19,77 @@ DEFAULT_BLOCKERS = PROJECT_ROOT / ".ai" / "project-layer" / "wing_mvp_blockers.m
 DEFAULT_OUTPUT = PROJECT_ROOT / "Docs" / "reports" / "MVP_PROGRESS_LATEST.md"
 CLOSED_STATUS = "closed"
 CURRENT_FIRST_COMMAND_HEADING = "## Current First Command"
+CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
+    "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick",
+    "Docs/runbooks/WING_READONLY_PREFLIGHT.md",
+    "operator_sequence_count: 10",
+    "operator_sequence_sha256_matches_actual: true",
+    "operator_sequence_matches_contract: true",
+    "operator_sequence_sha256_matches_contract: true",
+    "backend_port_prestart_gate",
+    "expected_backend_port_prestart_gate",
+    "backend_port_prestart_gate.grants_live_authority: false",
+    "backend_port_prestart_gate.must_pass_before_backend_wing_session: true",
+    "backend_port_prestart_check_command",
+    "backend_port_prestart_check_command_text",
+    "backend_port_prestart_check_required: true",
+    "backend_port_prestart_check_must_pass_before_starting_backend: true",
+    "backend_port_prestart_gate_execution_allowed: false",
+    "backend_port_prestart_gate_readiness_closure_allowed: false",
+    "backend_port_prestart_gate_live_authority_granted: false",
+    "backend_port_prestart_check_failure_detail_fields",
+    "listener_confirmation_template_status: pending_operator_edit",
+    "listener_confirmation_template_safe_to_stop_listener_by_gate: false",
+    "listener_confirmation_template_live_authority_granted: false",
+    "listener_confirmation_template_accepted_by_template: false",
+    "listener_confirmation_template_operator_placeholder_fields",
+    "listener_confirmation_template_execution_allowed_by_template: false",
+    "listener_confirmation_template_readiness_closure_allowed_by_template: false",
+    "manual_review_required_before_readiness_update: true",
+    "readiness_matrix_update_allowed_by_packet: false",
+    "readiness_closure_allowed_by_packet: false",
+    "read_only: true",
+    "live_write: false",
+    "mutates_console_state: false",
+    "queries_console: false",
+    "executes_tests: false",
+    "operator_required: true",
+    "expected_plan_required_for_real_run: true",
+    "physical_preflight_requires_existing_backend_connection: true",
+    "backend_port_prestart_summary_required: true",
+    "backend_port_prestart_summary_type: no_wing_release_check",
+    "backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes",
+    "backend_port_prestart_summary_status: passed",
+    "backend_port_prestart_summary_live_write: false",
+    "backend_port_prestart_summary_contacts_backend: false",
+    "backend_port_prestart_summary_queries_console: false",
+    "backend_port_prestart_summary_executes_tests: false",
+    "backend_port_prestart_check_status: passed",
+    "execution_allowed_by_packet: false",
+    "live_authority_granted: false",
+    "full_autonomous_ready: false",
+    "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json",
+    "expected_artifacts",
+    "expected_artifacts_match_plan: true",
+    "summary_glob_matches_plan: true",
+    "event_log_glob_matches_plan: true",
+    "mvp_blocker_anchor_matches_current_first_open: true",
+    "mvp_blocker_anchor_sha256_matches_current_first_open: true",
+    "mvp_blocker_anchor.packet_does_not_close_blocker: true",
+    "operator_sequence_has_supervised_prestart_gate: true",
+    "operator_sequence_supervised_prestart_gate_is_final: true",
+    "required_supervised_prestart_gate_markers",
+    "supervised_prestart_gate",
+    "expected_supervised_prestart_gate",
+    "supervised_prestart_gate.grants_live_authority: false",
+    "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true",
+    "required_supervised_proof_plan_summary_fields",
+    "expected_required_supervised_proof_plan_summary_fields",
+    "required_supervised_proof_plan_summary_fields_match_contract: true",
+    "readonly_preflight_review_decision_expected_candidate_prestart_source_ids",
+    "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source",
+    "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof",
+)
 
 
 def utc_now() -> str:
@@ -82,6 +153,15 @@ def current_first_command(path: Path) -> str | None:
     return markdown_section_text(path, CURRENT_FIRST_COMMAND_HEADING)
 
 
+def current_first_command_covers_baseline(current_first_command: str | None) -> bool:
+    if not current_first_command:
+        return False
+    return all(
+        marker in current_first_command
+        for marker in CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS
+    )
+
+
 def selected_action_text(
     *,
     blocker_next_action: str | None,
@@ -89,6 +169,8 @@ def selected_action_text(
 ) -> tuple[str, str]:
     if current_first_command and blocker_next_action:
         if current_first_command == blocker_next_action:
+            return current_first_command, "Current First Command"
+        if current_first_command_covers_baseline(current_first_command):
             return current_first_command, "Current First Command"
         return (
             f"{current_first_command} Baseline blocker next action remains: "

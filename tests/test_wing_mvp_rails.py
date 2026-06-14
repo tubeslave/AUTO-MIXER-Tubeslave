@@ -1002,6 +1002,13 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
         in current_command
     )
+    assert progress.current_first_command_covers_baseline(current_command)
+    assert not progress.current_first_command_covers_baseline(
+        current_command.replace(
+            "required_supervised_proof_plan_summary_fields",
+            "missing_supervised_proof_plan_summary_fields",
+        )
+    )
     report = progress.build_progress_report(
         rows,
         generated_at="2026-06-06T00:00:00Z",
@@ -1011,10 +1018,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "Total blockers: 9" in report
     assert "Closed blockers: 0" in report
     assert "Current first open blocker: WING read-only connection proof" in report
-    assert (
-        "Next required action source: Current First Command + blocker table baseline"
-        in report
-    )
+    assert "Next required action source: Current First Command" in report
     assert "backend_port_prestart_gate" in report
     assert "expected_backend_port_prestart_gate" in report
     assert "backend_port_prestart_gate.grants_live_authority: false" in report

@@ -103,8 +103,15 @@ if a backend listener is already present, the failed no-WING summary must
 expose `listener_confirmation_template_path`,
 `listener_confirmation_template_status: pending_operator_edit`,
 `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and
-`listener_confirmation_template_live_authority_granted: false`; the generated
-template required edits must include
+`listener_confirmation_template_live_authority_granted: false`;
+it must also show `listener_confirmation_template_accepted_by_template: false`;
+it must also show `listener_confirmation_template_operator_placeholder_fields`
+listing `operator_reviewed_at` and `operator_name`;
+it must also show
+`listener_confirmation_template_execution_allowed_by_template: false`;
+it must also show
+`listener_confirmation_template_readiness_closure_allowed_by_template: false`;
+the generated template required edits must include
 `set template_status to operator_reviewed_and_edited if using the generated
 template` and `set accepted_by_template to true if using the generated
 template`, and any template-derived accepted confirmation must replace
