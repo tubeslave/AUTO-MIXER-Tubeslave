@@ -231,6 +231,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING prestart summary type current command | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_TYPE_CURRENT_COMMAND_20260614.md` requires Current First Command and autoloop prompts to expose `backend_port_prestart_summary_type: no_wing_release_check`. |
 | Current WING prestart summary type blocker row | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_TYPE_BLOCKER_ROW_20260614.md` requires the first WING blocker table row to expose `backend_port_prestart_summary_type: no_wing_release_check`. |
 | Current WING prestart summary policy rails | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_POLICY_RAILS_20260614.md` requires current WING rails to expose `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`. |
+| Current WING prestart summary policy blocker row | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_POLICY_BLOCKER_ROW_20260614.md` requires the first WING blocker table row to expose `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`. |
 | Current WING blocker evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_REPORTS_20260613.md` |
 | Current WING blocker listener-probe evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` |
 | Current WING no-WING busy-port fail-closed evidence | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` |

@@ -547,6 +547,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_summary_type: no_wing_release_check" in rows[0][
         "next action"
     ]
+    assert (
+        "backend_port_prestart_summary_connection_policy: "
+        "no_hardware_no_network_no_live_writes"
+    ) in rows[0]["next action"]
     assert "backend_port_prestart_summary_path_placeholder" in rows[0][
         "next action"
     ]
