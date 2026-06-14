@@ -132,6 +132,15 @@ Stop the current Codex work direction and return to the first open blocker if:
   `operator_sequence_sha256`,
   `actual_operator_sequence_sha256`,
   `operator_sequence_sha256_matches_actual: true`,
+  `expected_operator_sequence_sha256`,
+  `actual_expected_operator_sequence_sha256`,
+  `operator_sequence_matches_contract: true`,
+  `operator_sequence_sha256_matches_contract: true`,
+  `declared_expected_operator_sequence_sha256_matches_contract: true`,
+  `declared_operator_sequence_matches_contract_flag: true`,
+  `declared_operator_sequence_matches_contract_flag_matches_actual: true`,
+  `declared_operator_sequence_sha256_matches_contract_flag: true`,
+  `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`,
   `declared_operator_sequence_count: 10`,
   `declared_expected_operator_sequence_count: 10`,
   `declared_operator_sequence_count_contract_flag: true`,
@@ -492,6 +501,17 @@ It must also show `operator_sequence_sha256`,
 `actual_operator_sequence_sha256`, and
 `operator_sequence_sha256_matches_actual: true` so reviewers can reject
 packets whose ordered checklist text drifted from the declared digest.
+It must also show `expected_operator_sequence_sha256`,
+`actual_expected_operator_sequence_sha256`,
+`operator_sequence_matches_contract: true`,
+`operator_sequence_sha256_matches_contract: true`,
+`declared_expected_operator_sequence_sha256_matches_contract: true`,
+`declared_operator_sequence_matches_contract_flag: true`,
+`declared_operator_sequence_matches_contract_flag_matches_actual: true`,
+`declared_operator_sequence_sha256_matches_contract_flag: true`, and
+`declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`
+so reviewers can reject packets whose checklist no longer matches the shared
+contract.
 It must also show `declared_operator_sequence_count: 10`,
 `declared_expected_operator_sequence_count: 10`,
 `declared_operator_sequence_count_contract_flag: true`,

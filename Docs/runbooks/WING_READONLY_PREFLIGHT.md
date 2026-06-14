@@ -423,6 +423,15 @@ The handoff validation must report:
 - `operator_sequence_sha256`
 - `actual_operator_sequence_sha256`
 - `operator_sequence_sha256_matches_actual: true`
+- `expected_operator_sequence_sha256`
+- `actual_expected_operator_sequence_sha256`
+- `operator_sequence_matches_contract: true`
+- `operator_sequence_sha256_matches_contract: true`
+- `declared_expected_operator_sequence_sha256_matches_contract: true`
+- `declared_operator_sequence_matches_contract_flag: true`
+- `declared_operator_sequence_matches_contract_flag_matches_actual: true`
+- `declared_operator_sequence_sha256_matches_contract_flag: true`
+- `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`
 - `declared_operator_sequence_count: 10`
 - `declared_expected_operator_sequence_count: 10`
 - `declared_operator_sequence_count_contract_flag: true`

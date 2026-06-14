@@ -364,6 +364,16 @@ you want the background automation active.
   `operator_sequence_sha256`, `actual_operator_sequence_sha256`, and
   `operator_sequence_sha256_matches_actual: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_operator_sequence_sha256`,
+  `actual_expected_operator_sequence_sha256`,
+  `operator_sequence_matches_contract: true`,
+  `operator_sequence_sha256_matches_contract: true`,
+  `declared_expected_operator_sequence_sha256_matches_contract: true`,
+  `declared_operator_sequence_matches_contract_flag: true`,
+  `declared_operator_sequence_matches_contract_flag_matches_actual: true`,
+  `declared_operator_sequence_sha256_matches_contract_flag: true`, and
+  `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
   `declared_operator_sequence_count: 10`,
   `declared_expected_operator_sequence_count: 10`,
   `declared_operator_sequence_count_contract_flag: true`,

@@ -44,6 +44,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
     expected_backend_port_prestart_gate,
+    expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
 )
 from tools import build_wing_readonly_preflight_handoff_packet as handoff
@@ -230,6 +231,14 @@ def test_handoff_packet_builds_readonly_operator_sequence():
             packet["operator_sequence"]
         )
     )
+    assert packet["operator_sequence"] == expected_handoff_operator_sequence()
+    assert packet["expected_operator_sequence_sha256"] == (
+        no_wing_release_check.wing_readonly_operator_sequence_sha256(
+            expected_handoff_operator_sequence()
+        )
+    )
+    assert packet["operator_sequence_matches_contract"] is True
+    assert packet["operator_sequence_sha256_matches_contract"] is True
     first_gate_step = packet["operator_sequence"][0]
     assert packet["backend_port_prestart_gate"] == expected_backend_port_prestart_gate(
         operator_sequence_step=first_gate_step,
@@ -301,6 +310,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["mvp_blocker_anchor_sha256"] in rendered
     assert "operator_sequence_sha256" in rendered
     assert packet["operator_sequence_sha256"] in rendered
+    assert "expected_operator_sequence_sha256" in rendered
+    assert packet["expected_operator_sequence_sha256"] in rendered
+    assert "operator_sequence_matches_contract: `true`" in rendered
+    assert "operator_sequence_sha256_matches_contract: `true`" in rendered
     assert "tools/wing_readonly_preflight_runner.py" in rendered
     assert "actual_matches_expected: `true`" in rendered
     assert "operator_sequence_step_must_be_final: `true`" in rendered

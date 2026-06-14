@@ -30,6 +30,18 @@ OPERATOR_SEQUENCE_SHA_MARKERS = (
     "operator_sequence_sha256_matches_actual: true",
 )
 
+OPERATOR_SEQUENCE_CONTRACT_MARKERS = (
+    "expected_operator_sequence_sha256",
+    "actual_expected_operator_sequence_sha256",
+    "operator_sequence_matches_contract: true",
+    "operator_sequence_sha256_matches_contract: true",
+    "declared_expected_operator_sequence_sha256_matches_contract: true",
+    "declared_operator_sequence_matches_contract_flag: true",
+    "declared_operator_sequence_matches_contract_flag_matches_actual: true",
+    "declared_operator_sequence_sha256_matches_contract_flag: true",
+    "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true",
+)
+
 DECLARED_OPERATOR_SEQUENCE_COUNT_FIELD_MARKERS = tuple(
     marker.split(":", 1)[0] for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS
 )
@@ -77,6 +89,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "expected_operator_sequence_count: 10" in text
     assert "operator_sequence_count_matches_contract: true" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
+        assert marker in text
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker in text
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in text
@@ -184,6 +198,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "operator_sequence_count: 10" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in text
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
+        assert marker in text
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in text
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in text
@@ -279,6 +295,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_SHA256_20260614.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CONTRACT_20260614.md"
+        in rows[0]["evidence"]
+    )
     assert "backend_port_prestart_summary_sha256_matches_plan: true" in rows[0][
         "next action"
     ]
@@ -293,6 +313,8 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "next action"
     ]
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
+        assert marker in rows[0]["next action"]
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker in rows[0]["next action"]
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in rows[0]["next action"]
@@ -633,6 +655,8 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_count: 10" in rows[0]["next action"]
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in rows[0]["next action"]
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
+        assert marker in rows[0]["next action"]
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in rows[0]["next action"]
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in rows[0][
@@ -778,6 +802,8 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readonly
     assert "operator_sequence_count: 10" in readonly
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
+        assert marker in readonly
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker in readonly
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in readonly
@@ -1047,6 +1073,8 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "operator_sequence_count: 10" in report
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in report
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
+        assert marker in report
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in report
     assert "mvp_blocker_anchor_digest_review_step_index: 8" in report
@@ -1226,6 +1254,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "operator_sequence_count: 10" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in text
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
+        assert marker in text
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in text
     assert "mvp_blocker_anchor_digest_review_step_index" in text
@@ -1375,6 +1405,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
         in text
     )
     assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CONTRACT_20260614.md"
+        in text
+    )
+    assert (
         "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_PENDING_SUMMARY_FIELDS_CANON_20260613.md"
         in text
     )
@@ -1487,6 +1521,8 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     assert "expected_supervised_prestart_gate" in text
     assert "operator_sequence_count" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
+        assert marker.split(":", 1)[0] in text
+    for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker.split(":", 1)[0] in text
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_FIELD_MARKERS:
         assert marker in text

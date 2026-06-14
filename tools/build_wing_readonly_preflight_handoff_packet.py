@@ -30,6 +30,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
+    WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -53,6 +54,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
     expected_backend_port_prestart_gate,
+    expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
 )
 from tools import no_wing_release_check
@@ -328,8 +330,7 @@ def build_handoff_packet(
     )
     backend_connection_step = WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
     mvp_blocker_anchor_digest_review_step = (
-        "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
-        "current first open blocker before supervised proof planning."
+        WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP
     )
     mvp_blocker_anchor_digest_review_step_index = (
         WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
@@ -380,23 +381,27 @@ def build_handoff_packet(
         mvp_blocker_anchor
     )
     prestart_summary_sha256 = _sha256_existing_file(prestart_summary)
-    operator_sequence = [
-        prestart_step,
-        "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
-        backend_connection_step,
-        "Confirm the selected channel numbers are safe to inspect.",
-        "Run capture_readonly_preflight.",
-        "Run review_artifact_and_write_pending_decision_template.",
-        "Edit the pending decision template into an accepted or rejected JSON record.",
-        "Run review_edited_decision_json.",
-        mvp_blocker_anchor_digest_review_step,
-        supervised_gate_step,
-    ]
+    expected_operator_sequence = expected_handoff_operator_sequence(
+        backend_port_prestart_step=prestart_step,
+        backend_connection_step=backend_connection_step,
+        mvp_blocker_anchor_digest_review_step=mvp_blocker_anchor_digest_review_step,
+        supervised_prestart_step=supervised_gate_step,
+    )
+    operator_sequence = list(expected_operator_sequence)
     operator_sequence_count = len(operator_sequence)
     operator_sequence_sha256 = (
         no_wing_release_check.wing_readonly_operator_sequence_sha256(
             operator_sequence
         )
+    )
+    expected_operator_sequence_sha256 = (
+        no_wing_release_check.wing_readonly_operator_sequence_sha256(
+            expected_operator_sequence
+        )
+    )
+    operator_sequence_matches_contract = operator_sequence == expected_operator_sequence
+    operator_sequence_sha256_matches_contract = (
+        operator_sequence_sha256 == expected_operator_sequence_sha256
     )
     return {
         "type": "wing_readonly_preflight_handoff_packet",
@@ -477,6 +482,11 @@ def build_handoff_packet(
         "mvp_blocker_anchor_sha256": mvp_blocker_anchor_sha256,
         "operator_sequence": operator_sequence,
         "operator_sequence_sha256": operator_sequence_sha256,
+        "expected_operator_sequence_sha256": expected_operator_sequence_sha256,
+        "operator_sequence_matches_contract": operator_sequence_matches_contract,
+        "operator_sequence_sha256_matches_contract": (
+            operator_sequence_sha256_matches_contract
+        ),
         "operator_sequence_count": operator_sequence_count,
         "expected_operator_sequence_count": (
             WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
@@ -571,6 +581,12 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['operator_sequence_count_matches_contract']).lower()}`",
         "- operator_sequence_sha256: "
         f"`{packet['operator_sequence_sha256']}`",
+        "- expected_operator_sequence_sha256: "
+        f"`{packet['expected_operator_sequence_sha256']}`",
+        "- operator_sequence_matches_contract: "
+        f"`{str(packet['operator_sequence_matches_contract']).lower()}`",
+        "- operator_sequence_sha256_matches_contract: "
+        f"`{str(packet['operator_sequence_sha256_matches_contract']).lower()}`",
         "- mvp_blocker_anchor_digest_review_step_index: "
         f"`{packet['mvp_blocker_anchor_digest_review_step_index']}`",
         "",

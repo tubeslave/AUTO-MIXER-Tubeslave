@@ -199,6 +199,26 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK = (
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS = (
     "accepted_decision_ready"
 )
+WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP = (
+    "Run preview_readonly_request_plan and confirm the request sequence is read-only."
+)
+WING_READONLY_PREFLIGHT_CHANNEL_SAFETY_CONFIRMATION_STEP = (
+    "Confirm the selected channel numbers are safe to inspect."
+)
+WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP = "Run capture_readonly_preflight."
+WING_READONLY_PREFLIGHT_REVIEW_OPERATOR_STEP = (
+    "Run review_artifact_and_write_pending_decision_template."
+)
+WING_READONLY_PREFLIGHT_DECISION_TEMPLATE_EDIT_STEP = (
+    "Edit the pending decision template into an accepted or rejected JSON record."
+)
+WING_READONLY_PREFLIGHT_DECISION_REVIEW_OPERATOR_STEP = (
+    "Run review_edited_decision_json."
+)
+WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP = (
+    "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
+    "current first open blocker before supervised proof planning."
+)
 
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES = (
     "create_operator_proposal",
@@ -304,6 +324,33 @@ def expected_supervised_prestart_gate(
         ),
         "requires_accepted_candidate_prestart_trace": True,
     }
+
+
+def expected_handoff_operator_sequence(
+    *,
+    backend_port_prestart_step: str = (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP
+    ),
+    backend_connection_step: str = (
+        WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+    ),
+    mvp_blocker_anchor_digest_review_step: str = (
+        WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP
+    ),
+    supervised_prestart_step: str = WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
+) -> list[str]:
+    return [
+        backend_port_prestart_step,
+        WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP,
+        backend_connection_step,
+        WING_READONLY_PREFLIGHT_CHANNEL_SAFETY_CONFIRMATION_STEP,
+        WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP,
+        WING_READONLY_PREFLIGHT_REVIEW_OPERATOR_STEP,
+        WING_READONLY_PREFLIGHT_DECISION_TEMPLATE_EDIT_STEP,
+        WING_READONLY_PREFLIGHT_DECISION_REVIEW_OPERATOR_STEP,
+        mvp_blocker_anchor_digest_review_step,
+        supervised_prestart_step,
+    ]
 
 
 def _contract_string_list(value: Any) -> tuple[str, ...]:

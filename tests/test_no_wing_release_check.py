@@ -57,6 +57,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
+    expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
 )
 from tools import no_wing_release_check as release_check
@@ -1530,6 +1531,19 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         release_check.wing_readonly_operator_sequence_sha256(
             payload["operator_sequence"]
         )
+    )
+    expected_operator_sequence = expected_handoff_operator_sequence()
+    payload["expected_operator_sequence_sha256"] = (
+        release_check.wing_readonly_operator_sequence_sha256(
+            expected_operator_sequence
+        )
+    )
+    payload["operator_sequence_matches_contract"] = (
+        payload["operator_sequence"] == expected_operator_sequence
+    )
+    payload["operator_sequence_sha256_matches_contract"] = (
+        payload["operator_sequence_sha256"]
+        == payload["expected_operator_sequence_sha256"]
     )
     return payload
 
@@ -3245,7 +3259,32 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["actual_operator_sequence_sha256"] == result.detail[
         "operator_sequence_sha256"
     ]
+    assert result.detail["expected_operator_sequence"] == expected_handoff_operator_sequence()
+    assert result.detail["expected_operator_sequence_sha256"] == result.detail[
+        "actual_expected_operator_sequence_sha256"
+    ]
     assert result.detail["operator_sequence_sha256_matches_actual"] is True
+    assert result.detail["operator_sequence_matches_contract"] is True
+    assert result.detail["operator_sequence_sha256_matches_contract"] is True
+    assert (
+        result.detail["declared_expected_operator_sequence_sha256_matches_contract"]
+        is True
+    )
+    assert result.detail["declared_operator_sequence_matches_contract_flag"] is True
+    assert (
+        result.detail["declared_operator_sequence_matches_contract_flag_matches_actual"]
+        is True
+    )
+    assert (
+        result.detail["declared_operator_sequence_sha256_matches_contract_flag"]
+        is True
+    )
+    assert (
+        result.detail[
+            "declared_operator_sequence_sha256_matches_contract_flag_matches_actual"
+        ]
+        is True
+    )
     assert (
         result.detail["declared_operator_sequence_count"]
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
@@ -4527,6 +4566,63 @@ def test_no_wing_release_check_rejects_handoff_packet_operator_sequence_sha256_m
     assert result.detail["operator_sequence_sha256_matches_actual"] is False
     assert (
         "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_operator_sequence_contract_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-operator-sequence-contract-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"][3] = "Skip selected-channel safety confirmation."
+    payload["operator_sequence_sha256"] = (
+        release_check.wing_readonly_operator_sequence_sha256(
+            payload["operator_sequence"]
+        )
+    )
+    payload["operator_sequence_matches_contract"] = True
+    payload["operator_sequence_sha256_matches_contract"] = True
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_sha256_matches_actual"] is True
+    assert result.detail["operator_sequence_matches_contract"] is False
+    assert result.detail["operator_sequence_sha256_matches_contract"] is False
+    assert (
+        result.detail["declared_operator_sequence_matches_contract_flag_matches_actual"]
+        is False
+    )
+    assert (
+        result.detail[
+            "declared_operator_sequence_sha256_matches_contract_flag_matches_actual"
+        ]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_operator_sequence_contract_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_contract_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_operator_sequence_contract_flag_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_contract_flag_mismatch"
         in result.detail["violations"]
     )
 
@@ -11336,7 +11432,18 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "operator_sequence_count_matches_contract": True,
             "operator_sequence_sha256": "b" * 64,
             "actual_operator_sequence_sha256": "b" * 64,
+            "expected_operator_sequence_sha256": "b" * 64,
+            "actual_expected_operator_sequence_sha256": "b" * 64,
             "operator_sequence_sha256_matches_actual": True,
+            "operator_sequence_matches_contract": True,
+            "operator_sequence_sha256_matches_contract": True,
+            "declared_expected_operator_sequence_sha256_matches_contract": True,
+            "declared_operator_sequence_matches_contract_flag": True,
+            "declared_operator_sequence_matches_contract_flag_matches_actual": True,
+            "declared_operator_sequence_sha256_matches_contract_flag": True,
+            "declared_operator_sequence_sha256_matches_contract_flag_matches_actual": (
+                True
+            ),
             "declared_operator_sequence_count": (
                 WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
             ),
@@ -11647,7 +11754,27 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["operator_sequence_count_matches_contract"] is True
     assert artifact["operator_sequence_sha256"] == "b" * 64
     assert artifact["actual_operator_sequence_sha256"] == "b" * 64
+    assert artifact["expected_operator_sequence_sha256"] == "b" * 64
+    assert artifact["actual_expected_operator_sequence_sha256"] == "b" * 64
     assert artifact["operator_sequence_sha256_matches_actual"] is True
+    assert artifact["operator_sequence_matches_contract"] is True
+    assert artifact["operator_sequence_sha256_matches_contract"] is True
+    assert (
+        artifact["declared_expected_operator_sequence_sha256_matches_contract"]
+        is True
+    )
+    assert artifact["declared_operator_sequence_matches_contract_flag"] is True
+    assert (
+        artifact["declared_operator_sequence_matches_contract_flag_matches_actual"]
+        is True
+    )
+    assert artifact["declared_operator_sequence_sha256_matches_contract_flag"] is True
+    assert (
+        artifact[
+            "declared_operator_sequence_sha256_matches_contract_flag_matches_actual"
+        ]
+        is True
+    )
     assert (
         artifact["declared_operator_sequence_count"]
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
@@ -11813,7 +11940,31 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "operator_sequence_sha256: `" in markdown_summary
     assert "actual_operator_sequence_sha256: `" in markdown_summary
+    assert "expected_operator_sequence_sha256: `" in markdown_summary
+    assert "actual_expected_operator_sequence_sha256: `" in markdown_summary
     assert "operator_sequence_sha256_matches_actual: `true`" in markdown_summary
+    assert "operator_sequence_matches_contract: `true`" in markdown_summary
+    assert "operator_sequence_sha256_matches_contract: `true`" in markdown_summary
+    assert (
+        "declared_expected_operator_sequence_sha256_matches_contract: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_operator_sequence_matches_contract_flag: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_operator_sequence_matches_contract_flag_matches_actual: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_operator_sequence_sha256_matches_contract_flag: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: `true`"
+        in markdown_summary
+    )
     assert "backend_port_prestart_gate" in markdown_summary
     assert "expected_backend_port_prestart_gate" in markdown_summary
     assert "prestart_backend_port_check_command" in markdown_summary

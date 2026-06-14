@@ -272,6 +272,29 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_sequence_sha256_matches_actual: true" in directive[
         "selected_action"
     ]
+    assert "operator_sequence_matches_contract: true" in directive["selected_action"]
+    assert "operator_sequence_sha256_matches_contract: true" in directive[
+        "selected_action"
+    ]
+    assert (
+        "declared_expected_operator_sequence_sha256_matches_contract: true"
+        in directive["selected_action"]
+    )
+    assert "declared_operator_sequence_matches_contract_flag: true" in directive[
+        "selected_action"
+    ]
+    assert (
+        "declared_operator_sequence_matches_contract_flag_matches_actual: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "declared_operator_sequence_sha256_matches_contract_flag: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true"
+        in directive["selected_action"]
+    )
     assert "declared_operator_sequence_count: 10" in directive["selected_action"]
     assert "declared_expected_operator_sequence_count: 10" in directive[
         "selected_action"
@@ -515,6 +538,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_SHA256_20260614.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CONTRACT_20260614.md"
         in directive["selected_evidence_files"]
     )
     assert (
@@ -826,6 +853,19 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "expected_operator_sequence_count: 10" in prompt
     assert "operator_sequence_count_matches_contract: true" in prompt
     assert "operator_sequence_sha256_matches_actual: true" in prompt
+    assert "operator_sequence_matches_contract: true" in prompt
+    assert "operator_sequence_sha256_matches_contract: true" in prompt
+    assert "declared_expected_operator_sequence_sha256_matches_contract: true" in prompt
+    assert "declared_operator_sequence_matches_contract_flag: true" in prompt
+    assert (
+        "declared_operator_sequence_matches_contract_flag_matches_actual: true"
+        in prompt
+    )
+    assert "declared_operator_sequence_sha256_matches_contract_flag: true" in prompt
+    assert (
+        "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true"
+        in prompt
+    )
     assert "declared_operator_sequence_count: 10" in prompt
     assert "declared_expected_operator_sequence_count: 10" in prompt
     assert "declared_operator_sequence_count_contract_flag: true" in prompt
@@ -883,6 +923,19 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "expected_operator_sequence_count: 10" in readme
     assert "operator_sequence_count_matches_contract: true" in readme
     assert "operator_sequence_sha256_matches_actual: true" in readme
+    assert "operator_sequence_matches_contract: true" in readme
+    assert "operator_sequence_sha256_matches_contract: true" in readme
+    assert "declared_expected_operator_sequence_sha256_matches_contract: true" in readme
+    assert "declared_operator_sequence_matches_contract_flag: true" in readme
+    assert (
+        "declared_operator_sequence_matches_contract_flag_matches_actual: true"
+        in readme
+    )
+    assert "declared_operator_sequence_sha256_matches_contract_flag: true" in readme
+    assert (
+        "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true"
+        in readme
+    )
     assert "declared_operator_sequence_count: 10" in readme
     assert "declared_expected_operator_sequence_count: 10" in readme
     assert "declared_operator_sequence_count_contract_flag: true" in readme

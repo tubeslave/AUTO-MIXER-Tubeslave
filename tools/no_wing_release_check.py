@@ -4782,6 +4782,17 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("operator_sequence_sha256"), str)
         else ""
     )
+    declared_expected_operator_sequence_sha256 = (
+        str(packet.get("expected_operator_sequence_sha256"))
+        if isinstance(packet.get("expected_operator_sequence_sha256"), str)
+        else ""
+    )
+    declared_operator_sequence_matches_contract_flag = (
+        packet.get("operator_sequence_matches_contract") is True
+    )
+    declared_operator_sequence_sha256_matches_contract_flag = (
+        packet.get("operator_sequence_sha256_matches_contract") is True
+    )
     supervised_prestart_gate = (
         packet.get("supervised_prestart_gate")
         if isinstance(packet.get("supervised_prestart_gate"), Mapping)
@@ -5413,9 +5424,28 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     actual_operator_sequence_sha256 = wing_readonly_operator_sequence_sha256(
         operator_sequence
     )
+    expected_operator_sequence = preflight_contract.expected_handoff_operator_sequence()
+    expected_operator_sequence_sha256 = wing_readonly_operator_sequence_sha256(
+        expected_operator_sequence
+    )
     operator_sequence_sha256_matches_actual = (
         bool(declared_operator_sequence_sha256)
         and declared_operator_sequence_sha256 == actual_operator_sequence_sha256
+    )
+    operator_sequence_matches_contract = operator_sequence == expected_operator_sequence
+    operator_sequence_sha256_matches_contract = (
+        actual_operator_sequence_sha256 == expected_operator_sequence_sha256
+    )
+    declared_expected_operator_sequence_sha256_matches_contract = (
+        declared_expected_operator_sequence_sha256 == expected_operator_sequence_sha256
+    )
+    declared_operator_sequence_matches_contract_flag_matches_actual = (
+        declared_operator_sequence_matches_contract_flag
+        == operator_sequence_matches_contract
+    )
+    declared_operator_sequence_sha256_matches_contract_flag_matches_actual = (
+        declared_operator_sequence_sha256_matches_contract_flag
+        == operator_sequence_sha256_matches_contract
     )
     declared_operator_sequence_count_matches_actual = (
         declared_operator_sequence_count == operator_sequence_count
@@ -5441,6 +5471,26 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not operator_sequence_sha256_matches_actual:
         violations.append(
             "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_mismatch"
+        )
+    if not operator_sequence_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_operator_sequence_contract_mismatch"
+        )
+    if not operator_sequence_sha256_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_contract_mismatch"
+        )
+    if not declared_expected_operator_sequence_sha256_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_operator_sequence_sha256_mismatch"
+        )
+    if not declared_operator_sequence_matches_contract_flag_matches_actual:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_operator_sequence_contract_flag_mismatch"
+        )
+    if not declared_operator_sequence_sha256_matches_contract_flag_matches_actual:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_operator_sequence_sha256_contract_flag_mismatch"
         )
     if not declared_operator_sequence_count_matches_actual:
         violations.append(
@@ -5926,6 +5976,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["operator_sequence_count"] = len(operator_sequence)
     detail["operator_sequence"] = list(operator_sequence)
+    detail["expected_operator_sequence"] = list(expected_operator_sequence)
     detail["expected_operator_sequence_count"] = (
         WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
     )
@@ -5934,9 +5985,34 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["operator_sequence_sha256"] = declared_operator_sequence_sha256
     detail["actual_operator_sequence_sha256"] = actual_operator_sequence_sha256
+    detail["expected_operator_sequence_sha256"] = (
+        declared_expected_operator_sequence_sha256
+    )
+    detail["actual_expected_operator_sequence_sha256"] = (
+        expected_operator_sequence_sha256
+    )
     detail["operator_sequence_sha256_matches_actual"] = (
         operator_sequence_sha256_matches_actual
     )
+    detail["operator_sequence_matches_contract"] = operator_sequence_matches_contract
+    detail["operator_sequence_sha256_matches_contract"] = (
+        operator_sequence_sha256_matches_contract
+    )
+    detail["declared_expected_operator_sequence_sha256_matches_contract"] = (
+        declared_expected_operator_sequence_sha256_matches_contract
+    )
+    detail["declared_operator_sequence_matches_contract_flag"] = (
+        declared_operator_sequence_matches_contract_flag
+    )
+    detail[
+        "declared_operator_sequence_matches_contract_flag_matches_actual"
+    ] = declared_operator_sequence_matches_contract_flag_matches_actual
+    detail["declared_operator_sequence_sha256_matches_contract_flag"] = (
+        declared_operator_sequence_sha256_matches_contract_flag
+    )
+    detail[
+        "declared_operator_sequence_sha256_matches_contract_flag_matches_actual"
+    ] = declared_operator_sequence_sha256_matches_contract_flag_matches_actual
     detail["declared_operator_sequence_count"] = declared_operator_sequence_count
     detail["declared_expected_operator_sequence_count"] = (
         declared_expected_operator_sequence_count
@@ -13765,8 +13841,45 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "actual_operator_sequence_sha256": str(
                 detail.get("actual_operator_sequence_sha256") or ""
             ),
+            "expected_operator_sequence_sha256": str(
+                detail.get("expected_operator_sequence_sha256") or ""
+            ),
+            "actual_expected_operator_sequence_sha256": str(
+                detail.get("actual_expected_operator_sequence_sha256") or ""
+            ),
             "operator_sequence_sha256_matches_actual": (
                 detail.get("operator_sequence_sha256_matches_actual") is True
+            ),
+            "operator_sequence_matches_contract": (
+                detail.get("operator_sequence_matches_contract") is True
+            ),
+            "operator_sequence_sha256_matches_contract": (
+                detail.get("operator_sequence_sha256_matches_contract") is True
+            ),
+            "declared_expected_operator_sequence_sha256_matches_contract": (
+                detail.get(
+                    "declared_expected_operator_sequence_sha256_matches_contract"
+                )
+                is True
+            ),
+            "declared_operator_sequence_matches_contract_flag": (
+                detail.get("declared_operator_sequence_matches_contract_flag") is True
+            ),
+            "declared_operator_sequence_matches_contract_flag_matches_actual": (
+                detail.get(
+                    "declared_operator_sequence_matches_contract_flag_matches_actual"
+                )
+                is True
+            ),
+            "declared_operator_sequence_sha256_matches_contract_flag": (
+                detail.get("declared_operator_sequence_sha256_matches_contract_flag")
+                is True
+            ),
+            "declared_operator_sequence_sha256_matches_contract_flag_matches_actual": (
+                detail.get(
+                    "declared_operator_sequence_sha256_matches_contract_flag_matches_actual"
+                )
+                is True
             ),
             "declared_operator_sequence_count": int(
                 detail.get("declared_operator_sequence_count") or 0
@@ -17472,8 +17585,26 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_sha256']}`",
                 "- actual_operator_sequence_sha256: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['actual_operator_sequence_sha256']}`",
+                "- expected_operator_sequence_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_sha256']}`",
+                "- actual_expected_operator_sequence_sha256: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['actual_expected_operator_sequence_sha256']}`",
                 "- operator_sequence_sha256_matches_actual: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_sha256_matches_actual']).lower()}`",
+                "- operator_sequence_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_matches_contract']).lower()}`",
+                "- operator_sequence_sha256_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_sha256_matches_contract']).lower()}`",
+                "- declared_expected_operator_sequence_sha256_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_expected_operator_sequence_sha256_matches_contract']).lower()}`",
+                "- declared_operator_sequence_matches_contract_flag: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_matches_contract_flag']).lower()}`",
+                "- declared_operator_sequence_matches_contract_flag_matches_actual: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_matches_contract_flag_matches_actual']).lower()}`",
+                "- declared_operator_sequence_sha256_matches_contract_flag: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_sha256_matches_contract_flag']).lower()}`",
+                "- declared_operator_sequence_sha256_matches_contract_flag_matches_actual: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_sha256_matches_contract_flag_matches_actual']).lower()}`",
                 "- declared_operator_sequence_count: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['declared_operator_sequence_count']}`",
                 "- declared_expected_operator_sequence_count: "
