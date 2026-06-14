@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BLOCKERS = PROJECT_ROOT / ".ai" / "project-layer" / "wing_mvp_blockers.md"
 DEFAULT_OUTPUT = PROJECT_ROOT / "Docs" / "reports" / "MVP_PROGRESS_LATEST.md"
 CLOSED_STATUS = "closed"
+CURRENT_FIRST_COMMAND_HEADING = "## Current First Command"
 
 
 def utc_now() -> str:
@@ -60,13 +61,62 @@ def first_open_blocker(rows: Sequence[dict[str, str]]) -> dict[str, str] | None:
     return None
 
 
-def build_progress_report(rows: Sequence[dict[str, str]], *, generated_at: str | None = None) -> str:
+def markdown_section_text(path: Path, heading: str) -> str | None:
+    section_lines: list[str] = []
+    in_section = False
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line == heading:
+            in_section = True
+            continue
+        if in_section and line.startswith("## "):
+            break
+        if in_section and line:
+            section_lines.append(line)
+    if not section_lines:
+        return None
+    return " ".join(section_lines)
+
+
+def current_first_command(path: Path) -> str | None:
+    return markdown_section_text(path, CURRENT_FIRST_COMMAND_HEADING)
+
+
+def selected_action_text(
+    *,
+    blocker_next_action: str | None,
+    current_first_command: str | None,
+) -> tuple[str, str]:
+    if current_first_command and blocker_next_action:
+        if current_first_command == blocker_next_action:
+            return current_first_command, "Current First Command"
+        return (
+            f"{current_first_command} Baseline blocker next action remains: "
+            f"{blocker_next_action}",
+            "Current First Command + blocker table baseline",
+        )
+    if current_first_command:
+        return current_first_command, "Current First Command"
+    if blocker_next_action:
+        return blocker_next_action, "blocker table"
+    return "All MVP blockers are closed.", "all blockers closed"
+
+
+def build_progress_report(
+    rows: Sequence[dict[str, str]],
+    *,
+    generated_at: str | None = None,
+    current_first_command: str | None = None,
+) -> str:
     generated = generated_at or utc_now()
     first_open = first_open_blocker(rows)
     total = len(rows)
     closed = sum(1 for row in rows if row.get("status") == CLOSED_STATUS)
     first_name = first_open["blocker"] if first_open else "none"
-    next_action = first_open["next action"] if first_open else "All MVP blockers are closed."
+    next_action, next_action_source = selected_action_text(
+        blocker_next_action=first_open["next action"] if first_open else None,
+        current_first_command=current_first_command if first_open else None,
+    )
 
     lines = [
         "# MVP Progress Latest",
@@ -82,6 +132,7 @@ def build_progress_report(rows: Sequence[dict[str, str]], *, generated_at: str |
         f"- Total blockers: {total}",
         f"- Closed blockers: {closed}",
         f"- Current first open blocker: {first_name}",
+        f"- Next required action source: {next_action_source}",
         f"- Next required action: {next_action}",
         "",
         "## Blockers",
@@ -127,7 +178,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not rows:
         print(f"No blocker rows found in {blockers_path}", file=sys.stderr)
         return 2
-    report = build_progress_report(rows)
+    command_text = current_first_command(blockers_path)
+    report = build_progress_report(rows, current_first_command=command_text)
     write_report(Path(args.output), report)
     if args.print:
         print(report)

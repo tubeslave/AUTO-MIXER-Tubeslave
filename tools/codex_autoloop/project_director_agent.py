@@ -60,10 +60,10 @@ def required_file_candidates_from_evidence(evidence_files: Sequence[str]) -> lis
 
 
 def build_directive(*, project_root: Path, lookback_commits: int, report_limit: int) -> dict:
-    rows = update_mvp_progress.parse_blocker_table(
-        project_root / ".ai" / "project-layer" / "wing_mvp_blockers.md"
-    )
+    blocker_path = project_root / ".ai" / "project-layer" / "wing_mvp_blockers.md"
+    rows = update_mvp_progress.parse_blocker_table(blocker_path)
     first_open = update_mvp_progress.first_open_blocker(rows)
+    current_first_command = update_mvp_progress.current_first_command(blocker_path)
     evidence = codex_direction_guard.collect_repo_evidence(
         project_root,
         lookback_commits=lookback_commits,
@@ -73,12 +73,18 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
 
     if first_open:
         selected_blocker = first_open["blocker"]
-        selected_action = first_open["next action"]
+        selected_action, selected_action_source = (
+            update_mvp_progress.selected_action_text(
+                blocker_next_action=first_open["next action"],
+                current_first_command=current_first_command,
+            )
+        )
         selected_status = first_open["status"]
         selected_evidence_files = extract_evidence_files(first_open["evidence"])
     else:
         selected_blocker = "none"
         selected_action = "All MVP blockers are closed; prepare operator review before widening scope."
+        selected_action_source = "all_blockers_closed"
         selected_status = "closed"
         selected_evidence_files = []
 
@@ -115,6 +121,7 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         "selected_blocker": selected_blocker,
         "selected_blocker_status": selected_status,
         "selected_action": selected_action,
+        "selected_action_source": selected_action_source,
         "selected_evidence_file_count": len(selected_evidence_files),
         "selected_evidence_files": selected_evidence_files,
         "stop_broad_work": stop_broad_work,
@@ -151,6 +158,7 @@ def render_markdown(directive: dict) -> str:
         "",
         f"- Selected blocker: `{directive['selected_blocker']}`",
         f"- Blocker status: `{directive['selected_blocker_status']}`",
+        f"- Selected action source: `{directive.get('selected_action_source', 'unknown')}`",
         f"- Selected action: {directive['selected_action']}",
         f"- Selected evidence file count: `{directive.get('selected_evidence_file_count', 0)}`",
         "",

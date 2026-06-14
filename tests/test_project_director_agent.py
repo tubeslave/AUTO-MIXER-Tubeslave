@@ -32,6 +32,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert directive["current_mvp"] == "supervised_wing_rack_proof"
     assert directive["selected_blocker"] == "WING read-only connection proof"
     assert directive["selected_blocker_status"] == "tooling_ready_waits_real_wing"
+    assert (
+        directive["selected_action_source"]
+        == "Current First Command + blocker table baseline"
+    )
     assert "tools/no_wing_release_check.py --quick" in directive["selected_action"]
     assert "before starting the intended backend/WING session" in directive["selected_action"]
     assert "`Docs/runbooks/WING_READONLY_PREFLIGHT.md`" in directive["selected_action"]
@@ -236,6 +240,16 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "selected_action"
     ]
     assert "operator_sequence_backend_connection_confirmation_step_index: 2" in directive[
+        "selected_action"
+    ]
+    assert "accepted_candidate_prestart_contract_violations_by_source" in directive[
+        "selected_action"
+    ]
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+        in directive["selected_action"]
+    )
+    assert "Both maps must be `{}` before supervised proof steps are planned" in directive[
         "selected_action"
     ]
     assert "operator_sequence_backend_connection_confirmation_before_capture: true" in directive[

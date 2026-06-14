@@ -964,11 +964,22 @@ def test_runbooks_keep_readonly_before_supervised_execute():
 def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     progress = load_progress_module()
     rows = progress.parse_blocker_table(BLOCKERS_DOC)
-    report = progress.build_progress_report(rows, generated_at="2026-06-06T00:00:00Z")
+    current_command = progress.current_first_command(BLOCKERS_DOC)
+    assert current_command is not None
+    assert current_command.startswith("Use `PYTHONPATH=backend python3")
+    report = progress.build_progress_report(
+        rows,
+        generated_at="2026-06-06T00:00:00Z",
+        current_first_command=current_command,
+    )
 
     assert "Total blockers: 9" in report
     assert "Closed blockers: 0" in report
     assert "Current first open blocker: WING read-only connection proof" in report
+    assert (
+        "Next required action source: Current First Command + blocker table baseline"
+        in report
+    )
     assert "backend_port_prestart_gate" in report
     assert "expected_backend_port_prestart_gate" in report
     assert "backend_port_prestart_gate.grants_live_authority: false" in report
@@ -1047,6 +1058,12 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "expected_artifacts_match_plan: true" in report
     assert "summary_glob_matches_plan: true" in report
     assert "event_log_glob_matches_plan: true" in report
+    assert "accepted_candidate_prestart_contract_violations_by_source" in report
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+        in report
+    )
+    assert "Both maps must be `{}` before supervised proof steps are planned" in report
     for marker in (
         "preview_command_artifact_root_matches_packet: true",
         "preview_command_plan_output_matches_packet: true",
