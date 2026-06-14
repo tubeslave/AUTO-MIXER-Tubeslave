@@ -137,6 +137,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_BOOL_RENDERING_20260614.md` | WING read-only decision review reports now keep missing candidate-prestart booleans empty instead of rendering them as safe `false`. |
 | `Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SKIP_SELF_REPORTS_20260614.md` | Direction guard now skips its own generated reports so derived diagnostics cannot create false mixed evidence. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_BINDING_20260614.md` | WING read-only handoff packets now bind an existing no-WING prestart summary by SHA256 and no-WING validation fails closed on packet/plan digest mismatch. |
+| `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md` | no-WING handoff validation now fails closed when the prestart summary SHA availability flag contradicts the packet digest. |
 | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_REPORTS_20260613.md` | The current first WING MVP blocker evidence cites the latest read-only artifact contract and decision prestart ready gate reports for Project Director context. |
 | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` | The current first WING MVP blocker evidence cites the backend-port listener-probe error field report for Project Director context. |
 | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` | The current no-WING quick gate failed closed on a busy backend port and requires operator confirmation before WING read-only preflight. |
@@ -212,6 +213,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING decision review prestart boolean rendering | `Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_BOOL_RENDERING_20260614.md` |
 | Current WING direction guard self-report skip | `Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SKIP_SELF_REPORTS_20260614.md` |
 | Current WING handoff prestart summary SHA binding | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_BINDING_20260614.md` |
+| Current WING handoff prestart summary SHA availability | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md` |
 | Current WING blocker evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_REPORTS_20260613.md` |
 | Current WING blocker listener-probe evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` |
 | Current WING no-WING busy-port fail-closed evidence | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` |

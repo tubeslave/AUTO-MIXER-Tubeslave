@@ -4804,6 +4804,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         if isinstance(packet.get("backend_port_prestart_summary_sha256"), str)
         else ""
     )
+    packet_backend_port_prestart_summary_sha256_available = (
+        packet.get("backend_port_prestart_summary_sha256_available") is True
+    )
+    packet_backend_port_prestart_summary_sha256_available_matches_digest = (
+        packet_backend_port_prestart_summary_sha256_available
+        == bool(packet_backend_port_prestart_summary_sha256)
+    )
     packet_backend_port_prestart_summary_sha256_matches_plan = (
         bool(plan_backend_port_prestart_summary_sha256)
         and packet_backend_port_prestart_summary_sha256
@@ -5188,6 +5195,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_prestart_summary_sha256_mismatch"
         )
+    if not packet_backend_port_prestart_summary_sha256_available_matches_digest:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_sha256_available_mismatch"
+        )
     backend_port_prestart_step_index = packet.get(
         "backend_port_prestart_check_operator_sequence_step_index"
     )
@@ -5558,6 +5569,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_summary_sha256"] = (
         packet_backend_port_prestart_summary_sha256
+    )
+    detail["backend_port_prestart_summary_sha256_available"] = (
+        packet_backend_port_prestart_summary_sha256_available
+    )
+    detail["backend_port_prestart_summary_sha256_available_matches_digest"] = (
+        packet_backend_port_prestart_summary_sha256_available_matches_digest
     )
     detail["plan_backend_port_prestart_summary_sha256"] = (
         plan_backend_port_prestart_summary_sha256
@@ -13156,6 +13173,15 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "backend_port_prestart_summary_sha256": str(
                 detail.get("backend_port_prestart_summary_sha256") or ""
             ),
+            "backend_port_prestart_summary_sha256_available": (
+                detail.get("backend_port_prestart_summary_sha256_available") is True
+            ),
+            "backend_port_prestart_summary_sha256_available_matches_digest": (
+                detail.get(
+                    "backend_port_prestart_summary_sha256_available_matches_digest"
+                )
+                is True
+            ),
             "plan_backend_port_prestart_summary_sha256": str(
                 detail.get("plan_backend_port_prestart_summary_sha256") or ""
             ),
@@ -16955,6 +16981,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_path']}`",
                 "- backend_port_prestart_summary_sha256: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_sha256']}`",
+                "- backend_port_prestart_summary_sha256_available: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_sha256_available']).lower()}`",
+                "- backend_port_prestart_summary_sha256_available_matches_digest: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_sha256_available_matches_digest']).lower()}`",
                 "- plan_backend_port_prestart_summary_sha256: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_sha256']}`",
                 "- backend_port_prestart_summary_sha256_matches_plan: "
