@@ -261,16 +261,21 @@ blockers выше.
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
 52. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
 53. verify `operator_sequence_count: 10`;
-54. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-55. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+54. verify `expected_operator_sequence_count: 10`;
+55. verify `operator_sequence_count_matches_contract: true`;
+56. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+57. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-56. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-57. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+58. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+59. verify `expected_operator_sequence_supervised_prestart_gate_step_index: 9`;
+60. verify
+   `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`;
+61. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-58. verify `required_supervised_prestart_gate_markers` exactly lists
+62. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
@@ -502,6 +507,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `operator_sequence_count: 10`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_operator_sequence_count: 10` and
+  `operator_sequence_count_matches_contract: true`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
 - Before any supervised fader/gain proof, the
@@ -510,6 +518,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `current first open blocker`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_supervised_prestart_gate_step_index` must be `9`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_operator_sequence_supervised_prestart_gate_step_index: 9` and
+  `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,

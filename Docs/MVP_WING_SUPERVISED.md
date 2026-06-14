@@ -126,6 +126,11 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while the no-WING handoff summary does not show
   `backend_port_prestart_summary_sha256_available: true` and
   `backend_port_prestart_summary_sha256_available_matches_digest: true`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `expected_operator_sequence_count: 10`,
+  `operator_sequence_count_matches_contract: true`,
+  `expected_operator_sequence_supervised_prestart_gate_step_index: 9`, and
+  `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `backend_port_prestart_gate` exactly matching
   `expected_backend_port_prestart_gate`.

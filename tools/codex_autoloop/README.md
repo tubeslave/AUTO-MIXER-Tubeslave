@@ -357,6 +357,9 @@ you want the background automation active.
   valid accepted-candidate prestart trace; they do not grant live authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `operator_sequence_count: 10`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_operator_sequence_count: 10` and
+  `operator_sequence_count_matches_contract: true`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
 - Before any supervised fader/gain proof, the
@@ -365,6 +368,9 @@ you want the background automation active.
   `current first open blocker`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_supervised_prestart_gate_step_index` must be `9`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_operator_sequence_supervised_prestart_gate_step_index: 9` and
+  `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,

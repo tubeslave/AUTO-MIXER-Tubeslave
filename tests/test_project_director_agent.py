@@ -264,6 +264,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "selected_action"
     ]
     assert "operator_sequence_count: 10" in directive["selected_action"]
+    assert "expected_operator_sequence_count: 10" in directive["selected_action"]
+    assert (
+        "operator_sequence_count_matches_contract: true"
+        in directive["selected_action"]
+    )
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in directive[
         "selected_action"
     ]
@@ -284,6 +289,14 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_sequence_supervised_prestart_gate_step_index: 9" in directive[
         "selected_action"
     ]
+    assert (
+        "expected_operator_sequence_supervised_prestart_gate_step_index: 9"
+        in directive["selected_action"]
+    )
+    assert (
+        "operator_sequence_supervised_prestart_gate_step_index_matches_contract: true"
+        in directive["selected_action"]
+    )
     assert "required_supervised_prestart_gate_markers" in directive[
         "selected_action"
     ]
@@ -439,6 +452,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CARDINALITY_20260614.md"
         in directive["selected_evidence_files"]
     )
     assert directive["stop_broad_work"] is True
@@ -743,12 +760,19 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in prompt
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in prompt
     assert "operator_sequence_count: 10" in prompt
+    assert "expected_operator_sequence_count: 10" in prompt
+    assert "operator_sequence_count_matches_contract: true" in prompt
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in prompt
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in prompt
     assert "operator_sequence_has_supervised_prestart_gate: true" in prompt
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in prompt
     assert "operator_sequence_supervised_prestart_gate_step" in prompt
     assert "operator_sequence_supervised_prestart_gate_step_index" in prompt
+    assert "expected_operator_sequence_supervised_prestart_gate_step_index" in prompt
+    assert (
+        "operator_sequence_supervised_prestart_gate_step_index_matches_contract: true"
+        in prompt
+    )
     assert "required_supervised_prestart_gate_markers" in prompt
     assert "accepted_decision_ready" in prompt
     assert "valid accepted-candidate prestart trace" in prompt
@@ -767,12 +791,19 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in readme
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readme
     assert "operator_sequence_count: 10" in readme
+    assert "expected_operator_sequence_count: 10" in readme
+    assert "operator_sequence_count_matches_contract: true" in readme
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in readme
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in readme
     assert "operator_sequence_has_supervised_prestart_gate: true" in readme
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in readme
     assert "operator_sequence_supervised_prestart_gate_step" in readme
     assert "operator_sequence_supervised_prestart_gate_step_index" in readme
+    assert "expected_operator_sequence_supervised_prestart_gate_step_index" in readme
+    assert (
+        "operator_sequence_supervised_prestart_gate_step_index_matches_contract: true"
+        in readme
+    )
     assert "required_supervised_prestart_gate_markers" in readme
     assert "accepted_decision_ready" in readme
     assert "valid accepted-candidate prestart trace" in readme

@@ -475,6 +475,12 @@ WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
 )
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = (
+    preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+)
+WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT = (
+    preflight_contract.WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+)
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
     preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS
 )
@@ -5365,8 +5371,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
                 "wing_readonly_preflight_handoff_packet_forbidden_"
                 f"{required_forbidden}_missing"
             )
+    operator_sequence_count = len(operator_sequence)
+    operator_sequence_count_matches_contract = (
+        operator_sequence_count == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
     if len(operator_sequence) < 8:
         violations.append("wing_readonly_preflight_handoff_packet_operator_sequence_short")
+    if not operator_sequence_count_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_operator_sequence_count_mismatch"
+        )
     backend_port_prestart_step = str(operator_sequence[0]) if operator_sequence else ""
     backend_port_prestart_step_is_first = bool(backend_port_prestart_step) and all(
         marker in backend_port_prestart_step
@@ -5472,10 +5486,18 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_missing"
         )
-    elif not operator_sequence_supervised_prestart_gate_is_final:
-        violations.append(
-            "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
-        )
+    else:
+        if (
+            operator_sequence_supervised_prestart_gate_step_index
+            != WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+        ):
+            violations.append(
+                "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_step_index_mismatch"
+            )
+        if not operator_sequence_supervised_prestart_gate_is_final:
+            violations.append(
+                "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
+            )
     operator_sequence_mvp_blocker_anchor_digest_review_step_index = next(
         (
             index
@@ -5808,6 +5830,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
     )
     detail["operator_sequence_count"] = len(operator_sequence)
+    detail["expected_operator_sequence_count"] = (
+        WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    detail["operator_sequence_count_matches_contract"] = (
+        operator_sequence_count_matches_contract
+    )
     detail["operator_sequence_has_mvp_blocker_anchor_digest_review"] = (
         operator_sequence_has_mvp_blocker_anchor_digest_review
     )
@@ -5825,6 +5853,15 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["operator_sequence_supervised_prestart_gate_step_index"] = (
         operator_sequence_supervised_prestart_gate_step_index
+    )
+    detail["expected_operator_sequence_supervised_prestart_gate_step_index"] = (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
+    detail[
+        "operator_sequence_supervised_prestart_gate_step_index_matches_contract"
+    ] = (
+        operator_sequence_supervised_prestart_gate_step_index
+        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
     )
     detail["operator_sequence_supervised_prestart_gate_is_final"] = (
         operator_sequence_supervised_prestart_gate_is_final
@@ -13578,6 +13615,12 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 detail.get("mvp_blocker_anchor_sha256_matches_current_first_open") is True
             ),
             "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
+            "expected_operator_sequence_count": int(
+                detail.get("expected_operator_sequence_count") or 0
+            ),
+            "operator_sequence_count_matches_contract": (
+                detail.get("operator_sequence_count_matches_contract") is True
+            ),
             "operator_sequence_has_mvp_blocker_anchor_digest_review": (
                 detail.get("operator_sequence_has_mvp_blocker_anchor_digest_review")
                 is True
@@ -13601,6 +13644,17 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "operator_sequence_supervised_prestart_gate_step_index": (
                 detail.get("operator_sequence_supervised_prestart_gate_step_index")
+            ),
+            "expected_operator_sequence_supervised_prestart_gate_step_index": (
+                detail.get(
+                    "expected_operator_sequence_supervised_prestart_gate_step_index"
+                )
+            ),
+            "operator_sequence_supervised_prestart_gate_step_index_matches_contract": (
+                detail.get(
+                    "operator_sequence_supervised_prestart_gate_step_index_matches_contract"
+                )
+                is True
             ),
             "operator_sequence_supervised_prestart_gate_is_final": (
                 detail.get("operator_sequence_supervised_prestart_gate_is_final") is True
@@ -17209,6 +17263,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_mvp_blocker_anchor'])}`",
                 "- operator_sequence_count: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count']}`",
+                "- expected_operator_sequence_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_count']}`",
+                "- operator_sequence_count_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_count_matches_contract']).lower()}`",
                 "- operator_sequence_has_mvp_blocker_anchor_digest_review: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_has_mvp_blocker_anchor_digest_review']).lower()}`",
                 "- operator_sequence_mvp_blocker_anchor_digest_review_step: "
@@ -17221,6 +17279,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_step']}`",
                 "- operator_sequence_supervised_prestart_gate_step_index: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_step_index']}`",
+                "- expected_operator_sequence_supervised_prestart_gate_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_supervised_prestart_gate_step_index']}`",
+                "- operator_sequence_supervised_prestart_gate_step_index_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_step_index_matches_contract']).lower()}`",
                 "- operator_sequence_supervised_prestart_gate_is_final: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_is_final']).lower()}`",
                 "- required_supervised_prestart_gate_markers: "

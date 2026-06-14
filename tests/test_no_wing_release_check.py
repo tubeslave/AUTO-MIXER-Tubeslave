@@ -23,6 +23,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
+    WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
@@ -54,6 +55,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK,
+    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
+    expected_supervised_prestart_gate,
 )
 from tools import no_wing_release_check as release_check
 from tools.no_wing_release_check import (
@@ -3208,7 +3211,15 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["mvp_blocker_anchor"]["selected_evidence_file_count"] == len(
         result.detail["mvp_blocker_anchor"]["selected_evidence_files"]
     )
-    assert result.detail["operator_sequence_count"] == 10
+    assert (
+        result.detail["operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert (
+        result.detail["expected_operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert result.detail["operator_sequence_count_matches_contract"] is True
     assert (
         result.detail["operator_sequence_has_mvp_blocker_anchor_digest_review"]
         is True
@@ -3231,7 +3242,20 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
             "to WING_SUPERVISED_FADER_GAIN_PROOF."
         )
     )
-    assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 9
+    assert (
+        result.detail["operator_sequence_supervised_prestart_gate_step_index"]
+        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
+    assert (
+        result.detail["expected_operator_sequence_supervised_prestart_gate_step_index"]
+        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
+    assert (
+        result.detail[
+            "operator_sequence_supervised_prestart_gate_step_index_matches_contract"
+        ]
+        is True
+    )
     assert result.detail["operator_sequence_supervised_prestart_gate_is_final"] is True
     assert result.detail["supervised_prestart_gate"] == result.detail[
         "expected_supervised_prestart_gate"
@@ -3241,7 +3265,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     ]
     assert result.detail["supervised_prestart_gate"][
         "operator_sequence_step_index"
-    ] == 9
+    ] == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
     assert result.detail["supervised_prestart_gate"][
         "operator_sequence_step_must_be_final"
     ] is True
@@ -4263,6 +4287,71 @@ def test_no_wing_release_check_rejects_handoff_packet_with_nonfinal_supervised_p
     assert result.detail["operator_sequence_supervised_prestart_gate_is_final"] is False
     assert (
         "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_extra_step_before_supervised_prestart_gate(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-extra-step-before-prestart-gate.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["operator_sequence"].insert(
+        -1,
+        "Review an extra offline note before supervised proof planning.",
+    )
+    shifted_gate_index = WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX + 1
+    shifted_gate = expected_supervised_prestart_gate(
+        operator_sequence_step=payload["operator_sequence"][-1],
+        operator_sequence_step_index=shifted_gate_index,
+    )
+    payload["supervised_prestart_gate"] = dict(shifted_gate)
+    payload["expected_supervised_prestart_gate"] = dict(shifted_gate)
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["operator_sequence_count"] == (
+        WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT + 1
+    )
+    assert result.detail["expected_operator_sequence_count"] == (
+        WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert result.detail["operator_sequence_count_matches_contract"] is False
+    assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
+    assert (
+        result.detail["operator_sequence_supervised_prestart_gate_step_index"]
+        == shifted_gate_index
+    )
+    assert (
+        result.detail["expected_operator_sequence_supervised_prestart_gate_step_index"]
+        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
+    assert (
+        result.detail[
+            "operator_sequence_supervised_prestart_gate_step_index_matches_contract"
+        ]
+        is False
+    )
+    assert (
+        result.detail["supervised_prestart_gate"]
+        == result.detail["expected_supervised_prestart_gate"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_operator_sequence_count_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_step_index_mismatch"
         in result.detail["violations"]
     )
 
@@ -10943,7 +11032,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "required_review_checklist_ids": ["confirm_no_live_authority"],
             "forbidden_live_request_types": ["apply_operator_proposal"],
             "blockers_not_closed_by_packet": ["physical_console_readback_proof"],
-            "operator_sequence_count": 10,
+            "operator_sequence_count": (
+                WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+            ),
+            "expected_operator_sequence_count": (
+                WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+            ),
+            "operator_sequence_count_matches_contract": True,
             "operator_sequence_has_mvp_blocker_anchor_digest_review": True,
             "operator_sequence_mvp_blocker_anchor_digest_review_step": (
                 "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
@@ -10956,7 +11051,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "prestart trace, and expected-artifact-bound accepted source id, move "
                 "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
-            "operator_sequence_supervised_prestart_gate_step_index": 9,
+            "operator_sequence_supervised_prestart_gate_step_index": (
+                WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+            ),
+            "expected_operator_sequence_supervised_prestart_gate_step_index": (
+                WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+            ),
+            "operator_sequence_supervised_prestart_gate_step_index_matches_contract": (
+                True
+            ),
             "operator_sequence_supervised_prestart_gate_is_final": True,
             "supervised_prestart_gate": {
                 "required": True,
@@ -11204,7 +11307,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
     )
     assert artifact["decision_review_command_decision_root_matches_packet"] is True
-    assert artifact["operator_sequence_count"] == 10
+    assert (
+        artifact["operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert (
+        artifact["expected_operator_sequence_count"]
+        == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
+    assert artifact["operator_sequence_count_matches_contract"] is True
     assert artifact["operator_sequence_has_mvp_blocker_anchor_digest_review"] is True
     assert artifact["operator_sequence_mvp_blocker_anchor_digest_review_step"] == (
         "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
@@ -11217,7 +11328,20 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "prestart trace, and expected-artifact-bound accepted source id, move "
         "to WING_SUPERVISED_FADER_GAIN_PROOF."
     )
-    assert artifact["operator_sequence_supervised_prestart_gate_step_index"] == 9
+    assert (
+        artifact["operator_sequence_supervised_prestart_gate_step_index"]
+        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
+    assert (
+        artifact["expected_operator_sequence_supervised_prestart_gate_step_index"]
+        == WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
+    assert (
+        artifact[
+            "operator_sequence_supervised_prestart_gate_step_index_matches_contract"
+        ]
+        is True
+    )
     assert artifact["operator_sequence_supervised_prestart_gate_is_final"] is True
     assert artifact["supervised_prestart_gate"] == artifact[
         "expected_supervised_prestart_gate"
@@ -11349,6 +11473,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "execution_allowed_by_packet: `false`" in markdown_summary
     assert "preview_command_uses_plan_only: `true`" in markdown_summary
     assert "capture_command_requires_physical_readback: `true`" in markdown_summary
+    assert "operator_sequence_count: `10`" in markdown_summary
+    assert "expected_operator_sequence_count: `10`" in markdown_summary
+    assert "operator_sequence_count_matches_contract: `true`" in markdown_summary
     assert "operator_sequence_has_supervised_prestart_gate: `true`" in markdown_summary
     assert (
         "operator_sequence_has_mvp_blocker_anchor_digest_review: `true`"
@@ -11361,6 +11488,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "operator_sequence_supervised_prestart_gate_step" in markdown_summary
     assert "operator_sequence_supervised_prestart_gate_step_index: `9`" in markdown_summary
+    assert (
+        "expected_operator_sequence_supervised_prestart_gate_step_index: `9`"
+        in markdown_summary
+    )
+    assert (
+        "operator_sequence_supervised_prestart_gate_step_index_matches_contract: `true`"
+        in markdown_summary
+    )
     assert "operator_sequence_supervised_prestart_gate_is_final: `true`" in markdown_summary
     assert "required_supervised_prestart_gate_markers" in markdown_summary
     assert "supervised_prestart_gate" in markdown_summary
