@@ -257,6 +257,7 @@ you want the background automation active.
 	  must show `backend_port_prestart_summary_required: true`,
 	  `backend_port_prestart_summary_type: no_wing_release_check`,
 	  `backend_port_prestart_summary_status: passed`,
+	  `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`,
 	  `backend_port_prestart_summary_live_write: false`,
 	  `backend_port_prestart_summary_contacts_backend: false`,
 	  `backend_port_prestart_summary_queries_console: false`,

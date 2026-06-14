@@ -210,6 +210,7 @@ blockers выше.
 29. verify `capture_command_prestart_summary` matches that path;
 30. verify `capture_command_prestart_summary_matches_plan: true`;
 30a. verify `backend_port_prestart_summary_type: no_wing_release_check`;
+30b. verify `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`;
 31. verify `backend_port_prestart_summary_status: passed`;
 32. verify `backend_port_prestart_summary_live_write: false`;
 33. verify `backend_port_prestart_summary_contacts_backend: false`;
@@ -477,6 +478,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
 	  must show `backend_port_prestart_summary_required: true`,
 	  `backend_port_prestart_summary_type: no_wing_release_check`,
 	  `backend_port_prestart_summary_status: passed`,
+	  `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`,
 	  `backend_port_prestart_summary_live_write: false`,
 	  `backend_port_prestart_summary_contacts_backend: false`,
 	  `backend_port_prestart_summary_queries_console: false`,
