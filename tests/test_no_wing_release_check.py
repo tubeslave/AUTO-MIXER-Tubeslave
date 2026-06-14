@@ -7991,6 +7991,7 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "accepted_candidate_prestart_source_ids": [
                     "artifacts/wing_readonly_preflight/run/summary.json"
                 ],
+                "accepted_candidate_prestart_contract_violations_by_source": {},
                 "candidate_reviews": [
                     {
                         "source_id": "artifacts/wing_readonly_preflight/run/summary.json",
@@ -8078,6 +8079,7 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "readonly_preflight_review_decision_candidate_prestart_source_ids": [
                     "artifacts/wing_readonly_preflight/run/summary.json"
                 ],
+                "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source": {},
                 "readonly_preflight_review_decision_rejected_source_ids": [],
                 "readonly_preflight_review_decision_invalid_record_count": 0,
                 "readonly_preflight_review_decision_unreviewed_candidate_count": 0,
@@ -8240,6 +8242,12 @@ def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
     assert result.detail[
         "readonly_preflight_review_decision_candidate_prestart_source_ids"
     ] == ["artifacts/wing_readonly_preflight/run/summary.json"]
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+        ]
+        == {}
+    )
     assert result.detail["violations"] == []
 
 
@@ -8293,6 +8301,36 @@ def test_no_wing_release_check_rejects_next_wing_plan_without_candidate_prestart
     )
     assert (
         "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_next_wing_plan_stale_candidate_prestart_violations_map(
+    tmp_path,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["wing_readonly_preflight_review_decision_ledger"]["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] = {
+        "artifacts/wing_readonly_preflight/run/summary.json": [
+            "backend_port_prestart_summary_sha256_missing"
+        ]
+    }
+    payload["next_wing_proof_plan"]["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+    ] = {}
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        "next_wing_proof_plan_review_decision_candidate_prestart_violations_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_candidate_prestart_contract_mismatch"
         in result.detail["violations"]
     )
 
@@ -14884,6 +14922,7 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             "readonly_preflight_review_decision_candidate_prestart_source_ids": [
                 "artifacts/wing_readonly_preflight/run/summary.json"
             ],
+            "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source": {},
             "readonly_preflight_review_decision_rejected_source_ids": [],
             "readonly_preflight_review_decision_invalid_record_count": 0,
             "readonly_preflight_review_decision_invalid_record_ids": [],
@@ -14978,6 +15017,12 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert (
         json_summary["next_wing_proof_plan"][
+            "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+        ]
+        == {}
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
             "readonly_preflight_review_decision_rejected_source_ids"
         ]
         == []
@@ -15024,6 +15069,10 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert "readonly_preflight_review_decision_candidate_prestart_source_ids" in markdown_summary
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: `{}`"
+        in markdown_summary
+    )
     assert "readonly_preflight_review_decision_rejected_source_ids: `[]`" in markdown_summary
     assert "readonly_preflight_review_decision_duplicate_source_ids: `[]`" in markdown_summary
 
