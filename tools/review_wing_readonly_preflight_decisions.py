@@ -82,6 +82,14 @@ def build_decision_review_report(
     accepted_candidate_prestart_source_ids = _string_list(
         summary.get("accepted_candidate_prestart_source_ids")
     )
+    accepted_candidate_prestart_contract_violations_by_source = (
+        summary.get("accepted_candidate_prestart_contract_violations_by_source")
+        if isinstance(
+            summary.get("accepted_candidate_prestart_contract_violations_by_source"),
+            Mapping,
+        )
+        else {}
+    )
     accepted_candidate_prestart_contract_valid = (
         summary.get("accepted_candidate_prestart_contract_valid") is True
     )
@@ -138,6 +146,9 @@ def build_decision_review_report(
             accepted_candidate_prestart_contract_valid
         ),
         "accepted_candidate_prestart_source_ids": accepted_candidate_prestart_source_ids,
+        "accepted_candidate_prestart_contract_violations_by_source": dict(
+            accepted_candidate_prestart_contract_violations_by_source
+        ),
         "rejected_source_ids": _string_list(summary.get("rejected_source_ids")),
         "invalid_record_ids": _string_list(summary.get("invalid_record_ids")),
         "duplicate_source_ids": _string_list(summary.get("duplicate_source_ids")),
@@ -202,6 +213,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"`{str(report['accepted_candidate_prestart_contract_valid']).lower()}`",
         "- accepted_candidate_prestart_source_ids: "
         f"`{json.dumps(report['accepted_candidate_prestart_source_ids'])}`",
+        "- accepted_candidate_prestart_contract_violations_by_source: "
+        f"`{json.dumps(report['accepted_candidate_prestart_contract_violations_by_source'], sort_keys=True)}`",
         "",
         "## Safety",
         "",

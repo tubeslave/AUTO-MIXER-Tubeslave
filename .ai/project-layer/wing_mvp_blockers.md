@@ -230,6 +230,14 @@ prestart `summary.json` by path and SHA256, with
 `backend_port_prestart_summary_queries_console: false`,
 `backend_port_prestart_summary_executes_tests: false`, and
 `backend_port_prestart_check_status: passed`.
+The decision-review ledger/report must expose
+`accepted_candidate_prestart_contract_violations_by_source`, and the supervised
+proof plan summary must expose
+`readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`.
+Both maps must be `{}` before supervised proof steps are planned; a non-empty
+map keeps
+`accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
+in force.
 
 ## Do Not Work On Instead
 

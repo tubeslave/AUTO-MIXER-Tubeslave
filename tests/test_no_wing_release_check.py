@@ -5803,6 +5803,7 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     assert result.detail["manual_readiness_update_candidate_available"] is False
     assert result.detail["accepted_candidate_prestart_contract_valid"] is False
     assert result.detail["accepted_candidate_prestart_source_ids"] == []
+    assert result.detail["accepted_candidate_prestart_contract_violations_by_source"] == {}
     assert result.detail["operator_review_required"] is True
     assert result.detail["readiness_matrix_update_allowed_by_decision"] is False
     assert result.detail["readiness_closure_allowed_by_decision"] is False
@@ -12214,6 +12215,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
             "accepted_source_ids": [],
             "accepted_candidate_prestart_contract_valid": False,
             "accepted_candidate_prestart_source_ids": [],
+            "accepted_candidate_prestart_contract_violations_by_source": {
+                "artifacts/wing_readonly_preflight/run/summary.json": [
+                    "backend_port_prestart_summary_sha256_missing"
+                ]
+            },
             "rejected_source_ids": [],
             "invalid_record_ids": [],
             "unreviewed_candidate_source_ids": [],
@@ -12278,6 +12284,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert decision["manual_readiness_update_candidate_available"] is False
     assert decision["accepted_candidate_prestart_contract_valid"] is False
     assert decision["accepted_candidate_prestart_source_ids"] == []
+    assert decision["accepted_candidate_prestart_contract_violations_by_source"] == {
+        "artifacts/wing_readonly_preflight/run/summary.json": [
+            "backend_port_prestart_summary_sha256_missing"
+        ]
+    }
     assert decision["readiness_matrix_update_allowed_by_decision"] is False
     assert decision["readiness_closure_allowed_by_decision"] is False
     assert decision["live_authority_granted"] is False
@@ -12288,6 +12299,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert "accepted_decision_ready" in markdown_summary
     assert "candidate_reviews:" in markdown_summary
     assert "accepted_candidate_prestart_contract_valid: `false`" in markdown_summary
+    assert (
+        "accepted_candidate_prestart_contract_violations_by_source: `"
+        in markdown_summary
+    )
+    assert "backend_port_prestart_summary_sha256_missing" in markdown_summary
     assert "backend_port_prestart_check_required" in markdown_summary
     assert "listener_processes" in markdown_summary
     assert "listener_confirmation_checklist" in markdown_summary

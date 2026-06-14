@@ -399,6 +399,7 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert report["accepted_source_ids"] == [str(summary_path)]
     assert report["accepted_candidate_prestart_contract_valid"] is True
     assert report["accepted_candidate_prestart_source_ids"] == [str(summary_path)]
+    assert report["accepted_candidate_prestart_contract_violations_by_source"] == {}
     summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
     candidate_review = report["candidate_reviews"][0]
     assert candidate_review["expected_artifacts"] == _expected_artifacts_for_summary(
@@ -421,6 +422,7 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     markdown = decision_tool.render_markdown(report)
     assert decision_tool.ACCEPTED_DECISION_READY_STATUS in markdown
     assert "accepted_candidate_prestart_contract_valid: `true`" in markdown
+    assert "accepted_candidate_prestart_contract_violations_by_source: `{}`" in markdown
     assert "live_authority_granted: `false`" in markdown
     assert "Candidate Prestart Contract" in markdown
     assert "expected_artifacts" in markdown
@@ -465,6 +467,9 @@ def test_decision_review_report_blocks_accepted_decision_without_prestart_trace(
                 "accepted_source_ids": ["source-a"],
                 "accepted_candidate_prestart_contract_valid": False,
                 "accepted_candidate_prestart_source_ids": [],
+                "accepted_candidate_prestart_contract_violations_by_source": {
+                    "source-a": ["backend_port_prestart_check_required_not_true"]
+                },
                 "rejected_source_ids": [],
                 "invalid_record_ids": [],
                 "duplicate_source_ids": [],
@@ -528,6 +533,9 @@ def test_decision_review_report_blocks_accepted_decision_without_prestart_trace(
     assert report["manual_readiness_update_candidate_available"] is False
     assert report["accepted_candidate_prestart_contract_valid"] is False
     assert report["accepted_candidate_prestart_source_ids"] == []
+    assert report["accepted_candidate_prestart_contract_violations_by_source"] == {
+        "source-a": ["backend_port_prestart_check_required_not_true"]
+    }
     assert WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER in report[
         "blocked_by"
     ]
@@ -536,6 +544,7 @@ def test_decision_review_report_blocks_accepted_decision_without_prestart_trace(
     markdown = decision_tool.render_markdown(report)
     assert "Status: `blocked`" in markdown
     assert "accepted_candidate_prestart_contract_valid: `false`" in markdown
+    assert "backend_port_prestart_check_required_not_true" in markdown
     assert "backend_port_prestart_check_required: `false`" in markdown
     assert "summary_path_matches_expected_artifact: ``" in markdown
     assert "events_path_matches_expected_artifact: ``" in markdown

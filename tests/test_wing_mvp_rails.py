@@ -947,6 +947,16 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in supervised
     )
+    assert "accepted_candidate_prestart_contract_violations_by_source" in readonly
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+        in readonly
+    )
+    assert "accepted_candidate_prestart_contract_violations_by_source: {}" in readonly
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}"
+        in readonly
+    )
     assert "negative delta" in supervised
     assert "Full autonomous" not in supervised
 

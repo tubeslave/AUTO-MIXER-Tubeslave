@@ -19,6 +19,7 @@ try:
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 except ImportError:  # pragma: no cover - package import compatibility
@@ -28,6 +29,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 
@@ -505,9 +507,16 @@ def build_wing_readonly_preflight_review_decision_ledger(
             candidate_reviews,
         )
     )
+    accepted_candidate_prestart_violations_by_source = (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            accepted_source_ids,
+            candidate_reviews,
+        )
+    )
     accepted_candidate_prestart_contract_valid = (
         bool(accepted_source_ids)
         and accepted_candidate_prestart_source_ids == accepted_source_ids
+        and not accepted_candidate_prestart_violations_by_source
     )
     manual_readiness_update_candidate_available = (
         bool(accepted_records)
@@ -576,6 +585,9 @@ def build_wing_readonly_preflight_review_decision_ledger(
             ),
             "accepted_candidate_prestart_source_ids": (
                 accepted_candidate_prestart_source_ids
+            ),
+            "accepted_candidate_prestart_contract_violations_by_source": (
+                accepted_candidate_prestart_violations_by_source
             ),
             "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
             "operator_review_required": True,

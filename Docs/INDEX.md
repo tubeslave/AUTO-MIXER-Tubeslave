@@ -226,6 +226,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING handoff declared operator sequence count | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_OPERATOR_SEQUENCE_COUNT_20260614.md` |
 | Current WING handoff operator sequence SHA256 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_SHA256_20260614.md` |
 | Current WING handoff operator sequence contract | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CONTRACT_20260614.md` |
+| Current WING accepted-candidate prestart diagnostics | `Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_PRESTART_DIAGNOSTICS_20260614.md` |
 | Current WING blocker evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_REPORTS_20260613.md` |
 | Current WING blocker listener-probe evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` |
 | Current WING no-WING busy-port fail-closed evidence | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` |

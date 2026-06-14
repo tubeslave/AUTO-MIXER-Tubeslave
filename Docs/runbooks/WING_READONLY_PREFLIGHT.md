@@ -573,6 +573,8 @@ The handoff validation must report:
 - `supervised_prestart_gate.unlocks_runbook:
   Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`
 - `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`
+- `accepted_candidate_prestart_contract_violations_by_source: {}`
+- `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`
 
 Until those markers are present in the final operator step and the structured
 gate matches the expected gate, the result remains a read-only proof artifact

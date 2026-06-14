@@ -259,6 +259,10 @@ blockers выше.
 51. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
    Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
+   also verify `accepted_candidate_prestart_contract_violations_by_source: {}`
+   in the decision-review ledger/report and
+   `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`
+   in the supervised proof plan summary;
 52. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
 53. verify `operator_sequence_count: 10`;
 54. verify `expected_operator_sequence_count: 10`;
@@ -467,6 +471,13 @@ python3 tools/codex_autoloop/project_director_agent.py \
 	  `backend_port_prestart_summary_queries_console: false`,
 	  `backend_port_prestart_summary_executes_tests: false`, and
 	  `backend_port_prestart_check_status: passed`.
+- Before any supervised fader/gain proof, accepted review source ids must show
+  `accepted_candidate_prestart_contract_violations_by_source: {}` in the
+  decision-review ledger/report and
+  `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`
+  in the supervised proof plan summary. A non-empty map keeps
+  `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
+  in force and grants no live authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_summary_path_placeholder` pointing to the passed
   no-WING prestart `summary.json`, plus matching

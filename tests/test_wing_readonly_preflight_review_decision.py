@@ -14,6 +14,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
+    wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
     wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
 from backend.wing_readonly_preflight_review_decision import (
@@ -73,6 +74,13 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         [source_id],
         [candidate_review],
     ) == [source_id]
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [candidate_review],
+        )
+        == {}
+    )
 
     forged_review = dict(candidate_review, backend_port_prestart_summary_sha256="")
     assert (
@@ -81,6 +89,13 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
             [forged_review],
         )
         == []
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [forged_review],
+        )
+        == {source_id: ["backend_port_prestart_summary_sha256_missing"]}
     )
     unbound_review = dict(
         candidate_review,
@@ -92,6 +107,20 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
             [unbound_review],
         )
         == []
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [unbound_review],
+        )
+        == {source_id: ["summary_path_not_bound_to_expected_artifact"]}
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            ["missing-summary.json"],
+            [candidate_review],
+        )
+        == {"missing-summary.json": ["candidate_review_missing"]}
     )
 
 
@@ -331,6 +360,10 @@ def test_review_decision_ledger_records_accepted_candidate_without_live_authorit
     assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == [
         "inline_payload_0"
     ]
+    assert (
+        ledger["summary"]["accepted_candidate_prestart_contract_violations_by_source"]
+        == {}
+    )
     assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["readiness_closure_allowed_by_decision"] is False
     assert ledger["summary"]["live_authority_granted"] is False
@@ -355,6 +388,9 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contr
     assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
     assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
     assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {"inline_payload_0": ["backend_port_prestart_check_required_not_true"]}
     assert (
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
         in ledger["summary"]["blocked_by"]
@@ -377,6 +413,9 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_summa
     assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
     assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
     assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {"inline_payload_0": ["backend_port_prestart_summary_sha256_missing"]}
     assert (
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
         in ledger["summary"]["blocked_by"]
@@ -397,6 +436,9 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_expected_artif
     assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
     assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
     assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {"inline_payload_0": ["summary_path_not_bound_to_expected_artifact"]}
     assert (
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
         in ledger["summary"]["blocked_by"]

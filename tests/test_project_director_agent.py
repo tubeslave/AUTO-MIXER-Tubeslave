@@ -912,6 +912,11 @@ def test_prompt_and_readme_document_project_director_agent():
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in prompt
     )
+    assert "accepted_candidate_prestart_contract_violations_by_source: {}" in prompt
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}"
+        in prompt
+    )
     assert "supervised_prestart_gate" in readme
     assert "expected_supervised_prestart_gate" in readme
     assert "supervised_prestart_gate.grants_live_authority: false" in readme
@@ -980,5 +985,10 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "current first open blocker" in readme
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
+        in readme
+    )
+    assert "accepted_candidate_prestart_contract_violations_by_source: {}" in readme
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}"
         in readme
     )

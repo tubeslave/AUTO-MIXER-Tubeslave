@@ -155,6 +155,13 @@ you want the background automation active.
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
   This keeps the backend listener prestart check non-optional and before the
   intended session.
+- Before any supervised fader/gain proof, accepted review source ids must show
+  `accepted_candidate_prestart_contract_violations_by_source: {}` in the
+  decision-review ledger/report and
+  `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`
+  in the supervised proof plan summary. A non-empty map keeps
+  `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
+  in force and grants no live authority.
 - The same summaries must also show
   `backend_port_prestart_gate_execution_allowed: false`,
   `backend_port_prestart_gate_readiness_closure_allowed: false`, and

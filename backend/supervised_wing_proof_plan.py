@@ -37,6 +37,7 @@ try:
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 except ImportError:  # pragma: no cover - package import compatibility
@@ -46,6 +47,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 
@@ -250,6 +252,30 @@ def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[
         accepted_source_ids,
         tuple(row for row in rows if isinstance(row, Mapping)),
     )
+
+
+def _accepted_candidate_prestart_violations_by_source(
+    summary: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    if not accepted_source_ids:
+        return {}
+    rows = summary.get("candidate_reviews")
+    if isinstance(rows, list):
+        return wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            accepted_source_ids,
+            tuple(row for row in rows if isinstance(row, Mapping)),
+        )
+    declared_violations = summary.get(
+        "accepted_candidate_prestart_contract_violations_by_source"
+    )
+    if isinstance(declared_violations, Mapping):
+        return {
+            str(source_id): _string_list(violations)
+            for source_id, violations in declared_violations.items()
+            if source_id
+        }
+    return {source_id: ["candidate_reviews_missing"] for source_id in accepted_source_ids}
 
 
 def _row_by_value_type(evidence_snapshot: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
@@ -493,6 +519,11 @@ def build_supervised_wing_proof_plan(
         bool(accepted_source_ids)
         and accepted_candidate_prestart_source_ids == accepted_source_ids
     )
+    accepted_candidate_prestart_violations_by_source = (
+        _accepted_candidate_prestart_violations_by_source(review_summary)
+    )
+    if accepted_candidate_prestart_violations_by_source:
+        candidate_prestart_contract_valid = False
     preflight_steps: Tuple[WingReadonlyPreflightPlanStep, ...] = ()
     if invalid:
         steps: Tuple[WingProofPlanStep, ...] = ()
@@ -598,6 +629,9 @@ def build_supervised_wing_proof_plan(
             ),
             "readonly_preflight_review_decision_candidate_prestart_source_ids": (
                 accepted_candidate_prestart_source_ids
+            ),
+            "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source": (
+                accepted_candidate_prestart_violations_by_source
             ),
             "readonly_preflight_review_decision_rejected_source_ids": _string_list(
                 review_summary.get("rejected_source_ids")

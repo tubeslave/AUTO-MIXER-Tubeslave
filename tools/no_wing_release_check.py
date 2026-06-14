@@ -6776,6 +6776,14 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         if isinstance(summary.get("accepted_candidate_prestart_source_ids"), list)
         else []
     )
+    accepted_candidate_prestart_contract_violations_by_source = (
+        dict(summary.get("accepted_candidate_prestart_contract_violations_by_source"))
+        if isinstance(
+            summary.get("accepted_candidate_prestart_contract_violations_by_source"),
+            Mapping,
+        )
+        else {}
+    )
     accepted_candidate_prestart_contract_valid = (
         summary.get("accepted_candidate_prestart_contract_valid") is True
     )
@@ -6849,6 +6857,9 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     )
     detail["accepted_candidate_prestart_source_ids"] = (
         accepted_candidate_prestart_source_ids
+    )
+    detail["accepted_candidate_prestart_contract_violations_by_source"] = (
+        accepted_candidate_prestart_contract_violations_by_source
     )
     detail["rejected_source_ids"] = (
         list(summary.get("rejected_source_ids"))
@@ -14009,6 +14020,9 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_candidate_prestart_source_ids = detail.get(
             "accepted_candidate_prestart_source_ids"
         )
+        accepted_candidate_prestart_contract_violations_by_source = detail.get(
+            "accepted_candidate_prestart_contract_violations_by_source"
+        )
         rejected_source_ids = detail.get("rejected_source_ids")
         invalid_record_ids = detail.get("invalid_record_ids")
         duplicate_source_ids = detail.get("duplicate_source_ids")
@@ -14069,6 +14083,14 @@ def wing_readonly_preflight_review_decision_summary(
                 list(accepted_candidate_prestart_source_ids)
                 if isinstance(accepted_candidate_prestart_source_ids, list)
                 else []
+            ),
+            "accepted_candidate_prestart_contract_violations_by_source": (
+                dict(accepted_candidate_prestart_contract_violations_by_source)
+                if isinstance(
+                    accepted_candidate_prestart_contract_violations_by_source,
+                    Mapping,
+                )
+                else {}
             ),
             "rejected_source_ids": (
                 list(rejected_source_ids)
@@ -17708,6 +17730,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_review_decision['accepted_candidate_prestart_contract_valid']).lower()}`",
                 "- accepted_candidate_prestart_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_candidate_prestart_source_ids'])}`",
+                "- accepted_candidate_prestart_contract_violations_by_source: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_candidate_prestart_contract_violations_by_source'], sort_keys=True)}`",
                 "- rejected_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['rejected_source_ids'])}`",
                 "- invalid_record_ids: "

@@ -102,6 +102,10 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while accepted review source ids lack a valid
   accepted-candidate prestart trace, or while the proof plan still carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
+- A supervised proof is planned while
+  `accepted_candidate_prestart_contract_violations_by_source` or
+  `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`
+  is non-empty.
 - A supervised proof is planned while the accepted-candidate prestart trace does
   not bind to a passed no-WING prestart `summary.json` by path and SHA256, with
 	  `backend_port_prestart_summary_required: true`,
@@ -330,6 +334,11 @@ for the passed no-WING prestart `summary.json`; a candidate that only repeats
 the prestart field names without the bound artifacts remains blocked.
 The decision-review CLI must not report `accepted_decision_ready` until the
 same accepted source ids have that valid accepted-candidate prestart trace.
+The decision-review ledger/report must expose
+`accepted_candidate_prestart_contract_violations_by_source`, and the supervised
+proof plan summary must expose
+`readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`.
+Both maps must be `{}` before supervised proof steps are planned.
 
 The no-WING handoff summary must also show `backend_port_prestart_gate` exactly
 matching `expected_backend_port_prestart_gate`, with

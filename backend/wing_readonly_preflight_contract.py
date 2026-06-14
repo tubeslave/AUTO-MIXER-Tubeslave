@@ -360,18 +360,108 @@ def _contract_string_list(value: Any) -> tuple[str, ...]:
 
 
 def _candidate_expected_artifact_binding_valid(row: Mapping[str, Any]) -> bool:
+    return not _candidate_expected_artifact_binding_violations(row)
+
+
+def _candidate_expected_artifact_binding_violations(
+    row: Mapping[str, Any],
+) -> list[str]:
+    violations: list[str] = []
     expected_artifacts = _contract_string_list(row.get("expected_artifacts"))
     if len(expected_artifacts) != 2:
-        return False
+        violations.append("expected_artifacts_count_mismatch")
     if not str(row.get("expected_summary_artifact") or ""):
-        return False
+        violations.append("expected_summary_artifact_missing")
     if not str(row.get("expected_events_artifact") or ""):
-        return False
+        violations.append("expected_events_artifact_missing")
     if row.get("summary_path_matches_expected_artifact") is not True:
-        return False
+        violations.append("summary_path_not_bound_to_expected_artifact")
     if row.get("events_path_matches_expected_artifact") is not True:
-        return False
-    return True
+        violations.append("events_path_not_bound_to_expected_artifact")
+    return violations
+
+
+def wing_readonly_preflight_candidate_prestart_contract_violations(
+    row: Mapping[str, Any],
+) -> list[str]:
+    """Return report-only prestart contract violations for one candidate row."""
+
+    violations = _candidate_expected_artifact_binding_violations(row)
+    if row.get("backend_port_prestart_check_required") is not True:
+        violations.append("backend_port_prestart_check_required_not_true")
+    if row.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
+        violations.append(
+            "backend_port_prestart_check_must_pass_before_starting_backend_not_true"
+        )
+    if _contract_string_list(row.get("backend_port_prestart_check_command")) != (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    ):
+        violations.append("backend_port_prestart_check_command_mismatch")
+    if _contract_string_list(
+        row.get("backend_port_prestart_check_failure_detail_fields")
+    ) != (WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS):
+        violations.append("backend_port_prestart_check_failure_detail_fields_mismatch")
+    if row.get("backend_port_prestart_summary_required") is not True:
+        violations.append("backend_port_prestart_summary_required_not_true")
+    if not str(row.get("backend_port_prestart_summary_path") or ""):
+        violations.append("backend_port_prestart_summary_path_missing")
+    if not str(row.get("backend_port_prestart_summary_sha256") or ""):
+        violations.append("backend_port_prestart_summary_sha256_missing")
+    if (
+        row.get("backend_port_prestart_summary_type")
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    ):
+        violations.append("backend_port_prestart_summary_type_mismatch")
+    if (
+        row.get("backend_port_prestart_summary_status")
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    ):
+        violations.append("backend_port_prestart_summary_status_not_passed")
+    if (
+        row.get("backend_port_prestart_summary_connection_policy")
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    ):
+        violations.append("backend_port_prestart_summary_connection_policy_mismatch")
+    if row.get("backend_port_prestart_summary_live_write") is not False:
+        violations.append("backend_port_prestart_summary_live_write_not_false")
+    if row.get("backend_port_prestart_summary_contacts_backend") is not False:
+        violations.append("backend_port_prestart_summary_contacts_backend_not_false")
+    if row.get("backend_port_prestart_summary_queries_console") is not False:
+        violations.append("backend_port_prestart_summary_queries_console_not_false")
+    if row.get("backend_port_prestart_summary_executes_tests") is not False:
+        violations.append("backend_port_prestart_summary_executes_tests_not_false")
+    if (
+        row.get("backend_port_prestart_check_status")
+        != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    ):
+        violations.append("backend_port_prestart_check_status_not_passed")
+    return violations
+
+
+def wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> dict[str, list[str]]:
+    """Return accepted source ids whose recorded prestart trace is incomplete."""
+
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    violations_by_source: dict[str, list[str]] = {}
+    for source_id in accepted_source_ids:
+        if not source_id:
+            continue
+        normalized_source_id = str(source_id)
+        row = rows_by_source.get(normalized_source_id)
+        if not isinstance(row, Mapping):
+            violations_by_source[normalized_source_id] = ["candidate_review_missing"]
+            continue
+        violations = wing_readonly_preflight_candidate_prestart_contract_violations(row)
+        if violations:
+            violations_by_source[normalized_source_id] = violations
+    return violations_by_source
 
 
 def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
@@ -397,53 +487,7 @@ def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
         row = rows_by_source.get(str(source_id))
         if not isinstance(row, Mapping):
             continue
-        if not _candidate_expected_artifact_binding_valid(row):
-            continue
-        if row.get("backend_port_prestart_check_required") is not True:
-            continue
-        if row.get("backend_port_prestart_check_must_pass_before_starting_backend") is not True:
-            continue
-        if _contract_string_list(row.get("backend_port_prestart_check_command")) != (
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
-        ):
-            continue
-        if _contract_string_list(
-            row.get("backend_port_prestart_check_failure_detail_fields")
-        ) != (WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS):
-            continue
-        if row.get("backend_port_prestart_summary_required") is not True:
-            continue
-        if not str(row.get("backend_port_prestart_summary_path") or ""):
-            continue
-        if not str(row.get("backend_port_prestart_summary_sha256") or ""):
-            continue
-        if (
-            row.get("backend_port_prestart_summary_type")
-            != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
-        ):
-            continue
-        if (
-            row.get("backend_port_prestart_summary_status")
-            != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
-        ):
-            continue
-        if (
-            row.get("backend_port_prestart_summary_connection_policy")
-            != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
-        ):
-            continue
-        if row.get("backend_port_prestart_summary_live_write") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_contacts_backend") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_queries_console") is not False:
-            continue
-        if row.get("backend_port_prestart_summary_executes_tests") is not False:
-            continue
-        if (
-            row.get("backend_port_prestart_check_status")
-            != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
-        ):
+        if wing_readonly_preflight_candidate_prestart_contract_violations(row):
             continue
         valid_source_ids.append(str(source_id))
     return valid_source_ids
