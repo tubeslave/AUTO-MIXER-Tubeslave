@@ -11520,6 +11520,10 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_step_count = 0
     readonly_preflight_expected_plan_required_for_real_run = False
     readonly_preflight_prestart_summary_required = False
+    readonly_preflight_command_channels = ""
+    readonly_preflight_command_operator_confirm_channels = ""
+    readonly_preflight_command_operator_confirm_session_ready = False
+    readonly_preflight_command_value_types = ""
     readonly_preflight_command_expected_plan = ""
     readonly_preflight_command_prestart_summary = ""
     readonly_preflight_review_decision_required = False
@@ -11637,6 +11641,19 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         )
         readonly_preflight_prestart_summary_required = (
             summary.get("readonly_preflight_prestart_summary_required") is True
+        )
+        readonly_preflight_command_channels = str(
+            summary.get("readonly_preflight_command_channels") or ""
+        )
+        readonly_preflight_command_operator_confirm_channels = str(
+            summary.get("readonly_preflight_command_operator_confirm_channels") or ""
+        )
+        readonly_preflight_command_operator_confirm_session_ready = (
+            summary.get("readonly_preflight_command_operator_confirm_session_ready")
+            is True
+        )
+        readonly_preflight_command_value_types = str(
+            summary.get("readonly_preflight_command_value_types") or ""
         )
         readonly_preflight_command_expected_plan = str(
             summary.get("readonly_preflight_command_expected_plan") or ""
@@ -11762,6 +11779,28 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         if not readonly_preflight_prestart_summary_required:
             violations.append(
                 "next_wing_proof_plan_preflight_prestart_summary_not_required"
+            )
+        if readonly_preflight_command_channels != WING_READONLY_PREFLIGHT_RUNNER_CHANNELS:
+            violations.append(
+                "next_wing_proof_plan_preflight_command_channels_mismatch"
+            )
+        if (
+            readonly_preflight_command_operator_confirm_channels
+            != WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+        ):
+            violations.append(
+                "next_wing_proof_plan_preflight_command_operator_confirm_channels_mismatch"
+            )
+        if not readonly_preflight_command_operator_confirm_session_ready:
+            violations.append(
+                "next_wing_proof_plan_preflight_command_operator_confirm_session_ready_missing"
+            )
+        if (
+            readonly_preflight_command_value_types
+            != WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+        ):
+            violations.append(
+                "next_wing_proof_plan_preflight_command_value_types_mismatch"
             )
         if readonly_preflight_command_expected_plan != WING_READONLY_PREFLIGHT_PLAN_OUTPUT:
             violations.append(
@@ -12061,6 +12100,32 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 violations.append(
                     f"next_wing_proof_plan_preflight_step_{index}_prestart_summary_flag_mismatch"
                 )
+            if preflight_command_value("--channels") != readonly_preflight_command_channels:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_channels_mismatch"
+                )
+            if (
+                preflight_command_value("--operator-confirm-channels")
+                != readonly_preflight_command_operator_confirm_channels
+            ):
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_operator_confirm_channels_mismatch"
+                )
+            if (
+                preflight_command_value("--operator-confirm-channels")
+                != preflight_command_value("--channels")
+            ):
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_operator_confirm_channels_not_matching_channels"
+                )
+            if "--operator-confirm-session-ready" not in command:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_operator_confirm_session_ready_missing"
+                )
+            if preflight_command_value("--value-types") != readonly_preflight_command_value_types:
+                violations.append(
+                    f"next_wing_proof_plan_preflight_step_{index}_value_types_mismatch"
+                )
             forbidden_tokens = (
                 "--execute",
                 "tools/wing_operator_proposal_validation_runner.py",
@@ -12187,6 +12252,16 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_prestart_summary_required"] = (
         readonly_preflight_prestart_summary_required
+    )
+    detail["readonly_preflight_command_channels"] = readonly_preflight_command_channels
+    detail["readonly_preflight_command_operator_confirm_channels"] = (
+        readonly_preflight_command_operator_confirm_channels
+    )
+    detail["readonly_preflight_command_operator_confirm_session_ready"] = (
+        readonly_preflight_command_operator_confirm_session_ready
+    )
+    detail["readonly_preflight_command_value_types"] = (
+        readonly_preflight_command_value_types
     )
     detail["readonly_preflight_command_expected_plan"] = (
         readonly_preflight_command_expected_plan
@@ -16662,6 +16737,19 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_prestart_summary_required": (
                 detail.get("readonly_preflight_prestart_summary_required") is True
             ),
+            "readonly_preflight_command_channels": str(
+                detail.get("readonly_preflight_command_channels") or ""
+            ),
+            "readonly_preflight_command_operator_confirm_channels": str(
+                detail.get("readonly_preflight_command_operator_confirm_channels") or ""
+            ),
+            "readonly_preflight_command_operator_confirm_session_ready": (
+                detail.get("readonly_preflight_command_operator_confirm_session_ready")
+                is True
+            ),
+            "readonly_preflight_command_value_types": str(
+                detail.get("readonly_preflight_command_value_types") or ""
+            ),
             "readonly_preflight_command_expected_plan": str(
                 detail.get("readonly_preflight_command_expected_plan") or ""
             ),
@@ -19474,6 +19562,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(next_plan['readonly_preflight_expected_plan_required_for_real_run']).lower()}`",
                 "- readonly_preflight_prestart_summary_required: "
                 f"`{str(next_plan['readonly_preflight_prestart_summary_required']).lower()}`",
+                "- readonly_preflight_command_channels: "
+                f"`{next_plan['readonly_preflight_command_channels']}`",
+                "- readonly_preflight_command_operator_confirm_channels: "
+                f"`{next_plan['readonly_preflight_command_operator_confirm_channels']}`",
+                "- readonly_preflight_command_operator_confirm_session_ready: "
+                f"`{str(next_plan['readonly_preflight_command_operator_confirm_session_ready']).lower()}`",
+                "- readonly_preflight_command_value_types: "
+                f"`{next_plan['readonly_preflight_command_value_types']}`",
                 "- readonly_preflight_command_expected_plan: "
                 f"`{next_plan['readonly_preflight_command_expected_plan']}`",
                 "- readonly_preflight_command_prestart_summary: "

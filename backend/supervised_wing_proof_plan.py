@@ -39,6 +39,8 @@ try:
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -51,6 +53,8 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -161,6 +165,21 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError("Read-only preflight step must bind --expected-plan")
         if "--prestart-summary" not in command or self.prestart_summary not in command:
             raise ValueError("Read-only preflight step must bind --prestart-summary")
+        if _command_value(command, "--channels") != WING_READONLY_PREFLIGHT_RUNNER_CHANNELS:
+            raise ValueError("Read-only preflight step must bind canonical --channels")
+        if (
+            _command_value(command, "--operator-confirm-channels")
+            != WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+        ):
+            raise ValueError(
+                "Read-only preflight step must require matching operator channel confirmation"
+            )
+        if "--operator-confirm-session-ready" not in command:
+            raise ValueError(
+                "Read-only preflight step must require session-ready operator confirmation"
+            )
+        if _command_value(command, "--value-types") != WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES:
+            raise ValueError("Read-only preflight step must bind canonical --value-types")
         forbidden = {
             "--execute",
             "tools/wing_operator_proposal_validation_runner.py",
@@ -260,6 +279,16 @@ def _readonly_preflight_review_decision_status(overlay: Mapping[str, Any]) -> An
 
 def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
+
+
+def _command_value(command: Tuple[str, ...], flag: str) -> str | None:
+    try:
+        index = command.index(flag)
+    except ValueError:
+        return None
+    if index + 1 >= len(command):
+        return None
+    return command[index + 1]
 
 
 def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[str]:
@@ -365,9 +394,12 @@ def _readonly_preflight_command(
         "--url",
         backend_url,
         "--channels",
-        "3",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-session-ready",
         "--value-types",
-        "fader,gain",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
         "--require-physical-readback",
         "--artifact-root",
         artifact_root,
@@ -656,6 +688,14 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_step_count": len(preflight_steps),
             "readonly_preflight_expected_plan_required_for_real_run": True,
             "readonly_preflight_prestart_summary_required": True,
+            "readonly_preflight_command_channels": WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+            "readonly_preflight_command_operator_confirm_channels": (
+                WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+            ),
+            "readonly_preflight_command_operator_confirm_session_ready": True,
+            "readonly_preflight_command_value_types": (
+                WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+            ),
             "readonly_preflight_command_expected_plan": readonly_preflight_expected_plan,
             "readonly_preflight_command_prestart_summary": (
                 readonly_preflight_prestart_summary

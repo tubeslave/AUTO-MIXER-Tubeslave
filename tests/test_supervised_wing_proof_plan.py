@@ -10,6 +10,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+    WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+    WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
     wing_readonly_preflight_accepted_candidate_prestart_source_ids,
@@ -29,6 +31,8 @@ READONLY_PREFLIGHT_EXPECTED_PLAN = WING_READONLY_PREFLIGHT_PLAN_OUTPUT
 READONLY_PREFLIGHT_PRESTART_SUMMARY = (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
 )
+READONLY_PREFLIGHT_CHANNELS = WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+READONLY_PREFLIGHT_VALUE_TYPES = WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
 GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
     "physical_pre_read",
     "bounded_gain_down_apply",
@@ -68,6 +72,19 @@ def assert_prestart_check(summary: dict) -> None:
         summary["readonly_preflight_command_prestart_summary"]
         == READONLY_PREFLIGHT_PRESTART_SUMMARY
     )
+    assert summary["readonly_preflight_command_channels"] == READONLY_PREFLIGHT_CHANNELS
+    assert (
+        summary["readonly_preflight_command_operator_confirm_channels"]
+        == READONLY_PREFLIGHT_CHANNELS
+    )
+    assert (
+        summary["readonly_preflight_command_operator_confirm_session_ready"]
+        is True
+    )
+    assert (
+        summary["readonly_preflight_command_value_types"]
+        == READONLY_PREFLIGHT_VALUE_TYPES
+    )
 
 
 def assert_readonly_preflight_command_bindings(step: dict) -> None:
@@ -84,6 +101,15 @@ def assert_readonly_preflight_command_bindings(step: dict) -> None:
     assert command[command.index("--expected-plan") + 1] == (
         READONLY_PREFLIGHT_EXPECTED_PLAN
     )
+    assert "--channels" in command
+    assert command[command.index("--channels") + 1] == READONLY_PREFLIGHT_CHANNELS
+    assert "--operator-confirm-channels" in command
+    assert command[command.index("--operator-confirm-channels") + 1] == (
+        READONLY_PREFLIGHT_CHANNELS
+    )
+    assert "--operator-confirm-session-ready" in command
+    assert "--value-types" in command
+    assert command[command.index("--value-types") + 1] == READONLY_PREFLIGHT_VALUE_TYPES
 
 
 def evidence_snapshot(*rows):

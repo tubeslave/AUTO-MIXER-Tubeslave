@@ -1339,7 +1339,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "3",
                 "--operator-confirm-session-ready",
                 "--value-types",
-                "fader,gain,pan",
+                WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
                 "--require-physical-readback",
                 "--artifact-root",
                 "artifacts/wing_readonly_preflight",
@@ -8067,6 +8067,14 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "readonly_preflight_step_count": 0,
                 "readonly_preflight_expected_plan_required_for_real_run": True,
                 "readonly_preflight_prestart_summary_required": True,
+                "readonly_preflight_command_channels": WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+                "readonly_preflight_command_operator_confirm_channels": (
+                    WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+                ),
+                "readonly_preflight_command_operator_confirm_session_ready": True,
+                "readonly_preflight_command_value_types": (
+                    WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+                ),
                 "readonly_preflight_command_expected_plan": (
                     WING_READONLY_PREFLIGHT_PLAN_OUTPUT
                 ),
@@ -8458,6 +8466,16 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
     plan["summary"]["readonly_preflight_blocked_by"] = [
         "operator_must_run_wing_readonly_preflight_runner"
     ]
+    plan["summary"]["readonly_preflight_command_channels"] = (
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+    )
+    plan["summary"]["readonly_preflight_command_operator_confirm_channels"] = (
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+    )
+    plan["summary"]["readonly_preflight_command_operator_confirm_session_ready"] = True
+    plan["summary"]["readonly_preflight_command_value_types"] = (
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+    )
     plan["summary"]["readonly_preflight_step_count"] = 1
     plan["summary"]["readonly_preflight_review_decision_accepted"] = False
     plan["summary"]["readonly_preflight_review_decision_status"] = "operator_review_required"
@@ -8527,6 +8545,18 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
     assert result.detail["readonly_preflight_candidate_available"] is False
     assert result.detail["readonly_preflight_evidence_status"] == "operator_preflight_required"
     assert result.detail["readonly_preflight_step_count"] == 1
+    assert (
+        result.detail["readonly_preflight_command_operator_confirm_channels"]
+        == WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+    )
+    assert (
+        result.detail["readonly_preflight_command_operator_confirm_session_ready"]
+        is True
+    )
+    assert (
+        result.detail["readonly_preflight_command_value_types"]
+        == WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+    )
     assert "readonly_preflight_candidate_required_before_supervised_proof" in result.detail["global_blockers"]
     assert result.detail["violations"] == []
 
@@ -14922,6 +14952,14 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             "readonly_preflight_step_count": 0,
             "readonly_preflight_expected_plan_required_for_real_run": True,
             "readonly_preflight_prestart_summary_required": True,
+            "readonly_preflight_command_channels": WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+            "readonly_preflight_command_operator_confirm_channels": (
+                WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+            ),
+            "readonly_preflight_command_operator_confirm_session_ready": True,
+            "readonly_preflight_command_value_types": (
+                WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
+            ),
             "readonly_preflight_command_expected_plan": (
                 WING_READONLY_PREFLIGHT_PLAN_OUTPUT
             ),
@@ -15010,6 +15048,26 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             "readonly_preflight_prestart_summary_required"
         ]
         is True
+    )
+    assert (
+        json_summary["next_wing_proof_plan"]["readonly_preflight_command_channels"]
+        == WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_command_operator_confirm_channels"
+        ]
+        == WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
+    )
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_command_operator_confirm_session_ready"
+        ]
+        is True
+    )
+    assert (
+        json_summary["next_wing_proof_plan"]["readonly_preflight_command_value_types"]
+        == WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
     )
     assert (
         json_summary["next_wing_proof_plan"][
@@ -15107,6 +15165,16 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert "readonly_preflight_prestart_summary_required: `true`" in markdown_summary
+    assert "readonly_preflight_command_channels" in markdown_summary
+    assert (
+        "readonly_preflight_command_operator_confirm_channels"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_command_operator_confirm_session_ready"
+        in markdown_summary
+    )
+    assert "readonly_preflight_command_value_types" in markdown_summary
     assert "readonly_preflight_command_expected_plan" in markdown_summary
     assert WING_READONLY_PREFLIGHT_PLAN_OUTPUT in markdown_summary
     assert "readonly_preflight_command_prestart_summary" in markdown_summary
