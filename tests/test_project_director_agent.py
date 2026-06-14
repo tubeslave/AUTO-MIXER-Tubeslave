@@ -269,6 +269,21 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "operator_sequence_count_matches_contract: true"
         in directive["selected_action"]
     )
+    assert "mvp_blocker_anchor_digest_review_step_index: 8" in directive[
+        "selected_action"
+    ]
+    assert (
+        "expected_mvp_blocker_anchor_digest_review_step_index: 8"
+        in directive["selected_action"]
+    )
+    assert (
+        "mvp_blocker_anchor_digest_review_step_index_matches_contract: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
+        in directive["selected_action"]
+    )
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in directive[
         "selected_action"
     ]
@@ -464,6 +479,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_ANCHOR_DIGEST_REVIEW_STEP_INDEX_20260614.md"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_ANCHOR_DIGEST_REVIEW_INDEX_20260614.md"
         in directive["selected_evidence_files"]
     )
     assert (
@@ -774,6 +793,13 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_count: 10" in prompt
     assert "expected_operator_sequence_count: 10" in prompt
     assert "operator_sequence_count_matches_contract: true" in prompt
+    assert "mvp_blocker_anchor_digest_review_step_index: 8" in prompt
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in prompt
+    assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in prompt
+    assert (
+        "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
+        in prompt
+    )
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in prompt
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in prompt
     assert (
@@ -813,6 +839,13 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_count: 10" in readme
     assert "expected_operator_sequence_count: 10" in readme
     assert "operator_sequence_count_matches_contract: true" in readme
+    assert "mvp_blocker_anchor_digest_review_step_index: 8" in readme
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in readme
+    assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in readme
+    assert (
+        "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
+        in readme
+    )
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in readme
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in readme
     assert (

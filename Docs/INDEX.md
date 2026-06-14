@@ -140,6 +140,7 @@ paths, Product Layer, or cleanup policy.
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md` | no-WING handoff validation now fails closed when the prestart summary SHA availability flag contradicts the packet digest. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CARDINALITY_20260614.md` | no-WING handoff validation now fails closed when the operator sequence count or supervised prestart gate index drifts from the contract. |
 | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_ANCHOR_DIGEST_REVIEW_STEP_INDEX_20260614.md` | no-WING handoff validation now fails closed unless `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index` and `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract` prove the anchor digest review operator step is at its expected contract index. |
+| `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_ANCHOR_DIGEST_REVIEW_INDEX_20260614.md` | no-WING handoff validation now fails closed unless `expected_mvp_blocker_anchor_digest_review_step_index`, `mvp_blocker_anchor_digest_review_step_index_matches_contract`, and `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence` prove the packet-declared anchor digest review index matches the contract and actual operator sequence. |
 | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_REPORTS_20260613.md` | The current first WING MVP blocker evidence cites the latest read-only artifact contract and decision prestart ready gate reports for Project Director context. |
 | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` | The current first WING MVP blocker evidence cites the backend-port listener-probe error field report for Project Director context. |
 | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` | The current no-WING quick gate failed closed on a busy backend port and requires operator confirmation before WING read-only preflight. |
@@ -218,6 +219,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING handoff prestart summary SHA availability | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md` |
 | Current WING handoff operator sequence cardinality | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CARDINALITY_20260614.md` |
 | Current WING handoff anchor digest review step index | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_ANCHOR_DIGEST_REVIEW_STEP_INDEX_20260614.md` |
+| Current WING handoff declared anchor digest review index | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_ANCHOR_DIGEST_REVIEW_INDEX_20260614.md` |
 | Current WING blocker evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_REPORTS_20260613.md` |
 | Current WING blocker listener-probe evidence refresh | `Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LISTENER_PROBE_ERROR_REPORT_20260613.md` |
 | Current WING no-WING busy-port fail-closed evidence | `Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md` |

@@ -1243,6 +1243,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "backend_connection_confirmation_step_index": (
             WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
         ),
+        "mvp_blocker_anchor_digest_review_step_index": (
+            WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+        ),
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": [
             "PYTHONPATH=backend",
@@ -3222,6 +3225,24 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     )
     assert result.detail["operator_sequence_count_matches_contract"] is True
     assert (
+        result.detail["mvp_blocker_anchor_digest_review_step_index"]
+        == WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    )
+    assert (
+        result.detail["expected_mvp_blocker_anchor_digest_review_step_index"]
+        == WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    )
+    assert (
+        result.detail["mvp_blocker_anchor_digest_review_step_index_matches_contract"]
+        is True
+    )
+    assert (
+        result.detail[
+            "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence"
+        ]
+        is True
+    )
+    assert (
         result.detail["operator_sequence_has_mvp_blocker_anchor_digest_review"]
         is True
     )
@@ -4434,6 +4455,63 @@ def test_no_wing_release_check_rejects_handoff_packet_with_shifted_anchor_digest
     )
     assert (
         "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_step_index_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_declared_anchor_digest_review_index_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-anchor-digest-review-index-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    expected_index = WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    payload["mvp_blocker_anchor_digest_review_step_index"] = expected_index - 1
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["mvp_blocker_anchor_digest_review_step_index"] == (
+        expected_index - 1
+    )
+    assert (
+        result.detail["expected_mvp_blocker_anchor_digest_review_step_index"]
+        == expected_index
+    )
+    assert (
+        result.detail["mvp_blocker_anchor_digest_review_step_index_matches_contract"]
+        is False
+    )
+    assert (
+        result.detail[
+            "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence"
+        ]
+        is False
+    )
+    assert (
+        result.detail["operator_sequence_mvp_blocker_anchor_digest_review_step_index"]
+        == expected_index
+    )
+    assert (
+        result.detail[
+            "operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract"
+        ]
+        is True
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_declared_step_index_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_declared_step_index_not_matching_operator_sequence"
         in result.detail["violations"]
     )
 
@@ -11121,6 +11199,16 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
             ),
             "operator_sequence_count_matches_contract": True,
+            "mvp_blocker_anchor_digest_review_step_index": (
+                WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+            ),
+            "expected_mvp_blocker_anchor_digest_review_step_index": (
+                WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+            ),
+            "mvp_blocker_anchor_digest_review_step_index_matches_contract": True,
+            "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence": (
+                True
+            ),
             "operator_sequence_has_mvp_blocker_anchor_digest_review": True,
             "operator_sequence_mvp_blocker_anchor_digest_review_step": (
                 "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
@@ -11406,6 +11494,21 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
     )
     assert artifact["operator_sequence_count_matches_contract"] is True
+    assert (
+        artifact["mvp_blocker_anchor_digest_review_step_index"]
+        == WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    )
+    assert (
+        artifact["expected_mvp_blocker_anchor_digest_review_step_index"]
+        == WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    )
+    assert artifact["mvp_blocker_anchor_digest_review_step_index_matches_contract"] is True
+    assert (
+        artifact[
+            "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence"
+        ]
+        is True
+    )
     assert artifact["operator_sequence_has_mvp_blocker_anchor_digest_review"] is True
     assert artifact["operator_sequence_mvp_blocker_anchor_digest_review_step"] == (
         "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
@@ -11581,6 +11684,21 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "operator_sequence_count: `10`" in markdown_summary
     assert "expected_operator_sequence_count: `10`" in markdown_summary
     assert "operator_sequence_count_matches_contract: `true`" in markdown_summary
+    assert (
+        "mvp_blocker_anchor_digest_review_step_index: `8`" in markdown_summary
+    )
+    assert (
+        "expected_mvp_blocker_anchor_digest_review_step_index: `8`"
+        in markdown_summary
+    )
+    assert (
+        "mvp_blocker_anchor_digest_review_step_index_matches_contract: `true`"
+        in markdown_summary
+    )
+    assert (
+        "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: `true`"
+        in markdown_summary
+    )
     assert "operator_sequence_has_supervised_prestart_gate: `true`" in markdown_summary
     assert (
         "operator_sequence_has_mvp_blocker_anchor_digest_review: `true`"

@@ -132,6 +132,10 @@ supervised proof planning. The no-WING handoff summary must expose that review
 step as `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` so
 reviewers can confirm the digest check occurs immediately before the final
 supervised prestart gate. The same summary must show
+`mvp_blocker_anchor_digest_review_step_index: 8`,
+`expected_mvp_blocker_anchor_digest_review_step_index: 8`,
+`mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
+`mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`,
 `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
 `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
 
@@ -510,6 +514,10 @@ The handoff validation must report:
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`
 - `mvp_blocker_anchor.packet_does_not_close_blocker: true`
 - `operator_sequence_has_mvp_blocker_anchor_digest_review: true`
+- `mvp_blocker_anchor_digest_review_step_index: 8`
+- `expected_mvp_blocker_anchor_digest_review_step_index: 8`
+- `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`
+- `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`
 - `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
 - `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
 - `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`

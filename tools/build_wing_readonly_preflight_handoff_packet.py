@@ -546,6 +546,9 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         "",
         "## Operator Sequence",
         "",
+        "- mvp_blocker_anchor_digest_review_step_index: "
+        f"`{packet['mvp_blocker_anchor_digest_review_step_index']}`",
+        "",
     ]
     for index, item in enumerate(packet.get("operator_sequence") or [], start=1):
         lines.append(f"{index}. {item}")
