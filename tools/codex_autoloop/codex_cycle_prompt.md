@@ -383,16 +383,22 @@ python3 tools/codex_autoloop/project_director_agent.py \
   audit/handoff проверки.
 - Для WING handoff rail no-WING handoff summary должен показывать
   `project_director_selected_action_anchor`,
+  `expected_project_director_selected_action_anchor`,
   `project_director_selected_action_anchor_matches_current_directive: true`,
   `project_director_selected_action_source: Current First Command`,
+  `expected_project_director_selected_action_source: Current First Command`,
   `project_director_selected_action_source_matches_current_directive: true`,
   `project_director_selected_action_sha256`,
+  `actual_project_director_selected_action_sha256`,
+  `expected_project_director_selected_action_sha256`,
   `project_director_selected_action_sha256_available: true`,
+  `project_director_selected_action_sha256_available_matches_digest: true`,
   `project_director_selected_action_sha256_matches_anchor: true`,
   `project_director_selected_action_sha256_matches_text: true`,
   `project_director_selected_action_sha256_matches_current_directive: true`,
   `project_director_current_first_command_baseline_coverage_required: true`,
-  `project_director_current_first_command_baseline_coverage_passed: true`, and
+  `project_director_current_first_command_baseline_coverage_passed: true`,
+  `project_director_current_first_command_baseline_coverage_marker_count`, and
   `project_director_current_first_command_baseline_missing_markers: []`.
 - Если WING Rack подключен, следующий шаг должен начинаться с
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` до старта

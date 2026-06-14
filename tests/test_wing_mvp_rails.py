@@ -1003,6 +1003,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert "project_director_selected_action_anchor" in current_command
+    assert "expected_project_director_selected_action_anchor" in current_command
     assert (
         "project_director_selected_action_anchor_matches_current_directive: true"
         in current_command
@@ -1012,11 +1013,21 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
+        "expected_project_director_selected_action_source: Current First Command"
+        in current_command
+    )
+    assert (
         "project_director_selected_action_source_matches_current_directive: true"
         in current_command
     )
     assert "project_director_selected_action_sha256" in current_command
+    assert "actual_project_director_selected_action_sha256" in current_command
+    assert "expected_project_director_selected_action_sha256" in current_command
     assert "project_director_selected_action_sha256_available: true" in current_command
+    assert (
+        "project_director_selected_action_sha256_available_matches_digest: true"
+        in current_command
+    )
     assert (
         "project_director_selected_action_sha256_matches_anchor: true"
         in current_command
@@ -1035,6 +1046,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     assert (
         "project_director_current_first_command_baseline_coverage_passed: true"
+        in current_command
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_marker_count"
         in current_command
     )
     assert (
@@ -1065,6 +1080,18 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "project_director_selected_action_sha256" in (
         progress.current_first_command_missing_baseline_markers(
             missing_director_action_digest_command
+        )
+    )
+    missing_expected_digest_command = current_command.replace(
+        "expected_project_director_selected_action_sha256",
+        "missing_expected_director_action_digest",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_expected_digest_command
+    )
+    assert "expected_project_director_selected_action_sha256" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_expected_digest_command
         )
     )
     report = progress.build_progress_report(
@@ -1202,17 +1229,28 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "mvp_blocker_anchor_matches_current_first_open: true" in report
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in report
     assert "project_director_selected_action_anchor" in report
+    assert "expected_project_director_selected_action_anchor" in report
     assert (
         "project_director_selected_action_anchor_matches_current_directive: true"
         in report
     )
     assert "project_director_selected_action_source: Current First Command" in report
     assert (
+        "expected_project_director_selected_action_source: Current First Command"
+        in report
+    )
+    assert (
         "project_director_selected_action_source_matches_current_directive: true"
         in report
     )
     assert "project_director_selected_action_sha256" in report
+    assert "actual_project_director_selected_action_sha256" in report
+    assert "expected_project_director_selected_action_sha256" in report
     assert "project_director_selected_action_sha256_available: true" in report
+    assert (
+        "project_director_selected_action_sha256_available_matches_digest: true"
+        in report
+    )
     assert "project_director_selected_action_sha256_matches_anchor: true" in report
     assert "project_director_selected_action_sha256_matches_text: true" in report
     assert (
@@ -1225,6 +1263,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     assert (
         "project_director_current_first_command_baseline_coverage_passed: true"
+        in report
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_marker_count"
         in report
     )
     assert "project_director_current_first_command_baseline_missing_markers: []" in report

@@ -196,7 +196,8 @@ the no-WING handoff summary must also show
 `project_director_selected_action_sha256_matches_text: true`,
 `project_director_selected_action_sha256_matches_current_directive: true`,
 `project_director_current_first_command_baseline_coverage_required: true`,
-`project_director_current_first_command_baseline_coverage_passed: true`, and
+`project_director_current_first_command_baseline_coverage_passed: true`,
+`project_director_current_first_command_baseline_coverage_marker_count`, and
 `project_director_current_first_command_baseline_missing_markers: []`;
 the no-WING handoff summary must also show
 `operator_sequence_has_mvp_blocker_anchor_digest_review: true`;

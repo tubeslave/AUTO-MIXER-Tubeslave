@@ -450,16 +450,22 @@ you want the background automation active.
   action text still covers the WING safety/proof baseline.
   For WING handoff work, the no-WING handoff summary must also show
   `project_director_selected_action_anchor`,
+  `expected_project_director_selected_action_anchor`,
   `project_director_selected_action_anchor_matches_current_directive: true`,
   `project_director_selected_action_source: Current First Command`,
+  `expected_project_director_selected_action_source: Current First Command`,
   `project_director_selected_action_source_matches_current_directive: true`,
   `project_director_selected_action_sha256`,
+  `actual_project_director_selected_action_sha256`,
+  `expected_project_director_selected_action_sha256`,
   `project_director_selected_action_sha256_available: true`,
+  `project_director_selected_action_sha256_available_matches_digest: true`,
   `project_director_selected_action_sha256_matches_anchor: true`,
   `project_director_selected_action_sha256_matches_text: true`,
   `project_director_selected_action_sha256_matches_current_directive: true`,
   `project_director_current_first_command_baseline_coverage_required: true`,
-  `project_director_current_first_command_baseline_coverage_passed: true`, and
+  `project_director_current_first_command_baseline_coverage_passed: true`,
+  `project_director_current_first_command_baseline_coverage_marker_count`, and
   `project_director_current_first_command_baseline_missing_markers: []`.
   If it detects broad-work drift, development still continues in Goal mode; the
   next task is redirected to the first non-closed MVP blocker instead of
