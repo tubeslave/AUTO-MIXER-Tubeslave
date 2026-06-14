@@ -172,6 +172,9 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "capture_command_prestart_summary_matches_plan: true" in directive[
         "selected_action"
     ]
+    assert "backend_port_prestart_summary_type: no_wing_release_check" in directive[
+        "selected_action"
+    ]
     assert "backend_port_prestart_summary_status: passed" in directive[
         "selected_action"
     ]
@@ -932,6 +935,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "valid accepted-candidate prestart trace" in prompt
     assert "expected-artifact-bound accepted source id" in prompt
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in prompt
+    assert "backend_port_prestart_summary_type: no_wing_release_check" in prompt
     assert "current first open blocker" in prompt
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
@@ -1007,6 +1011,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "valid accepted-candidate prestart trace" in readme
     assert "expected-artifact-bound accepted source id" in readme
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in readme
+    assert "backend_port_prestart_summary_type: no_wing_release_check" in readme
     assert "current first open blocker" in readme
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"

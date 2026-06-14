@@ -209,6 +209,7 @@ blockers выше.
    `preview_command_prestart_summary_matches_plan: true`;
 29. verify `capture_command_prestart_summary` matches that path;
 30. verify `capture_command_prestart_summary_matches_plan: true`;
+30a. verify `backend_port_prestart_summary_type: no_wing_release_check`;
 31. verify `backend_port_prestart_summary_status: passed`;
 32. verify `backend_port_prestart_summary_live_write: false`;
 33. verify `backend_port_prestart_summary_contacts_backend: false`;
@@ -474,6 +475,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `expected_plan_required_for_real_run: true`.
 - Before any supervised fader/gain proof, the accepted-candidate prestart trace
 	  must show `backend_port_prestart_summary_required: true`,
+	  `backend_port_prestart_summary_type: no_wing_release_check`,
 	  `backend_port_prestart_summary_status: passed`,
 	  `backend_port_prestart_summary_live_write: false`,
 	  `backend_port_prestart_summary_contacts_backend: false`,

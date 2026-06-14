@@ -229,6 +229,7 @@ in the proof plan blockers.
 The accepted-candidate prestart trace must also bind to a passed no-WING
 prestart `summary.json` by path and SHA256, with
 `backend_port_prestart_summary_required: true`,
+`backend_port_prestart_summary_type: no_wing_release_check`,
 `backend_port_prestart_summary_status: passed`,
 `backend_port_prestart_summary_live_write: false`,
 `backend_port_prestart_summary_contacts_backend: false`,
