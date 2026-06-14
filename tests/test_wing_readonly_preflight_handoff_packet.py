@@ -24,7 +24,11 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
@@ -85,6 +89,22 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     assert packet["backend_port_prestart_summary_sha256"] == ""
     assert packet["backend_port_prestart_summary_sha256_available"] is False
+    assert packet["backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert packet["backend_port_prestart_summary_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert packet["backend_port_prestart_summary_connection_policy"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert packet["backend_port_prestart_summary_live_write"] is False
+    assert packet["backend_port_prestart_summary_contacts_backend"] is False
+    assert packet["backend_port_prestart_summary_queries_console"] is False
+    assert packet["backend_port_prestart_summary_executes_tests"] is False
+    assert packet["backend_port_prestart_check_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
     assert packet["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert packet["backend_port_prestart_check_must_be_first_operator_step"] is True
     assert packet["backend_connection_confirmation_step_index"] == (
@@ -371,6 +391,26 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     rendered = handoff.render_markdown(packet)
     assert "## Backend Port Prestart Gate" in rendered
+    assert (
+        "backend_port_prestart_summary_type: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE}`"
+    ) in rendered
+    assert (
+        "backend_port_prestart_summary_status: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS}`"
+    ) in rendered
+    assert (
+        "backend_port_prestart_summary_connection_policy: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY}`"
+    ) in rendered
+    assert "backend_port_prestart_summary_live_write: `false`" in rendered
+    assert "backend_port_prestart_summary_contacts_backend: `false`" in rendered
+    assert "backend_port_prestart_summary_queries_console: `false`" in rendered
+    assert "backend_port_prestart_summary_executes_tests: `false`" in rendered
+    assert (
+        "backend_port_prestart_check_status: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS}`"
+    ) in rendered
     assert "## Expected Backend Port Prestart Gate" in rendered
     assert "expected_backend_port_prestart_gate" in rendered
     assert "backend_port_prestart_gate_matches_expected: `true`" in rendered

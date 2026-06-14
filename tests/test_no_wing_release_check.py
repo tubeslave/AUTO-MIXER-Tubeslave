@@ -1251,6 +1251,22 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             plan_payload["backend_port_prestart_summary_sha256"]
         ),
         "backend_port_prestart_summary_sha256_available": True,
+        "backend_port_prestart_summary_type": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ),
+        "backend_port_prestart_summary_status": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+        ),
+        "backend_port_prestart_summary_connection_policy": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ),
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
+        "backend_port_prestart_check_status": (
+            WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+        ),
         "backend_port_prestart_check_operator_sequence_step_index": 0,
         "backend_connection_confirmation_step_index": (
             WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
@@ -3145,6 +3161,72 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert (
         result.detail["backend_port_prestart_summary_sha256_matches_plan"] is True
     )
+    assert result.detail["backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert result.detail["plan_backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert result.detail["backend_port_prestart_summary_type_matches_plan"] is True
+    assert result.detail["backend_port_prestart_summary_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert result.detail["plan_backend_port_prestart_summary_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert result.detail["backend_port_prestart_summary_status_matches_plan"] is True
+    assert result.detail["backend_port_prestart_summary_connection_policy"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert result.detail["plan_backend_port_prestart_summary_connection_policy"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert (
+        result.detail[
+            "backend_port_prestart_summary_connection_policy_matches_plan"
+        ]
+        is True
+    )
+    assert result.detail["backend_port_prestart_summary_live_write"] is False
+    assert result.detail["plan_backend_port_prestart_summary_live_write"] is False
+    assert (
+        result.detail["backend_port_prestart_summary_live_write_matches_plan"]
+        is True
+    )
+    assert result.detail["backend_port_prestart_summary_contacts_backend"] is False
+    assert (
+        result.detail["plan_backend_port_prestart_summary_contacts_backend"]
+        is False
+    )
+    assert (
+        result.detail["backend_port_prestart_summary_contacts_backend_matches_plan"]
+        is True
+    )
+    assert result.detail["backend_port_prestart_summary_queries_console"] is False
+    assert (
+        result.detail["plan_backend_port_prestart_summary_queries_console"]
+        is False
+    )
+    assert (
+        result.detail["backend_port_prestart_summary_queries_console_matches_plan"]
+        is True
+    )
+    assert result.detail["backend_port_prestart_summary_executes_tests"] is False
+    assert (
+        result.detail["plan_backend_port_prestart_summary_executes_tests"]
+        is False
+    )
+    assert (
+        result.detail["backend_port_prestart_summary_executes_tests_matches_plan"]
+        is True
+    )
+    assert result.detail["backend_port_prestart_check_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
+    assert result.detail["plan_backend_port_prestart_check_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
+    assert result.detail["backend_port_prestart_check_status_matches_plan"] is True
     assert result.detail["preview_command_prestart_summary"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
@@ -4600,6 +4682,74 @@ def test_no_wing_release_check_rejects_handoff_packet_with_prestart_summary_sha2
         "wing_readonly_preflight_handoff_packet_prestart_summary_sha256_available_mismatch"
         in result.detail["violations"]
     )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_prestart_summary_contract_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-prestart-summary-contract-drift.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["backend_port_prestart_summary_type"] = "stale_summary_type"
+    payload["backend_port_prestart_summary_status"] = "stale_status"
+    payload["backend_port_prestart_summary_connection_policy"] = "stale_policy"
+    payload["backend_port_prestart_summary_live_write"] = True
+    payload["backend_port_prestart_summary_contacts_backend"] = True
+    payload["backend_port_prestart_summary_queries_console"] = True
+    payload["backend_port_prestart_summary_executes_tests"] = True
+    payload["backend_port_prestart_check_status"] = "stale_check_status"
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["backend_port_prestart_summary_type"] == "stale_summary_type"
+    assert result.detail["plan_backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert result.detail["backend_port_prestart_summary_type_matches_plan"] is False
+    assert result.detail["backend_port_prestart_summary_status_matches_plan"] is False
+    assert (
+        result.detail[
+            "backend_port_prestart_summary_connection_policy_matches_plan"
+        ]
+        is False
+    )
+    assert (
+        result.detail["backend_port_prestart_summary_live_write_matches_plan"]
+        is False
+    )
+    assert (
+        result.detail["backend_port_prestart_summary_contacts_backend_matches_plan"]
+        is False
+    )
+    assert (
+        result.detail["backend_port_prestart_summary_queries_console_matches_plan"]
+        is False
+    )
+    assert (
+        result.detail["backend_port_prestart_summary_executes_tests_matches_plan"]
+        is False
+    )
+    assert result.detail["backend_port_prestart_check_status_matches_plan"] is False
+    for violation in (
+        "wing_readonly_preflight_handoff_packet_prestart_summary_type_mismatch",
+        "wing_readonly_preflight_handoff_packet_prestart_summary_status_mismatch",
+        "wing_readonly_preflight_handoff_packet_prestart_summary_policy_mismatch",
+        "wing_readonly_preflight_handoff_packet_prestart_summary_live_write_not_false",
+        "wing_readonly_preflight_handoff_packet_prestart_summary_contacts_backend_not_false",
+        "wing_readonly_preflight_handoff_packet_prestart_summary_queries_console_not_false",
+        "wing_readonly_preflight_handoff_packet_prestart_summary_executes_tests_not_false",
+        "wing_readonly_preflight_handoff_packet_prestart_check_status_mismatch",
+    ):
+        assert violation in result.detail["violations"]
 
 
 def test_no_wing_release_check_rejects_handoff_packet_with_prestart_gate_mismatch(
@@ -12058,6 +12208,46 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "backend_port_prestart_summary_sha256_available_matches_digest": True,
             "plan_backend_port_prestart_summary_sha256": "a" * 64,
             "backend_port_prestart_summary_sha256_matches_plan": True,
+            "backend_port_prestart_summary_type": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+            ),
+            "plan_backend_port_prestart_summary_type": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+            ),
+            "backend_port_prestart_summary_type_matches_plan": True,
+            "backend_port_prestart_summary_status": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+            ),
+            "plan_backend_port_prestart_summary_status": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+            ),
+            "backend_port_prestart_summary_status_matches_plan": True,
+            "backend_port_prestart_summary_connection_policy": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+            ),
+            "plan_backend_port_prestart_summary_connection_policy": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+            ),
+            "backend_port_prestart_summary_connection_policy_matches_plan": True,
+            "backend_port_prestart_summary_live_write": False,
+            "plan_backend_port_prestart_summary_live_write": False,
+            "backend_port_prestart_summary_live_write_matches_plan": True,
+            "backend_port_prestart_summary_contacts_backend": False,
+            "plan_backend_port_prestart_summary_contacts_backend": False,
+            "backend_port_prestart_summary_contacts_backend_matches_plan": True,
+            "backend_port_prestart_summary_queries_console": False,
+            "plan_backend_port_prestart_summary_queries_console": False,
+            "backend_port_prestart_summary_queries_console_matches_plan": True,
+            "backend_port_prestart_summary_executes_tests": False,
+            "plan_backend_port_prestart_summary_executes_tests": False,
+            "backend_port_prestart_summary_executes_tests_matches_plan": True,
+            "backend_port_prestart_check_status": (
+                WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+            ),
+            "plan_backend_port_prestart_check_status": (
+                WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+            ),
+            "backend_port_prestart_check_status_matches_plan": True,
             "preview_command_prestart_summary": (
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
             ),
@@ -12436,6 +12626,58 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert artifact["plan_backend_port_prestart_summary_sha256"] == "a" * 64
     assert artifact["backend_port_prestart_summary_sha256_matches_plan"] is True
+    assert artifact["backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert artifact["plan_backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert artifact["backend_port_prestart_summary_type_matches_plan"] is True
+    assert artifact["backend_port_prestart_summary_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert artifact["plan_backend_port_prestart_summary_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert artifact["backend_port_prestart_summary_status_matches_plan"] is True
+    assert artifact["backend_port_prestart_summary_connection_policy"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert artifact["plan_backend_port_prestart_summary_connection_policy"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert (
+        artifact["backend_port_prestart_summary_connection_policy_matches_plan"]
+        is True
+    )
+    assert artifact["backend_port_prestart_summary_live_write"] is False
+    assert artifact["plan_backend_port_prestart_summary_live_write"] is False
+    assert artifact["backend_port_prestart_summary_live_write_matches_plan"] is True
+    assert artifact["backend_port_prestart_summary_contacts_backend"] is False
+    assert artifact["plan_backend_port_prestart_summary_contacts_backend"] is False
+    assert (
+        artifact["backend_port_prestart_summary_contacts_backend_matches_plan"]
+        is True
+    )
+    assert artifact["backend_port_prestart_summary_queries_console"] is False
+    assert artifact["plan_backend_port_prestart_summary_queries_console"] is False
+    assert (
+        artifact["backend_port_prestart_summary_queries_console_matches_plan"]
+        is True
+    )
+    assert artifact["backend_port_prestart_summary_executes_tests"] is False
+    assert artifact["plan_backend_port_prestart_summary_executes_tests"] is False
+    assert (
+        artifact["backend_port_prestart_summary_executes_tests_matches_plan"]
+        is True
+    )
+    assert artifact["backend_port_prestart_check_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
+    assert artifact["plan_backend_port_prestart_check_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
+    assert artifact["backend_port_prestart_check_status_matches_plan"] is True
     assert artifact["preview_command_prestart_summary"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
@@ -12672,6 +12914,52 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert (
         "backend_port_prestart_summary_sha256_available_matches_digest: `true`"
         in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_summary_type: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE}`"
+        in markdown_summary
+    )
+    assert "backend_port_prestart_summary_type_matches_plan: `true`" in (
+        markdown_summary
+    )
+    assert (
+        "backend_port_prestart_summary_status: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS}`"
+        in markdown_summary
+    )
+    assert "backend_port_prestart_summary_status_matches_plan: `true`" in (
+        markdown_summary
+    )
+    assert (
+        "backend_port_prestart_summary_connection_policy: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY}`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_summary_connection_policy_matches_plan: `true`"
+        in markdown_summary
+    )
+    assert "backend_port_prestart_summary_live_write: `false`" in markdown_summary
+    assert (
+        "backend_port_prestart_summary_contacts_backend: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_summary_queries_console: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_summary_executes_tests: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_check_status: "
+        f"`{WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS}`"
+        in markdown_summary
+    )
+    assert "backend_port_prestart_check_status_matches_plan: `true`" in (
+        markdown_summary
     )
     assert "backend_port_prestart_check_command: " in markdown_summary
     assert "prestart_backend_port_check_command: " in markdown_summary

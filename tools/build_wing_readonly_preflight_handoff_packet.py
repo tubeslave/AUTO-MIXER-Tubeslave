@@ -35,7 +35,11 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
@@ -454,6 +458,22 @@ def build_handoff_packet(
         "backend_port_prestart_summary_sha256_available": bool(
             prestart_summary_sha256
         ),
+        "backend_port_prestart_summary_type": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ),
+        "backend_port_prestart_summary_status": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+        ),
+        "backend_port_prestart_summary_connection_policy": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ),
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
+        "backend_port_prestart_check_status": (
+            WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+        ),
         "backend_port_prestart_check_operator_sequence_step_index": prestart_step_index,
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
@@ -647,6 +667,22 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{packet['backend_port_prestart_summary_sha256']}`",
         "- backend_port_prestart_summary_sha256_available: "
         f"`{str(packet['backend_port_prestart_summary_sha256_available']).lower()}`",
+        "- backend_port_prestart_summary_type: "
+        f"`{packet['backend_port_prestart_summary_type']}`",
+        "- backend_port_prestart_summary_status: "
+        f"`{packet['backend_port_prestart_summary_status']}`",
+        "- backend_port_prestart_summary_connection_policy: "
+        f"`{packet['backend_port_prestart_summary_connection_policy']}`",
+        "- backend_port_prestart_summary_live_write: "
+        f"`{str(packet['backend_port_prestart_summary_live_write']).lower()}`",
+        "- backend_port_prestart_summary_contacts_backend: "
+        f"`{str(packet['backend_port_prestart_summary_contacts_backend']).lower()}`",
+        "- backend_port_prestart_summary_queries_console: "
+        f"`{str(packet['backend_port_prestart_summary_queries_console']).lower()}`",
+        "- backend_port_prestart_summary_executes_tests: "
+        f"`{str(packet['backend_port_prestart_summary_executes_tests']).lower()}`",
+        "- backend_port_prestart_check_status: "
+        f"`{packet['backend_port_prestart_check_status']}`",
         "- backend_port_prestart_check_operator_sequence_step_index: "
         f"`{packet['backend_port_prestart_check_operator_sequence_step_index']}`",
         "- backend_port_prestart_check_must_be_first_operator_step: "

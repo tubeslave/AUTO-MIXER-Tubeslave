@@ -5019,6 +5019,31 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     plan_backend_port_prestart_summary_sha256 = str(
         plan_artifact_detail.get("backend_port_prestart_summary_sha256") or ""
     )
+    plan_backend_port_prestart_summary_type = str(
+        plan_artifact_detail.get("backend_port_prestart_summary_type") or ""
+    )
+    plan_backend_port_prestart_summary_status = str(
+        plan_artifact_detail.get("backend_port_prestart_summary_status") or ""
+    )
+    plan_backend_port_prestart_summary_connection_policy = str(
+        plan_artifact_detail.get("backend_port_prestart_summary_connection_policy")
+        or ""
+    )
+    plan_backend_port_prestart_summary_live_write = plan_artifact_detail.get(
+        "backend_port_prestart_summary_live_write"
+    )
+    plan_backend_port_prestart_summary_contacts_backend = plan_artifact_detail.get(
+        "backend_port_prestart_summary_contacts_backend"
+    )
+    plan_backend_port_prestart_summary_queries_console = plan_artifact_detail.get(
+        "backend_port_prestart_summary_queries_console"
+    )
+    plan_backend_port_prestart_summary_executes_tests = plan_artifact_detail.get(
+        "backend_port_prestart_summary_executes_tests"
+    )
+    plan_backend_port_prestart_check_status = str(
+        plan_artifact_detail.get("backend_port_prestart_check_status") or ""
+    )
     expected_prestart_summary = plan_backend_port_prestart_summary_path
     packet_backend_port_prestart_summary_sha256 = (
         str(packet.get("backend_port_prestart_summary_sha256"))
@@ -5036,6 +5061,66 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         bool(plan_backend_port_prestart_summary_sha256)
         and packet_backend_port_prestart_summary_sha256
         == plan_backend_port_prestart_summary_sha256
+    )
+    packet_backend_port_prestart_summary_type = str(
+        packet.get("backend_port_prestart_summary_type") or ""
+    )
+    packet_backend_port_prestart_summary_type_matches_plan = (
+        bool(plan_backend_port_prestart_summary_type)
+        and packet_backend_port_prestart_summary_type
+        == plan_backend_port_prestart_summary_type
+    )
+    packet_backend_port_prestart_summary_status = str(
+        packet.get("backend_port_prestart_summary_status") or ""
+    )
+    packet_backend_port_prestart_summary_status_matches_plan = (
+        bool(plan_backend_port_prestart_summary_status)
+        and packet_backend_port_prestart_summary_status
+        == plan_backend_port_prestart_summary_status
+    )
+    packet_backend_port_prestart_summary_connection_policy = str(
+        packet.get("backend_port_prestart_summary_connection_policy") or ""
+    )
+    packet_backend_port_prestart_summary_connection_policy_matches_plan = (
+        bool(plan_backend_port_prestart_summary_connection_policy)
+        and packet_backend_port_prestart_summary_connection_policy
+        == plan_backend_port_prestart_summary_connection_policy
+    )
+    packet_backend_port_prestart_summary_live_write = packet.get(
+        "backend_port_prestart_summary_live_write"
+    )
+    packet_backend_port_prestart_summary_live_write_matches_plan = (
+        packet_backend_port_prestart_summary_live_write
+        == plan_backend_port_prestart_summary_live_write
+    )
+    packet_backend_port_prestart_summary_contacts_backend = packet.get(
+        "backend_port_prestart_summary_contacts_backend"
+    )
+    packet_backend_port_prestart_summary_contacts_backend_matches_plan = (
+        packet_backend_port_prestart_summary_contacts_backend
+        == plan_backend_port_prestart_summary_contacts_backend
+    )
+    packet_backend_port_prestart_summary_queries_console = packet.get(
+        "backend_port_prestart_summary_queries_console"
+    )
+    packet_backend_port_prestart_summary_queries_console_matches_plan = (
+        packet_backend_port_prestart_summary_queries_console
+        == plan_backend_port_prestart_summary_queries_console
+    )
+    packet_backend_port_prestart_summary_executes_tests = packet.get(
+        "backend_port_prestart_summary_executes_tests"
+    )
+    packet_backend_port_prestart_summary_executes_tests_matches_plan = (
+        packet_backend_port_prestart_summary_executes_tests
+        == plan_backend_port_prestart_summary_executes_tests
+    )
+    packet_backend_port_prestart_check_status = str(
+        packet.get("backend_port_prestart_check_status") or ""
+    )
+    packet_backend_port_prestart_check_status_matches_plan = (
+        bool(plan_backend_port_prestart_check_status)
+        and packet_backend_port_prestart_check_status
+        == plan_backend_port_prestart_check_status
     )
     required_checklist = (
         packet.get("required_review_checklist_ids")
@@ -5419,6 +5504,66 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not packet_backend_port_prestart_summary_sha256_available_matches_digest:
         violations.append(
             "wing_readonly_preflight_handoff_packet_prestart_summary_sha256_available_mismatch"
+        )
+    if (
+        not packet_backend_port_prestart_summary_type_matches_plan
+        or packet_backend_port_prestart_summary_type
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_type_mismatch"
+        )
+    if (
+        not packet_backend_port_prestart_summary_status_matches_plan
+        or packet_backend_port_prestart_summary_status
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_status_mismatch"
+        )
+    if (
+        not packet_backend_port_prestart_summary_connection_policy_matches_plan
+        or packet_backend_port_prestart_summary_connection_policy
+        != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_policy_mismatch"
+        )
+    if (
+        not packet_backend_port_prestart_summary_live_write_matches_plan
+        or packet_backend_port_prestart_summary_live_write is not False
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_live_write_not_false"
+        )
+    if (
+        not packet_backend_port_prestart_summary_contacts_backend_matches_plan
+        or packet_backend_port_prestart_summary_contacts_backend is not False
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_contacts_backend_not_false"
+        )
+    if (
+        not packet_backend_port_prestart_summary_queries_console_matches_plan
+        or packet_backend_port_prestart_summary_queries_console is not False
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_queries_console_not_false"
+        )
+    if (
+        not packet_backend_port_prestart_summary_executes_tests_matches_plan
+        or packet_backend_port_prestart_summary_executes_tests is not False
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_executes_tests_not_false"
+        )
+    if (
+        not packet_backend_port_prestart_check_status_matches_plan
+        or packet_backend_port_prestart_check_status
+        != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_check_status_mismatch"
         )
     backend_port_prestart_step_index = packet.get(
         "backend_port_prestart_check_operator_sequence_step_index"
@@ -6126,6 +6271,78 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_summary_sha256_matches_plan"] = (
         packet_backend_port_prestart_summary_sha256_matches_plan
+    )
+    detail["backend_port_prestart_summary_type"] = (
+        packet_backend_port_prestart_summary_type
+    )
+    detail["plan_backend_port_prestart_summary_type"] = (
+        plan_backend_port_prestart_summary_type
+    )
+    detail["backend_port_prestart_summary_type_matches_plan"] = (
+        packet_backend_port_prestart_summary_type_matches_plan
+    )
+    detail["backend_port_prestart_summary_status"] = (
+        packet_backend_port_prestart_summary_status
+    )
+    detail["plan_backend_port_prestart_summary_status"] = (
+        plan_backend_port_prestart_summary_status
+    )
+    detail["backend_port_prestart_summary_status_matches_plan"] = (
+        packet_backend_port_prestart_summary_status_matches_plan
+    )
+    detail["backend_port_prestart_summary_connection_policy"] = (
+        packet_backend_port_prestart_summary_connection_policy
+    )
+    detail["plan_backend_port_prestart_summary_connection_policy"] = (
+        plan_backend_port_prestart_summary_connection_policy
+    )
+    detail["backend_port_prestart_summary_connection_policy_matches_plan"] = (
+        packet_backend_port_prestart_summary_connection_policy_matches_plan
+    )
+    detail["backend_port_prestart_summary_live_write"] = (
+        packet_backend_port_prestart_summary_live_write
+    )
+    detail["plan_backend_port_prestart_summary_live_write"] = (
+        plan_backend_port_prestart_summary_live_write
+    )
+    detail["backend_port_prestart_summary_live_write_matches_plan"] = (
+        packet_backend_port_prestart_summary_live_write_matches_plan
+    )
+    detail["backend_port_prestart_summary_contacts_backend"] = (
+        packet_backend_port_prestart_summary_contacts_backend
+    )
+    detail["plan_backend_port_prestart_summary_contacts_backend"] = (
+        plan_backend_port_prestart_summary_contacts_backend
+    )
+    detail["backend_port_prestart_summary_contacts_backend_matches_plan"] = (
+        packet_backend_port_prestart_summary_contacts_backend_matches_plan
+    )
+    detail["backend_port_prestart_summary_queries_console"] = (
+        packet_backend_port_prestart_summary_queries_console
+    )
+    detail["plan_backend_port_prestart_summary_queries_console"] = (
+        plan_backend_port_prestart_summary_queries_console
+    )
+    detail["backend_port_prestart_summary_queries_console_matches_plan"] = (
+        packet_backend_port_prestart_summary_queries_console_matches_plan
+    )
+    detail["backend_port_prestart_summary_executes_tests"] = (
+        packet_backend_port_prestart_summary_executes_tests
+    )
+    detail["plan_backend_port_prestart_summary_executes_tests"] = (
+        plan_backend_port_prestart_summary_executes_tests
+    )
+    detail["backend_port_prestart_summary_executes_tests_matches_plan"] = (
+        packet_backend_port_prestart_summary_executes_tests_matches_plan
+    )
+    detail["backend_port_prestart_check_status"] = (
+        packet_backend_port_prestart_check_status
+    )
+    detail["plan_backend_port_prestart_check_status"] = (
+        plan_backend_port_prestart_check_status
+    )
+    detail["backend_port_prestart_check_status_matches_plan"] = (
+        packet_backend_port_prestart_check_status_matches_plan
     )
     detail["backend_port_prestart_check_operator_sequence_step_index"] = packet.get(
         "backend_port_prestart_check_operator_sequence_step_index"
@@ -14206,6 +14423,126 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 detail.get("backend_port_prestart_summary_sha256_matches_plan")
                 is True
             ),
+            "backend_port_prestart_summary_type": str(
+                detail.get("backend_port_prestart_summary_type") or ""
+            ),
+            "plan_backend_port_prestart_summary_type": str(
+                detail.get("plan_backend_port_prestart_summary_type") or ""
+            ),
+            "backend_port_prestart_summary_type_matches_plan": (
+                detail.get("backend_port_prestart_summary_type_matches_plan") is True
+            ),
+            "backend_port_prestart_summary_status": str(
+                detail.get("backend_port_prestart_summary_status") or ""
+            ),
+            "plan_backend_port_prestart_summary_status": str(
+                detail.get("plan_backend_port_prestart_summary_status") or ""
+            ),
+            "backend_port_prestart_summary_status_matches_plan": (
+                detail.get("backend_port_prestart_summary_status_matches_plan") is True
+            ),
+            "backend_port_prestart_summary_connection_policy": str(
+                detail.get("backend_port_prestart_summary_connection_policy") or ""
+            ),
+            "plan_backend_port_prestart_summary_connection_policy": str(
+                detail.get("plan_backend_port_prestart_summary_connection_policy") or ""
+            ),
+            "backend_port_prestart_summary_connection_policy_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_connection_policy_matches_plan"
+                )
+                is True
+            ),
+            "backend_port_prestart_summary_live_write": (
+                detail.get("backend_port_prestart_summary_live_write")
+                if isinstance(detail.get("backend_port_prestart_summary_live_write"), bool)
+                else None
+            ),
+            "plan_backend_port_prestart_summary_live_write": (
+                detail.get("plan_backend_port_prestart_summary_live_write")
+                if isinstance(
+                    detail.get("plan_backend_port_prestart_summary_live_write"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_live_write_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_live_write_matches_plan"
+                )
+                is True
+            ),
+            "backend_port_prestart_summary_contacts_backend": (
+                detail.get("backend_port_prestart_summary_contacts_backend")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_contacts_backend"), bool
+                )
+                else None
+            ),
+            "plan_backend_port_prestart_summary_contacts_backend": (
+                detail.get("plan_backend_port_prestart_summary_contacts_backend")
+                if isinstance(
+                    detail.get("plan_backend_port_prestart_summary_contacts_backend"),
+                    bool,
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_contacts_backend_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_contacts_backend_matches_plan"
+                )
+                is True
+            ),
+            "backend_port_prestart_summary_queries_console": (
+                detail.get("backend_port_prestart_summary_queries_console")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_queries_console"), bool
+                )
+                else None
+            ),
+            "plan_backend_port_prestart_summary_queries_console": (
+                detail.get("plan_backend_port_prestart_summary_queries_console")
+                if isinstance(
+                    detail.get("plan_backend_port_prestart_summary_queries_console"),
+                    bool,
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_queries_console_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_queries_console_matches_plan"
+                )
+                is True
+            ),
+            "backend_port_prestart_summary_executes_tests": (
+                detail.get("backend_port_prestart_summary_executes_tests")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_executes_tests"), bool
+                )
+                else None
+            ),
+            "plan_backend_port_prestart_summary_executes_tests": (
+                detail.get("plan_backend_port_prestart_summary_executes_tests")
+                if isinstance(
+                    detail.get("plan_backend_port_prestart_summary_executes_tests"),
+                    bool,
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_executes_tests_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_executes_tests_matches_plan"
+                )
+                is True
+            ),
+            "backend_port_prestart_check_status": str(
+                detail.get("backend_port_prestart_check_status") or ""
+            ),
+            "plan_backend_port_prestart_check_status": str(
+                detail.get("plan_backend_port_prestart_check_status") or ""
+            ),
+            "backend_port_prestart_check_status_matches_plan": (
+                detail.get("backend_port_prestart_check_status_matches_plan") is True
+            ),
             "backend_port_prestart_check_operator_sequence_step_index": (
                 detail.get("backend_port_prestart_check_operator_sequence_step_index")
             ),
@@ -18329,6 +18666,54 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_sha256']}`",
                 "- backend_port_prestart_summary_sha256_matches_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_sha256_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_type: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_type']}`",
+                "- plan_backend_port_prestart_summary_type: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_type']}`",
+                "- backend_port_prestart_summary_type_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_type_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_status']}`",
+                "- plan_backend_port_prestart_summary_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_status']}`",
+                "- backend_port_prestart_summary_status_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_status_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_connection_policy: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_connection_policy']}`",
+                "- plan_backend_port_prestart_summary_connection_policy: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_connection_policy']}`",
+                "- backend_port_prestart_summary_connection_policy_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_connection_policy_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_live_write: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_live_write']).lower()}`",
+                "- plan_backend_port_prestart_summary_live_write: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_live_write']).lower()}`",
+                "- backend_port_prestart_summary_live_write_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_live_write_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_contacts_backend: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_contacts_backend']).lower()}`",
+                "- plan_backend_port_prestart_summary_contacts_backend: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_contacts_backend']).lower()}`",
+                "- backend_port_prestart_summary_contacts_backend_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_contacts_backend_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_queries_console: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_queries_console']).lower()}`",
+                "- plan_backend_port_prestart_summary_queries_console: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_queries_console']).lower()}`",
+                "- backend_port_prestart_summary_queries_console_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_queries_console_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_executes_tests: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_executes_tests']).lower()}`",
+                "- plan_backend_port_prestart_summary_executes_tests: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_executes_tests']).lower()}`",
+                "- backend_port_prestart_summary_executes_tests_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_executes_tests_matches_plan']).lower()}`",
+                "- backend_port_prestart_check_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_status']}`",
+                "- plan_backend_port_prestart_check_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_check_status']}`",
+                "- backend_port_prestart_check_status_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_status_matches_plan']).lower()}`",
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- execution_allowed_by_packet: "
