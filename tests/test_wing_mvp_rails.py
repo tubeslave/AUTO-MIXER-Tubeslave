@@ -48,6 +48,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "backend_port_prestart_gate.runs_command: prestart_backend_port_check" in text
     assert "backend_port_prestart_gate.required_markers" in text
     assert "Before starting the intended backend/WING session" in text
+    assert "backend_port_prestart_summary_sha256_matches_plan: true" in text
     assert "backend_port_prestart_check_command" in text
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
@@ -178,6 +179,13 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_DIRECTION_GUARD_SKIP_SELF_REPORTS_20260614.md"
         in rows[0]["evidence"]
     )
+    assert (
+        "AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_BINDING_20260614.md"
+        in rows[0]["evidence"]
+    )
+    assert "backend_port_prestart_summary_sha256_matches_plan: true" in rows[0][
+        "next action"
+    ]
     assert (
         "AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md"
         in rows[0]["evidence"]
@@ -1126,6 +1134,10 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     )
     assert (
         "Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SKIP_SELF_REPORTS_20260614.md"
+        in text
+    )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_BINDING_20260614.md"
         in text
     )
     assert (

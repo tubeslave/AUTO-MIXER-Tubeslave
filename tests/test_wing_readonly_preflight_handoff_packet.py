@@ -1,3 +1,4 @@
+import hashlib
 import json
 import subprocess
 import sys
@@ -79,6 +80,8 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["backend_port_prestart_summary_path_placeholder"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
+    assert packet["backend_port_prestart_summary_sha256"] == ""
+    assert packet["backend_port_prestart_summary_sha256_available"] is False
     assert packet["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert packet["backend_port_prestart_check_must_be_first_operator_step"] is True
     assert packet["backend_connection_confirmation_step_index"] == (
@@ -523,6 +526,8 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "backend_port_prestart_summary_required: `true`" in markdown
     assert "backend_port_prestart_summary_path_placeholder" in markdown
     assert WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER in markdown
+    assert "backend_port_prestart_summary_sha256: ``" in markdown
+    assert "backend_port_prestart_summary_sha256_available: `false`" in markdown
     assert "backend_port_prestart_check_operator_sequence_step_index: `0`" in markdown
     assert "backend_port_prestart_check_must_be_first_operator_step: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
@@ -596,6 +601,8 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     assert payload["backend_port_prestart_summary_path_placeholder"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
+    assert payload["backend_port_prestart_summary_sha256"] == ""
+    assert payload["backend_port_prestart_summary_sha256_available"] is False
     assert payload["backend_port_prestart_check_operator_sequence_step_index"] == 0
     assert payload["backend_port_prestart_check_must_be_first_operator_step"] is True
     assert payload["allowed_request_types"] == list(
@@ -634,6 +641,34 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     )
     assert payload["manual_review_required_before_readiness_update"] is True
     assert payload["live_authority_granted"] is False
+
+
+def test_handoff_packet_hashes_existing_prestart_summary(tmp_path: Path):
+    prestart_summary = tmp_path / "summary.json"
+    prestart_summary.write_text(
+        '{"type":"no_wing_release_check","status":"passed"}\n',
+        encoding="utf-8",
+    )
+    expected_sha256 = hashlib.sha256(prestart_summary.read_bytes()).hexdigest()
+
+    packet = handoff.build_handoff_packet(
+        prestart_summary=str(prestart_summary),
+        generated_at="2026-06-07T00:00:00Z",
+    )
+
+    assert packet["backend_port_prestart_summary_path_placeholder"] == str(
+        prestart_summary
+    )
+    assert packet["backend_port_prestart_summary_sha256"] == expected_sha256
+    assert packet["backend_port_prestart_summary_sha256_available"] is True
+    assert packet["commands"]["preview_readonly_request_plan"][
+        packet["commands"]["preview_readonly_request_plan"].index("--prestart-summary")
+        + 1
+    ] == str(prestart_summary)
+    assert packet["commands"]["capture_readonly_preflight"][
+        packet["commands"]["capture_readonly_preflight"].index("--prestart-summary")
+        + 1
+    ] == str(prestart_summary)
 
 
 def test_handoff_tool_runs_as_repo_local_script_path(tmp_path: Path):

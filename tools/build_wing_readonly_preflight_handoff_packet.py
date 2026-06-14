@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime, timezone
@@ -121,6 +122,18 @@ def _command_text(command: Sequence[str]) -> str:
 
 def _split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _sha256_existing_file(path_value: str) -> str:
+    path = Path(path_value)
+    candidates = [path] if path.is_absolute() else [path, REPO_ROOT / path]
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return hashlib.sha256(candidate.read_bytes()).hexdigest()
+        except OSError:
+            return ""
+    return ""
 
 
 def _validate_value_types(value_types: str) -> list[str]:
@@ -361,6 +374,7 @@ def build_handoff_packet(
     mvp_blocker_anchor_sha256 = no_wing_release_check.wing_mvp_blocker_anchor_sha256(
         mvp_blocker_anchor
     )
+    prestart_summary_sha256 = _sha256_existing_file(prestart_summary)
     return {
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
@@ -377,6 +391,10 @@ def build_handoff_packet(
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_summary_required": True,
         "backend_port_prestart_summary_path_placeholder": prestart_summary,
+        "backend_port_prestart_summary_sha256": prestart_summary_sha256,
+        "backend_port_prestart_summary_sha256_available": bool(
+            prestart_summary_sha256
+        ),
         "backend_port_prestart_check_operator_sequence_step_index": prestart_step_index,
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
@@ -488,6 +506,10 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['backend_port_prestart_summary_required']).lower()}`",
         "- backend_port_prestart_summary_path_placeholder: "
         f"`{packet['backend_port_prestart_summary_path_placeholder']}`",
+        "- backend_port_prestart_summary_sha256: "
+        f"`{packet['backend_port_prestart_summary_sha256']}`",
+        "- backend_port_prestart_summary_sha256_available: "
+        f"`{str(packet['backend_port_prestart_summary_sha256_available']).lower()}`",
         "- backend_port_prestart_check_operator_sequence_step_index: "
         f"`{packet['backend_port_prestart_check_operator_sequence_step_index']}`",
         "- backend_port_prestart_check_must_be_first_operator_step: "

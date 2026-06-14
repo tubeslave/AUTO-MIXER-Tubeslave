@@ -1231,6 +1231,10 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "backend_port_prestart_summary_path_placeholder": (
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
         ),
+        "backend_port_prestart_summary_sha256": (
+            plan_payload["backend_port_prestart_summary_sha256"]
+        ),
+        "backend_port_prestart_summary_sha256_available": True,
         "backend_port_prestart_check_operator_sequence_step_index": 0,
         "backend_connection_confirmation_step_index": (
             WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
@@ -3027,6 +3031,11 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["plan_backend_port_prestart_summary_path"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
+    assert result.detail["backend_port_prestart_summary_sha256"] == "a" * 64
+    assert result.detail["plan_backend_port_prestart_summary_sha256"] == "a" * 64
+    assert (
+        result.detail["backend_port_prestart_summary_sha256_matches_plan"] is True
+    )
     assert result.detail["preview_command_prestart_summary"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
@@ -4028,6 +4037,36 @@ def test_no_wing_release_check_rejects_handoff_packet_with_prestart_summary_bind
         "wing_readonly_preflight_handoff_packet_capture_prestart_summary_mismatch",
     ):
         assert violation in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_prestart_summary_sha256_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-prestart-summary-sha-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["backend_port_prestart_summary_sha256"] = "b" * 64
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert result.detail["backend_port_prestart_summary_sha256"] == "b" * 64
+    assert result.detail["plan_backend_port_prestart_summary_sha256"] == "a" * 64
+    assert (
+        result.detail["backend_port_prestart_summary_sha256_matches_plan"] is False
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_prestart_summary_sha256_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_rejects_handoff_packet_with_prestart_gate_mismatch(
@@ -10795,6 +10834,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "plan_backend_port_prestart_summary_path": (
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
             ),
+            "backend_port_prestart_summary_sha256": "a" * 64,
+            "plan_backend_port_prestart_summary_sha256": "a" * 64,
+            "backend_port_prestart_summary_sha256_matches_plan": True,
             "preview_command_prestart_summary": (
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
             ),
@@ -11039,6 +11081,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["plan_backend_port_prestart_summary_path"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
+    assert artifact["backend_port_prestart_summary_sha256"] == "a" * 64
+    assert artifact["plan_backend_port_prestart_summary_sha256"] == "a" * 64
+    assert artifact["backend_port_prestart_summary_sha256_matches_plan"] is True
     assert artifact["preview_command_prestart_summary"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
     )
@@ -11175,6 +11220,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "plan_backend_port_prestart_summary_path: "
         f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER}`"
         in markdown_summary
+    )
+    assert "backend_port_prestart_summary_sha256_matches_plan: `true`" in (
+        markdown_summary
     )
     assert "backend_port_prestart_check_command: " in markdown_summary
     assert "prestart_backend_port_check_command: " in markdown_summary

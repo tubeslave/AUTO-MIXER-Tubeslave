@@ -121,6 +121,8 @@ Stop the current Codex work direction and return to the first open blocker if:
   `review_command_artifact_root_matches_packet: true`,
   `decision_review_command_artifact_root_matches_packet: true`, and
   `decision_review_command_decision_root_matches_packet: true`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `backend_port_prestart_summary_sha256_matches_plan: true`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `backend_port_prestart_gate` exactly matching
   `expected_backend_port_prestart_gate`.
