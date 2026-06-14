@@ -362,6 +362,10 @@ you want the background automation active.
   `operator_sequence_count_matches_contract: true`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
+  and
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step` must include
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and

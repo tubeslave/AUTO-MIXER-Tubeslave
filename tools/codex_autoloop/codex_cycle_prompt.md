@@ -264,27 +264,31 @@ blockers выше.
 54. verify `expected_operator_sequence_count: 10`;
 55. verify `operator_sequence_count_matches_contract: true`;
 56. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
-57. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
+57. verify
+   `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`;
+58. verify
+   `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`;
+59. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-58. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
-59. verify `expected_operator_sequence_supervised_prestart_gate_step_index: 9`;
-60. verify
+60. verify `operator_sequence_supervised_prestart_gate_step_index: 9`;
+61. verify `expected_operator_sequence_supervised_prestart_gate_step_index: 9`;
+62. verify
    `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`;
-61. verify the final `operator_sequence_supervised_prestart_gate_step` includes
+63. verify the final `operator_sequence_supervised_prestart_gate_step` includes
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-62. verify `required_supervised_prestart_gate_markers` exactly lists
+64. verify `required_supervised_prestart_gate_markers` exactly lists
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-59. run dry-run recommendation;
-60. require explicit operator approval for the exact action;
-61. apply only bounded supervised fader/gain action;
-62. read back the result;
-63. test rollback;
-64. record proof artifact.
+65. run dry-run recommendation;
+66. require explicit operator approval for the exact action;
+67. apply only bounded supervised fader/gain action;
+68. read back the result;
+69. test rollback;
+70. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -512,6 +516,10 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `operator_sequence_count_matches_contract: true`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
+  and
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step` must include
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and

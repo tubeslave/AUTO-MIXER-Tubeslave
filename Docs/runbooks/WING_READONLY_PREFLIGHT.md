@@ -131,7 +131,9 @@ include a dedicated review step that names `mvp_blocker_anchor`,
 supervised proof planning. The no-WING handoff summary must expose that review
 step as `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` so
 reviewers can confirm the digest check occurs immediately before the final
-supervised prestart gate.
+supervised prestart gate. The same summary must show
+`expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
+`operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
 
 Replace channel `3` with the operator-approved channel:
 
@@ -509,6 +511,8 @@ The handoff validation must report:
 - `mvp_blocker_anchor.packet_does_not_close_blocker: true`
 - `operator_sequence_has_mvp_blocker_anchor_digest_review: true`
 - `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
+- `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
+- `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`
 - `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
   `current first open blocker`

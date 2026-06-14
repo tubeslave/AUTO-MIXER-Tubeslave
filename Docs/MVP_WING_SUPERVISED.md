@@ -129,6 +129,8 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while the no-WING handoff summary does not show
   `expected_operator_sequence_count: 10`,
   `operator_sequence_count_matches_contract: true`,
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`,
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
   `expected_operator_sequence_supervised_prestart_gate_step_index: 9`, and
   `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`.
 - A supervised proof is planned before the no-WING handoff summary shows
@@ -262,7 +264,10 @@ Stop the current Codex work direction and return to the first open blocker if:
   `operator_sequence_step_index: 9` and
   `operator_sequence_step_must_be_final: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
-  `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`,
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`,
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
+  and
   `operator_sequence_supervised_prestart_gate_step_index: 9`.
 - A supervised proof is planned while the no-WING handoff summary does not show
   `operator_sequence_count: 10`.
@@ -446,7 +451,10 @@ exactly listing `accepted_decision_ready`,
 `WING_SUPERVISED_FADER_GAIN_PROOF`.
 
 The operator sequence indexes must also remain explicit:
-`operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
+`operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`,
+`expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`,
+`operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
+and
 `operator_sequence_supervised_prestart_gate_step_index: 9`.
 
 The handoff summary must also show `operator_sequence_count: 10` so reviewers

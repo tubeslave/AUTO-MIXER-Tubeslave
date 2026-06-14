@@ -48,6 +48,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
     expected_backend_port_prestart_gate,
@@ -329,6 +330,9 @@ def build_handoff_packet(
         "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
         "current first open blocker before supervised proof planning."
     )
+    mvp_blocker_anchor_digest_review_step_index = (
+        WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    )
     expected_prestart_gate = expected_backend_port_prestart_gate(
         operator_sequence_step=prestart_step,
         operator_sequence_step_index=prestart_step_index,
@@ -469,6 +473,9 @@ def build_handoff_packet(
         "expected_backend_port_prestart_gate": dict(expected_prestart_gate),
         "supervised_prestart_gate": dict(expected_supervised_gate),
         "expected_supervised_prestart_gate": dict(expected_supervised_gate),
+        "mvp_blocker_anchor_digest_review_step_index": (
+            mvp_blocker_anchor_digest_review_step_index
+        ),
         "required_review_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
         "forbidden_live_request_types": list(FORBIDDEN_LIVE_REQUEST_TYPES),
         "blockers_not_closed_by_packet": list(NOT_CLOSED_BLOCKERS),

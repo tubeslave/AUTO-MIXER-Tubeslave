@@ -478,6 +478,9 @@ WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = (
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
 )
+WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX = (
+    preflight_contract.WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+)
 WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT = (
     preflight_contract.WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
 )
@@ -5516,9 +5519,19 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     operator_sequence_has_mvp_blocker_anchor_digest_review = bool(
         operator_sequence_mvp_blocker_anchor_digest_review_step
     )
+    operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract = (
+        operator_sequence_mvp_blocker_anchor_digest_review_step_index
+        == WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    )
     if not operator_sequence_has_mvp_blocker_anchor_digest_review:
         violations.append(
             "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_step_missing"
+        )
+    elif (
+        not operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_step_index_mismatch"
         )
     expected_supervised_prestart_gate = (
         preflight_contract.expected_supervised_prestart_gate(
@@ -5845,6 +5858,12 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["operator_sequence_mvp_blocker_anchor_digest_review_step_index"] = (
         operator_sequence_mvp_blocker_anchor_digest_review_step_index
     )
+    detail[
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index"
+    ] = WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
+    detail[
+        "operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract"
+    ] = operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract
     detail["operator_sequence_has_supervised_prestart_gate"] = (
         operator_sequence_has_supervised_prestart_gate
     )
@@ -13636,6 +13655,17 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "operator_sequence_mvp_blocker_anchor_digest_review_step_index": (
                 detail.get("operator_sequence_mvp_blocker_anchor_digest_review_step_index")
             ),
+            "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index": (
+                detail.get(
+                    "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index"
+                )
+            ),
+            "operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract": (
+                detail.get(
+                    "operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract"
+                )
+                is True
+            ),
             "operator_sequence_has_supervised_prestart_gate": (
                 detail.get("operator_sequence_has_supervised_prestart_gate") is True
             ),
@@ -17273,6 +17303,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_mvp_blocker_anchor_digest_review_step']}`",
                 "- operator_sequence_mvp_blocker_anchor_digest_review_step_index: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_mvp_blocker_anchor_digest_review_step_index']}`",
+                "- expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index']}`",
+                "- operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract']).lower()}`",
                 "- operator_sequence_has_supervised_prestart_gate: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_has_supervised_prestart_gate']).lower()}`",
                 "- operator_sequence_supervised_prestart_gate_step: "
