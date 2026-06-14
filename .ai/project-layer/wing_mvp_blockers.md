@@ -220,6 +220,13 @@ the no-WING handoff summary must also show
 `supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`;
 the no-WING handoff summary must also show
 `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`;
+the no-WING handoff summary must also show
+`required_supervised_proof_plan_summary_fields`,
+`expected_required_supervised_proof_plan_summary_fields`, and
+`required_supervised_proof_plan_summary_fields_match_contract: true`;
+`required_supervised_proof_plan_summary_fields` must include
+`readonly_preflight_review_decision_expected_candidate_prestart_source_ids` and
+`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`;
 accepted review source ids must also have a valid accepted-candidate prestart
 trace with `expected_artifacts`, `expected_summary_artifact`,
 `expected_events_artifact`, `summary_path_matches_expected_artifact: true`, and

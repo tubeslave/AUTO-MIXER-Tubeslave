@@ -261,6 +261,22 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
         in directive["selected_action"]
     )
+    assert "required_supervised_proof_plan_summary_fields" in directive[
+        "selected_action"
+    ]
+    assert "expected_required_supervised_proof_plan_summary_fields" in directive[
+        "selected_action"
+    ]
+    assert "required_supervised_proof_plan_summary_fields_match_contract: true" in directive[
+        "selected_action"
+    ]
+    assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in directive[
+        "selected_action"
+    ]
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        in directive["selected_action"]
+    )
     assert "Both maps must be `{}` before supervised proof steps are planned" in directive[
         "selected_action"
     ]

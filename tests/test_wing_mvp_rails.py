@@ -988,6 +988,20 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     current_command = progress.current_first_command(BLOCKERS_DOC)
     assert current_command is not None
     assert current_command.startswith("Use `PYTHONPATH=backend python3")
+    assert "required_supervised_proof_plan_summary_fields" in current_command
+    assert "expected_required_supervised_proof_plan_summary_fields" in current_command
+    assert (
+        "required_supervised_proof_plan_summary_fields_match_contract: true"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        in current_command
+    )
     report = progress.build_progress_report(
         rows,
         generated_at="2026-06-06T00:00:00Z",
