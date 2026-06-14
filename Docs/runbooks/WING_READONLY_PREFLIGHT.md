@@ -472,6 +472,7 @@ The handoff validation must report:
   `preflight_blocked_until_listener_confirmed`,
   `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`,
   `listener_confirmation_template_status`,
+  `listener_confirmation_template_path`,
   `listener_confirmation_template_acceptance_status`,
   `listener_confirmation_template_safe_to_stop_listener_by_gate`,
   `listener_confirmation_template_live_authority_granted`,

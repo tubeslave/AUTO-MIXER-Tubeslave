@@ -250,6 +250,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING handoff backend prestart command summary | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_PRESTART_COMMAND_SUMMARY_20260614.md` |
 | Current WING backend prestart command text | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_COMMAND_TEXT_20260614.md` |
 | Current WING listener template acceptance status field | `Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_ACCEPTANCE_STATUS_FIELD_20260614.md` requires `listener_confirmation_template_acceptance_status` in backend-port prestart failure details. |
+| Current WING listener template path failure field | `Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_PATH_FAILURE_FIELD_20260614.md` requires `listener_confirmation_template_path` in backend-port prestart failure details. |
 | Current WING handoff denial flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING handoff safety flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING prestart summary contact boundary | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md` |

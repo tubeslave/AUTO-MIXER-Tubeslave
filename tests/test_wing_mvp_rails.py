@@ -124,8 +124,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "listener_process_error" in text
     assert "safe_to_stop_listener_by_gate" in text
     assert "operator_next_step" in text
-    assert "listener_confirmation_template_acceptance_status" in text
     assert "listener_confirmation_template_path" in text
+    assert "listener_confirmation_template_acceptance_status" in text
     assert "listener_confirmation_template_status: pending_operator_edit" in text
     assert "listener_confirmation_template_safe_to_stop_listener_by_gate: false" in text
     assert "listener_confirmation_template_live_authority_granted: false" in text
@@ -480,10 +480,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "listener_process_error" in rows[0]["next action"]
     assert "safe_to_stop_listener_by_gate" in rows[0]["next action"]
     assert "operator_next_step" in rows[0]["next action"]
+    assert "listener_confirmation_template_path" in rows[0]["next action"]
     assert "listener_confirmation_template_acceptance_status" in rows[0][
         "next action"
     ]
-    assert "listener_confirmation_template_path" in rows[0]["next action"]
     assert "listener_confirmation_template_status: pending_operator_edit" in rows[0][
         "next action"
     ]
@@ -1017,6 +1017,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "listener_process_error" in report
     assert "safe_to_stop_listener_by_gate" in report
     assert "operator_next_step" in report
+    assert "listener_confirmation_template_path" in report
     assert "listener_confirmation_template_acceptance_status" in report
     assert "listener_confirmation_template_accepted_by_template: false" in report
     assert (
@@ -1546,6 +1547,7 @@ def test_docs_index_points_to_current_wing_mvp_prestart_gate():
     assert "backend_port_prestart_gate_readiness_closure_allowed: false" in text
     assert "backend_port_prestart_gate_live_authority_granted: false" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
+    assert "listener_confirmation_template_path" in text
     assert "listener_confirmation_template_acceptance_status" in text
     assert "manual_review_required_before_readiness_update" in text
     assert "readiness_matrix_update_allowed_by_packet" in text
