@@ -457,6 +457,9 @@ The handoff validation must report:
 - the failed busy-port no-WING summary and no-WING handoff summary both show
   `backend_port_prestart_check_command` exactly matching
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
+- the same summaries also show `backend_port_prestart_check_command_text`
+  exactly matching
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
 - the same summaries also show `backend_port_prestart_check_required: true`
   and `backend_port_prestart_check_must_pass_before_starting_backend: true`
 - the same summaries also show

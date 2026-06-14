@@ -6,6 +6,7 @@ from pathlib import Path
 from backend.wing_readonly_preflight_evidence import (
     ALLOWED_VALUE_TYPES,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS,
     EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
@@ -146,6 +147,9 @@ def _valid_summary() -> dict:
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_command_text": (
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -326,6 +330,9 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_command_text": (
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -818,6 +825,7 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
     plan["backend_port_prestart_check_required"] = False
     plan["backend_port_prestart_check_must_pass_before_starting_backend"] = False
     plan["backend_port_prestart_check_command"] = ["python3", "other_check.py"]
+    plan["backend_port_prestart_check_command_text"] = "python3 other_check.py"
     plan["backend_port_prestart_check_failure_detail_fields"] = ["other_field"]
     plan["allowed_request_types"] = ["get_operator_mode", "set_gain"]
     plan["expected_response_types_by_request_type"] = {"get_operator_mode": ["wrong"]}
@@ -849,6 +857,10 @@ def test_file_preflight_artifact_requires_expected_plan_policy_metadata(tmp_path
         in violations
     )
     assert (
+        "expected_plan_backend_port_prestart_check_command_text_mismatch"
+        in violations
+    )
+    assert (
         "expected_plan_backend_port_prestart_check_failure_detail_fields_mismatch"
         in violations
     )
@@ -877,6 +889,7 @@ def test_file_preflight_artifact_requires_summary_prestart_contract(tmp_path):
     summary["backend_port_prestart_check_required"] = False
     summary["backend_port_prestart_check_must_pass_before_starting_backend"] = False
     summary["backend_port_prestart_check_command"] = ["python3", "other_check.py"]
+    summary["backend_port_prestart_check_command_text"] = "python3 other_check.py"
     summary["backend_port_prestart_check_failure_detail_fields"] = ["other_field"]
     artifact_path.write_text(json.dumps(summary), encoding="utf-8")
 
@@ -893,6 +906,7 @@ def test_file_preflight_artifact_requires_summary_prestart_contract(tmp_path):
         in violations
     )
     assert "backend_port_prestart_check_command_mismatch" in violations
+    assert "backend_port_prestart_check_command_text_mismatch" in violations
     assert "backend_port_prestart_check_failure_detail_fields_mismatch" in violations
 
 

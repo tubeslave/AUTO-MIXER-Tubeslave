@@ -13,6 +13,7 @@ import pytest
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
@@ -245,6 +246,10 @@ def assert_summary_prestart_contract(summary: dict) -> None:
     assert summary["backend_port_prestart_check_must_pass_before_starting_backend"] is True
     assert summary["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert (
+        summary["backend_port_prestart_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
     )
     assert summary["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -1274,6 +1279,10 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["backend_port_prestart_check_must_pass_before_starting_backend"] is True
     assert written["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert (
+        written["backend_port_prestart_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
     )
     assert written["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS

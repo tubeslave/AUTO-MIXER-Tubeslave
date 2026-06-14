@@ -7,6 +7,7 @@ from backend.wing_readonly_preflight_evidence import (
 )
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
@@ -47,6 +48,9 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_command_text": (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
         "backend_port_prestart_check_failure_detail_fields": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -154,6 +158,9 @@ def _valid_summary() -> dict:
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_command_text": (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
         "backend_port_prestart_check_failure_detail_fields": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -321,6 +328,9 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
                 "tools/no_wing_release_check.py",
                 "--quick",
             ],
+            "backend_port_prestart_check_command_text": (
+                WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+            ),
             "backend_port_prestart_check_failure_detail_fields": list(
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),

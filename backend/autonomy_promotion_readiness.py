@@ -18,6 +18,7 @@ try:
     from safety_coverage_matrix import get_safety_coverage_row
     from wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     )
     from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
@@ -28,6 +29,7 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.safety_coverage_matrix import get_safety_coverage_row
     from backend.wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     )
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
@@ -400,6 +402,9 @@ def _wing_readonly_preflight_readiness_overlay(
         "prestart_backend_port_check_must_pass_before_starting_backend": True,
         "prestart_backend_port_check_command": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "prestart_backend_port_check_command_text": (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
         "prestart_backend_port_check_failure_detail_fields": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS

@@ -181,6 +181,10 @@ Stop the current Codex work direction and return to the first open blocker if:
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 - A supervised proof is planned while the failed busy-port no-WING summary or
   no-WING handoff summary does not show
+  `backend_port_prestart_check_command_text` exactly matching
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
+- A supervised proof is planned while the failed busy-port no-WING summary or
+  no-WING handoff summary does not show
   `backend_port_prestart_check_required: true` and
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.
 - A supervised proof is planned while the failed busy-port no-WING summary or
@@ -360,6 +364,10 @@ The same `backend_port_prestart_gate` must also show
 
 The failed busy-port no-WING summary and no-WING handoff summary must both show
 `backend_port_prestart_check_command` exactly matching
+`PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
+
+The failed busy-port no-WING summary and no-WING handoff summary must both show
+`backend_port_prestart_check_command_text` exactly matching
 `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 
 The same summaries must also show

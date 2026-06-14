@@ -65,6 +65,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "selected_action"
     ]
     assert "backend_port_prestart_check_command" in directive["selected_action"]
+    assert "backend_port_prestart_check_command_text" in directive["selected_action"]
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in directive[
         "selected_action"
     ]
@@ -660,6 +661,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "backend_port_prestart_gate.required_markers" in prompt
     assert "Before starting the intended backend/WING session" in prompt
     assert "backend_port_prestart_check_command" in prompt
+    assert "backend_port_prestart_check_command_text" in prompt
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in prompt
     assert "failed busy-port no-WING summary and no-WING handoff summary both" in prompt
     assert "backend_port_prestart_check_required: true" in prompt
@@ -753,6 +755,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "backend_port_prestart_gate.required_markers" in readme
     assert "Before starting the intended backend/WING session" in readme
     assert "backend_port_prestart_check_command" in readme
+    assert "backend_port_prestart_check_command_text" in readme
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in readme
     assert "failed busy-port no-WING summary" in readme
     assert "no-WING handoff summary must both show" in readme

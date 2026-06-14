@@ -7,6 +7,7 @@ from pathlib import Path
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
@@ -90,6 +91,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     assert packet["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert (
+        packet["backend_port_prestart_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
     )
     assert packet["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -551,6 +556,8 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "backend_port_prestart_check_operator_sequence_step_index: `0`" in markdown
     assert "backend_port_prestart_check_must_be_first_operator_step: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
+    assert "backend_port_prestart_check_command_text" in markdown
+    assert WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
     for field_name in WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS:
         assert field_name in markdown
@@ -658,6 +665,10 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
     )
     assert payload["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert (
+        payload["backend_port_prestart_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
     )
     assert payload["manual_review_required_before_readiness_update"] is True
     assert payload["live_authority_granted"] is False

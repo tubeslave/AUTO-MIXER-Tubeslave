@@ -27,6 +27,7 @@ if str(REPO_ROOT) not in sys.path:
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
@@ -129,6 +130,9 @@ SUPPORTED_VALUE_TYPES = set(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
+BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+)
 BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
@@ -156,6 +160,7 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "backend_port_prestart_check_required",
     "backend_port_prestart_check_must_pass_before_starting_backend",
     "backend_port_prestart_check_command",
+    "backend_port_prestart_check_command_text",
     "backend_port_prestart_check_failure_detail_fields",
     "backend_port_prestart_summary_required",
     "backend_port_prestart_summary_path",
@@ -636,6 +641,9 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
+        "backend_port_prestart_check_command_text": (
+            BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+        ),
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
@@ -802,6 +810,9 @@ async def run(args: argparse.Namespace) -> int:
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
+        "backend_port_prestart_check_command_text": (
+            BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+        ),
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),

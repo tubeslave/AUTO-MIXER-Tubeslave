@@ -277,6 +277,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{_markdown_bool(row.get('backend_port_prestart_check_must_pass_before_starting_backend'))}`",
                     "  - backend_port_prestart_check_command: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
+                    "  - backend_port_prestart_check_command_text: "
+                    f"`{row.get('backend_port_prestart_check_command_text') or ''}`",
                     "  - backend_port_prestart_check_failure_detail_fields: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
                     "  - backend_port_prestart_summary_required: "

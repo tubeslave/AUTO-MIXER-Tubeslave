@@ -18,6 +18,7 @@ try:
     from wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
@@ -44,6 +45,7 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_contract import (
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
@@ -183,6 +185,9 @@ EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS = tuple(
 EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND = tuple(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
+EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+)
 EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = tuple(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
@@ -254,6 +259,7 @@ class WingReadonlyPreflightArtifactRecord:
     backend_port_prestart_check_required: bool
     backend_port_prestart_check_must_pass_before_starting_backend: bool
     backend_port_prestart_check_command: Tuple[str, ...]
+    backend_port_prestart_check_command_text: str
     backend_port_prestart_check_failure_detail_fields: Tuple[str, ...]
     backend_port_prestart_summary_required: bool
     backend_port_prestart_summary_path: str | None
@@ -286,6 +292,9 @@ class WingReadonlyPreflightArtifactRecord:
         payload["expected_artifacts"] = list(self.expected_artifacts)
         payload["backend_port_prestart_check_command"] = list(
             self.backend_port_prestart_check_command
+        )
+        payload["backend_port_prestart_check_command_text"] = (
+            self.backend_port_prestart_check_command_text
         )
         payload["backend_port_prestart_check_failure_detail_fields"] = list(
             self.backend_port_prestart_check_failure_detail_fields
@@ -663,6 +672,13 @@ def _validate_expected_plan_payload(
         EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
     ):
         violations.append("expected_plan_backend_port_prestart_check_command_mismatch")
+    if (
+        plan.get("backend_port_prestart_check_command_text")
+        != EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+    ):
+        violations.append(
+            "expected_plan_backend_port_prestart_check_command_text_mismatch"
+        )
     if plan.get("backend_port_prestart_check_failure_detail_fields") != list(
         EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     ):
@@ -1120,6 +1136,11 @@ def validate_wing_readonly_preflight_artifact(
         EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
     ):
         violations.append("backend_port_prestart_check_command_mismatch")
+    if (
+        payload.get("backend_port_prestart_check_command_text")
+        != EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+    ):
+        violations.append("backend_port_prestart_check_command_text_mismatch")
     if payload.get("backend_port_prestart_check_failure_detail_fields") != list(
         EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     ):
@@ -1306,6 +1327,9 @@ def validate_wing_readonly_preflight_artifact(
                 if isinstance(payload.get("backend_port_prestart_check_command"), list)
                 else []
             ),
+            "backend_port_prestart_check_command_text": str(
+                payload.get("backend_port_prestart_check_command_text") or ""
+            ),
             "backend_port_prestart_check_failure_detail_fields": (
                 list(payload.get("backend_port_prestart_check_failure_detail_fields"))
                 if isinstance(
@@ -1450,6 +1474,9 @@ def _record_from_validation(
         backend_port_prestart_check_command=_string_tuple(
             evidence.get("backend_port_prestart_check_command")
         ),
+        backend_port_prestart_check_command_text=str(
+            evidence.get("backend_port_prestart_check_command_text") or ""
+        ),
         backend_port_prestart_check_failure_detail_fields=_string_tuple(
             evidence.get("backend_port_prestart_check_failure_detail_fields")
         ),
@@ -1549,6 +1576,7 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         backend_port_prestart_check_required=False,
         backend_port_prestart_check_must_pass_before_starting_backend=False,
         backend_port_prestart_check_command=(),
+        backend_port_prestart_check_command_text="",
         backend_port_prestart_check_failure_detail_fields=(),
         backend_port_prestart_summary_required=False,
         backend_port_prestart_summary_path=None,

@@ -213,6 +213,9 @@ def _candidate_review_rows(
                 "backend_port_prestart_check_command": list(
                     candidate.get("backend_port_prestart_check_command") or []
                 ),
+                "backend_port_prestart_check_command_text": str(
+                    candidate.get("backend_port_prestart_check_command_text") or ""
+                ),
                 "backend_port_prestart_check_failure_detail_fields": list(
                     candidate.get("backend_port_prestart_check_failure_detail_fields")
                     or []

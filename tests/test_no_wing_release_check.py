@@ -9,6 +9,7 @@ from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_st
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
@@ -7958,6 +7959,9 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         "tools/no_wing_release_check.py",
                         "--quick",
                     ],
+                    "prestart_backend_port_check_command_text": (
+                        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+                    ),
                     "prestart_backend_port_check_failure_detail_fields": list(
                         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
                     ),
@@ -7993,6 +7997,9 @@ def valid_proof_report_with_gap_rollup() -> dict:
                             "tools/no_wing_release_check.py",
                             "--quick",
                         ],
+                        "backend_port_prestart_check_command_text": (
+                            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+                        ),
                         "backend_port_prestart_check_failure_detail_fields": list(
                             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
                         ),
@@ -8041,6 +8048,9 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "tools/no_wing_release_check.py",
                     "--quick",
                 ],
+                "readonly_preflight_prestart_check_command_text": (
+                    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+                ),
                 "readonly_preflight_prestart_check_failure_detail_fields": list(
                     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
                 ),
@@ -15062,6 +15072,10 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
     )
     assert result.detail["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert (
+        result.detail["backend_port_prestart_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
     )
     assert result.detail["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS

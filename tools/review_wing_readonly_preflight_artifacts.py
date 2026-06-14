@@ -144,6 +144,9 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                     if isinstance(item.get("backend_port_prestart_check_command"), list)
                     else []
                 ),
+                "backend_port_prestart_check_command_text": str(
+                    item.get("backend_port_prestart_check_command_text") or ""
+                ),
                 "backend_port_prestart_check_failure_detail_fields": (
                     item.get("backend_port_prestart_check_failure_detail_fields")
                     if isinstance(
@@ -487,6 +490,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{str(row.get('backend_port_prestart_check_must_pass_before_starting_backend') is True).lower()}`",
                     "  - backend_port_prestart_check_command: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_command') or [])}`",
+                    "  - backend_port_prestart_check_command_text: "
+                    f"`{row.get('backend_port_prestart_check_command_text') or ''}`",
                     "  - backend_port_prestart_check_failure_detail_fields: "
                     f"`{json.dumps(row.get('backend_port_prestart_check_failure_detail_fields') or [])}`",
                     "  - backend_port_prestart_summary_required: "

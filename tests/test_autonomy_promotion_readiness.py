@@ -10,6 +10,7 @@ from backend.wing_readonly_preflight_evidence import (
 )
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
 )
 
@@ -44,6 +45,9 @@ def _valid_wing_preflight_summary() -> dict:
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_command_text": (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
         "backend_port_prestart_check_failure_detail_fields": list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -161,6 +165,10 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
         "tools/no_wing_release_check.py",
         "--quick",
     ]
+    assert (
+        preflight["prestart_backend_port_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+    )
     assert preflight["prestart_backend_port_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
@@ -433,6 +441,10 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
         "tools/no_wing_release_check.py",
         "--quick",
     ]
+    assert (
+        preflight["prestart_backend_port_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+    )
     assert preflight["prestart_backend_port_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )

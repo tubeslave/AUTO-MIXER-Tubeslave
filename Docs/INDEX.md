@@ -248,6 +248,7 @@ paths, Product Layer, or cleanup policy.
 | Current WING handoff prestart summary placeholder | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md` |
 | Current WING handoff prestart summary command binding | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_COMMAND_BINDING_20260614.md` |
 | Current WING handoff backend prestart command summary | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_PRESTART_COMMAND_SUMMARY_20260614.md` |
+| Current WING backend prestart command text | `Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_COMMAND_TEXT_20260614.md` |
 | Current WING handoff denial flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING handoff safety flag summary truth | `Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md` |
 | Current WING prestart summary contact boundary | `Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md` |

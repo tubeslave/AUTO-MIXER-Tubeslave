@@ -18,6 +18,7 @@ if str(REPO_ROOT) not in sys.path:
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
     WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX,
@@ -101,6 +102,9 @@ SELECTED_MVP_BLOCKER_STATUS = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATU
 FAIL_CLOSED_CONDITIONS = list(WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS)
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
 )
 BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -426,6 +430,9 @@ def build_handoff_packet(
         "backend_port_prestart_check_operator_sequence_step_index": prestart_step_index,
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
+        "backend_port_prestart_check_command_text": (
+            BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+        ),
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
@@ -550,6 +557,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['backend_port_prestart_check_must_be_first_operator_step']).lower()}`",
         "- backend_port_prestart_check_command: "
         f"`{_command_text(packet['backend_port_prestart_check_command'])}`",
+        "- backend_port_prestart_check_command_text: "
+        f"`{packet['backend_port_prestart_check_command_text']}`",
         "- backend_port_prestart_check_failure_detail_fields: "
         f"`{json.dumps(packet['backend_port_prestart_check_failure_detail_fields'])}`",
         "- manual_review_required_before_readiness_update: "

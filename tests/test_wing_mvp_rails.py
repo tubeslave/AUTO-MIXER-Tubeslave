@@ -117,6 +117,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         in text
     )
     assert "backend_port_prestart_check_command" in text
+    assert "backend_port_prestart_check_command_text" in text
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in text
     assert "backend_port_prestart_check_failure_detail_fields" in text
     assert "listener_processes" in text
@@ -841,6 +842,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "backend_port_prestart_gate.required_markers" in readonly
     assert "Before starting the intended backend/WING session" in readonly
     assert "backend_port_prestart_check_command" in readonly
+    assert "backend_port_prestart_check_command_text" in readonly
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in readonly
     assert (
         "failed busy-port no-WING summary and no-WING handoff summary both show"
@@ -992,6 +994,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "backend_port_prestart_gate.required_markers" in report
     assert "Before starting the intended backend/WING session" in report
     assert "backend_port_prestart_check_command" in report
+    assert "backend_port_prestart_check_command_text" in report
     assert "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick" in report
     assert (
         "failed busy-port no-WING summary and no-WING handoff summary must both show"

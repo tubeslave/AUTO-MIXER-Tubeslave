@@ -150,6 +150,11 @@ you want the background automation active.
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
   This keeps the structured prestart command aligned with the required
   no-WING release check.
+- The same summaries must also show `backend_port_prestart_check_command_text`
+  exactly matching
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
+  This gives operators and automation a stable exact-string mirror of the
+  structured prestart command.
 - The same summaries must also show
   `backend_port_prestart_check_required: true` and
   `backend_port_prestart_check_must_pass_before_starting_backend: true`.

@@ -3,12 +3,16 @@ from pathlib import Path
 
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
 )
 from tools import evaluate_supervised_proof_artifacts as report_tool
 
 PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT = (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
 )
 PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -40,6 +44,10 @@ def assert_prestart_backend_port_check(summary: dict) -> None:
     assert (
         summary["readonly_preflight_prestart_check_command"]
         == PRESTART_BACKEND_PORT_CHECK_COMMAND
+    )
+    assert (
+        summary["readonly_preflight_prestart_check_command_text"]
+        == PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
     )
     assert (
         summary["readonly_preflight_prestart_check_failure_detail_fields"]

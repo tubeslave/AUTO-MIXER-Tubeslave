@@ -424,6 +424,9 @@ WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS = (
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
+    preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+)
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
     getattr(
         preflight_contract,
@@ -1665,6 +1668,14 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
             "  - backend_port_prestart_check_command: "
             f"`{json.dumps(backend_port_prestart_check_command, ensure_ascii=False)}`"
         )
+    backend_port_prestart_check_command_text = detail.get(
+        "backend_port_prestart_check_command_text"
+    )
+    if backend_port_prestart_check_command_text:
+        lines.append(
+            "  - backend_port_prestart_check_command_text: "
+            f"`{backend_port_prestart_check_command_text}`"
+        )
     backend_port_prestart_check_failure_detail_fields = detail.get(
         "backend_port_prestart_check_failure_detail_fields"
     )
@@ -1941,6 +1952,9 @@ def maybe_attach_backend_listener_confirmation_template(
     detail["backend_port_prestart_check_command"] = list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )
+    detail["backend_port_prestart_check_command_text"] = (
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+    )
     detail["backend_port_prestart_check_failure_detail_fields"] = list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
@@ -2022,6 +2036,9 @@ def check_port_free(
         detail["backend_port_prestart_check_must_pass_before_starting_backend"] = True
         detail["backend_port_prestart_check_command"] = list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        )
+        detail["backend_port_prestart_check_command_text"] = (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         )
         detail["backend_port_prestart_check_failure_detail_fields"] = list(
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -4662,6 +4679,9 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["backend_port_prestart_check_command"] = plan.get(
         "backend_port_prestart_check_command"
     )
+    detail["backend_port_prestart_check_command_text"] = plan.get(
+        "backend_port_prestart_check_command_text"
+    )
     detail["backend_port_prestart_check_failure_detail_fields"] = plan.get(
         "backend_port_prestart_check_failure_detail_fields"
     )
@@ -5791,6 +5811,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_check_command"] = packet.get(
         "backend_port_prestart_check_command"
+    )
+    detail["backend_port_prestart_check_command_text"] = packet.get(
+        "backend_port_prestart_check_command_text"
     )
     detail["backend_port_prestart_check_failure_detail_fields"] = packet.get(
         "backend_port_prestart_check_failure_detail_fields"
@@ -11492,6 +11515,7 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_prestart_check_required = False
     readonly_preflight_prestart_check_must_pass_before_starting_backend = False
     readonly_preflight_prestart_check_command: list[str] = []
+    readonly_preflight_prestart_check_command_text = ""
     readonly_preflight_prestart_check_failure_detail_fields: list[str] = []
     readonly_preflight_step_count = 0
     readonly_preflight_review_decision_required = False
@@ -11721,6 +11745,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 if isinstance(preflight.get("prestart_backend_port_check_command"), list)
                 else []
             )
+            readonly_preflight_prestart_check_command_text = str(
+                preflight.get("prestart_backend_port_check_command_text") or ""
+            )
             readonly_preflight_prestart_check_failure_detail_fields = (
                 [
                     str(item)
@@ -11749,6 +11776,13 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             ):
                 violations.append(
                     "next_wing_proof_plan_preflight_prestart_check_command_mismatch"
+                )
+            if (
+                readonly_preflight_prestart_check_command_text
+                != WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+            ):
+                violations.append(
+                    "next_wing_proof_plan_preflight_prestart_check_command_text_mismatch"
                 )
             if readonly_preflight_prestart_check_failure_detail_fields != list(
                 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -11793,6 +11827,11 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                     continue
                 if _string_list(row.get("backend_port_prestart_check_command")) != list(
                     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+                ):
+                    continue
+                if (
+                    str(row.get("backend_port_prestart_check_command_text") or "")
+                    != WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
                 ):
                     continue
                 if _string_list(
@@ -12033,6 +12072,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_prestart_check_command"] = (
         readonly_preflight_prestart_check_command
+    )
+    detail["readonly_preflight_prestart_check_command_text"] = (
+        readonly_preflight_prestart_check_command_text
     )
     detail["readonly_preflight_prestart_check_failure_detail_fields"] = (
         readonly_preflight_prestart_check_failure_detail_fields
@@ -13242,6 +13284,9 @@ def wing_readonly_preflight_plan_artifact_summary(
                 if isinstance(detail.get("backend_port_prestart_check_command"), list)
                 else []
             ),
+            "backend_port_prestart_check_command_text": str(
+                detail.get("backend_port_prestart_check_command_text") or ""
+            ),
             "backend_port_prestart_check_failure_detail_fields": (
                 list(detail.get("backend_port_prestart_check_failure_detail_fields"))
                 if isinstance(
@@ -13520,6 +13565,9 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 list(detail.get("backend_port_prestart_check_command"))
                 if isinstance(detail.get("backend_port_prestart_check_command"), list)
                 else []
+            ),
+            "backend_port_prestart_check_command_text": str(
+                detail.get("backend_port_prestart_check_command_text") or ""
             ),
             "manual_review_required_before_readiness_update": (
                 detail.get("manual_review_required_before_readiness_update") is True
@@ -16415,6 +16463,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         readonly_preflight_prestart_check_command = detail.get(
             "readonly_preflight_prestart_check_command"
         )
+        readonly_preflight_prestart_check_command_text = str(
+            detail.get("readonly_preflight_prestart_check_command_text") or ""
+        )
         readonly_preflight_prestart_check_failure_detail_fields = detail.get(
             "readonly_preflight_prestart_check_failure_detail_fields"
         )
@@ -16464,6 +16515,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                 list(readonly_preflight_prestart_check_command)
                 if isinstance(readonly_preflight_prestart_check_command, list)
                 else []
+            ),
+            "readonly_preflight_prestart_check_command_text": (
+                readonly_preflight_prestart_check_command_text
             ),
             "readonly_preflight_prestart_check_failure_detail_fields": (
                 list(readonly_preflight_prestart_check_failure_detail_fields)
@@ -19267,6 +19321,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(next_plan['readonly_preflight_prestart_check_must_pass_before_starting_backend']).lower()}`",
                 "- readonly_preflight_prestart_check_command: "
                 f"`{json.dumps(next_plan['readonly_preflight_prestart_check_command'])}`",
+                "- readonly_preflight_prestart_check_command_text: "
+                f"`{next_plan['readonly_preflight_prestart_check_command_text']}`",
                 "- readonly_preflight_prestart_check_failure_detail_fields: "
                 f"`{json.dumps(next_plan['readonly_preflight_prestart_check_failure_detail_fields'])}`",
                 "- readonly_preflight_step_count: "

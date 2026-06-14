@@ -126,6 +126,9 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = (
     "tools/no_wing_release_check.py",
     "--quick",
 )
+WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = " ".join(
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
 
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = (
     "listener_processes",
@@ -397,6 +400,9 @@ def wing_readonly_preflight_candidate_prestart_contract_violations(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     ):
         violations.append("backend_port_prestart_check_command_mismatch")
+    command_text = str(row.get("backend_port_prestart_check_command_text") or "")
+    if command_text != WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT:
+        violations.append("backend_port_prestart_check_command_text_mismatch")
     if _contract_string_list(
         row.get("backend_port_prestart_check_failure_detail_fields")
     ) != (WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS):

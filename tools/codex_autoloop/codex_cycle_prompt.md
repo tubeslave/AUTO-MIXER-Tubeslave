@@ -147,6 +147,8 @@ blockers выше.
    show `backend_port_prestart_check_command` exactly matching
    `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`;
 10. verify the same summaries expose
+   `backend_port_prestart_check_command_text` exactly matching
+   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`, plus
    `backend_port_prestart_check_required: true` and
    `backend_port_prestart_check_must_pass_before_starting_backend: true`, plus
    `backend_port_prestart_gate_execution_allowed: false`,
@@ -397,6 +399,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the failed busy-port no-WING summary
   and no-WING handoff summary must both show
   `backend_port_prestart_check_command` exactly matching
+  `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
+- The same summaries must also show `backend_port_prestart_check_command_text`
+  exactly matching
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`.
 - The same summaries must also show
   `backend_port_prestart_check_required: true` and

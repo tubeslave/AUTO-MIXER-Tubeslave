@@ -2,6 +2,7 @@ from pathlib import Path
 
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
@@ -15,6 +16,9 @@ from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan
 
 PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+)
+PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT = (
+    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
 )
 PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -39,6 +43,10 @@ def assert_prestart_check(summary: dict) -> None:
     assert (
         summary["readonly_preflight_prestart_check_command"]
         == PRESTART_BACKEND_PORT_CHECK_COMMAND
+    )
+    assert (
+        summary["readonly_preflight_prestart_check_command_text"]
+        == PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
     )
     assert (
         summary["readonly_preflight_prestart_check_failure_detail_fields"]
@@ -108,6 +116,9 @@ def accepted_review_decision_ledger() -> dict:
                     "backend_port_prestart_check_command": list(
                         PRESTART_BACKEND_PORT_CHECK_COMMAND
                     ),
+                    "backend_port_prestart_check_command_text": (
+                        PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
+                    ),
                     "backend_port_prestart_check_failure_detail_fields": list(
                         PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
                     ),
@@ -164,6 +175,9 @@ def preflight_ready_snapshot() -> dict:
                 "prestart_backend_port_check_must_pass_before_starting_backend": True,
                 "prestart_backend_port_check_command": list(
                     PRESTART_BACKEND_PORT_CHECK_COMMAND
+                ),
+                "prestart_backend_port_check_command_text": (
+                    PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
                 ),
                 "prestart_backend_port_check_failure_detail_fields": list(
                     PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
@@ -405,6 +419,9 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
             "backend_port_prestart_check_command": list(
                 PRESTART_BACKEND_PORT_CHECK_COMMAND
             ),
+            "backend_port_prestart_check_command_text": (
+                PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
+            ),
             "backend_port_prestart_check_failure_detail_fields": list(
                 PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
             ),
@@ -625,6 +642,9 @@ def test_plan_blocks_physical_proof_steps_until_readonly_preflight_candidate_exi
                     "prestart_backend_port_check_command": list(
                         PRESTART_BACKEND_PORT_CHECK_COMMAND
                     ),
+                    "prestart_backend_port_check_command_text": (
+                        PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
+                    ),
                     "prestart_backend_port_check_failure_detail_fields": list(
                         PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
                     ),
@@ -692,6 +712,9 @@ def test_plan_blocks_physical_proof_steps_for_mixed_preflight_artifacts():
                     "prestart_backend_port_check_must_pass_before_starting_backend": True,
                     "prestart_backend_port_check_command": list(
                         PRESTART_BACKEND_PORT_CHECK_COMMAND
+                    ),
+                    "prestart_backend_port_check_command_text": (
+                        PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
                     ),
                     "prestart_backend_port_check_failure_detail_fields": list(
                         PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS

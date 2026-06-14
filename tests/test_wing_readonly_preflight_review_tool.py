@@ -4,6 +4,7 @@ from pathlib import Path
 
 from backend.wing_readonly_preflight_evidence import (
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND,
+    EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
     EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -89,6 +90,9 @@ def _valid_summary() -> dict:
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
         "backend_port_prestart_check_command": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_command_text": (
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
@@ -256,6 +260,9 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_command": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
         ),
+        "backend_port_prestart_check_command_text": (
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+        ),
         "backend_port_prestart_check_failure_detail_fields": list(
             EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
@@ -419,6 +426,9 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "backend_port_prestart_check_command": list(
                 EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND
             ),
+            "backend_port_prestart_check_command_text": (
+                EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+            ),
             "backend_port_prestart_check_failure_detail_fields": list(
                 EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
             ),
@@ -465,6 +475,8 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "backend_port_prestart_check_required: `true`" in markdown
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
+    assert "backend_port_prestart_check_command_text" in markdown
+    assert EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT in markdown
     assert "backend_port_prestart_check_failure_detail_fields" in markdown
     assert "backend_port_prestart_summary_required: `true`" in markdown
     assert "backend_port_prestart_summary_type: `no_wing_release_check`" in markdown
