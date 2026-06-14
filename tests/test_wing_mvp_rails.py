@@ -173,6 +173,17 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "backend_port_prestart_summary_queries_console: false" in text
     assert "backend_port_prestart_summary_executes_tests: false" in text
     assert "backend_port_prestart_check_status: passed" in text
+    for marker in (
+        "backend_port_prestart_summary_type_matches_plan: true",
+        "backend_port_prestart_summary_status_matches_plan: true",
+        "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_live_write_matches_plan: true",
+        "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_queries_console_matches_plan: true",
+        "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "backend_port_prestart_check_status_matches_plan: true",
+    ):
+        assert marker in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text
@@ -1178,6 +1189,17 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "backend_port_prestart_summary_connection_policy: "
         "no_hardware_no_network_no_live_writes"
     ) in report
+    for marker in (
+        "backend_port_prestart_summary_type_matches_plan: true",
+        "backend_port_prestart_summary_status_matches_plan: true",
+        "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_live_write_matches_plan: true",
+        "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_queries_console_matches_plan: true",
+        "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "backend_port_prestart_check_status_matches_plan: true",
+    ):
+        assert marker in report
     assert "physical_preflight_requires_existing_backend_connection: true" in report
     assert "backend_port_prestart_check_required: true" in report
     assert (
@@ -1442,6 +1464,17 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "backend_port_prestart_summary_queries_console: false" in text
     assert "backend_port_prestart_summary_executes_tests: false" in text
     assert "backend_port_prestart_check_status: passed" in text
+    for marker in (
+        "backend_port_prestart_summary_type_matches_plan: true",
+        "backend_port_prestart_summary_status_matches_plan: true",
+        "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_live_write_matches_plan: true",
+        "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_queries_console_matches_plan: true",
+        "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "backend_port_prestart_check_status_matches_plan: true",
+    ):
+        assert marker in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
     assert "backend_port_prestart_check_required: true" in text
     assert "backend_port_prestart_check_must_pass_before_starting_backend: true" in text

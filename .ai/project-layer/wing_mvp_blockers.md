@@ -154,6 +154,21 @@ it must also show `preview_command_prestart_summary` matching that path;
 it must also show `preview_command_prestart_summary_matches_plan: true`;
 it must also show `capture_command_prestart_summary` matching that path;
 it must also show `capture_command_prestart_summary_matches_plan: true`;
+the no-WING handoff summary must also show
+`backend_port_prestart_summary_type_matches_plan: true`;
+it must also show
+`backend_port_prestart_summary_status_matches_plan: true`;
+it must also show
+`backend_port_prestart_summary_connection_policy_matches_plan: true`;
+it must also show
+`backend_port_prestart_summary_live_write_matches_plan: true`;
+it must also show
+`backend_port_prestart_summary_contacts_backend_matches_plan: true`;
+it must also show
+`backend_port_prestart_summary_queries_console_matches_plan: true`;
+it must also show
+`backend_port_prestart_summary_executes_tests_matches_plan: true`;
+it must also show `backend_port_prestart_check_status_matches_plan: true`;
 it must also show `execution_allowed_by_packet: false`;
 it must also show `live_authority_granted: false`;
 it must also show `full_autonomous_ready: false`;

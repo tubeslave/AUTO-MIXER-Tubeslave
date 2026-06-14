@@ -217,6 +217,14 @@ blockers выше.
 34. verify `backend_port_prestart_summary_queries_console: false`;
 35. verify `backend_port_prestart_summary_executes_tests: false`;
 36. verify `backend_port_prestart_check_status: passed`;
+36a. verify `backend_port_prestart_summary_type_matches_plan: true`;
+36b. verify `backend_port_prestart_summary_status_matches_plan: true`;
+36c. verify `backend_port_prestart_summary_connection_policy_matches_plan: true`;
+36d. verify `backend_port_prestart_summary_live_write_matches_plan: true`;
+36e. verify `backend_port_prestart_summary_contacts_backend_matches_plan: true`;
+36f. verify `backend_port_prestart_summary_queries_console_matches_plan: true`;
+36g. verify `backend_port_prestart_summary_executes_tests_matches_plan: true`;
+36h. verify `backend_port_prestart_check_status_matches_plan: true`;
 37. verify `physical_preflight_requires_existing_backend_connection: true`;
 38. verify `backend_port_prestart_check_required: true`;
 39. verify
@@ -511,6 +519,15 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `operator_required: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `expected_plan_required_for_real_run: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_summary_type_matches_plan: true`,
+  `backend_port_prestart_summary_status_matches_plan: true`,
+  `backend_port_prestart_summary_connection_policy_matches_plan: true`,
+  `backend_port_prestart_summary_live_write_matches_plan: true`,
+  `backend_port_prestart_summary_contacts_backend_matches_plan: true`,
+  `backend_port_prestart_summary_queries_console_matches_plan: true`,
+  `backend_port_prestart_summary_executes_tests_matches_plan: true`, and
+  `backend_port_prestart_check_status_matches_plan: true`.
 - Before any supervised fader/gain proof, the accepted-candidate prestart trace
 	  must show `backend_port_prestart_summary_required: true`,
 	  `backend_port_prestart_summary_type: no_wing_release_check`,

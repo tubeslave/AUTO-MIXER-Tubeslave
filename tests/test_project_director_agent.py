@@ -207,6 +207,17 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "backend_port_prestart_check_status: passed" in directive[
         "selected_action"
     ]
+    for marker in (
+        "backend_port_prestart_summary_type_matches_plan: true",
+        "backend_port_prestart_summary_status_matches_plan: true",
+        "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_live_write_matches_plan: true",
+        "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_queries_console_matches_plan: true",
+        "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "backend_port_prestart_check_status_matches_plan: true",
+    ):
+        assert marker in directive["selected_action"]
     assert (
         "physical_preflight_requires_existing_backend_connection: true"
         in directive["selected_action"]
@@ -1122,6 +1133,17 @@ def test_prompt_and_readme_document_project_director_agent():
         "backend_port_prestart_summary_connection_policy: "
         "no_hardware_no_network_no_live_writes"
     ) in prompt
+    for marker in (
+        "backend_port_prestart_summary_type_matches_plan: true",
+        "backend_port_prestart_summary_status_matches_plan: true",
+        "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_live_write_matches_plan: true",
+        "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_queries_console_matches_plan: true",
+        "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "backend_port_prestart_check_status_matches_plan: true",
+    ):
+        assert marker in prompt
     assert "current first open blocker" in prompt
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
@@ -1259,6 +1281,17 @@ def test_prompt_and_readme_document_project_director_agent():
         "backend_port_prestart_summary_connection_policy: "
         "no_hardware_no_network_no_live_writes"
     ) in readme
+    for marker in (
+        "backend_port_prestart_summary_type_matches_plan: true",
+        "backend_port_prestart_summary_status_matches_plan: true",
+        "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_live_write_matches_plan: true",
+        "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_queries_console_matches_plan: true",
+        "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "backend_port_prestart_check_status_matches_plan: true",
+    ):
+        assert marker in readme
     assert "current first open blocker" in readme
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"

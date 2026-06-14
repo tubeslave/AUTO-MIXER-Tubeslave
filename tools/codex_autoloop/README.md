@@ -253,6 +253,16 @@ you want the background automation active.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `expected_plan_required_for_real_run: true`.
   This keeps the real read-only preflight tied to the offline expected plan.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `backend_port_prestart_summary_type_matches_plan: true`,
+  `backend_port_prestart_summary_status_matches_plan: true`,
+  `backend_port_prestart_summary_connection_policy_matches_plan: true`,
+  `backend_port_prestart_summary_live_write_matches_plan: true`,
+  `backend_port_prestart_summary_contacts_backend_matches_plan: true`,
+  `backend_port_prestart_summary_queries_console_matches_plan: true`,
+  `backend_port_prestart_summary_executes_tests_matches_plan: true`, and
+  `backend_port_prestart_check_status_matches_plan: true`.
+  This keeps the packet's no-WING prestart summary contract bound to the plan.
 - Before any supervised fader/gain proof, the accepted-candidate prestart trace
 	  must show `backend_port_prestart_summary_required: true`,
 	  `backend_port_prestart_summary_type: no_wing_release_check`,
