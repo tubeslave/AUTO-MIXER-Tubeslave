@@ -220,10 +220,18 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["project_director_selected_action_anchor"] == (
         no_wing_release_check.wing_mvp_project_director_selected_action_anchor()
     )
+    assert packet["expected_project_director_selected_action_anchor"] == (
+        packet["project_director_selected_action_anchor"]
+    )
+    assert packet["project_director_selected_action_anchor_matches_current_directive"] is True
     assert packet["project_director_selected_action_source"] == (
         packet["project_director_selected_action_anchor"]["selected_action_source"]
     )
     assert packet["project_director_selected_action_source"] == "Current First Command"
+    assert packet["expected_project_director_selected_action_source"] == (
+        "Current First Command"
+    )
+    assert packet["project_director_selected_action_source_matches_current_directive"] is True
     assert packet["project_director_selected_action_sha256"] == (
         packet["project_director_selected_action_anchor"]["selected_action_sha256"]
     )
@@ -232,7 +240,23 @@ def test_handoff_packet_builds_readonly_operator_sequence():
             "utf-8"
         )
     ).hexdigest()
+    assert packet["actual_project_director_selected_action_sha256"] == (
+        packet["project_director_selected_action_sha256"]
+    )
+    assert packet["expected_project_director_selected_action_sha256"] == (
+        packet["project_director_selected_action_sha256"]
+    )
     assert packet["project_director_selected_action_sha256_available"] is True
+    assert (
+        packet["project_director_selected_action_sha256_available_matches_digest"]
+        is True
+    )
+    assert packet["project_director_selected_action_sha256_matches_anchor"] is True
+    assert packet["project_director_selected_action_sha256_matches_text"] is True
+    assert (
+        packet["project_director_selected_action_sha256_matches_current_directive"]
+        is True
+    )
     assert (
         packet["project_director_current_first_command_baseline_coverage_required"]
         is True
@@ -355,8 +379,33 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["mvp_blocker_anchor_sha256"] in rendered
     assert "## Project Director Selected Action Anchor" in rendered
     assert "project_director_selected_action_source: `Current First Command`" in rendered
+    assert (
+        "expected_project_director_selected_action_source: `Current First Command`"
+        in rendered
+    )
+    assert (
+        "project_director_selected_action_source_matches_current_directive: `true`"
+        in rendered
+    )
     assert "project_director_selected_action_sha256" in rendered
     assert packet["project_director_selected_action_sha256"] in rendered
+    assert "actual_project_director_selected_action_sha256" in rendered
+    assert "expected_project_director_selected_action_sha256" in rendered
+    assert (
+        "project_director_selected_action_sha256_available_matches_digest: `true`"
+        in rendered
+    )
+    assert "project_director_selected_action_sha256_matches_anchor: `true`" in rendered
+    assert "project_director_selected_action_sha256_matches_text: `true`" in rendered
+    assert (
+        "project_director_selected_action_sha256_matches_current_directive: `true`"
+        in rendered
+    )
+    assert (
+        "project_director_selected_action_anchor_matches_current_directive: `true`"
+        in rendered
+    )
+    assert "expected_project_director_selected_action_anchor" in rendered
     assert (
         "project_director_current_first_command_baseline_coverage_required: `true`"
         in rendered

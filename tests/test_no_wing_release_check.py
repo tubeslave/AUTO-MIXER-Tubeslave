@@ -1411,13 +1411,33 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             release_check.wing_mvp_first_open_blocker_anchor()
         ),
         "project_director_selected_action_anchor": project_director_action_anchor,
+        "expected_project_director_selected_action_anchor": (
+            project_director_action_anchor
+        ),
+        "project_director_selected_action_anchor_matches_current_directive": True,
         "project_director_selected_action_source": (
             project_director_action_anchor["selected_action_source"]
         ),
+        "expected_project_director_selected_action_source": (
+            project_director_action_anchor["selected_action_source"]
+        ),
+        "project_director_selected_action_source_matches_current_directive": True,
         "project_director_selected_action_sha256": (
             project_director_action_anchor["selected_action_sha256"]
         ),
+        "actual_project_director_selected_action_sha256": (
+            release_check.wing_mvp_selected_action_sha256(
+                str(project_director_action_anchor["selected_action"])
+            )
+        ),
+        "expected_project_director_selected_action_sha256": (
+            project_director_action_anchor["selected_action_sha256"]
+        ),
         "project_director_selected_action_sha256_available": True,
+        "project_director_selected_action_sha256_available_matches_digest": True,
+        "project_director_selected_action_sha256_matches_anchor": True,
+        "project_director_selected_action_sha256_matches_text": True,
+        "project_director_selected_action_sha256_matches_current_directive": True,
         "project_director_current_first_command_baseline_coverage_required": (
             project_director_action_anchor[
                 "current_first_command_baseline_coverage_required"
@@ -3926,6 +3946,59 @@ def test_no_wing_release_check_rejects_handoff_packet_project_director_action_di
     )
     assert (
         "wing_readonly_preflight_handoff_packet_project_director_action_sha256_current_directive_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_project_director_action_sha256_anchor_match_flag_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_project_director_action_sha256_current_directive_match_flag_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_project_director_declared_self_check_mismatch(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "project-director-declared-self-check-mismatch.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["expected_project_director_selected_action_anchor"] = {}
+    payload["expected_project_director_selected_action_source"] = "stale action"
+    payload["actual_project_director_selected_action_sha256"] = "1" * 64
+    payload["expected_project_director_selected_action_sha256"] = "2" * 64
+    payload["project_director_selected_action_sha256_matches_text"] = False
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        "wing_readonly_preflight_handoff_packet_expected_project_director_action_anchor_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_expected_project_director_action_source_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_actual_project_director_action_sha256_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_expected_project_director_action_sha256_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_project_director_action_sha256_text_match_flag_mismatch"
         in result.detail["violations"]
     )
 

@@ -4909,14 +4909,46 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     expected_project_director_action_anchor = (
         wing_mvp_project_director_selected_action_anchor()
     )
+    declared_expected_project_director_action_anchor = (
+        packet.get("expected_project_director_selected_action_anchor")
+        if isinstance(packet.get("expected_project_director_selected_action_anchor"), Mapping)
+        else {}
+    )
+    declared_project_director_anchor_matches_current_directive = (
+        packet.get("project_director_selected_action_anchor_matches_current_directive")
+    )
     project_director_selected_action_source = str(
         packet.get("project_director_selected_action_source") or ""
+    )
+    declared_expected_project_director_selected_action_source = str(
+        packet.get("expected_project_director_selected_action_source") or ""
+    )
+    declared_project_director_selected_action_source_matches_current_directive = (
+        packet.get("project_director_selected_action_source_matches_current_directive")
     )
     project_director_selected_action_sha256 = str(
         packet.get("project_director_selected_action_sha256") or ""
     )
+    declared_actual_project_director_selected_action_sha256 = str(
+        packet.get("actual_project_director_selected_action_sha256") or ""
+    )
+    declared_expected_project_director_selected_action_sha256 = str(
+        packet.get("expected_project_director_selected_action_sha256") or ""
+    )
     project_director_selected_action_sha256_available = (
         packet.get("project_director_selected_action_sha256_available") is True
+    )
+    declared_project_director_selected_action_sha256_available_matches_digest = (
+        packet.get("project_director_selected_action_sha256_available_matches_digest")
+    )
+    declared_project_director_selected_action_sha256_matches_anchor = (
+        packet.get("project_director_selected_action_sha256_matches_anchor")
+    )
+    declared_project_director_selected_action_sha256_matches_text = (
+        packet.get("project_director_selected_action_sha256_matches_text")
+    )
+    declared_project_director_selected_action_sha256_matches_current_directive = (
+        packet.get("project_director_selected_action_sha256_matches_current_directive")
     )
     expected_project_director_selected_action_sha256 = str(
         expected_project_director_action_anchor.get("selected_action_sha256") or ""
@@ -5862,6 +5894,35 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_project_director_action_source_mismatch"
         )
+    if dict(declared_expected_project_director_action_anchor) != (
+        expected_project_director_action_anchor
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_project_director_action_anchor_mismatch"
+        )
+    if (
+        declared_project_director_anchor_matches_current_directive
+        is not project_director_anchor_matches_current_directive
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_anchor_match_flag_mismatch"
+        )
+    if declared_expected_project_director_selected_action_source != str(
+        expected_project_director_action_anchor.get("selected_action_source") or ""
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_project_director_action_source_mismatch"
+        )
+    if (
+        declared_project_director_selected_action_source_matches_current_directive
+        is not (
+            project_director_selected_action_source
+            == expected_project_director_action_anchor.get("selected_action_source")
+        )
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_source_match_flag_mismatch"
+        )
     if not project_director_selected_action_sha256:
         violations.append(
             "wing_readonly_preflight_handoff_packet_project_director_action_sha256_missing"
@@ -5881,6 +5942,48 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not project_director_selected_action_sha256_available_matches_digest:
         violations.append(
             "wing_readonly_preflight_handoff_packet_project_director_action_sha256_available_mismatch"
+        )
+    if (
+        declared_actual_project_director_selected_action_sha256
+        != actual_project_director_selected_action_sha256
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_actual_project_director_action_sha256_mismatch"
+        )
+    if (
+        declared_expected_project_director_selected_action_sha256
+        != expected_project_director_selected_action_sha256
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_expected_project_director_action_sha256_mismatch"
+        )
+    if (
+        declared_project_director_selected_action_sha256_available_matches_digest
+        is not project_director_selected_action_sha256_available_matches_digest
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_available_match_flag_mismatch"
+        )
+    if (
+        declared_project_director_selected_action_sha256_matches_anchor
+        is not project_director_selected_action_sha256_matches_anchor
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_anchor_match_flag_mismatch"
+        )
+    if (
+        declared_project_director_selected_action_sha256_matches_text
+        is not project_director_selected_action_sha256_matches_text
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_text_match_flag_mismatch"
+        )
+    if (
+        declared_project_director_selected_action_sha256_matches_current_directive
+        is not project_director_selected_action_sha256_matches_current_directive
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_action_sha256_current_directive_match_flag_mismatch"
         )
     if (
         packet.get(
