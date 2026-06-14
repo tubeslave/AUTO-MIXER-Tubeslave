@@ -312,6 +312,48 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in directive[
         "selected_action"
     ]
+    assert "project_director_selected_action_anchor" in directive["selected_action"]
+    assert (
+        "project_director_selected_action_anchor_matches_current_directive: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_selected_action_source: Current First Command"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_selected_action_source_matches_current_directive: true"
+        in directive["selected_action"]
+    )
+    assert "project_director_selected_action_sha256" in directive["selected_action"]
+    assert (
+        "project_director_selected_action_sha256_available: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_anchor: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_text: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_current_directive: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_required: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_passed: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "project_director_current_first_command_baseline_missing_markers: []"
+        in directive["selected_action"]
+    )
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in directive[
         "selected_action"
     ]
@@ -923,6 +965,33 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "mvp_blocker_anchor_matches_current_first_open: true" in prompt
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in prompt
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in prompt
+    assert "project_director_selected_action_anchor" in prompt
+    assert (
+        "project_director_selected_action_anchor_matches_current_directive: true"
+        in prompt
+    )
+    assert "project_director_selected_action_source: Current First Command" in prompt
+    assert (
+        "project_director_selected_action_source_matches_current_directive: true"
+        in prompt
+    )
+    assert "project_director_selected_action_sha256" in prompt
+    assert "project_director_selected_action_sha256_available: true" in prompt
+    assert "project_director_selected_action_sha256_matches_anchor: true" in prompt
+    assert "project_director_selected_action_sha256_matches_text: true" in prompt
+    assert (
+        "project_director_selected_action_sha256_matches_current_directive: true"
+        in prompt
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_required: true"
+        in prompt
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_passed: true"
+        in prompt
+    )
+    assert "project_director_current_first_command_baseline_missing_markers: []" in prompt
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in prompt
     assert "operator_sequence_count: 10" in prompt
     assert "expected_operator_sequence_count: 10" in prompt
@@ -1014,6 +1083,33 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "mvp_blocker_anchor_matches_current_first_open: true" in readme
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in readme
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in readme
+    assert "project_director_selected_action_anchor" in readme
+    assert (
+        "project_director_selected_action_anchor_matches_current_directive: true"
+        in readme
+    )
+    assert "project_director_selected_action_source: Current First Command" in readme
+    assert (
+        "project_director_selected_action_source_matches_current_directive: true"
+        in readme
+    )
+    assert "project_director_selected_action_sha256" in readme
+    assert "project_director_selected_action_sha256_available: true" in readme
+    assert "project_director_selected_action_sha256_matches_anchor: true" in readme
+    assert "project_director_selected_action_sha256_matches_text: true" in readme
+    assert (
+        "project_director_selected_action_sha256_matches_current_directive: true"
+        in readme
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_required: true"
+        in readme
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_passed: true"
+        in readme
+    )
+    assert "project_director_current_first_command_baseline_missing_markers: []" in readme
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readme
     assert "operator_sequence_count: 10" in readme
     assert "expected_operator_sequence_count: 10" in readme

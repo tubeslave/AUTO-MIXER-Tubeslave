@@ -1002,6 +1002,45 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
         in current_command
     )
+    assert "project_director_selected_action_anchor" in current_command
+    assert (
+        "project_director_selected_action_anchor_matches_current_directive: true"
+        in current_command
+    )
+    assert (
+        "project_director_selected_action_source: Current First Command"
+        in current_command
+    )
+    assert (
+        "project_director_selected_action_source_matches_current_directive: true"
+        in current_command
+    )
+    assert "project_director_selected_action_sha256" in current_command
+    assert "project_director_selected_action_sha256_available: true" in current_command
+    assert (
+        "project_director_selected_action_sha256_matches_anchor: true"
+        in current_command
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_text: true"
+        in current_command
+    )
+    assert (
+        "project_director_selected_action_sha256_matches_current_directive: true"
+        in current_command
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_required: true"
+        in current_command
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_passed: true"
+        in current_command
+    )
+    assert (
+        "project_director_current_first_command_baseline_missing_markers: []"
+        in current_command
+    )
     assert progress.current_first_command_missing_baseline_markers(current_command) == []
     assert progress.current_first_command_covers_baseline(current_command)
     missing_proof_plan_fields_command = current_command.replace(
@@ -1014,6 +1053,18 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "required_supervised_proof_plan_summary_fields" in (
         progress.current_first_command_missing_baseline_markers(
             missing_proof_plan_fields_command
+        )
+    )
+    missing_director_action_digest_command = current_command.replace(
+        "project_director_selected_action_sha256",
+        "missing_director_action_digest",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_director_action_digest_command
+    )
+    assert "project_director_selected_action_sha256" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_director_action_digest_command
         )
     )
     report = progress.build_progress_report(
@@ -1150,6 +1201,33 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "mvp_blocker_anchor" in report
     assert "mvp_blocker_anchor_matches_current_first_open: true" in report
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in report
+    assert "project_director_selected_action_anchor" in report
+    assert (
+        "project_director_selected_action_anchor_matches_current_directive: true"
+        in report
+    )
+    assert "project_director_selected_action_source: Current First Command" in report
+    assert (
+        "project_director_selected_action_source_matches_current_directive: true"
+        in report
+    )
+    assert "project_director_selected_action_sha256" in report
+    assert "project_director_selected_action_sha256_available: true" in report
+    assert "project_director_selected_action_sha256_matches_anchor: true" in report
+    assert "project_director_selected_action_sha256_matches_text: true" in report
+    assert (
+        "project_director_selected_action_sha256_matches_current_directive: true"
+        in report
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_required: true"
+        in report
+    )
+    assert (
+        "project_director_current_first_command_baseline_coverage_passed: true"
+        in report
+    )
+    assert "project_director_current_first_command_baseline_missing_markers: []" in report
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in report
     assert "operator_sequence_count: 10" in report
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:

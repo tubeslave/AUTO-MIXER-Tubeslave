@@ -381,6 +381,19 @@ python3 tools/codex_autoloop/project_director_agent.py \
   должен быть `true`, `current_first_command_baseline_missing_markers` должен
   быть пустым, а `selected_action_sha256` фиксирует выбранный action для
   audit/handoff проверки.
+- Для WING handoff rail no-WING handoff summary должен показывать
+  `project_director_selected_action_anchor`,
+  `project_director_selected_action_anchor_matches_current_directive: true`,
+  `project_director_selected_action_source: Current First Command`,
+  `project_director_selected_action_source_matches_current_directive: true`,
+  `project_director_selected_action_sha256`,
+  `project_director_selected_action_sha256_available: true`,
+  `project_director_selected_action_sha256_matches_anchor: true`,
+  `project_director_selected_action_sha256_matches_text: true`,
+  `project_director_selected_action_sha256_matches_current_directive: true`,
+  `project_director_current_first_command_baseline_coverage_required: true`,
+  `project_director_current_first_command_baseline_coverage_passed: true`, and
+  `project_director_current_first_command_baseline_missing_markers: []`.
 - Если WING Rack подключен, следующий шаг должен начинаться с
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` до старта
   intended backend/WING session, затем read-only preflight или ручной review
@@ -714,7 +727,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - результат Project Director Agent: выбранный blocker, его status и почему
   задача была взята из first non-closed row; если action source был
   `Current First Command`, укажи baseline coverage verdict и
-  `selected_action_sha256`;
+  `selected_action_sha256`; для WING handoff rail также укажи, что no-WING
+  handoff summary содержит `project_director_selected_action_sha256` и
+  `project_director_selected_action_sha256_matches_current_directive: true`;
 - что осталось;
 - какие риски есть;
 - ссылки на измененные файлы;
