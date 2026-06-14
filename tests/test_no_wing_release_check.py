@@ -16,6 +16,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX,
     WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_COMMAND_NAME,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS,
@@ -473,6 +474,8 @@ def test_no_wing_release_check_commands_have_no_live_write_tokens(tmp_path):
     assert any(check.name == "write_surface_static_scan" for check in checks)
     assert any(check.name == "memory_lint" for check in checks)
     assert any(check.name == "frontend_dist_package" for check in checks)
+    frontend_e2e = next(check for check in checks if check.name == "frontend_e2e")
+    assert frontend_e2e.preserve_paths == ("frontend/test-results/.last-run.json",)
     assert all(check.timeout_sec == release_check.DEFAULT_COMMAND_TIMEOUT_SEC for check in checks)
 
 
@@ -552,6 +555,12 @@ def test_no_wing_release_check_rejects_external_project_command_paths(tmp_path):
             cwd=str(repo_root),
             env={"PYTHONPATH": "../paperclip"},
         ),
+        CommandCheck(
+            name="bad_preserve_path",
+            command=("python3", "tools/offline_check.py"),
+            cwd=str(repo_root),
+            preserve_paths=(str(external_project / ".last-run.json"),),
+        ),
     ]
 
     with pytest.raises(ValueError) as excinfo:
@@ -563,6 +572,7 @@ def test_no_wing_release_check_rejects_external_project_command_paths(tmp_path):
     assert "bad_absolute_script:command_path:" in message
     assert "bad_relative_script:command_path:../paperclip/runner.py" in message
     assert "bad_env_path:env_path:PYTHONPATH" in message
+    assert "bad_preserve_path:preserve_path:" in message
 
 
 def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy():
@@ -16255,6 +16265,50 @@ def test_no_wing_release_check_records_command_timeout(tmp_path):
     assert "Command timed out after 2.0 seconds." in Path(result.stderr_log).read_text()
 
 
+def test_no_wing_release_check_restores_mutated_preserved_command_artifact(tmp_path):
+    preserved = tmp_path / "frontend" / "test-results" / ".last-run.json"
+    preserved.parent.mkdir(parents=True)
+    preserved.write_text('{"status":"passed"}\n', encoding="utf-8")
+    check = CommandCheck(
+        name="mutates_preserved_artifact",
+        command=(
+            sys.executable,
+            "-c",
+            "from pathlib import Path; import sys; Path(sys.argv[1]).write_text('{\"status\":\"failed\"}\\n', encoding='utf-8')",
+            str(preserved),
+        ),
+        cwd=str(Path.cwd()),
+        preserve_paths=(str(preserved),),
+    )
+
+    result = run_command_check(check, tmp_path)
+
+    assert result.status == "passed"
+    assert preserved.read_text(encoding="utf-8") == '{"status":"passed"}\n'
+    assert result.detail == {"preserved_paths_restored": [str(preserved)]}
+
+
+def test_no_wing_release_check_removes_created_preserved_command_artifact(tmp_path):
+    preserved = tmp_path / "frontend" / "test-results" / ".last-run.json"
+    check = CommandCheck(
+        name="creates_preserved_artifact",
+        command=(
+            sys.executable,
+            "-c",
+            "from pathlib import Path; import sys; path = Path(sys.argv[1]); path.parent.mkdir(parents=True, exist_ok=True); path.write_text('{\"status\":\"failed\"}\\n', encoding='utf-8')",
+            str(preserved),
+        ),
+        cwd=str(Path.cwd()),
+        preserve_paths=(str(preserved),),
+    )
+
+    result = run_command_check(check, tmp_path)
+
+    assert result.status == "passed"
+    assert not preserved.exists()
+    assert result.detail == {"preserved_paths_restored": [str(preserved)]}
+
+
 def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
     listener_processes = [
         {"pid": 87210, "command": "Python", "name": "TCP *:8765 (LISTEN)"}
@@ -16305,6 +16359,33 @@ def test_backend_port_check_records_listener_owner_when_busy(monkeypatch):
     )
     assert "operator_next_step" in result.detail
     assert "listener_process_error" not in result.detail
+
+
+def test_backend_port_check_records_no_authority_flags_when_free():
+    with bind_local_test_server_or_skip() as server:
+        port = server.getsockname()[1]
+
+        result = release_check.check_port_free(port=port)
+
+    assert result.status == WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    assert result.detail["listener_detected"] is False
+    assert result.detail["backend_port_prestart_check_required"] is True
+    assert (
+        result.detail["backend_port_prestart_check_must_pass_before_starting_backend"]
+        is True
+    )
+    assert result.detail["backend_port_prestart_check_command"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+    )
+    assert (
+        result.detail["backend_port_prestart_check_command_text"]
+        == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+    )
+    assert result.detail["backend_port_prestart_check_failure_detail_fields"] == list(
+        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+    )
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        assert result.detail[field] is False
 
 
 def test_backend_port_check_accepts_operator_confirmed_intended_listener(

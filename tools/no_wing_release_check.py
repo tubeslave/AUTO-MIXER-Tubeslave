@@ -1095,9 +1095,17 @@ class CommandCheck:
     cwd: str
     env: dict[str, str] | None = None
     timeout_sec: float | None = None
+    preserve_paths: tuple[str, ...] = ()
 
     def shell_display(self) -> str:
         return " ".join(self.command)
+
+
+@dataclass(frozen=True)
+class _PreservedPathSnapshot:
+    path: Path
+    existed: bool
+    content: bytes | None
 
 
 @dataclass
@@ -1405,6 +1413,7 @@ def build_checks(
                     name="frontend_e2e",
                     command=("npm", "run", "test:e2e"),
                     cwd=str(repo_root / "frontend"),
+                    preserve_paths=("frontend/test-results/.last-run.json",),
                 ),
                 CommandCheck(
                     name="frontend_build",
@@ -1574,6 +1583,14 @@ def validate_repo_local_commands(
             value_path = _resolve_repo_scoped_path(value, resolved_repo_root)
             if not _is_path_inside(value_path, resolved_repo_root):
                 violations.append(f"{check.name}:env_path:{key}")
+
+        for preserve_path in check.preserve_paths:
+            resolved_preserve_path = _resolve_repo_scoped_path(
+                preserve_path,
+                resolved_repo_root,
+            )
+            if not _is_path_inside(resolved_preserve_path, resolved_repo_root):
+                violations.append(f"{check.name}:preserve_path:{preserve_path}")
 
     if violations:
         joined = ", ".join(sorted(violations))
@@ -2079,7 +2096,27 @@ def check_port_free(
     listener_confirmation_path: Path | None = None,
 ) -> CheckResult:
     started = datetime.now(timezone.utc)
-    detail: dict[str, object] = {"host": host, "port": port, "policy": "port_must_not_have_unexpected_listener"}
+    detail: dict[str, object] = {
+        "host": host,
+        "port": port,
+        "policy": "port_must_not_have_unexpected_listener",
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
+        ),
+        "backend_port_prestart_check_command_text": (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+        ),
+        "backend_port_prestart_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
+        "backend_port_prestart_gate_execution_allowed": False,
+        "backend_port_prestart_gate_readiness_closure_allowed": False,
+        "backend_port_prestart_gate_live_authority_granted": False,
+        "safe_to_stop_listener_by_gate": False,
+        "live_authority_granted": False,
+    }
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.5)
         connected = sock.connect_ex((host, port)) == 0
@@ -2091,23 +2128,8 @@ def check_port_free(
         detail["listener_confirmation_checklist"] = list(
             BACKEND_PORT_LISTENER_CONFIRMATION_CHECKLIST
         )
-        detail["backend_port_prestart_check_required"] = True
-        detail["backend_port_prestart_check_must_pass_before_starting_backend"] = True
-        detail["backend_port_prestart_check_command"] = list(
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
-        )
-        detail["backend_port_prestart_check_command_text"] = (
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
-        )
-        detail["backend_port_prestart_check_failure_detail_fields"] = list(
-            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
-        )
-        detail["backend_port_prestart_gate_execution_allowed"] = False
-        detail["backend_port_prestart_gate_readiness_closure_allowed"] = False
-        detail["backend_port_prestart_gate_live_authority_granted"] = False
         detail["preflight_blocked_until_listener_confirmed"] = True
         detail["intended_backend_confirmation_required"] = True
-        detail["safe_to_stop_listener_by_gate"] = False
         detail["fail_closed_reason"] = "backend_port_listener_requires_operator_confirmation"
         detail["operator_next_step"] = (
             "Stop or reconfigure the unexpected local listener only after "
@@ -2145,8 +2167,6 @@ def check_port_free(
     elif listener_confirmation_path is not None:
         detail["listener_confirmation_path"] = str(listener_confirmation_path)
         detail["listener_confirmation_status"] = "not_used_no_listener_detected"
-        detail["safe_to_stop_listener_by_gate"] = False
-        detail["live_authority_granted"] = False
     status = (
         "failed"
         if connected
@@ -2207,12 +2227,61 @@ def _coerce_timeout_output(value: str | bytes | None) -> str:
     return value
 
 
+def _snapshot_preserved_paths(paths: Iterable[str]) -> list[_PreservedPathSnapshot]:
+    snapshots: list[_PreservedPathSnapshot] = []
+    for raw_path in paths:
+        path = _resolve_repo_scoped_path(raw_path, REPO_ROOT)
+        try:
+            content = path.read_bytes()
+        except FileNotFoundError:
+            snapshots.append(
+                _PreservedPathSnapshot(path=path, existed=False, content=None)
+            )
+        else:
+            snapshots.append(
+                _PreservedPathSnapshot(path=path, existed=True, content=content)
+            )
+    return snapshots
+
+
+def _restore_preserved_paths(
+    snapshots: Iterable[_PreservedPathSnapshot],
+) -> list[str]:
+    restored: list[str] = []
+    for snapshot in snapshots:
+        if snapshot.existed:
+            current_content: bytes | None
+            try:
+                current_content = snapshot.path.read_bytes()
+            except FileNotFoundError:
+                current_content = None
+            if current_content != snapshot.content:
+                snapshot.path.parent.mkdir(parents=True, exist_ok=True)
+                snapshot.path.write_bytes(snapshot.content or b"")
+                restored.append(str(snapshot.path))
+            continue
+
+        if not snapshot.path.exists():
+            continue
+        if snapshot.path.is_file() or snapshot.path.is_symlink():
+            snapshot.path.unlink()
+            restored.append(str(snapshot.path))
+            continue
+        raise IsADirectoryError(
+            f"Preserved command artifact path became a directory: {snapshot.path}"
+        )
+    return restored
+
+
 def run_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
     started = datetime.now(timezone.utc)
     env = os.environ.copy()
     if check.env:
         env.update(check.env)
     detail: dict[str, object] | None = None
+    preserved_snapshots = _snapshot_preserved_paths(check.preserve_paths)
+    restored_preserved_paths: list[str] = []
+    restore_error: str | None = None
     try:
         completed = subprocess.run(
             check.command,
@@ -2238,7 +2307,26 @@ def run_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
             "timeout_sec": check.timeout_sec,
             "reason": "command_timeout",
         }
+    try:
+        restored_preserved_paths = _restore_preserved_paths(preserved_snapshots)
+    except OSError as exc:
+        restore_error = f"{exc.__class__.__name__}: {exc}"
+        stderr = f"{stderr.rstrip()}\nFailed to restore preserved command artifact: {restore_error}\n"
+        if status == "passed":
+            status = "failed"
+            returncode = 1
     finished = datetime.now(timezone.utc)
+
+    if restored_preserved_paths:
+        detail = {
+            **(detail or {}),
+            "preserved_paths_restored": restored_preserved_paths,
+        }
+    if restore_error is not None:
+        detail = {
+            **(detail or {}),
+            "preserve_paths_restore_error": restore_error,
+        }
 
     stdout_log = log_dir / f"{check.name}.stdout.log"
     stderr_log = log_dir / f"{check.name}.stderr.log"

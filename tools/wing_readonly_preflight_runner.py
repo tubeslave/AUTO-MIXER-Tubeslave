@@ -35,6 +35,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
@@ -82,6 +83,9 @@ PRESTART_SUMMARY_BACKEND_CHECK_NAME = (
 )
 PRESTART_SUMMARY_BACKEND_CHECK_STATUS = (
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+)
+PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
 )
 PROOF_RUNNER = WING_READONLY_PREFLIGHT_PROOF_RUNNER
 SELECTED_MVP_BLOCKER = WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
@@ -173,6 +177,7 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "backend_port_prestart_summary_queries_console",
     "backend_port_prestart_summary_executes_tests",
     "backend_port_prestart_check_status",
+    *PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     "manual_review_required_before_readiness_update",
     "contacts_backend",
     "queries_console",
@@ -603,10 +608,13 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append("prestart_summary_backend_port_check_not_passed")
         check_detail = backend_check.get("detail")
         if isinstance(check_detail, dict):
-            if check_detail.get("live_authority_granted") is True:
-                violations.append("prestart_summary_live_authority_granted")
-            if check_detail.get("safe_to_stop_listener_by_gate") is True:
-                violations.append("prestart_summary_safe_to_stop_listener_true")
+            for field in PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+                value = check_detail.get(field)
+                detail[field] = value
+                if value is not False:
+                    violations.append(f"prestart_summary_{field}_not_false")
+        else:
+            violations.append("prestart_summary_backend_port_check_detail_missing")
 
     return detail, violations
 

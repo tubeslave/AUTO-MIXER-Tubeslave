@@ -15,6 +15,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
@@ -162,6 +163,9 @@ def ensure_prestart_summary(tmp_path: Path) -> Path:
                     "port": 8765,
                     "safe_to_stop_listener_by_gate": False,
                     "live_authority_granted": False,
+                    "backend_port_prestart_gate_execution_allowed": False,
+                    "backend_port_prestart_gate_readiness_closure_allowed": False,
+                    "backend_port_prestart_gate_live_authority_granted": False,
                 },
             }
         ],
@@ -272,6 +276,8 @@ def assert_summary_prestart_contract(summary: dict) -> None:
     assert summary["backend_port_prestart_summary_queries_console"] is False
     assert summary["backend_port_prestart_summary_executes_tests"] is False
     assert summary["backend_port_prestart_check_status"] == "passed"
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        assert summary[field] is False
 
 
 def test_forbidden_request_types_cover_hard_safety_boundary() -> None:
@@ -1305,6 +1311,8 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["backend_port_prestart_summary_queries_console"] is False
     assert written["backend_port_prestart_summary_executes_tests"] is False
     assert written["backend_port_prestart_check_status"] == "passed"
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        assert written[field] is False
     assert written["manual_review_required_before_readiness_update"] is True
     assert written["request_id_policy"] == WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
     assert written["expected_response_types_by_request_type"] == {
@@ -1418,6 +1426,60 @@ async def test_readonly_preflight_blocks_missing_prestart_summary_before_websock
     assert summary["backend_port_prestart_summary_required"] is True
     assert summary["prestart_summary_violations"] == ["prestart_summary_missing"]
     assert "tools/no_wing_release_check.py" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_prestart_missing_backend_detail_safety_flags(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"unsafe prestart summary must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    payload = json.loads(prestart_path.read_text(encoding="utf-8"))
+    detail = payload["results"][0]["detail"]
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        detail.pop(field, None)
+    prestart_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(tmp_path / "expected-plan.json"),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        assert f"prestart_summary_{field}_not_false" in summary[
+            "prestart_summary_violations"
+        ]
     assert summary["sent_request_types"] == []
 
 

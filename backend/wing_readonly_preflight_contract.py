@@ -98,6 +98,13 @@ WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME = "backend_port_free"
 WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS = (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
 )
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS = (
+    "safe_to_stop_listener_by_gate",
+    "live_authority_granted",
+    "backend_port_prestart_gate_execution_allowed",
+    "backend_port_prestart_gate_readiness_closure_allowed",
+    "backend_port_prestart_gate_live_authority_granted",
+)
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS = "passed"
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON = "wing_readonly_preflight_passed"
 WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY = (
