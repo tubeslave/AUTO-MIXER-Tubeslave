@@ -540,6 +540,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_summary_required: true" in rows[0][
         "next action"
     ]
+    assert "backend_port_prestart_summary_type: no_wing_release_check" in rows[0][
+        "next action"
+    ]
     assert "backend_port_prestart_summary_path_placeholder" in rows[0][
         "next action"
     ]
