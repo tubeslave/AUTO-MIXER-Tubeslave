@@ -428,6 +428,15 @@ you want the background automation active.
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `required_supervised_proof_plan_summary_fields`,
+  `expected_required_supervised_proof_plan_summary_fields`, and
+  `required_supervised_proof_plan_summary_fields_match_contract: true`.
+- Before any supervised fader/gain proof,
+  `required_supervised_proof_plan_summary_fields` must include
+  `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`
+  and
+  `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`.
 - Project Director Agent activation is inside each Codex cycle after the
   direction guard. `tools/codex_autoloop/project_director_agent.py` reads
   `Docs/MVP_WING_SUPERVISED.md`, `.ai/project-layer/wing_mvp_blockers.md`, and

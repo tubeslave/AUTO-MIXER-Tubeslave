@@ -935,6 +935,17 @@ def test_prompt_and_readme_document_project_director_agent():
         in prompt
     )
     assert "required_supervised_prestart_gate_markers" in prompt
+    assert "required_supervised_proof_plan_summary_fields" in prompt
+    assert "expected_required_supervised_proof_plan_summary_fields" in prompt
+    assert "required_supervised_proof_plan_summary_fields_match_contract: true" in prompt
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
+        in prompt
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        in prompt
+    )
     assert "accepted_decision_ready" in prompt
     assert "valid accepted-candidate prestart trace" in prompt
     assert "expected-artifact-bound accepted source id" in prompt
@@ -1015,6 +1026,17 @@ def test_prompt_and_readme_document_project_director_agent():
         in readme
     )
     assert "required_supervised_prestart_gate_markers" in readme
+    assert "required_supervised_proof_plan_summary_fields" in readme
+    assert "expected_required_supervised_proof_plan_summary_fields" in readme
+    assert "required_supervised_proof_plan_summary_fields_match_contract: true" in readme
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
+        in readme
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        in readme
+    )
     assert "accepted_decision_ready" in readme
     assert "valid accepted-candidate prestart trace" in readme
     assert "expected-artifact-bound accepted source id" in readme

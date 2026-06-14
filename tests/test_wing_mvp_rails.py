@@ -1333,6 +1333,14 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "supervised_prestart_gate.requires_operator_decision_status:" in text
     assert "supervised_prestart_gate.unlocks_runbook:" in text
     assert "required_supervised_prestart_gate_markers" in text
+    assert "required_supervised_proof_plan_summary_fields" in text
+    assert "expected_required_supervised_proof_plan_summary_fields" in text
+    assert "required_supervised_proof_plan_summary_fields_match_contract: true" in text
+    assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in text
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        in text
+    )
 
 
 def test_docs_index_points_to_current_wing_mvp_prestart_gate():

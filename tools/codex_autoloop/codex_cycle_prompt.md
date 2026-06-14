@@ -317,12 +317,20 @@ blockers выше.
    `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
    `expected-artifact-bound accepted source id`, and
    `WING_SUPERVISED_FADER_GAIN_PROOF`;
-84. run dry-run recommendation;
-85. require explicit operator approval for the exact action;
-86. apply only bounded supervised fader/gain action;
-87. read back the result;
-88. test rollback;
-89. record proof artifact.
+84. verify the no-WING handoff summary has
+   `required_supervised_proof_plan_summary_fields`,
+   `expected_required_supervised_proof_plan_summary_fields`, and
+   `required_supervised_proof_plan_summary_fields_match_contract: true`;
+85. verify `required_supervised_proof_plan_summary_fields` includes
+   `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`
+   and
+   `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`;
+86. run dry-run recommendation;
+87. require explicit operator approval for the exact action;
+88. apply only bounded supervised fader/gain action;
+89. read back the result;
+90. test rollback;
+91. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -614,6 +622,15 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `required_supervised_proof_plan_summary_fields`,
+  `expected_required_supervised_proof_plan_summary_fields`, and
+  `required_supervised_proof_plan_summary_fields_match_contract: true`.
+- Before any supervised fader/gain proof,
+  `required_supervised_proof_plan_summary_fields` must include
+  `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`
+  and
+  `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит
   физический read-only/supervised proof и имеет тест.
 - Методы коррекций Gain/Trim, Pan, EQ, Comp, FX, Balance и другие продолжай
