@@ -292,6 +292,12 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md"
         in rows[0]["evidence"]
     )
+    for report_name in (
+        "AUTOMIXER_WING_MVP_HANDOFF_GATE_MATCH_VERDICTS_20260614.md",
+        "AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_CONTRACT_20260614.md",
+        "AUTOMIXER_WING_MVP_CURRENT_FIRST_PRESTART_SUMMARY_MATCH_FLAGS_20260614.md",
+    ):
+        assert report_name in rows[0]["evidence"]
     assert (
         "AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CARDINALITY_20260614.md"
         in rows[0]["evidence"]
