@@ -11893,60 +11893,47 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 if isinstance(review_summary.get("candidate_reviews"), list)
                 else []
             )
-            candidate_rows_by_source = {
-                str(row.get("source_id")): row
-                for row in candidate_reviews
-                if isinstance(row, Mapping) and row.get("source_id")
-            }
-            expected_candidate_prestart_source_ids = []
-            for source_id in _string_list(review_summary.get("accepted_source_ids")):
-                row = candidate_rows_by_source.get(source_id)
-                if not isinstance(row, Mapping):
-                    continue
-                if row.get("backend_port_prestart_check_required") is not True:
-                    continue
-                if (
-                    row.get(
-                        "backend_port_prestart_check_must_pass_before_starting_backend"
-                    )
-                    is not True
-                ):
-                    continue
-                if _string_list(row.get("backend_port_prestart_check_command")) != list(
-                    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
-                ):
-                    continue
-                if (
-                    str(row.get("backend_port_prestart_check_command_text") or "")
-                    != WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
-                ):
-                    continue
-                if _string_list(
-                    row.get("backend_port_prestart_check_failure_detail_fields")
-                ) != list(
-                    WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
-                ):
-                    continue
-                expected_candidate_prestart_source_ids.append(source_id)
+            accepted_source_ids = _string_list(review_summary.get("accepted_source_ids"))
+            candidate_review_rows = tuple(
+                row for row in candidate_reviews if isinstance(row, Mapping)
+            )
+            expected_candidate_prestart_source_ids = (
+                preflight_contract.wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
+            expected_candidate_prestart_violations_by_source = (
+                preflight_contract.wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
             expected_candidate_prestart_contract_valid = (
-                bool(_string_list(review_summary.get("accepted_source_ids")))
+                bool(accepted_source_ids)
                 and expected_candidate_prestart_source_ids
-                == _string_list(review_summary.get("accepted_source_ids"))
+                == accepted_source_ids
+                and not expected_candidate_prestart_violations_by_source
             )
             (
-                expected_candidate_prestart_violations_by_source,
-                expected_candidate_prestart_violations_map_valid,
+                reported_candidate_prestart_violations_by_source,
+                reported_candidate_prestart_violations_map_valid,
             ) = _string_list_map(
                 review_summary.get(
                     "accepted_candidate_prestart_contract_violations_by_source"
                 )
             )
-            if not expected_candidate_prestart_violations_map_valid:
+            if not reported_candidate_prestart_violations_map_valid:
                 violations.append(
                     "next_wing_proof_plan_review_decision_candidate_prestart_violations_source_missing"
                 )
-            if expected_candidate_prestart_violations_by_source:
-                expected_candidate_prestart_contract_valid = False
+            if (
+                reported_candidate_prestart_violations_by_source
+                != expected_candidate_prestart_violations_by_source
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_prestart_source_violations_mismatch"
+                )
             if (
                 readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source
                 != expected_candidate_prestart_violations_by_source

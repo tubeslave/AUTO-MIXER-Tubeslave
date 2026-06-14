@@ -7996,6 +7996,18 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     {
                         "source_id": "artifacts/wing_readonly_preflight/run/summary.json",
                         "status": "valid_readonly_preflight_artifact",
+                        "expected_artifacts": [
+                            f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+                            f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+                        ],
+                        "expected_summary_artifact": (
+                            "artifacts/wing_readonly_preflight/run/summary.json"
+                        ),
+                        "expected_events_artifact": (
+                            "artifacts/wing_readonly_preflight/run/events.jsonl"
+                        ),
+                        "summary_path_matches_expected_artifact": True,
+                        "events_path_matches_expected_artifact": True,
                         "backend_port_prestart_check_required": True,
                         "backend_port_prestart_check_must_pass_before_starting_backend": True,
                         "backend_port_prestart_check_command": [
@@ -8009,6 +8021,27 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         ),
                         "backend_port_prestart_check_failure_detail_fields": list(
                             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                        ),
+                        "backend_port_prestart_summary_required": True,
+                        "backend_port_prestart_summary_path": (
+                            "artifacts/no_wing_release_check/run/summary.json"
+                        ),
+                        "backend_port_prestart_summary_sha256": "3" * 64,
+                        "backend_port_prestart_summary_type": (
+                            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+                        ),
+                        "backend_port_prestart_summary_status": (
+                            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+                        ),
+                        "backend_port_prestart_summary_connection_policy": (
+                            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+                        ),
+                        "backend_port_prestart_summary_live_write": False,
+                        "backend_port_prestart_summary_contacts_backend": False,
+                        "backend_port_prestart_summary_queries_console": False,
+                        "backend_port_prestart_summary_executes_tests": False,
+                        "backend_port_prestart_check_status": (
+                            WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
                         ),
                     }
                 ],
@@ -8321,6 +8354,37 @@ def test_no_wing_release_check_rejects_next_wing_plan_without_candidate_prestart
     )
 
 
+def test_no_wing_release_check_rejects_next_wing_plan_without_expected_artifact_binding(
+    tmp_path,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["wing_readonly_preflight_review_decision_ledger"]["summary"][
+        "candidate_reviews"
+    ][0]["summary_path_matches_expected_artifact"] = False
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        "next_wing_proof_plan_review_decision_candidate_prestart_source_violations_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_candidate_prestart_violations_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_candidate_prestart_contract_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_candidate_prestart_sources_mismatch"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_rejects_next_wing_plan_stale_candidate_prestart_violations_map(
     tmp_path,
 ):
@@ -8342,11 +8406,7 @@ def test_no_wing_release_check_rejects_next_wing_plan_stale_candidate_prestart_v
 
     assert result.status == "failed"
     assert (
-        "next_wing_proof_plan_review_decision_candidate_prestart_violations_mismatch"
-        in result.detail["violations"]
-    )
-    assert (
-        "next_wing_proof_plan_review_decision_candidate_prestart_contract_mismatch"
+        "next_wing_proof_plan_review_decision_candidate_prestart_source_violations_mismatch"
         in result.detail["violations"]
     )
 
@@ -8359,6 +8419,14 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_candidate_presta
     payload["wing_readonly_preflight_review_decision_ledger"]["summary"][
         "candidate_reviews"
     ][0]["backend_port_prestart_check_required"] = False
+    prestart_violations_by_source = {
+        "artifacts/wing_readonly_preflight/run/summary.json": [
+            "backend_port_prestart_check_required_not_true"
+        ]
+    }
+    payload["wing_readonly_preflight_review_decision_ledger"]["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] = prestart_violations_by_source
     plan = payload["next_wing_proof_plan"]
     plan["status"] = "manual_review_ready"
     plan["summary"]["step_count"] = 0
@@ -8371,6 +8439,9 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_candidate_presta
     plan["summary"][
         "readonly_preflight_review_decision_candidate_prestart_source_ids"
     ] = []
+    plan["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+    ] = prestart_violations_by_source
     plan["summary"]["global_blockers"] = [
         "accepted_readonly_preflight_review_decision_required_before_supervised_proof",
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof",
