@@ -9,6 +9,7 @@ WING, or grant live authority.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -59,11 +60,20 @@ def required_file_candidates_from_evidence(evidence_files: Sequence[str]) -> lis
     ]
 
 
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def build_directive(*, project_root: Path, lookback_commits: int, report_limit: int) -> dict:
     blocker_path = project_root / ".ai" / "project-layer" / "wing_mvp_blockers.md"
     rows = update_mvp_progress.parse_blocker_table(blocker_path)
     first_open = update_mvp_progress.first_open_blocker(rows)
     current_first_command = update_mvp_progress.current_first_command(blocker_path)
+    current_first_command_missing_markers = (
+        update_mvp_progress.current_first_command_missing_baseline_markers(
+            current_first_command
+        )
+    )
     evidence = codex_direction_guard.collect_repo_evidence(
         project_root,
         lookback_commits=lookback_commits,
@@ -88,6 +98,11 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         selected_status = "closed"
         selected_evidence_files = []
 
+    baseline_coverage_required = bool(
+        first_open
+        and current_first_command
+        and current_first_command != first_open["next action"]
+    )
     stop_broad_work = bool(guard_report["stop_the_line"]) or selected_status != "closed"
     required_files = unique_ordered(
         [
@@ -122,6 +137,17 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         "selected_blocker_status": selected_status,
         "selected_action": selected_action,
         "selected_action_source": selected_action_source,
+        "selected_action_sha256": sha256_text(selected_action),
+        "current_first_command_baseline_coverage_required": baseline_coverage_required,
+        "current_first_command_baseline_coverage_passed": (
+            bool(current_first_command) and not current_first_command_missing_markers
+        ),
+        "current_first_command_baseline_coverage_marker_count": len(
+            update_mvp_progress.CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS
+        ),
+        "current_first_command_baseline_missing_markers": (
+            current_first_command_missing_markers
+        ),
         "selected_evidence_file_count": len(selected_evidence_files),
         "selected_evidence_files": selected_evidence_files,
         "stop_broad_work": stop_broad_work,
@@ -159,6 +185,15 @@ def render_markdown(directive: dict) -> str:
         f"- Selected blocker: `{directive['selected_blocker']}`",
         f"- Blocker status: `{directive['selected_blocker_status']}`",
         f"- Selected action source: `{directive.get('selected_action_source', 'unknown')}`",
+        f"- Selected action sha256: `{directive.get('selected_action_sha256', '')}`",
+        "- Current first command baseline coverage required: "
+        f"`{str(directive.get('current_first_command_baseline_coverage_required', False)).lower()}`",
+        "- Current first command baseline coverage passed: "
+        f"`{str(directive.get('current_first_command_baseline_coverage_passed', False)).lower()}`",
+        "- Current first command baseline coverage marker count: "
+        f"`{directive.get('current_first_command_baseline_coverage_marker_count', 0)}`",
+        "- Current first command baseline missing marker count: "
+        f"`{len(directive.get('current_first_command_baseline_missing_markers', []))}`",
         f"- Selected action: {directive['selected_action']}",
         f"- Selected evidence file count: `{directive.get('selected_evidence_file_count', 0)}`",
         "",

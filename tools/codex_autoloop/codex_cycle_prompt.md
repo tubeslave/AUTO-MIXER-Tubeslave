@@ -376,6 +376,11 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Project Director Agent является рабочим директором цикла: выбери задачу из
   его `Selected Work`, то есть из first non-closed row в
   `.ai/project-layer/wing_mvp_blockers.md`.
+- Если Project Director Agent использует `Selected action source:
+  Current First Command`, его `current_first_command_baseline_coverage_passed`
+  должен быть `true`, `current_first_command_baseline_missing_markers` должен
+  быть пустым, а `selected_action_sha256` фиксирует выбранный action для
+  audit/handoff проверки.
 - Если WING Rack подключен, следующий шаг должен начинаться с
   `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` до старта
   intended backend/WING session, затем read-only preflight или ручной review
@@ -707,7 +712,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - результат direction guard: статус, score и краткое объяснение, почему задача
   двигала supervised WING Rack MVP;
 - результат Project Director Agent: выбранный blocker, его status и почему
-  задача была взята из first non-closed row;
+  задача была взята из first non-closed row; если action source был
+  `Current First Command`, укажи baseline coverage verdict и
+  `selected_action_sha256`;
 - что осталось;
 - какие риски есть;
 - ссылки на измененные файлы;

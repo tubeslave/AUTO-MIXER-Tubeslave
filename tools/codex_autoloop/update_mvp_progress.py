@@ -153,13 +153,20 @@ def current_first_command(path: Path) -> str | None:
     return markdown_section_text(path, CURRENT_FIRST_COMMAND_HEADING)
 
 
-def current_first_command_covers_baseline(current_first_command: str | None) -> bool:
+def current_first_command_missing_baseline_markers(
+    current_first_command: str | None,
+) -> list[str]:
     if not current_first_command:
-        return False
-    return all(
-        marker in current_first_command
+        return list(CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS)
+    return [
+        marker
         for marker in CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS
-    )
+        if marker not in current_first_command
+    ]
+
+
+def current_first_command_covers_baseline(current_first_command: str | None) -> bool:
+    return not current_first_command_missing_baseline_markers(current_first_command)
 
 
 def selected_action_text(

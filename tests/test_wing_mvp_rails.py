@@ -1002,11 +1002,18 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
         in current_command
     )
+    assert progress.current_first_command_missing_baseline_markers(current_command) == []
     assert progress.current_first_command_covers_baseline(current_command)
+    missing_proof_plan_fields_command = current_command.replace(
+        "required_supervised_proof_plan_summary_fields",
+        "missing_supervised_proof_plan_summary_fields",
+    )
     assert not progress.current_first_command_covers_baseline(
-        current_command.replace(
-            "required_supervised_proof_plan_summary_fields",
-            "missing_supervised_proof_plan_summary_fields",
+        missing_proof_plan_fields_command
+    )
+    assert "required_supervised_proof_plan_summary_fields" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_proof_plan_fields_command
         )
     )
     report = progress.build_progress_report(

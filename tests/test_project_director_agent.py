@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -33,6 +34,18 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert directive["selected_blocker"] == "WING read-only connection proof"
     assert directive["selected_blocker_status"] == "tooling_ready_waits_real_wing"
     assert directive["selected_action_source"] == "Current First Command"
+    assert directive["selected_action_sha256"] == hashlib.sha256(
+        directive["selected_action"].encode("utf-8")
+    ).hexdigest()
+    assert directive["current_first_command_baseline_coverage_required"] is True
+    assert directive["current_first_command_baseline_coverage_passed"] is True
+    assert directive["current_first_command_baseline_missing_markers"] == []
+    assert (
+        directive["current_first_command_baseline_coverage_marker_count"]
+        == len(
+            director.update_mvp_progress.CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS
+        )
+    )
     assert "tools/no_wing_release_check.py --quick" in directive["selected_action"]
     assert "before starting the intended backend/WING session" in directive["selected_action"]
     assert "`Docs/runbooks/WING_READONLY_PREFLIGHT.md`" in directive["selected_action"]
@@ -644,6 +657,12 @@ def test_project_director_markdown_is_operator_readable():
         "continue_goal_mode": True,
         "selected_blocker": "WING read-only connection proof",
         "selected_blocker_status": "tooling_ready_waits_real_wing",
+        "selected_action_source": "Current First Command",
+        "selected_action_sha256": "a" * 64,
+        "current_first_command_baseline_coverage_required": True,
+        "current_first_command_baseline_coverage_passed": True,
+        "current_first_command_baseline_coverage_marker_count": 68,
+        "current_first_command_baseline_missing_markers": [],
         "selected_action": "Run read-only preflight.",
         "selected_evidence_file_count": 1,
         "selected_evidence_files": ["tools/wing_readonly_preflight_runner.py"],
@@ -657,6 +676,11 @@ def test_project_director_markdown_is_operator_readable():
     assert "# Project Director Agent Directive" in markdown
     assert "Selected blocker" in markdown
     assert "Continue Goal mode: `true`" in markdown
+    assert "Selected action source: `Current First Command`" in markdown
+    assert "Selected action sha256: `" in markdown
+    assert "Current first command baseline coverage required: `true`" in markdown
+    assert "Current first command baseline coverage passed: `true`" in markdown
+    assert "Current first command baseline missing marker count: `0`" in markdown
     assert "Selected evidence file count: `1`" in markdown
     assert "## Selected Evidence Files" in markdown
     assert "tools/wing_readonly_preflight_runner.py" in markdown
@@ -672,6 +696,12 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "project_director_latest.md" in prompt
     assert "Project Director Agent" in readme
     assert "first non-closed MVP blocker" in readme
+    assert "selected_action_sha256" in prompt
+    assert "current_first_command_baseline_coverage_passed" in prompt
+    assert "current_first_command_baseline_missing_markers" in prompt
+    assert "selected_action_sha256" in readme
+    assert "current_first_command_baseline_coverage_passed" in readme
+    assert "current_first_command_baseline_missing_markers" in readme
     assert "backend_port_prestart_gate" in prompt
     assert "expected_backend_port_prestart_gate" in prompt
     assert "backend_port_prestart_gate.grants_live_authority: false" in prompt

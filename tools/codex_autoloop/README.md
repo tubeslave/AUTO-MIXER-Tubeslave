@@ -443,6 +443,11 @@ you want the background automation active.
   the guard result, then selects the first non-closed MVP blocker as the only
   acceptable task direction. It writes `.paperclip/reports/project_director_latest.md`
   and never writes code, contacts WING, or grants live authority.
+  When the selected action source is `Current First Command`, the directive also
+  reports `current_first_command_baseline_coverage_passed`,
+  `current_first_command_baseline_missing_markers`, and
+  `selected_action_sha256` so the autonomous cycle can prove that the shorter
+  action text still covers the WING safety/proof baseline.
   If it detects broad-work drift, development still continues in Goal mode; the
   next task is redirected to the first non-closed MVP blocker instead of
   stopping the autonomous cycle.
