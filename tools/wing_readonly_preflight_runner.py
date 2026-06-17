@@ -191,6 +191,11 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "verifier_report_executes_tests_matches_expected",
     "verifier_report_readiness_closure_allowed_matches_expected",
     "verifier_report_live_authority_granted_matches_expected",
+    "verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean",
+    "verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected",
+    "verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected",
+    "verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected",
+    "verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected",
     "failed_checks_have_check_entries",
     "failed_checks_missing_check_entries_empty",
 )
@@ -259,6 +264,11 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "artifact_manifest_verifier_report_mutates_console_state",
     "artifact_manifest_verifier_report_queries_console",
     "artifact_manifest_verifier_report_executes_tests",
+    "artifact_manifest_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required",
+    "artifact_manifest_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches",
+    "artifact_manifest_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match",
+    "artifact_manifest_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
+    "artifact_manifest_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
     *tuple(
         f"artifact_manifest_verifier_check_{check_name}"
         for check_name in ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
@@ -293,6 +303,10 @@ ARTIFACT_MANIFEST_VERIFIER_REPORT_EXPECTED_VALUES = {
     "executes_tests": False,
     "readiness_closure_allowed": False,
     "live_authority_granted": False,
+    "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
+    "wing_readonly_handoff_plan_verifier_summary_surface_match": True,
+    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": False,
+    "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": False,
 }
 
 

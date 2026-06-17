@@ -23248,6 +23248,11 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert report["verifier_report_required_fields_match_contract"] is True
     for field_name in expected_required_report_fields:
         assert field_name in report
+    for field_name in (
+        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+    ):
+        assert field_name in expected_required_report_fields
+        assert report[field_name] == summary[field_name]
     checks = report["checks"]
     assert checks["summary_json_exists"] is True
     assert checks["summary_md_exists"] is True
@@ -23288,6 +23293,18 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert checks["verifier_report_executes_tests_matches_expected"] is True
     assert checks["verifier_report_readiness_closure_allowed_matches_expected"] is True
     assert checks["verifier_report_live_authority_granted_matches_expected"] is True
+    assert (
+        checks[
+            "verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean"
+        ]
+        is True
+    )
+    for field_name in (
+        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+    ):
+        if field_name.endswith("_required"):
+            continue
+        assert checks[f"verifier_report_{field_name}_matches_expected"] is True
     assert checks["summary_json_artifact_manifest_verifier_fields_present"] is True
     assert checks["summary_md_artifact_manifest_verifier_fields_rendered"] is True
     assert checks["manifest_artifact_manifest_verifier_fields_present"] is True

@@ -25,6 +25,12 @@ VERIFIER_REPORT_STATIC_SAFETY_FIELDS = {
     "queries_console": False,
     "executes_tests": False,
 }
+VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS = {
+    "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
+    "wing_readonly_handoff_plan_verifier_summary_surface_match": True,
+    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": False,
+    "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": False,
+}
 SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
     "readiness_closure_allowed_by_packet",
     "live_authority_granted",
@@ -180,6 +186,32 @@ def _record_verifier_report_safety_checks(
         )
 
 
+def _record_verifier_report_handoff_plan_summary_surface_checks(
+    checks: dict[str, bool],
+    *,
+    report: dict[str, object],
+    summary_json: Mapping[str, Any],
+) -> None:
+    required_field = "wing_readonly_handoff_plan_verifier_summary_surface_required"
+    required_value = summary_json.get(required_field)
+    report[required_field] = required_value
+    _record_check(
+        checks,
+        f"verifier_report_{required_field}_is_boolean",
+        isinstance(required_value, bool),
+    )
+    for field_name, expected_value in (
+        VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS.items()
+    ):
+        actual_value = summary_json.get(field_name)
+        report[field_name] = actual_value
+        _record_check(
+            checks,
+            f"verifier_report_{field_name}_matches_expected",
+            actual_value == expected_value,
+        )
+
+
 def _record_summary_md_safety_checks(
     checks: dict[str, bool],
     *,
@@ -291,6 +323,11 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         **VERIFIER_REPORT_STATIC_SAFETY_FIELDS,
         "readiness_closure_allowed": False,
         "live_authority_granted": False,
+        "wing_readonly_handoff_plan_verifier_summary_surface_required": False,
+        "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
+        "wing_readonly_handoff_plan_verifier_summary_surface_match": False,
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": False,
+        "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": False,
         "artifact_manifest_self_consistency_match": False,
         "artifact_manifest_contract_cross_surface_match": False,
         "artifact_manifest_self_consistency_summary_surface_match": False,
@@ -462,6 +499,11 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         report=report,
         readiness_closure_allowed=readiness_closure_allowed,
         live_authority_granted=live_authority_granted,
+    )
+    _record_verifier_report_handoff_plan_summary_surface_checks(
+        checks,
+        report=report,
+        summary_json=summary_json,
     )
     _record_summary_md_safety_checks(
         checks,

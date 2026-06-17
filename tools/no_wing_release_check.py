@@ -576,6 +576,11 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS = (
     "executes_tests",
     "readiness_closure_allowed",
     "live_authority_granted",
+    "wing_readonly_handoff_plan_verifier_summary_surface_required",
+    "wing_readonly_handoff_plan_verifier_summary_surface_mismatches",
+    "wing_readonly_handoff_plan_verifier_summary_surface_match",
+    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
+    "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
 )
 PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "same no-WING artifact directory",
