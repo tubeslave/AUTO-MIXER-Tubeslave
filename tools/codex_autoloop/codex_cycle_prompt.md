@@ -283,22 +283,22 @@ blockers выше.
    `prestart_backend_port_check` and `unexpected listeners`,
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
-45. verify `backend_connection_confirmation_step_index: 2`,
-   `expected_backend_connection_confirmation_step_index: 2`,
+45. verify `backend_connection_confirmation_step_index: 3`,
+   `expected_backend_connection_confirmation_step_index: 3`,
    `operator_sequence_has_backend_connection_confirmation: true`,
-   `operator_sequence_backend_connection_confirmation_step_index: 2`,
+   `operator_sequence_backend_connection_confirmation_step_index: 3`,
    `operator_sequence_backend_connection_confirmation_before_capture: true`,
    `operator_sequence_backend_connection_confirmation_step` includes
    `existing backend connection`, `intended WING Rack`, and
    `read-only inspection`, and
-   `operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
-   `expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
+   `operator_sequence_validate_readonly_preflight_inputs_step_index: 5`,
+   `expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 5`,
    `operator_sequence_validate_readonly_preflight_inputs_step_index_matches_contract: true`,
    `operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
    `expected_operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
    `operator_sequence_validate_readonly_preflight_inputs_step_matches_contract: true`,
-   `operator_sequence_capture_readonly_preflight_step_index: 5`,
-   `expected_operator_sequence_capture_readonly_preflight_step_index: 5`,
+   `operator_sequence_capture_readonly_preflight_step_index: 6`,
+   `expected_operator_sequence_capture_readonly_preflight_step_index: 6`,
    `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`,
    `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
    `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
@@ -326,7 +326,7 @@ blockers выше.
    `supervised_prestart_gate_matches_expected: true`, and
    `declared_supervised_prestart_gate_matches_expected: true`;
 49. verify `supervised_prestart_gate.grants_live_authority: false`;
-50. verify `supervised_prestart_gate.operator_sequence_step_index: 10` and
+50. verify `supervised_prestart_gate.operator_sequence_step_index: 11` and
    `supervised_prestart_gate.operator_sequence_step_must_be_final: true`;
 51. verify `supervised_prestart_gate.requires_operator_decision_status:
    accepted_decision_ready` and `supervised_prestart_gate.unlocks_runbook:
@@ -336,7 +336,7 @@ blockers выше.
    `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`
    in the supervised proof plan summary;
 52. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
-53. verify `operator_sequence_count: 11`;
+53. verify `operator_sequence_count: 12`;
 53a. verify top-level `operator_sequence`;
 53b. verify top-level `expected_operator_sequence`;
 53c. verify `wing_readonly_operator_sequence_list_summary_surface_match: true`;
@@ -347,7 +347,7 @@ blockers выше.
 53h. verify `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value`;
 53i. verify `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value`;
 53j. verify `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: true`;
-54. verify `expected_operator_sequence_count: 11`;
+54. verify `expected_operator_sequence_count: 12`;
 55. verify `operator_sequence_count_matches_contract: true`;
 56. verify `operator_sequence_sha256_matches_actual: true`;
 57. verify `operator_sequence_matches_contract: true`;
@@ -360,29 +360,29 @@ blockers выше.
 62. verify `declared_operator_sequence_sha256_matches_contract_flag: true`;
 63. verify
    `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`;
-64. verify `declared_operator_sequence_count: 11`;
-65. verify `declared_expected_operator_sequence_count: 11`;
+64. verify `declared_operator_sequence_count: 12`;
+65. verify `declared_expected_operator_sequence_count: 12`;
 66. verify `declared_operator_sequence_count_contract_flag: true`;
 67. verify `declared_operator_sequence_count_matches_actual: true`;
 68. verify `declared_operator_sequence_count_matches_contract: true`;
 69. verify `declared_expected_operator_sequence_count_matches_contract: true`;
 70. verify
    `declared_operator_sequence_count_contract_flag_matches_declared_count: true`;
-71. verify `mvp_blocker_anchor_digest_review_step_index: 9`;
-72. verify `expected_mvp_blocker_anchor_digest_review_step_index: 9`;
+71. verify `mvp_blocker_anchor_digest_review_step_index: 10`;
+72. verify `expected_mvp_blocker_anchor_digest_review_step_index: 10`;
 73. verify `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`;
 74. verify
    `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`;
-75. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`;
+75. verify `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`;
 76. verify
-   `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`;
+   `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`;
 77. verify
    `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`;
 78. verify `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
    `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
    `current first open blocker`;
-79. verify `operator_sequence_supervised_prestart_gate_step_index: 10`;
-80. verify `expected_operator_sequence_supervised_prestart_gate_step_index: 10`;
+79. verify `operator_sequence_supervised_prestart_gate_step_index: 11`;
+80. verify `expected_operator_sequence_supervised_prestart_gate_step_index: 11`;
 81. verify
    `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`;
 82. verify the final `operator_sequence_supervised_prestart_gate_step` includes
@@ -800,22 +800,22 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_check_must_be_first_operator_step: true`, and
   `backend_port_prestart_check_operator_sequence_step_is_first: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `backend_connection_confirmation_step_index: 2`,
-  `expected_backend_connection_confirmation_step_index: 2`,
+  `backend_connection_confirmation_step_index: 3`,
+  `expected_backend_connection_confirmation_step_index: 3`,
   `operator_sequence_has_backend_connection_confirmation: true`,
-  `operator_sequence_backend_connection_confirmation_step_index: 2`,
+  `operator_sequence_backend_connection_confirmation_step_index: 3`,
   `operator_sequence_backend_connection_confirmation_before_capture: true`,
   `operator_sequence_backend_connection_confirmation_step` including
   `existing backend connection`, `intended WING Rack`, and
   `read-only inspection`, and
-  `operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
-  `expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
+  `operator_sequence_validate_readonly_preflight_inputs_step_index: 5`,
+  `expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 5`,
   `operator_sequence_validate_readonly_preflight_inputs_step_index_matches_contract: true`,
   `operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
   `expected_operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
   `operator_sequence_validate_readonly_preflight_inputs_step_matches_contract: true`,
-  `operator_sequence_capture_readonly_preflight_step_index: 5`,
-  `expected_operator_sequence_capture_readonly_preflight_step_index: 5`,
+  `operator_sequence_capture_readonly_preflight_step_index: 6`,
+  `expected_operator_sequence_capture_readonly_preflight_step_index: 6`,
   `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`,
   `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
   `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
@@ -826,7 +826,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `supervised_prestart_gate.grants_live_authority: false`.
 - Before any supervised fader/gain proof, the structured
   `supervised_prestart_gate` must show
-  `supervised_prestart_gate.operator_sequence_step_index: 10` and
+  `supervised_prestart_gate.operator_sequence_step_index: 11` and
   `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
 - Before any supervised fader/gain proof, the structured
   `supervised_prestart_gate` must show
@@ -847,7 +847,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`.
   It must also expose top-level
   `supervised_prestart_gate_required: true`,
-  `supervised_prestart_gate_operator_sequence_step_index: 10`,
+  `supervised_prestart_gate_operator_sequence_step_index: 11`,
   `supervised_prestart_gate_operator_sequence_step_must_be_final: true`,
   `supervised_prestart_gate_operator_sequence_step`,
   `supervised_prestart_gate_operator_sequence_step_matches_summary: true`,
@@ -875,7 +875,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
   and
   `supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `operator_sequence_count: 11`.
+  `operator_sequence_count: 12`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   top-level `operator_sequence` and top-level `expected_operator_sequence`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
@@ -892,7 +892,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_operator_sequence_count: 11` and
+  `expected_operator_sequence_count: 12` and
   `operator_sequence_count_matches_contract: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `operator_sequence_sha256`, `actual_operator_sequence_sha256`, and
@@ -908,8 +908,8 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `declared_operator_sequence_sha256_matches_contract_flag: true`, and
   `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `declared_operator_sequence_count: 11`,
-  `declared_expected_operator_sequence_count: 11`,
+  `declared_operator_sequence_count: 12`,
+  `declared_expected_operator_sequence_count: 12`,
   `declared_operator_sequence_count_contract_flag: true`,
   `declared_operator_sequence_count_matches_actual: true`,
   `declared_operator_sequence_count_matches_contract: true`,
@@ -918,13 +918,13 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the
   `mvp_blocker_anchor_digest_review_step_index` must be `9`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_mvp_blocker_anchor_digest_review_step_index: 9`,
+  `expected_mvp_blocker_anchor_digest_review_step_index: 10`,
   `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`, and
   `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`.
 - Before any supervised fader/gain proof, the
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `9`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`
   and
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the
@@ -934,7 +934,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the
   `operator_sequence_supervised_prestart_gate_step_index` must be `10`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_operator_sequence_supervised_prestart_gate_step_index: 10` and
+  `expected_operator_sequence_supervised_prestart_gate_step_index: 11` and
   `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include

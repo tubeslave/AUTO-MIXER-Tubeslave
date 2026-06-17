@@ -16436,9 +16436,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "operator_sequence_has_backend_connection_confirmation: `true`"
         in markdown_summary
     )
-    assert "backend_connection_confirmation_step_index: `2`" in markdown_summary
     assert (
-        "expected_backend_connection_confirmation_step_index: `2`"
+        "backend_connection_confirmation_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX}`"
+        in markdown_summary
+    )
+    assert (
+        "expected_backend_connection_confirmation_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX}`"
         in markdown_summary
     )
     assert (
@@ -16612,7 +16617,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         markdown_summary
     )
     assert (
-        "operator_sequence_backend_connection_confirmation_step_index: `2`"
+        "operator_sequence_backend_connection_confirmation_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX}`"
         in markdown_summary
     )
     assert (

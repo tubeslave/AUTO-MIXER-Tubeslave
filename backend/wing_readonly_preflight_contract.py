@@ -202,7 +202,18 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
     "unexpected listeners",
 )
 
-WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX = 2
+WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX = 1
+WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP = (
+    "Run verify_no_wing_artifact_manifest against the same passed no-WING "
+    "artifact directory before any backend/WING WebSocket."
+)
+WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS = (
+    "verify_no_wing_artifact_manifest",
+    "same passed no-WING artifact directory",
+    "before any backend/WING WebSocket",
+)
+
+WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX = 3
 WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP = (
     "Confirm existing backend connection is the intended WING Rack and ready "
     "for read-only inspection."
@@ -213,8 +224,8 @@ WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS = (
     "read-only inspection",
 )
 
-WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX = 4
-WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = 10
+WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX = 5
+WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = 11
 WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX = (
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX - 1
 )
@@ -419,6 +430,9 @@ def expected_handoff_operator_sequence(
     backend_port_prestart_step: str = (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP
     ),
+    artifact_manifest_verifier_step: str = (
+        WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+    ),
     backend_connection_step: str = (
         WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
     ),
@@ -429,6 +443,7 @@ def expected_handoff_operator_sequence(
 ) -> list[str]:
     return [
         backend_port_prestart_step,
+        artifact_manifest_verifier_step,
         WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP,
         backend_connection_step,
         WING_READONLY_PREFLIGHT_CHANNEL_SAFETY_CONFIRMATION_STEP,

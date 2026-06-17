@@ -17,6 +17,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
+    WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP,
+    WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX,
+    WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
@@ -44,6 +47,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+    WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP,
     WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
     WING_READONLY_PREFLIGHT_PROOF_RUNNER,
     WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
@@ -442,6 +446,12 @@ def build_handoff_packet(
         WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
     )
     backend_connection_step = WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP
+    artifact_manifest_verifier_step_index = (
+        WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX
+    )
+    artifact_manifest_verifier_step = (
+        WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+    )
     mvp_blocker_anchor_digest_review_step = (
         WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP
     )
@@ -617,6 +627,7 @@ def build_handoff_packet(
     }
     expected_operator_sequence = expected_handoff_operator_sequence(
         backend_port_prestart_step=prestart_step,
+        artifact_manifest_verifier_step=artifact_manifest_verifier_step,
         backend_connection_step=backend_connection_step,
         mvp_blocker_anchor_digest_review_step=mvp_blocker_anchor_digest_review_step,
         supervised_prestart_step=supervised_gate_step,
@@ -727,6 +738,33 @@ def build_handoff_packet(
         "artifact_manifest_verifier_executes_tests": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
+        "artifact_manifest_verifier_operator_sequence_step_index": (
+            artifact_manifest_verifier_step_index
+        ),
+        "expected_artifact_manifest_verifier_operator_sequence_step_index": (
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX
+        ),
+        "artifact_manifest_verifier_operator_sequence_step_index_matches_contract": (
+            artifact_manifest_verifier_step_index
+            == WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX
+        ),
+        "artifact_manifest_verifier_operator_sequence_step": (
+            artifact_manifest_verifier_step
+        ),
+        "expected_artifact_manifest_verifier_operator_sequence_step": (
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+        ),
+        "artifact_manifest_verifier_operator_sequence_step_matches_contract": (
+            artifact_manifest_verifier_step
+            == WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+        ),
+        "artifact_manifest_verifier_required_markers": list(
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS
+        ),
+        "artifact_manifest_verifier_operator_sequence_before_preview": (
+            operator_sequence.index(artifact_manifest_verifier_step)
+            < operator_sequence.index(WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP)
+        ),
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
@@ -1005,6 +1043,22 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['artifact_manifest_verifier_readiness_closure_allowed']).lower()}`",
         "- artifact_manifest_verifier_live_authority_granted: "
         f"`{str(packet['artifact_manifest_verifier_live_authority_granted']).lower()}`",
+        "- artifact_manifest_verifier_operator_sequence_step_index: "
+        f"`{packet['artifact_manifest_verifier_operator_sequence_step_index']}`",
+        "- expected_artifact_manifest_verifier_operator_sequence_step_index: "
+        f"`{packet['expected_artifact_manifest_verifier_operator_sequence_step_index']}`",
+        "- artifact_manifest_verifier_operator_sequence_step_index_matches_contract: "
+        f"`{str(packet['artifact_manifest_verifier_operator_sequence_step_index_matches_contract']).lower()}`",
+        "- artifact_manifest_verifier_operator_sequence_step: "
+        f"`{packet['artifact_manifest_verifier_operator_sequence_step']}`",
+        "- expected_artifact_manifest_verifier_operator_sequence_step: "
+        f"`{packet['expected_artifact_manifest_verifier_operator_sequence_step']}`",
+        "- artifact_manifest_verifier_operator_sequence_step_matches_contract: "
+        f"`{str(packet['artifact_manifest_verifier_operator_sequence_step_matches_contract']).lower()}`",
+        "- artifact_manifest_verifier_required_markers: "
+        f"`{json.dumps(packet['artifact_manifest_verifier_required_markers'])}`",
+        "- artifact_manifest_verifier_operator_sequence_before_preview: "
+        f"`{str(packet['artifact_manifest_verifier_operator_sequence_before_preview']).lower()}`",
         "- backend_port_prestart_check_failure_detail_fields: "
         f"`{json.dumps(packet['backend_port_prestart_check_failure_detail_fields'])}`",
         "- manual_review_required_before_readiness_update: "

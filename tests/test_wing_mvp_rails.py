@@ -16,8 +16,8 @@ PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress
 PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
 
 DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS = (
-    "declared_operator_sequence_count: 11",
-    "declared_expected_operator_sequence_count: 11",
+    "declared_operator_sequence_count: 12",
+    "declared_expected_operator_sequence_count: 12",
     "declared_operator_sequence_count_contract_flag: true",
     "declared_operator_sequence_count_matches_actual: true",
     "declared_operator_sequence_count_matches_contract: true",
@@ -134,7 +134,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         "backend_port_prestart_summary_sha256_available_matches_digest: true"
         in text
     )
-    assert "expected_operator_sequence_count: 11" in text
+    assert "expected_operator_sequence_count: 12" in text
     assert "operator_sequence_count_matches_contract: true" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in text
@@ -142,14 +142,14 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         assert marker in text
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in text
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in text
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 10" in text
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in text
     assert (
         "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
         in text
     )
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10"
         in text
     )
     assert (
@@ -157,7 +157,7 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         in text
     )
     assert (
-        "expected_operator_sequence_supervised_prestart_gate_step_index: 10"
+        "expected_operator_sequence_supervised_prestart_gate_step_index: 11"
         in text
     )
     assert (
@@ -283,32 +283,32 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "expected_supervised_prestart_gate" in text
     assert "required_supervised_prestart_gate_markers" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
-    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in text
+    assert "supervised_prestart_gate.operator_sequence_step_index: 11" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
-    assert "operator_sequence_count: 11" in text
+    assert "operator_sequence_count: 12" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in text
     for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker in text
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in text
-    assert "mvp_blocker_anchor_digest_review_step_index: 9" in text
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in text
+    assert "mvp_blocker_anchor_digest_review_step_index: 10" in text
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 10" in text
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in text
     assert (
         "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
         in text
     )
-    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9" in text
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10" in text
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10"
         in text
     )
     assert (
         "operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true"
         in text
     )
-    assert "operator_sequence_supervised_prestart_gate_step_index: 10" in text
+    assert "operator_sequence_supervised_prestart_gate_step_index: 11" in text
     assert (
         "supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready"
         in text
@@ -414,7 +414,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_summary_sha256_available_matches_digest: true" in rows[
         0
     ]["next action"]
-    assert "expected_operator_sequence_count: 11" in rows[0]["next action"]
+    assert "expected_operator_sequence_count: 12" in rows[0]["next action"]
     assert "operator_sequence_count_matches_contract: true" in rows[0][
         "next action"
     ]
@@ -424,7 +424,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         assert marker in rows[0]["next action"]
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in rows[0]["next action"]
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in rows[0][
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 10" in rows[0][
         "next action"
     ]
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in rows[
@@ -434,7 +434,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         0
     ]["next action"]
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10"
         in rows[0]["next action"]
     )
     assert (
@@ -442,7 +442,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["next action"]
     )
     assert (
-        "expected_operator_sequence_supervised_prestart_gate_step_index: 10"
+        "expected_operator_sequence_supervised_prestart_gate_step_index: 11"
         in rows[0]["next action"]
     )
     assert (
@@ -743,7 +743,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         0
     ]["next action"]
     assert (
-        "backend_connection_confirmation_step_index: 2"
+        "backend_connection_confirmation_step_index: 3"
         in rows[0]["next action"]
     )
     assert (
@@ -751,7 +751,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["next action"]
     )
     assert (
-        "operator_sequence_backend_connection_confirmation_step_index: 2"
+        "operator_sequence_backend_connection_confirmation_step_index: 3"
         in rows[0]["next action"]
     )
     assert (
@@ -765,7 +765,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "intended WING Rack" in rows[0]["next action"]
     assert "read-only inspection" in rows[0]["next action"]
     assert (
-        "operator_sequence_validate_readonly_preflight_inputs_step_index: 4"
+        "operator_sequence_validate_readonly_preflight_inputs_step_index: 5"
         in rows[0]["next action"]
     )
     assert (
@@ -773,7 +773,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["next action"]
     )
     assert (
-        "operator_sequence_capture_readonly_preflight_step_index: 5"
+        "operator_sequence_capture_readonly_preflight_step_index: 6"
         in rows[0]["next action"]
     )
     assert "mvp_blocker_anchor" in rows[0]["next action"]
@@ -789,17 +789,17 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in rows[0][
         "next action"
     ]
-    assert "operator_sequence_count: 11" in rows[0]["next action"]
+    assert "operator_sequence_count: 12" in rows[0]["next action"]
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in rows[0]["next action"]
     for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker in rows[0]["next action"]
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in rows[0]["next action"]
-    assert "mvp_blocker_anchor_digest_review_step_index: 9" in rows[0][
+    assert "mvp_blocker_anchor_digest_review_step_index: 10" in rows[0][
         "next action"
     ]
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in rows[0][
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 10" in rows[0][
         "next action"
     ]
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in rows[
@@ -811,11 +811,11 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in rows[0][
         "next action"
     ]
-    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9" in rows[
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10" in rows[
         0
     ]["next action"]
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10"
         in rows[0]["next action"]
     )
     assert (
@@ -833,7 +833,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "operator_sequence_supervised_prestart_gate_step" in rows[0][
         "next action"
     ]
-    assert "operator_sequence_supervised_prestart_gate_step_index: 10" in rows[0][
+    assert "operator_sequence_supervised_prestart_gate_step_index: 11" in rows[0][
         "next action"
     ]
     assert "required_supervised_prestart_gate_markers" in rows[0]["next action"]
@@ -846,7 +846,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "supervised_prestart_gate.grants_live_authority: false" in rows[0][
         "next action"
     ]
-    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in rows[0][
+    assert "supervised_prestart_gate.operator_sequence_step_index: 11" in rows[0][
         "next action"
     ]
     assert (
@@ -919,9 +919,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "unexpected listeners" in readonly
     assert "backend_port_prestart_check_must_be_first_operator_step: true" in readonly
     assert "backend_port_prestart_check_operator_sequence_step_is_first: true" in readonly
-    assert "backend_connection_confirmation_step_index: 2" in readonly
+    assert "backend_connection_confirmation_step_index: 3" in readonly
     assert "operator_sequence_has_backend_connection_confirmation: true" in readonly
-    assert "operator_sequence_backend_connection_confirmation_step_index: 2" in readonly
+    assert "operator_sequence_backend_connection_confirmation_step_index: 3" in readonly
     assert (
         "operator_sequence_backend_connection_confirmation_before_capture: true"
         in readonly
@@ -930,36 +930,36 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "existing backend connection" in readonly
     assert "intended WING Rack" in readonly
     assert "read-only inspection" in readonly
-    assert "operator_sequence_validate_readonly_preflight_inputs_step_index: 4" in readonly
+    assert "operator_sequence_validate_readonly_preflight_inputs_step_index: 5" in readonly
     assert (
         "operator_sequence_validate_readonly_preflight_inputs_step_matches_contract: true"
         in readonly
     )
-    assert "operator_sequence_capture_readonly_preflight_step_index: 5" in readonly
+    assert "operator_sequence_capture_readonly_preflight_step_index: 6" in readonly
     assert "mvp_blocker_anchor" in readonly
     assert "mvp_blocker_anchor_matches_current_first_open: true" in readonly
     assert "mvp_blocker_anchor_sha256" in readonly
     assert "mvp_blocker_anchor_sha256_matches_current_first_open: true" in readonly
     assert "mvp_blocker_anchor.packet_does_not_close_blocker: true" in readonly
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readonly
-    assert "operator_sequence_count: 11" in readonly
+    assert "operator_sequence_count: 12" in readonly
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in readonly
     for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker in readonly
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in readonly
-    assert "mvp_blocker_anchor_digest_review_step_index: 9" in readonly
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in readonly
+    assert "mvp_blocker_anchor_digest_review_step_index: 10" in readonly
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 10" in readonly
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in readonly
     assert (
         "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
         in readonly
     )
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in readonly
-    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9" in readonly
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10" in readonly
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10"
         in readonly
     )
     assert (
@@ -1063,8 +1063,8 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         assert marker in readonly
     assert "supervised_prestart_gate.grants_live_authority: false" in readonly
     assert "required_supervised_prestart_gate_markers" in readonly
-    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in readonly
-    assert "operator_sequence_supervised_prestart_gate_step_index: 10" in readonly
+    assert "supervised_prestart_gate.operator_sequence_step_index: 11" in readonly
+    assert "operator_sequence_supervised_prestart_gate_step_index: 11" in readonly
     assert (
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in readonly
@@ -1675,9 +1675,9 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "backend_port_prestart_check_operator_sequence_step" in report
     assert "prestart_backend_port_check" in report
     assert "unexpected listeners" in report
-    assert "backend_connection_confirmation_step_index: 2" in report
+    assert "backend_connection_confirmation_step_index: 3" in report
     assert "operator_sequence_has_backend_connection_confirmation: true" in report
-    assert "operator_sequence_backend_connection_confirmation_step_index: 2" in report
+    assert "operator_sequence_backend_connection_confirmation_step_index: 3" in report
     assert (
         "operator_sequence_backend_connection_confirmation_before_capture: true"
         in report
@@ -1686,12 +1686,12 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "existing backend connection" in report
     assert "intended WING Rack" in report
     assert "read-only inspection" in report
-    assert "operator_sequence_validate_readonly_preflight_inputs_step_index: 4" in report
+    assert "operator_sequence_validate_readonly_preflight_inputs_step_index: 5" in report
     assert (
         "operator_sequence_validate_readonly_preflight_inputs_step_matches_contract: true"
         in report
     )
-    assert "operator_sequence_capture_readonly_preflight_step_index: 5" in report
+    assert "operator_sequence_capture_readonly_preflight_step_index: 6" in report
     assert (
         "backend_port_prestart_gate.operator_sequence_step_must_be_first: true"
         in report
@@ -1742,23 +1742,23 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     assert "project_director_current_first_command_baseline_missing_markers: []" in report
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in report
-    assert "operator_sequence_count: 11" in report
+    assert "operator_sequence_count: 12" in report
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in report
     for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:
         assert marker in report
     for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS:
         assert marker in report
-    assert "mvp_blocker_anchor_digest_review_step_index: 9" in report
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in report
+    assert "mvp_blocker_anchor_digest_review_step_index: 10" in report
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 10" in report
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in report
     assert (
         "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
         in report
     )
-    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9" in report
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10" in report
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10"
         in report
     )
     assert (
@@ -1766,12 +1766,12 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in report
     )
     assert "operator_sequence_supervised_prestart_gate_is_final: true" in report
-    assert "operator_sequence_supervised_prestart_gate_step_index: 10" in report
+    assert "operator_sequence_supervised_prestart_gate_step_index: 11" in report
     assert "operator_sequence_has_supervised_prestart_gate: true" in report
     assert "required_supervised_prestart_gate_markers" in report
     assert "supervised_prestart_gate" in report
     assert "expected_supervised_prestart_gate" in report
-    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in report
+    assert "supervised_prestart_gate.operator_sequence_step_index: 11" in report
     assert (
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in report
@@ -1962,9 +1962,9 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "prestart_backend_port_check" in text
     assert "unexpected listeners" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
-    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in text
+    assert "supervised_prestart_gate.operator_sequence_step_index: 11" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
-    assert "operator_sequence_count: 11" in text
+    assert "operator_sequence_count: 12" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in text
     for marker in OPERATOR_SEQUENCE_CONTRACT_MARKERS:

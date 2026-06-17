@@ -210,7 +210,7 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while the no-WING handoff summary does not show
   `operator_sequence`,
   `expected_operator_sequence`,
-  `expected_operator_sequence_count: 11`,
+  `expected_operator_sequence_count: 12`,
   `operator_sequence_count_matches_contract: true`,
   `operator_sequence_sha256`,
   `actual_operator_sequence_sha256`,
@@ -224,19 +224,19 @@ Stop the current Codex work direction and return to the first open blocker if:
   `declared_operator_sequence_matches_contract_flag_matches_actual: true`,
   `declared_operator_sequence_sha256_matches_contract_flag: true`,
   `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`,
-  `declared_operator_sequence_count: 11`,
-  `declared_expected_operator_sequence_count: 11`,
+  `declared_operator_sequence_count: 12`,
+  `declared_expected_operator_sequence_count: 12`,
   `declared_operator_sequence_count_contract_flag: true`,
   `declared_operator_sequence_count_matches_actual: true`,
   `declared_operator_sequence_count_matches_contract: true`,
   `declared_expected_operator_sequence_count_matches_contract: true`,
   `declared_operator_sequence_count_contract_flag_matches_declared_count: true`,
-  `expected_mvp_blocker_anchor_digest_review_step_index: 9`,
+  `expected_mvp_blocker_anchor_digest_review_step_index: 10`,
   `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
   `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`,
-  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`,
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`,
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
-  `expected_operator_sequence_supervised_prestart_gate_step_index: 10`, and
+  `expected_operator_sequence_supervised_prestart_gate_step_index: 11`, and
   `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`.
 - A supervised proof is planned before the no-WING handoff summary shows
   `backend_port_prestart_gate` exactly matching
@@ -389,20 +389,20 @@ Stop the current Codex work direction and return to the first open blocker if:
   `operator_sequence_step_index: 9` and
   `operator_sequence_step_must_be_final: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
-  `mvp_blocker_anchor_digest_review_step_index: 9`,
-  `expected_mvp_blocker_anchor_digest_review_step_index: 9`,
+  `mvp_blocker_anchor_digest_review_step_index: 10`,
+  `expected_mvp_blocker_anchor_digest_review_step_index: 10`,
   `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
   `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`,
-  `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`,
-  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`,
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`,
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`,
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
   and
-  `operator_sequence_supervised_prestart_gate_step_index: 10`.
+  `operator_sequence_supervised_prestart_gate_step_index: 11`.
 - A supervised proof is planned while the no-WING handoff summary does not show
-  `operator_sequence_count: 11`.
+  `operator_sequence_count: 12`.
 - A supervised proof is planned while the no-WING handoff summary does not show
-  `declared_operator_sequence_count: 11`,
-  `declared_expected_operator_sequence_count: 11`,
+  `declared_operator_sequence_count: 12`,
+  `declared_expected_operator_sequence_count: 12`,
   `declared_operator_sequence_count_contract_flag: true`,
   `declared_operator_sequence_count_matches_actual: true`,
   `declared_operator_sequence_count_matches_contract: true`,
@@ -633,11 +633,11 @@ It must also show `supervised_prestart_gate` exactly matching
 `supervised_prestart_gate.grants_live_authority: false`.
 
 The same `supervised_prestart_gate` must show
-`supervised_prestart_gate.operator_sequence_step_index: 10` and
+`supervised_prestart_gate.operator_sequence_step_index: 11` and
 `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
 It must also expose top-level
 `supervised_prestart_gate_required: true`,
-`supervised_prestart_gate_operator_sequence_step_index: 10`, and
+`supervised_prestart_gate_operator_sequence_step_index: 11`, and
 `supervised_prestart_gate_operator_sequence_step_must_be_final: true`.
 It must also expose top-level `supervised_prestart_gate_operator_sequence_step`
 and `supervised_prestart_gate_operator_sequence_step_matches_summary: true`.
@@ -692,17 +692,17 @@ exactly listing `accepted_decision_ready`,
 `WING_SUPERVISED_FADER_GAIN_PROOF`.
 
 The operator sequence indexes must also remain explicit:
-`mvp_blocker_anchor_digest_review_step_index: 9`,
-`expected_mvp_blocker_anchor_digest_review_step_index: 9`,
+`mvp_blocker_anchor_digest_review_step_index: 10`,
+`expected_mvp_blocker_anchor_digest_review_step_index: 10`,
 `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
 `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`,
-`operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`,
-`expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`,
+`operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`,
+`expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 10`,
 `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
 and
-`operator_sequence_supervised_prestart_gate_step_index: 10`.
+`operator_sequence_supervised_prestart_gate_step_index: 11`.
 
-The handoff summary must also show `operator_sequence_count: 11` so reviewers
+The handoff summary must also show `operator_sequence_count: 12` so reviewers
 can reject packets with missing or extra operator steps.
 It must also show `operator_sequence` and `expected_operator_sequence` so
 reviewers can inspect the ordered checklist directly from the flat no-WING
@@ -748,8 +748,8 @@ It must also show `expected_operator_sequence_sha256`,
 `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`
 so reviewers can reject packets whose checklist no longer matches the shared
 contract.
-It must also show `declared_operator_sequence_count: 11`,
-`declared_expected_operator_sequence_count: 11`,
+It must also show `declared_operator_sequence_count: 12`,
+`declared_expected_operator_sequence_count: 12`,
 `declared_operator_sequence_count_contract_flag: true`,
 `declared_operator_sequence_count_matches_actual: true`,
 `declared_operator_sequence_count_matches_contract: true`,
@@ -762,22 +762,22 @@ The first operator step text must also be explicit:
 
 The handoff summary must also prove the backend/WING connection confirmation
 step is explicit and occurs before capture:
-`backend_connection_confirmation_step_index: 2`,
-`expected_backend_connection_confirmation_step_index: 2`,
+`backend_connection_confirmation_step_index: 3`,
+`expected_backend_connection_confirmation_step_index: 3`,
 `operator_sequence_has_backend_connection_confirmation: true`,
-`operator_sequence_backend_connection_confirmation_step_index: 2`,
+`operator_sequence_backend_connection_confirmation_step_index: 3`,
 `operator_sequence_backend_connection_confirmation_before_capture: true`,
 `operator_sequence_backend_connection_confirmation_step` includes
 `existing backend connection`, `intended WING Rack`, and
 `read-only inspection`, and
-`operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
-`expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
+`operator_sequence_validate_readonly_preflight_inputs_step_index: 5`,
+`expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 5`,
 `operator_sequence_validate_readonly_preflight_inputs_step_index_matches_contract: true`,
 `operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
 `expected_operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
 `operator_sequence_validate_readonly_preflight_inputs_step_matches_contract: true`,
-`operator_sequence_capture_readonly_preflight_step_index: 5`,
-`expected_operator_sequence_capture_readonly_preflight_step_index: 5`,
+`operator_sequence_capture_readonly_preflight_step_index: 6`,
+`expected_operator_sequence_capture_readonly_preflight_step_index: 6`,
 `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`,
 `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
 `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
