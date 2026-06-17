@@ -668,6 +668,15 @@ def validation_error_violation(reason: str) -> str:
     return f"validation_{collapsed or 'invalid_args'}"
 
 
+def validation_error_operator_next_step(reason: str) -> str:
+    return (
+        "Fix the invalid read-only preflight arguments, regenerate the offline "
+        "expected plan with --plan-only using the same corrected arguments, "
+        "then rerun with --validate-run-inputs-only before opening the "
+        "backend/WING WebSocket."
+    )
+
+
 def build_read_requests(channels: tuple[int, ...], value_types: tuple[str, ...]) -> list[Dict[str, Any]]:
     requests: list[Dict[str, Any]] = []
     for channel in channels:
@@ -1294,6 +1303,9 @@ async def run(args: argparse.Namespace) -> int:
                 "execution_allowed_by_plan": False,
                 "live_authority_granted": False,
                 "manual_review_required_before_readiness_update": True,
+                "operator_next_step": validation_error_operator_next_step(
+                    validation_error
+                ),
             }
             plan_output_error = write_plan_output_if_requested(args, plan)
             if plan_output_error:
@@ -1398,6 +1410,9 @@ async def run(args: argparse.Namespace) -> int:
                 "validation_violations": [
                     validation_error_violation(validation_error)
                 ],
+                "operator_next_step": validation_error_operator_next_step(
+                    validation_error
+                ),
             }
         )
         recorder.write_summary(summary)

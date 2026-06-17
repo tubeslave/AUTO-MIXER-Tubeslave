@@ -1375,6 +1375,10 @@ async def test_readonly_preflight_reports_validation_violation_before_websocket(
     assert summary["validation_violations"] == [
         "validation_value_types_unsupported_eq"
     ]
+    assert "invalid read-only preflight arguments" in summary["operator_next_step"]
+    assert "--plan-only" in summary["operator_next_step"]
+    assert "--validate-run-inputs-only" in summary["operator_next_step"]
+    assert "backend/WING WebSocket" in summary["operator_next_step"]
     assert summary["websocket_opened"] is False
     assert summary["sent_request_types"] == []
 
@@ -3826,6 +3830,10 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
     assert printed["validation_violations"] == [
         "validation_operator_confirm_channels_must_exactly_match_channels"
     ]
+    assert "invalid read-only preflight arguments" in printed["operator_next_step"]
+    assert "--plan-only" in printed["operator_next_step"]
+    assert "--validate-run-inputs-only" in printed["operator_next_step"]
+    assert "backend/WING WebSocket" in printed["operator_next_step"]
     assert printed["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
     assert printed["operator_required"] is True
     assert printed["contacts_backend"] is False
