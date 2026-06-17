@@ -1305,6 +1305,7 @@ async def test_readonly_preflight_requires_expected_plan_before_websocket(
     assert "--expected-plan" in summary["operator_next_step"]
     assert summary["contacts_backend"] is False
     assert summary["queries_console"] is False
+    assert summary["mutates_console_state"] is False
     assert summary["live_authority_granted"] is False
     assert summary["sent_request_types"] == []
 
@@ -1440,6 +1441,7 @@ async def test_validate_run_inputs_only_passes_ready_command_without_websocket(
     assert summary["expected_plan_violations"] == []
     assert summary["contacts_backend"] is False
     assert summary["queries_console"] is False
+    assert summary["mutates_console_state"] is False
     assert summary["execution_allowed_by_validation"] is False
     assert summary["readiness_closure_allowed"] is False
     assert summary["live_authority_granted"] is False
@@ -1711,6 +1713,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     )
     assert written["contacts_backend"] is False
     assert written["queries_console"] is False
+    assert written["mutates_console_state"] is False
     assert written["execution_allowed_by_plan"] is False
     assert written["readiness_closure_allowed"] is False
     assert written["live_authority_granted"] is False
@@ -3849,6 +3852,7 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
     assert printed["operator_required"] is True
     assert printed["contacts_backend"] is False
     assert printed["queries_console"] is False
+    assert printed["mutates_console_state"] is False
     assert printed["manual_review_required_before_readiness_update"] is True
     assert printed["readiness_closure_allowed"] is False
     assert printed["live_authority_granted"] is False
