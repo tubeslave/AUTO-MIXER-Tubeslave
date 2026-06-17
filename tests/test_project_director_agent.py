@@ -300,6 +300,16 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority: true",
     ):
         assert marker in directive["selected_action"]
+    for marker in (
+        "artifact_manifest_verifier_check_verifier_report_read_only_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_live_write_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_contacts_wing_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_contacts_backend_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_mutates_console_state_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_queries_console_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true",
+    ):
+        assert marker in directive["selected_action"]
     assert "full_autonomous_ready: false" in directive["selected_action"]
     assert (
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
