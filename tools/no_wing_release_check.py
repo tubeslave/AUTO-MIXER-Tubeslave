@@ -6890,6 +6890,22 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         bool(validate_inputs_command_prestart_summary)
         and validate_inputs_command_prestart_summary == expected_prestart_summary
     )
+    required_validate_run_inputs_only_values = {
+        "validate_run_inputs_only_read_only": True,
+        "validate_run_inputs_only_live_write": False,
+        "validate_run_inputs_only_contacts_backend": False,
+        "validate_run_inputs_only_contacts_wing": False,
+        "validate_run_inputs_only_queries_console": False,
+        "validate_run_inputs_only_transport_opened": False,
+        "validate_run_inputs_only_write_request_sent": False,
+        "validate_run_inputs_only_proposal_request_sent": False,
+        "validate_run_inputs_only_readiness_closure_allowed": False,
+        "validate_run_inputs_only_grants_live_authority": False,
+    }
+    validate_run_inputs_only_values_match_expected = {
+        key: packet.get(key) == expected
+        for key, expected in required_validate_run_inputs_only_values.items()
+    }
     capture_command_artifact_root = command_value_after_flag(
         capture_command,
         "--artifact-root",
@@ -7448,6 +7464,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_validate_inputs_prestart_summary_mismatch"
         )
+    for key, expected in required_validate_run_inputs_only_values.items():
+        if packet.get(key) is not expected:
+            expected_suffix = "true" if expected is True else "false"
+            violations.append(
+                "wing_readonly_preflight_handoff_packet_"
+                f"{key}_not_{expected_suffix}"
+            )
     if commands.get("prestart_backend_port_check") != (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     ):
@@ -8462,6 +8485,11 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["manual_review_required_before_readiness_update"] = packet.get(
         "manual_review_required_before_readiness_update"
     )
+    for key in required_validate_run_inputs_only_values:
+        detail[key] = packet.get(key)
+        detail[f"{key}_matches_expected"] = (
+            validate_run_inputs_only_values_match_expected[key]
+        )
     detail["execution_allowed_by_packet"] = packet.get("execution_allowed_by_packet")
     detail["readiness_matrix_update_allowed_by_packet"] = packet.get(
         "readiness_matrix_update_allowed_by_packet"

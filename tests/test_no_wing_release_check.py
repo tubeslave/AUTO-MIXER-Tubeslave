@@ -1510,9 +1510,15 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             release_check.WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP
         ),
         "validate_run_inputs_only_before_capture": True,
+        "validate_run_inputs_only_read_only": True,
+        "validate_run_inputs_only_live_write": False,
         "validate_run_inputs_only_transport_opened": False,
         "validate_run_inputs_only_contacts_backend": False,
+        "validate_run_inputs_only_contacts_wing": False,
         "validate_run_inputs_only_queries_console": False,
+        "validate_run_inputs_only_write_request_sent": False,
+        "validate_run_inputs_only_proposal_request_sent": False,
+        "validate_run_inputs_only_readiness_closure_allowed": False,
         "validate_run_inputs_only_grants_live_authority": False,
         "artifact_manifest_verifier_required": True,
         "artifact_manifest_verifier_command": (
@@ -3573,6 +3579,21 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["execution_allowed_by_packet"] is False
     assert result.detail["readiness_matrix_update_allowed_by_packet"] is False
     assert result.detail["readiness_closure_allowed_by_packet"] is False
+
+    for key, expected in {
+        "validate_run_inputs_only_read_only": True,
+        "validate_run_inputs_only_live_write": False,
+        "validate_run_inputs_only_contacts_backend": False,
+        "validate_run_inputs_only_contacts_wing": False,
+        "validate_run_inputs_only_queries_console": False,
+        "validate_run_inputs_only_transport_opened": False,
+        "validate_run_inputs_only_write_request_sent": False,
+        "validate_run_inputs_only_proposal_request_sent": False,
+        "validate_run_inputs_only_readiness_closure_allowed": False,
+        "validate_run_inputs_only_grants_live_authority": False,
+    }.items():
+        assert result.detail[key] is expected
+        assert result.detail[f"{key}_matches_expected"] is True
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
     assert result.detail["url"] == "ws://localhost:8765"
@@ -5196,6 +5217,63 @@ def test_no_wing_release_check_rejects_handoff_packet_with_capture_step_mismatch
         "wing_readonly_preflight_handoff_packet_capture_step_mismatch"
         in result.detail["violations"]
     )
+
+
+def test_no_wing_release_check_rejects_handoff_validate_inputs_safety_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-validate-inputs-safety-drift.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    payload["validate_run_inputs_only_read_only"] = False
+    payload["validate_run_inputs_only_live_write"] = True
+    payload["validate_run_inputs_only_contacts_backend"] = True
+    payload["validate_run_inputs_only_contacts_wing"] = True
+    payload["validate_run_inputs_only_queries_console"] = True
+    payload["validate_run_inputs_only_transport_opened"] = True
+    payload["validate_run_inputs_only_write_request_sent"] = True
+    payload["validate_run_inputs_only_proposal_request_sent"] = True
+    payload["validate_run_inputs_only_readiness_closure_allowed"] = True
+    payload["validate_run_inputs_only_grants_live_authority"] = True
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    for key in (
+        "validate_run_inputs_only_read_only",
+        "validate_run_inputs_only_live_write",
+        "validate_run_inputs_only_contacts_backend",
+        "validate_run_inputs_only_contacts_wing",
+        "validate_run_inputs_only_queries_console",
+        "validate_run_inputs_only_transport_opened",
+        "validate_run_inputs_only_write_request_sent",
+        "validate_run_inputs_only_proposal_request_sent",
+        "validate_run_inputs_only_readiness_closure_allowed",
+        "validate_run_inputs_only_grants_live_authority",
+    ):
+        assert result.detail[f"{key}_matches_expected"] is False
+
+    for violation in (
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_read_only_not_true",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_live_write_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_contacts_backend_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_contacts_wing_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_queries_console_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_transport_opened_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_write_request_sent_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_proposal_request_sent_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_readiness_closure_allowed_not_false",
+        "wing_readonly_preflight_handoff_packet_validate_run_inputs_only_grants_live_authority_not_false",
+    ):
+        assert violation in result.detail["violations"]
 
 
 def test_no_wing_release_check_rejects_handoff_packet_with_command_artifact_binding_mismatch(
