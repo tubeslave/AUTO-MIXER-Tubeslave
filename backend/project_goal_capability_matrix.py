@@ -318,7 +318,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("compressor", "eq"),
         blocker="De-esser live writes need dynamics or dynamic-EQ readback and rollback proof.",
-        next_step="Connect vocal de-esser proposals to operator review without creating live writes.",
+        next_step="Connect arrangement-aware vocal de-esser proposals to operator review without creating live writes.",
     ),
     ProjectGoalCapabilityRow(
         id="panning",

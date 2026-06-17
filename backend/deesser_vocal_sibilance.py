@@ -97,6 +97,7 @@ class DeesserAnalysisInput:
     channel_id: int
     source_role: str
     channel_label: str = ""
+    arrangement_role: str = ""
     band_energy_db: Mapping[str, Any] = field(default_factory=dict)
     sibilance_ratio: Optional[float] = None
     sibilance_excess_db: float = 0.0
@@ -105,6 +106,7 @@ class DeesserAnalysisInput:
     persistence_cycles: int = 1
     true_peak_headroom_db: float = 6.0
     current_state_cache_freshness: Optional[Dict[str, Any]] = None
+    arrangement_context_cache_freshness: Optional[Dict[str, Any]] = None
     source_identity_trust_state: str = "not_provided"
     source_identity_trust_confidence: float = 0.0
     source_identity_replay_outcome_count: int = 0
@@ -205,6 +207,15 @@ def _frequency_from_bands(band_energy_db: Mapping[str, Any]) -> float:
     return DEFAULT_CENTER_HZ
 
 
+def _arrangement_deesser_profile(arrangement_role: str, source_role: str) -> Tuple[str, float, float, float]:
+    text = f"{arrangement_role} {source_role}".strip().lower().replace("-", "_")
+    if any(token in text for token in ("backing", "background", "tucked", "double", "harmony")):
+        return "tucked_or_backing_vocal", 0.8, 1.0, 2.0
+    if any(token in text for token in ("lead", "main", "anchor", "solo")):
+        return "lead_vocal", 1.0, 0.0, 0.0
+    return "general_vocal", 0.9, 0.5, 1.0
+
+
 def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
     if not isinstance(payload, Mapping):
         return "not_provided"
@@ -236,6 +247,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def analyze_deesser_need(
     analysis: DeesserAnalysisInput,
     *,
@@ -254,6 +273,19 @@ def analyze_deesser_need(
     is_vocal = is_vocal_role(analysis.source_role)
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
+    arrangement_context_freshness = _freshness_payload(
+        analysis.arrangement_context_cache_freshness
+    )
+    arrangement_context_freshness_status = str(
+        arrangement_context_freshness.get("status") or "unknown"
+    )
+    arrangement_context_no_authority = _freshness_is_no_authority(
+        arrangement_context_freshness
+    )
+    arrangement_profile, score_scale, excess_floor_offset, threshold_offset_db = (
+        _arrangement_deesser_profile(analysis.arrangement_role, analysis.source_role)
+    )
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=f"ch:{int(analysis.channel_id)}",
         source_type=str(analysis.source_role or "unknown"),
@@ -266,6 +298,8 @@ def analyze_deesser_need(
     evidence = {
         "source": DEESSER_VERSION,
         "source_role": analysis.source_role,
+        "arrangement_role": analysis.arrangement_role,
+        "arrangement_deesser_profile": arrangement_profile,
         "sibilance_ratio": round(ratio, 3),
         "sibilance_excess_db": round(excess_db, 2),
         "contribution_share": round(contribution, 3),
@@ -274,6 +308,16 @@ def analyze_deesser_need(
         "true_peak_headroom_db": round(_safe_float(analysis.true_peak_headroom_db), 2),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_dynamics_or_dynamic_eq_cache_no_live_authority": (
+            current_state_no_authority
+        ),
+        "arrangement_context_cache_freshness_status": (
+            arrangement_context_freshness_status
+        ),
+        "arrangement_context_cache_freshness": arrangement_context_freshness,
+        "current_arrangement_context_cache_no_live_authority": (
+            arrangement_context_no_authority
+        ),
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
     }
@@ -281,26 +325,43 @@ def analyze_deesser_need(
     blockers = []
     if not is_vocal:
         blockers.append("source_not_vocal")
-    if ratio < min_ratio and excess_db < min_excess_db:
+    effective_min_excess_db = min_excess_db + excess_floor_offset
+    if ratio < min_ratio and excess_db < effective_min_excess_db:
         blockers.append("sibilance_below_threshold")
     if _safe_float(analysis.true_peak_headroom_db) < 1.0:
         blockers.append("insufficient_true_peak_headroom_for_processing")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("deesser_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("deesser_current_state_cache_live_authority_present")
+    if arrangement_context_freshness_status != "fresh":
+        blockers.append("deesser_arrangement_context_cache_not_fresh")
+    if (
+        arrangement_context_freshness_status == "fresh"
+        and not arrangement_context_no_authority
+    ):
+        blockers.append("deesser_arrangement_context_cache_live_authority_present")
     blockers.extend(source_identity_trust.blockers)
 
     score = _clip01(
-        0.35 * (ratio / max(min_ratio, EPSILON))
-        + 0.35 * (excess_db / 8.0)
-        + 0.15 * contribution
-        + 0.15 * min(persistence / 3.0, 1.0)
+        (
+            0.35 * (ratio / max(min_ratio, EPSILON))
+            + 0.35 * (excess_db / 8.0)
+            + 0.15 * contribution
+            + 0.15 * min(persistence / 3.0, 1.0)
+        )
+        * score_scale
     )
     confidence = _clip01(score if is_vocal else score * 0.35)
     status = "proposal_only" if not blockers and confidence >= min_confidence else "analysis_only"
 
     frequency_hz = _clip(_frequency_from_bands(analysis.band_energy_db), MIN_CENTER_HZ, MAX_CENTER_HZ)
     ratio_value = _clip(MIN_RATIO + score * 4.0, MIN_RATIO, MAX_RATIO)
-    threshold = _clip(_safe_float(analysis.peak_dbfs) - (8.0 + score * 8.0), MIN_THRESHOLD_DB, MAX_THRESHOLD_DB)
+    threshold = _clip(
+        _safe_float(analysis.peak_dbfs) - (8.0 + score * 8.0) + threshold_offset_db,
+        MIN_THRESHOLD_DB,
+        MAX_THRESHOLD_DB,
+    )
     label = analysis.channel_label or f"Ch {analysis.channel_id}"
     if status == "proposal_only":
         reason = (

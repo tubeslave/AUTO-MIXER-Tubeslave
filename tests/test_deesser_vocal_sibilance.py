@@ -11,6 +11,17 @@ from backend.processing_registry import get_processing_method
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _fresh(fields=6):
+    return {
+        "status": "fresh",
+        "field_count": fields,
+        "fresh_field_count": fields,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
 def test_deesser_module_is_transport_free():
     source = Path("backend/deesser_vocal_sibilance.py").read_text()
 
@@ -33,6 +44,7 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
             channel_id=7,
             channel_label="Lead Vox",
             source_role="lead_vocal",
+            arrangement_role="lead",
             band_energy_db={
                 "low_mid": -38.0,
                 "mid": -30.0,
@@ -53,6 +65,14 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
                 "live_write": False,
                 "queries_console": False,
             },
+            arrangement_context_cache_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
         )
     )
 
@@ -64,8 +84,12 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
     assert recommendation.confidence >= 0.45
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
+    assert recommendation.evidence["arrangement_role"] == "lead"
+    assert recommendation.evidence["arrangement_deesser_profile"] == "lead_vocal"
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
+    assert recommendation.evidence["arrangement_context_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["arrangement_context_cache_freshness"]["fresh_field_count"] == 4
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
 
     proposal = recommendation.to_operator_proposal()
@@ -76,6 +100,85 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
     assert "unsupported_value_type:deesser" in proposal["blockers"]
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["arrangement_context_cache_freshness_status"] == "fresh"
+
+
+def test_backing_vocal_deesser_profile_is_less_aggressive_than_lead():
+    shared = {
+        "channel_id": 7,
+        "channel_label": "Vox",
+        "source_role": "lead_vocal",
+        "band_energy_db": {
+            "low_mid": -38.0,
+            "mid": -30.0,
+            "presence": -24.0,
+            "sibilance": -16.0,
+            "air": -18.0,
+        },
+        "sibilance_excess_db": 4.5,
+        "peak_dbfs": -7.0,
+        "contribution_share": 0.72,
+        "persistence_cycles": 3,
+        "true_peak_headroom_db": 5.0,
+        "current_state_cache_freshness": _fresh(8),
+        "arrangement_context_cache_freshness": _fresh(4),
+    }
+
+    lead = analyze_deesser_need(
+        DeesserAnalysisInput(**shared, arrangement_role="lead")
+    )
+    tucked = analyze_deesser_need(
+        DeesserAnalysisInput(**shared, arrangement_role="tucked backing vocal")
+    )
+
+    assert lead.status == "proposal_only"
+    assert tucked.status == "proposal_only"
+    assert tucked.evidence["arrangement_deesser_profile"] == "tucked_or_backing_vocal"
+    assert tucked.ratio < lead.ratio
+    assert tucked.threshold_db > lead.threshold_db
+    assert tucked.confidence < lead.confidence
+
+
+def test_stale_arrangement_context_blocks_deesser_proposal():
+    recommendation = analyze_deesser_need(
+        DeesserAnalysisInput(
+            channel_id=7,
+            channel_label="Lead Vox",
+            source_role="lead_vocal",
+            arrangement_role="lead",
+            band_energy_db={
+                "low_mid": -38.0,
+                "mid": -30.0,
+                "presence": -24.0,
+                "sibilance": -16.0,
+                "air": -18.0,
+            },
+            sibilance_excess_db=4.5,
+            peak_dbfs=-7.0,
+            contribution_share=0.72,
+            persistence_cycles=3,
+            true_peak_headroom_db=5.0,
+            arrangement_context_cache_freshness={
+                "status": "stale",
+                "field_count": 4,
+                "fresh_field_count": 2,
+                "stale_field_count": 2,
+                "stale_fields": ["arrangement_role", "section_role"],
+                "read_only": True,
+                "live_write": False,
+                "queries_console": False,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "deesser_arrangement_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["arrangement_context_cache_freshness_status"] == "stale"
+    assert recommendation.evidence["arrangement_context_cache_freshness"]["stale_fields"] == [
+        "arrangement_role",
+        "section_role",
+    ]
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
 def test_non_vocal_sibilance_is_not_deesser_proposal():
@@ -150,6 +253,156 @@ def test_stale_current_deesser_state_blocks_proposal_only_recommendation():
         "ratio",
     ]
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_missing_current_deesser_state_blocks_proposal_only_recommendation():
+    analysis = DeesserAnalysisInput(
+        channel_id=7,
+        channel_label="Lead Vox",
+        source_role="lead_vocal",
+        arrangement_role="lead",
+        band_energy_db={
+            "low_mid": -38.0,
+            "mid": -30.0,
+            "presence": -24.0,
+            "sibilance": -16.0,
+            "air": -18.0,
+        },
+        sibilance_excess_db=4.5,
+        peak_dbfs=-7.0,
+        contribution_share=0.72,
+        persistence_cycles=3,
+        true_peak_headroom_db=5.0,
+        arrangement_context_cache_freshness=_fresh(4),
+    )
+    recommendation = analyze_deesser_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "deesser_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert build_deesser_proposals([analysis]) == ()
+
+
+def test_missing_arrangement_context_blocks_deesser_proposal_only_recommendation():
+    analysis = DeesserAnalysisInput(
+        channel_id=7,
+        channel_label="Lead Vox",
+        source_role="lead_vocal",
+        arrangement_role="lead",
+        band_energy_db={
+            "low_mid": -38.0,
+            "mid": -30.0,
+            "presence": -24.0,
+            "sibilance": -16.0,
+            "air": -18.0,
+        },
+        sibilance_excess_db=4.5,
+        peak_dbfs=-7.0,
+        contribution_share=0.72,
+        persistence_cycles=3,
+        true_peak_headroom_db=5.0,
+        current_state_cache_freshness=_fresh(8),
+    )
+    recommendation = analyze_deesser_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "deesser_arrangement_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["arrangement_context_cache_freshness_status"] == "not_provided"
+    assert build_deesser_proposals([analysis]) == ()
+
+
+def test_live_authority_current_deesser_state_blocks_proposal_only_recommendation():
+    recommendation = analyze_deesser_need(
+        DeesserAnalysisInput(
+            channel_id=7,
+            channel_label="Lead Vox",
+            source_role="lead_vocal",
+            arrangement_role="lead",
+            band_energy_db={
+                "low_mid": -38.0,
+                "mid": -30.0,
+                "presence": -24.0,
+                "sibilance": -16.0,
+                "air": -18.0,
+            },
+            sibilance_excess_db=4.5,
+            peak_dbfs=-7.0,
+            contribution_share=0.72,
+            persistence_cycles=3,
+            true_peak_headroom_db=5.0,
+            current_state_cache_freshness={
+                "status": "fresh",
+                "field_count": 8,
+                "fresh_field_count": 8,
+                "read_only": False,
+                "live_write": True,
+                "queries_console": True,
+            },
+            arrangement_context_cache_freshness=_fresh(4),
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "deesser_current_state_cache_live_authority_present" in recommendation.blockers
+    assert (
+        recommendation.evidence[
+            "current_dynamics_or_dynamic_eq_cache_no_live_authority"
+        ]
+        is False
+    )
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert "deesser_current_state_cache_live_authority_present" in proposal["blockers"]
+
+
+def test_live_authority_arrangement_context_blocks_deesser_proposal_only_recommendation():
+    recommendation = analyze_deesser_need(
+        DeesserAnalysisInput(
+            channel_id=7,
+            channel_label="Lead Vox",
+            source_role="lead_vocal",
+            arrangement_role="lead",
+            band_energy_db={
+                "low_mid": -38.0,
+                "mid": -30.0,
+                "presence": -24.0,
+                "sibilance": -16.0,
+                "air": -18.0,
+            },
+            sibilance_excess_db=4.5,
+            peak_dbfs=-7.0,
+            contribution_share=0.72,
+            persistence_cycles=3,
+            true_peak_headroom_db=5.0,
+            current_state_cache_freshness=_fresh(8),
+            arrangement_context_cache_freshness={
+                "status": "fresh",
+                "field_count": 4,
+                "fresh_field_count": 4,
+                "read_only": False,
+                "live_write": True,
+                "queries_console": True,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert (
+        "deesser_arrangement_context_cache_live_authority_present"
+        in recommendation.blockers
+    )
+    assert (
+        recommendation.evidence[
+            "current_arrangement_context_cache_no_live_authority"
+        ]
+        is False
+    )
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert (
+        "deesser_arrangement_context_cache_live_authority_present"
+        in proposal["blockers"]
+    )
 
 
 def test_source_identity_hold_blocks_downstream_deesser_proposal():
@@ -258,6 +511,8 @@ def test_build_deesser_proposals_filters_to_proposal_only_items():
                 sibilance_excess_db=4.0,
                 contribution_share=0.7,
                 persistence_cycles=3,
+                current_state_cache_freshness=_fresh(8),
+                arrangement_context_cache_freshness=_fresh(4),
             ),
             DeesserAnalysisInput(
                 channel_id=3,
@@ -306,3 +561,6 @@ def test_deesser_is_registered_as_proposal_only_goal_capability():
     assert contracts["deesser_vocal_sibilance"]["proposal_contract"]["value_type"] == "deesser"
     evidence = contracts["deesser_vocal_sibilance"]["proposal_contract"]["safety_evidence_required"]
     assert "source_identity_downstream_trust" in evidence
+    assert "current_arrangement_context_cache_freshness" in evidence
+    assert "current_arrangement_context_cache_no_live_authority" in evidence
+    assert "current_dynamics_or_dynamic_eq_cache_no_live_authority" in evidence

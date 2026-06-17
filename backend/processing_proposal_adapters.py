@@ -166,9 +166,13 @@ PROPOSAL_ONLY_CONTRACTS = {
         "old_value_source": "cached_or_physical_dynamics_or_dynamic_eq_read_required_before_promotion",
         "safety_evidence": [
             "vocal_source_role",
+            "arrangement_role",
             "sibilance_ratio",
             "sibilance_persistence",
+            "current_arrangement_context_cache_freshness",
+            "current_arrangement_context_cache_no_live_authority",
             "current_dynamics_or_dynamic_eq_cache_freshness",
+            "current_dynamics_or_dynamic_eq_cache_no_live_authority",
             "source_identity_downstream_trust",
             "true_peak_headroom",
         ],

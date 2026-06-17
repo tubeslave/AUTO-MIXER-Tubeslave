@@ -14,6 +14,7 @@ offline, dry-run, proposal-only, read-only, and tested artifacts.
 | Pan / Stereo Placement | proposal_only | Keep spatial pan proposals non-queueable with fresh current-pan context, mono/phase safety for non-center moves, source-identity trust, and rollback/readback requirements. | separate ADR after WING MVP |
 | EQ | proposal_only | Keep corrective EQ proposals non-queueable with fresh EQ-band identity, feedback-notch/manual-band protection, bounded gain/headroom, fresh phase context, source-identity trust, and rollback/readback requirements. | separate ADR after WING MVP |
 | Compressor | proposal_only | Keep dynamics proposals non-queueable with GR estimate, true-peak bounded makeup gain, feedback safety, fresh dynamics context, source-identity trust, and rollback/readback requirements. | separate ADR after WING MVP |
+| De-essing | proposal_only | Keep vocal sibilance proposals arrangement-aware, freshness-gated, and non-queueable until dynamics/dynamic-EQ readback and rollback are proven. | separate ADR after WING MVP |
 | Gate / Expander | proposal_only_needed | Build gate proposals with source-identity freshness and chatter/hysteresis protection. | separate ADR after WING MVP |
 | FX / Sends | proposal_only_needed | Build FX/send proposal plans with return-level and monitor-safety boundaries. | separate ADR after WING MVP |
 | Routing / Groups | read_only_map_needed | Build read-only routing/group maps and proposal-only plans. | separate ADR after WING MVP |
