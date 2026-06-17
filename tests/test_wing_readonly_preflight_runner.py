@@ -3771,6 +3771,9 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
     assert printed["type"] == "wing_readonly_preflight_offline_plan"
     assert printed["status"] == "blocked"
     assert printed["reason"] == "--operator-confirm-channels must exactly match --channels"
+    assert printed["validation_violations"] == [
+        "validation_operator_confirm_channels_must_exactly_match_channels"
+    ]
     assert printed["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
     assert printed["operator_required"] is True
     assert printed["contacts_backend"] is False
