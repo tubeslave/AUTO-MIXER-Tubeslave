@@ -1324,12 +1324,17 @@ async def test_readonly_preflight_requires_expected_plan_before_websocket(
     assert summary["expected_plan_violations"] == ["expected_plan_missing"]
     assert "--plan-only" in summary["operator_next_step"]
     assert "--expected-plan" in summary["operator_next_step"]
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
     assert summary["contacts_backend"] is False
     assert summary["queries_console"] is False
     assert summary["mutates_console_state"] is False
     assert summary["executes_tests"] is False
     assert summary["readiness_matrix_update_allowed"] is False
+    assert summary["readiness_closure_allowed"] is False
     assert summary["live_authority_granted"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == []
 
 
@@ -1371,6 +1376,11 @@ async def test_validate_run_inputs_only_requires_expected_plan_before_websocket(
         == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
     )
     assert summary["contacts_wing"] is False
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
+    assert summary["readiness_closure_allowed"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == []
 
 
@@ -1409,6 +1419,12 @@ async def test_readonly_preflight_reports_validation_violation_before_websocket(
     assert "backend/WING WebSocket" in summary["operator_next_step"]
     assert summary["websocket_opened"] is False
     assert summary["contacts_wing"] is False
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
+    assert summary["readiness_closure_allowed"] is False
+    assert summary["live_authority_granted"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == []
 
 
@@ -1520,10 +1536,15 @@ async def test_readonly_preflight_reports_invalid_expected_plan_next_step_before
     assert summary["expected_plan_error"]["type"] == "JSONDecodeError"
     assert "Regenerate the offline expected plan" in summary["operator_next_step"]
     assert "--expected-plan" in summary["operator_next_step"]
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
     assert summary["contacts_backend"] is False
     assert summary["contacts_wing"] is False
     assert summary["queries_console"] is False
+    assert summary["readiness_closure_allowed"] is False
     assert summary["live_authority_granted"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == []
 
 
@@ -1572,10 +1593,15 @@ async def test_readonly_preflight_blocks_expected_plan_mismatch_before_websocket
     assert "expected_plan_request_sequence_mismatch" in summary["expected_plan_violations"]
     assert "current runtime arguments" in summary["operator_next_step"]
     assert "backend/WING WebSocket" in summary["operator_next_step"]
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
     assert summary["contacts_backend"] is False
     assert summary["contacts_wing"] is False
     assert summary["queries_console"] is False
+    assert summary["readiness_closure_allowed"] is False
     assert summary["live_authority_granted"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == []
 
 
