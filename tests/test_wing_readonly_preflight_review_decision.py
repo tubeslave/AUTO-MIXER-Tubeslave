@@ -10,11 +10,20 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
+    wing_readonly_preflight_accepted_candidate_artifact_root_contract,
+    wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
+    wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
     wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
     wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
@@ -36,6 +45,8 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
     source_id = "artifacts/wing_readonly_preflight/run/summary.json"
     candidate_review = {
         "source_id": source_id,
+        "summary_path": source_id,
+        "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
         "expected_artifacts": [
             f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
             f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
@@ -67,11 +78,26 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         "backend_port_prestart_summary_connection_policy": (
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
+        "backend_port_prestart_summary_read_only": True,
         "backend_port_prestart_summary_live_write": False,
         "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_contacts_wing": False,
+        "backend_port_prestart_summary_mutates_console_state": False,
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: True
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
     }
 
     assert wing_readonly_preflight_accepted_candidate_prestart_source_ids(
@@ -101,6 +127,24 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         )
         == {source_id: ["backend_port_prestart_summary_sha256_missing"]}
     )
+    malformed_digest_review = dict(
+        candidate_review,
+        backend_port_prestart_summary_sha256="not-a-sha256",
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            [source_id],
+            [malformed_digest_review],
+        )
+        == []
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [malformed_digest_review],
+        )
+        == {source_id: ["backend_port_prestart_summary_sha256_invalid"]}
+    )
     unbound_review = dict(
         candidate_review,
         summary_path_matches_expected_artifact=False,
@@ -119,6 +163,42 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         )
         == {source_id: ["summary_path_not_bound_to_expected_artifact"]}
     )
+    mismatched_summary_review = dict(
+        candidate_review,
+        expected_summary_artifact="artifacts/wing_readonly_preflight/other/summary.json",
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            [source_id],
+            [mismatched_summary_review],
+        )
+        == []
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [mismatched_summary_review],
+        )
+        == {source_id: ["expected_summary_artifact_mismatch"]}
+    )
+    mismatched_events_review = dict(
+        candidate_review,
+        expected_events_artifact="artifacts/wing_readonly_preflight/other/events.jsonl",
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            [source_id],
+            [mismatched_events_review],
+        )
+        == []
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [mismatched_events_review],
+        )
+        == {source_id: ["expected_events_artifact_mismatch"]}
+    )
     assert (
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
             ["missing-summary.json"],
@@ -126,6 +206,68 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         )
         == {"missing-summary.json": ["candidate_review_missing"]}
     )
+
+
+def test_accepted_candidate_artifact_root_contract_rejects_parent_traversal():
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    traversal_summary = (
+        "artifacts/wing_readonly_preflight/../stale_preflight/run/summary.json"
+    )
+    traversal_events = (
+        "artifacts/wing_readonly_preflight/../stale_preflight/run/events.jsonl"
+    )
+    artifact_roots, violations = (
+        wing_readonly_preflight_accepted_candidate_artifact_root_contract(
+            [source_id],
+            [
+                {
+                    "source_id": source_id,
+                    "artifact_root": "artifacts/wing_readonly_preflight",
+                    "summary_path": traversal_summary,
+                    "events_path": traversal_events,
+                    "expected_summary_artifact": traversal_summary,
+                    "expected_events_artifact": traversal_events,
+                }
+            ],
+        )
+    )
+
+    assert artifact_roots == ["artifacts/wing_readonly_preflight"]
+    assert set(violations[source_id]) == {
+        "summary_path_contains_parent_traversal",
+        "summary_path_not_under_artifact_root",
+        "events_path_contains_parent_traversal",
+        "events_path_not_under_artifact_root",
+        "expected_summary_artifact_contains_parent_traversal",
+        "expected_summary_artifact_not_under_artifact_root",
+        "expected_events_artifact_contains_parent_traversal",
+        "expected_events_artifact_not_under_artifact_root",
+    }
+
+
+def test_accepted_candidate_artifact_root_contract_rejects_parent_traversal_in_root():
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    events_path = "artifacts/wing_readonly_preflight/run/events.jsonl"
+    artifact_roots, violations = (
+        wing_readonly_preflight_accepted_candidate_artifact_root_contract(
+            [source_id],
+            [
+                {
+                    "source_id": source_id,
+                    "artifact_root": "artifacts/wing_readonly_preflight/..",
+                    "summary_path": source_id,
+                    "events_path": events_path,
+                    "expected_summary_artifact": source_id,
+                    "expected_events_artifact": events_path,
+                }
+            ],
+        )
+    )
+
+    assert artifact_roots == ["artifacts/wing_readonly_preflight/.."]
+    assert violations == {
+        source_id: ["artifact_root_contains_parent_traversal"]
+    }
 
 
 def _valid_summary() -> dict:
@@ -136,6 +278,7 @@ def _valid_summary() -> dict:
         "captured_at": "2026-06-07T01:00:00Z",
         "proof_artifact_schema": "wing_readonly_preflight.v1",
         "proof_runner": "wing_readonly_preflight_runner",
+        "artifact_root": "artifacts/wing_readonly_preflight",
         "connection_mode": "wing",
         "channels": [3],
         "operator_channel_confirmation_required": True,
@@ -175,11 +318,26 @@ def _valid_summary() -> dict:
         "backend_port_prestart_summary_connection_policy": (
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
+        "backend_port_prestart_summary_read_only": True,
         "backend_port_prestart_summary_live_write": False,
         "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_contacts_wing": False,
+        "backend_port_prestart_summary_mutates_console_state": False,
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: True
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -222,6 +380,27 @@ def _valid_summary() -> dict:
     }
 
 
+def _expected_request_sequence() -> list[dict]:
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        {
+            "type": "query_mixer_parameter",
+            "request_id": "wing-readonly-preflight:ch3:fader",
+            "channel": 3,
+            "value_type": "fader",
+            "address": "/ch/3/fdr",
+        },
+        {
+            "type": "query_mixer_parameter",
+            "request_id": "wing-readonly-preflight:ch3:gain",
+            "channel": 3,
+            "value_type": "gain",
+            "address": "/ch/3/in/set/trim",
+        },
+    ]
+
+
 def _evidence_with_candidate() -> dict:
     evidence = build_wing_readonly_preflight_evidence(
         artifact_payloads=(_valid_summary(),),
@@ -240,6 +419,10 @@ def _evidence_with_candidate() -> dict:
     )
     candidate["summary_path_matches_expected_artifact"] = True
     candidate["events_path_matches_expected_artifact"] = True
+    candidate["event_log_run_id_matches_summary"] = True
+    candidate["request_sequence"] = _expected_request_sequence()
+    candidate["plan_request_sequence"] = _expected_request_sequence()
+    candidate["request_sequence_matches_plan"] = True
     return evidence
 
 
@@ -249,10 +432,20 @@ def _accepted_record(**overrides) -> dict:
         "artifact_source_id": "inline_payload_0",
         "run_id": "20260606T120000Z_wing_readonly_preflight",
         "artifact_captured_at": "2026-06-07T01:00:00Z",
+        "artifact_root": "artifacts/wing_readonly_preflight",
         "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
         "summary_sha256": "1" * 64,
         "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
         "events_sha256": "2" * 64,
+        "channels": [3],
+        "value_types": ["fader", "gain"],
+        "operator_confirmed_channels": [3],
+        "operator_confirmed_session_ready": True,
+        "readback_count": 2,
+        "physical_readback_count": 2,
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "request_id_correlation_required": True,
+        "event_log_run_id_matches_summary": True,
         "decision": "accepted",
         "reviewed_by": "operator",
         "reviewed_at": "2026-06-07T01:05:00Z",
@@ -304,6 +497,7 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
             "status": "valid_readonly_preflight_artifact",
             "run_id": "20260606T120000Z_wing_readonly_preflight",
             "captured_at": "2026-06-07T01:00:00Z",
+            "artifact_root": "artifacts/wing_readonly_preflight",
             "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
             "summary_sha256": "1" * 64,
             "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
@@ -320,6 +514,9 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
             ),
             "summary_path_matches_expected_artifact": True,
             "events_path_matches_expected_artifact": True,
+            "request_sequence": _expected_request_sequence(),
+            "plan_request_sequence": _expected_request_sequence(),
+            "request_sequence_matches_plan": True,
             "backend_port_prestart_check_required": True,
             "backend_port_prestart_check_must_pass_before_starting_backend": True,
             "backend_port_prestart_check_command": [
@@ -344,11 +541,26 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
             "backend_port_prestart_summary_connection_policy": (
                 "no_hardware_no_network_no_live_writes"
             ),
+            "backend_port_prestart_summary_read_only": True,
             "backend_port_prestart_summary_live_write": False,
             "backend_port_prestart_summary_contacts_backend": False,
+            "backend_port_prestart_summary_contacts_wing": False,
+            "backend_port_prestart_summary_mutates_console_state": False,
             "backend_port_prestart_summary_queries_console": False,
             "backend_port_prestart_summary_executes_tests": False,
             "backend_port_prestart_check_status": "passed",
+            **{
+                field: False
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
+            **{
+                field: False
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+            },
+            **{
+                field: True
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+            },
         }
     ]
     assert "operator_must_record_readonly_preflight_review_decision" in ledger[
@@ -374,8 +586,71 @@ def test_review_decision_ledger_records_accepted_candidate_without_live_authorit
         ledger["summary"]["accepted_candidate_prestart_contract_violations_by_source"]
         == {}
     )
+    assert ledger["summary"]["accepted_candidate_artifact_root_contract_valid"] is True
+    assert ledger["summary"]["accepted_candidate_artifact_roots"] == [
+        "artifacts/wing_readonly_preflight"
+    ]
+    assert (
+        ledger["summary"][
+            "accepted_candidate_artifact_root_contract_violations_by_source"
+        ]
+        == {}
+    )
+    assert (
+        ledger["summary"]["accepted_candidate_request_sequence_contract_valid"]
+        is True
+    )
+    assert ledger["summary"]["accepted_candidate_request_sequence_source_ids"] == [
+        "inline_payload_0"
+    ] == wing_readonly_preflight_accepted_candidate_request_sequence_source_ids(
+        ["inline_payload_0"],
+        ledger["summary"]["candidate_reviews"],
+    )
+    assert (
+        ledger["summary"][
+            "accepted_candidate_request_sequence_contract_violations_by_source"
+        ]
+        == wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source(
+            ["inline_payload_0"],
+            ledger["summary"]["candidate_reviews"],
+        )
+    )
     assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["readiness_closure_allowed_by_decision"] is False
+    assert ledger["summary"]["live_authority_granted"] is False
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_without_request_sequence_trace():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["plan_request_sequence"] = []
+    evidence["artifacts"][0]["request_sequence_matches_plan"] = False
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert (
+        ledger["summary"]["accepted_candidate_request_sequence_contract_valid"]
+        is False
+    )
+    assert ledger["summary"]["accepted_candidate_request_sequence_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_request_sequence_contract_violations_by_source"
+    ] == {
+        "inline_payload_0": [
+            "plan_request_sequence_missing",
+            "request_sequence_matches_plan_not_true",
+        ]
+    }
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+    assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["live_authority_granted"] is False
     assert ledger["summary"]["full_autonomous_ready"] is False
     record = ledger["records"][0]
@@ -409,6 +684,39 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contr
     assert ledger["summary"]["live_authority_granted"] is False
 
 
+def test_review_decision_ledger_blocks_accepted_candidate_with_artifact_root_violation():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["artifact_root"] = "artifacts/wing_readonly_preflight/.."
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[
+            _accepted_record(artifact_root="artifacts/wing_readonly_preflight/.."),
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is True
+    assert (
+        ledger["summary"]["accepted_candidate_artifact_root_contract_valid"]
+        is False
+    )
+    assert ledger["summary"]["accepted_candidate_artifact_roots"] == [
+        "artifacts/wing_readonly_preflight/.."
+    ]
+    assert ledger["summary"][
+        "accepted_candidate_artifact_root_contract_violations_by_source"
+    ] == {"inline_payload_0": ["artifact_root_contains_parent_traversal"]}
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+    assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
+    assert ledger["summary"]["live_authority_granted"] is False
+
+
 def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_summary_binding():
     evidence = _evidence_with_candidate()
     evidence["artifacts"][0]["backend_port_prestart_summary_sha256"] = None
@@ -426,6 +734,56 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_summa
     assert ledger["summary"][
         "accepted_candidate_prestart_contract_violations_by_source"
     ] == {"inline_payload_0": ["backend_port_prestart_summary_sha256_missing"]}
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_with_malformed_prestart_digest():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["backend_port_prestart_summary_sha256"] = "not-a-sha256"
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {"inline_payload_0": ["backend_port_prestart_summary_sha256_invalid"]}
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_without_required_false_prestart_detail():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["backend_port_prestart_gate_live_authority_granted"] = True
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {
+        "inline_payload_0": [
+            "backend_port_prestart_gate_live_authority_granted_not_false"
+        ]
+    }
     assert (
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
         in ledger["summary"]["blocked_by"]
@@ -453,6 +811,47 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_expected_artif
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
         in ledger["summary"]["blocked_by"]
     )
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_with_mismatched_expected_artifact_paths():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["expected_summary_artifact"] = (
+        "artifacts/wing_readonly_preflight/other/summary.json"
+    )
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {"inline_payload_0": ["expected_summary_artifact_mismatch"]}
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["expected_events_artifact"] = (
+        "artifacts/wing_readonly_preflight/other/events.jsonl"
+    )
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {"inline_payload_0": ["expected_events_artifact_mismatch"]}
 
 
 def test_review_decision_ledger_loads_decision_record_from_json_file(tmp_path):
@@ -574,6 +973,110 @@ def test_review_decision_ledger_rejects_unsafe_or_unmatched_decision():
     assert ledger["records"][0]["unsafe_authority_flags"] == ["live_authority_granted"]
 
 
+def test_review_decision_ledger_rejects_old_checklist_without_event_run_id_binding():
+    old_checklist = [
+        item
+        for item in REQUIRED_REVIEW_CHECKLIST_IDS
+        if item != "confirm_event_log_run_id_binding"
+    ]
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record(checklist_ids=old_checklist)],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 1
+    assert "review_decision_checklist_ids_mismatch" in (
+        ledger["records"][0]["violations"]
+    )
+
+
+def test_review_decision_ledger_rejects_record_without_event_run_id_verdict():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record(event_log_run_id_matches_summary=False)],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 1
+    assert "review_decision_event_log_run_id_not_confirmed" in (
+        ledger["records"][0]["violations"]
+    )
+    assert ledger["records"][0]["event_log_run_id_matches_summary"] is False
+
+
+def test_review_decision_ledger_rejects_record_without_request_id_correlation_verdict():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(
+                request_id_policy="",
+                request_id_correlation_required=False,
+            )
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 1
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_request_id_policy_mismatch" in violations
+    assert "review_decision_request_id_correlation_not_confirmed" in violations
+    assert ledger["records"][0]["request_id_policy"] == ""
+    assert ledger["records"][0]["request_id_correlation_required"] is False
+
+
+def test_review_decision_ledger_rejects_stale_scope_fields():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(
+                channels=[4],
+                value_types=["fader"],
+                operator_confirmed_channels=[4],
+                operator_confirmed_session_ready=False,
+                readback_count=1,
+                physical_readback_count=1,
+            )
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 1
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_channels_mismatch" in violations
+    assert "review_decision_value_types_mismatch" in violations
+    assert "review_decision_operator_confirmed_channels_mismatch" in violations
+    assert "review_decision_operator_session_not_confirmed" in violations
+    assert "review_decision_readback_count_mismatch" in violations
+    assert "review_decision_physical_readback_count_mismatch" in violations
+
+
+def test_review_decision_ledger_rejects_coerced_channel_scope_fields():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(
+                channels=["3"],
+                operator_confirmed_channels=[3.0],
+            )
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 1
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_channels_mismatch" in violations
+    assert "review_decision_operator_confirmed_channels_mismatch" in violations
+    assert ledger["records"][0]["channels"] == []
+    assert ledger["records"][0]["operator_confirmed_channels"] == []
+
+
 def test_review_decision_ledger_rejects_stale_artifact_hashes():
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=_evidence_with_candidate(),
@@ -590,6 +1093,90 @@ def test_review_decision_ledger_rejects_stale_artifact_hashes():
     violations = set(ledger["records"][0]["violations"])
     assert "review_decision_summary_sha256_mismatch" in violations
     assert "review_decision_events_sha256_mismatch" in violations
+
+
+def test_review_decision_ledger_rejects_missing_or_stale_artifact_root():
+    missing_root = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record(artifact_root="")],
+    )
+    stale_root = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record(artifact_root="artifacts/stale_preflight")],
+    )
+
+    assert missing_root["status"] == "operator_review_decision_replacement_required"
+    assert missing_root["summary"]["invalid_record_count"] == 1
+    assert (
+        "review_decision_artifact_root_missing"
+        in missing_root["records"][0]["violations"]
+    )
+    assert stale_root["status"] == "operator_review_decision_replacement_required"
+    assert stale_root["summary"]["invalid_record_count"] == 1
+    assert (
+        "review_decision_artifact_root_mismatch"
+        in stale_root["records"][0]["violations"]
+    )
+
+
+def test_review_decision_ledger_rejects_missing_review_id():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record(review_id="")],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 1
+    assert "review_decision_review_id_missing" in ledger["records"][0]["violations"]
+    assert (
+        ledger["records"][0]["operator_accepted_readonly_preflight_candidate"]
+        is False
+    )
+
+
+def test_review_decision_ledger_rejects_unedited_template_status():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(
+                template_status=WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
+            )
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 1
+    assert (
+        "review_decision_template_status_unedited"
+        in ledger["records"][0]["violations"]
+    )
+    assert ledger["records"][0]["template_status"] == (
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
+    assert (
+        ledger["records"][0]["operator_accepted_readonly_preflight_candidate"]
+        is False
+    )
+
+
+def test_review_decision_ledger_rejects_malformed_artifact_hashes():
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[
+            _accepted_record(
+                summary_sha256="not-a-sha256",
+                events_sha256="also-not-a-sha256",
+            )
+        ],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["invalid_record_count"] == 1
+    violations = set(ledger["records"][0]["violations"])
+    assert "review_decision_summary_sha256_invalid" in violations
+    assert "review_decision_events_sha256_invalid" in violations
 
 
 def test_review_decision_ledger_rejects_pre_capture_review_decision():

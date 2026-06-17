@@ -47,6 +47,44 @@ DECLARED_OPERATOR_SEQUENCE_COUNT_FIELD_MARKERS = tuple(
     marker.split(":", 1)[0] for marker in DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS
 )
 
+ENVIRONMENT_BLOCKED_FRONTEND_MARKERS = (
+    "environment_blocked_checks",
+    "environment_blocked_check_details",
+    "local_dev_server_bind_denied",
+    "127.0.0.1:3000",
+)
+
+ARTIFACT_MANIFEST_SUMMARY_SURFACE_SIDECAR_MARKERS = (
+    "artifact-manifest.json",
+    "same no-WING artifact directory",
+    "artifact_manifest_self_consistency_summary_surface_match: true",
+    "artifact_manifest_self_consistency_summary_surface_json_mismatches: []",
+    "artifact_manifest_self_consistency_summary_surface_markdown_mismatches: []",
+    "artifact_manifest_self_consistency_summary_surface_mismatches: []",
+    "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed: false",
+    "artifact_manifest_self_consistency_summary_surface_live_authority_granted: false",
+    "artifact_manifest_self_consistency_match: true",
+    "artifact_manifest_self_consistency_mismatches: []",
+    "artifact_manifest_contract_cross_surface_match: true",
+    "artifact_manifest_contract_cross_surface_mismatches: []",
+)
+
+ARTIFACT_MANIFEST_VERIFIER_REPORT_MARKERS = (
+    "PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py",
+    "status: passed",
+    "failed_checks: []",
+    "failed_checks_missing_check_entries: []",
+    "failed_checks_have_check_entries: true",
+    "verifier_report_required_fields_present: true",
+    "verifier_report_required_fields_missing: []",
+    "verifier_report_required_fields_match_contract: true",
+    "artifact_manifest_verifier_report_required_fields",
+    "checks",
+    "verifier_report_required_fields",
+    "verifier_report_required_fields_missing",
+    "verifier_report_required_fields_match_contract",
+)
+
 
 def load_progress_module():
     spec = importlib.util.spec_from_file_location("update_mvp_progress", PROGRESS_TOOL)
@@ -134,6 +172,8 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "listener_process_error" in text
     assert "safe_to_stop_listener_by_gate" in text
     assert "operator_next_step" in text
+    for marker in ENVIRONMENT_BLOCKED_FRONTEND_MARKERS:
+        assert marker in text
     assert "listener_confirmation_template_path" in text
     assert "listener_confirmation_template_acceptance_status" in text
     assert "listener_confirmation_template_status: pending_operator_edit" in text
@@ -178,8 +218,11 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         "backend_port_prestart_summary_connection_policy: "
         "no_hardware_no_network_no_live_writes"
     ) in text
+    assert "backend_port_prestart_summary_read_only: true" in text
     assert "backend_port_prestart_summary_live_write: false" in text
     assert "backend_port_prestart_summary_contacts_backend: false" in text
+    assert "backend_port_prestart_summary_contacts_wing: false" in text
+    assert "backend_port_prestart_summary_mutates_console_state: false" in text
     assert "backend_port_prestart_summary_queries_console: false" in text
     assert "backend_port_prestart_summary_executes_tests: false" in text
     assert "backend_port_prestart_check_status: passed" in text
@@ -187,11 +230,29 @@ def test_mvp_doc_declares_scope_and_stop_rules():
         "backend_port_prestart_summary_type_matches_plan: true",
         "backend_port_prestart_summary_status_matches_plan: true",
         "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_read_only_matches_plan: true",
         "backend_port_prestart_summary_live_write_matches_plan: true",
         "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+        "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
         "backend_port_prestart_summary_queries_console_matches_plan: true",
         "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "plan_safe_to_stop_listener_by_gate: false",
+        "plan_live_authority_granted: false",
+        "plan_backend_port_prestart_gate_execution_allowed: false",
+        "plan_backend_port_prestart_gate_readiness_closure_allowed: false",
+        "plan_backend_port_prestart_gate_live_authority_granted: false",
         "backend_port_prestart_check_status_matches_plan: true",
+        "safe_to_stop_listener_by_gate_matches_plan: true",
+        "live_authority_granted_matches_plan: true",
+        "backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "backend_port_prestart_gate_live_authority_granted_matches_plan: true",
+        "declared_safe_to_stop_listener_by_gate_matches_plan: true",
+        "declared_live_authority_granted_matches_plan: true",
+        "declared_backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true",
     ):
         assert marker in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
@@ -598,10 +659,19 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "backend_port_prestart_summary_status: passed" in rows[0][
         "next action"
     ]
+    assert "backend_port_prestart_summary_read_only: true" in rows[0][
+        "next action"
+    ]
     assert "backend_port_prestart_summary_live_write: false" in rows[0][
         "next action"
     ]
     assert "backend_port_prestart_summary_contacts_backend: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_contacts_wing: false" in rows[0][
+        "next action"
+    ]
+    assert "backend_port_prestart_summary_mutates_console_state: false" in rows[0][
         "next action"
     ]
     assert "backend_port_prestart_summary_queries_console: false" in rows[0][
@@ -913,6 +983,8 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "listener_process_error" in readonly
     assert "safe_to_stop_listener_by_gate" in readonly
     assert "operator_next_step" in readonly
+    for marker in ENVIRONMENT_BLOCKED_FRONTEND_MARKERS:
+        assert marker in readonly
     assert "listener_confirmation_template_accepted_by_template: false" in readonly
     assert (
         "listener_confirmation_template_execution_allowed_by_template: false"
@@ -986,6 +1058,25 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "reviewed_listener_command_line" in readonly
     assert "safe_to_stop_listener_by_gate" in readonly
     assert "live_authority_granted" in readonly
+    assert '"artifact_root": "artifacts/wing_readonly_preflight"' in readonly
+    assert "`review_id` field must remain present" in readonly
+    assert (
+        "keeps the record invalid even if the artifact hashes still match"
+        in readonly
+    )
+    assert (
+        "`template_status: operator_must_replace_placeholders_before_ledger_acceptance`"
+        in readonly
+    )
+    assert "unedited pending template and fails closed" in readonly
+    assert (
+        "`artifact_captured_at`, `artifact_root`, `summary_sha256`, `events_sha256`"
+        in readonly
+    )
+    assert (
+        "`artifact_captured_at`, `artifact_root`, `summary_path`, `events_path`"
+        in readonly
+    )
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in readonly
@@ -1015,6 +1106,21 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "Full autonomous" not in supervised
 
 
+def test_readonly_runbook_requires_no_wing_manifest_summary_surface_sidecar_gate():
+    readonly = READONLY_RUNBOOK.read_text(encoding="utf-8")
+    normalized_readonly = " ".join(readonly.split())
+
+    assert "Before opening a backend/WING WebSocket" in readonly
+    assert "do not open the WING session" in normalized_readonly
+    assert "do not close readiness" in readonly
+    assert "approve live writes" in readonly
+    assert "grant live authority" in readonly
+    for marker in ARTIFACT_MANIFEST_SUMMARY_SURFACE_SIDECAR_MARKERS:
+        assert marker in readonly
+    for marker in ARTIFACT_MANIFEST_VERIFIER_REPORT_MARKERS:
+        assert marker in readonly
+
+
 def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     progress = load_progress_module()
     rows = progress.parse_blocker_table(BLOCKERS_DOC)
@@ -1027,6 +1133,94 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "required_supervised_proof_plan_summary_fields_match_contract: true"
         in current_command
     )
+    assert (
+        "required_supervised_proof_plan_summary_fields_include_invalid_records: true"
+        in current_command
+    )
+    assert "operator-readable no-WING `summary.md`" in current_command
+    assert "operator_markdown_summary_required: true" in current_command
+    assert "operator_markdown_summary_field_lines_rendered: true" in current_command
+    assert "operator_markdown_summary_missing_field_lines: []" in current_command
+    assert "operator_markdown_summary_artifact: summary.md" in current_command
+    assert "operator_markdown_summary_sha256" in current_command
+    assert "operator_markdown_summary_sha256_available: true" in current_command
+    assert "operator_markdown_summary_actual_sha256" in current_command
+    assert "operator_markdown_summary_sha256_matches_actual: true" in current_command
+    assert "artifact_manifest_summary_surface_required: true" in current_command
+    assert "artifact_manifest_summary_surface_missing_fields: []" in current_command
+    assert "artifact_manifest_summary_surface_required_field_lines" in current_command
+    assert (
+        "artifact_manifest_summary_surface_missing_field_lines: []"
+        in current_command
+    )
+    assert (
+        "artifact_manifest_summary_surface_field_lines_rendered: true"
+        in current_command
+    )
+    assert "artifact_manifest_contract_id" in current_command
+    assert "artifact_manifest_contract_required: true" in current_command
+    assert "artifact_manifest_contract_fields" in current_command
+    assert "artifact_manifest_contract_sha256" in current_command
+    assert "artifact_manifest_contract_sha256_available: true" in current_command
+    assert (
+        "artifact_manifest_contract_sha256_matches_expected: true"
+        in current_command
+    )
+    assert "artifact_manifest_contract_cross_surface_required: true" in current_command
+    assert "artifact_manifest_contract_cross_surface_required_surfaces" in current_command
+    assert "artifact_manifest_contract_cross_surface_required_fields" in current_command
+    assert (
+        "artifact_manifest_contract_cross_surface_expected_match: true"
+        in current_command
+    )
+    assert "artifact_manifest_contract_cross_surface_match: true" in current_command
+    assert (
+        "artifact_manifest_summary_json_contract_sha256_matches_manifest: true"
+        in current_command
+    )
+    assert (
+        "artifact_manifest_summary_md_contract_sha256_matches_manifest: true"
+        in current_command
+    )
+    assert "artifact_manifest_contract_cross_surface_mismatches: []" in current_command
+    assert (
+        "artifact_manifest_contract_cross_surface_readiness_closure_allowed: false"
+        in current_command
+    )
+    assert (
+        "artifact_manifest_contract_cross_surface_live_authority_granted: false"
+        in current_command
+    )
+    assert "artifact_manifest_required_artifact_sha256_fields" in current_command
+    assert "artifact_manifest_path: artifact-manifest.json" in current_command
+    assert "artifact_manifest_artifact_count: 2" in current_command
+    assert "artifact_manifest_required_artifact_count: 2" in current_command
+    assert "artifact_manifest_artifact_count_matches_required: true" in current_command
+    assert "artifact_manifest_required_artifact_ids" in current_command
+    assert "artifact_manifest_artifact_ids" in current_command
+    assert "artifact_manifest_required_artifacts_present: true" in current_command
+    assert "artifact_manifest_required_artifact_paths" in current_command
+    assert "artifact_manifest_artifact_paths" in current_command
+    assert "artifact_manifest_required_artifact_paths_present: true" in current_command
+    assert (
+        "artifact_manifest_required_artifact_sha256_available: true"
+        in current_command
+    )
+    assert "artifact_manifest_summary_json_sha256" in current_command
+    assert "artifact_manifest_summary_json_sha256_available: true" in current_command
+    assert "artifact_manifest_summary_md_sha256" in current_command
+    assert "artifact_manifest_summary_md_sha256_available: true" in current_command
+    assert "artifact_manifest_readiness_closure_allowed: false" in current_command
+    assert "artifact_manifest_live_authority_granted: false" in current_command
+    assert "Before opening a backend/WING WebSocket" in current_command
+    assert "do not open the WING session" in current_command
+    assert "do not close readiness" in current_command
+    assert "approve live writes" in current_command
+    assert "grant live authority" in current_command
+    for marker in ARTIFACT_MANIFEST_SUMMARY_SURFACE_SIDECAR_MARKERS:
+        assert marker in current_command
+    for marker in ARTIFACT_MANIFEST_VERIFIER_REPORT_MARKERS:
+        assert marker in current_command
     assert "backend_port_prestart_gate_matches_expected: true" in current_command
     assert (
         "declared_backend_port_prestart_gate_matches_expected: true"
@@ -1043,6 +1237,14 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     assert (
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_artifact_roots"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
         in current_command
     )
     assert "project_director_selected_action_anchor" in current_command
@@ -1113,6 +1315,150 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
             missing_proof_plan_fields_command
         )
     )
+    missing_markdown_summary_command = current_command.replace(
+        "operator-readable no-WING `summary.md`",
+        "machine-only no-WING summary",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_markdown_summary_command
+    )
+    assert "operator-readable no-WING `summary.md`" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_markdown_summary_command
+        )
+    )
+    missing_markdown_rendered_command = current_command.replace(
+        "operator_markdown_summary_field_lines_rendered: true",
+        "operator_markdown_summary_field_lines_rendered: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_markdown_rendered_command
+    )
+    assert "operator_markdown_summary_field_lines_rendered: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_markdown_rendered_command
+        )
+    )
+    missing_markdown_sha_command = current_command.replace(
+        "operator_markdown_summary_sha256_available: true",
+        "operator_markdown_summary_sha256_available: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_markdown_sha_command
+    )
+    assert "operator_markdown_summary_sha256_available: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_markdown_sha_command
+        )
+    )
+    missing_markdown_sha_match_command = current_command.replace(
+        "operator_markdown_summary_sha256_matches_actual: true",
+        "operator_markdown_summary_sha256_matches_actual: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_markdown_sha_match_command
+    )
+    assert "operator_markdown_summary_sha256_matches_actual: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_markdown_sha_match_command
+        )
+    )
+    missing_artifact_manifest_command = current_command.replace(
+        "artifact_manifest_path: artifact-manifest.json",
+        "artifact_manifest_path: missing",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_command
+    )
+    assert "artifact_manifest_path: artifact-manifest.json" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_command
+        )
+    )
+    missing_artifact_manifest_surface_command = current_command.replace(
+        "artifact_manifest_summary_surface_required: true",
+        "artifact_manifest_summary_surface_required: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_surface_command
+    )
+    assert "artifact_manifest_summary_surface_required: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_surface_command
+        )
+    )
+    missing_artifact_manifest_surface_rendered_command = current_command.replace(
+        "artifact_manifest_summary_surface_field_lines_rendered: true",
+        "artifact_manifest_summary_surface_field_lines_rendered: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_surface_rendered_command
+    )
+    assert "artifact_manifest_summary_surface_field_lines_rendered: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_surface_rendered_command
+        )
+    )
+    missing_artifact_manifest_contract_digest_command = current_command.replace(
+        "artifact_manifest_contract_sha256_matches_expected: true",
+        "artifact_manifest_contract_sha256_matches_expected: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_contract_digest_command
+    )
+    assert "artifact_manifest_contract_sha256_matches_expected: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_contract_digest_command
+        )
+    )
+    missing_artifact_manifest_cross_surface_command = current_command.replace(
+        "artifact_manifest_contract_cross_surface_match: true",
+        "artifact_manifest_contract_cross_surface_match: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_cross_surface_command
+    )
+    assert "artifact_manifest_contract_cross_surface_match: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_cross_surface_command
+        )
+    )
+    missing_artifact_manifest_count_match_command = current_command.replace(
+        "artifact_manifest_artifact_count_matches_required: true",
+        "artifact_manifest_artifact_count_matches_required: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_count_match_command
+    )
+    assert "artifact_manifest_artifact_count_matches_required: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_count_match_command
+        )
+    )
+    missing_artifact_manifest_closure_command = current_command.replace(
+        "artifact_manifest_readiness_closure_allowed: false",
+        "artifact_manifest_readiness_closure_allowed: true",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_closure_command
+    )
+    assert "artifact_manifest_readiness_closure_allowed: false" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_closure_command
+        )
+    )
+    missing_artifact_manifest_ids_command = current_command.replace(
+        "artifact_manifest_required_artifacts_present: true",
+        "artifact_manifest_required_artifacts_present: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_artifact_manifest_ids_command
+    )
+    assert "artifact_manifest_required_artifacts_present: true" in (
+        progress.current_first_command_missing_baseline_markers(
+            missing_artifact_manifest_ids_command
+        )
+    )
     missing_director_action_digest_command = current_command.replace(
         "project_director_selected_action_sha256",
         "missing_director_action_digest",
@@ -1147,6 +1493,18 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "Closed blockers: 0" in report
     assert "Current first open blocker: WING read-only connection proof" in report
     assert "Next required action source: Current First Command" in report
+    assert "Current First Command baseline coverage required: true" in report
+    assert "Current First Command baseline coverage passed: true" in report
+    assert (
+        "Current First Command baseline coverage marker count: "
+        f"{len(progress.CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS)}"
+        in report
+    )
+    assert "Current First Command baseline missing markers: []" in report
+    assert (
+        f"Selected evidence file count: {len(progress.extract_evidence_files(rows[0]['evidence']))}"
+        in report
+    )
     assert "backend_port_prestart_gate" in report
     assert "expected_backend_port_prestart_gate" in report
     assert "backend_port_prestart_gate.grants_live_authority: false" in report
@@ -1178,6 +1536,8 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "listener_process_error" in report
     assert "safe_to_stop_listener_by_gate" in report
     assert "operator_next_step" in report
+    for marker in ENVIRONMENT_BLOCKED_FRONTEND_MARKERS:
+        assert marker in report
     assert "listener_confirmation_template_path" in report
     assert "listener_confirmation_template_acceptance_status" in report
     assert "listener_confirmation_template_accepted_by_template: false" in report
@@ -1211,15 +1571,40 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "backend_port_prestart_summary_connection_policy: "
         "no_hardware_no_network_no_live_writes"
     ) in report
+    assert "backend_port_prestart_summary_read_only: true" in report
+    assert "backend_port_prestart_summary_live_write: false" in report
+    assert "backend_port_prestart_summary_contacts_backend: false" in report
+    assert "backend_port_prestart_summary_contacts_wing: false" in report
+    assert "backend_port_prestart_summary_mutates_console_state: false" in report
+    assert "backend_port_prestart_summary_queries_console: false" in report
+    assert "backend_port_prestart_summary_executes_tests: false" in report
     for marker in (
         "backend_port_prestart_summary_type_matches_plan: true",
         "backend_port_prestart_summary_status_matches_plan: true",
         "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_read_only_matches_plan: true",
         "backend_port_prestart_summary_live_write_matches_plan: true",
         "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+        "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
         "backend_port_prestart_summary_queries_console_matches_plan: true",
         "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "plan_safe_to_stop_listener_by_gate: false",
+        "plan_live_authority_granted: false",
+        "plan_backend_port_prestart_gate_execution_allowed: false",
+        "plan_backend_port_prestart_gate_readiness_closure_allowed: false",
+        "plan_backend_port_prestart_gate_live_authority_granted: false",
         "backend_port_prestart_check_status_matches_plan: true",
+        "safe_to_stop_listener_by_gate_matches_plan: true",
+        "live_authority_granted_matches_plan: true",
+        "backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "backend_port_prestart_gate_live_authority_granted_matches_plan: true",
+        "declared_safe_to_stop_listener_by_gate_matches_plan: true",
+        "declared_live_authority_granted_matches_plan: true",
+        "declared_backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true",
     ):
         assert marker in report
     assert "physical_preflight_requires_existing_backend_connection: true" in report
@@ -1442,6 +1827,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "listener_process_error" in text
     assert "safe_to_stop_listener_by_gate" in text
     assert "operator_next_step" in text
+    for marker in ENVIRONMENT_BLOCKED_FRONTEND_MARKERS:
+        assert marker in text
     assert "listener_confirmation_template_accepted_by_template: false" in text
     assert "listener_confirmation_template_execution_allowed_by_template: false" in text
     assert (
@@ -1481,8 +1868,11 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
         "backend_port_prestart_summary_connection_policy: "
         "no_hardware_no_network_no_live_writes"
     ) in text
+    assert "backend_port_prestart_summary_read_only: true" in text
     assert "backend_port_prestart_summary_live_write: false" in text
     assert "backend_port_prestart_summary_contacts_backend: false" in text
+    assert "backend_port_prestart_summary_contacts_wing: false" in text
+    assert "backend_port_prestart_summary_mutates_console_state: false" in text
     assert "backend_port_prestart_summary_queries_console: false" in text
     assert "backend_port_prestart_summary_executes_tests: false" in text
     assert "backend_port_prestart_check_status: passed" in text
@@ -1490,11 +1880,29 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
         "backend_port_prestart_summary_type_matches_plan: true",
         "backend_port_prestart_summary_status_matches_plan: true",
         "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_read_only_matches_plan: true",
         "backend_port_prestart_summary_live_write_matches_plan: true",
         "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+        "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
         "backend_port_prestart_summary_queries_console_matches_plan: true",
         "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "plan_safe_to_stop_listener_by_gate: false",
+        "plan_live_authority_granted: false",
+        "plan_backend_port_prestart_gate_execution_allowed: false",
+        "plan_backend_port_prestart_gate_readiness_closure_allowed: false",
+        "plan_backend_port_prestart_gate_live_authority_granted: false",
         "backend_port_prestart_check_status_matches_plan: true",
+        "safe_to_stop_listener_by_gate_matches_plan: true",
+        "live_authority_granted_matches_plan: true",
+        "backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "backend_port_prestart_gate_live_authority_granted_matches_plan: true",
+        "declared_safe_to_stop_listener_by_gate_matches_plan: true",
+        "declared_live_authority_granted_matches_plan: true",
+        "declared_backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true",
     ):
         assert marker in text
     assert "physical_preflight_requires_existing_backend_connection: true" in text
@@ -1546,6 +1954,64 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "required_supervised_proof_plan_summary_fields" in text
     assert "expected_required_supervised_proof_plan_summary_fields" in text
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in text
+    assert (
+        "required_supervised_proof_plan_summary_fields_include_invalid_records: true"
+        in text
+    )
+    assert "operator-readable no-WING `summary.md`" in text
+    assert "operator_markdown_summary_required: true" in text
+    assert "operator_markdown_summary_field_lines_rendered: true" in text
+    assert "operator_markdown_summary_missing_field_lines: []" in text
+    assert "operator_markdown_summary_artifact: summary.md" in text
+    assert "operator_markdown_summary_sha256" in text
+    assert "operator_markdown_summary_sha256_available: true" in text
+    assert "operator_markdown_summary_actual_sha256" in text
+    assert "operator_markdown_summary_sha256_matches_actual: true" in text
+    assert "artifact_manifest_summary_surface_required: true" in text
+    assert "artifact_manifest_summary_surface_missing_fields: []" in text
+    assert "artifact_manifest_summary_surface_required_field_lines" in text
+    assert "artifact_manifest_summary_surface_missing_field_lines: []" in text
+    assert "artifact_manifest_summary_surface_field_lines_rendered: true" in text
+    assert "artifact_manifest_contract_id" in text
+    assert "artifact_manifest_contract_required: true" in text
+    assert "artifact_manifest_contract_fields" in text
+    assert "artifact_manifest_contract_sha256" in text
+    assert "artifact_manifest_contract_sha256_available: true" in text
+    assert "artifact_manifest_contract_sha256_matches_expected: true" in text
+    assert "artifact_manifest_contract_cross_surface_required: true" in text
+    assert "artifact_manifest_contract_cross_surface_required_surfaces" in text
+    assert "artifact_manifest_contract_cross_surface_required_fields" in text
+    assert "artifact_manifest_contract_cross_surface_expected_match: true" in text
+    assert "artifact_manifest_contract_cross_surface_match: true" in text
+    assert "artifact_manifest_summary_json_contract_sha256_matches_manifest: true" in text
+    assert "artifact_manifest_summary_md_contract_sha256_matches_manifest: true" in text
+    assert "artifact_manifest_contract_cross_surface_mismatches: []" in text
+    assert (
+        "artifact_manifest_contract_cross_surface_readiness_closure_allowed: false"
+        in text
+    )
+    assert (
+        "artifact_manifest_contract_cross_surface_live_authority_granted: false"
+        in text
+    )
+    assert "artifact_manifest_required_artifact_sha256_fields" in text
+    assert "artifact_manifest_path: artifact-manifest.json" in text
+    assert "artifact_manifest_artifact_count: 2" in text
+    assert "artifact_manifest_required_artifact_count: 2" in text
+    assert "artifact_manifest_artifact_count_matches_required: true" in text
+    assert "artifact_manifest_required_artifact_ids" in text
+    assert "artifact_manifest_artifact_ids" in text
+    assert "artifact_manifest_required_artifacts_present: true" in text
+    assert "artifact_manifest_required_artifact_paths" in text
+    assert "artifact_manifest_artifact_paths" in text
+    assert "artifact_manifest_required_artifact_paths_present: true" in text
+    assert "artifact_manifest_required_artifact_sha256_available: true" in text
+    assert "artifact_manifest_summary_json_sha256" in text
+    assert "artifact_manifest_summary_json_sha256_available: true" in text
+    assert "artifact_manifest_summary_md_sha256" in text
+    assert "artifact_manifest_summary_md_sha256_available: true" in text
+    assert "artifact_manifest_readiness_closure_allowed: false" in text
+    assert "artifact_manifest_live_authority_granted: false" in text
     assert "backend_port_prestart_gate_matches_expected: true" in text
     assert "declared_backend_port_prestart_gate_matches_expected: true" in text
     assert "supervised_prestart_gate_matches_expected: true" in text

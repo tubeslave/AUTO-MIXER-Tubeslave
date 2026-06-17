@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Tuple
 try:
     from wing_readonly_preflight_contract import (
+        is_sha256_hexdigest,
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
@@ -25,6 +26,9 @@ try:
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
         WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
         WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
@@ -43,6 +47,7 @@ try:
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_contract import (
+        is_sha256_hexdigest,
         WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
@@ -52,6 +57,9 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES,
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
         WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
         WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
         WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
@@ -191,9 +199,19 @@ EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
 EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = tuple(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
+EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+)
+EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+)
+EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+)
 EXPECTED_PLAN_SUMMARY_FIELDS = (
     "proof_artifact_schema",
     "proof_runner",
+    "artifact_root",
     "channels",
     "operator_channel_confirmation_required",
     "operator_confirmed_channels",
@@ -211,11 +229,15 @@ EXPECTED_PLAN_SUMMARY_FIELDS = (
     "backend_port_prestart_summary_type",
     "backend_port_prestart_summary_status",
     "backend_port_prestart_summary_connection_policy",
+    "backend_port_prestart_summary_read_only",
     "backend_port_prestart_summary_live_write",
     "backend_port_prestart_summary_contacts_backend",
+    "backend_port_prestart_summary_contacts_wing",
+    "backend_port_prestart_summary_mutates_console_state",
     "backend_port_prestart_summary_queries_console",
     "backend_port_prestart_summary_executes_tests",
     "backend_port_prestart_check_status",
+    *EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     "request_id_policy",
     "expected_response_types_by_request_type",
 )
@@ -239,10 +261,12 @@ class WingReadonlyPreflightArtifactRecord:
     accepted_as_readonly_preflight_candidate: bool
     run_id: str | None
     captured_at: str | None
+    artifact_root: str | None
     summary_path: str | None
     summary_sha256: str | None
     events_path: str | None
     events_sha256: str | None
+    event_log_run_id_matches_summary: bool | None
     expected_artifacts: Tuple[str, ...]
     expected_summary_artifact: str | None
     expected_events_artifact: str | None
@@ -252,6 +276,9 @@ class WingReadonlyPreflightArtifactRecord:
     readback_count: int
     physical_readback_count: int
     sent_request_types: Tuple[str, ...]
+    request_sequence: Tuple[Dict[str, Any], ...]
+    plan_request_sequence: Tuple[Dict[str, Any], ...]
+    request_sequence_matches_plan: bool | None
     channels: Tuple[int, ...]
     operator_confirmed_channels: Tuple[int, ...]
     operator_session_confirmation_required: bool
@@ -267,11 +294,29 @@ class WingReadonlyPreflightArtifactRecord:
     backend_port_prestart_summary_type: str | None
     backend_port_prestart_summary_status: str | None
     backend_port_prestart_summary_connection_policy: str | None
+    backend_port_prestart_summary_read_only: bool | None
     backend_port_prestart_summary_live_write: bool | None
     backend_port_prestart_summary_contacts_backend: bool | None
+    backend_port_prestart_summary_contacts_wing: bool | None
+    backend_port_prestart_summary_mutates_console_state: bool | None
     backend_port_prestart_summary_queries_console: bool | None
     backend_port_prestart_summary_executes_tests: bool | None
     backend_port_prestart_check_status: str | None
+    safe_to_stop_listener_by_gate: bool | None
+    live_authority_granted: bool | None
+    backend_port_prestart_gate_execution_allowed: bool | None
+    backend_port_prestart_gate_readiness_closure_allowed: bool | None
+    backend_port_prestart_gate_live_authority_granted: bool | None
+    plan_safe_to_stop_listener_by_gate: bool | None
+    plan_live_authority_granted: bool | None
+    plan_backend_port_prestart_gate_execution_allowed: bool | None
+    plan_backend_port_prestart_gate_readiness_closure_allowed: bool | None
+    plan_backend_port_prestart_gate_live_authority_granted: bool | None
+    safe_to_stop_listener_by_gate_matches_plan: bool | None
+    live_authority_granted_matches_plan: bool | None
+    backend_port_prestart_gate_execution_allowed_matches_plan: bool | None
+    backend_port_prestart_gate_readiness_closure_allowed_matches_plan: bool | None
+    backend_port_prestart_gate_live_authority_granted_matches_plan: bool | None
     operator_next_step: str | None
     value_types: Tuple[str, ...]
     violations: Tuple[str, ...]
@@ -287,9 +332,19 @@ class WingReadonlyPreflightArtifactRecord:
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
         payload["sent_request_types"] = list(self.sent_request_types)
+        payload["request_sequence"] = [dict(row) for row in self.request_sequence]
+        payload["plan_request_sequence"] = [
+            dict(row) for row in self.plan_request_sequence
+        ]
+        payload["request_sequence_matches_plan"] = (
+            self.request_sequence_matches_plan
+        )
         payload["channels"] = list(self.channels)
         payload["operator_confirmed_channels"] = list(self.operator_confirmed_channels)
         payload["expected_artifacts"] = list(self.expected_artifacts)
+        payload["event_log_run_id_matches_summary"] = (
+            self.event_log_run_id_matches_summary
+        )
         payload["backend_port_prestart_check_command"] = list(
             self.backend_port_prestart_check_command
         )
@@ -317,11 +372,20 @@ class WingReadonlyPreflightArtifactRecord:
         payload["backend_port_prestart_summary_connection_policy"] = (
             self.backend_port_prestart_summary_connection_policy
         )
+        payload["backend_port_prestart_summary_read_only"] = (
+            self.backend_port_prestart_summary_read_only
+        )
         payload["backend_port_prestart_summary_live_write"] = (
             self.backend_port_prestart_summary_live_write
         )
         payload["backend_port_prestart_summary_contacts_backend"] = (
             self.backend_port_prestart_summary_contacts_backend
+        )
+        payload["backend_port_prestart_summary_contacts_wing"] = (
+            self.backend_port_prestart_summary_contacts_wing
+        )
+        payload["backend_port_prestart_summary_mutates_console_state"] = (
+            self.backend_port_prestart_summary_mutates_console_state
         )
         payload["backend_port_prestart_summary_queries_console"] = (
             self.backend_port_prestart_summary_queries_console
@@ -332,6 +396,20 @@ class WingReadonlyPreflightArtifactRecord:
         payload["backend_port_prestart_check_status"] = (
             self.backend_port_prestart_check_status
         )
+        payload["safe_to_stop_listener_by_gate"] = self.safe_to_stop_listener_by_gate
+        payload["live_authority_granted"] = self.live_authority_granted
+        payload["backend_port_prestart_gate_execution_allowed"] = (
+            self.backend_port_prestart_gate_execution_allowed
+        )
+        payload["backend_port_prestart_gate_readiness_closure_allowed"] = (
+            self.backend_port_prestart_gate_readiness_closure_allowed
+        )
+        payload["backend_port_prestart_gate_live_authority_granted"] = (
+            self.backend_port_prestart_gate_live_authority_granted
+        )
+        for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+            payload[f"plan_{field}"] = getattr(self, f"plan_{field}")
+            payload[f"{field}_matches_plan"] = getattr(self, f"{field}_matches_plan")
         payload["operator_next_step"] = self.operator_next_step
         payload["value_types"] = list(self.value_types)
         payload["violations"] = list(self.violations)
@@ -366,7 +444,14 @@ def _mapping(value: Any) -> Mapping[str, Any]:
 
 
 def _safe_int(value: Any) -> int:
+    if isinstance(value, bool):
+        return 0
     return value if isinstance(value, int) and value >= 0 else 0
+
+
+def _optional_bool(mapping: Mapping[str, Any], key: str) -> bool | None:
+    value = mapping.get(key)
+    return value if isinstance(value, bool) else None
 
 
 def _string_tuple(value: Any) -> Tuple[str, ...]:
@@ -380,12 +465,16 @@ def _int_tuple(value: Any) -> Tuple[int, ...]:
         return ()
     items: list[int] = []
     for item in value:
-        try:
-            number = int(item)
-        except (TypeError, ValueError):
+        if isinstance(item, bool) or not isinstance(item, int):
             continue
-        items.append(number)
+        items.append(item)
     return tuple(items)
+
+
+def _request_sequence_tuple(value: Any) -> Tuple[Dict[str, Any], ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(dict(row) for row in value if isinstance(row, Mapping))
 
 
 def _artifact_roots(artifact_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
@@ -767,10 +856,16 @@ def _validate_prestart_summary_payload(
         violations.append("prestart_summary_status_not_passed")
     if prestart.get("connection_policy") != PRESTART_SUMMARY_CONNECTION_POLICY:
         violations.append("prestart_summary_connection_policy_mismatch")
+    if prestart.get("read_only") is not True:
+        violations.append("prestart_summary_read_only_not_true")
     if prestart.get("live_write") is not False:
         violations.append("prestart_summary_live_write_not_false")
     if prestart.get("contacts_backend") is not False:
         violations.append("prestart_summary_contacts_backend_not_false")
+    if prestart.get("contacts_wing") is not False:
+        violations.append("prestart_summary_contacts_wing_not_false")
+    if prestart.get("mutates_console_state") is not False:
+        violations.append("prestart_summary_mutates_console_state_not_false")
     if prestart.get("queries_console") is not False:
         violations.append("prestart_summary_queries_console_not_false")
     if prestart.get("executes_tests") is not False:
@@ -784,10 +879,42 @@ def _validate_prestart_summary_payload(
         violations.append("prestart_summary_backend_port_check_not_passed")
     check_detail = backend_check.get("detail")
     if isinstance(check_detail, Mapping):
+        failure_detail_fields = check_detail.get(
+            "backend_port_prestart_check_failure_detail_fields"
+        )
+        if failure_detail_fields != list(
+            EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ):
+            violations.append(
+                "prestart_summary_backend_port_check_failure_detail_fields_mismatch"
+            )
+        if summary.get("backend_port_prestart_check_failure_detail_fields") != (
+            failure_detail_fields
+        ):
+            violations.append(
+                "prestart_summary_recorded_backend_port_check_failure_detail_fields_mismatch"
+            )
+        for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+            if check_detail.get(field) is not False:
+                violations.append(f"prestart_summary_{field}_not_false")
+            if summary.get(field) != check_detail.get(field):
+                violations.append(f"prestart_summary_recorded_{field}_mismatch")
+            plan_field = f"plan_{field}"
+            if check_detail.get(plan_field) is not False:
+                violations.append(f"prestart_summary_{plan_field}_not_false")
+            if summary.get(plan_field) != check_detail.get(plan_field):
+                violations.append(f"prestart_summary_recorded_{plan_field}_mismatch")
+            match_field = f"{field}_matches_plan"
+            if check_detail.get(match_field) is not True:
+                violations.append(f"prestart_summary_{match_field}_not_true")
+            if summary.get(match_field) != check_detail.get(match_field):
+                violations.append(f"prestart_summary_recorded_{match_field}_mismatch")
         if check_detail.get("live_authority_granted") is True:
             violations.append("prestart_summary_live_authority_granted")
         if check_detail.get("safe_to_stop_listener_by_gate") is True:
             violations.append("prestart_summary_safe_to_stop_listener_true")
+    else:
+        violations.append("prestart_summary_backend_port_check_detail_missing")
 
     if summary.get("backend_port_prestart_summary_type") != prestart.get("type"):
         violations.append("prestart_summary_recorded_type_mismatch")
@@ -798,6 +925,10 @@ def _validate_prestart_summary_payload(
         != prestart.get("connection_policy")
     ):
         violations.append("prestart_summary_recorded_connection_policy_mismatch")
+    if summary.get("backend_port_prestart_summary_read_only") != prestart.get(
+        "read_only"
+    ):
+        violations.append("prestart_summary_recorded_read_only_mismatch")
     if summary.get("backend_port_prestart_summary_live_write") != prestart.get(
         "live_write"
     ):
@@ -806,6 +937,16 @@ def _validate_prestart_summary_payload(
         "contacts_backend"
     ):
         violations.append("prestart_summary_recorded_contacts_backend_mismatch")
+    if summary.get("backend_port_prestart_summary_contacts_wing") != prestart.get(
+        "contacts_wing"
+    ):
+        violations.append("prestart_summary_recorded_contacts_wing_mismatch")
+    if summary.get(
+        "backend_port_prestart_summary_mutates_console_state"
+    ) != prestart.get("mutates_console_state"):
+        violations.append(
+            "prestart_summary_recorded_mutates_console_state_mismatch"
+        )
     if summary.get("backend_port_prestart_summary_queries_console") != prestart.get(
         "queries_console"
     ):
@@ -853,22 +994,28 @@ def _validate_event_log(
     payload: Mapping[str, Any],
     summary_path: Path,
     violations: list[str],
-) -> None:
+) -> bool | None:
     event_path = _summary_event_path(payload, summary_path)
     if event_path is None:
         violations.append("event_log_path_missing")
-        return
+        return None
     if not event_path.exists():
         violations.append("event_log_missing")
-        return
+        return None
     try:
         events = _load_jsonl_events(event_path)
     except Exception as exc:
         violations.append(f"event_log_load_error:{type(exc).__name__}")
-        return
+        return None
     if not events:
         violations.append("event_log_empty")
-        return
+        return None
+    summary_run_id = str(payload.get("run_id") or "")
+    event_log_run_id_matches_summary = True
+    for index, event in enumerate(events):
+        if event.get("run_id") != summary_run_id:
+            violations.append(f"event_log_run_id_mismatch:{index}")
+            event_log_run_id_matches_summary = False
     event_sequences = tuple(_safe_int(event.get("seq")) for event in events)
     if event_sequences != tuple(range(1, len(events) + 1)):
         violations.append("event_log_seq_sequence_invalid")
@@ -1027,6 +1174,7 @@ def _validate_event_log(
         )
         if response_type not in expected_response_types:
             violations.append(f"event_log_response_type_mismatch:{index // 2}")
+    return event_log_run_id_matches_summary
 
 
 def _readback_is_physical(payload: Mapping[str, Any]) -> bool:
@@ -1093,6 +1241,9 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("schema_not_wing_readonly_preflight_v1")
     if payload.get("proof_runner") != WING_READONLY_PREFLIGHT_RUNNER:
         violations.append("proof_runner_not_wing_readonly_preflight_runner")
+    artifact_root = payload.get("artifact_root")
+    if not isinstance(artifact_root, str) or not artifact_root:
+        violations.append("artifact_root_missing")
     if payload.get("status") != EXPECTED_RUN_SUMMARY_STATUS:
         violations.append("status_not_passed")
     if payload.get("reason") != EXPECTED_RUN_SUMMARY_REASON:
@@ -1113,8 +1264,11 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("expected_response_type_mapping_missing_or_invalid")
     if not str(payload.get("expected_plan_path") or ""):
         violations.append("expected_plan_path_missing")
-    if not str(payload.get("expected_plan_sha256") or ""):
+    expected_plan_sha256 = str(payload.get("expected_plan_sha256") or "")
+    if not expected_plan_sha256:
         violations.append("expected_plan_sha256_missing")
+    elif not is_sha256_hexdigest(expected_plan_sha256):
+        violations.append("expected_plan_sha256_invalid")
     if payload.get("expected_plan_match") is not True:
         violations.append("expected_plan_match_not_true")
     if payload.get("expected_plan_violations") not in ([], ()):
@@ -1151,8 +1305,13 @@ def validate_wing_readonly_preflight_artifact(
         violations.append("backend_port_prestart_summary_required_not_true")
     if not str(payload.get("backend_port_prestart_summary_path") or ""):
         violations.append("backend_port_prestart_summary_path_missing")
-    if not str(payload.get("backend_port_prestart_summary_sha256") or ""):
+    prestart_summary_sha256 = str(
+        payload.get("backend_port_prestart_summary_sha256") or ""
+    )
+    if not prestart_summary_sha256:
         violations.append("backend_port_prestart_summary_sha256_missing")
+    elif not is_sha256_hexdigest(prestart_summary_sha256):
+        violations.append("backend_port_prestart_summary_sha256_invalid")
     if payload.get("backend_port_prestart_summary_type") != PRESTART_SUMMARY_TYPE:
         violations.append("backend_port_prestart_summary_type_mismatch")
     if payload.get("backend_port_prestart_summary_status") != PRESTART_SUMMARY_STATUS:
@@ -1162,10 +1321,18 @@ def validate_wing_readonly_preflight_artifact(
         != PRESTART_SUMMARY_CONNECTION_POLICY
     ):
         violations.append("backend_port_prestart_summary_connection_policy_mismatch")
+    if payload.get("backend_port_prestart_summary_read_only") is not True:
+        violations.append("backend_port_prestart_summary_read_only_not_true")
     if payload.get("backend_port_prestart_summary_live_write") is not False:
         violations.append("backend_port_prestart_summary_live_write_not_false")
     if payload.get("backend_port_prestart_summary_contacts_backend") is not False:
         violations.append("backend_port_prestart_summary_contacts_backend_not_false")
+    if payload.get("backend_port_prestart_summary_contacts_wing") is not False:
+        violations.append("backend_port_prestart_summary_contacts_wing_not_false")
+    if payload.get("backend_port_prestart_summary_mutates_console_state") is not False:
+        violations.append(
+            "backend_port_prestart_summary_mutates_console_state_not_false"
+        )
     if payload.get("backend_port_prestart_summary_queries_console") is not False:
         violations.append("backend_port_prestart_summary_queries_console_not_false")
     if payload.get("backend_port_prestart_summary_executes_tests") is not False:
@@ -1239,6 +1406,7 @@ def validate_wing_readonly_preflight_artifact(
             violations.append(f"mutation_evidence_field_present:{field}")
 
     expected_plan_payload: Mapping[str, Any] | None = None
+    event_log_run_id_matches_summary: bool | None = None
     if summary_path is not None:
         expected_plan_payload = _validate_expected_plan_file(
             payload,
@@ -1251,7 +1419,11 @@ def validate_wing_readonly_preflight_artifact(
             violations,
         )
         _validate_prestart_summary_file(payload, summary_path, violations)
-        _validate_event_log(payload, summary_path, violations)
+        event_log_run_id_matches_summary = _validate_event_log(
+            payload,
+            summary_path,
+            violations,
+        )
     if any(
         violation.startswith("event_log_")
         for violation in violations
@@ -1261,6 +1433,17 @@ def validate_wing_readonly_preflight_artifact(
     accepted = not violations
     expected_artifacts = _expected_plan_artifacts(expected_plan_payload)
     run_id = str(payload.get("run_id") or "")
+    request_sequence = _request_sequence_tuple(_expected_plan_request_sequence(payload))
+    plan_request_sequence = _request_sequence_tuple(
+        expected_plan_payload.get("request_sequence")
+        if expected_plan_payload is not None
+        else None
+    )
+    request_sequence_matches_plan = (
+        request_sequence == plan_request_sequence
+        if expected_plan_payload is not None
+        else None
+    )
     expected_summary_artifact = _expected_summary_artifact(expected_artifacts, run_id)
     expected_events_artifact = _expected_events_artifact(expected_artifacts, run_id)
     return {
@@ -1274,6 +1457,7 @@ def validate_wing_readonly_preflight_artifact(
         "evidence": {
             "run_id": payload.get("run_id"),
             "captured_at": captured_at if isinstance(captured_at, str) else None,
+            "artifact_root": artifact_root if isinstance(artifact_root, str) else None,
             "summary_path": payload.get("summary_path"),
             "summary_sha256": (
                 payload.get("summary_sha256")
@@ -1286,6 +1470,7 @@ def validate_wing_readonly_preflight_artifact(
                 if isinstance(payload.get("events_sha256"), str)
                 else None
             ),
+            "event_log_run_id_matches_summary": event_log_run_id_matches_summary,
             "expected_artifacts": list(expected_artifacts),
             "expected_summary_artifact": expected_summary_artifact,
             "expected_events_artifact": expected_events_artifact,
@@ -1307,6 +1492,9 @@ def validate_wing_readonly_preflight_artifact(
             "readback_count": readback_count,
             "physical_readback_count": physical_readback_count,
             "sent_request_types": list(sent_request_types),
+            "request_sequence": [dict(row) for row in request_sequence],
+            "plan_request_sequence": [dict(row) for row in plan_request_sequence],
+            "request_sequence_matches_plan": request_sequence_matches_plan,
             "channels": list(channels),
             "operator_confirmed_channels": list(confirmed_channels),
             "operator_session_confirmation_required": (
@@ -1366,6 +1554,13 @@ def validate_wing_readonly_preflight_artifact(
                 if payload.get("backend_port_prestart_summary_connection_policy")
                 else None
             ),
+            "backend_port_prestart_summary_read_only": (
+                payload.get("backend_port_prestart_summary_read_only")
+                if isinstance(
+                    payload.get("backend_port_prestart_summary_read_only"), bool
+                )
+                else None
+            ),
             "backend_port_prestart_summary_live_write": (
                 payload.get("backend_port_prestart_summary_live_write")
                 if isinstance(payload.get("backend_port_prestart_summary_live_write"), bool)
@@ -1375,6 +1570,21 @@ def validate_wing_readonly_preflight_artifact(
                 payload.get("backend_port_prestart_summary_contacts_backend")
                 if isinstance(
                     payload.get("backend_port_prestart_summary_contacts_backend"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_contacts_wing": (
+                payload.get("backend_port_prestart_summary_contacts_wing")
+                if isinstance(
+                    payload.get("backend_port_prestart_summary_contacts_wing"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_mutates_console_state": (
+                payload.get("backend_port_prestart_summary_mutates_console_state")
+                if isinstance(
+                    payload.get("backend_port_prestart_summary_mutates_console_state"),
+                    bool,
                 )
                 else None
             ),
@@ -1397,6 +1607,24 @@ def validate_wing_readonly_preflight_artifact(
                 if payload.get("backend_port_prestart_check_status")
                 else None
             ),
+            **{
+                field: payload.get(field)
+                if isinstance(payload.get(field), bool)
+                else None
+                for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
+            **{
+                field: payload.get(field)
+                if isinstance(payload.get(field), bool)
+                else None
+                for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+            },
+            **{
+                field: payload.get(field)
+                if isinstance(payload.get(field), bool)
+                else None
+                for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+            },
             "operator_next_step": (
                 str(payload.get("operator_next_step"))
                 if payload.get("operator_next_step")
@@ -1425,12 +1653,20 @@ def _record_from_validation(
         captured_at=(
             str(evidence.get("captured_at")) if evidence.get("captured_at") else None
         ),
+        artifact_root=(
+            str(evidence.get("artifact_root")) if evidence.get("artifact_root") else None
+        ),
         summary_path=str(evidence.get("summary_path")) if evidence.get("summary_path") else None,
         summary_sha256=summary_sha256
         or (str(evidence.get("summary_sha256")) if evidence.get("summary_sha256") else None),
         events_path=str(evidence.get("events_path")) if evidence.get("events_path") else None,
         events_sha256=events_sha256
         or (str(evidence.get("events_sha256")) if evidence.get("events_sha256") else None),
+        event_log_run_id_matches_summary=(
+            evidence.get("event_log_run_id_matches_summary")
+            if isinstance(evidence.get("event_log_run_id_matches_summary"), bool)
+            else None
+        ),
         expected_artifacts=_string_tuple(evidence.get("expected_artifacts")),
         expected_summary_artifact=(
             str(evidence.get("expected_summary_artifact"))
@@ -1456,6 +1692,15 @@ def _record_from_validation(
         readback_count=_safe_int(evidence.get("readback_count")),
         physical_readback_count=_safe_int(evidence.get("physical_readback_count")),
         sent_request_types=_string_tuple(evidence.get("sent_request_types")),
+        request_sequence=_request_sequence_tuple(evidence.get("request_sequence")),
+        plan_request_sequence=_request_sequence_tuple(
+            evidence.get("plan_request_sequence")
+        ),
+        request_sequence_matches_plan=(
+            evidence.get("request_sequence_matches_plan")
+            if isinstance(evidence.get("request_sequence_matches_plan"), bool)
+            else None
+        ),
         channels=_int_tuple(evidence.get("channels")),
         operator_confirmed_channels=_int_tuple(evidence.get("operator_confirmed_channels")),
         operator_session_confirmation_required=(
@@ -1508,6 +1753,11 @@ def _record_from_validation(
             if evidence.get("backend_port_prestart_summary_connection_policy")
             else None
         ),
+        backend_port_prestart_summary_read_only=(
+            evidence.get("backend_port_prestart_summary_read_only")
+            if isinstance(evidence.get("backend_port_prestart_summary_read_only"), bool)
+            else None
+        ),
         backend_port_prestart_summary_live_write=(
             evidence.get("backend_port_prestart_summary_live_write")
             if isinstance(evidence.get("backend_port_prestart_summary_live_write"), bool)
@@ -1517,6 +1767,21 @@ def _record_from_validation(
             evidence.get("backend_port_prestart_summary_contacts_backend")
             if isinstance(
                 evidence.get("backend_port_prestart_summary_contacts_backend"), bool
+            )
+            else None
+        ),
+        backend_port_prestart_summary_contacts_wing=(
+            evidence.get("backend_port_prestart_summary_contacts_wing")
+            if isinstance(
+                evidence.get("backend_port_prestart_summary_contacts_wing"), bool
+            )
+            else None
+        ),
+        backend_port_prestart_summary_mutates_console_state=(
+            evidence.get("backend_port_prestart_summary_mutates_console_state")
+            if isinstance(
+                evidence.get("backend_port_prestart_summary_mutates_console_state"),
+                bool,
             )
             else None
         ),
@@ -1539,6 +1804,48 @@ def _record_from_validation(
             if evidence.get("backend_port_prestart_check_status")
             else None
         ),
+        safe_to_stop_listener_by_gate=(
+            evidence.get("safe_to_stop_listener_by_gate")
+            if isinstance(evidence.get("safe_to_stop_listener_by_gate"), bool)
+            else None
+        ),
+        live_authority_granted=(
+            evidence.get("live_authority_granted")
+            if isinstance(evidence.get("live_authority_granted"), bool)
+            else None
+        ),
+        backend_port_prestart_gate_execution_allowed=(
+            evidence.get("backend_port_prestart_gate_execution_allowed")
+            if isinstance(
+                evidence.get("backend_port_prestart_gate_execution_allowed"), bool
+            )
+            else None
+        ),
+        backend_port_prestart_gate_readiness_closure_allowed=(
+            evidence.get("backend_port_prestart_gate_readiness_closure_allowed")
+            if isinstance(
+                evidence.get("backend_port_prestart_gate_readiness_closure_allowed"),
+                bool,
+            )
+            else None
+        ),
+        backend_port_prestart_gate_live_authority_granted=(
+            evidence.get("backend_port_prestart_gate_live_authority_granted")
+            if isinstance(
+                evidence.get("backend_port_prestart_gate_live_authority_granted"), bool
+            )
+            else None
+        ),
+        **{
+            f"plan_{field}": _optional_bool(evidence, f"plan_{field}")
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            f"{field}_matches_plan": _optional_bool(
+                evidence, f"{field}_matches_plan"
+            )
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
         operator_next_step=(
             str(evidence.get("operator_next_step"))
             if evidence.get("operator_next_step")
@@ -1556,10 +1863,12 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         accepted_as_readonly_preflight_candidate=False,
         run_id=None,
         captured_at=None,
+        artifact_root=None,
         summary_path=None,
         summary_sha256=None,
         events_path=None,
         events_sha256=None,
+        event_log_run_id_matches_summary=None,
         expected_artifacts=(),
         expected_summary_artifact=None,
         expected_events_artifact=None,
@@ -1569,6 +1878,9 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         readback_count=0,
         physical_readback_count=0,
         sent_request_types=(),
+        request_sequence=(),
+        plan_request_sequence=(),
+        request_sequence_matches_plan=None,
         channels=(),
         operator_confirmed_channels=(),
         operator_session_confirmation_required=False,
@@ -1584,11 +1896,27 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         backend_port_prestart_summary_type=None,
         backend_port_prestart_summary_status=None,
         backend_port_prestart_summary_connection_policy=None,
+        backend_port_prestart_summary_read_only=None,
         backend_port_prestart_summary_live_write=None,
         backend_port_prestart_summary_contacts_backend=None,
+        backend_port_prestart_summary_contacts_wing=None,
+        backend_port_prestart_summary_mutates_console_state=None,
         backend_port_prestart_summary_queries_console=None,
         backend_port_prestart_summary_executes_tests=None,
         backend_port_prestart_check_status=None,
+        safe_to_stop_listener_by_gate=None,
+        live_authority_granted=None,
+        backend_port_prestart_gate_execution_allowed=None,
+        backend_port_prestart_gate_readiness_closure_allowed=None,
+        backend_port_prestart_gate_live_authority_granted=None,
+        **{
+            f"plan_{field}": None
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            f"{field}_matches_plan": None
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
         operator_next_step=None,
         value_types=(),
         violations=(f"artifact_load_error:{type(exc).__name__}",),
@@ -1734,6 +2062,19 @@ def build_wing_readonly_preflight_evidence(
             "latest_valid_candidate_run_id": latest_valid.run_id if latest_valid else None,
             "latest_valid_candidate_captured_at": (
                 latest_valid.captured_at if latest_valid else None
+            ),
+            "latest_valid_candidate_request_sequence": (
+                [dict(row) for row in latest_valid.request_sequence]
+                if latest_valid
+                else []
+            ),
+            "latest_valid_candidate_plan_request_sequence": (
+                [dict(row) for row in latest_valid.plan_request_sequence]
+                if latest_valid
+                else []
+            ),
+            "latest_valid_candidate_request_sequence_matches_plan": (
+                latest_valid.request_sequence_matches_plan if latest_valid else None
             ),
             "next_global_step": next_global_step,
             "blocked_by": list(blocked_by),

@@ -6,6 +6,7 @@ transport or grant live-write authority.
 
 from __future__ import annotations
 
+import posixpath
 from typing import Any, Iterable, Mapping
 
 
@@ -27,12 +28,19 @@ WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED = (
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
 )
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER = (
+    "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof"
+)
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER = (
+    "accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof"
+)
 WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_artifact_paths",
     "confirm_operator_channel_scope",
     "confirm_operator_session_ready",
     "confirm_physical_readbacks",
     "confirm_event_log_readonly_sequence",
+    "confirm_event_log_run_id_binding",
     "confirm_no_live_authority",
 )
 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
@@ -40,10 +48,20 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
     "artifact_source_id",
     "run_id",
     "artifact_captured_at",
+    "artifact_root",
     "summary_path",
     "summary_sha256",
     "events_path",
     "events_sha256",
+    "channels",
+    "value_types",
+    "operator_confirmed_channels",
+    "operator_confirmed_session_ready",
+    "readback_count",
+    "physical_readback_count",
+    "request_id_policy",
+    "request_id_correlation_required",
+    "event_log_run_id_matches_summary",
     "decision",
     "reviewed_by",
     "reviewed_at",
@@ -104,6 +122,14 @@ WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS = (
     "backend_port_prestart_gate_execution_allowed",
     "backend_port_prestart_gate_readiness_closure_allowed",
     "backend_port_prestart_gate_live_authority_granted",
+)
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS = tuple(
+    f"plan_{field}"
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+)
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS = tuple(
+    f"{field}_matches_plan"
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
 )
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS = "passed"
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON = "wing_readonly_preflight_passed"
@@ -196,12 +222,16 @@ WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT = (
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
     "Only after accepted_decision_ready, a valid accepted-candidate "
-    "prestart trace, and expected-artifact-bound accepted source id, move "
-    "to WING_SUPERVISED_FADER_GAIN_PROOF."
+    "prestart trace, a valid accepted-candidate artifact-root trace, and "
+    "a valid accepted-candidate request-sequence trace, plus "
+    "expected-artifact-bound accepted source id, move to "
+    "WING_SUPERVISED_FADER_GAIN_PROOF."
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS = (
     "accepted_decision_ready",
     "valid accepted-candidate prestart trace",
+    "valid accepted-candidate artifact-root trace",
+    "valid accepted-candidate request-sequence trace",
     "expected-artifact-bound accepted source id",
     "WING_SUPERVISED_FADER_GAIN_PROOF",
 )
@@ -211,12 +241,42 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK = (
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS = (
     "accepted_decision_ready"
 )
+WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES = (
+    "fader",
+    "gain",
+)
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS = (
+    "allowed_supervised_live_value_types",
     "readonly_preflight_review_decision_candidate_prestart_contract_valid",
     "readonly_preflight_review_decision_candidate_prestart_source_ids",
     "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source",
     "readonly_preflight_review_decision_expected_candidate_prestart_source_ids",
     "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source",
+    "readonly_preflight_review_decision_candidate_request_sequence_contract_valid",
+    "readonly_preflight_review_decision_candidate_request_sequence_source_ids",
+    "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source",
+    "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids",
+    "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source",
+    "readonly_preflight_review_decision_candidate_artifact_root_contract_valid",
+    "readonly_preflight_review_decision_candidate_artifact_roots",
+    "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source",
+    "readonly_preflight_review_decision_expected_candidate_artifact_roots",
+    "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete",
+    "readonly_preflight_review_decision_invalid_records",
 )
 WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP = (
     "Run preview_readonly_request_plan and confirm the request sequence is read-only."
@@ -295,6 +355,7 @@ WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS = (
     "existing_backend_connection_boundary_missing",
     "forbidden_request_type_sent",
     "unexpected_response_type",
+    "event_log_run_id_mismatch",
     "event_log_missing_or_invalid",
     "manual_review_decision_missing_or_invalid",
 )
@@ -342,6 +403,9 @@ def expected_supervised_prestart_gate(
             WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS
         ),
         "requires_accepted_candidate_prestart_trace": True,
+        "requires_accepted_candidate_artifact_root_trace": True,
+        "requires_accepted_candidate_request_sequence_trace": True,
+        "requires_accepted_candidate_expected_artifact_trace": True,
     }
 
 
@@ -378,6 +442,18 @@ def _contract_string_list(value: Any) -> tuple[str, ...]:
     return tuple(str(item) for item in value if isinstance(item, str) and item)
 
 
+def _contract_mapping_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def is_sha256_hexdigest(value: Any) -> bool:
+    if not isinstance(value, str) or len(value) != 64:
+        return False
+    return all(char in "0123456789abcdef" for char in value)
+
+
 def _candidate_expected_artifact_binding_valid(row: Mapping[str, Any]) -> bool:
     return not _candidate_expected_artifact_binding_violations(row)
 
@@ -387,12 +463,20 @@ def _candidate_expected_artifact_binding_violations(
 ) -> list[str]:
     violations: list[str] = []
     expected_artifacts = _contract_string_list(row.get("expected_artifacts"))
+    summary_path = str(row.get("summary_path") or row.get("source_id") or "")
+    events_path = str(row.get("events_path") or "")
+    expected_summary_artifact = str(row.get("expected_summary_artifact") or "")
+    expected_events_artifact = str(row.get("expected_events_artifact") or "")
     if len(expected_artifacts) != 2:
         violations.append("expected_artifacts_count_mismatch")
-    if not str(row.get("expected_summary_artifact") or ""):
+    if not expected_summary_artifact:
         violations.append("expected_summary_artifact_missing")
-    if not str(row.get("expected_events_artifact") or ""):
+    elif summary_path and expected_summary_artifact != summary_path:
+        violations.append("expected_summary_artifact_mismatch")
+    if not expected_events_artifact:
         violations.append("expected_events_artifact_missing")
+    elif events_path and expected_events_artifact != events_path:
+        violations.append("expected_events_artifact_mismatch")
     if row.get("summary_path_matches_expected_artifact") is not True:
         violations.append("summary_path_not_bound_to_expected_artifact")
     if row.get("events_path_matches_expected_artifact") is not True:
@@ -427,8 +511,13 @@ def wing_readonly_preflight_candidate_prestart_contract_violations(
         violations.append("backend_port_prestart_summary_required_not_true")
     if not str(row.get("backend_port_prestart_summary_path") or ""):
         violations.append("backend_port_prestart_summary_path_missing")
-    if not str(row.get("backend_port_prestart_summary_sha256") or ""):
+    prestart_summary_sha256 = str(
+        row.get("backend_port_prestart_summary_sha256") or ""
+    )
+    if not prestart_summary_sha256:
         violations.append("backend_port_prestart_summary_sha256_missing")
+    elif not is_sha256_hexdigest(prestart_summary_sha256):
+        violations.append("backend_port_prestart_summary_sha256_invalid")
     if (
         row.get("backend_port_prestart_summary_type")
         != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
@@ -444,10 +533,18 @@ def wing_readonly_preflight_candidate_prestart_contract_violations(
         != WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
     ):
         violations.append("backend_port_prestart_summary_connection_policy_mismatch")
+    if row.get("backend_port_prestart_summary_read_only") is not True:
+        violations.append("backend_port_prestart_summary_read_only_not_true")
     if row.get("backend_port_prestart_summary_live_write") is not False:
         violations.append("backend_port_prestart_summary_live_write_not_false")
     if row.get("backend_port_prestart_summary_contacts_backend") is not False:
         violations.append("backend_port_prestart_summary_contacts_backend_not_false")
+    if row.get("backend_port_prestart_summary_contacts_wing") is not False:
+        violations.append("backend_port_prestart_summary_contacts_wing_not_false")
+    if row.get("backend_port_prestart_summary_mutates_console_state") is not False:
+        violations.append(
+            "backend_port_prestart_summary_mutates_console_state_not_false"
+        )
     if row.get("backend_port_prestart_summary_queries_console") is not False:
         violations.append("backend_port_prestart_summary_queries_console_not_false")
     if row.get("backend_port_prestart_summary_executes_tests") is not False:
@@ -457,6 +554,13 @@ def wing_readonly_preflight_candidate_prestart_contract_violations(
         != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
     ):
         violations.append("backend_port_prestart_check_status_not_passed")
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        if row.get(field) is not False:
+            violations.append(f"{field}_not_false")
+        if row.get(f"plan_{field}") is not False:
+            violations.append(f"plan_{field}_not_false")
+        if row.get(f"{field}_matches_plan") is not True:
+            violations.append(f"{field}_matches_plan_not_true")
     return violations
 
 
@@ -513,3 +617,146 @@ def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
             continue
         valid_source_ids.append(str(source_id))
     return valid_source_ids
+
+
+def wing_readonly_preflight_candidate_request_sequence_plan_violations(
+    row: Mapping[str, Any],
+) -> list[str]:
+    """Return report-only request-sequence/expected-plan trace violations."""
+
+    violations: list[str] = []
+    request_sequence = _contract_mapping_list(row.get("request_sequence"))
+    plan_request_sequence = _contract_mapping_list(row.get("plan_request_sequence"))
+    if not request_sequence:
+        violations.append("request_sequence_missing")
+    if not plan_request_sequence:
+        violations.append("plan_request_sequence_missing")
+    if row.get("request_sequence_matches_plan") is not True:
+        violations.append("request_sequence_matches_plan_not_true")
+    elif request_sequence and plan_request_sequence and request_sequence != plan_request_sequence:
+        violations.append("request_sequence_plan_mismatch")
+    return violations
+
+
+def wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> dict[str, list[str]]:
+    """Return accepted source ids whose request sequence is not bound to plan."""
+
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    violations_by_source: dict[str, list[str]] = {}
+    for source_id in accepted_source_ids:
+        if not source_id:
+            continue
+        normalized_source_id = str(source_id)
+        row = rows_by_source.get(normalized_source_id)
+        if not isinstance(row, Mapping):
+            violations_by_source[normalized_source_id] = ["candidate_review_missing"]
+            continue
+        violations = wing_readonly_preflight_candidate_request_sequence_plan_violations(
+            row
+        )
+        if violations:
+            violations_by_source[normalized_source_id] = violations
+    return violations_by_source
+
+
+def wing_readonly_preflight_accepted_candidate_request_sequence_source_ids(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> list[str]:
+    """Return accepted source ids whose request sequence matches expected plan."""
+
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    valid_source_ids: list[str] = []
+    for source_id in accepted_source_ids:
+        if not source_id:
+            continue
+        row = rows_by_source.get(str(source_id))
+        if not isinstance(row, Mapping):
+            continue
+        if wing_readonly_preflight_candidate_request_sequence_plan_violations(row):
+            continue
+        valid_source_ids.append(str(source_id))
+    return valid_source_ids
+
+
+def _candidate_artifact_root_path_violations(
+    row: Mapping[str, Any],
+    *,
+    source_id: str,
+    artifact_root: str,
+) -> list[str]:
+    violations: list[str] = []
+    normalized_root = posixpath.normpath(artifact_root.rstrip("/"))
+    if not normalized_root:
+        return ["artifact_root_missing"]
+    if ".." in artifact_root.split("/"):
+        violations.append("artifact_root_contains_parent_traversal")
+    path_fields = (
+        ("source_id", source_id),
+        ("summary_path", str(row.get("summary_path") or "")),
+        ("events_path", str(row.get("events_path") or "")),
+        ("expected_summary_artifact", str(row.get("expected_summary_artifact") or "")),
+        ("expected_events_artifact", str(row.get("expected_events_artifact") or "")),
+    )
+    for field, path in path_fields:
+        if not path:
+            violations.append(f"{field}_missing")
+            continue
+        if ".." in path.split("/"):
+            violations.append(f"{field}_contains_parent_traversal")
+        normalized_path = posixpath.normpath(path)
+        if not normalized_path.startswith(f"{normalized_root}/"):
+            violations.append(f"{field}_not_under_artifact_root")
+    return violations
+
+
+def wing_readonly_preflight_accepted_candidate_artifact_root_contract(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> tuple[list[str], dict[str, list[str]]]:
+    """Return accepted source ids whose candidate rows bind one artifact root.
+
+    This report-only gate checks that the accepted source id and the associated
+    summary/event artifact paths all live under the declared artifact root. It
+    does not read files, contact WING, mutate state, or grant authority.
+    """
+
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    artifact_roots: list[str] = []
+    violations_by_source: dict[str, list[str]] = {}
+    for source_id in accepted_source_ids:
+        if not source_id:
+            continue
+        normalized_source_id = str(source_id)
+        row = rows_by_source.get(normalized_source_id)
+        if not isinstance(row, Mapping):
+            violations_by_source[normalized_source_id] = ["candidate_review_missing"]
+            continue
+        artifact_root = str(row.get("artifact_root") or "")
+        if not artifact_root:
+            violations_by_source[normalized_source_id] = ["artifact_root_missing"]
+            continue
+        artifact_roots.append(artifact_root)
+        violations = _candidate_artifact_root_path_violations(
+            row,
+            source_id=normalized_source_id,
+            artifact_root=artifact_root,
+        )
+        if violations:
+            violations_by_source[normalized_source_id] = violations
+    return artifact_roots, violations_by_source

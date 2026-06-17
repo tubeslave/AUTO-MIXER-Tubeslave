@@ -32,29 +32,41 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 try:
     from wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
         WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        wing_readonly_preflight_accepted_candidate_artifact_root_contract,
+        wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
+        wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_contract import (
+        WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
         WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
         WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
         WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
         WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
         WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        wing_readonly_preflight_accepted_candidate_artifact_root_contract,
+        wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
+        wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -70,6 +82,15 @@ READONLY_PREFLIGHT_REVIEW_DECISION_BLOCKER = (
 READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
 )
+READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER = (
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+)
+READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER = (
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+)
+READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER = (
+    "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
+)
 PLAN_STATUSES = {
     "operator_proof_required",
     "manual_review_ready",
@@ -84,6 +105,9 @@ DEFAULT_DELTA_DB_BY_VALUE_TYPE = {
     "gain": -0.25,
     "fader": -0.25,
 }
+ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES = frozenset(
+    WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
+)
 DEFAULT_ARTIFACT_ROOT = "artifacts/wing_telemetry"
 DEFAULT_READONLY_PREFLIGHT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 DEFAULT_READONLY_PREFLIGHT_EXPECTED_PLAN = WING_READONLY_PREFLIGHT_PLAN_OUTPUT
@@ -264,6 +288,7 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and int(summary.get("accepted_record_count") or 0) > 0
         and bool(accepted_source_ids)
         and _accepted_candidate_prestart_source_ids(summary) == accepted_source_ids
+        and _accepted_candidate_request_sequence_source_ids(summary) == accepted_source_ids
         and int(summary.get("invalid_record_count") or 0) == 0
         and int(summary.get("unreviewed_candidate_count") or 0) == 0
         and summary.get("readiness_matrix_update_allowed_by_decision") is not True
@@ -281,6 +306,28 @@ def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
 
 
+def _invalid_review_decision_records(records: Any) -> list[dict[str, Any]]:
+    if not isinstance(records, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for record in records:
+        if not isinstance(record, Mapping) or record.get("valid") is True:
+            continue
+        rows.append(
+            {
+                "review_id": str(record.get("review_id") or ""),
+                "artifact_source_id": str(record.get("artifact_source_id") or ""),
+                "decision": str(record.get("decision") or ""),
+                "template_status": str(record.get("template_status") or ""),
+                "violations": _string_list(record.get("violations")),
+                "unsafe_authority_flags": _string_list(
+                    record.get("unsafe_authority_flags")
+                ),
+            }
+        )
+    return rows
+
+
 def _command_value(command: Tuple[str, ...], flag: str) -> str | None:
     try:
         index = command.index(flag)
@@ -289,6 +336,16 @@ def _command_value(command: Tuple[str, ...], flag: str) -> str | None:
     if index + 1 >= len(command):
         return None
     return command[index + 1]
+
+
+def _unsupported_supervised_value_types(mapping: Mapping[str, Any] | None) -> list[str]:
+    if not mapping:
+        return []
+    return sorted(
+        str(key)
+        for key in mapping
+        if str(key) not in ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES
+    )
 
 
 def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[str]:
@@ -326,6 +383,200 @@ def _accepted_candidate_prestart_violations_by_source(
             if source_id
         }
     return {source_id: ["candidate_reviews_missing"] for source_id in accepted_source_ids}
+
+
+def _accepted_candidate_request_sequence_source_ids(
+    summary: Mapping[str, Any],
+) -> list[str]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    if not accepted_source_ids:
+        return []
+    rows = summary.get("candidate_reviews")
+    if isinstance(rows, list):
+        return wing_readonly_preflight_accepted_candidate_request_sequence_source_ids(
+            accepted_source_ids,
+            tuple(row for row in rows if isinstance(row, Mapping)),
+        )
+    return _string_list(summary.get("accepted_candidate_request_sequence_source_ids"))
+
+
+def _accepted_candidate_request_sequence_violations_by_source(
+    summary: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    if not accepted_source_ids:
+        return {}
+    rows = summary.get("candidate_reviews")
+    if isinstance(rows, list):
+        return (
+            wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source(
+                accepted_source_ids,
+                tuple(row for row in rows if isinstance(row, Mapping)),
+            )
+        )
+    violations = summary.get(
+        "accepted_candidate_request_sequence_contract_violations_by_source"
+    )
+    if isinstance(violations, Mapping):
+        return {
+            str(source_id): _string_list(source_violations)
+            for source_id, source_violations in violations.items()
+        }
+    return {source_id: ["candidate_reviews_missing"] for source_id in accepted_source_ids}
+
+
+def _accepted_candidate_artifact_root_contract(
+    summary: Mapping[str, Any],
+) -> tuple[list[str], dict[str, list[str]]]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    if not accepted_source_ids:
+        return [], {}
+    rows = summary.get("candidate_reviews")
+    if not isinstance(rows, list):
+        return [], {
+            source_id: ["candidate_reviews_missing"]
+            for source_id in accepted_source_ids
+        }
+    return wing_readonly_preflight_accepted_candidate_artifact_root_contract(
+        accepted_source_ids,
+        tuple(row for row in rows if isinstance(row, Mapping)),
+    )
+
+
+def _accepted_candidate_expected_artifact_trace(
+    summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    rows = summary.get("candidate_reviews")
+    candidate_rows = (
+        tuple(row for row in rows if isinstance(row, Mapping))
+        if isinstance(rows, list)
+        else ()
+    )
+    rows_by_source: dict[str, Mapping[str, Any]] = {
+        str(row.get("source_id")): row
+        for row in candidate_rows
+        if isinstance(row.get("source_id"), str) and row.get("source_id")
+    }
+    expected_artifacts_by_source: dict[str, list[str]] = {}
+    expected_summary_artifact_by_source: dict[str, str] = {}
+    expected_events_artifact_by_source: dict[str, str] = {}
+    summary_path_matches_by_source: dict[str, bool] = {}
+    events_path_matches_by_source: dict[str, bool] = {}
+    missing_source_ids: list[str] = []
+
+    for source_id in accepted_source_ids:
+        row = rows_by_source.get(source_id)
+        if row is None:
+            missing_source_ids.append(source_id)
+            continue
+        expected_artifacts = _string_list(row.get("expected_artifacts"))
+        expected_summary_artifact = str(row.get("expected_summary_artifact") or "")
+        expected_events_artifact = str(row.get("expected_events_artifact") or "")
+        summary_path_matches = row.get("summary_path_matches_expected_artifact") is True
+        events_path_matches = row.get("events_path_matches_expected_artifact") is True
+        expected_artifacts_by_source[source_id] = expected_artifacts
+        expected_summary_artifact_by_source[source_id] = expected_summary_artifact
+        expected_events_artifact_by_source[source_id] = expected_events_artifact
+        summary_path_matches_by_source[source_id] = summary_path_matches
+        events_path_matches_by_source[source_id] = events_path_matches
+        if (
+            len(expected_artifacts) < 2
+            or not expected_summary_artifact
+            or not expected_events_artifact
+            or not summary_path_matches
+            or not events_path_matches
+        ):
+            missing_source_ids.append(source_id)
+
+    return {
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids": (
+            accepted_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source": (
+            expected_artifacts_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source": (
+            expected_summary_artifact_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source": (
+            expected_events_artifact_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source": (
+            summary_path_matches_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source": (
+            events_path_matches_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids": (
+            missing_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete": (
+            bool(accepted_source_ids) and not missing_source_ids
+        ),
+    }
+
+
+def _mapping_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def _accepted_candidate_request_sequence_trace(
+    summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    rows = summary.get("candidate_reviews")
+    candidate_rows = (
+        tuple(row for row in rows if isinstance(row, Mapping))
+        if isinstance(rows, list)
+        else ()
+    )
+    rows_by_source: dict[str, Mapping[str, Any]] = {
+        str(row.get("source_id")): row
+        for row in candidate_rows
+        if isinstance(row.get("source_id"), str) and row.get("source_id")
+    }
+    request_sequence_by_source: dict[str, list[dict[str, Any]]] = {}
+    plan_request_sequence_by_source: dict[str, list[dict[str, Any]]] = {}
+    matches_plan_by_source: dict[str, bool] = {}
+    missing_source_ids: list[str] = []
+
+    for source_id in accepted_source_ids:
+        row = rows_by_source.get(source_id)
+        if row is None:
+            missing_source_ids.append(source_id)
+            continue
+        request_sequence = _mapping_list(row.get("request_sequence"))
+        plan_request_sequence = _mapping_list(row.get("plan_request_sequence"))
+        matches_plan = row.get("request_sequence_matches_plan") is True
+        request_sequence_by_source[source_id] = request_sequence
+        plan_request_sequence_by_source[source_id] = plan_request_sequence
+        matches_plan_by_source[source_id] = matches_plan
+        if not request_sequence or not plan_request_sequence or not matches_plan:
+            missing_source_ids.append(source_id)
+
+    return {
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids": (
+            accepted_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source": (
+            request_sequence_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source": (
+            plan_request_sequence_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source": (
+            matches_plan_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids": (
+            missing_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete": (
+            bool(accepted_source_ids) and not missing_source_ids
+        ),
+    }
 
 
 def _row_by_value_type(evidence_snapshot: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
@@ -564,6 +815,19 @@ def build_supervised_wing_proof_plan(
 ) -> Dict[str, Any]:
     """Build a non-executing proof checklist from promotion evidence rows."""
 
+    unsupported_channels = _unsupported_supervised_value_types(channels_by_value_type)
+    if unsupported_channels:
+        raise ValueError(
+            "Unsupported supervised WING proof channel value types: "
+            + ", ".join(unsupported_channels)
+        )
+    unsupported_deltas = _unsupported_supervised_value_types(delta_db_by_value_type)
+    if unsupported_deltas:
+        raise ValueError(
+            "Unsupported supervised WING proof delta value types: "
+            + ", ".join(unsupported_deltas)
+        )
+
     channels = dict(DEFAULT_CHANNELS_BY_VALUE_TYPE)
     if channels_by_value_type:
         channels.update({key: tuple(int(item) for item in value) for key, value in channels_by_value_type.items()})
@@ -579,7 +843,9 @@ def build_supervised_wing_proof_plan(
         readonly_preflight_review_decision_ledger,
     )
     review_summary = _review_decision_summary(review_decision)
-    review_decision_accepted = _readonly_preflight_review_decision_accepted(review_decision)
+    review_invalid_records = _invalid_review_decision_records(
+        review_summary.get("invalid_records")
+    ) or _invalid_review_decision_records(review_decision.get("records"))
     accepted_candidate_prestart_source_ids = _accepted_candidate_prestart_source_ids(
         review_summary
     )
@@ -593,6 +859,51 @@ def build_supervised_wing_proof_plan(
     )
     if accepted_candidate_prestart_violations_by_source:
         candidate_prestart_contract_valid = False
+    accepted_candidate_request_sequence_source_ids = (
+        _accepted_candidate_request_sequence_source_ids(review_summary)
+    )
+    accepted_candidate_request_sequence_violations_by_source = (
+        _accepted_candidate_request_sequence_violations_by_source(review_summary)
+    )
+    candidate_request_sequence_contract_valid = (
+        bool(accepted_source_ids)
+        and accepted_candidate_request_sequence_source_ids == accepted_source_ids
+        and not accepted_candidate_request_sequence_violations_by_source
+    )
+    (
+        accepted_candidate_artifact_roots,
+        accepted_candidate_artifact_root_violations_by_source,
+    ) = _accepted_candidate_artifact_root_contract(review_summary)
+    accepted_candidate_expected_artifact_trace = (
+        _accepted_candidate_expected_artifact_trace(review_summary)
+    )
+    accepted_candidate_expected_artifact_trace_complete = (
+        accepted_candidate_expected_artifact_trace[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+        ]
+        is True
+    )
+    accepted_candidate_request_sequence_trace = (
+        _accepted_candidate_request_sequence_trace(review_summary)
+    )
+    accepted_candidate_request_sequence_trace_complete = (
+        accepted_candidate_request_sequence_trace[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
+        ]
+        is True
+    )
+    candidate_artifact_root_contract_valid = (
+        bool(accepted_source_ids)
+        and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
+        and not accepted_candidate_artifact_root_violations_by_source
+    )
+    review_decision_accepted = (
+        _readonly_preflight_review_decision_accepted(review_decision)
+        and candidate_request_sequence_contract_valid
+        and candidate_artifact_root_contract_valid
+        and accepted_candidate_expected_artifact_trace_complete
+        and accepted_candidate_request_sequence_trace_complete
+    )
     preflight_steps: Tuple[WingReadonlyPreflightPlanStep, ...] = ()
     if invalid:
         steps: Tuple[WingProofPlanStep, ...] = ()
@@ -622,6 +933,21 @@ def build_supervised_wing_proof_plan(
         if accepted_source_ids and not candidate_prestart_contract_valid:
             review_blockers = [
                 READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+                *review_blockers,
+            ]
+        if accepted_source_ids and not candidate_artifact_root_contract_valid:
+            review_blockers = [
+                READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
+                *review_blockers,
+            ]
+        if accepted_source_ids and not candidate_request_sequence_contract_valid:
+            review_blockers = [
+                READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+                *review_blockers,
+            ]
+        if accepted_source_ids and not accepted_candidate_expected_artifact_trace_complete:
+            review_blockers = [
+                READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER,
                 *review_blockers,
             ]
         global_blockers = [
@@ -657,6 +983,9 @@ def build_supervised_wing_proof_plan(
             "operator_required": True,
         },
         "summary": {
+            "allowed_supervised_live_value_types": sorted(
+                ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES
+            ),
             "step_count": len(steps),
             "planned_value_types": sorted({step.value_type for step in steps}),
             "planned_channels": [step.channel for step in steps],
@@ -727,6 +1056,38 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source": (
                 accepted_candidate_prestart_violations_by_source
             ),
+            "readonly_preflight_review_decision_candidate_request_sequence_contract_valid": (
+                candidate_request_sequence_contract_valid
+            ),
+            "readonly_preflight_review_decision_candidate_request_sequence_source_ids": (
+                accepted_candidate_request_sequence_source_ids
+            ),
+            "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source": (
+                accepted_candidate_request_sequence_violations_by_source
+            ),
+            "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids": (
+                accepted_candidate_request_sequence_source_ids
+            ),
+            "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source": (
+                accepted_candidate_request_sequence_violations_by_source
+            ),
+            "readonly_preflight_review_decision_candidate_artifact_root_contract_valid": (
+                candidate_artifact_root_contract_valid
+            ),
+            "readonly_preflight_review_decision_candidate_artifact_roots": (
+                accepted_candidate_artifact_roots
+            ),
+            "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source": (
+                accepted_candidate_artifact_root_violations_by_source
+            ),
+            "readonly_preflight_review_decision_expected_candidate_artifact_roots": (
+                accepted_candidate_artifact_roots
+            ),
+            "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source": (
+                accepted_candidate_artifact_root_violations_by_source
+            ),
+            **accepted_candidate_expected_artifact_trace,
+            **accepted_candidate_request_sequence_trace,
             "readonly_preflight_review_decision_rejected_source_ids": _string_list(
                 review_summary.get("rejected_source_ids")
             ),
@@ -736,6 +1097,7 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_invalid_record_ids": _string_list(
                 review_summary.get("invalid_record_ids")
             ),
+            "readonly_preflight_review_decision_invalid_records": review_invalid_records,
             "readonly_preflight_review_decision_duplicate_source_ids": _string_list(
                 review_summary.get("duplicate_source_ids")
             ),

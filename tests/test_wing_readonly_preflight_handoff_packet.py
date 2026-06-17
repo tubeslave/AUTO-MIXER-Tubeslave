@@ -24,6 +24,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
@@ -57,6 +59,71 @@ from tools import build_wing_readonly_preflight_handoff_packet as handoff
 from tools import no_wing_release_check
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def write_no_wing_prestart_summary(
+    path: Path,
+    *,
+    status: str = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
+    environment_blocked: bool = False,
+) -> None:
+    detail = {
+        "backend_port_prestart_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
+        "safe_to_stop_listener_by_gate": False,
+        "live_authority_granted": False,
+        "backend_port_prestart_gate_execution_allowed": False,
+        "backend_port_prestart_gate_readiness_closure_allowed": False,
+        "backend_port_prestart_gate_live_authority_granted": False,
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: True
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
+    }
+    payload = {
+        "type": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+        "status": status,
+        "connection_policy": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+        "read_only": True,
+        "live_write": False,
+        "contacts_backend": False,
+        "contacts_wing": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "results": [
+            {
+                "name": no_wing_release_check.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
+                "status": WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
+                "detail": detail,
+            }
+        ],
+    }
+    if environment_blocked:
+        payload["failed_checks"] = ["frontend_e2e"]
+        payload["environment_blocked_checks"] = ["frontend_e2e"]
+        payload["environment_blocked_check_details"] = [
+            {
+                "name": "frontend_e2e",
+                "reason": "local_dev_server_bind_denied",
+                "address": "127.0.0.1:3000",
+                "operator_next_step": (
+                    "Rerun the no-WING quick check in an environment that can "
+                    "bind the frontend dev server."
+                ),
+                "stdout_log": "frontend-stdout.log",
+                "stderr_log": "frontend-stderr.log",
+            }
+        ]
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def test_handoff_packet_builds_readonly_operator_sequence():
@@ -98,8 +165,11 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["backend_port_prestart_summary_connection_policy"] == (
         WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
     )
+    assert packet["backend_port_prestart_summary_read_only"] is True
     assert packet["backend_port_prestart_summary_live_write"] is False
     assert packet["backend_port_prestart_summary_contacts_backend"] is False
+    assert packet["backend_port_prestart_summary_contacts_wing"] is False
+    assert packet["backend_port_prestart_summary_mutates_console_state"] is False
     assert packet["backend_port_prestart_summary_queries_console"] is False
     assert packet["backend_port_prestart_summary_executes_tests"] is False
     assert packet["backend_port_prestart_check_status"] == (
@@ -358,6 +428,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     supervised_gate_step = packet["operator_sequence"][-1]
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step
+    assert "valid accepted-candidate artifact-root trace" in supervised_gate_step
     assert "expected-artifact-bound accepted source id" in supervised_gate_step
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in supervised_gate_step
     assert (
@@ -375,6 +446,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["supervised_prestart_gate"]["unlocks_runbook"] == (
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_RUNBOOK
     )
+    assert (
+        packet["supervised_prestart_gate"][
+            "requires_accepted_candidate_expected_artifact_trace"
+        ]
+        is True
+    )
     assert packet["expected_supervised_prestart_gate"] == packet[
         "supervised_prestart_gate"
     ]
@@ -382,11 +459,25 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["required_supervised_proof_plan_summary_fields"] == list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_artifact_roots"
+        in packet["required_supervised_proof_plan_summary_fields"]
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
+        in packet["required_supervised_proof_plan_summary_fields"]
+    )
     assert packet["expected_required_supervised_proof_plan_summary_fields"] == list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
     assert (
         packet["required_supervised_proof_plan_summary_fields_match_contract"]
+        is True
+    )
+    assert (
+        packet[
+            "required_supervised_proof_plan_summary_fields_include_invalid_records"
+        ]
         is True
     )
     rendered = handoff.render_markdown(packet)
@@ -403,8 +494,14 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "backend_port_prestart_summary_connection_policy: "
         f"`{WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY}`"
     ) in rendered
+    assert "backend_port_prestart_summary_read_only: `true`" in rendered
     assert "backend_port_prestart_summary_live_write: `false`" in rendered
     assert "backend_port_prestart_summary_contacts_backend: `false`" in rendered
+    assert "backend_port_prestart_summary_contacts_wing: `false`" in rendered
+    assert (
+        "backend_port_prestart_summary_mutates_console_state: `false`"
+        in rendered
+    )
     assert "backend_port_prestart_summary_queries_console: `false`" in rendered
     assert "backend_port_prestart_summary_executes_tests: `false`" in rendered
     assert (
@@ -480,6 +577,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "operator_sequence_step_must_be_final: `true`" in rendered
     assert "grants_live_authority: `false`" in rendered
     assert "valid accepted-candidate prestart trace" in rendered
+    assert "valid accepted-candidate artifact-root trace" in rendered
     assert "expected-artifact-bound accepted source id" in rendered
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rendered
     assert "required_supervised_proof_plan_summary_fields" in rendered
@@ -488,7 +586,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "required_supervised_proof_plan_summary_fields_match_contract: `true`"
         in rendered
     )
+    assert (
+        "required_supervised_proof_plan_summary_fields_include_invalid_records: `true`"
+        in rendered
+    )
     assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in rendered
+    assert "readonly_preflight_review_decision_invalid_records" in rendered
     assert (
         "next_manual_artifact_required: "
         f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
@@ -521,6 +624,7 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["decision_review_output_matches_contract"] is True
     assert "confirm_no_live_authority" in packet["required_review_checklist_ids"]
     assert "confirm_operator_session_ready" in packet["required_review_checklist_ids"]
+    assert "confirm_event_log_run_id_binding" in packet["required_review_checklist_ids"]
     assert packet["required_review_checklist_ids"] == list(
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
     )
@@ -747,6 +851,7 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "Fail-Closed Conditions" in markdown
     assert "fail_closed_conditions" in markdown
     assert "unexpected_response_type" in markdown
+    assert "event_log_run_id_mismatch" in markdown
     assert "manual_review_decision_missing_or_invalid" in markdown
     assert "expected_artifacts" in markdown
     assert WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME in markdown
@@ -839,10 +944,7 @@ def test_handoff_tool_main_writes_markdown_and_json(tmp_path: Path):
 
 def test_handoff_packet_hashes_existing_prestart_summary(tmp_path: Path):
     prestart_summary = tmp_path / "summary.json"
-    prestart_summary.write_text(
-        '{"type":"no_wing_release_check","status":"passed"}\n',
-        encoding="utf-8",
-    )
+    write_no_wing_prestart_summary(prestart_summary)
     expected_sha256 = hashlib.sha256(prestart_summary.read_bytes()).hexdigest()
 
     packet = handoff.build_handoff_packet(
@@ -855,6 +957,43 @@ def test_handoff_packet_hashes_existing_prestart_summary(tmp_path: Path):
     )
     assert packet["backend_port_prestart_summary_sha256"] == expected_sha256
     assert packet["backend_port_prestart_summary_sha256_available"] is True
+    assert packet["backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert packet["backend_port_prestart_summary_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert packet["backend_port_prestart_summary_connection_policy"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+    )
+    assert packet["backend_port_prestart_summary_read_only"] is True
+    assert packet["backend_port_prestart_summary_live_write"] is False
+    assert packet["backend_port_prestart_summary_contacts_backend"] is False
+    assert packet["backend_port_prestart_summary_contacts_wing"] is False
+    assert packet["backend_port_prestart_summary_mutates_console_state"] is False
+    assert packet["backend_port_prestart_summary_queries_console"] is False
+    assert packet["backend_port_prestart_summary_executes_tests"] is False
+    assert packet["backend_port_prestart_check_status"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS:
+        assert packet[field] is False
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS:
+        assert packet[field] is True
+    assert packet["safe_to_stop_listener_by_gate_matches_plan"] is True
+    assert packet["live_authority_granted_matches_plan"] is True
+    assert (
+        packet["backend_port_prestart_gate_execution_allowed_matches_plan"]
+        is True
+    )
+    assert (
+        packet["backend_port_prestart_gate_readiness_closure_allowed_matches_plan"]
+        is True
+    )
+    assert (
+        packet["backend_port_prestart_gate_live_authority_granted_matches_plan"]
+        is True
+    )
     assert packet["commands"]["preview_readonly_request_plan"][
         packet["commands"]["preview_readonly_request_plan"].index("--prestart-summary")
         + 1
@@ -863,6 +1002,137 @@ def test_handoff_packet_hashes_existing_prestart_summary(tmp_path: Path):
         packet["commands"]["capture_readonly_preflight"].index("--prestart-summary")
         + 1
     ] == str(prestart_summary)
+
+
+def test_handoff_packet_preserves_environment_blocked_prestart_summary_metadata(
+    tmp_path: Path,
+):
+    prestart_summary = tmp_path / "environment-blocked-summary.json"
+    write_no_wing_prestart_summary(
+        prestart_summary,
+        status="failed",
+        environment_blocked=True,
+    )
+    expected_sha256 = hashlib.sha256(prestart_summary.read_bytes()).hexdigest()
+
+    packet = handoff.build_handoff_packet(
+        prestart_summary=str(prestart_summary),
+        generated_at="2026-06-07T00:00:00Z",
+    )
+    rendered = handoff.render_markdown(packet)
+
+    assert packet["backend_port_prestart_summary_sha256"] == expected_sha256
+    assert packet["backend_port_prestart_summary_sha256_available"] is True
+    assert packet["backend_port_prestart_summary_type"] == (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+    )
+    assert packet["backend_port_prestart_summary_status"] == "failed"
+    assert packet["backend_port_prestart_summary_status"] != (
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
+    )
+    assert packet["backend_port_prestart_summary_environment_blocked_checks"] == [
+        "frontend_e2e"
+    ]
+    assert packet[
+        "backend_port_prestart_summary_environment_blocked_check_details"
+    ][0]["reason"] == "local_dev_server_bind_denied"
+    assert packet[
+        "backend_port_prestart_summary_environment_blocked_check_details"
+    ][0]["address"] == "127.0.0.1:3000"
+    assert packet["execution_allowed_by_packet"] is False
+    assert packet["live_authority_granted"] is False
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS:
+        assert packet[field] is False
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS:
+        assert packet[field] is True
+    assert packet["safe_to_stop_listener_by_gate_matches_plan"] is True
+    assert packet["live_authority_granted_matches_plan"] is True
+    assert (
+        packet["backend_port_prestart_gate_execution_allowed_matches_plan"]
+        is True
+    )
+    assert (
+        packet["backend_port_prestart_gate_readiness_closure_allowed_matches_plan"]
+        is True
+    )
+    assert (
+        packet["backend_port_prestart_gate_live_authority_granted_matches_plan"]
+        is True
+    )
+    assert "backend_port_prestart_summary_status: `failed`" in rendered
+    assert "local_dev_server_bind_denied" in rendered
+    assert "127.0.0.1:3000" in rendered
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS:
+        assert f"{field}: `false`" in rendered
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS:
+        assert f"{field}: `true`" in rendered
+    assert "safe_to_stop_listener_by_gate_matches_plan: `true`" in rendered
+    assert "live_authority_granted_matches_plan: `true`" in rendered
+
+
+def test_handoff_packet_denial_match_flags_detect_prestart_summary_drift(
+    tmp_path: Path,
+):
+    prestart_summary = tmp_path / "drifted-summary.json"
+    write_no_wing_prestart_summary(prestart_summary)
+    payload = json.loads(prestart_summary.read_text(encoding="utf-8"))
+    detail = payload["results"][0]["detail"]
+    detail["safe_to_stop_listener_by_gate"] = True
+    detail["live_authority_granted"] = True
+    detail["backend_port_prestart_gate_execution_allowed"] = True
+    detail["backend_port_prestart_gate_readiness_closure_allowed"] = True
+    detail["backend_port_prestart_gate_live_authority_granted"] = True
+    prestart_summary.write_text(json.dumps(payload), encoding="utf-8")
+
+    packet = handoff.build_handoff_packet(
+        prestart_summary=str(prestart_summary),
+        generated_at="2026-06-07T00:00:00Z",
+    )
+    rendered = handoff.render_markdown(packet)
+
+    assert packet["safe_to_stop_listener_by_gate"] is True
+    assert packet["backend_port_prestart_gate_execution_allowed"] is True
+    assert packet["backend_port_prestart_gate_readiness_closure_allowed"] is True
+    assert packet["backend_port_prestart_gate_live_authority_granted"] is True
+    assert packet["safe_to_stop_listener_by_gate_matches_plan"] is False
+    assert packet["live_authority_granted_matches_plan"] is False
+    assert (
+        packet["backend_port_prestart_gate_execution_allowed_matches_plan"]
+        is False
+    )
+    assert (
+        packet["backend_port_prestart_gate_readiness_closure_allowed_matches_plan"]
+        is False
+    )
+    assert (
+        packet["backend_port_prestart_gate_live_authority_granted_matches_plan"]
+        is False
+    )
+    assert "safe_to_stop_listener_by_gate_matches_plan: `false`" in rendered
+    assert "live_authority_granted_matches_plan: `false`" in rendered
+
+
+def test_handoff_packet_denial_plan_fields_detect_prestart_summary_drift(
+    tmp_path: Path,
+):
+    prestart_summary = tmp_path / "plan-drifted-summary.json"
+    write_no_wing_prestart_summary(prestart_summary)
+    payload = json.loads(prestart_summary.read_text(encoding="utf-8"))
+    detail = payload["results"][0]["detail"]
+    detail["plan_safe_to_stop_listener_by_gate"] = True
+    prestart_summary.write_text(json.dumps(payload), encoding="utf-8")
+
+    packet = handoff.build_handoff_packet(
+        prestart_summary=str(prestart_summary),
+        generated_at="2026-06-07T00:00:00Z",
+    )
+    rendered = handoff.render_markdown(packet)
+
+    assert packet["safe_to_stop_listener_by_gate"] is False
+    assert packet["plan_safe_to_stop_listener_by_gate"] is True
+    assert packet["safe_to_stop_listener_by_gate_matches_plan"] is False
+    assert "plan_safe_to_stop_listener_by_gate: `true`" in rendered
+    assert "safe_to_stop_listener_by_gate_matches_plan: `false`" in rendered
 
 
 def test_handoff_tool_runs_as_repo_local_script_path(tmp_path: Path):

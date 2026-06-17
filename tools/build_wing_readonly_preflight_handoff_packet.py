@@ -35,6 +35,9 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
@@ -114,6 +117,15 @@ BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
 BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
+PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS = list(
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+)
+PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS = list(
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+)
+PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS = list(
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+)
 FORBIDDEN_LIVE_REQUEST_TYPES = list(
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES
 )
@@ -147,6 +159,57 @@ def _sha256_existing_file(path_value: str) -> str:
         except OSError:
             return ""
     return ""
+
+
+def _load_existing_json_object(path_value: str) -> dict[str, Any]:
+    path = Path(path_value)
+    candidates = [path] if path.is_absolute() else [path, REPO_ROOT / path]
+    for candidate in candidates:
+        try:
+            if not candidate.is_file():
+                continue
+            payload = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+    return {}
+
+
+def _prestart_backend_check_detail(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    results = payload.get("results")
+    if not isinstance(results, list):
+        return {}
+    for item in results:
+        if (
+            isinstance(item, Mapping)
+            and item.get("name")
+            == no_wing_release_check.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+        ):
+            detail = item.get("detail")
+            return detail if isinstance(detail, Mapping) else {}
+    return {}
+
+
+def _prestart_backend_check_status(payload: Mapping[str, Any]) -> Any:
+    results = payload.get("results")
+    if not isinstance(results, list):
+        return None
+    for item in results:
+        if (
+            isinstance(item, Mapping)
+            and item.get("name")
+            == no_wing_release_check.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME
+        ):
+            return item.get("status")
+    return None
+
+
+def _prestart_summary_value(
+    payload: Mapping[str, Any],
+    field: str,
+    expected_value: Any,
+) -> Any:
+    return payload.get(field) if payload else expected_value
 
 
 def _validate_value_types(value_types: str) -> list[str]:
@@ -406,6 +469,103 @@ def build_handoff_packet(
         == actual_project_director_selected_action_sha256
     )
     prestart_summary_sha256 = _sha256_existing_file(prestart_summary)
+    prestart_summary_payload = _load_existing_json_object(prestart_summary)
+    prestart_backend_check_detail = _prestart_backend_check_detail(
+        prestart_summary_payload
+    )
+    prestart_summary_type = _prestart_summary_value(
+        prestart_summary_payload,
+        "type",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+    )
+    prestart_summary_status = _prestart_summary_value(
+        prestart_summary_payload,
+        "status",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
+    )
+    prestart_summary_connection_policy = _prestart_summary_value(
+        prestart_summary_payload,
+        "connection_policy",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+    )
+    prestart_summary_read_only = _prestart_summary_value(
+        prestart_summary_payload,
+        "read_only",
+        True,
+    )
+    prestart_summary_live_write = _prestart_summary_value(
+        prestart_summary_payload,
+        "live_write",
+        False,
+    )
+    prestart_summary_contacts_backend = _prestart_summary_value(
+        prestart_summary_payload,
+        "contacts_backend",
+        False,
+    )
+    prestart_summary_contacts_wing = _prestart_summary_value(
+        prestart_summary_payload,
+        "contacts_wing",
+        False,
+    )
+    prestart_summary_mutates_console_state = _prestart_summary_value(
+        prestart_summary_payload,
+        "mutates_console_state",
+        False,
+    )
+    prestart_summary_queries_console = _prestart_summary_value(
+        prestart_summary_payload,
+        "queries_console",
+        False,
+    )
+    prestart_summary_executes_tests = _prestart_summary_value(
+        prestart_summary_payload,
+        "executes_tests",
+        False,
+    )
+    prestart_backend_check_status = (
+        _prestart_backend_check_status(prestart_summary_payload)
+        if prestart_summary_payload
+        else WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    )
+    environment_blocked_checks = prestart_summary_payload.get(
+        "environment_blocked_checks"
+    )
+    environment_blocked_check_details = prestart_summary_payload.get(
+        "environment_blocked_check_details"
+    )
+    prestart_required_false_all_values = {
+        field: (
+            prestart_backend_check_detail.get(field)
+            if prestart_summary_payload
+            else False
+        )
+        for field in PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
+    prestart_required_false_values = {
+        field: value
+        for field, value in prestart_required_false_all_values.items()
+        if field != "live_authority_granted"
+    }
+    prestart_required_false_plan_values = {
+        field: (
+            prestart_backend_check_detail.get(field)
+            if prestart_summary_payload
+            else False
+        )
+        for field in PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+    }
+    prestart_denial_match_flags = {
+        match_field: (
+            prestart_required_false_all_values.get(detail_field)
+            == prestart_required_false_plan_values.get(plan_field)
+        )
+        for detail_field, plan_field, match_field in zip(
+            PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+            PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
+            PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+        )
+    }
     expected_operator_sequence = expected_handoff_operator_sequence(
         backend_port_prestart_step=prestart_step,
         backend_connection_step=backend_connection_step,
@@ -434,6 +594,10 @@ def build_handoff_packet(
     expected_required_supervised_proof_plan_summary_fields = list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
+    required_supervised_proof_plan_summary_fields_include_invalid_records = (
+        "readonly_preflight_review_decision_invalid_records"
+        in required_supervised_proof_plan_summary_fields
+    )
     backend_port_prestart_gate = dict(expected_prestart_gate)
     expected_backend_port_prestart_gate_dict = dict(expected_prestart_gate)
     supervised_prestart_gate = dict(expected_supervised_gate)
@@ -458,22 +622,42 @@ def build_handoff_packet(
         "backend_port_prestart_summary_sha256_available": bool(
             prestart_summary_sha256
         ),
-        "backend_port_prestart_summary_type": (
-            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
-        ),
-        "backend_port_prestart_summary_status": (
-            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS
-        ),
+        "backend_port_prestart_summary_type": prestart_summary_type,
+        "backend_port_prestart_summary_status": prestart_summary_status,
         "backend_port_prestart_summary_connection_policy": (
-            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+            prestart_summary_connection_policy
         ),
-        "backend_port_prestart_summary_live_write": False,
-        "backend_port_prestart_summary_contacts_backend": False,
-        "backend_port_prestart_summary_queries_console": False,
-        "backend_port_prestart_summary_executes_tests": False,
-        "backend_port_prestart_check_status": (
-            WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+        "backend_port_prestart_summary_read_only": prestart_summary_read_only,
+        "backend_port_prestart_summary_live_write": prestart_summary_live_write,
+        "backend_port_prestart_summary_contacts_backend": (
+            prestart_summary_contacts_backend
         ),
+        "backend_port_prestart_summary_contacts_wing": (
+            prestart_summary_contacts_wing
+        ),
+        "backend_port_prestart_summary_mutates_console_state": (
+            prestart_summary_mutates_console_state
+        ),
+        "backend_port_prestart_summary_queries_console": (
+            prestart_summary_queries_console
+        ),
+        "backend_port_prestart_summary_executes_tests": (
+            prestart_summary_executes_tests
+        ),
+        "backend_port_prestart_summary_environment_blocked_checks": (
+            environment_blocked_checks
+            if isinstance(environment_blocked_checks, list)
+            else []
+        ),
+        "backend_port_prestart_summary_environment_blocked_check_details": (
+            environment_blocked_check_details
+            if isinstance(environment_blocked_check_details, list)
+            else []
+        ),
+        "backend_port_prestart_check_status": prestart_backend_check_status,
+        **prestart_required_false_values,
+        **prestart_required_false_plan_values,
+        **prestart_denial_match_flags,
         "backend_port_prestart_check_operator_sequence_step_index": prestart_step_index,
         "backend_port_prestart_check_must_be_first_operator_step": True,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
@@ -623,6 +807,9 @@ def build_handoff_packet(
             required_supervised_proof_plan_summary_fields
             == expected_required_supervised_proof_plan_summary_fields
         ),
+        "required_supervised_proof_plan_summary_fields_include_invalid_records": (
+            required_supervised_proof_plan_summary_fields_include_invalid_records
+        ),
         "mvp_blocker_anchor_digest_review_step_index": (
             mvp_blocker_anchor_digest_review_step_index
         ),
@@ -673,16 +860,38 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{packet['backend_port_prestart_summary_status']}`",
         "- backend_port_prestart_summary_connection_policy: "
         f"`{packet['backend_port_prestart_summary_connection_policy']}`",
+        "- backend_port_prestart_summary_read_only: "
+        f"`{str(packet['backend_port_prestart_summary_read_only']).lower()}`",
         "- backend_port_prestart_summary_live_write: "
         f"`{str(packet['backend_port_prestart_summary_live_write']).lower()}`",
         "- backend_port_prestart_summary_contacts_backend: "
         f"`{str(packet['backend_port_prestart_summary_contacts_backend']).lower()}`",
+        "- backend_port_prestart_summary_contacts_wing: "
+        f"`{str(packet['backend_port_prestart_summary_contacts_wing']).lower()}`",
+        "- backend_port_prestart_summary_mutates_console_state: "
+        f"`{str(packet['backend_port_prestart_summary_mutates_console_state']).lower()}`",
         "- backend_port_prestart_summary_queries_console: "
         f"`{str(packet['backend_port_prestart_summary_queries_console']).lower()}`",
         "- backend_port_prestart_summary_executes_tests: "
         f"`{str(packet['backend_port_prestart_summary_executes_tests']).lower()}`",
+        "- backend_port_prestart_summary_environment_blocked_checks: "
+        f"`{json.dumps(packet['backend_port_prestart_summary_environment_blocked_checks'])}`",
+        "- backend_port_prestart_summary_environment_blocked_check_details: "
+        f"`{json.dumps(packet['backend_port_prestart_summary_environment_blocked_check_details'])}`",
         "- backend_port_prestart_check_status: "
         f"`{packet['backend_port_prestart_check_status']}`",
+        *[
+            f"- {field}: `{str(packet[field]).lower()}`"
+            for field in PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        ],
+        *[
+            f"- {field}: `{str(packet[field]).lower()}`"
+            for field in PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        ],
+        *[
+            f"- {field}: `{str(packet[field]).lower()}`"
+            for field in PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        ],
         "- backend_port_prestart_check_operator_sequence_step_index: "
         f"`{packet['backend_port_prestart_check_operator_sequence_step_index']}`",
         "- backend_port_prestart_check_must_be_first_operator_step: "
@@ -845,6 +1054,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 f"`{json.dumps(packet.get('expected_required_supervised_proof_plan_summary_fields') or [])}`",
                 "- required_supervised_proof_plan_summary_fields_match_contract: "
                 f"`{str(packet.get('required_supervised_proof_plan_summary_fields_match_contract')).lower()}`",
+                "- required_supervised_proof_plan_summary_fields_include_invalid_records: "
+                f"`{str(packet.get('required_supervised_proof_plan_summary_fields_include_invalid_records')).lower()}`",
             ]
         )
     if expected_supervised_gate:

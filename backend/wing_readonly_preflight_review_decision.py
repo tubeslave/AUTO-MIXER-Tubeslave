@@ -15,20 +15,42 @@ from typing import Any, Dict, Iterable, Mapping, Tuple
 try:
     from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from wing_readonly_preflight_contract import (
+        is_sha256_hexdigest,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
+        WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+        wing_readonly_preflight_accepted_candidate_artifact_root_contract,
+        wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
+        wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from backend.wing_readonly_preflight_contract import (
+        is_sha256_hexdigest,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
+        WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
+        wing_readonly_preflight_accepted_candidate_artifact_root_contract,
+        wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
+        wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -79,6 +101,27 @@ def _string_list(value: Any) -> Tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
         return ()
     return tuple(str(item) for item in value if isinstance(item, str) and item)
+
+
+def _int_list(value: Any) -> Tuple[int, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    rows: list[int] = []
+    for item in value:
+        if isinstance(item, bool) or not isinstance(item, int):
+            continue
+        rows.append(item)
+    return tuple(rows)
+
+
+def _mapping_list(value: Any) -> list[Dict[str, Any]]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def _non_bool_int(value: Any) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
 
 
 def _record_list(value: Iterable[Mapping[str, Any]] | None) -> Tuple[Mapping[str, Any], ...]:
@@ -173,6 +216,36 @@ def _candidate_items_by_source(evidence: Mapping[str, Any]) -> Dict[str, Mapping
     }
 
 
+def _source_id_is_path_like(source_id: str) -> bool:
+    return "/" in source_id or "\\" in source_id
+
+
+def _accepted_candidate_artifact_root_contract_for_ledger(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> tuple[list[str], dict[str, list[str]]]:
+    """Return artifact-root violations, tolerating synthetic inline source ids."""
+
+    roots, violations_by_source = (
+        wing_readonly_preflight_accepted_candidate_artifact_root_contract(
+            accepted_source_ids,
+            candidate_reviews,
+        )
+    )
+    filtered: dict[str, list[str]] = {}
+    for source_id, violations in violations_by_source.items():
+        items = list(violations)
+        if not _source_id_is_path_like(source_id):
+            items = [
+                item
+                for item in items
+                if item not in {"source_id_not_under_artifact_root"}
+            ]
+        if items:
+            filtered[source_id] = items
+    return roots, filtered
+
+
 def _candidate_review_rows(
     candidates_by_source: Mapping[str, Mapping[str, Any]],
 ) -> list[Dict[str, Any]]:
@@ -184,6 +257,7 @@ def _candidate_review_rows(
                 "status": candidate.get("status"),
                 "run_id": candidate.get("run_id"),
                 "captured_at": candidate.get("captured_at"),
+                "artifact_root": candidate.get("artifact_root"),
                 "summary_path": candidate.get("summary_path"),
                 "summary_sha256": candidate.get("summary_sha256"),
                 "events_path": candidate.get("events_path"),
@@ -200,6 +274,13 @@ def _candidate_review_rows(
                 ),
                 "events_path_matches_expected_artifact": (
                     candidate.get("events_path_matches_expected_artifact") is True
+                ),
+                "request_sequence": _mapping_list(candidate.get("request_sequence")),
+                "plan_request_sequence": _mapping_list(
+                    candidate.get("plan_request_sequence")
+                ),
+                "request_sequence_matches_plan": (
+                    candidate.get("request_sequence_matches_plan") is True
                 ),
                 "backend_port_prestart_check_required": (
                     candidate.get("backend_port_prestart_check_required") is True
@@ -238,11 +319,20 @@ def _candidate_review_rows(
                 "backend_port_prestart_summary_connection_policy": candidate.get(
                     "backend_port_prestart_summary_connection_policy"
                 ),
+                "backend_port_prestart_summary_read_only": candidate.get(
+                    "backend_port_prestart_summary_read_only"
+                ),
                 "backend_port_prestart_summary_live_write": candidate.get(
                     "backend_port_prestart_summary_live_write"
                 ),
                 "backend_port_prestart_summary_contacts_backend": candidate.get(
                     "backend_port_prestart_summary_contacts_backend"
+                ),
+                "backend_port_prestart_summary_contacts_wing": candidate.get(
+                    "backend_port_prestart_summary_contacts_wing"
+                ),
+                "backend_port_prestart_summary_mutates_console_state": candidate.get(
+                    "backend_port_prestart_summary_mutates_console_state"
                 ),
                 "backend_port_prestart_summary_queries_console": candidate.get(
                     "backend_port_prestart_summary_queries_console"
@@ -253,6 +343,30 @@ def _candidate_review_rows(
                 "backend_port_prestart_check_status": candidate.get(
                     "backend_port_prestart_check_status"
                 ),
+                **{
+                    field: candidate.get(field)
+                    if isinstance(candidate.get(field), bool)
+                    else None
+                    for field in (
+                        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                    )
+                },
+                **{
+                    field: candidate.get(field)
+                    if isinstance(candidate.get(field), bool)
+                    else None
+                    for field in (
+                        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+                    )
+                },
+                **{
+                    field: candidate.get(field)
+                    if isinstance(candidate.get(field), bool)
+                    else None
+                    for field in (
+                        WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+                    )
+                },
             }
         )
     return rows
@@ -337,17 +451,35 @@ def _validated_record(
     index: int,
     candidates_by_source: Mapping[str, Mapping[str, Any]],
 ) -> Dict[str, Any]:
+    explicit_review_id = _string(record.get("review_id"))
     record_id = _record_id(record, index)
     artifact_source_id = _string(record.get("artifact_source_id"))
     decision = _string(record.get("decision"))
     reviewed_by = _string(record.get("reviewed_by"))
     reviewed_at = _string(record.get("reviewed_at"))
+    template_status = _string(record.get("template_status"))
     run_id = _string(record.get("run_id"))
     artifact_captured_at = _string(record.get("artifact_captured_at"))
+    artifact_root = _string(record.get("artifact_root"))
     summary_path = _string(record.get("summary_path"))
     summary_sha256 = _string(record.get("summary_sha256"))
     events_path = _string(record.get("events_path"))
     events_sha256 = _string(record.get("events_sha256"))
+    channels = _int_list(record.get("channels"))
+    value_types = _string_list(record.get("value_types"))
+    operator_confirmed_channels = _int_list(record.get("operator_confirmed_channels"))
+    operator_confirmed_session_ready = (
+        record.get("operator_confirmed_session_ready") is True
+    )
+    readback_count = _non_bool_int(record.get("readback_count"))
+    physical_readback_count = _non_bool_int(record.get("physical_readback_count"))
+    request_id_policy = _string(record.get("request_id_policy"))
+    request_id_correlation_required = (
+        record.get("request_id_correlation_required") is True
+    )
+    event_log_run_id_matches_summary = (
+        record.get("event_log_run_id_matches_summary") is True
+    )
     checklist_ids = _string_list(record.get("checklist_ids"))
     candidate = _mapping(candidates_by_source.get(artifact_source_id))
     unsafe_flags = _unsafe_flags(record)
@@ -355,6 +487,10 @@ def _validated_record(
 
     if artifact_source_id not in candidates_by_source:
         violations.append("review_decision_candidate_missing")
+    if not explicit_review_id:
+        violations.append("review_decision_review_id_missing")
+    if template_status == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS:
+        violations.append("review_decision_template_status_unedited")
     if decision not in REVIEW_DECISIONS:
         violations.append("review_decision_unknown")
     if not reviewed_by:
@@ -369,6 +505,16 @@ def _validated_record(
         violations.append("review_decision_artifact_source_missing")
     if checklist_ids != REQUIRED_REVIEW_CHECKLIST_IDS:
         violations.append("review_decision_checklist_ids_mismatch")
+    if request_id_policy != WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY:
+        violations.append("review_decision_request_id_policy_mismatch")
+    if not request_id_correlation_required:
+        violations.append("review_decision_request_id_correlation_not_confirmed")
+    if not event_log_run_id_matches_summary:
+        violations.append("review_decision_event_log_run_id_not_confirmed")
+    if summary_sha256 and not is_sha256_hexdigest(summary_sha256):
+        violations.append("review_decision_summary_sha256_invalid")
+    if events_sha256 and not is_sha256_hexdigest(events_sha256):
+        violations.append("review_decision_events_sha256_invalid")
     if candidate:
         if run_id != candidate.get("run_id"):
             violations.append("review_decision_run_id_mismatch")
@@ -388,6 +534,12 @@ def _validated_record(
                 and reviewed_timestamp < captured_timestamp
             ):
                 violations.append("review_decision_reviewed_at_before_artifact_captured_at")
+        candidate_artifact_root = _string(candidate.get("artifact_root"))
+        if candidate_artifact_root:
+            if not artifact_root:
+                violations.append("review_decision_artifact_root_missing")
+            elif artifact_root != candidate_artifact_root:
+                violations.append("review_decision_artifact_root_mismatch")
         if summary_path != candidate.get("summary_path"):
             violations.append("review_decision_summary_path_mismatch")
         candidate_summary_sha256 = _string(candidate.get("summary_sha256"))
@@ -398,6 +550,31 @@ def _validated_record(
                 violations.append("review_decision_summary_sha256_mismatch")
         if events_path != candidate.get("events_path"):
             violations.append("review_decision_events_path_mismatch")
+        if candidate.get("event_log_run_id_matches_summary") is not True:
+            violations.append("review_decision_candidate_event_log_run_id_mismatch")
+        candidate_channels = _int_list(candidate.get("channels"))
+        if channels != candidate_channels:
+            violations.append("review_decision_channels_mismatch")
+        candidate_value_types = _string_list(candidate.get("value_types"))
+        if value_types != candidate_value_types:
+            violations.append("review_decision_value_types_mismatch")
+        candidate_operator_confirmed_channels = _int_list(
+            candidate.get("operator_confirmed_channels")
+        )
+        if operator_confirmed_channels != candidate_operator_confirmed_channels:
+            violations.append("review_decision_operator_confirmed_channels_mismatch")
+        if operator_confirmed_session_ready is not True:
+            violations.append("review_decision_operator_session_not_confirmed")
+        elif candidate.get("operator_confirmed_session_ready") is not True:
+            violations.append("review_decision_candidate_operator_session_not_confirmed")
+        candidate_readback_count = _non_bool_int(candidate.get("readback_count"))
+        if readback_count != candidate_readback_count:
+            violations.append("review_decision_readback_count_mismatch")
+        candidate_physical_readback_count = _non_bool_int(
+            candidate.get("physical_readback_count")
+        )
+        if physical_readback_count != candidate_physical_readback_count:
+            violations.append("review_decision_physical_readback_count_mismatch")
         candidate_events_sha256 = _string(candidate.get("events_sha256"))
         if candidate_events_sha256:
             if not events_sha256:
@@ -413,13 +590,24 @@ def _validated_record(
         "artifact_source_id": artifact_source_id,
         "run_id": run_id,
         "artifact_captured_at": artifact_captured_at,
+        "artifact_root": artifact_root,
         "summary_path": summary_path,
         "summary_sha256": summary_sha256,
         "events_path": events_path,
         "events_sha256": events_sha256,
+        "channels": list(channels),
+        "value_types": list(value_types),
+        "operator_confirmed_channels": list(operator_confirmed_channels),
+        "operator_confirmed_session_ready": operator_confirmed_session_ready,
+        "readback_count": readback_count,
+        "physical_readback_count": physical_readback_count,
+        "request_id_policy": request_id_policy,
+        "request_id_correlation_required": request_id_correlation_required,
+        "event_log_run_id_matches_summary": event_log_run_id_matches_summary,
         "decision": decision if decision in REVIEW_DECISIONS else "invalid",
         "reviewed_by": reviewed_by,
         "reviewed_at": reviewed_at,
+        "template_status": template_status,
         "checklist_ids": list(checklist_ids),
         "candidate_present": bool(candidate),
         "candidate_status": candidate.get("status") or "missing",
@@ -521,11 +709,42 @@ def build_wing_readonly_preflight_review_decision_ledger(
         and accepted_candidate_prestart_source_ids == accepted_source_ids
         and not accepted_candidate_prestart_violations_by_source
     )
+    accepted_candidate_request_sequence_source_ids = (
+        wing_readonly_preflight_accepted_candidate_request_sequence_source_ids(
+            accepted_source_ids,
+            candidate_reviews,
+        )
+    )
+    accepted_candidate_request_sequence_violations_by_source = (
+        wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source(
+            accepted_source_ids,
+            candidate_reviews,
+        )
+    )
+    accepted_candidate_request_sequence_contract_valid = (
+        bool(accepted_source_ids)
+        and accepted_candidate_request_sequence_source_ids == accepted_source_ids
+        and not accepted_candidate_request_sequence_violations_by_source
+    )
+    (
+        accepted_candidate_artifact_roots,
+        accepted_candidate_artifact_root_violations_by_source,
+    ) = _accepted_candidate_artifact_root_contract_for_ledger(
+        accepted_source_ids,
+        candidate_reviews,
+    )
+    accepted_candidate_artifact_root_contract_valid = (
+        bool(accepted_source_ids)
+        and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
+        and not accepted_candidate_artifact_root_violations_by_source
+    )
     manual_readiness_update_candidate_available = (
         bool(accepted_records)
         and not invalid_records
         and not unreviewed_candidate_source_ids
         and accepted_candidate_prestart_contract_valid
+        and accepted_candidate_artifact_root_contract_valid
+        and accepted_candidate_request_sequence_contract_valid
     )
 
     if invalid_records:
@@ -539,6 +758,14 @@ def build_wing_readonly_preflight_review_decision_ledger(
         blocked_by_items = []
         if accepted_records and not accepted_candidate_prestart_contract_valid:
             blocked_by_items.append(WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER)
+        if accepted_records and not accepted_candidate_artifact_root_contract_valid:
+            blocked_by_items.append(
+                WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+            )
+        if accepted_records and not accepted_candidate_request_sequence_contract_valid:
+            blocked_by_items.append(
+                WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+            )
         blocked_by_items.append("readiness_matrix_update_still_requires_separate_manual_action")
         blocked_by = tuple(blocked_by_items)
     else:
@@ -591,6 +818,22 @@ def build_wing_readonly_preflight_review_decision_ledger(
             ),
             "accepted_candidate_prestart_contract_violations_by_source": (
                 accepted_candidate_prestart_violations_by_source
+            ),
+            "accepted_candidate_artifact_root_contract_valid": (
+                accepted_candidate_artifact_root_contract_valid
+            ),
+            "accepted_candidate_artifact_roots": accepted_candidate_artifact_roots,
+            "accepted_candidate_artifact_root_contract_violations_by_source": (
+                accepted_candidate_artifact_root_violations_by_source
+            ),
+            "accepted_candidate_request_sequence_contract_valid": (
+                accepted_candidate_request_sequence_contract_valid
+            ),
+            "accepted_candidate_request_sequence_source_ids": (
+                accepted_candidate_request_sequence_source_ids
+            ),
+            "accepted_candidate_request_sequence_contract_violations_by_source": (
+                accepted_candidate_request_sequence_violations_by_source
             ),
             "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
             "operator_review_required": True,

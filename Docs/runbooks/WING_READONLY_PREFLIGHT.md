@@ -88,6 +88,43 @@ It does not approve live writes.
   real run must both use it with `--prestart-summary`; the runner records its
   SHA256 and fails closed before WebSocket if the file is missing, stale, or not
   a passed `backend_port_free` prestart result.
+- Before opening a backend/WING WebSocket, verify the detached
+  `artifact-manifest.json` in the same no-WING artifact directory as the passed
+  prestart `summary.json`:
+
+  ```bash
+  PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py \
+    path/to/no_wing_artifact_dir
+  ```
+
+  The verifier must return `status: passed`, `failed_checks: []`,
+  `failed_checks_missing_check_entries: []`, and
+  `failed_checks_have_check_entries: true` in `checks`. Its report must also
+  show `verifier_report_required_fields_present: true`,
+  `verifier_report_required_fields_missing: []`, and
+  `verifier_report_required_fields_match_contract: true`. The published
+  `artifact_manifest_verifier_report_required_fields` list must include
+  `checks`, `verifier_report_required_fields`,
+  `verifier_report_required_fields_missing`, and
+  `verifier_report_required_fields_match_contract`. The sidecar must preserve
+  the same summary-surface value-gate verdict as `summary.json` and
+  `summary.md`:
+  `artifact_manifest_self_consistency_summary_surface_match: true`,
+  `artifact_manifest_self_consistency_summary_surface_json_mismatches: []`,
+  `artifact_manifest_self_consistency_summary_surface_markdown_mismatches: []`,
+  `artifact_manifest_self_consistency_summary_surface_mismatches: []`,
+  `artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed: false`,
+  `artifact_manifest_self_consistency_summary_surface_live_authority_granted: false`,
+  `artifact_manifest_self_consistency_match: true`,
+  `artifact_manifest_self_consistency_mismatches: []`,
+  `artifact_manifest_contract_cross_surface_match: true`, and
+  `artifact_manifest_contract_cross_surface_mismatches: []`. Missing or failing
+  verifier/report/sidecar markers mean rerun the no-WING quick check and do not
+  open the WING session. The verifier is diagnostic only and does not contact
+  WING; its results do not close readiness, approve live writes, or grant live
+  authority. The read-only preflight runner repeats this verifier against the
+  artifact directory that contains `--prestart-summary` and fails closed before
+  opening a backend/WING WebSocket when the detached manifest verifier fails.
 - If the no-WING release summary includes
   `wing_readonly_preflight_evidence.artifact_operator_next_steps`, inspect and
   complete those repair instructions before opening a backend/WING WebSocket.
@@ -138,6 +175,42 @@ supervised prestart gate. The same summary must show
 `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`,
 `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
 `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
+Before any supervised proof, the handoff summary must also show
+`required_supervised_proof_plan_summary_fields_include_invalid_records: true`
+so invalid review-decision record diagnostics cannot be hidden behind a stale
+proof-plan field list.
+The same summary must also show the Project Director selected-action value-gate
+self-check fields before supervised proof planning:
+`project_director_selected_action_value_gate_self_check_required: true`,
+`project_director_selected_action_value_gate_self_check_required_markers`,
+`project_director_selected_action_value_gate_self_check_missing_markers: []`,
+`project_director_selected_action_value_gate_self_check_markers_present: true`,
+`project_director_selected_action_value_gate_self_check_readiness_closure_allowed: false`,
+and
+`project_director_selected_action_value_gate_self_check_live_authority_granted: false`.
+The operator Markdown surface must also prove those Project Director value-gate
+self-check lines were rendered:
+`operator_markdown_summary_required_field_lines` must include
+`readonly_preflight_review_decision_candidate_request_sequence_contract_valid`,
+`readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source`,
+`readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete`,
+`next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed`,
+`next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted`,
+`next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed`
+and
+`next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted`,
+and the same summary must show
+`operator_markdown_summary_required_field_lines_missing_members: []` and
+`operator_markdown_summary_required_field_lines_match_contract: true`,
+`project_director_selected_action_value_gate_self_check_markdown_surface_required: true`,
+`project_director_selected_action_value_gate_self_check_markdown_surface_required_field_lines`,
+`project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines: []`,
+`project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered: true`,
+`project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed: false`,
+and
+`project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted: false`.
+Missing markers mean rerun the no-WING quick check and keep Project Director
+audit/planning-only.
 
 Replace channel `3` with the operator-approved channel:
 
@@ -209,6 +282,8 @@ The summary must show:
 - `physical_preflight_requires_existing_backend_connection: true`
 - `request_id_policy: required_for_every_query_mixer_parameter_response`
 - `expected_plan_path: artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- `artifact_root` matches the runtime `--artifact-root` and the referenced
+  offline plan `artifact_root`
 - `expected_plan_match: true`
 - `expected_plan_violations: []`
 - `expected_plan_sha256` is non-empty and matches the referenced offline plan
@@ -222,8 +297,11 @@ The summary must show:
 - `backend_port_prestart_summary_status: passed`
 - `backend_port_prestart_summary_connection_policy:
   no_hardware_no_network_no_live_writes`
+- `backend_port_prestart_summary_read_only: true`
 - `backend_port_prestart_summary_live_write: false`
 - `backend_port_prestart_summary_contacts_backend: false`
+- `backend_port_prestart_summary_contacts_wing: false`
+- `backend_port_prestart_summary_mutates_console_state: false`
 - `backend_port_prestart_summary_queries_console: false`
 - `backend_port_prestart_summary_executes_tests: false`
 - `backend_port_prestart_check_status: passed`
@@ -248,6 +326,10 @@ Event timestamps must be valid UTC values, monotonic in event order, and not
 later than `summary.json` `captured_at`. Event payloads must not include
 mutation evidence such as apply/rollback/write results, requested changes, or
 truthy live-authority flags.
+The review must also show `event_log_run_id_matches_summary: true`; event rows
+with a missing or different `run_id` keep the artifact invalid.
+The offline plan and handoff `fail_closed_conditions` must explicitly include
+`event_log_run_id_mismatch`.
 
 The offline review report must show:
 
@@ -272,10 +354,20 @@ Minimum accepted-decision shape:
   "artifact_source_id": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
   "run_id": "<run_id>",
   "artifact_captured_at": "2026-06-07T00:00:00Z",
+  "artifact_root": "artifacts/wing_readonly_preflight",
   "summary_path": "artifacts/wing_readonly_preflight/<run_id>/summary.json",
   "summary_sha256": "<sha256 of summary.json>",
   "events_path": "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
   "events_sha256": "<sha256 of events.jsonl>",
+  "channels": [3],
+  "value_types": ["fader", "gain", "pan"],
+  "operator_confirmed_channels": [3],
+  "operator_confirmed_session_ready": true,
+  "readback_count": 3,
+  "physical_readback_count": 3,
+  "request_id_policy": "required_for_every_query_mixer_parameter_response",
+  "request_id_correlation_required": true,
+  "event_log_run_id_matches_summary": true,
   "decision": "accepted",
   "reviewed_by": "<operator>",
   "reviewed_at": "2026-06-07T00:00:00Z",
@@ -285,14 +377,22 @@ Minimum accepted-decision shape:
     "confirm_operator_session_ready",
     "confirm_physical_readbacks",
     "confirm_event_log_readonly_sequence",
+    "confirm_event_log_run_id_binding",
     "confirm_no_live_authority"
   ]
 }
 ```
 
 Use `decision: "rejected"` if the operator does not accept the candidate. The
-`artifact_captured_at`, `summary_sha256`, and `events_sha256` fields must match
-the current captured files; stale decisions for replaced artifacts fail closed.
+`review_id` field must remain present in the saved decision record. A missing
+`review_id` keeps the record invalid even if the artifact hashes still match.
+The `artifact_captured_at`, `artifact_root`, `summary_sha256`, `events_sha256`,
+`channels`, `value_types`, `operator_confirmed_channels`,
+`operator_confirmed_session_ready`, `readback_count`,
+`physical_readback_count`, `request_id_policy`,
+`request_id_correlation_required`, and `event_log_run_id_matches_summary` fields
+must match the current captured files; stale decisions for replaced artifacts
+fail closed.
 `reviewed_at` must be the same time as or later than `artifact_captured_at`, so a
 pre-filled or pre-capture operator decision cannot accept a later artifact. The
 decision ledger still does not grant live authority or close readiness rows by
@@ -320,9 +420,12 @@ Exit codes:
 
 The decision template is intentionally not a valid accepted decision yet. The
 operator must edit `decision`, `reviewed_by`, and `reviewed_at`, then save the
-file as a durable review decision. Keep `artifact_source_id`, `run_id`,
-`artifact_captured_at`, `summary_path`, `events_path`, and `checklist_ids`
-aligned with the template.
+file as a durable review decision. Do not leave the generated
+`template_status: operator_must_replace_placeholders_before_ledger_acceptance`
+marker in an accepted decision; the decision ledger treats that marker as an
+unedited pending template and fails closed. Keep `artifact_source_id`, `run_id`,
+`artifact_captured_at`, `artifact_root`, `summary_path`, `events_path`, and
+`checklist_ids` aligned with the template.
 
 After editing the decision JSON, run the focused decision review:
 
@@ -337,11 +440,22 @@ Exit codes:
 
 - `0`: an accepted decision is ready for the next manual WING MVP step only
   when the accepted source ids also have a valid accepted-candidate prestart
-  trace and the generated handoff keeps the supervised-proof transition behind
-  a final accepted-candidate prestart gate;
+  trace, a valid accepted-candidate artifact-root trace, a valid
+  accepted-candidate request-sequence trace, and the generated handoff keeps
+  the supervised-proof transition behind a final accepted-candidate
+  prestart/artifact-root/request-sequence gate;
 - `2`: no clean preflight candidate exists yet;
 - `3`: the decision record is missing, incomplete, invalid, or unsafe;
 - `4`: the operator rejected the candidate, so supervised proof remains blocked.
+
+If the decision review exits `3`, inspect the `Invalid Decision Records`
+section in the generated markdown. It must show the blocked `review_id`,
+`artifact_source_id`, `template_status`, and `violations`; stale generated
+decision templates must expose `review_decision_template_status_unedited` until
+the pending `template_status` marker is removed or replaced.
+The no-WING `summary.json` and operator-readable `summary.md` mirror the same
+decision-ledger `invalid_records` field, so the quick release gate must also
+show the stale-template violation instead of only an invalid record id.
 
 Then run the focused validation checks:
 
@@ -389,14 +503,49 @@ Then update:
   `connection_policy: no_hardware_no_network_no_live_writes`, has
   `live_write: true`, lacks `backend_port_free`, or has
   `backend_port_free.status` other than `passed`;
+- the referenced no-WING summary's `backend_port_free.detail` omits or changes
+  `backend_port_prestart_check_failure_detail_fields`, including missing
+  `listener_confirmation_checklist`, or any backend-port required-false detail
+  field is missing or not `false`;
 - the captured read-only summary's `backend_port_prestart_summary_sha256` does
   not match the referenced no-WING prestart summary file;
+- the referenced no-WING prestart artifact's detached `artifact-manifest.json`
+  is missing, absent from the same artifact directory as `summary.json`, or does
+  not pass
+  `PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py
+  <no_wing_artifact_dir>` with `status: passed`, `failed_checks: []`,
+  `failed_checks_missing_check_entries: []`,
+  `failed_checks_have_check_entries: true`,
+  `verifier_report_required_fields_present: true`,
+  `verifier_report_required_fields_missing: []`, and
+  `verifier_report_required_fields_match_contract: true`, or does
+  not show `artifact_manifest_self_consistency_summary_surface_match: true`,
+  `artifact_manifest_self_consistency_summary_surface_json_mismatches: []`,
+  `artifact_manifest_self_consistency_summary_surface_markdown_mismatches: []`,
+  `artifact_manifest_self_consistency_summary_surface_mismatches: []`,
+  `artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed: false`,
+  `artifact_manifest_self_consistency_summary_surface_live_authority_granted: false`,
+  `artifact_manifest_self_consistency_match: true`,
+  `artifact_manifest_self_consistency_mismatches: []`,
+  `artifact_manifest_contract_cross_surface_match: true`, and
+  `artifact_manifest_contract_cross_surface_mismatches: []`, and the referenced
+  `artifact_manifest_verifier_report_required_fields` list does not include
+  `checks`, `verifier_report_required_fields`,
+  `verifier_report_required_fields_missing`, and
+  `verifier_report_required_fields_match_contract`, and the referenced
+  no-WING operator-readable `summary.md` does not show
+  `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines`,
+  `wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []`
+  and
+  `wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: true`;
 - the expected offline plan uses a stale backend-port prestart failure-detail
   contract, including missing `listener_confirmation_checklist`;
 - the referenced offline plan file is missing or its SHA256 does not match
   `expected_plan_sha256`;
 - the referenced offline plan content does not match the captured summary or
   read-only request sequence;
+- the captured summary omits `artifact_root` or it does not match the
+  referenced offline plan `artifact_root`;
 - the summary does not prove the run required an already-connected
   backend/WING session;
 - the run contacts the wrong mixer;
@@ -407,7 +556,9 @@ Then update:
 - the review decision JSON is missing, malformed, not UTC stamped, linked to
   the wrong artifact/run, duplicated for the same candidate, conflicts with
   another decision for the same candidate, lacks a valid accepted-candidate
-  prestart trace, or claims live/readiness authority.
+  prestart trace, lacks a valid accepted-candidate artifact-root trace, lacks a
+  valid accepted-candidate request-sequence trace, or claims live/readiness
+  authority.
 
 ## Next Step
 
@@ -466,6 +617,18 @@ The handoff validation must report:
   `backend_port_prestart_gate_execution_allowed: false`,
   `backend_port_prestart_gate_readiness_closure_allowed: false`, and
   `backend_port_prestart_gate_live_authority_granted: false`
+- the no-WING handoff summary also shows
+  `plan_safe_to_stop_listener_by_gate: false`,
+  `plan_live_authority_granted: false`,
+  `plan_backend_port_prestart_gate_execution_allowed: false`,
+  `plan_backend_port_prestart_gate_readiness_closure_allowed: false`,
+  and `plan_backend_port_prestart_gate_live_authority_granted: false`
+- the no-WING handoff summary also shows
+  `safe_to_stop_listener_by_gate_matches_plan: true`,
+  `live_authority_granted_matches_plan: true`,
+  `backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+  `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`,
+  and `backend_port_prestart_gate_live_authority_granted_matches_plan: true`
 - the same summaries also show `backend_port_prestart_check_failure_detail_fields`
   exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,
@@ -485,6 +648,11 @@ The handoff validation must report:
   `backend_port_prestart_gate_readiness_closure_allowed`,
   `backend_port_prestart_gate_live_authority_granted`,
   `fail_closed_reason`, and `operator_next_step`
+- If no-WING quick reports `environment_blocked_checks`, the no-WING summary
+  must also expose `environment_blocked_check_details` with
+  `local_dev_server_bind_denied`, `127.0.0.1:3000`, log paths, and
+  `operator_next_step`. That result remains failed until rerun in an
+  environment that can bind the frontend dev server.
 - `manual_review_required_before_readiness_update: true`
 - `readiness_matrix_update_allowed_by_packet: false`
 - `readiness_closure_allowed_by_packet: false`
@@ -511,6 +679,18 @@ The handoff validation must report:
   `backend_port_prestart_gate_readiness_closure_allowed: false`, and
   `backend_port_prestart_gate_live_authority_granted: false`
 - the no-WING handoff summary also shows
+  `plan_safe_to_stop_listener_by_gate: false`,
+  `plan_live_authority_granted: false`,
+  `plan_backend_port_prestart_gate_execution_allowed: false`,
+  `plan_backend_port_prestart_gate_readiness_closure_allowed: false`,
+  and `plan_backend_port_prestart_gate_live_authority_granted: false`
+- the no-WING handoff summary also shows
+  `safe_to_stop_listener_by_gate_matches_plan: true`,
+  `live_authority_granted_matches_plan: true`,
+  `backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+  `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`,
+  and `backend_port_prestart_gate_live_authority_granted_matches_plan: true`
+- the no-WING handoff summary also shows
   `backend_port_prestart_summary_path_placeholder` pointing to the passed
   no-WING prestart `summary.json`,
   `preview_command_prestart_summary` matching that path,
@@ -521,6 +701,24 @@ The handoff validation must report:
 - `live_authority_granted: false`
 - `full_autonomous_ready: false`
 - `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`
+- `operator_sequence` lists the actual ordered handoff checklist
+- `expected_operator_sequence` lists the expected ordered handoff checklist
+- `wing_readonly_operator_sequence_list_summary_surface_self_check_required: true`
+- `wing_readonly_operator_sequence_list_summary_surface_mismatches: []`
+- `wing_readonly_operator_sequence_list_summary_surface_match: true`
+- `wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed: false`
+- `wing_readonly_operator_sequence_list_summary_surface_live_authority_granted: false`
+- `wing_readonly_operator_sequence_list_markdown_surface_required: true`
+- `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines`
+- `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value`
+- `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value`
+- `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: true`
+- `wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []`
+- `wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: true`
+- `wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed: false`
+- `wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted: false`
+These Markdown-surface verdict lines are part of the no-WING fail-closed
+contract; if any are missing, do not open the WING session.
 - `expected_artifacts` exactly matches `expected_artifact_globs` and
   `plan_expected_artifacts`
 - `expected_artifacts_match_plan: true`
@@ -549,6 +747,7 @@ The handoff validation must report:
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
   `current first open blocker`
 - `backend_connection_confirmation_step_index: 2`
+- `expected_backend_connection_confirmation_step_index: 2`
 - `operator_sequence_has_backend_connection_confirmation: true`
 - `operator_sequence_backend_connection_confirmation_step_index: 2`
 - `operator_sequence_backend_connection_confirmation_before_capture: true`
@@ -556,16 +755,25 @@ The handoff validation must report:
   `existing backend connection`, `intended WING Rack`, and
   `read-only inspection`
 - `operator_sequence_capture_readonly_preflight_step_index: 4`
+- `expected_operator_sequence_capture_readonly_preflight_step_index: 4`
+- `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`
+- `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`
+- `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`
+- `operator_sequence_capture_readonly_preflight_step_matches_contract: true`
 - the final handoff operator-sequence step contains the supervised prestart gate
 - `operator_sequence_has_supervised_prestart_gate: true`
 - `operator_sequence_supervised_prestart_gate_is_final: true`
 - `operator_sequence_supervised_prestart_gate_step_index: 9`
 - `operator_sequence_supervised_prestart_gate_step` includes
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate artifact-root trace`,
+  `valid accepted-candidate request-sequence trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `required_supervised_prestart_gate_markers` exactly lists
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate artifact-root trace`,
+  `valid accepted-candidate request-sequence trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `supervised_prestart_gate` exactly matches
@@ -578,9 +786,19 @@ The handoff validation must report:
 - `supervised_prestart_gate.unlocks_runbook:
   Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`
 - `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`
+- `supervised_prestart_gate.requires_accepted_candidate_artifact_root_trace: true`
+- `supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true`
 - `accepted_candidate_prestart_contract_violations_by_source: {}`
 - `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`
+- `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`
+- `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`
+- `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`
 
-Until those markers are present in the final operator step and the structured
-gate matches the expected gate, the result remains a read-only proof artifact
-and grants no supervised write authority.
+Until those markers are present in the final operator step, the structured gate
+matches the expected gate, and no-WING validation avoids
+`next_wing_proof_plan_steps_with_candidate_prestart_violations`,
+`next_wing_proof_plan_steps_with_expected_candidate_prestart_violations`, and
+`next_wing_proof_plan_steps_with_candidate_artifact_root_violations`, and
+`next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations`,
+the result remains a read-only proof artifact and grants no supervised write
+authority.

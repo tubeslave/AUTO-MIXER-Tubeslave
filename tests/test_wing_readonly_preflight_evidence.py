@@ -8,6 +8,9 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS,
     EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
     EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -125,6 +128,7 @@ def _valid_summary() -> dict:
         "captured_at": "2026-06-07T01:00:00Z",
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": WING_READONLY_PREFLIGHT_PROOF_RUNNER,
+        "artifact_root": WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
         "connection_mode": "wing",
         "channels": [3],
         "operator_channel_confirmation_required": True,
@@ -162,11 +166,26 @@ def _valid_summary() -> dict:
         "backend_port_prestart_summary_connection_policy": (
             "no_hardware_no_network_no_live_writes"
         ),
+        "backend_port_prestart_summary_read_only": True,
         "backend_port_prestart_summary_live_write": False,
         "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_contacts_wing": False,
+        "backend_port_prestart_summary_mutates_console_state": False,
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        **{
+            field: False
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: False
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: True
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -230,8 +249,15 @@ def test_expected_plan_fail_closed_conditions_use_shared_contract():
     )
 
 
-def _event(seq: int, event_type: str, payload: dict) -> dict:
+def _event(
+    seq: int,
+    event_type: str,
+    payload: dict,
+    *,
+    run_id: str = "20260606T120000Z_wing_readonly_preflight",
+) -> dict:
     return {
+        "run_id": run_id,
         "seq": seq,
         "timestamp": "2026-06-06T12:00:00.000Z",
         "event_type": event_type,
@@ -241,10 +267,20 @@ def _event(seq: int, event_type: str, payload: dict) -> dict:
 
 def _valid_events(summary: dict) -> list[dict]:
     events = [
-        _event(1, "send", {"type": "get_operator_mode"}),
-        _event(2, "recv", {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"}),
-        _event(3, "send", {"type": "get_state"}),
-        _event(4, "recv", {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}}),
+        _event(1, "send", {"type": "get_operator_mode"}, run_id=summary["run_id"]),
+        _event(
+            2,
+            "recv",
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            run_id=summary["run_id"],
+        ),
+        _event(3, "send", {"type": "get_state"}, run_id=summary["run_id"]),
+        _event(
+            4,
+            "recv",
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            run_id=summary["run_id"],
+        ),
     ]
     seq = 5
     for row in summary["readbacks"]:
@@ -259,9 +295,10 @@ def _valid_events(summary: dict) -> list[dict]:
                     "value_type": row["value_type"],
                     "address": row["address"],
                 },
+                run_id=summary["run_id"],
             )
         )
-        events.append(_event(seq + 1, "recv", row))
+        events.append(_event(seq + 1, "recv", row, run_id=summary["run_id"]))
         seq += 2
     return events
 
@@ -284,7 +321,7 @@ def _expected_plan_request_sequence(summary: dict) -> list[dict]:
 
 
 def _artifact_root_from_summary(summary: dict) -> str:
-    return str(Path(summary["summary_path"]).parent.parent)
+    return str(summary.get("artifact_root") or Path(summary["summary_path"]).parent.parent)
 
 
 def _expected_artifacts_for_summary(summary: dict) -> list[str]:
@@ -355,11 +392,20 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_summary_connection_policy": summary[
             "backend_port_prestart_summary_connection_policy"
         ],
+        "backend_port_prestart_summary_read_only": summary[
+            "backend_port_prestart_summary_read_only"
+        ],
         "backend_port_prestart_summary_live_write": summary[
             "backend_port_prestart_summary_live_write"
         ],
         "backend_port_prestart_summary_contacts_backend": summary[
             "backend_port_prestart_summary_contacts_backend"
+        ],
+        "backend_port_prestart_summary_contacts_wing": summary[
+            "backend_port_prestart_summary_contacts_wing"
+        ],
+        "backend_port_prestart_summary_mutates_console_state": summary[
+            "backend_port_prestart_summary_mutates_console_state"
         ],
         "backend_port_prestart_summary_queries_console": summary[
             "backend_port_prestart_summary_queries_console"
@@ -370,6 +416,18 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_status": summary[
             "backend_port_prestart_check_status"
         ],
+        **{
+            field: summary[field]
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: summary[field]
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: summary[field]
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
         "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
@@ -402,8 +460,11 @@ def _write_prestart_summary(path: Path, *, status: str = "passed") -> None:
         "type": "no_wing_release_check",
         "status": status,
         "connection_policy": "no_hardware_no_network_no_live_writes",
+        "read_only": True,
         "live_write": False,
         "contacts_backend": False,
+        "contacts_wing": False,
+        "mutates_console_state": False,
         "queries_console": False,
         "executes_tests": False,
         "results": [
@@ -411,8 +472,23 @@ def _write_prestart_summary(path: Path, *, status: str = "passed") -> None:
                 "name": "backend_port_free",
                 "status": "passed",
                 "detail": {
+                    "backend_port_prestart_check_failure_detail_fields": list(
+                        EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                    ),
                     "safe_to_stop_listener_by_gate": False,
                     "live_authority_granted": False,
+                    **{
+                        field: False
+                        for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                    },
+                    **{
+                        field: False
+                        for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+                    },
+                    **{
+                        field: True
+                        for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+                    },
                 },
             }
         ],
@@ -438,6 +514,7 @@ def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events
     prestart_path = run_dir / "no_wing_prestart_summary.json"
     payload["events_path"] = str(events_path)
     payload["summary_path"] = str(artifact_path)
+    payload["artifact_root"] = str(run_dir.parent)
     payload["expected_plan_path"] = str(plan_path)
     payload["backend_port_prestart_summary_path"] = str(prestart_path)
     _write_prestart_summary(prestart_path)
@@ -509,6 +586,14 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert evidence["summary"]["live_authority_granted"] is False
     assert evidence["summary"]["latest_valid_candidate_run_id"] == "20260606T120000Z_wing_readonly_preflight"
     assert evidence["summary"]["latest_valid_candidate_captured_at"] == "2026-06-07T01:00:00Z"
+    assert evidence["summary"]["latest_valid_candidate_request_sequence"] == (
+        _expected_plan_request_sequence(_valid_summary())
+    )
+    assert evidence["summary"]["latest_valid_candidate_plan_request_sequence"] == []
+    assert (
+        evidence["summary"]["latest_valid_candidate_request_sequence_matches_plan"]
+        is None
+    )
     assert evidence["summary"]["blocked_by"] == [
         "operator_must_review_readonly_preflight_candidate_before_readiness_update"
     ]
@@ -529,6 +614,11 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert evidence["artifacts"][0]["expected_artifacts"] == []
     assert evidence["artifacts"][0]["summary_path_matches_expected_artifact"] is None
     assert evidence["artifacts"][0]["events_path_matches_expected_artifact"] is None
+    assert evidence["artifacts"][0]["request_sequence"] == (
+        _expected_plan_request_sequence(_valid_summary())
+    )
+    assert evidence["artifacts"][0]["plan_request_sequence"] == []
+    assert evidence["artifacts"][0]["request_sequence_matches_plan"] is None
     assert evidence["artifacts"][0]["physical_readback_count"] == 3
     assert evidence["artifacts"][0]["channels"] == [3]
     assert evidence["artifacts"][0]["operator_confirmed_channels"] == [3]
@@ -540,8 +630,32 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
         == "no_wing_release_check"
     )
     assert evidence["artifacts"][0]["backend_port_prestart_summary_status"] == "passed"
+    assert evidence["artifacts"][0]["backend_port_prestart_summary_read_only"] is True
+    assert evidence["artifacts"][0]["backend_port_prestart_summary_contacts_wing"] is False
+    assert (
+        evidence["artifacts"][0]["backend_port_prestart_summary_mutates_console_state"]
+        is False
+    )
     assert evidence["artifacts"][0]["backend_port_prestart_check_status"] == "passed"
+    for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        assert evidence["artifacts"][0][field] is False
     assert evidence["artifacts"][0]["violations"] == []
+
+
+def test_file_preflight_artifact_exposes_plan_request_sequence_match(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "request-sequence-match")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    expected_sequence = _expected_plan_request_sequence(summary)
+
+    evidence = build_wing_readonly_preflight_evidence(artifact_roots=(tmp_path / "preflight",))
+
+    assert evidence["status"] == "readonly_preflight_candidate_available"
+    assert evidence["summary"]["latest_valid_candidate_request_sequence"] == expected_sequence
+    assert evidence["summary"]["latest_valid_candidate_plan_request_sequence"] == expected_sequence
+    assert evidence["summary"]["latest_valid_candidate_request_sequence_matches_plan"] is True
+    assert evidence["artifacts"][0]["request_sequence"] == expected_sequence
+    assert evidence["artifacts"][0]["plan_request_sequence"] == expected_sequence
+    assert evidence["artifacts"][0]["request_sequence_matches_plan"] is True
 
 
 def test_preflight_evidence_rejects_non_physical_or_forbidden_request_artifact():
@@ -619,6 +733,32 @@ def test_preflight_evidence_rejects_missing_expected_plan_link():
     )
 
 
+def test_preflight_evidence_rejects_malformed_expected_plan_sha():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["expected_plan_sha256"] = "not-a-sha256"
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "expected_plan_sha256_invalid" in validation["violations"]
+    assert "expected_plan_sha256_invalid" in evidence["summary"]["violations"]
+    assert evidence["summary"]["valid_candidate_count"] == 0
+
+
+def test_preflight_evidence_rejects_missing_artifact_root():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact.pop("artifact_root")
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "artifact_root_missing" in validation["violations"]
+
+
 def test_preflight_evidence_rejects_missing_existing_backend_connection_boundary():
     artifact = copy.deepcopy(_valid_summary())
     artifact.pop("physical_preflight_requires_existing_backend_connection")
@@ -632,6 +772,25 @@ def test_preflight_evidence_rejects_missing_existing_backend_connection_boundary
     )
 
 
+def test_preflight_evidence_rejects_malformed_prestart_summary_sha():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["backend_port_prestart_summary_sha256"] = "not-a-sha256"
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "backend_port_prestart_summary_sha256_invalid" in validation["violations"]
+    assert (
+        "backend_port_prestart_summary_sha256_invalid"
+        in evidence["summary"]["violations"]
+    )
+    assert evidence["summary"]["valid_candidate_count"] == 0
+
+
 def test_preflight_evidence_rejects_operator_channel_confirmation_mismatch():
     artifact = copy.deepcopy(_valid_summary())
     artifact["operator_confirmed_channels"] = [4]
@@ -639,6 +798,44 @@ def test_preflight_evidence_rejects_operator_channel_confirmation_mismatch():
     validation = validate_wing_readonly_preflight_artifact(artifact)
 
     assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "operator_confirmed_channels_mismatch" in validation["violations"]
+
+
+def test_preflight_evidence_rejects_boolean_channel_scope_and_counts():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["channels"] = [True]
+    artifact["operator_confirmed_channels"] = [True]
+    artifact["readback_count"] = True
+    artifact["physical_readback_count"] = True
+    artifact["readbacks"][0]["channel"] = True
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "operator_confirmed_channels_missing" in validation["violations"]
+    assert "readback_count_missing" in validation["violations"]
+    assert "readback_count_mismatch" in validation["violations"]
+    assert "physical_readback_count_mismatch" in validation["violations"]
+    assert "readback_0_invalid_channel" in validation["violations"]
+
+
+def test_preflight_evidence_rejects_non_integer_channel_scope_values():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["channels"] = ["3"]
+    artifact["operator_confirmed_channels"] = [3]
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "operator_confirmed_channels_mismatch" in validation["violations"]
+
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["operator_confirmed_channels"] = [3.0]
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "operator_confirmed_channels_missing" in validation["violations"]
     assert "operator_confirmed_channels_mismatch" in validation["violations"]
 
 
@@ -717,6 +914,7 @@ def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path)
     )
     assert valid_row["summary_path_matches_expected_artifact"] is True
     assert valid_row["events_path_matches_expected_artifact"] is True
+    assert valid_row["event_log_run_id_matches_summary"] is True
     assert any(
         "artifact_load_error:JSONDecodeError" in row["violations"]
         for row in evidence["artifacts"]
@@ -737,6 +935,31 @@ def test_file_preflight_artifact_requires_matching_event_log(tmp_path):
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert "event_log_missing" in evidence["summary"]["violations"]
+    assert "event_log_missing_or_invalid" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_event_log_run_id_to_match_summary(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "run-id-mismatch")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    events_path = Path(summary["events_path"])
+    events = [
+        json.loads(line)
+        for line in events_path.read_text(encoding="utf-8").splitlines()
+    ]
+    events[0]["run_id"] = "other_wing_readonly_preflight"
+    events_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in events),
+        encoding="utf-8",
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_roots=(tmp_path / "preflight",)
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["artifacts"][0]["event_log_run_id_matches_summary"] is False
+    assert "event_log_run_id_mismatch:0" in evidence["summary"]["violations"]
     assert "event_log_missing_or_invalid" in evidence["summary"]["violations"]
 
 
@@ -787,6 +1010,30 @@ def test_file_preflight_artifact_requires_expected_plan_metadata_to_match_summar
     assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert "expected_plan_channels_mismatch" in evidence["summary"]["violations"]
+
+
+def test_file_preflight_artifact_requires_expected_plan_artifact_root_to_match_summary(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "artifact-root-mismatch")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    plan = _valid_expected_plan(summary)
+    stale_root = tmp_path / "stale_preflight_root"
+    plan["artifact_root"] = str(stale_root)
+    plan["expected_artifacts"] = [
+        f"{stale_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{stale_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+    ]
+    _write_expected_plan(artifact_path, plan)
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_roots=(tmp_path / "preflight",)
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    violations = evidence["summary"]["violations"]
+    assert "expected_plan_artifact_root_mismatch" in violations
+    assert "summary_path_expected_artifact_mismatch" in violations
+    assert "events_path_expected_artifact_mismatch" in violations
 
 
 def test_file_preflight_artifact_requires_expected_plan_artifacts_to_match_paths(tmp_path):
@@ -948,7 +1195,10 @@ def test_file_preflight_artifact_rejects_prestart_summary_contact_boundary(tmp_p
     summary = json.loads(artifact_path.read_text(encoding="utf-8"))
     prestart_path = Path(summary["backend_port_prestart_summary_path"])
     prestart = json.loads(prestart_path.read_text(encoding="utf-8"))
+    prestart["read_only"] = False
     prestart["contacts_backend"] = True
+    prestart["contacts_wing"] = True
+    prestart["mutates_console_state"] = True
     prestart_path.write_text(json.dumps(prestart), encoding="utf-8")
     summary["backend_port_prestart_summary_sha256"] = hashlib.sha256(
         prestart_path.read_bytes()
@@ -964,9 +1214,124 @@ def test_file_preflight_artifact_rejects_prestart_summary_contact_boundary(tmp_p
     assert "prestart_summary_contacts_backend_not_false" in evidence["summary"][
         "violations"
     ]
+    assert "prestart_summary_read_only_not_true" in evidence["summary"]["violations"]
+    assert "prestart_summary_contacts_wing_not_false" in evidence["summary"][
+        "violations"
+    ]
+    assert "prestart_summary_mutates_console_state_not_false" in evidence["summary"][
+        "violations"
+    ]
     assert "prestart_summary_recorded_contacts_backend_mismatch" in evidence["summary"][
         "violations"
     ]
+    assert "prestart_summary_recorded_read_only_mismatch" in evidence["summary"][
+        "violations"
+    ]
+    assert "prestart_summary_recorded_contacts_wing_mismatch" in evidence["summary"][
+        "violations"
+    ]
+    assert (
+        "prestart_summary_recorded_mutates_console_state_mismatch"
+        in evidence["summary"]["violations"]
+    )
+
+
+def test_file_preflight_artifact_rejects_stale_prestart_detail_contract(tmp_path):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "prestart-detail-list")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    prestart_path = Path(summary["backend_port_prestart_summary_path"])
+    prestart = json.loads(prestart_path.read_text(encoding="utf-8"))
+    detail = prestart["results"][0]["detail"]
+    detail["backend_port_prestart_check_failure_detail_fields"] = [
+        field
+        for field in detail["backend_port_prestart_check_failure_detail_fields"]
+        if field != "listener_confirmation_checklist"
+    ]
+    prestart_path.write_text(json.dumps(prestart), encoding="utf-8")
+    summary["backend_port_prestart_summary_sha256"] = hashlib.sha256(
+        prestart_path.read_bytes()
+    ).hexdigest()
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    violations = evidence["summary"]["violations"]
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert (
+        "prestart_summary_backend_port_check_failure_detail_fields_mismatch"
+        in violations
+    )
+    assert (
+        "prestart_summary_recorded_backend_port_check_failure_detail_fields_mismatch"
+        in violations
+    )
+
+
+def test_file_preflight_artifact_rejects_missing_prestart_required_false_detail(
+    tmp_path,
+):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "prestart-false-detail")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    prestart_path = Path(summary["backend_port_prestart_summary_path"])
+    prestart = json.loads(prestart_path.read_text(encoding="utf-8"))
+    detail = prestart["results"][0]["detail"]
+    detail["backend_port_prestart_gate_live_authority_granted"] = True
+    prestart_path.write_text(json.dumps(prestart), encoding="utf-8")
+    summary["backend_port_prestart_summary_sha256"] = hashlib.sha256(
+        prestart_path.read_bytes()
+    ).hexdigest()
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    violations = evidence["summary"]["violations"]
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert (
+        "prestart_summary_backend_port_prestart_gate_live_authority_granted_not_false"
+        in violations
+    )
+    assert (
+        "prestart_summary_recorded_backend_port_prestart_gate_live_authority_granted_mismatch"
+        in violations
+    )
+
+
+def test_file_preflight_artifact_rejects_stale_prestart_required_false_match_flag(
+    tmp_path,
+):
+    artifact_path = _write_file_artifact(tmp_path / "preflight" / "prestart-match-flag")
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    prestart_path = Path(summary["backend_port_prestart_summary_path"])
+    prestart = json.loads(prestart_path.read_text(encoding="utf-8"))
+    detail = prestart["results"][0]["detail"]
+    detail["backend_port_prestart_gate_live_authority_granted_matches_plan"] = False
+    prestart_path.write_text(json.dumps(prestart), encoding="utf-8")
+    summary["backend_port_prestart_summary_sha256"] = hashlib.sha256(
+        prestart_path.read_bytes()
+    ).hexdigest()
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    violations = evidence["summary"]["violations"]
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert (
+        "prestart_summary_backend_port_prestart_gate_live_authority_granted_matches_plan_not_true"
+        in violations
+    )
+    assert (
+        "prestart_summary_recorded_backend_port_prestart_gate_live_authority_granted_matches_plan_mismatch"
+        in violations
+    )
 
 
 def test_file_preflight_artifact_requires_expected_plan_request_sequence_to_match_summary(tmp_path):
@@ -981,6 +1346,11 @@ def test_file_preflight_artifact_requires_expected_plan_request_sequence_to_matc
     assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert "expected_plan_request_sequence_mismatch" in evidence["summary"]["violations"]
+    assert evidence["artifacts"][0]["request_sequence"] == _expected_plan_request_sequence(
+        summary
+    )
+    assert evidence["artifacts"][0]["plan_request_sequence"] == plan["request_sequence"]
+    assert evidence["artifacts"][0]["request_sequence_matches_plan"] is False
 
 
 def test_file_preflight_artifact_rejects_tampered_event_log_send_types(tmp_path):

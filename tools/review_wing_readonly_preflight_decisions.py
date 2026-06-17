@@ -26,6 +26,10 @@ from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     build_wing_readonly_preflight_review_decision_ledger,
 )
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
 )
@@ -60,6 +64,28 @@ def _markdown_bool(value: Any) -> str:
     return str(value).lower() if isinstance(value, bool) else ""
 
 
+def _invalid_decision_records(records: Any) -> list[dict[str, Any]]:
+    if not isinstance(records, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for record in records:
+        if not isinstance(record, Mapping) or record.get("valid") is True:
+            continue
+        rows.append(
+            {
+                "review_id": str(record.get("review_id") or ""),
+                "artifact_source_id": str(record.get("artifact_source_id") or ""),
+                "decision": str(record.get("decision") or ""),
+                "template_status": str(record.get("template_status") or ""),
+                "violations": _string_list(record.get("violations")),
+                "unsafe_authority_flags": _string_list(
+                    record.get("unsafe_authority_flags")
+                ),
+            }
+        )
+    return rows
+
+
 def build_decision_review_report(
     *,
     artifact_roots: Iterable[str | Path] | None = None,
@@ -78,6 +104,7 @@ def build_decision_review_report(
     )
     summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}
     safety = ledger.get("safety") if isinstance(ledger.get("safety"), Mapping) else {}
+    invalid_records = _invalid_decision_records(ledger.get("records"))
     accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
     accepted_candidate_prestart_source_ids = _string_list(
         summary.get("accepted_candidate_prestart_source_ids")
@@ -93,12 +120,28 @@ def build_decision_review_report(
     accepted_candidate_prestart_contract_valid = (
         summary.get("accepted_candidate_prestart_contract_valid") is True
     )
+    accepted_candidate_artifact_roots = _string_list(
+        summary.get("accepted_candidate_artifact_roots")
+    )
+    accepted_candidate_artifact_root_contract_violations_by_source = (
+        summary.get("accepted_candidate_artifact_root_contract_violations_by_source")
+        if isinstance(
+            summary.get("accepted_candidate_artifact_root_contract_violations_by_source"),
+            Mapping,
+        )
+        else {}
+    )
+    accepted_candidate_artifact_root_contract_valid = (
+        summary.get("accepted_candidate_artifact_root_contract_valid") is True
+    )
     accepted_ready = (
         summary.get("manual_readiness_update_candidate_available") is True
         and int(summary.get("accepted_record_count") or 0) > 0
         and bool(accepted_source_ids)
         and accepted_candidate_prestart_contract_valid
         and accepted_candidate_prestart_source_ids == accepted_source_ids
+        and accepted_candidate_artifact_root_contract_valid
+        and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
         and int(summary.get("invalid_record_count") or 0) == 0
         and int(summary.get("unreviewed_candidate_count") or 0) == 0
     )
@@ -149,8 +192,16 @@ def build_decision_review_report(
         "accepted_candidate_prestart_contract_violations_by_source": dict(
             accepted_candidate_prestart_contract_violations_by_source
         ),
+        "accepted_candidate_artifact_root_contract_valid": (
+            accepted_candidate_artifact_root_contract_valid
+        ),
+        "accepted_candidate_artifact_roots": accepted_candidate_artifact_roots,
+        "accepted_candidate_artifact_root_contract_violations_by_source": dict(
+            accepted_candidate_artifact_root_contract_violations_by_source
+        ),
         "rejected_source_ids": _string_list(summary.get("rejected_source_ids")),
         "invalid_record_ids": _string_list(summary.get("invalid_record_ids")),
+        "invalid_records": invalid_records,
         "duplicate_source_ids": _string_list(summary.get("duplicate_source_ids")),
         "conflicting_source_ids": _string_list(summary.get("conflicting_source_ids")),
         "unreviewed_candidate_source_ids": _string_list(
@@ -172,6 +223,11 @@ def build_decision_review_report(
                 "have a valid accepted-candidate prestart trace."
             )
             if accepted_source_ids and not accepted_candidate_prestart_contract_valid
+            else (
+                "Accepted review decision remains blocked until accepted source ids "
+                "have a valid accepted-candidate artifact-root trace."
+            )
+            if accepted_source_ids and not accepted_candidate_artifact_root_contract_valid
             else "Operator rejected the candidate; capture or review a replacement artifact."
             if rejected_only
             else str(summary.get("next_global_step") or "Capture and review WING preflight evidence.")
@@ -215,6 +271,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"`{json.dumps(report['accepted_candidate_prestart_source_ids'])}`",
         "- accepted_candidate_prestart_contract_violations_by_source: "
         f"`{json.dumps(report['accepted_candidate_prestart_contract_violations_by_source'], sort_keys=True)}`",
+        "- accepted_candidate_artifact_root_contract_valid: "
+        f"`{str(report['accepted_candidate_artifact_root_contract_valid']).lower()}`",
+        "- accepted_candidate_artifact_roots: "
+        f"`{json.dumps(report['accepted_candidate_artifact_roots'])}`",
+        "- accepted_candidate_artifact_root_contract_violations_by_source: "
+        f"`{json.dumps(report['accepted_candidate_artifact_root_contract_violations_by_source'], sort_keys=True)}`",
         "",
         "## Safety",
         "",
@@ -244,9 +306,38 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"`{json.dumps(report['unreviewed_candidate_source_ids'])}`",
         f"- required_checklist_ids: `{json.dumps(report['required_checklist_ids'])}`",
         "",
+        "## Invalid Decision Records",
+        "",
+    ]
+    invalid_records = (
+        report.get("invalid_records")
+        if isinstance(report.get("invalid_records"), list)
+        else []
+    )
+    if invalid_records:
+        for item in invalid_records:
+            row = item if isinstance(item, Mapping) else {}
+            lines.extend(
+                [
+                    f"- review_id: `{row.get('review_id')}`",
+                    f"  - artifact_source_id: `{row.get('artifact_source_id')}`",
+                    f"  - decision: `{row.get('decision')}`",
+                    f"  - template_status: `{row.get('template_status')}`",
+                    "  - violations: "
+                    f"`{json.dumps(row.get('violations') or [])}`",
+                    "  - unsafe_authority_flags: "
+                    f"`{json.dumps(row.get('unsafe_authority_flags') or [])}`",
+                ]
+            )
+    else:
+        lines.append("- no invalid decision records")
+    lines.extend(
+        [
+            "",
         "## Candidate Prestart Contract",
         "",
     ]
+    )
     candidate_reviews = (
         report.get("candidate_reviews")
         if isinstance(report.get("candidate_reviews"), list)
@@ -260,6 +351,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"- source: `{row.get('source_id')}`",
                     f"  - status: `{row.get('status')}`",
                     f"  - run_id: `{row.get('run_id')}`",
+                    f"  - artifact_root: `{row.get('artifact_root') or ''}`",
                     f"  - summary_path: `{row.get('summary_path')}`",
                     "  - expected_artifacts: "
                     f"`{json.dumps(row.get('expected_artifacts') or [])}`",
@@ -293,10 +385,16 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{row.get('backend_port_prestart_summary_status') or ''}`",
                     "  - backend_port_prestart_summary_connection_policy: "
                     f"`{row.get('backend_port_prestart_summary_connection_policy') or ''}`",
+                    "  - backend_port_prestart_summary_read_only: "
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_read_only'))}`",
                     "  - backend_port_prestart_summary_live_write: "
                     f"`{_markdown_bool(row.get('backend_port_prestart_summary_live_write'))}`",
                     "  - backend_port_prestart_summary_contacts_backend: "
                     f"`{_markdown_bool(row.get('backend_port_prestart_summary_contacts_backend'))}`",
+                    "  - backend_port_prestart_summary_contacts_wing: "
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_contacts_wing'))}`",
+                    "  - backend_port_prestart_summary_mutates_console_state: "
+                    f"`{_markdown_bool(row.get('backend_port_prestart_summary_mutates_console_state'))}`",
                     "  - backend_port_prestart_summary_queries_console: "
                     f"`{_markdown_bool(row.get('backend_port_prestart_summary_queries_console'))}`",
                     "  - backend_port_prestart_summary_executes_tests: "
@@ -305,6 +403,18 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{row.get('backend_port_prestart_check_status') or ''}`",
                 ]
             )
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+                lines.append(
+                    f"  - {field}: `{_markdown_bool(row.get(field))}`"
+                )
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS:
+                lines.append(
+                    f"  - {field}: `{_markdown_bool(row.get(field))}`"
+                )
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS:
+                lines.append(
+                    f"  - {field}: `{_markdown_bool(row.get(field))}`"
+                )
     else:
         lines.append("- none")
     lines.extend(
@@ -322,6 +432,15 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER not in blocked_by
     ):
         rendered_blockers.append(WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER)
+    if (
+        report.get("accepted_source_ids")
+        and report.get("accepted_candidate_artifact_root_contract_valid") is not True
+        and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+        not in blocked_by
+    ):
+        rendered_blockers.append(
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+        )
     lines.extend(f"- `{item}`" for item in rendered_blockers)
     if not rendered_blockers:
         lines.append("- none")
