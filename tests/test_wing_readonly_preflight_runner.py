@@ -1510,6 +1510,65 @@ async def test_readonly_preflight_blocks_stale_prestart_detail_plan_before_webso
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_blocks_stale_verifier_check_plan_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"stale verifier-check plan must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    plan_payload = json.loads(expected_plan.read_text(encoding="utf-8"))
+    plan_payload[
+        "artifact_manifest_verifier_check_summary_json_sha256_matches_manifest"
+    ] = False
+    expected_plan.write_text(
+        json.dumps(plan_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "expected_plan_mismatch"
+    assert_summary_prestart_contract(summary)
+    assert summary["expected_plan_match"] is False
+    assert (
+        "expected_plan_artifact_manifest_verifier_check_summary_json_sha256_matches_manifest_mismatch"
+        in summary["expected_plan_violations"]
+    )
+    assert "prestart contract" in summary["operator_next_step"]
+    assert "backend/WING WebSocket" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
 async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_artifacts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
