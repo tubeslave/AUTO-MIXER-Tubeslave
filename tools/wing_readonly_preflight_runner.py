@@ -1171,16 +1171,40 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def write_plan_output_if_requested(args: argparse.Namespace, plan: Dict[str, Any]) -> None:
+def write_plan_output_if_requested(
+    args: argparse.Namespace, plan: Dict[str, Any]
+) -> Optional[Dict[str, str]]:
     if not args.plan_output:
-        return
+        return None
     output_path = Path(args.plan_output)
     plan["plan_output"] = str(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        return {"type": type(exc).__name__, "message": str(exc)}
+    return None
+
+
+def block_plan_output_write_error(
+    plan: Dict[str, Any], error: Dict[str, str]
+) -> Dict[str, Any]:
+    plan.update(
+        {
+            "status": "blocked",
+            "reason": "plan_output_write_error",
+            "plan_output_write_error": error,
+            "plan_output_violations": [
+                f"plan_output_write_error:{error['type']}"
+            ],
+            "execution_allowed_by_plan": False,
+            "live_authority_granted": False,
+        }
     )
+    return plan
 
 
 def validate_expected_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> list[str]:
@@ -1263,7 +1287,9 @@ async def run(args: argparse.Namespace) -> int:
                 "live_authority_granted": False,
                 "manual_review_required_before_readiness_update": True,
             }
-            write_plan_output_if_requested(args, plan)
+            plan_output_error = write_plan_output_if_requested(args, plan)
+            if plan_output_error:
+                block_plan_output_write_error(plan, plan_output_error)
             print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
             return 2
         if prestart_violations:
@@ -1286,11 +1312,17 @@ async def run(args: argparse.Namespace) -> int:
                 ),
             }
             plan.update(prestart_detail)
-            write_plan_output_if_requested(args, plan)
+            plan_output_error = write_plan_output_if_requested(args, plan)
+            if plan_output_error:
+                block_plan_output_write_error(plan, plan_output_error)
             print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
             return 2
         plan = build_offline_preflight_plan(args)
-        write_plan_output_if_requested(args, plan)
+        plan_output_error = write_plan_output_if_requested(args, plan)
+        if plan_output_error:
+            block_plan_output_write_error(plan, plan_output_error)
+            print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
+            return 2
         print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
     channels = parse_csv_ints(args.channels) if validation_error is None else ()

@@ -1846,6 +1846,49 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
 
 
 @pytest.mark.asyncio
+async def test_plan_only_blocks_plan_output_write_error_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"plan-output write error must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,gain,pan",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--plan-only",
+        "--plan-output",
+        str(tmp_path),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["type"] == "wing_readonly_preflight_offline_plan"
+    assert printed["status"] == "blocked"
+    assert printed["reason"] == "plan_output_write_error"
+    assert printed["plan_output"] == str(tmp_path)
+    assert printed["plan_output_write_error"]["type"] == "IsADirectoryError"
+    assert printed["plan_output_violations"] == [
+        "plan_output_write_error:IsADirectoryError"
+    ]
+    assert printed["contacts_backend"] is False
+    assert printed["queries_console"] is False
+    assert printed["execution_allowed_by_plan"] is False
+    assert printed["live_authority_granted"] is False
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_blocks_missing_prestart_summary_before_websocket(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
