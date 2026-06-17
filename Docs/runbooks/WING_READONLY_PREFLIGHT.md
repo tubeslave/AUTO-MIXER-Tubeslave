@@ -444,6 +444,28 @@ python3 tools/wing_readonly_preflight_runner.py \
   --validate-run-inputs-only
 ```
 
+The validation-only summary must show:
+
+- `status: ready_for_websocket`
+- `reason: run_inputs_validated_no_websocket`
+- `validation_only: true`
+- `websocket_opened: false`
+- `read_only: true`
+- `live_write: false`
+- `contacts_backend: false`
+- `contacts_wing: false`
+- `queries_console: false`
+- `mutates_console_state: false`
+- `executes_tests: false`
+- `write_request_sent: false`
+- `proposal_request_sent: false`
+- `expected_plan_match: true`
+- `expected_plan_violations: []`
+- `readiness_matrix_update_allowed: false`
+- `readiness_closure_allowed: false`
+- `live_authority_granted: false`
+- `sent_request_types: []`
+
 After the validation-only command passes, run the real read-only preflight. The
 real run must point at the offline plan generated above with `--expected-plan`;
 if the flag is omitted, or if the runtime arguments or request sequence do not

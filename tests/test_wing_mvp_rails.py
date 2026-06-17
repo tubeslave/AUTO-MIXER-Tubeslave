@@ -1001,8 +1001,24 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "--artifact-root artifacts/wing_readonly_preflight" in readonly
     assert "--value-types fader,gain \\" not in readonly
     assert "--plan-output artifacts/wing_readonly_preflight_plan/latest_plan.json" in readonly
+    assert "--validate-run-inputs-only" in readonly
+    assert "status: ready_for_websocket" in readonly
+    assert "reason: run_inputs_validated_no_websocket" in readonly
+    assert "validation_only: true" in readonly
+    assert "websocket_opened: false" in readonly
+    assert "contacts_backend: false" in readonly
+    assert "contacts_wing: false" in readonly
+    assert "expected_plan_match: true" in readonly
+    assert "expected_plan_violations: []" in readonly
+    assert "sent_request_types: []" in readonly
     assert "--execute" not in readonly
+    assert "read_only: true" in readonly
+    assert "live_write: false" in readonly
     assert "write_request_sent: false" in readonly
+    assert "proposal_request_sent: false" in readonly
+    assert "readiness_matrix_update_allowed: false" in readonly
+    assert "readiness_closure_allowed: false" in readonly
+    assert "live_authority_granted: false" in readonly
     assert "operator_confirmed_channels == channels" in readonly
     assert "strict `send`/`recv` pairs" in readonly
     assert "channel, value type, and address" in readonly
