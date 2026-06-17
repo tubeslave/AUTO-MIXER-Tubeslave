@@ -501,6 +501,9 @@ and `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_s
 the no-WING proof plan summary must also show
 `operator_markdown_summary_required: true`,
 `operator_markdown_summary_required_field_lines`,
+`readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids`,
+`readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source`,
+`readonly_preflight_review_decision_candidate_verifier_ws_proof_complete`,
 `operator_markdown_summary_required_field_lines_missing_members: []`,
 `operator_markdown_summary_required_field_lines_match_contract: true`,
 `operator_markdown_summary_field_lines_rendered: true`, and

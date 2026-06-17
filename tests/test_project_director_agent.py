@@ -350,6 +350,12 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_markdown_summary_required_field_lines" in directive[
         "selected_action"
     ]
+    for marker in (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+    ):
+        assert marker in directive["selected_action"]
     assert "operator_markdown_summary_required_field_lines_missing_members: []" in directive[
         "selected_action"
     ]
@@ -1564,6 +1570,12 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "`summary.md` proof plan section" in prompt
     assert "operator_markdown_summary_required: true" in prompt
     assert "operator_markdown_summary_required_field_lines" in prompt
+    for marker in (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+    ):
+        assert marker in prompt
     assert "operator_markdown_summary_required_field_lines_missing_members: []" in prompt
     assert "operator_markdown_summary_required_field_lines_match_contract: true" in prompt
     assert "operator_markdown_summary_field_lines_rendered: true" in prompt
@@ -1849,6 +1861,12 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "`summary.md` proof plan section" in readme
     assert "operator_markdown_summary_required: true" in readme
     assert "operator_markdown_summary_required_field_lines" in readme
+    for marker in (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+    ):
+        assert marker in readme
     assert "operator_markdown_summary_required_field_lines_missing_members: []" in readme
     assert "operator_markdown_summary_required_field_lines_match_contract: true" in readme
     assert "operator_markdown_summary_field_lines_rendered: true" in readme

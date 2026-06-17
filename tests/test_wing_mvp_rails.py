@@ -1160,6 +1160,12 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "required_supervised_proof_plan_summary_fields_include_invalid_records: true"
         in current_command
     )
+    for marker in (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+    ):
+        assert marker in current_command
     assert "operator-readable no-WING `summary.md`" in current_command
     assert "operator_markdown_summary_required: true" in current_command
     assert "operator_markdown_summary_field_lines_rendered: true" in current_command
@@ -1992,6 +1998,12 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
         "required_supervised_proof_plan_summary_fields_include_invalid_records: true"
         in text
     )
+    for marker in (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+    ):
+        assert marker in text
     assert "operator-readable no-WING `summary.md`" in text
     assert "operator_markdown_summary_required: true" in text
     assert "operator_markdown_summary_field_lines_rendered: true" in text
