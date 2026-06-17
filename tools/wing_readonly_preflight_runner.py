@@ -170,6 +170,8 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "summary_md_artifact_manifest_live_authority_granted_denies_authority",
     "summary_md_artifact_manifest_verifier_readiness_closure_allowed_denies_authority",
     "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority",
+    "summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_denies_authority",
+    "summary_md_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_denies_authority",
     "summary_json_artifact_manifest_verifier_fields_present",
     "manifest_artifact_manifest_verifier_fields_present",
     "summary_md_artifact_manifest_verifier_fields_rendered",
