@@ -15,8 +15,11 @@ from backend.agentic_method_foundation import (
     safety_review_recommendations,
 )
 from backend.context_aware_gate import (
+    BleedTelemetry,
     ContextAwareGateAgent,
+    GATE_READ_REQUIRED_SOURCE,
     assert_no_live_transport_imports as context_gate_has_no_live_transport_imports,
+    build_context_gate_proposals,
     extract_bleed_telemetry,
     recommendation_to_decision_trace,
 )
@@ -290,6 +293,8 @@ def test_context_aware_gate_treats_cymbal_bleed_differently_by_channel_context()
         expected_instrument="Overhead",
         peer_samples=[cymbal_bleed],
     )
+    vocal_telemetry = replace(vocal_telemetry, current_state_cache_freshness=_freshness())
+    overhead_telemetry = replace(overhead_telemetry, current_state_cache_freshness=_freshness())
 
     agent = ContextAwareGateAgent()
     vocal_recommendation = agent.recommend(vocal_telemetry)
@@ -317,6 +322,7 @@ def test_context_aware_gate_recommendation_is_decision_trace_ready_without_live_
         expected_instrument="Snare",
         peer_samples=[_tone(200.0, amplitude=0.18)],
     )
+    snare_bleed = replace(snare_bleed, current_state_cache_freshness=_freshness())
 
     recommendation = ContextAwareGateAgent().recommend(snare_bleed)
 
@@ -331,6 +337,92 @@ def test_context_aware_gate_recommendation_is_decision_trace_ready_without_live_
     assert trace["safety_limits"]["live_write_allowed"] is False
     assert trace["metadata"]["evidence"]["telemetry"]["channel_label"] == "Snare Top"
     assert trace["idempotency_key"].startswith("context-gate-")
+
+
+def test_context_aware_gate_operator_proposal_is_not_queueable_or_live_apply():
+    snare_bleed = extract_bleed_telemetry(
+        _tone(200.0, amplitude=0.18) + _tone(4000.0, amplitude=0.12),
+        channel_id=3,
+        channel_label="Snare Top",
+        expected_instrument="Snare",
+        peer_samples=[_tone(200.0, amplitude=0.18)],
+    )
+    snare_bleed = replace(snare_bleed, current_state_cache_freshness=_freshness())
+
+    recommendation = ContextAwareGateAgent().recommend(snare_bleed)
+    proposal = recommendation.to_operator_proposal()
+
+    assert proposal["method_id"] == "context_aware_gate_agent"
+    assert proposal["kind"] == "gate"
+    assert proposal["can_import_to_queue"] is False
+    assert proposal["can_apply_live"] is False
+    assert "unsupported_value_type:gate" in proposal["blockers"]
+    assert proposal["old_value"]["source"] == GATE_READ_REQUIRED_SOURCE
+    assert proposal["rollback_value"]["source"] == GATE_READ_REQUIRED_SOURCE
+    assert proposal["evidence"]["current_gate_bleed_context_cache_freshness"] == "fresh"
+    assert proposal["evidence"]["current_gate_bleed_context_cache_no_live_authority"] is True
+    assert proposal["evidence"]["source_identity_downstream_trust"]["status"] == (
+        "legacy_unverified"
+    )
+    assert proposal["evidence"]["readback_required_before_promotion"] is True
+    assert proposal["evidence"]["rollback_required_before_promotion"] is True
+    assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["queue_mutation"] is False
+
+
+def test_context_aware_gate_chatter_guard_forces_expander_instead_of_hard_gate():
+    telemetry = BleedTelemetry(
+        channel_id=4,
+        channel_label="Snare Bottom",
+        expected_instrument="snare",
+        noise_floor_db=-70.0,
+        activity_ratio=0.38,
+        bleed_correlation_score=0.72,
+        spectral_outlier_score=0.48,
+        transient_density=0.8,
+        tail_risk=0.12,
+        chatter_risk=0.72,
+        false_open_risk=0.34,
+        false_close_risk=0.26,
+        current_state_cache_freshness=_freshness(),
+    )
+
+    recommendation = ContextAwareGateAgent().recommend(telemetry)
+
+    assert recommendation is not None
+    assert recommendation.action_type == "expander"
+    assert recommendation.suggested_params["mode"] == "expander"
+    guard = recommendation.evidence["chatter_guard"]
+    assert guard["hard_gate_allowed"] is False
+    assert guard["chatter_risk"] == 0.72
+    assert recommendation.evidence["hysteresis"] >= 4.0
+    assert recommendation.evidence["live_write"] is False
+
+
+def test_build_context_gate_proposals_filters_analysis_holds():
+    fresh = BleedTelemetry(
+        channel_id=4,
+        channel_label="Snare Bottom",
+        expected_instrument="snare",
+        noise_floor_db=-70.0,
+        activity_ratio=0.38,
+        bleed_correlation_score=0.72,
+        spectral_outlier_score=0.48,
+        transient_density=0.8,
+        tail_risk=0.12,
+        chatter_risk=0.12,
+        false_open_risk=0.34,
+        false_close_risk=0.26,
+        current_state_cache_freshness=_freshness(),
+    )
+    stale = replace(fresh, channel_id=5, current_state_cache_freshness=_freshness("stale"))
+
+    proposals = build_context_gate_proposals((fresh, stale))
+
+    assert len(proposals) == 1
+    assert proposals[0]["channel"] == 4
+    assert proposals[0]["can_import_to_queue"] is False
+    assert proposals[0]["can_apply_live"] is False
 
 
 def test_context_aware_gate_blocks_stale_context_without_live_or_queue_mutation():
@@ -358,6 +450,69 @@ def test_context_aware_gate_blocks_stale_context_without_live_or_queue_mutation(
     trace = recommendation_to_decision_trace(recommendation)
     assert trace["safety_limits"]["live_write_allowed"] is False
     assert trace["proposed_value"] == {}
+
+
+def test_context_aware_gate_blocks_missing_context_without_gate_params():
+    snare_bleed = extract_bleed_telemetry(
+        _tone(200.0, amplitude=0.18) + _tone(4000.0, amplitude=0.12),
+        channel_id=3,
+        channel_label="Snare Top",
+        expected_instrument="Snare",
+        peer_samples=[_tone(200.0, amplitude=0.18)],
+    )
+
+    recommendation = ContextAwareGateAgent().recommend(snare_bleed)
+
+    assert recommendation is not None
+    assert recommendation.action_type == "gate_analysis_hold"
+    assert recommendation.suggested_params == {}
+    assert recommendation.safety_status == "analysis_only"
+    assert "context_aware_gate_context_cache_not_fresh" in recommendation.evidence["blockers"]
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert recommendation.evidence["current_state_cache_freshness"]["provided"] is False
+    assert build_context_gate_proposals((snare_bleed,)) == ()
+
+
+def test_context_aware_gate_blocks_live_authority_context_without_gate_params():
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 5,
+        "fresh_field_count": 5,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    telemetry = BleedTelemetry(
+        channel_id=4,
+        channel_label="Snare Bottom",
+        expected_instrument="snare",
+        noise_floor_db=-70.0,
+        activity_ratio=0.38,
+        bleed_correlation_score=0.72,
+        spectral_outlier_score=0.48,
+        transient_density=0.8,
+        tail_risk=0.12,
+        chatter_risk=0.12,
+        false_open_risk=0.34,
+        false_close_risk=0.26,
+        current_state_cache_freshness=live_authority_context,
+    )
+
+    recommendation = ContextAwareGateAgent().recommend(telemetry)
+
+    assert recommendation is not None
+    assert recommendation.action_type == "gate_analysis_hold"
+    assert recommendation.suggested_params == {}
+    assert recommendation.safety_status == "analysis_only"
+    assert "context_aware_gate_context_cache_live_authority_present" in recommendation.evidence[
+        "blockers"
+    ]
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_gate_bleed_context_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
+    assert recommendation.evidence["live_write"] is False
+    assert recommendation.evidence["queue_mutation"] is False
+    assert build_context_gate_proposals((telemetry,)) == ()
 
 
 def test_context_aware_gate_blocks_held_source_identity_without_gate_params():
@@ -403,7 +558,10 @@ def test_context_aware_gate_contract_requires_freshness_and_source_identity():
     assert contract["value_type"] == "gate"
     assert contract["target_kind"] == "channel_gate_or_expander"
     assert "current_gate_bleed_context_cache_freshness" in evidence
+    assert "current_gate_bleed_context_cache_no_live_authority" in evidence
     assert "source_identity_downstream_trust" in evidence
+    assert "chatter_guard" in evidence
+    assert "old_value_source" in evidence
     assert "rollback_gate_readback" in evidence
     assert contract["live_apply_allowed"] is False
 
@@ -432,10 +590,12 @@ def test_agentic_foundation_uses_context_aware_gate_for_gate_recommendations():
     recommendations = build_agentic_recommendations(snapshot)
     gate = next(item for item in recommendations if item.agent_name == "ContextAwareGateAgent")
 
-    assert gate.action_type == "expander"
-    assert gate.safety_status in {"proposal_only", "review_required_high_risk"}
+    assert gate.action_type == "gate_analysis_hold"
+    assert gate.suggested_params == {}
+    assert gate.safety_status == "analysis_only"
     assert gate.dry_run is True
     assert gate.evidence["live_write"] is False
+    assert "context_aware_gate_context_cache_not_fresh" in gate.evidence["blockers"]
     assert gate.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
     assert gate.evidence["telemetry"]["expected_instrument"] == "vocal"
 

@@ -296,10 +296,10 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_downstream_gate.py",
         ),
         target_console_surfaces=("gate",),
-        blocker="Gate live writes remain blocked; CAIG direct gate sends and AutoFaderV2 adaptive gate return blocked evidence until false-open/false-close evidence is replayed.",
+        blocker="Gate live writes remain blocked; context-aware gate proposals are non-queueable, and CAIG direct gate sends plus AutoFaderV2 adaptive gate return blocked evidence until false-open/false-close evidence is replayed.",
         next_step=(
-            "Evaluate gate decisions against fresh bleed telemetry, trusted source "
-            "identity, false-open/false-close replay, and rollback readback before any supervised promotion."
+            "Evaluate gate proposals against fresh bleed telemetry, trusted source "
+            "identity, chatter guard, false-open/false-close replay, and rollback readback before any supervised promotion."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -732,8 +732,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_downstream_gate.py",
         ),
         target_console_surfaces=("gate",),
-        blocker="Gate writes are blocked; CAIG direct gate sends and AutoFaderV2 adaptive gate are quarantined until replay evidence reduces false decisions.",
-        next_step="Create supervised gate candidate only after fresh telemetry validation, trusted source identity, and rollback readback proof.",
+        blocker="Gate writes are blocked; context-aware gate proposals are non-queueable, and CAIG direct gate sends plus AutoFaderV2 adaptive gate are quarantined until replay evidence reduces false decisions.",
+        next_step="Create supervised gate candidate only after fresh telemetry validation, trusted source identity, chatter guard, physical readback, and rollback proof.",
     ),
     ProjectGoalCapabilityRow(
         id="console_routing_control",

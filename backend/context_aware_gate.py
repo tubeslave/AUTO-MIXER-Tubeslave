@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover - direct PYTHONPATH=backend compatibilit
 
 
 CONTEXT_AWARE_GATE_VERSION = "context_aware_gate_v1"
+GATE_READ_REQUIRED_SOURCE = "cached_or_physical_gate_read_required_before_promotion"
 EPSILON = 1e-12
 DEFAULT_SAMPLE_RATE = 48000
 
@@ -134,6 +135,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     normalized.setdefault("status", _freshness_status(payload))
     normalized.setdefault("provided", True)
     return normalized
+
+
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
 
 
 def normalize_instrument(value: str) -> str:
@@ -396,6 +405,67 @@ class ContextGateRecommendation:
         payload["idempotency_key"] = payload["idempotency_key"] or context_gate_idempotency_key(payload)
         return payload
 
+    def to_operator_proposal(self) -> Dict[str, Any]:
+        """Return a Product Layer proposal without queue or live-apply authority."""
+
+        payload = self.to_dict()
+        params = dict(self.suggested_params)
+        evidence = {
+            **self.evidence,
+            "current_gate_bleed_context_cache_freshness": self.evidence.get(
+                "current_gate_bleed_context_cache_freshness",
+                self.evidence.get("current_state_cache_freshness_status", "unknown"),
+            ),
+            "current_gate_bleed_context_cache_no_live_authority": self.evidence.get(
+                "current_gate_bleed_context_cache_no_live_authority",
+                False,
+            ),
+            "old_value_source": GATE_READ_REQUIRED_SOURCE,
+            "rollback_value_source": GATE_READ_REQUIRED_SOURCE,
+            "live_write": False,
+            "queue_mutation": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        evidence_blockers = self.evidence.get("blockers", ())
+        if isinstance(evidence_blockers, str):
+            evidence_blockers = (evidence_blockers,)
+        return {
+            "id": payload["idempotency_key"],
+            "method_id": "context_aware_gate_agent",
+            "source": "context_aware_gate_agent",
+            "title": f"Ch {self.channel_id}: gate/expander proposal",
+            "reason": self.reason,
+            "channel": self.channel_id,
+            "target": self.channel_id,
+            "kind": "gate",
+            "severity": "medium" if self.safety_status == "review_required_high_risk" else "low",
+            "confidence": self.confidence,
+            "queue_action": "not_queueable_until_promoted",
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "blockers": [
+                "unsupported_value_type:gate",
+                "not_in_supervised_fader_gain_executor",
+                "hardware_readback_and_rollback_not_proven",
+                *tuple(evidence_blockers),
+            ],
+            "proposed_action": {
+                "action_type": self.action_type,
+                "channel_id": self.channel_id,
+                "params": params,
+            },
+            "old_value": {
+                "source": GATE_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
+            },
+            "rollback_value": {
+                "source": GATE_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
+            },
+            "evidence": evidence,
+        }
+
     def to_decision_trace(self, *, mode: str = "dry_run") -> Dict[str, Any]:
         payload = self.to_dict()
         return AutomationDecisionTrace(
@@ -444,6 +514,7 @@ class ContextAwareGateConfig:
     high_risk_threshold: float = 0.68
     max_musical_range_db: float = 8.0
     max_drum_range_db: float = 24.0
+    max_chatter_risk_for_hard_gate: float = 0.35
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -471,6 +542,7 @@ class ContextAwareGateAgent:
         instrument = normalize_instrument(telemetry.expected_instrument)
         current_state_freshness = _freshness_payload(telemetry.current_state_cache_freshness)
         current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+        current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
         source_identity_trust = evaluate_source_identity_downstream_trust(
             source_id=f"channel:{telemetry.channel_id}",
             source_type=instrument,
@@ -480,8 +552,10 @@ class ContextAwareGateAgent:
             current_state_cache_freshness=telemetry.source_identity_calibration_freshness,
         )
         blockers = []
-        if current_state_freshness_status not in {"fresh", "not_provided"}:
+        if current_state_freshness_status != "fresh":
             blockers.append("context_aware_gate_context_cache_not_fresh")
+        elif not current_state_no_authority:
+            blockers.append("context_aware_gate_context_cache_live_authority_present")
         blockers.extend(source_identity_trust.blockers)
         if blockers:
             blockers_tuple = tuple(sorted(set(blockers)))
@@ -502,9 +576,19 @@ class ContextAwareGateAgent:
                     "context_instrument": instrument,
                     "policy": self.config.to_dict(),
                     "current_state_cache_freshness_status": current_state_freshness_status,
+                    "current_gate_bleed_context_cache_freshness": (
+                        current_state_freshness_status
+                    ),
+                    "current_gate_bleed_context_cache_no_live_authority": (
+                        current_state_no_authority
+                    ),
                     "current_state_cache_freshness": current_state_freshness,
                     "source_identity_downstream_trust": source_identity_trust.to_dict(),
                     "blockers": blockers_tuple,
+                    "old_value_source": GATE_READ_REQUIRED_SOURCE,
+                    "rollback_value_source": GATE_READ_REQUIRED_SOURCE,
+                    "readback_required_before_promotion": True,
+                    "rollback_required_before_promotion": True,
                     "live_write": False,
                     "queue_mutation": False,
                     "model_mutation": False,
@@ -514,7 +598,14 @@ class ContextAwareGateAgent:
             )
         risk = self._risk_score(telemetry)
         confidence = self._confidence(telemetry, risk)
-        action_type = "gate" if instrument in DRUM_SOURCES and telemetry.tail_risk < 0.55 else "expander"
+        chatter_guard = self._chatter_guard(telemetry)
+        action_type = (
+            "gate"
+            if instrument in DRUM_SOURCES
+            and telemetry.tail_risk < 0.55
+            and chatter_guard["hard_gate_allowed"]
+            else "expander"
+        )
         safety_status = "proposal_only"
         if risk >= self.config.high_risk_threshold:
             safety_status = "review_required_high_risk"
@@ -536,8 +627,24 @@ class ContextAwareGateAgent:
                 "context_instrument": instrument,
                 "policy": self.config.to_dict(),
                 "current_state_cache_freshness_status": current_state_freshness_status,
+                "current_gate_bleed_context_cache_freshness": (
+                    current_state_freshness_status
+                ),
+                "current_gate_bleed_context_cache_no_live_authority": (
+                    current_state_no_authority
+                ),
                 "current_state_cache_freshness": current_state_freshness,
                 "source_identity_downstream_trust": source_identity_trust.to_dict(),
+                "false_open_risk": telemetry.false_open_risk,
+                "false_close_risk": telemetry.false_close_risk,
+                "chatter_risk": telemetry.chatter_risk,
+                "tail_risk": telemetry.tail_risk,
+                "chatter_guard": chatter_guard,
+                "hysteresis": params.get("hysteresis_db"),
+                "old_value_source": GATE_READ_REQUIRED_SOURCE,
+                "rollback_value_source": GATE_READ_REQUIRED_SOURCE,
+                "readback_required_before_promotion": True,
+                "rollback_required_before_promotion": True,
                 "live_write": False,
                 "queue_mutation": False,
                 "model_mutation": False,
@@ -578,6 +685,15 @@ class ContextAwareGateAgent:
             "hysteresis_db": 4.0,
         }
 
+    def _chatter_guard(self, telemetry: BleedTelemetry) -> Dict[str, Any]:
+        max_chatter = _clip01(self.config.max_chatter_risk_for_hard_gate)
+        chatter_risk = _clip01(telemetry.chatter_risk)
+        return {
+            "chatter_risk": _round(chatter_risk, 3),
+            "max_chatter_risk_for_hard_gate": _round(max_chatter, 3),
+            "hard_gate_allowed": chatter_risk <= max_chatter,
+        }
+
     def _risk_score(self, telemetry: BleedTelemetry) -> float:
         return _clip01(
             0.28 * telemetry.false_close_risk
@@ -616,6 +732,25 @@ class ContextAwareGateAgent:
 
 def recommendation_to_decision_trace(recommendation: ContextGateRecommendation, *, mode: str = "dry_run") -> Dict[str, Any]:
     return recommendation.to_decision_trace(mode=mode)
+
+
+def build_context_gate_proposals(
+    telemetries: Iterable[BleedTelemetry],
+    *,
+    agent: Optional[ContextAwareGateAgent] = None,
+) -> tuple[Dict[str, Any], ...]:
+    gate_agent = agent or ContextAwareGateAgent()
+    proposals = []
+    for telemetry in telemetries:
+        recommendation = gate_agent.recommend(telemetry)
+        if recommendation is None:
+            continue
+        if not recommendation.suggested_params:
+            continue
+        if recommendation.safety_status not in {"proposal_only", "review_required_high_risk"}:
+            continue
+        proposals.append(recommendation.to_operator_proposal())
+    return tuple(proposals)
 
 
 def assert_no_live_transport_imports() -> bool:

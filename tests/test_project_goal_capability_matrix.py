@@ -321,6 +321,7 @@ def test_gating_is_freshness_and_identity_guarded_without_live_widening():
         assert "backend/source_identity_downstream_gate.py" in row.support_paths
         assert row.current_live_write_kinds == ()
         assert "trusted source identity" in row.next_step
+        assert "chatter guard" in row.next_step
         assert "AutoFaderV2" in row.blocker
 
 

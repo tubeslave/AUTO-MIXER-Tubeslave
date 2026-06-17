@@ -4966,7 +4966,8 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         summary=(
             "ACAD-inspired dry-run gate/expander recommendations using channel "
             "context, bleed correlation, spectral outliers, false-open/false-close "
-            "risk, freshness, and source identity trust."
+            "risk, chatter guard, freshness, source identity trust, and Product "
+            "Layer proposal output."
         ),
         module="backend/context_aware_gate.py",
         can_analyze=True,
@@ -4978,12 +4979,14 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         ),
         promotion_next=(
             "collect live/offline bleed replay evidence with trusted source identity; "
-            "keep gate/expander changes proposal-only until separate physical proof exists"
+            "keep gate/expander changes non-queueable until separate physical proof exists"
         ),
         notes=(
             "no_live_transport",
             "dry_run_true",
             "decision_trace_ready",
+            "product_layer_proposal_ready",
+            "chatter_guard",
             "current_gate_bleed_context_freshness_gate",
             "source_identity_downstream_trust",
         ),
