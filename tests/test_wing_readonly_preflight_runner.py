@@ -1438,6 +1438,7 @@ async def test_validate_run_inputs_only_passes_ready_command_without_websocket(
     assert summary["contacts_backend"] is False
     assert summary["queries_console"] is False
     assert summary["execution_allowed_by_validation"] is False
+    assert summary["readiness_closure_allowed"] is False
     assert summary["live_authority_granted"] is False
     assert "--validate-run-inputs-only" in summary["operator_next_step"]
     assert "real read-only preflight artifact" in summary["operator_next_step"]
@@ -1702,6 +1703,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["contacts_backend"] is False
     assert written["queries_console"] is False
     assert written["execution_allowed_by_plan"] is False
+    assert written["readiness_closure_allowed"] is False
     assert written["live_authority_granted"] is False
     assert written["operator_required"] is True
     assert written["expected_plan_required_for_real_run"] is True
@@ -3839,4 +3841,5 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
     assert printed["contacts_backend"] is False
     assert printed["queries_console"] is False
     assert printed["manual_review_required_before_readiness_update"] is True
+    assert printed["readiness_closure_allowed"] is False
     assert printed["live_authority_granted"] is False

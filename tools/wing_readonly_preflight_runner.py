@@ -1142,6 +1142,7 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "contacts_backend": False,
         "queries_console": False,
         "execution_allowed_by_plan": False,
+        "readiness_closure_allowed": False,
         "live_authority_granted": False,
         "allowed_request_types": list(ALLOWED_REQUEST_TYPES),
         "expected_response_types_by_request_type": dict(
@@ -1301,6 +1302,7 @@ async def run(args: argparse.Namespace) -> int:
                 "contacts_backend": False,
                 "queries_console": False,
                 "execution_allowed_by_plan": False,
+                "readiness_closure_allowed": False,
                 "live_authority_granted": False,
                 "manual_review_required_before_readiness_update": True,
                 "operator_next_step": validation_error_operator_next_step(
@@ -1324,6 +1326,7 @@ async def run(args: argparse.Namespace) -> int:
                 "contacts_backend": False,
                 "queries_console": False,
                 "execution_allowed_by_plan": False,
+                "readiness_closure_allowed": False,
                 "live_authority_granted": False,
                 "manual_review_required_before_readiness_update": True,
                 "prestart_summary_violations": prestart_violations,
@@ -1375,6 +1378,7 @@ async def run(args: argparse.Namespace) -> int:
         "expected_plan_required_for_real_run": True,
         "read_only": True,
         "live_write": False,
+        "readiness_closure_allowed": False,
         "write_request_sent": False,
         "proposal_request_sent": False,
         "physical_preflight_requires_existing_backend_connection": True,
@@ -1506,6 +1510,7 @@ async def run(args: argparse.Namespace) -> int:
                 "contacts_backend": False,
                 "queries_console": False,
                 "execution_allowed_by_validation": False,
+                "readiness_closure_allowed": False,
                 "live_authority_granted": False,
                 "operator_next_step": (
                     "Only after the operator confirms the intended backend/WING "
