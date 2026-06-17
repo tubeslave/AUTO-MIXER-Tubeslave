@@ -840,7 +840,31 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         else:
             violations.append("prestart_summary_backend_port_check_detail_missing")
 
-    verifier_report = verify_no_wing_artifact_manifest(summary_path.parent)
+    detail.update(
+        {
+            "artifact_manifest_verifier_required": True,
+            "artifact_manifest_verifier_run_dir": str(summary_path.parent),
+        }
+    )
+    try:
+        verifier_report = verify_no_wing_artifact_manifest(summary_path.parent)
+    except Exception as exc:
+        detail["artifact_manifest_verifier_error"] = type(exc).__name__
+        detail["artifact_manifest_verifier_error_message"] = str(exc)
+        violations.append("prestart_summary_artifact_manifest_verifier_failed")
+        violations.append(
+            f"prestart_summary_artifact_manifest_verifier_error:{type(exc).__name__}"
+        )
+        return detail, violations
+    if not isinstance(verifier_report, dict):
+        detail["artifact_manifest_verifier_report_type"] = type(
+            verifier_report
+        ).__name__
+        violations.append("prestart_summary_artifact_manifest_verifier_failed")
+        violations.append(
+            "prestart_summary_artifact_manifest_verifier_report_not_object"
+        )
+        return detail, violations
     verifier_checks = verifier_report.get("checks")
     verifier_failed_checks = verifier_report.get("failed_checks")
     verifier_missing_check_entries = verifier_report.get(
@@ -864,8 +888,6 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
     ]
     detail.update(
         {
-            "artifact_manifest_verifier_required": True,
-            "artifact_manifest_verifier_run_dir": str(summary_path.parent),
             "artifact_manifest_verifier_status": verifier_report.get("status"),
             "artifact_manifest_verifier_failed_checks": (
                 verifier_failed_checks if isinstance(verifier_failed_checks, list) else []
