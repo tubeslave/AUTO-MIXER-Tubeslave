@@ -3175,6 +3175,10 @@ async def test_readonly_preflight_reports_missing_verifier_failed_check_entries_
         "prestart_summary_artifact_manifest_verifier_failed_check_entry_missing"
         in summary["prestart_summary_violations"]
     )
+    assert (
+        "prestart_summary_artifact_manifest_verifier_failed_checks_missing_check_entries_not_empty"
+        in summary["prestart_summary_violations"]
+    )
     assert summary["artifact_manifest_verifier_status"] == "failed"
     assert summary["artifact_manifest_verifier_failed_checks"] == [
         "future_manifest_check"
