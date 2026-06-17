@@ -13,7 +13,7 @@ The WING read-only handoff packet now includes `validate_readonly_preflight_inpu
 ## Validation
 
 - `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`: passed.
-- `PYTHONPATH=backend python3 tools/codex_autoloop/codex_direction_guard.py --format markdown`: current package appears as WING target evidence; repository still reports unrelated memory-trust drift.
+- `PYTHONPATH=backend python3 tools/codex_autoloop/codex_direction_guard.py --format markdown`: current package appears as WING target evidence; repository still reports unrelated non-WING dirty worktree drift.
 - `python3 tools/memory/memory_lint.py`: passed.
 - `tests/test_wing_readonly_preflight_handoff_packet.py`: passed.
 - `tests/test_no_wing_release_check.py` focused WING/no-WING subset: passed.
