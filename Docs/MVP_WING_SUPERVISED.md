@@ -103,6 +103,9 @@ Stop the current Codex work direction and return to the first open blocker if:
   accepted-candidate prestart trace, or while the proof plan still carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
 - A supervised proof is planned while accepted review source ids lack a valid
+  accepted-candidate verifier WebSocket proof, or while the proof plan still carries
+  `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`.
+- A supervised proof is planned while accepted review source ids lack a valid
   accepted-candidate artifact-root trace, or while the proof plan still carries
   `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`.
 - A supervised proof is planned while
@@ -428,6 +431,11 @@ Before any supervised proof, accepted review source ids must have a valid
 accepted-candidate prestart trace from read-only preflight review. If that trace
 is missing or invalid, the proof plan must keep
 `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
+as an operator blocker.
+The same accepted source ids must also have a valid accepted-candidate verifier
+WebSocket proof before supervised proof planning; otherwise the proof plan must
+keep
+`accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`
 as an operator blocker.
 That trace must include `expected_artifacts`, `expected_summary_artifact`,
 `expected_events_artifact`, `summary_path_matches_expected_artifact: true`,

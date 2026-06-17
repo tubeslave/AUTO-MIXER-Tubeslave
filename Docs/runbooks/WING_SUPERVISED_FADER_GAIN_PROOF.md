@@ -46,6 +46,8 @@ Forbidden live writes:
   read-only preflight review and are expected-artifact-bound accepted source ids.
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
+- The next supervised proof plan does not carry
+  `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`.
 - The next supervised proof plan lists the accepted read-only preflight
   `summary.json` source id that anchors the physical proof.
 - `.ai/project-layer/wing_mvp_blockers.md` shows read-only preflight as reviewed
@@ -122,6 +124,8 @@ The artifact must show:
   expected-artifact-bound accepted source id;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`;
+- the proof plan carries
+  `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`;
 - operator approval is not explicit;
 - operator confirmation flags are missing or do not match the requested
   channel, value type, and delta;

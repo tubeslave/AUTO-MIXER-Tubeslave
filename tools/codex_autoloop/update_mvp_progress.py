@@ -238,6 +238,7 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source",
     "readonly_preflight_review_decision_invalid_records",
     "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof",
+    "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof",
     "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source",
     "next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations",
     "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof",

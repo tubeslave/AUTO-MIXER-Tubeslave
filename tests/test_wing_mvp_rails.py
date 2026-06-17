@@ -869,6 +869,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in rows[0]["next action"]
     )
+    assert (
+        "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
+        in rows[0]["next action"]
+    )
     fader_row = next(row for row in rows if row["blocker"] == "Supervised fader write proof")
     gain_row = next(
         row for row in rows if row["blocker"] == "Supervised gain-down / trim proof"
@@ -1113,6 +1117,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "expected-artifact-bound accepted source id" in supervised
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in supervised
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
         in supervised
     )
     assert "accepted_candidate_prestart_contract_violations_by_source" in readonly
@@ -1795,6 +1803,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "expected-artifact-bound accepted source id" in report
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in report
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
         in report
     )
     assert "final handoff operator-sequence step" in report

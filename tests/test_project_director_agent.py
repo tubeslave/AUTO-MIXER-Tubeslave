@@ -496,6 +496,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof"
         in directive["selected_action"]
     )
+    assert (
+        "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
+        in directive["selected_action"]
+    )
     for marker in (
         "backend_port_prestart_summary_read_only: true",
         "backend_port_prestart_summary_read_only_matches_plan: true",
@@ -885,6 +889,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     ]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in directive["selected_action"]
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
         in directive["selected_action"]
     )
     assert (
@@ -1659,6 +1667,10 @@ def test_prompt_and_readme_document_project_director_agent():
     )
     assert (
         "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof"
+        in prompt
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
         in prompt
     )
     assert (

@@ -92,6 +92,9 @@ READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER = (
 READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER = (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
 )
+READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER = (
+    "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
+)
 READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER = (
     "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
 )
@@ -947,6 +950,7 @@ def build_supervised_wing_proof_plan(
     )
     review_decision_accepted = (
         _readonly_preflight_review_decision_accepted(review_decision)
+        and accepted_candidate_verifier_ws_proof_complete
         and candidate_request_sequence_contract_valid
         and candidate_artifact_root_contract_valid
         and accepted_candidate_expected_artifact_trace_complete
@@ -991,6 +995,11 @@ def build_supervised_wing_proof_plan(
         if accepted_source_ids and not candidate_request_sequence_contract_valid:
             review_blockers = [
                 READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+                *review_blockers,
+            ]
+        if accepted_source_ids and not accepted_candidate_verifier_ws_proof_complete:
+            review_blockers = [
+                READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
                 *review_blockers,
             ]
         if accepted_source_ids and not accepted_candidate_expected_artifact_trace_complete:

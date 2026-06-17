@@ -1160,6 +1160,54 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_verifier
     assert plan["steps"] == []
 
 
+def test_plan_reports_verifier_proof_blocker_when_verifier_proof_is_missing():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"]["candidate_reviews"][0].pop(
+        "artifact_manifest_verifier_must_pass_before_websocket"
+    )
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+        ]
+        is False
+    )
+    assert plan["summary"][
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+    ] == []
+    assert plan["summary"][
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+    ] == {
+        "artifacts/wing_readonly_preflight/run/summary.json": [
+            "artifact_manifest_verifier_must_pass_before_websocket_not_true"
+        ]
+    }
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+        ]
+        is False
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
 def test_plan_blocks_physical_proof_steps_when_accepted_candidate_has_stale_prestart_match_flag():
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()

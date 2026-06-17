@@ -174,6 +174,11 @@ you want the background automation active.
   map must also stay `{}`. A non-empty expected map must trigger
   `next_wing_proof_plan_steps_with_expected_candidate_prestart_violations` if
   proof steps are still present.
+- Before any supervised fader/gain proof, accepted review source ids must show
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`
+  in the supervised proof plan summary. Missing verifier proof keeps
+  `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`
+  in force and grants no live authority.
 - Accepted review source ids must also show
   `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`
   in the supervised proof plan summary. A non-empty map keeps
