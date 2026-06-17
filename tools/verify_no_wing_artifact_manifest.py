@@ -26,6 +26,8 @@ VERIFIER_REPORT_STATIC_SAFETY_FIELDS = {
     "executes_tests": False,
 }
 SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
+    "readiness_closure_allowed_by_packet",
+    "live_authority_granted",
     "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
     "artifact_manifest_contract_cross_surface_live_authority_granted",
     "artifact_manifest_readiness_closure_allowed",

@@ -162,6 +162,8 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "manifest_denies_live_authority",
     "summary_denies_readiness_closure",
     "summary_denies_live_authority",
+    "summary_md_readiness_closure_allowed_by_packet_denies_authority",
+    "summary_md_live_authority_granted_denies_authority",
     "summary_json_artifact_manifest_verifier_fields_present",
     "manifest_artifact_manifest_verifier_fields_present",
     "summary_md_artifact_manifest_verifier_fields_rendered",
