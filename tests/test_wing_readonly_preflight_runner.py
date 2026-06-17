@@ -2086,6 +2086,113 @@ async def test_readonly_preflight_blocks_bad_verifier_report_values_before_webso
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_reports_verifier_artifact_match_mismatches_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(
+            f"verifier artifact match mismatch must not open WebSocket: {url}"
+        )
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    verifier_report = runner.verify_no_wing_artifact_manifest(prestart_path.parent)
+    verifier_report.update(
+        {
+            "status": "passed",
+            "failed_checks": [],
+            "failed_checks_missing_check_entries": [],
+            "artifact_manifest_self_consistency_match": False,
+            "artifact_manifest_contract_cross_surface_match": False,
+            "artifact_manifest_self_consistency_summary_surface_match": False,
+        }
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify_no_wing_artifact_manifest",
+        lambda _run_dir: verifier_report,
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(expected_plan),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert "prestart_summary_artifact_manifest_verifier_failed" in summary[
+        "prestart_summary_violations"
+    ]
+    for artifact_match_field in (
+        "artifact_manifest_self_consistency_match",
+        "artifact_manifest_contract_cross_surface_match",
+        "artifact_manifest_self_consistency_summary_surface_match",
+    ):
+        assert (
+            "prestart_summary_artifact_manifest_verifier_"
+            f"{artifact_match_field}_mismatch"
+        ) in summary["prestart_summary_violations"]
+    assert summary["artifact_manifest_verifier_report_value_mismatches"] == [
+        "artifact_manifest_self_consistency_match",
+        "artifact_manifest_contract_cross_surface_match",
+        "artifact_manifest_self_consistency_summary_surface_match",
+    ]
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_artifact_manifest_self_consistency_match"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_artifact_manifest_contract_cross_surface_match"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_artifact_manifest_self_consistency_summary_surface_match"
+        ]
+        is False
+    )
+    assert "tools/verify_no_wing_artifact_manifest.py" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_reports_verifier_authority_claim_before_websocket(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

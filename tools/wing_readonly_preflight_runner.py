@@ -940,6 +940,16 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
             )
+        for artifact_match_field in (
+            "artifact_manifest_self_consistency_match",
+            "artifact_manifest_contract_cross_surface_match",
+            "artifact_manifest_self_consistency_summary_surface_match",
+        ):
+            if artifact_match_field in verifier_report_value_mismatches:
+                violations.append(
+                    "prestart_summary_artifact_manifest_verifier_"
+                    f"{artifact_match_field}_mismatch"
+                )
         for safety_field in (
             "read_only",
             "live_write",
