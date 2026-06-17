@@ -119,9 +119,12 @@ It does not approve live writes.
   `verifier_report_executes_tests_matches_expected: true`.
   The published
   no-WING summary and detached sidecar must show
+  `artifact_manifest_verifier_required: true`,
+  `artifact_manifest_verifier_command`,
   `artifact_manifest_verifier_target_artifact_dir`,
   `artifact_manifest_verifier_status_required: passed`,
   `artifact_manifest_verifier_failed_checks_required: []`,
+  `artifact_manifest_verifier_required_fields_missing: []`,
   `artifact_manifest_verifier_contacts_wing: false`,
   `artifact_manifest_verifier_mutates_console_state: false`,
   `artifact_manifest_verifier_queries_console: false`,
@@ -608,9 +611,12 @@ Then update:
   `artifact_manifest_contract_cross_surface_match: true`, and
   `artifact_manifest_contract_cross_surface_mismatches: []`, and the referenced
   no-WING summary or detached sidecar does not show
+  `artifact_manifest_verifier_required: true`,
+  `artifact_manifest_verifier_command`,
   `artifact_manifest_verifier_target_artifact_dir`,
   `artifact_manifest_verifier_status_required: passed`,
   `artifact_manifest_verifier_failed_checks_required: []`,
+  `artifact_manifest_verifier_required_fields_missing: []`,
   `artifact_manifest_verifier_contacts_wing: false`,
   `artifact_manifest_verifier_mutates_console_state: false`,
   `artifact_manifest_verifier_queries_console: false`,

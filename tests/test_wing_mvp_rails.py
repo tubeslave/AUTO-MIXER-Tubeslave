@@ -930,9 +930,12 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "artifact_operator_next_steps" in readonly
     assert "before opening a backend/WING WebSocket" in readonly
     assert "they do not approve live writes or close readiness rows" in readonly
+    assert "artifact_manifest_verifier_required: true" in readonly
+    assert "artifact_manifest_verifier_command" in readonly
     assert "artifact_manifest_verifier_target_artifact_dir" in readonly
     assert "artifact_manifest_verifier_status_required: passed" in readonly
     assert "artifact_manifest_verifier_failed_checks_required: []" in readonly
+    assert "artifact_manifest_verifier_required_fields_missing: []" in readonly
     assert "artifact_manifest_verifier_contacts_wing: false" in readonly
     assert "artifact_manifest_verifier_mutates_console_state: false" in readonly
     assert "artifact_manifest_verifier_queries_console: false" in readonly
