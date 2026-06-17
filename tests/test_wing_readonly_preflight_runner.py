@@ -40,6 +40,12 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_STATE_RESPONSE_TYPES,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
+from tools.no_wing_release_check import (
+    CheckResult,
+    NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME,
+    write_no_wing_release_check_artifact_manifest,
+    write_summary as write_no_wing_release_summary,
+)
 
 
 RUNNER_PATH = Path(__file__).resolve().parents[1] / "tools" / "wing_readonly_preflight_runner.py"
@@ -139,41 +145,58 @@ def test_runner_uses_shared_run_summary_contract() -> None:
 
 
 def prestart_summary_path(tmp_path: Path) -> Path:
-    return tmp_path / "no-wing-prestart-summary.json"
+    return tmp_path / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
 
 
 def ensure_prestart_summary(tmp_path: Path) -> Path:
     path = prestart_summary_path(tmp_path)
     if path.exists():
         return path
-    payload = {
-        "type": "no_wing_release_check",
-        "status": "passed",
-        "connection_policy": "no_hardware_no_network_no_live_writes",
-        "live_write": False,
-        "contacts_backend": False,
-        "queries_console": False,
-        "executes_tests": False,
-        "results": [
-            {
-                "name": "backend_port_free",
-                "status": "passed",
-                "detail": {
+    generated_at = "2026-06-15T00:00:00Z"
+    write_no_wing_release_summary(
+        tmp_path,
+        [
+            CheckResult(
+                name="backend_port_free",
+                status="passed",
+                started_at="2026-06-15T00:00:00Z",
+                finished_at="2026-06-15T00:00:01Z",
+                duration_sec=1.0,
+                command="PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick",
+                cwd=str(Path.cwd()),
+                returncode=0,
+                detail={
                     "host": "127.0.0.1",
                     "port": 8765,
+                    "backend_port_prestart_check_failure_detail_fields": list(
+                        WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                    ),
                     "safe_to_stop_listener_by_gate": False,
                     "live_authority_granted": False,
                     "backend_port_prestart_gate_execution_allowed": False,
                     "backend_port_prestart_gate_readiness_closure_allowed": False,
                     "backend_port_prestart_gate_live_authority_granted": False,
                 },
-            }
+            )
         ],
-    }
+        generated_at=generated_at,
+    )
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "read_only": True,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+        }
+    )
     path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    write_no_wing_release_check_artifact_manifest(tmp_path, generated_at=generated_at)
     return path
 
 
@@ -271,10 +294,53 @@ def assert_summary_prestart_contract(summary: dict) -> None:
         summary["backend_port_prestart_summary_connection_policy"]
         == "no_hardware_no_network_no_live_writes"
     )
+    assert summary["backend_port_prestart_summary_read_only"] is True
     assert summary["backend_port_prestart_summary_live_write"] is False
+    assert summary["backend_port_prestart_summary_contacts_wing"] is False
     assert summary["backend_port_prestart_summary_contacts_backend"] is False
+    assert summary["backend_port_prestart_summary_mutates_console_state"] is False
     assert summary["backend_port_prestart_summary_queries_console"] is False
     assert summary["backend_port_prestart_summary_executes_tests"] is False
+    assert summary["artifact_manifest_verifier_required"] is True
+    assert (
+        summary["artifact_manifest_verifier_run_dir"]
+        == str(Path(summary["backend_port_prestart_summary_path"]).parent)
+    )
+    assert summary["artifact_manifest_verifier_status"] == "passed"
+    assert summary["artifact_manifest_verifier_failed_checks"] == []
+    assert summary["artifact_manifest_verifier_failed_checks_missing_check_entries"] == []
+    assert summary["artifact_manifest_verifier_required_fields_missing"] == []
+    assert summary["artifact_manifest_verifier_failed_checks_have_check_entries"] is True
+    assert summary["artifact_manifest_verifier_report_required_fields_present"] is True
+    assert summary["artifact_manifest_verifier_report_required_fields_match_contract"] is True
+    assert summary["artifact_manifest_verifier_readiness_closure_allowed"] is False
+    assert summary["artifact_manifest_verifier_live_authority_granted"] is False
+    assert summary["artifact_manifest_verifier_report_value_mismatches"] == []
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_artifact_manifest_self_consistency_match"
+        ]
+        is True
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_artifact_manifest_contract_cross_surface_match"
+        ]
+        is True
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_artifact_manifest_self_consistency_summary_surface_match"
+        ]
+        is True
+    )
+    assert summary["artifact_manifest_verifier_report_read_only"] is True
+    assert summary["artifact_manifest_verifier_report_live_write"] is False
+    assert summary["artifact_manifest_verifier_report_contacts_wing"] is False
+    assert summary["artifact_manifest_verifier_report_contacts_backend"] is False
+    assert summary["artifact_manifest_verifier_report_mutates_console_state"] is False
+    assert summary["artifact_manifest_verifier_report_queries_console"] is False
+    assert summary["artifact_manifest_verifier_report_executes_tests"] is False
     assert summary["backend_port_prestart_check_status"] == "passed"
     for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
         assert summary[field] is False
@@ -458,6 +524,7 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["operator_confirmed_channels"] == [3]
     assert summary["operator_session_confirmation_required"] is True
     assert summary["operator_confirmed_session_ready"] is True
+    assert summary["artifact_root"] == str(tmp_path)
     assert summary["expected_plan_path"] == str(expected_plan)
     assert summary["expected_plan_match"] is True
     assert summary["expected_plan_sha256"]
@@ -470,7 +537,9 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
     assert summary["proposal_request_sent"] is False
     assert summary["physical_readback_count"] == 3
     assert summary["forbidden_request_types_sent"] == []
-    assert [event["event_type"] for event in read_events(summary)] == [
+    events = read_events(summary)
+    assert [event["run_id"] for event in events] == [summary["run_id"]] * len(events)
+    assert [event["event_type"] for event in events] == [
         "send",
         "recv",
         "send",
@@ -577,6 +646,7 @@ async def test_readonly_preflight_passes_with_state_unavailable_but_readbacks(
     assert summary["operator_confirmed_channels"] == [3]
     assert summary["operator_session_confirmation_required"] is True
     assert summary["operator_confirmed_session_ready"] is True
+    assert summary["artifact_root"] == str(tmp_path)
     assert summary["expected_plan_path"] == str(expected_plan)
     assert summary["expected_plan_match"] is True
     assert summary["expected_plan_sha256"]
@@ -1306,10 +1376,40 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         written["backend_port_prestart_summary_connection_policy"]
         == "no_hardware_no_network_no_live_writes"
     )
+    assert written["backend_port_prestart_summary_read_only"] is True
     assert written["backend_port_prestart_summary_live_write"] is False
+    assert written["backend_port_prestart_summary_contacts_wing"] is False
     assert written["backend_port_prestart_summary_contacts_backend"] is False
+    assert written["backend_port_prestart_summary_mutates_console_state"] is False
     assert written["backend_port_prestart_summary_queries_console"] is False
     assert written["backend_port_prestart_summary_executes_tests"] is False
+    assert written["artifact_manifest_verifier_report_required_fields_match_contract"] is True
+    assert written["artifact_manifest_verifier_report_value_mismatches"] == []
+    assert (
+        written[
+            "artifact_manifest_verifier_report_artifact_manifest_self_consistency_match"
+        ]
+        is True
+    )
+    assert (
+        written[
+            "artifact_manifest_verifier_report_artifact_manifest_contract_cross_surface_match"
+        ]
+        is True
+    )
+    assert (
+        written[
+            "artifact_manifest_verifier_report_artifact_manifest_self_consistency_summary_surface_match"
+        ]
+        is True
+    )
+    assert written["artifact_manifest_verifier_report_read_only"] is True
+    assert written["artifact_manifest_verifier_report_live_write"] is False
+    assert written["artifact_manifest_verifier_report_contacts_wing"] is False
+    assert written["artifact_manifest_verifier_report_contacts_backend"] is False
+    assert written["artifact_manifest_verifier_report_mutates_console_state"] is False
+    assert written["artifact_manifest_verifier_report_queries_console"] is False
+    assert written["artifact_manifest_verifier_report_executes_tests"] is False
     assert written["backend_port_prestart_check_status"] == "passed"
     for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
         assert written[field] is False
@@ -1383,6 +1483,7 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
         in written["fail_closed_conditions"]
     )
     assert "unexpected_response_type" in written["fail_closed_conditions"]
+    assert "event_log_run_id_mismatch" in written["fail_closed_conditions"]
     assert "manual_review_decision_missing_or_invalid" in written["fail_closed_conditions"]
     assert not list(tmp_path.glob(f"*/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"))
 
@@ -1426,6 +1527,308 @@ async def test_readonly_preflight_blocks_missing_prestart_summary_before_websock
     assert summary["backend_port_prestart_summary_required"] is True
     assert summary["prestart_summary_violations"] == ["prestart_summary_missing"]
     assert "tools/no_wing_release_check.py" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_environment_blocked_prestart_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(
+            f"environment-blocked prestart summary must not open WebSocket: {url}"
+        )
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    payload = json.loads(prestart_path.read_text(encoding="utf-8"))
+    payload["status"] = "failed"
+    payload["failed_checks"] = ["frontend_e2e"]
+    payload["environment_blocked_checks"] = ["frontend_e2e"]
+    payload["environment_blocked_check_details"] = [
+        {
+            "name": "frontend_e2e",
+            "reason": "local_dev_server_bind_denied",
+            "address": "127.0.0.1:3000",
+            "operator_next_step": (
+                "Rerun the no-WING quick check in an environment that can bind "
+                "the frontend dev server; this does not grant readiness."
+            ),
+            "stdout_log": str(tmp_path / "frontend-stdout.log"),
+            "stderr_log": str(tmp_path / "frontend-stderr.log"),
+        }
+    ]
+    prestart_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(tmp_path / "expected-plan.json"),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert summary["backend_port_prestart_summary_status"] == "failed"
+    assert summary["environment_blocked_checks"] == ["frontend_e2e"]
+    assert summary["environment_blocked_check_details"][0]["reason"] == (
+        "local_dev_server_bind_denied"
+    )
+    assert summary["environment_blocked_check_details"][0]["address"] == (
+        "127.0.0.1:3000"
+    )
+    assert summary["prestart_summary_violations"][:2] == [
+        "prestart_summary_environment_blocked",
+        "prestart_summary_status_not_passed",
+    ]
+    assert "127.0.0.1:3000" in summary["operator_next_step"]
+    assert "does not grant readiness" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_stale_prestart_manifest_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"stale prestart manifest must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    manifest_path = tmp_path / NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_manifest_verifier_command"] = "stale verifier command"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(expected_plan),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert "prestart_summary_artifact_manifest_verifier_failed" in summary[
+        "prestart_summary_violations"
+    ]
+    assert summary["artifact_manifest_verifier_status"] == "failed"
+    assert (
+        "manifest_artifact_manifest_verifier_command_matches_expected"
+        in summary["artifact_manifest_verifier_failed_checks"]
+    )
+    assert summary["artifact_manifest_verifier_failed_checks_missing_check_entries"] == []
+    assert summary["artifact_manifest_verifier_required_fields_missing"] == []
+    assert summary["artifact_manifest_verifier_failed_checks_have_check_entries"] is True
+    assert summary["artifact_manifest_verifier_report_required_fields_present"] is True
+    assert summary["artifact_manifest_verifier_readiness_closure_allowed"] is False
+    assert summary["artifact_manifest_verifier_live_authority_granted"] is False
+    assert "tools/verify_no_wing_artifact_manifest.py" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_bad_verifier_report_values_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"bad verifier report must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    verifier_report = runner.verify_no_wing_artifact_manifest(prestart_path.parent)
+    verifier_report.update(
+        {
+            "status": "passed",
+            "failed_checks": [],
+            "failed_checks_missing_check_entries": [],
+            "artifact_manifest_contract_cross_surface_match": False,
+        }
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify_no_wing_artifact_manifest",
+        lambda _run_dir: verifier_report,
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(expected_plan),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert "prestart_summary_artifact_manifest_verifier_failed" in summary[
+        "prestart_summary_violations"
+    ]
+    assert (
+        "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
+        in summary["prestart_summary_violations"]
+    )
+    assert summary["artifact_manifest_verifier_status"] == "passed"
+    assert summary["artifact_manifest_verifier_failed_checks"] == []
+    assert summary["artifact_manifest_verifier_report_value_mismatches"] == [
+        "artifact_manifest_contract_cross_surface_match"
+    ]
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_artifact_manifest_contract_cross_surface_match"
+        ]
+        is False
+    )
+    assert "tools/verify_no_wing_artifact_manifest.py" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_unsafe_prestart_summary_safety_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"unsafe prestart summary must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    payload = json.loads(prestart_path.read_text(encoding="utf-8"))
+    payload["read_only"] = False
+    payload["contacts_wing"] = True
+    payload["mutates_console_state"] = True
+    prestart_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(tmp_path / "expected-plan.json"),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert summary["backend_port_prestart_summary_read_only"] is False
+    assert summary["backend_port_prestart_summary_contacts_wing"] is True
+    assert summary["backend_port_prestart_summary_mutates_console_state"] is True
+    assert "prestart_summary_read_only_not_true" in summary[
+        "prestart_summary_violations"
+    ]
+    assert "prestart_summary_contacts_wing_not_false" in summary[
+        "prestart_summary_violations"
+    ]
+    assert "prestart_summary_mutates_console_state_not_false" in summary[
+        "prestart_summary_violations"
+    ]
     assert summary["sent_request_types"] == []
 
 
@@ -1480,6 +1883,64 @@ async def test_readonly_preflight_blocks_prestart_missing_backend_detail_safety_
         assert f"prestart_summary_{field}_not_false" in summary[
             "prestart_summary_violations"
         ]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_blocks_stale_prestart_failure_detail_fields_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"stale prestart summary must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    payload = json.loads(prestart_path.read_text(encoding="utf-8"))
+    detail = payload["results"][0]["detail"]
+    detail["backend_port_prestart_check_failure_detail_fields"] = [
+        field
+        for field in detail["backend_port_prestart_check_failure_detail_fields"]
+        if field != "listener_confirmation_checklist"
+    ]
+    prestart_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(tmp_path / "expected-plan.json"),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert (
+        "prestart_summary_backend_port_check_failure_detail_fields_mismatch"
+        in summary["prestart_summary_violations"]
+    )
+    assert "failure-detail contract" in summary["operator_next_step"]
     assert summary["sent_request_types"] == []
 
 

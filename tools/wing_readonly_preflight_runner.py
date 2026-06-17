@@ -56,6 +56,9 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
+from tools.verify_no_wing_artifact_manifest import (  # noqa: E402
+    verify_no_wing_artifact_manifest,
+)
 
 _EXPECTED_RESPONSE_TYPES_CONTRACT = (
     WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE
@@ -172,10 +175,35 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "backend_port_prestart_summary_type",
     "backend_port_prestart_summary_status",
     "backend_port_prestart_summary_connection_policy",
+    "backend_port_prestart_summary_read_only",
     "backend_port_prestart_summary_live_write",
+    "backend_port_prestart_summary_contacts_wing",
     "backend_port_prestart_summary_contacts_backend",
+    "backend_port_prestart_summary_mutates_console_state",
     "backend_port_prestart_summary_queries_console",
     "backend_port_prestart_summary_executes_tests",
+    "artifact_manifest_verifier_required",
+    "artifact_manifest_verifier_run_dir",
+    "artifact_manifest_verifier_status",
+    "artifact_manifest_verifier_failed_checks",
+    "artifact_manifest_verifier_failed_checks_missing_check_entries",
+    "artifact_manifest_verifier_required_fields_missing",
+    "artifact_manifest_verifier_failed_checks_have_check_entries",
+    "artifact_manifest_verifier_report_required_fields_present",
+    "artifact_manifest_verifier_report_required_fields_match_contract",
+    "artifact_manifest_verifier_readiness_closure_allowed",
+    "artifact_manifest_verifier_live_authority_granted",
+    "artifact_manifest_verifier_report_value_mismatches",
+    "artifact_manifest_verifier_report_artifact_manifest_self_consistency_match",
+    "artifact_manifest_verifier_report_artifact_manifest_contract_cross_surface_match",
+    "artifact_manifest_verifier_report_artifact_manifest_self_consistency_summary_surface_match",
+    "artifact_manifest_verifier_report_read_only",
+    "artifact_manifest_verifier_report_live_write",
+    "artifact_manifest_verifier_report_contacts_wing",
+    "artifact_manifest_verifier_report_contacts_backend",
+    "artifact_manifest_verifier_report_mutates_console_state",
+    "artifact_manifest_verifier_report_queries_console",
+    "artifact_manifest_verifier_report_executes_tests",
     "backend_port_prestart_check_status",
     *PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     "manual_review_required_before_readiness_update",
@@ -193,6 +221,20 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "fail_closed_conditions",
     "next_step",
 )
+ARTIFACT_MANIFEST_VERIFIER_REPORT_EXPECTED_VALUES = {
+    "artifact_manifest_self_consistency_match": True,
+    "artifact_manifest_contract_cross_surface_match": True,
+    "artifact_manifest_self_consistency_summary_surface_match": True,
+    "read_only": True,
+    "live_write": False,
+    "contacts_wing": False,
+    "contacts_backend": False,
+    "mutates_console_state": False,
+    "queries_console": False,
+    "executes_tests": False,
+    "readiness_closure_allowed": False,
+    "live_authority_granted": False,
+}
 
 
 class UnexpectedResponseError(RuntimeError):
@@ -325,6 +367,7 @@ def transport_failure_classification(exc: Exception) -> tuple[str, list[str], Di
 class EventRecorder:
     def __init__(self, run_dir: Path):
         self.run_dir = run_dir
+        self.run_id = run_dir.name
         self.events_path = run_dir / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
         self.summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
         self.seq = 0
@@ -335,6 +378,7 @@ class EventRecorder:
         if event_type == "send":
             self.sent_request_types.append(str(payload.get("type") or "unknown"))
         event = {
+            "run_id": self.run_id,
             "seq": self.seq,
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             "event_type": event_type,
@@ -527,6 +571,28 @@ def prestart_summary_operator_next_step(reason: str) -> str:
             "rerun the read-only plan and real preflight with --prestart-summary "
             "pointing to that passed summary.json."
         )
+    if reason == "prestart_summary_backend_port_check_failure_detail_fields_mismatch":
+        return (
+            "Regenerate the no-WING prestart summary with the current "
+            "backend-port failure-detail contract before opening the "
+            "backend/WING WebSocket."
+        )
+    if reason == "prestart_summary_environment_blocked":
+        return (
+            "Rerun PYTHONPATH=backend python3 tools/no_wing_release_check.py "
+            "--quick in an environment that can bind the frontend dev server "
+            "on 127.0.0.1:3000, then rerun the read-only plan and real "
+            "preflight with --prestart-summary pointing to the passed "
+            "summary.json. An environment-blocked no-WING summary does not "
+            "grant readiness or live authority."
+        )
+    if reason == "prestart_summary_artifact_manifest_verifier_failed":
+        return (
+            "Rerun PYTHONPATH=backend python3 tools/no_wing_release_check.py "
+            "--quick, then run PYTHONPATH=backend python3 "
+            "tools/verify_no_wing_artifact_manifest.py on the same no-WING "
+            "artifact directory before opening the backend/WING WebSocket."
+        )
     return (
         "Use a passed no-WING prestart summary.json from the current intended "
         "backend/WING session. Do not open the backend/WING WebSocket until "
@@ -567,9 +633,16 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
     detail["backend_port_prestart_summary_connection_policy"] = payload.get(
         "connection_policy"
     )
+    detail["backend_port_prestart_summary_read_only"] = payload.get("read_only")
     detail["backend_port_prestart_summary_live_write"] = payload.get("live_write")
+    detail["backend_port_prestart_summary_contacts_wing"] = payload.get(
+        "contacts_wing"
+    )
     detail["backend_port_prestart_summary_contacts_backend"] = payload.get(
         "contacts_backend"
+    )
+    detail["backend_port_prestart_summary_mutates_console_state"] = payload.get(
+        "mutates_console_state"
     )
     detail["backend_port_prestart_summary_queries_console"] = payload.get(
         "queries_console"
@@ -577,6 +650,18 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
     detail["backend_port_prestart_summary_executes_tests"] = payload.get(
         "executes_tests"
     )
+    environment_blocked_checks = payload.get("environment_blocked_checks")
+    if isinstance(environment_blocked_checks, list) and environment_blocked_checks:
+        detail["environment_blocked_checks"] = [
+            str(item) for item in environment_blocked_checks
+        ]
+        environment_blocked_details = payload.get("environment_blocked_check_details")
+        detail["environment_blocked_check_details"] = (
+            environment_blocked_details
+            if isinstance(environment_blocked_details, list)
+            else []
+        )
+        violations.append("prestart_summary_environment_blocked")
 
     if payload.get("type") != PRESTART_SUMMARY_TYPE:
         violations.append("prestart_summary_type_mismatch")
@@ -584,10 +669,16 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         violations.append("prestart_summary_status_not_passed")
     if payload.get("connection_policy") != PRESTART_SUMMARY_CONNECTION_POLICY:
         violations.append("prestart_summary_connection_policy_mismatch")
+    if payload.get("read_only") is not True:
+        violations.append("prestart_summary_read_only_not_true")
     if payload.get("live_write") is not False:
         violations.append("prestart_summary_live_write_not_false")
+    if payload.get("contacts_wing") is not False:
+        violations.append("prestart_summary_contacts_wing_not_false")
     if payload.get("contacts_backend") is not False:
         violations.append("prestart_summary_contacts_backend_not_false")
+    if payload.get("mutates_console_state") is not False:
+        violations.append("prestart_summary_mutates_console_state_not_false")
     if payload.get("queries_console") is not False:
         violations.append("prestart_summary_queries_console_not_false")
     if payload.get("executes_tests") is not False:
@@ -608,6 +699,18 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append("prestart_summary_backend_port_check_not_passed")
         check_detail = backend_check.get("detail")
         if isinstance(check_detail, dict):
+            failure_detail_fields = check_detail.get(
+                "backend_port_prestart_check_failure_detail_fields"
+            )
+            detail["backend_port_prestart_check_failure_detail_fields"] = (
+                failure_detail_fields
+            )
+            if failure_detail_fields != list(
+                BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+            ):
+                violations.append(
+                    "prestart_summary_backend_port_check_failure_detail_fields_mismatch"
+                )
             for field in PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
                 value = check_detail.get(field)
                 detail[field] = value
@@ -615,6 +718,90 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
                     violations.append(f"prestart_summary_{field}_not_false")
         else:
             violations.append("prestart_summary_backend_port_check_detail_missing")
+
+    verifier_report = verify_no_wing_artifact_manifest(summary_path.parent)
+    verifier_checks = verifier_report.get("checks")
+    verifier_failed_checks = verifier_report.get("failed_checks")
+    verifier_missing_check_entries = verifier_report.get(
+        "failed_checks_missing_check_entries"
+    )
+    verifier_required_fields_missing = verifier_report.get(
+        "verifier_report_required_fields_missing"
+    )
+    verifier_report_value_mismatches = [
+        field_name
+        for field_name, expected_value in (
+            ARTIFACT_MANIFEST_VERIFIER_REPORT_EXPECTED_VALUES.items()
+        )
+        if verifier_report.get(field_name) != expected_value
+    ]
+    detail.update(
+        {
+            "artifact_manifest_verifier_required": True,
+            "artifact_manifest_verifier_run_dir": str(summary_path.parent),
+            "artifact_manifest_verifier_status": verifier_report.get("status"),
+            "artifact_manifest_verifier_failed_checks": (
+                verifier_failed_checks if isinstance(verifier_failed_checks, list) else []
+            ),
+            "artifact_manifest_verifier_failed_checks_missing_check_entries": (
+                verifier_missing_check_entries
+                if isinstance(verifier_missing_check_entries, list)
+                else []
+            ),
+            "artifact_manifest_verifier_required_fields_missing": (
+                verifier_required_fields_missing
+                if isinstance(verifier_required_fields_missing, list)
+                else []
+            ),
+            "artifact_manifest_verifier_failed_checks_have_check_entries": (
+                isinstance(verifier_checks, dict)
+                and verifier_checks.get("failed_checks_have_check_entries") is True
+            ),
+            "artifact_manifest_verifier_report_required_fields_present": (
+                isinstance(verifier_checks, dict)
+                and verifier_checks.get("verifier_report_required_fields_present")
+                is True
+            ),
+            "artifact_manifest_verifier_report_required_fields_match_contract": (
+                verifier_report.get("verifier_report_required_fields_match_contract")
+            ),
+            "artifact_manifest_verifier_readiness_closure_allowed": (
+                verifier_report.get("readiness_closure_allowed")
+            ),
+            "artifact_manifest_verifier_live_authority_granted": (
+                verifier_report.get("live_authority_granted")
+            ),
+            "artifact_manifest_verifier_report_value_mismatches": (
+                verifier_report_value_mismatches
+            ),
+            **{
+                f"artifact_manifest_verifier_report_{field_name}": verifier_report.get(
+                    field_name
+                )
+                for field_name in ARTIFACT_MANIFEST_VERIFIER_REPORT_EXPECTED_VALUES
+            },
+        }
+    )
+    if (
+        verifier_report.get("status") != "passed"
+        or verifier_failed_checks != []
+        or verifier_missing_check_entries != []
+        or verifier_required_fields_missing != []
+        or detail["artifact_manifest_verifier_failed_checks_have_check_entries"]
+        is not True
+        or detail["artifact_manifest_verifier_report_required_fields_present"]
+        is not True
+        or detail["artifact_manifest_verifier_report_required_fields_match_contract"]
+        is not True
+        or verifier_report_value_mismatches
+        or verifier_report.get("readiness_closure_allowed") is not False
+        or verifier_report.get("live_authority_granted") is not False
+    ):
+        violations.append("prestart_summary_artifact_manifest_verifier_failed")
+        if verifier_report_value_mismatches:
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
+            )
 
     return detail, violations
 
@@ -800,6 +987,7 @@ async def run(args: argparse.Namespace) -> int:
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": PROOF_RUNNER,
         "url": args.url,
+        "artifact_root": str(args.artifact_root),
         "channels": list(channels),
         "operator_channel_confirmation_required": bool(args.require_physical_readback),
         "operator_confirmed_channels": parse_csv_ints_for_summary(
