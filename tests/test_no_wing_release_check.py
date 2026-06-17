@@ -15660,6 +15660,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         ]
     )
     for marker in (
+        "artifact_manifest_verifier_read_only: true",
+        "artifact_manifest_verifier_live_write: false",
+        "artifact_manifest_verifier_contacts_backend: false",
+        "artifact_manifest_verifier_executes_tests: false",
         "artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true",
         "artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true",
         "artifact_manifest_verifier_check_verifier_report_read_only_matches_expected: true",

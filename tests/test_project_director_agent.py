@@ -301,6 +301,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     ):
         assert marker in directive["selected_action"]
     for marker in (
+        "artifact_manifest_verifier_read_only: true",
+        "artifact_manifest_verifier_live_write: false",
+        "artifact_manifest_verifier_contacts_backend: false",
+        "artifact_manifest_verifier_executes_tests: false",
         "artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true",
         "artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true",
         "artifact_manifest_verifier_check_verifier_report_read_only_matches_expected: true",

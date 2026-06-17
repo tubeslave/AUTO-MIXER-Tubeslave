@@ -51,9 +51,13 @@ also expose `artifact_manifest_verifier_required: true`,
 `artifact_manifest_verifier_status_required: passed`,
 `artifact_manifest_verifier_failed_checks_required: []`,
 `artifact_manifest_verifier_report_required_fields`,
+`artifact_manifest_verifier_read_only: true`,
+`artifact_manifest_verifier_live_write: false`,
 `artifact_manifest_verifier_contacts_wing: false`,
+`artifact_manifest_verifier_contacts_backend: false`,
 `artifact_manifest_verifier_mutates_console_state: false`,
 `artifact_manifest_verifier_queries_console: false`,
+`artifact_manifest_verifier_executes_tests: false`,
 `artifact_manifest_verifier_readiness_closure_allowed: false`, and
 `artifact_manifest_verifier_live_authority_granted: false`. The detached
 `artifact-manifest.json` sidecar must mirror the same verifier/no-authority
