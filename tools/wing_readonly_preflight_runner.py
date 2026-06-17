@@ -936,6 +936,10 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         or verifier_report.get("live_authority_granted") is not False
     ):
         violations.append("prestart_summary_artifact_manifest_verifier_failed")
+        if verifier_report.get("status") != "passed":
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_status_not_passed"
+            )
         if verifier_report_value_mismatches:
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
