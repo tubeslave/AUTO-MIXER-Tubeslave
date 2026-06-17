@@ -557,6 +557,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered: true",
         "project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed: false",
         "project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted: false",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true",
     ):
         assert marker in directive["selected_action"]
     assert "backend_port_prestart_gate_matches_expected: true" in directive[

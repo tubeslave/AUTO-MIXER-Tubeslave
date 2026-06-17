@@ -213,6 +213,8 @@ It does not approve live writes.
   `artifact_manifest_verifier_check_summary_md_artifact_manifest_live_authority_granted_denies_authority: true`,
   `artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_readiness_closure_allowed_denies_authority: true`,
   `artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority: true`,
+  `artifact_manifest_verifier_check_summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_denies_authority: true`,
+  `artifact_manifest_verifier_check_summary_md_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_denies_authority: true`,
   `artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_fields_present: true`,
   `artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_fields_present: true`,
   `artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_fields_rendered: true`,
@@ -232,6 +234,11 @@ It does not approve live writes.
   `artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_live_authority_granted_matches_expected: true`,
+  `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true`,
+  `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true`,
+  `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true`,
+  `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true`,
+  `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true`,
   `artifact_manifest_verifier_check_failed_checks_have_check_entries: true`, and
   `artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true`.
   A real captured artifact must later prove the ordering with
@@ -705,6 +712,11 @@ Then update:
   `verifier_report_executes_tests_matches_expected: true`,
   `verifier_report_readiness_closure_allowed_matches_expected: true`, and
   `verifier_report_live_authority_granted_matches_expected: true`,
+  `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true`,
+  `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true`,
+  `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true`,
+  `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true`, and
+  `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true`,
   or does
   not show `artifact_manifest_self_consistency_summary_surface_match: true`,
   `artifact_manifest_self_consistency_summary_surface_json_mismatches: []`,
@@ -731,7 +743,14 @@ Then update:
   `artifact_manifest_verifier_report_required_fields` list does not include
   `checks`, `verifier_report_required_fields`,
   `verifier_report_required_fields_missing`, and
-  `verifier_report_required_fields_match_contract`, and the referenced
+  `verifier_report_required_fields_match_contract`,
+  `wing_readonly_handoff_plan_verifier_summary_surface_required`,
+  `wing_readonly_handoff_plan_verifier_summary_surface_mismatches`,
+  `wing_readonly_handoff_plan_verifier_summary_surface_match`,
+  `wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed`,
+  and
+  `wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted`,
+  and the referenced
   no-WING operator-readable `summary.md` does not show
   `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines`,
   `wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []`

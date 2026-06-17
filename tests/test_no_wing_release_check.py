@@ -15671,6 +15671,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_live_authority_granted_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true",
         "artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true",
     ):
         assert marker in json_summary[
