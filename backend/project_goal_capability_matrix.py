@@ -238,9 +238,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically perform equalization.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("auto_eq", "autoeq_audit_validation", "phase_aware_eq_guard"),
+        method_ids=(
+            "auto_eq",
+            "corrective_eq_proposal",
+            "autoeq_audit_validation",
+            "phase_aware_eq_guard",
+        ),
         support_paths=(
             "backend/auto_eq.py",
+            "backend/corrective_eq_proposal.py",
             "backend/auto_fader_v2/controller.py",
             "backend/auto_soundcheck_engine.py",
             "backend/autoeq_audit.py",
@@ -248,7 +254,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("eq",),
         blocker="EQ live writes need filter audit, feedback safety, readback, and rollback proof; AutoEQ direct apply/reset, AutoFaderV2 masking EQ, and AutoSoundcheck EQ-enable writes now return blocked evidence.",
-        next_step="Route AutoEQ, AutoFaderV2 masking EQ, and AutoSoundcheck EQ-enable blocked evidence to operator review; promote only audited EQ proposals with fresh phase context.",
+        next_step=(
+            "Route AutoEQ, corrective EQ, AutoFaderV2 masking EQ, and "
+            "AutoSoundcheck EQ-enable blocked evidence to operator review; "
+            "promote only audited EQ proposals with band identity, protected-band "
+            "guards, and fresh phase context."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="compression",
@@ -670,16 +681,21 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Control equalizers.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("auto_eq", "phase_aware_eq_guard"),
+        method_ids=("auto_eq", "corrective_eq_proposal", "phase_aware_eq_guard"),
         support_paths=(
             "backend/auto_eq.py",
+            "backend/corrective_eq_proposal.py",
             "backend/auto_fader_v2/controller.py",
             "backend/auto_soundcheck_engine.py",
             "backend/phase_aware_eq_guard.py",
         ),
         target_console_surfaces=("eq",),
         blocker="Direct EQ apply/reset, AutoFaderV2 masking EQ, and AutoSoundcheck EQ-enable writes remain quarantined and return blocked evidence only.",
-        next_step="Require AutoEQ audit, feedback safety, readback and rollback proof before supervised EQ candidates.",
+        next_step=(
+            "Require AutoEQ audit, corrective EQ band identity, protected-band "
+            "guards, feedback safety, readback and rollback proof before "
+            "supervised EQ candidates."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="console_compressor_control",

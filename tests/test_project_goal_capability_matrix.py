@@ -333,13 +333,16 @@ def test_equalization_tracks_fail_closed_auto_eq_boundary():
         assert capability.status == "proposal_only"
         assert capability.autonomy_mode_ceiling == "assisted"
         assert "auto_eq" in capability.method_ids
+        assert "corrective_eq_proposal" in capability.method_ids
         assert "backend/auto_eq.py" in capability.support_paths
+        assert "backend/corrective_eq_proposal.py" in capability.support_paths
         assert "backend/auto_fader_v2/controller.py" in capability.support_paths
         assert "backend/auto_soundcheck_engine.py" in capability.support_paths
         assert "blocked evidence" in capability.blocker
         assert capability.current_live_write_kinds == ()
     assert "AutoSoundcheck EQ-enable writes" in console.blocker
     assert "operator review" in row.next_step
+    assert "protected-band" in row.next_step
     assert "readback and rollback proof" in console.next_step
 
 

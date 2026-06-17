@@ -5003,6 +5003,39 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("proposal_only", "direct_eq_apply_quarantined", "direct_eq_reset_quarantined", "blocked_apply_evidence", "no_live_writes"),
     ),
     ProcessingMethod(
+        id="corrective_eq_proposal",
+        label="Corrective EQ Proposal Layer",
+        domain="eq",
+        status="proposal_only",
+        summary=(
+            "Transport-free corrective EQ analyzer that emits band-scoped "
+            "operator proposals with fresh EQ/phase context, protected-band "
+            "guards, bounded gain, and source identity trust evidence."
+        ),
+        module="backend/corrective_eq_proposal.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "corrective_eq_live_writes_need_fresh_eq_band_readback_phase_context_"
+            "protected_band_feedback_headroom_rollback_and_hardware_proof"
+        ),
+        promotion_next=(
+            "route only fresh-context corrective EQ proposals to operator review; "
+            "keep EQ writes out of the live executor until physical band readback "
+            "and rollback proof exist"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "band_identity_gate",
+            "protected_band_guard",
+            "bounded_gain_headroom_guard",
+            "source_identity_downstream_trust",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
         id="autoeq_audit_validation",
         label="AutoEQ Audit Validation",
         domain="eq",
@@ -5518,6 +5551,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "long_term_memory_learning_proposal",
             "agentic_method_foundation",
             "context_aware_gate_agent",
+            "corrective_eq_proposal",
             "compressor_dynamics_proposal",
             "deesser_vocal_sibilance",
             "pan_spatial_proposal",
@@ -5656,6 +5690,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "autonomy_evidence_overlay",
             "autonomy_mode_transition_gate",
             "read_surface_remediation_plan",
+            "corrective_eq_proposal",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
             "compressor_dynamics_proposal",
@@ -5678,6 +5713,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
         summary="DSP research/proposal pool kept outside live runtime defaults.",
         method_ids=(
             "auto_eq",
+            "corrective_eq_proposal",
             "source_identity_confidence_proposal",
             "source_identity_replay_calibration",
             "source_identity_calibration_acceptance_ledger",
@@ -6540,6 +6576,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "phase_aware_eq_guard.analyze_phase_aware_eq_guard / PhaseAwareEQGuardPlugin.process",
         "ui_surface": "Future AutoEQ guard, Channel Intelligence, phase/EQ proposal traces",
         "next_step": "Use as fresh-context proposal-only phase-before-EQ evidence; do not promote phase/delay/polarity writes without separate hardware proof.",
+    },
+    "corrective_eq_proposal": {
+        "entrypoint": "corrective_eq_proposal.analyze_corrective_eq_need / build_corrective_eq_proposals",
+        "ui_surface": "Channel Intelligence, EQ proposals, future EQ panel",
+        "next_step": "Keep corrective EQ proposals non-queueable until band identity, protected-band policy, fresh phase context, readback, rollback, and hardware proof are complete.",
     },
     "agentic_method_foundation": {
         "entrypoint": "channel_intelligence foundation DTO / BaselineAgenticRecommender",
