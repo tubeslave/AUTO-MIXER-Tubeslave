@@ -89,7 +89,12 @@ fields, and the verifier report must show
 `verifier_report_readiness_closure_allowed_matches_expected: true`, and
 `verifier_report_live_authority_granted_matches_expected: true`, and
 `failed_checks_have_check_entries: true`, and
-`failed_checks_missing_check_entries: []`. The no-WING handoff operator
+`failed_checks_missing_check_entries: []`. The read-only preflight runner must
+mirror those detached verifier checks before any WebSocket with
+`artifact_manifest_verifier_check_mismatches: []`,
+`artifact_manifest_verifier_check_manifest_type: true`,
+`artifact_manifest_verifier_check_summary_json_sha256_matches_manifest: true`,
+and `artifact_manifest_verifier_check_summary_denies_live_authority: true`. The no-WING handoff operator
 sequence must place this verifier before preview and expose
 `artifact_manifest_verifier_operator_sequence_step_index: 1`,
 `expected_artifact_manifest_verifier_operator_sequence_step_index: 1`,

@@ -105,6 +105,10 @@ ARTIFACT_MANIFEST_VERIFIER_REPORT_MARKERS = (
     "verifier_report_required_fields_match_contract: true",
     "verifier_report_readiness_closure_allowed_matches_expected: true",
     "verifier_report_live_authority_granted_matches_expected: true",
+    "artifact_manifest_verifier_check_mismatches: []",
+    "artifact_manifest_verifier_check_manifest_type: true",
+    "artifact_manifest_verifier_check_summary_json_sha256_matches_manifest: true",
+    "artifact_manifest_verifier_check_summary_denies_live_authority: true",
     "artifact_manifest_verifier_report_required_fields",
     "checks",
     "verifier_report_required_fields",
@@ -1004,6 +1008,17 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         in readonly
     )
     assert "verifier_report_live_authority_granted_matches_expected: true" in readonly
+    assert "artifact_manifest_verifier_check_mismatches: []" in readonly
+    assert "artifact_manifest_verifier_check_<check_name>: true" in readonly
+    assert "artifact_manifest_verifier_check_manifest_type: true" in readonly
+    assert (
+        "artifact_manifest_verifier_check_summary_json_sha256_matches_manifest: true"
+        in readonly
+    )
+    assert (
+        "artifact_manifest_verifier_check_summary_denies_live_authority: true"
+        in readonly
+    )
     assert "artifact_manifest_verifier_must_pass_before_websocket: true" in readonly
     assert "artifact_manifest_verifier_passed_before_websocket: true" in readonly
     assert "artifact_manifest_verifier_websocket_opened_after_pass: true" in readonly

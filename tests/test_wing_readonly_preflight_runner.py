@@ -190,6 +190,8 @@ def ensure_prestart_summary(tmp_path: Path) -> Path:
             "mutates_console_state": False,
             "queries_console": False,
             "executes_tests": False,
+            "readiness_closure_allowed_by_packet": False,
+            "live_authority_granted": False,
         }
     )
     path.write_text(
@@ -331,6 +333,9 @@ def assert_summary_prestart_contract(summary: dict) -> None:
     assert summary["artifact_manifest_verifier_readiness_closure_allowed"] is False
     assert summary["artifact_manifest_verifier_live_authority_granted"] is False
     assert summary["artifact_manifest_verifier_report_value_mismatches"] == []
+    assert summary["artifact_manifest_verifier_check_mismatches"] == []
+    for check_name in runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS:
+        assert summary[f"artifact_manifest_verifier_check_{check_name}"] is True
     assert (
         summary[
             "artifact_manifest_verifier_report_artifact_manifest_self_consistency_match"
@@ -1590,6 +1595,9 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["backend_port_prestart_summary_executes_tests"] is False
     assert written["artifact_manifest_verifier_report_required_fields_match_contract"] is True
     assert written["artifact_manifest_verifier_report_value_mismatches"] == []
+    assert written["artifact_manifest_verifier_check_mismatches"] == []
+    for check_name in runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS:
+        assert written[f"artifact_manifest_verifier_check_{check_name}"] is True
     assert (
         written[
             "artifact_manifest_verifier_report_artifact_manifest_self_consistency_match"

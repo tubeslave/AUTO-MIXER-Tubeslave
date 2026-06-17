@@ -143,6 +143,37 @@ BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
 BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
+ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
+    "summary_json_exists",
+    "summary_md_exists",
+    "artifact_manifest_exists",
+    "artifact_bundle_loadable",
+    "manifest_type",
+    "manifest_required_artifact_ids_match_contract",
+    "manifest_required_artifact_paths_match_contract",
+    "manifest_records_required_artifact_ids",
+    "summary_json_path_matches_contract",
+    "summary_json_sha256_matches_actual",
+    "summary_md_path_matches_contract",
+    "summary_md_sha256_matches_actual",
+    "summary_json_sha256_matches_manifest",
+    "summary_md_sha256_matches_manifest",
+    "manifest_denies_readiness_closure",
+    "manifest_denies_live_authority",
+    "summary_denies_readiness_closure",
+    "summary_denies_live_authority",
+    "summary_json_artifact_manifest_verifier_fields_present",
+    "manifest_artifact_manifest_verifier_fields_present",
+    "summary_md_artifact_manifest_verifier_fields_rendered",
+    "manifest_artifact_manifest_verifier_command_matches_expected",
+    "summary_json_artifact_manifest_verifier_report_required_fields_matches_expected",
+    "summary_md_artifact_manifest_verifier_report_required_fields_matches_expected",
+    "manifest_artifact_manifest_verifier_report_required_fields_matches_expected",
+    "verifier_report_required_fields_present",
+    "verifier_report_readiness_closure_allowed_matches_expected",
+    "verifier_report_live_authority_granted_matches_expected",
+    "failed_checks_have_check_entries",
+)
 EXPECTED_PLAN_MATCH_KEYS = (
     "type",
     "status",
@@ -197,6 +228,7 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "artifact_manifest_verifier_readiness_closure_allowed",
     "artifact_manifest_verifier_live_authority_granted",
     "artifact_manifest_verifier_report_value_mismatches",
+    "artifact_manifest_verifier_check_mismatches",
     "artifact_manifest_verifier_report_artifact_manifest_self_consistency_match",
     "artifact_manifest_verifier_report_artifact_manifest_contract_cross_surface_match",
     "artifact_manifest_verifier_report_artifact_manifest_self_consistency_summary_surface_match",
@@ -207,6 +239,10 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "artifact_manifest_verifier_report_mutates_console_state",
     "artifact_manifest_verifier_report_queries_console",
     "artifact_manifest_verifier_report_executes_tests",
+    *tuple(
+        f"artifact_manifest_verifier_check_{check_name}"
+        for check_name in ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+    ),
     "backend_port_prestart_check_status",
     *PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     "manual_review_required_before_readiness_update",
@@ -748,6 +784,12 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         )
         if verifier_report.get(field_name) != expected_value
     ]
+    verifier_check_mismatches = [
+        check_name
+        for check_name in ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+        if not isinstance(verifier_checks, dict)
+        or verifier_checks.get(check_name) is not True
+    ]
     detail.update(
         {
             "artifact_manifest_verifier_required": True,
@@ -787,11 +829,21 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             "artifact_manifest_verifier_report_value_mismatches": (
                 verifier_report_value_mismatches
             ),
+            "artifact_manifest_verifier_check_mismatches": (
+                verifier_check_mismatches
+            ),
             **{
                 f"artifact_manifest_verifier_report_{field_name}": verifier_report.get(
                     field_name
                 )
                 for field_name in ARTIFACT_MANIFEST_VERIFIER_REPORT_EXPECTED_VALUES
+            },
+            **{
+                f"artifact_manifest_verifier_check_{check_name}": (
+                    isinstance(verifier_checks, dict)
+                    and verifier_checks.get(check_name) is True
+                )
+                for check_name in ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
             },
         }
     )
@@ -807,6 +859,7 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         or detail["artifact_manifest_verifier_report_required_fields_match_contract"]
         is not True
         or verifier_report_value_mismatches
+        or verifier_check_mismatches
         or verifier_report.get("readiness_closure_allowed") is not False
         or verifier_report.get("live_authority_granted") is not False
     ):
@@ -814,6 +867,10 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         if verifier_report_value_mismatches:
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
+            )
+        if verifier_check_mismatches:
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_check_mismatch"
             )
 
     return detail, violations
@@ -931,6 +988,7 @@ def artifact_manifest_verifier_passed(detail: Dict[str, Any]) -> bool:
         and detail.get("artifact_manifest_verifier_report_required_fields_match_contract")
         is True
         and detail.get("artifact_manifest_verifier_report_value_mismatches") == []
+        and detail.get("artifact_manifest_verifier_check_mismatches") == []
         and detail.get("artifact_manifest_verifier_readiness_closure_allowed") is False
         and detail.get("artifact_manifest_verifier_live_authority_granted") is False
     )

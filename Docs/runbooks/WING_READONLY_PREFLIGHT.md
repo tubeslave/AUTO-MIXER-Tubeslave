@@ -176,6 +176,13 @@ It does not approve live writes.
   authority. The read-only preflight runner repeats this verifier against the
   artifact directory that contains `--prestart-summary` and fails closed before
   opening a backend/WING WebSocket when the detached manifest verifier fails.
+  Its summary/expected plan must expose
+  `artifact_manifest_verifier_check_mismatches: []` and mirror every required
+  verifier check as `artifact_manifest_verifier_check_<check_name>: true`,
+  including `artifact_manifest_verifier_check_manifest_type: true`,
+  `artifact_manifest_verifier_check_summary_json_sha256_matches_manifest: true`,
+  and
+  `artifact_manifest_verifier_check_summary_denies_live_authority: true`.
   A real captured artifact must later prove the ordering with
   `artifact_manifest_verifier_must_pass_before_websocket: true`,
   `artifact_manifest_verifier_passed_before_websocket: true`, and
