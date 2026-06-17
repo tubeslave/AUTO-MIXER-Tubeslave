@@ -34,6 +34,9 @@ WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER = (
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER = (
     "accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof"
 )
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER = (
+    "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
+)
 WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_artifact_paths",
     "confirm_operator_channel_scope",

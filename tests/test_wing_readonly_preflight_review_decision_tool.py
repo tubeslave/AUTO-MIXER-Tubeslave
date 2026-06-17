@@ -21,6 +21,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -510,6 +511,11 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert report["accepted_candidate_prestart_contract_valid"] is True
     assert report["accepted_candidate_prestart_source_ids"] == [str(summary_path)]
     assert report["accepted_candidate_prestart_contract_violations_by_source"] == {}
+    assert report["accepted_candidate_verifier_ws_proof_valid"] is True
+    assert report["accepted_candidate_verifier_ws_proof_source_ids"] == [
+        str(summary_path)
+    ]
+    assert report["accepted_candidate_verifier_ws_proof_violations_by_source"] == {}
     assert report["accepted_candidate_artifact_root_contract_valid"] is True
     assert report["accepted_candidate_artifact_roots"] == [
         str(summary_path.parent.parent)
@@ -554,6 +560,8 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert decision_tool.ACCEPTED_DECISION_READY_STATUS in markdown
     assert "accepted_candidate_prestart_contract_valid: `true`" in markdown
     assert "accepted_candidate_prestart_contract_violations_by_source: `{}`" in markdown
+    assert "accepted_candidate_verifier_ws_proof_valid: `true`" in markdown
+    assert "accepted_candidate_verifier_ws_proof_violations_by_source: `{}`" in markdown
     assert "accepted_candidate_artifact_root_contract_valid: `true`" in markdown
     assert "accepted_candidate_artifact_root_contract_violations_by_source: `{}`" in markdown
     assert "live_authority_granted: `false`" in markdown
@@ -726,6 +734,108 @@ def test_decision_review_report_blocks_accepted_decision_without_prestart_trace(
     assert "- none" not in markdown
 
 
+def test_decision_review_report_blocks_accepted_decision_without_verifier_proof(
+    monkeypatch,
+):
+    def fake_ledger(**_kwargs):
+        return {
+            "status": "operator_review_decision_records_available",
+            "summary": {
+                "preflight_evidence_status": "readonly_preflight_candidate_available",
+                "review_candidate_count": 1,
+                "decision_record_count": 1,
+                "accepted_record_count": 1,
+                "rejected_record_count": 0,
+                "invalid_record_count": 0,
+                "unreviewed_candidate_count": 0,
+                "accepted_source_ids": ["source-a"],
+                "accepted_candidate_prestart_contract_valid": True,
+                "accepted_candidate_prestart_source_ids": ["source-a"],
+                "accepted_candidate_prestart_contract_violations_by_source": {},
+                "accepted_candidate_verifier_ws_proof_valid": False,
+                "accepted_candidate_verifier_ws_proof_source_ids": [],
+                "accepted_candidate_verifier_ws_proof_violations_by_source": {
+                    "source-a": [
+                        "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+                    ]
+                },
+                "accepted_candidate_artifact_root_contract_valid": True,
+                "accepted_candidate_artifact_roots": ["artifacts/wing_readonly_preflight"],
+                "accepted_candidate_artifact_root_contract_violations_by_source": {},
+                "rejected_source_ids": [],
+                "invalid_record_ids": [],
+                "duplicate_source_ids": [],
+                "conflicting_source_ids": [],
+                "unreviewed_candidate_source_ids": [],
+                "candidate_reviews": [
+                    {
+                        "source_id": "source-a",
+                        "status": "valid_readonly_preflight_artifact",
+                        "run_id": "run-a",
+                        "summary_path": "summary.json",
+                        "artifact_manifest_verifier_must_pass_before_websocket": True,
+                        "artifact_manifest_verifier_passed_before_websocket": True,
+                        "artifact_manifest_verifier_websocket_opened_after_pass": False,
+                    }
+                ],
+                "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
+                "manual_readiness_update_candidate_available": False,
+                "blocked_by": [
+                    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
+                ],
+                "next_global_step": "Manual readiness matrix update remains separate.",
+            },
+            "safety": {
+                "read_only": True,
+                "live_write": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "executes_tests": False,
+                "operator_required": True,
+                "execution_allowed_by_decision": False,
+                "readiness_matrix_update_allowed_by_decision": False,
+                "readiness_closure_allowed_by_decision": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+        }
+
+    monkeypatch.setattr(
+        decision_tool,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        fake_ledger,
+    )
+
+    report = decision_tool.build_decision_review_report(artifact_roots=())
+
+    assert report["status"] == "blocked"
+    assert report["accepted_record_count"] == 1
+    assert report["manual_readiness_update_candidate_available"] is False
+    assert report["accepted_candidate_prestart_contract_valid"] is True
+    assert report["accepted_candidate_artifact_root_contract_valid"] is True
+    assert report["accepted_candidate_verifier_ws_proof_valid"] is False
+    assert report["accepted_candidate_verifier_ws_proof_source_ids"] == []
+    assert report["accepted_candidate_verifier_ws_proof_violations_by_source"] == {
+        "source-a": [
+            "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+        ]
+    }
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
+        in report["blocked_by"]
+    )
+    assert "verifier WebSocket proof" in report["next_required_action"]
+    assert decision_tool.exit_code_for_report(report) == 3
+    markdown = decision_tool.render_markdown(report)
+    assert "Status: `blocked`" in markdown
+    assert "accepted_candidate_verifier_ws_proof_valid: `false`" in markdown
+    assert (
+        "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+        in markdown
+    )
+    assert WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER in markdown
+
+
 def test_decision_review_report_blocks_accepted_decision_without_artifact_root_trace(
     monkeypatch,
 ):
@@ -751,6 +861,9 @@ def test_decision_review_report_blocks_accepted_decision_without_artifact_root_t
                 "accepted_candidate_artifact_root_contract_violations_by_source": {
                     "source-a": ["artifact_root_contains_parent_traversal"]
                 },
+                "accepted_candidate_verifier_ws_proof_valid": True,
+                "accepted_candidate_verifier_ws_proof_source_ids": ["source-a"],
+                "accepted_candidate_verifier_ws_proof_violations_by_source": {},
                 "rejected_source_ids": [],
                 "invalid_record_ids": [],
                 "duplicate_source_ids": [],

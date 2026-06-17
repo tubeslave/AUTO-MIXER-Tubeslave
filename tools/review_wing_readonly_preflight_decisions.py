@@ -31,6 +31,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
 )
 
@@ -126,6 +127,20 @@ def build_decision_review_report(
     accepted_candidate_prestart_contract_valid = (
         summary.get("accepted_candidate_prestart_contract_valid") is True
     )
+    accepted_candidate_verifier_ws_proof_source_ids = _string_list(
+        summary.get("accepted_candidate_verifier_ws_proof_source_ids")
+    )
+    accepted_candidate_verifier_ws_proof_violations_by_source = (
+        summary.get("accepted_candidate_verifier_ws_proof_violations_by_source")
+        if isinstance(
+            summary.get("accepted_candidate_verifier_ws_proof_violations_by_source"),
+            Mapping,
+        )
+        else {}
+    )
+    accepted_candidate_verifier_ws_proof_valid = (
+        summary.get("accepted_candidate_verifier_ws_proof_valid") is True
+    )
     accepted_candidate_artifact_roots = _string_list(
         summary.get("accepted_candidate_artifact_roots")
     )
@@ -146,6 +161,8 @@ def build_decision_review_report(
         and bool(accepted_source_ids)
         and accepted_candidate_prestart_contract_valid
         and accepted_candidate_prestart_source_ids == accepted_source_ids
+        and accepted_candidate_verifier_ws_proof_valid
+        and accepted_candidate_verifier_ws_proof_source_ids == accepted_source_ids
         and accepted_candidate_artifact_root_contract_valid
         and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
         and int(summary.get("invalid_record_count") or 0) == 0
@@ -198,6 +215,15 @@ def build_decision_review_report(
         "accepted_candidate_prestart_contract_violations_by_source": dict(
             accepted_candidate_prestart_contract_violations_by_source
         ),
+        "accepted_candidate_verifier_ws_proof_valid": (
+            accepted_candidate_verifier_ws_proof_valid
+        ),
+        "accepted_candidate_verifier_ws_proof_source_ids": (
+            accepted_candidate_verifier_ws_proof_source_ids
+        ),
+        "accepted_candidate_verifier_ws_proof_violations_by_source": dict(
+            accepted_candidate_verifier_ws_proof_violations_by_source
+        ),
         "accepted_candidate_artifact_root_contract_valid": (
             accepted_candidate_artifact_root_contract_valid
         ),
@@ -229,6 +255,11 @@ def build_decision_review_report(
                 "have a valid accepted-candidate prestart trace."
             )
             if accepted_source_ids and not accepted_candidate_prestart_contract_valid
+            else (
+                "Accepted review decision remains blocked until accepted source ids "
+                "have a valid accepted-candidate verifier WebSocket proof."
+            )
+            if accepted_source_ids and not accepted_candidate_verifier_ws_proof_valid
             else (
                 "Accepted review decision remains blocked until accepted source ids "
                 "have a valid accepted-candidate artifact-root trace."
@@ -277,6 +308,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"`{json.dumps(report['accepted_candidate_prestart_source_ids'])}`",
         "- accepted_candidate_prestart_contract_violations_by_source: "
         f"`{json.dumps(report['accepted_candidate_prestart_contract_violations_by_source'], sort_keys=True)}`",
+        "- accepted_candidate_verifier_ws_proof_valid: "
+        f"`{str(report['accepted_candidate_verifier_ws_proof_valid']).lower()}`",
+        "- accepted_candidate_verifier_ws_proof_source_ids: "
+        f"`{json.dumps(report['accepted_candidate_verifier_ws_proof_source_ids'])}`",
+        "- accepted_candidate_verifier_ws_proof_violations_by_source: "
+        f"`{json.dumps(report['accepted_candidate_verifier_ws_proof_violations_by_source'], sort_keys=True)}`",
         "- accepted_candidate_artifact_root_contract_valid: "
         f"`{str(report['accepted_candidate_artifact_root_contract_valid']).lower()}`",
         "- accepted_candidate_artifact_roots: "
@@ -450,6 +487,15 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     ):
         rendered_blockers.append(
             WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+        )
+    if (
+        report.get("accepted_source_ids")
+        and report.get("accepted_candidate_verifier_ws_proof_valid") is not True
+        and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
+        not in blocked_by
+    ):
+        rendered_blockers.append(
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
         )
     lines.extend(f"- `{item}`" for item in rendered_blockers)
     if not rendered_blockers:

@@ -18,12 +18,15 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
     wing_readonly_preflight_accepted_candidate_artifact_root_contract,
     wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
     wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
+    wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids,
+    wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source,
     wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
     wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
@@ -639,6 +642,20 @@ def test_review_decision_ledger_records_accepted_candidate_without_live_authorit
         ledger["summary"]["accepted_candidate_prestart_contract_violations_by_source"]
         == {}
     )
+    assert ledger["summary"]["accepted_candidate_verifier_ws_proof_valid"] is True
+    assert ledger["summary"]["accepted_candidate_verifier_ws_proof_source_ids"] == [
+        "inline_payload_0"
+    ] == wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids(
+        ["inline_payload_0"],
+        ledger["summary"]["candidate_reviews"],
+    )
+    assert (
+        ledger["summary"]["accepted_candidate_verifier_ws_proof_violations_by_source"]
+        == wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source(
+            ["inline_payload_0"],
+            ledger["summary"]["candidate_reviews"],
+        )
+    )
     assert ledger["summary"]["accepted_candidate_artifact_root_contract_valid"] is True
     assert ledger["summary"]["accepted_candidate_artifact_roots"] == [
         "artifacts/wing_readonly_preflight"
@@ -830,6 +847,10 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_required_false
     assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
     assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
     assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"]["accepted_candidate_verifier_ws_proof_valid"] is True
+    assert ledger["summary"]["accepted_candidate_verifier_ws_proof_source_ids"] == [
+        "inline_payload_0"
+    ]
     assert ledger["summary"][
         "accepted_candidate_prestart_contract_violations_by_source"
     ] == {
@@ -864,8 +885,19 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_verifier_webso
             "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
         ]
     }
+    assert ledger["summary"][
+        "accepted_candidate_verifier_ws_proof_violations_by_source"
+    ] == {
+        "inline_payload_0": [
+            "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+        ]
+    }
     assert (
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
         in ledger["summary"]["blocked_by"]
     )
 

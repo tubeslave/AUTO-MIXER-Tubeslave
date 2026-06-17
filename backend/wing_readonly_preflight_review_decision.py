@@ -25,11 +25,14 @@ try:
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
         wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
         wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -46,11 +49,14 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
         wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
         wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -721,6 +727,23 @@ def build_wing_readonly_preflight_review_decision_ledger(
         and accepted_candidate_prestart_source_ids == accepted_source_ids
         and not accepted_candidate_prestart_violations_by_source
     )
+    accepted_candidate_verifier_ws_proof_source_ids = (
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids(
+            accepted_source_ids,
+            candidate_reviews,
+        )
+    )
+    accepted_candidate_verifier_ws_proof_violations_by_source = (
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source(
+            accepted_source_ids,
+            candidate_reviews,
+        )
+    )
+    accepted_candidate_verifier_ws_proof_valid = (
+        bool(accepted_source_ids)
+        and accepted_candidate_verifier_ws_proof_source_ids == accepted_source_ids
+        and not accepted_candidate_verifier_ws_proof_violations_by_source
+    )
     accepted_candidate_request_sequence_source_ids = (
         wing_readonly_preflight_accepted_candidate_request_sequence_source_ids(
             accepted_source_ids,
@@ -755,6 +778,7 @@ def build_wing_readonly_preflight_review_decision_ledger(
         and not invalid_records
         and not unreviewed_candidate_source_ids
         and accepted_candidate_prestart_contract_valid
+        and accepted_candidate_verifier_ws_proof_valid
         and accepted_candidate_artifact_root_contract_valid
         and accepted_candidate_request_sequence_contract_valid
     )
@@ -770,6 +794,10 @@ def build_wing_readonly_preflight_review_decision_ledger(
         blocked_by_items = []
         if accepted_records and not accepted_candidate_prestart_contract_valid:
             blocked_by_items.append(WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER)
+        if accepted_records and not accepted_candidate_verifier_ws_proof_valid:
+            blocked_by_items.append(
+                WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
+            )
         if accepted_records and not accepted_candidate_artifact_root_contract_valid:
             blocked_by_items.append(
                 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
@@ -830,6 +858,15 @@ def build_wing_readonly_preflight_review_decision_ledger(
             ),
             "accepted_candidate_prestart_contract_violations_by_source": (
                 accepted_candidate_prestart_violations_by_source
+            ),
+            "accepted_candidate_verifier_ws_proof_valid": (
+                accepted_candidate_verifier_ws_proof_valid
+            ),
+            "accepted_candidate_verifier_ws_proof_source_ids": (
+                accepted_candidate_verifier_ws_proof_source_ids
+            ),
+            "accepted_candidate_verifier_ws_proof_violations_by_source": (
+                accepted_candidate_verifier_ws_proof_violations_by_source
             ),
             "accepted_candidate_artifact_root_contract_valid": (
                 accepted_candidate_artifact_root_contract_valid
