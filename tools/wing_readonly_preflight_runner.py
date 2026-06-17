@@ -906,6 +906,25 @@ def validate_expected_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> li
     return violations
 
 
+def artifact_manifest_verifier_passed(detail: Dict[str, Any]) -> bool:
+    return (
+        detail.get("artifact_manifest_verifier_status") == "passed"
+        and detail.get("artifact_manifest_verifier_failed_checks") == []
+        and detail.get("artifact_manifest_verifier_failed_checks_missing_check_entries")
+        == []
+        and detail.get("artifact_manifest_verifier_required_fields_missing") == []
+        and detail.get("artifact_manifest_verifier_failed_checks_have_check_entries")
+        is True
+        and detail.get("artifact_manifest_verifier_report_required_fields_present")
+        is True
+        and detail.get("artifact_manifest_verifier_report_required_fields_match_contract")
+        is True
+        and detail.get("artifact_manifest_verifier_report_value_mismatches") == []
+        and detail.get("artifact_manifest_verifier_readiness_closure_allowed") is False
+        and detail.get("artifact_manifest_verifier_live_authority_granted") is False
+    )
+
+
 def expected_plan_operator_next_step(reason: str) -> str:
     if reason == "expected_plan_missing":
         return (
@@ -932,6 +951,9 @@ async def run(args: argparse.Namespace) -> int:
     validation_error = validate_args(args)
     prestart_detail, prestart_violations = load_backend_port_prestart_summary(
         args.prestart_summary
+    )
+    verifier_passed_before_websocket = (
+        artifact_manifest_verifier_passed(prestart_detail) and not prestart_violations
     )
     if args.plan_only:
         if validation_error:
@@ -1019,6 +1041,11 @@ async def run(args: argparse.Namespace) -> int:
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": (
+            verifier_passed_before_websocket
+        ),
+        "artifact_manifest_verifier_websocket_opened_after_pass": False,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
         "backend_port_prestart_check_command_text": (
             BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
@@ -1141,6 +1168,9 @@ async def run(args: argparse.Namespace) -> int:
     try:
         async with websockets.connect(args.url) as ws:
             summary["websocket_opened"] = True
+            summary["artifact_manifest_verifier_websocket_opened_after_pass"] = (
+                summary["artifact_manifest_verifier_passed_before_websocket"] is True
+            )
             mode = await send_and_wait(
                 ws,
                 recorder,

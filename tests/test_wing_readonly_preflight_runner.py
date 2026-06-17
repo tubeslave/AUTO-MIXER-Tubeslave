@@ -356,6 +356,8 @@ def assert_summary_prestart_contract(summary: dict) -> None:
     assert summary["artifact_manifest_verifier_report_mutates_console_state"] is False
     assert summary["artifact_manifest_verifier_report_queries_console"] is False
     assert summary["artifact_manifest_verifier_report_executes_tests"] is False
+    assert summary["artifact_manifest_verifier_must_pass_before_websocket"] is True
+    assert summary["artifact_manifest_verifier_passed_before_websocket"] is True
     assert summary["backend_port_prestart_check_status"] == "passed"
     for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
         assert summary[field] is False
@@ -642,6 +644,7 @@ async def test_readonly_preflight_verifies_manifest_before_opening_websocket(
     assert websocket.url == "ws://fake-backend"
     summary = read_summary(tmp_path)
     assert summary["websocket_opened"] is True
+    assert summary["artifact_manifest_verifier_websocket_opened_after_pass"] is True
     assert summary["artifact_manifest_verifier_status"] == "passed"
     assert summary["artifact_manifest_verifier_failed_checks"] == []
 
