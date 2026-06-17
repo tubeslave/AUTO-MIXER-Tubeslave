@@ -2,10 +2,15 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from backend.wing_readonly_preflight_evidence import (
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
     EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
     EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
@@ -52,6 +57,13 @@ def test_review_decision_template_required_fields_match_shared_contract():
     assert (
         review_tool.review_decision_template_status()
         == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
+    )
+    assert review_tool.review_decision_template_required_edits() == list(
+        review_tool.REVIEW_DECISION_TEMPLATE_REQUIRED_EDITS
+    )
+    assert (
+        "remove template_status or replace the generated pending marker before ledger acceptance"
+        in review_tool.review_decision_template_required_edits()
     )
     assert review_tool.DEFAULT_DECISION_TEMPLATE_OUTPUT == (
         Path(__file__).resolve().parents[1]
@@ -105,11 +117,26 @@ def _valid_summary() -> dict:
         "backend_port_prestart_summary_connection_policy": (
             "no_hardware_no_network_no_live_writes"
         ),
+        "backend_port_prestart_summary_read_only": True,
         "backend_port_prestart_summary_live_write": False,
         "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_contacts_wing": False,
+        "backend_port_prestart_summary_mutates_console_state": False,
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        **{
+            field: False
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: False
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: True
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -159,8 +186,15 @@ def _valid_summary() -> dict:
     }
 
 
-def _event(seq: int, event_type: str, payload: dict) -> dict:
+def _event(
+    seq: int,
+    event_type: str,
+    payload: dict,
+    *,
+    run_id: str = "20260606T120000Z_wing_readonly_preflight",
+) -> dict:
     return {
+        "run_id": run_id,
         "seq": seq,
         "timestamp": "2026-06-06T12:00:00.000Z",
         "event_type": event_type,
@@ -170,10 +204,20 @@ def _event(seq: int, event_type: str, payload: dict) -> dict:
 
 def _valid_events(summary: dict) -> list[dict]:
     events = [
-        _event(1, "send", {"type": "get_operator_mode"}),
-        _event(2, "recv", {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"}),
-        _event(3, "send", {"type": "get_state"}),
-        _event(4, "recv", {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}}),
+        _event(1, "send", {"type": "get_operator_mode"}, run_id=summary["run_id"]),
+        _event(
+            2,
+            "recv",
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            run_id=summary["run_id"],
+        ),
+        _event(3, "send", {"type": "get_state"}, run_id=summary["run_id"]),
+        _event(
+            4,
+            "recv",
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            run_id=summary["run_id"],
+        ),
     ]
     seq = 5
     for row in summary["readbacks"]:
@@ -188,9 +232,10 @@ def _valid_events(summary: dict) -> list[dict]:
                     "value_type": row["value_type"],
                     "address": row["address"],
                 },
+                run_id=summary["run_id"],
             )
         )
-        events.append(_event(seq + 1, "recv", row))
+        events.append(_event(seq + 1, "recv", row, run_id=summary["run_id"]))
         seq += 2
     return events
 
@@ -284,11 +329,20 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_summary_connection_policy": summary[
             "backend_port_prestart_summary_connection_policy"
         ],
+        "backend_port_prestart_summary_read_only": summary[
+            "backend_port_prestart_summary_read_only"
+        ],
         "backend_port_prestart_summary_live_write": summary[
             "backend_port_prestart_summary_live_write"
         ],
         "backend_port_prestart_summary_contacts_backend": summary[
             "backend_port_prestart_summary_contacts_backend"
+        ],
+        "backend_port_prestart_summary_contacts_wing": summary[
+            "backend_port_prestart_summary_contacts_wing"
+        ],
+        "backend_port_prestart_summary_mutates_console_state": summary[
+            "backend_port_prestart_summary_mutates_console_state"
         ],
         "backend_port_prestart_summary_queries_console": summary[
             "backend_port_prestart_summary_queries_console"
@@ -299,6 +353,18 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_status": summary[
             "backend_port_prestart_check_status"
         ],
+        **{
+            field: summary[field]
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: summary[field]
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: summary[field]
+            for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
         "operator_required": True,
         "manual_review_required_before_readiness_update": True,
         "contacts_backend": False,
@@ -330,6 +396,7 @@ def _write_artifact(
     events_path = run_dir / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
     plan_path = run_dir / "expected_plan.json"
     prestart_path = run_dir / "no_wing_prestart_summary.json"
+    summary["artifact_root"] = str(run_dir.parent)
     summary["summary_path"] = str(summary_path)
     summary["events_path"] = str(events_path)
     summary["expected_plan_path"] = str(plan_path)
@@ -338,8 +405,11 @@ def _write_artifact(
         "type": "no_wing_release_check",
         "status": "passed",
         "connection_policy": "no_hardware_no_network_no_live_writes",
+        "read_only": True,
         "live_write": False,
         "contacts_backend": False,
+        "contacts_wing": False,
+        "mutates_console_state": False,
         "queries_console": False,
         "executes_tests": False,
         "results": [
@@ -347,8 +417,27 @@ def _write_artifact(
                 "name": "backend_port_free",
                 "status": "passed",
                 "detail": {
-                    "safe_to_stop_listener_by_gate": False,
-                    "live_authority_granted": False,
+                    "backend_port_prestart_check_failure_detail_fields": list(
+                        EXPECTED_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+                    ),
+                    **{
+                        field: False
+                        for field in (
+                            EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                        )
+                    },
+                    **{
+                        field: False
+                        for field in (
+                            EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+                        )
+                    },
+                    **{
+                        field: True
+                        for field in (
+                            EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+                        )
+                    },
                 },
             }
         ],
@@ -393,12 +482,20 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert report["review_decision_template_required_fields"] == list(
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
     )
+    assert report["review_decision_template_required_edits"] == list(
+        review_tool.REVIEW_DECISION_TEMPLATE_REQUIRED_EDITS
+    )
+    assert (
+        "remove template_status or replace the generated pending marker before ledger acceptance"
+        in report["review_decision_template_required_edits"]
+    )
     assert [row["id"] for row in report["manual_review_checklist"]] == [
         "confirm_artifact_paths",
         "confirm_operator_channel_scope",
         "confirm_operator_session_ready",
         "confirm_physical_readbacks",
         "confirm_event_log_readonly_sequence",
+        "confirm_event_log_run_id_binding",
         "confirm_no_live_authority",
     ]
     assert report["artifact_sources"] == [str(summary_path)]
@@ -408,10 +505,12 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "status": "valid_readonly_preflight_artifact",
             "run_id": "20260606T120000Z_wing_readonly_preflight",
             "captured_at": "2026-06-07T01:00:00Z",
+            "artifact_root": str(summary_path.parent.parent),
             "summary_path": str(summary_path),
             "summary_sha256": _sha256_file(summary_path),
             "events_path": str(summary_path.parent / "events.jsonl"),
             "events_sha256": _sha256_file(summary_path.parent / "events.jsonl"),
+            "event_log_run_id_matches_summary": True,
             "expected_artifacts": expected_artifacts,
             "expected_summary_artifact": str(summary_path),
             "expected_events_artifact": str(summary_path.parent / "events.jsonl"),
@@ -444,11 +543,26 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "backend_port_prestart_summary_connection_policy": (
                 "no_hardware_no_network_no_live_writes"
             ),
+            "backend_port_prestart_summary_read_only": True,
             "backend_port_prestart_summary_live_write": False,
             "backend_port_prestart_summary_contacts_backend": False,
+            "backend_port_prestart_summary_contacts_wing": False,
+            "backend_port_prestart_summary_mutates_console_state": False,
             "backend_port_prestart_summary_queries_console": False,
             "backend_port_prestart_summary_executes_tests": False,
             "backend_port_prestart_check_status": "passed",
+            **{
+                field: False
+                for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
+            **{
+                field: False
+                for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+            },
+            **{
+                field: True
+                for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+            },
             "operator_next_step": None,
             "value_types": ["fader", "gain", "pan"],
             "readback_count": 3,
@@ -460,10 +574,12 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     markdown = review_tool.render_markdown(report)
     assert "candidate_ready_for_manual_review" in markdown
     assert "captured_at: `2026-06-07T01:00:00Z`" in markdown
+    assert f"artifact_root: `{summary_path.parent.parent}`" in markdown
     assert f"summary_path: `{summary_path}`" in markdown
     assert f"summary_sha256: `{_sha256_file(summary_path)}`" in markdown
     assert f"events_path: `{summary_path.parent / 'events.jsonl'}`" in markdown
     assert f"events_sha256: `{_sha256_file(summary_path.parent / 'events.jsonl')}`" in markdown
+    assert "event_log_run_id_matches_summary: `true`" in markdown
     assert f"expected_artifacts: `{json.dumps(expected_artifacts)}`" in markdown
     assert f"expected_summary_artifact: `{summary_path}`" in markdown
     assert f"expected_events_artifact: `{summary_path.parent / 'events.jsonl'}`" in markdown
@@ -481,21 +597,40 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "backend_port_prestart_summary_required: `true`" in markdown
     assert "backend_port_prestart_summary_type: `no_wing_release_check`" in markdown
     assert "backend_port_prestart_summary_status: `passed`" in markdown
+    assert "backend_port_prestart_summary_read_only: `true`" in markdown
     assert "backend_port_prestart_summary_contacts_backend: `false`" in markdown
+    assert "backend_port_prestart_summary_contacts_wing: `false`" in markdown
+    assert (
+        "backend_port_prestart_summary_mutates_console_state: `false`"
+        in markdown
+    )
     assert "backend_port_prestart_summary_queries_console: `false`" in markdown
     assert "backend_port_prestart_summary_executes_tests: `false`" in markdown
     assert "backend_port_prestart_check_status: `passed`" in markdown
+    for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        assert f"{field}: `false`" in markdown
+    for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS:
+        assert f"{field}: `false`" in markdown
+    for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS:
+        assert f"{field}: `true`" in markdown
     assert "listener_processes" in markdown
     assert "listener_confirmation_checklist" in markdown
     assert "operator_next_step: `None`" in markdown
     assert "Manual Review Gate" in markdown
     assert "confirm_operator_session_ready" in markdown
     assert "confirm_event_log_readonly_sequence" in markdown
+    assert "confirm_event_log_run_id_binding" in markdown
     assert "manual_review_decision_required: `true`" in markdown
     assert "request_id_policy: `required_for_every_query_mixer_parameter_response`" in markdown
     assert "request_id_correlation_required: `true`" in markdown
     assert "review_decision_template_available: `true`" in markdown
+    assert "review_decision_template_required_edits" in markdown
     assert "Review Decision Template" in markdown
+    assert "required_edits" in markdown
+    assert (
+        "remove template_status or replace the generated pending marker before ledger acceptance"
+        in markdown
+    )
     assert "does not contact WING" in markdown
 
 
@@ -516,10 +651,23 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     assert template["artifact_source_id"] == str(summary_path)
     assert template["run_id"] == "20260606T120000Z_wing_readonly_preflight"
     assert template["artifact_captured_at"] == "2026-06-07T01:00:00Z"
+    assert template["artifact_root"] == str(summary_path.parent.parent)
     assert template["summary_path"] == str(summary_path)
     assert template["summary_sha256"] == _sha256_file(summary_path)
     assert template["events_path"] == str(summary_path.parent / "events.jsonl")
     assert template["events_sha256"] == _sha256_file(summary_path.parent / "events.jsonl")
+    assert template["channels"] == [3]
+    assert template["value_types"] == ["fader", "gain", "pan"]
+    assert template["operator_confirmed_channels"] == [3]
+    assert template["operator_confirmed_session_ready"] is True
+    assert template["readback_count"] == 3
+    assert template["physical_readback_count"] == 3
+    assert (
+        template["request_id_policy"]
+        == "required_for_every_query_mixer_parameter_response"
+    )
+    assert template["request_id_correlation_required"] is True
+    assert template["event_log_run_id_matches_summary"] is True
     assert template["decision"] == "pending_operator_decision"
     assert template["reviewed_by"] == ""
     assert template["reviewed_at"] == ""
@@ -539,6 +687,105 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     assert "review_decision_unknown" in violations
     assert "review_decision_reviewer_missing" in violations
     assert "review_decision_reviewed_at_missing" in violations
+    assert "review_decision_template_status_unedited" in violations
+
+
+def test_review_decision_template_rejects_coerced_readback_counts(tmp_path: Path):
+    _write_artifact(tmp_path / "preflight" / "run")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["readback_count"] = True
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["physical_readback_count"] = "3"
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+
+def test_review_decision_template_rejects_coerced_channel_scope(tmp_path: Path):
+    _write_artifact(tmp_path / "preflight" / "run")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["channels"] = ["3"]
+    report["artifact_reviews"][0]["operator_confirmed_channels"] = ["3"]
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["operator_confirmed_channels"] = [3.0]
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+
+def test_review_decision_template_rejects_invalid_value_types(tmp_path: Path):
+    _write_artifact(tmp_path / "preflight" / "run")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["value_types"] = ["fader", 3]
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["value_types"] = ["fader", "eq"]
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["value_types"] = ["fader", "fader"]
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+
+def test_review_decision_template_rejects_malformed_artifact_hashes(tmp_path: Path):
+    _write_artifact(tmp_path / "preflight" / "run")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["summary_sha256"] = "not-a-sha256"
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["events_sha256"] = "also-not-a-sha256"
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+
+def test_review_decision_template_rejects_unbound_expected_artifact_paths(tmp_path: Path):
+    _write_artifact(tmp_path / "preflight" / "run")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["summary_path_matches_expected_artifact"] = False
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["events_path_matches_expected_artifact"] = False
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["expected_summary_artifact"] = str(
+        tmp_path / "other" / "summary.json"
+    )
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["expected_events_artifact"] = str(
+        tmp_path / "other" / "events.jsonl"
+    )
+
+    with pytest.raises(ValueError, match="decision_template_candidate_identity_incomplete"):
+        review_tool.build_review_decision_template(report)
 
 
 def test_review_decision_template_requires_explicit_source_for_multiple_candidates(tmp_path: Path):
