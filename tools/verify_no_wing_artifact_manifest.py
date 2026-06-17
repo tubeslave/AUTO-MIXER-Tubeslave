@@ -36,8 +36,10 @@ SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
     "readiness_closure_allowed_by_packet",
     "live_authority_granted",
     "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
+    "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed",
     "artifact_manifest_contract_cross_surface_live_authority_granted",
     "artifact_manifest_readiness_closure_allowed",
+    "artifact_manifest_readiness_matrix_update_allowed",
     "artifact_manifest_live_authority_granted",
     "artifact_manifest_verifier_readiness_closure_allowed",
     "artifact_manifest_verifier_readiness_matrix_update_allowed",
@@ -519,12 +521,24 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
     )
     _record_check(
         checks,
+        "manifest_denies_readiness_matrix_update",
+        manifest.get("artifact_manifest_readiness_matrix_update_allowed") is False,
+    )
+    _record_check(
+        checks,
         "manifest_denies_live_authority",
         manifest.get("artifact_manifest_live_authority_granted") is False,
     )
     readiness_closure_allowed = summary_json.get(
         "readiness_closure_allowed_by_packet",
         manifest.get("artifact_manifest_readiness_closure_allowed"),
+    )
+    readiness_matrix_update_allowed = summary_json.get(
+        "readiness_matrix_update_allowed_by_packet",
+        summary_json.get(
+            "readiness_matrix_update_allowed",
+            manifest.get("artifact_manifest_readiness_matrix_update_allowed"),
+        ),
     )
     live_authority_granted = summary_json.get(
         "live_authority_granted",
@@ -535,6 +549,15 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
             checks,
             "summary_denies_readiness_closure",
             readiness_closure_allowed is False,
+        )
+    if (
+        "readiness_matrix_update_allowed_by_packet" in summary_json
+        or "readiness_matrix_update_allowed" in summary_json
+    ):
+        _record_check(
+            checks,
+            "summary_denies_readiness_matrix_update",
+            readiness_matrix_update_allowed is False,
         )
     if "live_authority_granted" in summary_json:
         _record_check(
@@ -563,6 +586,7 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         {
             "summary_json_sha256": actual_sha256_by_id.get("summary_json"),
             "summary_md_sha256": actual_sha256_by_id.get("summary_md"),
+            "readiness_matrix_update_allowed": readiness_matrix_update_allowed,
             "readiness_closure_allowed": readiness_closure_allowed,
             "live_authority_granted": live_authority_granted,
             "artifact_manifest_contract_sha256": contract_sha256,

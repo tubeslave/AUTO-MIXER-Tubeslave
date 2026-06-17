@@ -779,6 +779,7 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_FIELDS = (
     "artifact_manifest_required_artifact_ids",
     "artifact_manifest_required_artifact_paths",
     "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_readiness_matrix_update_allowed",
     "artifact_manifest_readiness_closure_allowed",
     "artifact_manifest_live_authority_granted",
     "read_only",
@@ -801,6 +802,7 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_FIELDS = (
     "artifact_manifest_contract_id",
     "artifact_manifest_contract_sha256",
     "artifact_manifest_contract_sha256_matches_expected",
+    "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed",
     "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
     "artifact_manifest_contract_cross_surface_live_authority_granted",
     *WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS,
@@ -822,12 +824,15 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS = (
     "artifact_manifest_summary_md_contract_id_matches_manifest",
     "artifact_manifest_summary_md_contract_sha256_matches_manifest",
     "artifact_manifest_summary_md_contract_sha256_match_flag",
+    "artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied",
     "artifact_manifest_summary_json_cross_surface_readiness_closure_denied",
     "artifact_manifest_summary_json_cross_surface_live_authority_denied",
+    "artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied",
     "artifact_manifest_summary_md_cross_surface_readiness_closure_denied",
     "artifact_manifest_summary_md_cross_surface_live_authority_denied",
     "artifact_manifest_contract_cross_surface_mismatches",
     "artifact_manifest_contract_cross_surface_match",
+    "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed",
     "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
     "artifact_manifest_contract_cross_surface_live_authority_granted",
     "artifact_manifest_required",
@@ -836,6 +841,7 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS = (
     "artifact_manifest_required_artifact_ids",
     "artifact_manifest_required_artifact_paths",
     "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_readiness_matrix_update_allowed",
     "readiness_closure_allowed_by_packet",
     "live_authority_granted",
     "artifact_manifest_readiness_closure_allowed",
@@ -868,12 +874,15 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELD_LINES = (
     "artifact_manifest_summary_md_contract_id_matches_manifest",
     "artifact_manifest_summary_md_contract_sha256_matches_manifest",
     "artifact_manifest_summary_md_contract_sha256_match_flag",
+    "artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied",
     "artifact_manifest_summary_json_cross_surface_readiness_closure_denied",
     "artifact_manifest_summary_json_cross_surface_live_authority_denied",
+    "artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied",
     "artifact_manifest_summary_md_cross_surface_readiness_closure_denied",
     "artifact_manifest_summary_md_cross_surface_live_authority_denied",
     "artifact_manifest_contract_cross_surface_mismatches",
     "artifact_manifest_contract_cross_surface_match",
+    "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed",
     "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
     "artifact_manifest_contract_cross_surface_live_authority_granted",
     "artifact_manifest_required",
@@ -882,6 +891,7 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELD_LINES = (
     "artifact_manifest_required_artifact_ids",
     "artifact_manifest_required_artifact_paths",
     "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_readiness_matrix_update_allowed",
     "artifact_manifest_readiness_closure_allowed",
     "artifact_manifest_live_authority_granted",
     *WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS,
@@ -904,6 +914,7 @@ def build_no_wing_artifact_manifest_contract_payload() -> dict[str, object]:
         "artifact_manifest_required_artifact_sha256_fields": list(
             NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_SHA256_FIELDS
         ),
+        "artifact_manifest_readiness_matrix_update_allowed": False,
         "artifact_manifest_readiness_closure_allowed": False,
         "artifact_manifest_live_authority_granted": False,
         "read_only": True,
@@ -913,6 +924,7 @@ def build_no_wing_artifact_manifest_contract_payload() -> dict[str, object]:
         "mutates_console_state": False,
         "queries_console": False,
         "executes_tests": False,
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed": False,
         "live_authority_granted": False,
     }
@@ -960,6 +972,12 @@ def build_no_wing_artifact_manifest_contract_cross_surface_check_from_surfaces(
             "- artifact_manifest_contract_sha256_matches_expected: `true`"
             in markdown_text
         ),
+        "artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied": (
+            summary_json.get(
+                "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed"
+            )
+            is False
+        ),
         "artifact_manifest_summary_json_cross_surface_readiness_closure_denied": (
             summary_json.get(
                 "artifact_manifest_contract_cross_surface_readiness_closure_allowed"
@@ -971,6 +989,11 @@ def build_no_wing_artifact_manifest_contract_cross_surface_check_from_surfaces(
                 "artifact_manifest_contract_cross_surface_live_authority_granted"
             )
             is False
+        ),
+        "artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied": (
+            "- artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed: "
+            "`false`"
+            in markdown_text
         ),
         "artifact_manifest_summary_md_cross_surface_readiness_closure_denied": (
             "- artifact_manifest_contract_cross_surface_readiness_closure_allowed: "
@@ -999,6 +1022,7 @@ def build_no_wing_artifact_manifest_contract_cross_surface_check_from_surfaces(
         **checks,
         "artifact_manifest_contract_cross_surface_mismatches": mismatches,
         "artifact_manifest_contract_cross_surface_match": not mismatches,
+        "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed": False,
         "artifact_manifest_contract_cross_surface_readiness_closure_allowed": False,
         "artifact_manifest_contract_cross_surface_live_authority_granted": False,
     }
@@ -24724,6 +24748,7 @@ def write_no_wing_release_check_artifact_manifest(
         "artifact_manifest_summary_md_path": summary_md["path"],
         "artifact_manifest_summary_md_sha256": summary_md_sha256,
         "artifact_manifest_summary_md_sha256_available": summary_md_sha256_available,
+        "artifact_manifest_readiness_matrix_update_allowed": False,
         "artifact_manifest_readiness_closure_allowed": False,
         "artifact_manifest_live_authority_granted": False,
         "artifact_manifest_verifier_required": True,
@@ -24868,6 +24893,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "mutates_console_state": False,
         "queries_console": False,
         "executes_tests": False,
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed": False,
         "readiness_closure_allowed_by_packet": False,
         "live_authority_granted": False,
@@ -24908,12 +24934,15 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "artifact_manifest_summary_md_contract_id_matches_manifest": True,
         "artifact_manifest_summary_md_contract_sha256_matches_manifest": True,
         "artifact_manifest_summary_md_contract_sha256_match_flag": True,
+        "artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied": True,
         "artifact_manifest_summary_json_cross_surface_readiness_closure_denied": True,
         "artifact_manifest_summary_json_cross_surface_live_authority_denied": True,
+        "artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied": True,
         "artifact_manifest_summary_md_cross_surface_readiness_closure_denied": True,
         "artifact_manifest_summary_md_cross_surface_live_authority_denied": True,
         "artifact_manifest_contract_cross_surface_mismatches": [],
         "artifact_manifest_contract_cross_surface_match": True,
+        "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed": False,
         "artifact_manifest_contract_cross_surface_readiness_closure_allowed": False,
         "artifact_manifest_contract_cross_surface_live_authority_granted": False,
         "wing_readonly_handoff_plan_verifier_summary_surface_required": False,
@@ -24939,6 +24968,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "artifact_manifest_required_artifact_sha256_fields": list(
             NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_SHA256_FIELDS
         ),
+        "artifact_manifest_readiness_matrix_update_allowed": False,
         "artifact_manifest_readiness_closure_allowed": False,
         "artifact_manifest_live_authority_granted": False,
         "artifact_manifest_verifier_required": True,
@@ -25215,9 +25245,13 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "`true`",
         "- artifact_manifest_summary_md_contract_sha256_match_flag: "
         "`true`",
+        "- artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied: "
+        "`true`",
         "- artifact_manifest_summary_json_cross_surface_readiness_closure_denied: "
         "`true`",
         "- artifact_manifest_summary_json_cross_surface_live_authority_denied: "
+        "`true`",
+        "- artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied: "
         "`true`",
         "- artifact_manifest_summary_md_cross_surface_readiness_closure_denied: "
         "`true`",
@@ -25225,6 +25259,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "`true`",
         "- artifact_manifest_contract_cross_surface_mismatches: `[]`",
         "- artifact_manifest_contract_cross_surface_match: `true`",
+        "- artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed: "
+        "`false`",
         "- artifact_manifest_contract_cross_surface_readiness_closure_allowed: "
         "`false`",
         "- artifact_manifest_contract_cross_surface_live_authority_granted: "
@@ -25239,6 +25275,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         f"`{json.dumps(summary['artifact_manifest_required_artifact_paths'])}`",
         "- artifact_manifest_required_artifact_sha256_fields: "
         f"`{json.dumps(summary['artifact_manifest_required_artifact_sha256_fields'])}`",
+        "- artifact_manifest_readiness_matrix_update_allowed: `false`",
         "- artifact_manifest_readiness_closure_allowed: `false`",
         "- artifact_manifest_live_authority_granted: `false`",
         *[
