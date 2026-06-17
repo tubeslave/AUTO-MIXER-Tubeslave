@@ -289,6 +289,12 @@ def test_validate_args_rejects_plan_only_with_validate_run_inputs_only(
     )
 
 
+def test_validation_error_violation_normalizes_validation_reason() -> None:
+    assert runner.validation_error_violation("--value-types unsupported: eq") == (
+        "validation_value_types_unsupported_eq"
+    )
+
+
 def write_expected_plan(tmp_path: Path, *argv: str) -> Path:
     plan_path = tmp_path / "expected-plan.json"
     args = parse_args(
@@ -1337,6 +1343,39 @@ async def test_validate_run_inputs_only_requires_expected_plan_before_websocket(
         summary["selected_mvp_blocker_status"]
         == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
     )
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_reports_validation_violation_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"invalid run inputs must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader,eq",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "--value-types unsupported: eq"
+    assert summary["validation_violations"] == [
+        "validation_value_types_unsupported_eq"
+    ]
+    assert summary["websocket_opened"] is False
     assert summary["sent_request_types"] == []
 
 

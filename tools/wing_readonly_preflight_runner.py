@@ -659,6 +659,15 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
     return None
 
 
+def validation_error_violation(reason: str) -> str:
+    normalized = "".join(
+        character.lower() if character.isalnum() else "_"
+        for character in reason.strip("-")
+    )
+    collapsed = "_".join(part for part in normalized.split("_") if part)
+    return f"validation_{collapsed or 'invalid_args'}"
+
+
 def build_read_requests(channels: tuple[int, ...], value_types: tuple[str, ...]) -> list[Dict[str, Any]]:
     requests: list[Dict[str, Any]] = []
     for channel in channels:
@@ -1229,6 +1238,9 @@ async def run(args: argparse.Namespace) -> int:
                 "type": "wing_readonly_preflight_offline_plan",
                 "status": "blocked",
                 "reason": validation_error,
+                "validation_violations": [
+                    validation_error_violation(validation_error)
+                ],
                 "read_only": True,
                 "live_write": False,
                 "operator_required": True,
@@ -1332,7 +1344,15 @@ async def run(args: argparse.Namespace) -> int:
     }
 
     if validation_error:
-        summary.update({"status": "blocked", "reason": validation_error})
+        summary.update(
+            {
+                "status": "blocked",
+                "reason": validation_error,
+                "validation_violations": [
+                    validation_error_violation(validation_error)
+                ],
+            }
+        )
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 2
