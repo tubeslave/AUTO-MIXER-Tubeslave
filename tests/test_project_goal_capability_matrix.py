@@ -375,6 +375,7 @@ def test_compression_is_tracked_as_transport_free_proposal_layer():
     assert "blocked evidence" in row.blocker
     assert "AutoSoundcheck compressor-threshold writes" in console.blocker
     assert "operator review" in row.next_step
+    assert "feedback safety" in row.next_step
     assert console is not None
     assert console.status == "proposal_only"
     assert "auto_compressor" in console.method_ids
@@ -382,6 +383,7 @@ def test_compression_is_tracked_as_transport_free_proposal_layer():
     assert "backend/auto_compressor.py" in console.support_paths
     assert "backend/auto_compressor_cf.py" in console.support_paths
     assert "blocked evidence" in console.blocker
+    assert "feedback safety" in console.next_step
 
 
 def test_panning_is_tracked_as_transport_free_proposal_layer():

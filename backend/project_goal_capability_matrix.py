@@ -279,7 +279,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("compressor",),
         blocker="Compressor apply paths are not proven through the supervised gate; AutoCompressor/CF, server reset helper, and AutoSoundcheck threshold writes now return blocked evidence instead of mutating the console.",
-        next_step="Route AutoCompressor/CF, server reset helper, and AutoSoundcheck threshold blocked evidence to operator review; require fresh dynamics readback, makeup/headroom and rollback proof before assisted apply.",
+        next_step="Route AutoCompressor/CF, server reset helper, and AutoSoundcheck threshold blocked evidence to operator review; require fresh dynamics readback, feedback safety, makeup/headroom and rollback proof before assisted apply.",
     ),
     ProjectGoalCapabilityRow(
         id="gating",
@@ -715,7 +715,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("compressor",),
         blocker="Compressor writes are not in current live executor; AutoCompressor/CF apply, server reset helper, and AutoSoundcheck compressor-threshold writes return blocked evidence only.",
-        next_step="Keep dynamics settings proposal-only until readback, rollback, and bounded makeup/headroom proof are complete.",
+        next_step="Keep dynamics settings proposal-only until readback, rollback, feedback safety, and bounded makeup/headroom proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="console_gate_control",

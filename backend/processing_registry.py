@@ -5147,9 +5147,9 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         can_analyze=True,
         can_propose=True,
         pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
-        blocked_reason="compressor_live_writes_need_dynamics_readback_rollback_and_hardware_proof",
-        promotion_next="connect compressor proposals to fresh dynamics readback and operator review; keep dynamics writes out of the live executor",
-        notes=("transport_free", "proposal_only", "bounded_makeup", "freshness_gated", "no_live_writes"),
+        blocked_reason="compressor_live_writes_need_dynamics_readback_feedback_safety_rollback_and_hardware_proof",
+        promotion_next="connect compressor proposals to fresh dynamics readback, feedback safety, bounded makeup and operator review; keep dynamics writes out of the live executor",
+        notes=("transport_free", "proposal_only", "bounded_makeup", "feedback_guard", "freshness_gated", "no_live_writes"),
     ),
     ProcessingMethod(
         id="auto_compressor_cf",
@@ -6595,7 +6595,7 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
     "compressor_dynamics_proposal": {
         "entrypoint": "compressor_dynamics_proposal.analyze_compressor_need / build_compressor_proposals",
         "ui_surface": "Channel Intelligence, vocal/instrument dynamics proposals, future Compressor panel",
-        "next_step": "Keep compressor output proposal-only until fresh dynamics readback, bounded makeup, and rollback are proven.",
+        "next_step": "Keep compressor output proposal-only until fresh dynamics readback, bounded makeup, feedback safety, and rollback are proven.",
     },
     "deesser_vocal_sibilance": {
         "entrypoint": "deesser_vocal_sibilance.analyze_deesser_need / build_deesser_proposals",

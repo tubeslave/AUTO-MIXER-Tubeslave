@@ -20,6 +20,7 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 COMPRESSOR_METHOD_ID = "compressor_dynamics_proposal"
 COMPRESSOR_VERSION = "compressor_dynamics_proposal_v1"
+DYNAMICS_READ_REQUIRED_SOURCE = "cached_or_physical_dynamics_read_required_before_promotion"
 MIN_THRESHOLD_DB = -50.0
 MAX_THRESHOLD_DB = -6.0
 MIN_RATIO = 1.2
@@ -29,6 +30,7 @@ MAX_ATTACK_MS = 120.0
 MIN_RELEASE_MS = 40.0
 MAX_RELEASE_MS = 1200.0
 MAX_MAKEUP_DB = 3.0
+HIGH_FEEDBACK_RISK = 0.45
 
 
 @dataclass(frozen=True)
@@ -113,6 +115,7 @@ class CompressorAnalysisInput:
     peak_dbfs: float = -12.0
     lufs_short: float = -24.0
     true_peak_headroom_db: float = 6.0
+    feedback_risk: float = 0.0
     existing_gain_reduction_db: float = 0.0
     contribution_share: float = 0.0
     persistence_cycles: int = 1
@@ -186,8 +189,18 @@ class CompressorRecommendation:
                 "makeup_gain_db": self.makeup_gain_db,
                 "target_gain_reduction_db": self.target_gain_reduction_db,
             },
+            "old_value": {
+                "source": DYNAMICS_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
+            },
+            "rollback_value": {
+                "source": DYNAMICS_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
+            },
             "evidence": {
                 **self.evidence,
+                "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+                "rollback_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
                 "live_write": False,
                 "queue_mutation": False,
                 "readback_required_before_promotion": True,
@@ -247,6 +260,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def analyze_compressor_need(
     analysis: CompressorAnalysisInput,
     *,
@@ -265,10 +286,12 @@ def analyze_compressor_need(
     persistence = max(1, int(analysis.persistence_cycles or 1))
     transient_density = _clip01(analysis.transient_density)
     stability = _clip01(analysis.loudness_stability)
+    feedback_risk = _clip01(analysis.feedback_risk)
     peak_dbfs = _safe_float(analysis.peak_dbfs, -120.0)
     rms_dbfs = _safe_float(analysis.rms_dbfs, -120.0)
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=f"ch:{int(analysis.channel_id)}",
         source_type=str(analysis.source_role or "unknown"),
@@ -292,6 +315,14 @@ def analyze_compressor_need(
     needs_compression = crest_factor >= preset.crest_factor_trigger_db or lra_db >= preset.lra_trigger_db
     confidence = _clip01(score + (0.08 if needs_compression else 0.0))
 
+    target_gr = _clip(preset.target_gain_reduction_db + score * 1.5, 1.0, 6.0)
+    ratio = _clip(preset.ratio + score * 1.4, MIN_RATIO, MAX_RATIO)
+    attack = _clip(preset.attack_ms * (0.85 if cf_excess > 4.0 else 1.0), MIN_ATTACK_MS, MAX_ATTACK_MS)
+    release = _clip(preset.release_ms * (1.0 + instability * 0.35), MIN_RELEASE_MS, MAX_RELEASE_MS)
+    threshold = _clip(rms_dbfs + 3.0 - score * 4.0, MIN_THRESHOLD_DB, MAX_THRESHOLD_DB)
+    makeup_budget = max(0.0, headroom - 1.0)
+    makeup = _clip(min(target_gr * 0.45, makeup_budget, MAX_MAKEUP_DB), 0.0, MAX_MAKEUP_DB)
+
     blockers = []
     if peak_dbfs < -55.0 or rms_dbfs < -70.0:
         blockers.append("signal_below_analysis_floor")
@@ -301,17 +332,21 @@ def analyze_compressor_need(
         blockers.append("existing_compression_already_heavy")
     if headroom < 1.0:
         blockers.append("insufficient_true_peak_headroom_for_makeup")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if feedback_risk >= HIGH_FEEDBACK_RISK and makeup > 0.0:
+        blockers.append("feedback_risk_blocks_compressor_makeup")
+    if current_state_freshness_status != "fresh":
         blockers.append("compressor_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("compressor_current_state_cache_live_authority_present")
     blockers.extend(source_identity_trust.blockers)
 
-    target_gr = _clip(preset.target_gain_reduction_db + score * 1.5, 1.0, 6.0)
-    ratio = _clip(preset.ratio + score * 1.4, MIN_RATIO, MAX_RATIO)
-    attack = _clip(preset.attack_ms * (0.85 if cf_excess > 4.0 else 1.0), MIN_ATTACK_MS, MAX_ATTACK_MS)
-    release = _clip(preset.release_ms * (1.0 + instability * 0.35), MIN_RELEASE_MS, MAX_RELEASE_MS)
-    threshold = _clip(rms_dbfs + 3.0 - score * 4.0, MIN_THRESHOLD_DB, MAX_THRESHOLD_DB)
-    makeup_budget = max(0.0, headroom - 1.0)
-    makeup = _clip(min(target_gr * 0.45, makeup_budget, MAX_MAKEUP_DB), 0.0, MAX_MAKEUP_DB)
+    feedback_safety = {
+        "status": "blocked" if "feedback_risk_blocks_compressor_makeup" in blockers else "passed",
+        "feedback_risk": round(feedback_risk, 3),
+        "high_feedback_risk_threshold": HIGH_FEEDBACK_RISK,
+        "makeup_gain_db": round(makeup, 1),
+        "blocks_makeup_gain": feedback_risk >= HIGH_FEEDBACK_RISK and makeup > 0.0,
+    }
 
     evidence = {
         "source": COMPRESSOR_VERSION,
@@ -323,6 +358,8 @@ def analyze_compressor_need(
         "peak_dbfs": round(peak_dbfs, 2),
         "lufs_short": round(_safe_float(analysis.lufs_short, -120.0), 2),
         "true_peak_headroom_db": round(headroom, 2),
+        "feedback_risk": round(feedback_risk, 3),
+        "feedback_safety": feedback_safety,
         "existing_gain_reduction_db": round(existing_gr, 2),
         "contribution_share": round(contribution, 3),
         "persistence_cycles": persistence,
@@ -330,10 +367,13 @@ def analyze_compressor_need(
         "loudness_stability": round(stability, 3),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_dynamics_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "target_crest_factor_db": preset.target_crest_factor_db,
         "crest_factor_trigger_db": preset.crest_factor_trigger_db,
         "lra_trigger_db": preset.lra_trigger_db,
+        "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+        "rollback_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
         "transport_free": True,
         "makeup_gain_is_bounded_by_headroom": True,
     }
