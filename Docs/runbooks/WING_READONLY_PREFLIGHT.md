@@ -103,7 +103,13 @@ It does not approve live writes.
   show `verifier_report_required_fields_present: true`,
   `verifier_report_required_fields_missing: []`, and
   `verifier_report_required_fields_match_contract: true`. Its `checks` must
-  also show `summary_json_artifact_manifest_verifier_fields_present: true`,
+  also show `summary_json_sha256_matches_manifest: true`,
+  `summary_md_sha256_matches_manifest: true`,
+  `manifest_denies_readiness_closure: true`,
+  `manifest_denies_live_authority: true`,
+  `summary_denies_readiness_closure: true`,
+  `summary_denies_live_authority: true`,
+  `summary_json_artifact_manifest_verifier_fields_present: true`,
   `manifest_artifact_manifest_verifier_fields_present: true`,
   `summary_md_artifact_manifest_verifier_fields_rendered: true`,
   `summary_json_artifact_manifest_verifier_command_matches_expected: true`,
@@ -592,6 +598,12 @@ Then update:
   `verifier_report_required_fields_present: true`,
   `verifier_report_required_fields_missing: []`, and
   `verifier_report_required_fields_match_contract: true`,
+  `summary_json_sha256_matches_manifest: true`,
+  `summary_md_sha256_matches_manifest: true`,
+  `manifest_denies_readiness_closure: true`,
+  `manifest_denies_live_authority: true`,
+  `summary_denies_readiness_closure: true`,
+  `summary_denies_live_authority: true`,
   `summary_json_artifact_manifest_verifier_fields_present: true`,
   `manifest_artifact_manifest_verifier_fields_present: true`,
   `summary_md_artifact_manifest_verifier_fields_rendered: true`,
