@@ -179,10 +179,35 @@ It does not approve live writes.
   Its summary/expected plan must expose
   `artifact_manifest_verifier_check_mismatches: []` and mirror every required
   verifier check as `artifact_manifest_verifier_check_<check_name>: true`,
-  including `artifact_manifest_verifier_check_manifest_type: true`,
+  including `artifact_manifest_verifier_check_summary_json_exists: true`,
+  `artifact_manifest_verifier_check_summary_md_exists: true`,
+  `artifact_manifest_verifier_check_artifact_manifest_exists: true`,
+  `artifact_manifest_verifier_check_artifact_bundle_loadable: true`,
+  `artifact_manifest_verifier_check_manifest_type: true`,
+  `artifact_manifest_verifier_check_manifest_required_artifact_ids_match_contract: true`,
+  `artifact_manifest_verifier_check_manifest_required_artifact_paths_match_contract: true`,
+  `artifact_manifest_verifier_check_manifest_records_required_artifact_ids: true`,
+  `artifact_manifest_verifier_check_summary_json_path_matches_contract: true`,
+  `artifact_manifest_verifier_check_summary_json_sha256_matches_actual: true`,
+  `artifact_manifest_verifier_check_summary_md_path_matches_contract: true`,
+  `artifact_manifest_verifier_check_summary_md_sha256_matches_actual: true`,
   `artifact_manifest_verifier_check_summary_json_sha256_matches_manifest: true`,
-  and
-  `artifact_manifest_verifier_check_summary_denies_live_authority: true`.
+  `artifact_manifest_verifier_check_summary_md_sha256_matches_manifest: true`,
+  `artifact_manifest_verifier_check_manifest_denies_readiness_closure: true`,
+  `artifact_manifest_verifier_check_manifest_denies_live_authority: true`,
+  `artifact_manifest_verifier_check_summary_denies_readiness_closure: true`,
+  `artifact_manifest_verifier_check_summary_denies_live_authority: true`,
+  `artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_fields_present: true`,
+  `artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_fields_present: true`,
+  `artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_fields_rendered: true`,
+  `artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_command_matches_expected: true`,
+  `artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  `artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  `artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  `artifact_manifest_verifier_check_verifier_report_required_fields_present: true`,
+  `artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true`,
+  `artifact_manifest_verifier_check_verifier_report_live_authority_granted_matches_expected: true`,
+  and `artifact_manifest_verifier_check_failed_checks_have_check_entries: true`.
   A real captured artifact must later prove the ordering with
   `artifact_manifest_verifier_must_pass_before_websocket: true`,
   `artifact_manifest_verifier_passed_before_websocket: true`, and
