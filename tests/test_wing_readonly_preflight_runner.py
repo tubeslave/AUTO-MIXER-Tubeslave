@@ -1885,6 +1885,7 @@ async def test_plan_only_blocks_plan_output_write_error_before_websocket(
     assert printed["contacts_backend"] is False
     assert printed["queries_console"] is False
     assert printed["execution_allowed_by_plan"] is False
+    assert printed["readiness_closure_allowed"] is False
     assert printed["live_authority_granted"] is False
 
 

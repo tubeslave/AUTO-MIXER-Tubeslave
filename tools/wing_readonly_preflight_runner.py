@@ -1201,6 +1201,7 @@ def block_plan_output_write_error(
                 f"plan_output_write_error:{error['type']}"
             ],
             "execution_allowed_by_plan": False,
+            "readiness_closure_allowed": False,
             "live_authority_granted": False,
         }
     )
