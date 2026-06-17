@@ -940,6 +940,20 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
             )
+        for safety_field in (
+            "read_only",
+            "live_write",
+            "contacts_wing",
+            "contacts_backend",
+            "mutates_console_state",
+            "queries_console",
+            "executes_tests",
+        ):
+            if safety_field in verifier_report_value_mismatches:
+                violations.append(
+                    "prestart_summary_artifact_manifest_verifier_"
+                    f"{safety_field}_mismatch"
+                )
         if not isinstance(verifier_checks, dict):
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_checks_not_object"
