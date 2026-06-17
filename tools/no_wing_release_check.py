@@ -334,6 +334,769 @@ DEFAULT_ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "no_wing_release_check"
 DEFAULT_BACKEND_PORT = 8765
 DEFAULT_COMMAND_TIMEOUT_SEC = 900
 AUTONOMY_GAP_ROLLUP_SOURCE = "autonomy_mode_transition_gate.rows[mode=auto]"
+NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SURFACE_CHECK_NAME = (
+    "next_wing_proof_plan_operator_markdown_surface"
+)
+NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT_INTEGRITY_CHECK_NAME = (
+    "next_wing_proof_plan_operator_markdown_artifact_integrity"
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME = (
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface"
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME = (
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface"
+)
+WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_CHECK_NAME = (
+    "wing_readonly_operator_sequence_list_summary_surface"
+)
+WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_CHECK_NAME = (
+    "wing_readonly_operator_sequence_list_markdown_surface"
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_CHECK_NAME = (
+    "no_wing_release_check_artifact_manifest_summary_surface"
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CROSS_SURFACE_CHECK_NAME = (
+    "no_wing_release_check_artifact_manifest_cross_surface"
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_CHECK_NAME = (
+    "no_wing_release_check_artifact_manifest_self_consistency"
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_CHECK_NAME = (
+    "no_wing_release_check_artifact_manifest_self_consistency_summary_surface"
+)
+PROJECT_DIRECTOR_SELECTED_ACTION_SUMMARY_SURFACE_CHECK_NAME = (
+    "project_director_selected_action_summary_surface"
+)
+PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_MARKDOWN_SURFACE_CHECK_NAME = (
+    "project_director_selected_action_value_gate_self_check_markdown_surface"
+)
+NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SECTION = "## Next WING Proof Plan"
+NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
+    "operator_markdown_summary_required_field_lines",
+    "operator_markdown_summary_required_field_lines_missing_members",
+    "operator_markdown_summary_required_field_lines_match_contract",
+    "allowed_supervised_live_value_types",
+    "operator_markdown_summary_allowed_supervised_live_value_types_expected_value",
+    "operator_markdown_summary_allowed_supervised_live_value_types_actual_value",
+    "operator_markdown_summary_allowed_supervised_live_value_types_match_contract",
+    "operator_markdown_summary_values_match_contract",
+    "operator_markdown_summary_value_mismatches",
+    "required_supervised_proof_plan_summary_fields",
+    "missing_required_supervised_proof_plan_summary_fields",
+    "readonly_preflight_review_decision_candidate_request_sequence_contract_valid",
+    "readonly_preflight_review_decision_candidate_request_sequence_source_ids",
+    "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source",
+    "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids",
+    "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted",
+    "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted",
+)
+NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_POST_CHECK_FIELD_LINES = (
+    "operator_markdown_summary_allowed_supervised_live_value_types_expected_value",
+    "operator_markdown_summary_allowed_supervised_live_value_types_actual_value",
+    "operator_markdown_summary_allowed_supervised_live_value_types_match_contract",
+    "operator_markdown_summary_values_match_contract",
+    "operator_markdown_summary_value_mismatches",
+    "operator_markdown_summary_required_field_lines_missing_members",
+    "operator_markdown_summary_required_field_lines_match_contract",
+    "operator_markdown_summary_missing_field_lines",
+    "operator_markdown_summary_field_lines_rendered",
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_VIOLATIONS = (
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_source_ids_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_source_ids_mismatch",
+    "next_wing_proof_plan_accepted_candidate_expected_artifacts_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_artifacts_mismatch",
+    "next_wing_proof_plan_accepted_candidate_expected_summary_artifact_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_summary_artifact_mismatch",
+    "next_wing_proof_plan_accepted_candidate_expected_events_artifact_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_events_artifact_mismatch",
+    "next_wing_proof_plan_accepted_candidate_summary_match_flags_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_summary_match_flags_mismatch",
+    "next_wing_proof_plan_accepted_candidate_events_match_flags_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_events_match_flags_mismatch",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_missing_source_ids_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_missing_source_ids_mismatch",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_complete_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_complete_mismatch",
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS = (
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted",
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_VIOLATIONS = (
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_source_ids_missing",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_source_ids_mismatch",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_mismatch",
+    "next_wing_proof_plan_accepted_candidate_plan_request_sequence_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_plan_request_sequence_mismatch",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_match_flags_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_match_flags_mismatch",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_missing_source_ids_missing",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_missing_source_ids_mismatch",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_complete_missing",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_complete_mismatch",
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS = (
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_required",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted",
+)
+NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT = "summary.md"
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME = "artifact-manifest.json"
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_TARGET_ARTIFACT_DIR = (
+    "<no_wing_artifact_dir>"
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_COMMAND = (
+    "PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py "
+    f"{NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_TARGET_ARTIFACT_DIR}"
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_ID = (
+    "no_wing_release_check_artifact_manifest_contract.v1"
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_SPECS = (
+    ("summary_json", preflight_contract.WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME),
+    ("summary_md", NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT),
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_IDS = tuple(
+    artifact_id
+    for artifact_id, _ in NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_SPECS
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_PATHS = tuple(
+    relative_path
+    for _, relative_path in NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_SPECS
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_SHA256_FIELDS = (
+    "artifact_manifest_summary_json_sha256",
+    "artifact_manifest_summary_md_sha256",
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS = (
+    "artifact_manifest_self_consistency_required",
+    "artifact_manifest_self_consistency_artifact_count_matches_required",
+    "artifact_manifest_self_consistency_required_artifact_ids_match_contract",
+    "artifact_manifest_self_consistency_artifact_ids_match_required",
+    "artifact_manifest_self_consistency_artifact_ids_unique",
+    "artifact_manifest_self_consistency_required_artifact_paths_match_contract",
+    "artifact_manifest_self_consistency_artifact_paths_match_required",
+    "artifact_manifest_self_consistency_artifact_paths_unique",
+    "artifact_manifest_self_consistency_required_sha_fields_match_contract",
+    "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level",
+    "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level",
+    "artifact_manifest_self_consistency_sha256_availability_matches_entries",
+    "artifact_manifest_self_consistency_read_only_required",
+    "artifact_manifest_self_consistency_live_write_denied",
+    "artifact_manifest_self_consistency_contacts_wing_denied",
+    "artifact_manifest_self_consistency_contacts_backend_denied",
+    "artifact_manifest_self_consistency_mutates_console_state_denied",
+    "artifact_manifest_self_consistency_queries_console_denied",
+    "artifact_manifest_self_consistency_executes_tests_denied",
+    "artifact_manifest_self_consistency_readiness_closure_denied",
+    "artifact_manifest_self_consistency_live_authority_denied",
+    "artifact_manifest_self_consistency_mismatches",
+    "artifact_manifest_self_consistency_match",
+    "artifact_manifest_self_consistency_readiness_closure_allowed",
+    "artifact_manifest_self_consistency_live_authority_granted",
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS = (
+    "artifact_manifest_self_consistency_summary_surface_required",
+    "artifact_manifest_self_consistency_summary_surface_required_fields",
+    "artifact_manifest_self_consistency_summary_surface_json_mismatches",
+    "artifact_manifest_self_consistency_summary_surface_markdown_mismatches",
+    "artifact_manifest_self_consistency_summary_surface_mismatches",
+    "artifact_manifest_self_consistency_summary_surface_match",
+    "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed",
+    "artifact_manifest_self_consistency_summary_surface_live_authority_granted",
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS = (
+    "artifact_manifest_verifier_required",
+    "artifact_manifest_verifier_command",
+    "artifact_manifest_verifier_target_artifact_dir",
+    "artifact_manifest_verifier_status_required",
+    "artifact_manifest_verifier_failed_checks_required",
+    "artifact_manifest_verifier_report_required_fields",
+    "artifact_manifest_verifier_contacts_wing",
+    "artifact_manifest_verifier_mutates_console_state",
+    "artifact_manifest_verifier_queries_console",
+    "artifact_manifest_verifier_readiness_closure_allowed",
+    "artifact_manifest_verifier_live_authority_granted",
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS = (
+    "status",
+    "failed_checks",
+    "failed_checks_missing_check_entries",
+    "checks",
+    "verifier_report_required_fields",
+    "verifier_report_required_fields_missing",
+    "verifier_report_required_fields_match_contract",
+    "artifact_manifest_self_consistency_match",
+    "artifact_manifest_contract_cross_surface_match",
+    "artifact_manifest_self_consistency_summary_surface_match",
+    "read_only",
+    "live_write",
+    "contacts_wing",
+    "contacts_backend",
+    "mutates_console_state",
+    "queries_console",
+    "executes_tests",
+    "readiness_closure_allowed",
+    "live_authority_granted",
+)
+PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
+    "same no-WING artifact directory",
+    "artifact_manifest_self_consistency_summary_surface_match: true",
+    "artifact_manifest_self_consistency_summary_surface_json_mismatches: []",
+    "artifact_manifest_self_consistency_summary_surface_markdown_mismatches: []",
+    "artifact_manifest_self_consistency_summary_surface_mismatches: []",
+    "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed: false",
+    "artifact_manifest_self_consistency_summary_surface_live_authority_granted: false",
+    "artifact_manifest_self_consistency_match: true",
+    "artifact_manifest_self_consistency_mismatches: []",
+    "artifact_manifest_contract_cross_surface_match: true",
+    "artifact_manifest_contract_cross_surface_mismatches: []",
+    "verifier_report_required_fields_present: true",
+    "verifier_report_required_fields_missing: []",
+    "verifier_report_required_fields_match_contract: true",
+    "failed_checks_have_check_entries: true",
+    "failed_checks_missing_check_entries: []",
+)
+PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_DENIAL_MARKERS = (
+    "do not open the WING session",
+    "do not close readiness",
+    "approve live writes",
+    "grant live authority",
+)
+PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_REQUIRED_MARKERS = (
+    "backend_port_prestart_summary_read_only: true",
+    "backend_port_prestart_summary_read_only_matches_plan: true",
+    "backend_port_prestart_summary_contacts_wing: false",
+    "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+    "backend_port_prestart_summary_mutates_console_state: false",
+    "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required: true",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches: []",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match: true",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed: false",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted: false",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required: true",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches: []",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match: true",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed: false",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted: false",
+)
+PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES = (
+    "project_director_selected_action_value_gate_self_check_required",
+    "project_director_selected_action_value_gate_self_check_required_markers",
+    "project_director_selected_action_value_gate_self_check_missing_markers",
+    "project_director_selected_action_value_gate_self_check_markers_present",
+    "project_director_selected_action_value_gate_self_check_readiness_closure_allowed",
+    "project_director_selected_action_value_gate_self_check_live_authority_granted",
+)
+WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_REQUIRED_FIELDS = (
+    "operator_sequence",
+    "expected_operator_sequence",
+)
+WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES = (
+    "operator_sequence",
+    "expected_operator_sequence",
+    "wing_readonly_operator_sequence_list_summary_surface_self_check_required",
+    "wing_readonly_operator_sequence_list_summary_surface_required_fields",
+    "wing_readonly_operator_sequence_list_summary_surface_mismatches",
+    "wing_readonly_operator_sequence_list_summary_surface_match",
+    "wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed",
+    "wing_readonly_operator_sequence_list_summary_surface_live_authority_granted",
+    "wing_readonly_operator_sequence_list_markdown_surface_required",
+    "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines",
+    "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value",
+    "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value",
+    "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract",
+    "wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines",
+    "wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered",
+    "wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed",
+    "wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted",
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_FIELDS = (
+    "artifact_manifest_path",
+    "artifact_manifest_required_artifact_ids",
+    "artifact_manifest_required_artifact_paths",
+    "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_readiness_closure_allowed",
+    "artifact_manifest_live_authority_granted",
+    "read_only",
+    "live_write",
+    "contacts_wing",
+    "contacts_backend",
+    "mutates_console_state",
+    "queries_console",
+    "executes_tests",
+    "readiness_closure_allowed",
+    "live_authority_granted",
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_SURFACES = (
+    preflight_contract.WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
+    NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT,
+    NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME,
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_FIELDS = (
+    "artifact_manifest_contract_id",
+    "artifact_manifest_contract_sha256",
+    "artifact_manifest_contract_sha256_matches_expected",
+    "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
+    "artifact_manifest_contract_cross_surface_live_authority_granted",
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS = (
+    "artifact_manifest_contract_id",
+    "artifact_manifest_contract_required",
+    "artifact_manifest_contract_fields",
+    "artifact_manifest_contract_sha256",
+    "artifact_manifest_contract_sha256_available",
+    "artifact_manifest_contract_sha256_matches_expected",
+    "artifact_manifest_contract_cross_surface_required",
+    "artifact_manifest_contract_cross_surface_required_surfaces",
+    "artifact_manifest_contract_cross_surface_required_fields",
+    "artifact_manifest_contract_cross_surface_expected_match",
+    "artifact_manifest_summary_json_contract_id_matches_manifest",
+    "artifact_manifest_summary_json_contract_sha256_matches_manifest",
+    "artifact_manifest_summary_json_contract_sha256_match_flag",
+    "artifact_manifest_summary_md_contract_id_matches_manifest",
+    "artifact_manifest_summary_md_contract_sha256_matches_manifest",
+    "artifact_manifest_summary_md_contract_sha256_match_flag",
+    "artifact_manifest_summary_json_cross_surface_readiness_closure_denied",
+    "artifact_manifest_summary_json_cross_surface_live_authority_denied",
+    "artifact_manifest_summary_md_cross_surface_readiness_closure_denied",
+    "artifact_manifest_summary_md_cross_surface_live_authority_denied",
+    "artifact_manifest_contract_cross_surface_mismatches",
+    "artifact_manifest_contract_cross_surface_match",
+    "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
+    "artifact_manifest_contract_cross_surface_live_authority_granted",
+    "artifact_manifest_required",
+    "artifact_manifest_path",
+    "artifact_manifest_required_artifact_count",
+    "artifact_manifest_required_artifact_ids",
+    "artifact_manifest_required_artifact_paths",
+    "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_readiness_closure_allowed",
+    "artifact_manifest_live_authority_granted",
+    *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS,
+    *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS,
+    *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS,
+)
+NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELD_LINES = (
+    "artifact_manifest_summary_surface_required",
+    "artifact_manifest_summary_surface_required_fields",
+    "artifact_manifest_summary_surface_missing_fields",
+    "artifact_manifest_summary_surface_required_field_lines",
+    "artifact_manifest_summary_surface_missing_field_lines",
+    "artifact_manifest_summary_surface_field_lines_rendered",
+    "artifact_manifest_contract_id",
+    "artifact_manifest_contract_required",
+    "artifact_manifest_contract_fields",
+    "artifact_manifest_contract_sha256",
+    "artifact_manifest_contract_sha256_available",
+    "artifact_manifest_contract_sha256_matches_expected",
+    "artifact_manifest_contract_cross_surface_required",
+    "artifact_manifest_contract_cross_surface_required_surfaces",
+    "artifact_manifest_contract_cross_surface_required_fields",
+    "artifact_manifest_contract_cross_surface_expected_match",
+    "artifact_manifest_summary_json_contract_id_matches_manifest",
+    "artifact_manifest_summary_json_contract_sha256_matches_manifest",
+    "artifact_manifest_summary_json_contract_sha256_match_flag",
+    "artifact_manifest_summary_md_contract_id_matches_manifest",
+    "artifact_manifest_summary_md_contract_sha256_matches_manifest",
+    "artifact_manifest_summary_md_contract_sha256_match_flag",
+    "artifact_manifest_summary_json_cross_surface_readiness_closure_denied",
+    "artifact_manifest_summary_json_cross_surface_live_authority_denied",
+    "artifact_manifest_summary_md_cross_surface_readiness_closure_denied",
+    "artifact_manifest_summary_md_cross_surface_live_authority_denied",
+    "artifact_manifest_contract_cross_surface_mismatches",
+    "artifact_manifest_contract_cross_surface_match",
+    "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
+    "artifact_manifest_contract_cross_surface_live_authority_granted",
+    "artifact_manifest_required",
+    "artifact_manifest_path",
+    "artifact_manifest_required_artifact_count",
+    "artifact_manifest_required_artifact_ids",
+    "artifact_manifest_required_artifact_paths",
+    "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_readiness_closure_allowed",
+    "artifact_manifest_live_authority_granted",
+    *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS,
+    *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS,
+    *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS,
+)
+
+
+def build_no_wing_artifact_manifest_contract_payload() -> dict[str, object]:
+    return {
+        "contract_id": NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_ID,
+        "artifact_manifest_path": NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME,
+        "artifact_manifest_required_artifact_ids": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_IDS
+        ),
+        "artifact_manifest_required_artifact_paths": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_PATHS
+        ),
+        "artifact_manifest_required_artifact_sha256_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_SHA256_FIELDS
+        ),
+        "artifact_manifest_readiness_closure_allowed": False,
+        "artifact_manifest_live_authority_granted": False,
+        "read_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+    }
+
+
+def no_wing_artifact_manifest_contract_sha256() -> str:
+    payload = build_no_wing_artifact_manifest_contract_payload()
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def build_no_wing_artifact_manifest_contract_cross_surface_check_from_surfaces(
+    summary_json: Mapping[str, Any],
+    markdown_text: str,
+    *,
+    contract_sha256: str,
+) -> dict[str, object]:
+    checks = {
+        "artifact_manifest_summary_json_contract_id_matches_manifest": (
+            summary_json.get("artifact_manifest_contract_id")
+            == NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_ID
+        ),
+        "artifact_manifest_summary_json_contract_sha256_matches_manifest": (
+            summary_json.get("artifact_manifest_contract_sha256") == contract_sha256
+        ),
+        "artifact_manifest_summary_json_contract_sha256_match_flag": (
+            summary_json.get("artifact_manifest_contract_sha256_matches_expected")
+            is True
+        ),
+        "artifact_manifest_summary_md_contract_id_matches_manifest": (
+            f"- artifact_manifest_contract_id: "
+            f"`{NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_ID}`"
+            in markdown_text
+        ),
+        "artifact_manifest_summary_md_contract_sha256_matches_manifest": (
+            f"- artifact_manifest_contract_sha256: `{contract_sha256}`"
+            in markdown_text
+        ),
+        "artifact_manifest_summary_md_contract_sha256_match_flag": (
+            "- artifact_manifest_contract_sha256_matches_expected: `true`"
+            in markdown_text
+        ),
+        "artifact_manifest_summary_json_cross_surface_readiness_closure_denied": (
+            summary_json.get(
+                "artifact_manifest_contract_cross_surface_readiness_closure_allowed"
+            )
+            is False
+        ),
+        "artifact_manifest_summary_json_cross_surface_live_authority_denied": (
+            summary_json.get(
+                "artifact_manifest_contract_cross_surface_live_authority_granted"
+            )
+            is False
+        ),
+        "artifact_manifest_summary_md_cross_surface_readiness_closure_denied": (
+            "- artifact_manifest_contract_cross_surface_readiness_closure_allowed: "
+            "`false`"
+            in markdown_text
+        ),
+        "artifact_manifest_summary_md_cross_surface_live_authority_denied": (
+            "- artifact_manifest_contract_cross_surface_live_authority_granted: "
+            "`false`"
+            in markdown_text
+        ),
+    }
+    mismatches = [
+        check_name for check_name, passed in checks.items() if not passed
+    ]
+
+    return {
+        "artifact_manifest_contract_cross_surface_required": True,
+        "artifact_manifest_contract_cross_surface_required_surfaces": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_SURFACES
+        ),
+        "artifact_manifest_contract_cross_surface_required_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_FIELDS
+        ),
+        "artifact_manifest_contract_cross_surface_expected_match": True,
+        **checks,
+        "artifact_manifest_contract_cross_surface_mismatches": mismatches,
+        "artifact_manifest_contract_cross_surface_match": not mismatches,
+        "artifact_manifest_contract_cross_surface_readiness_closure_allowed": False,
+        "artifact_manifest_contract_cross_surface_live_authority_granted": False,
+    }
+
+
+def build_no_wing_artifact_manifest_contract_cross_surface_check(
+    run_dir: Path,
+    *,
+    contract_sha256: str,
+) -> dict[str, object]:
+    summary_json_path = (
+        run_dir / preflight_contract.WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+    )
+    summary_md_path = run_dir / NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT
+    summary_json = json.loads(summary_json_path.read_text(encoding="utf-8"))
+    markdown_text = summary_md_path.read_text(encoding="utf-8")
+    return build_no_wing_artifact_manifest_contract_cross_surface_check_from_surfaces(
+        summary_json,
+        markdown_text,
+        contract_sha256=contract_sha256,
+    )
+
+
+def build_no_wing_artifact_manifest_self_consistency_check(
+    manifest: Mapping[str, Any],
+) -> dict[str, object]:
+    artifacts = manifest.get("artifacts")
+    artifact_rows = [
+        artifact for artifact in artifacts if isinstance(artifact, Mapping)
+    ] if isinstance(artifacts, list) else []
+    artifacts_by_id = {
+        str(artifact.get("artifact_id")): artifact
+        for artifact in artifact_rows
+        if isinstance(artifact.get("artifact_id"), str)
+    }
+    artifact_ids = [
+        str(artifact.get("artifact_id"))
+        for artifact in artifact_rows
+        if isinstance(artifact.get("artifact_id"), str)
+    ]
+    artifact_paths = [
+        str(artifact.get("path"))
+        for artifact in artifact_rows
+        if isinstance(artifact.get("path"), str)
+    ]
+    required_ids = list(NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_IDS)
+    required_paths = list(
+        NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_PATHS
+    )
+    required_sha_fields = list(
+        NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_SHA256_FIELDS
+    )
+
+    summary_json_artifact = artifacts_by_id.get("summary_json", {})
+    summary_md_artifact = artifacts_by_id.get("summary_md", {})
+    summary_json_entry_sha = summary_json_artifact.get("sha256")
+    summary_md_entry_sha = summary_md_artifact.get("sha256")
+    checks = {
+        "artifact_manifest_self_consistency_artifact_count_matches_required": (
+            manifest.get("artifact_manifest_artifact_count") == len(artifact_rows)
+            and manifest.get("artifact_manifest_required_artifact_count")
+            == len(required_ids)
+            and len(artifact_rows) == len(required_ids)
+        ),
+        "artifact_manifest_self_consistency_required_artifact_ids_match_contract": (
+            manifest.get("artifact_manifest_required_artifact_ids") == required_ids
+        ),
+        "artifact_manifest_self_consistency_artifact_ids_match_required": (
+            artifact_ids == required_ids
+            and manifest.get("artifact_manifest_artifact_ids") == artifact_ids
+        ),
+        "artifact_manifest_self_consistency_artifact_ids_unique": (
+            len(set(artifact_ids)) == len(artifact_ids)
+        ),
+        "artifact_manifest_self_consistency_required_artifact_paths_match_contract": (
+            manifest.get("artifact_manifest_required_artifact_paths") == required_paths
+        ),
+        "artifact_manifest_self_consistency_artifact_paths_match_required": (
+            artifact_paths == required_paths
+            and manifest.get("artifact_manifest_artifact_paths") == artifact_paths
+        ),
+        "artifact_manifest_self_consistency_artifact_paths_unique": (
+            len(set(artifact_paths)) == len(artifact_paths)
+        ),
+        "artifact_manifest_self_consistency_required_sha_fields_match_contract": (
+            manifest.get("artifact_manifest_required_artifact_sha256_fields")
+            == required_sha_fields
+        ),
+        "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level": (
+            manifest.get("artifact_manifest_summary_json_sha256")
+            == summary_json_entry_sha
+            and isinstance(summary_json_entry_sha, str)
+            and bool(summary_json_entry_sha)
+        ),
+        "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level": (
+            manifest.get("artifact_manifest_summary_md_sha256") == summary_md_entry_sha
+            and isinstance(summary_md_entry_sha, str)
+            and bool(summary_md_entry_sha)
+        ),
+        "artifact_manifest_self_consistency_sha256_availability_matches_entries": (
+            manifest.get("artifact_manifest_required_artifact_sha256_available")
+            is True
+            and manifest.get("artifact_manifest_summary_json_sha256_available")
+            is True
+            and manifest.get("artifact_manifest_summary_md_sha256_available") is True
+            and all(
+                isinstance(artifact.get("sha256"), str) and bool(artifact.get("sha256"))
+                for artifact in artifact_rows
+            )
+        ),
+        "artifact_manifest_self_consistency_read_only_required": (
+            manifest.get("read_only") is True
+        ),
+        "artifact_manifest_self_consistency_live_write_denied": (
+            manifest.get("live_write") is False
+        ),
+        "artifact_manifest_self_consistency_contacts_wing_denied": (
+            manifest.get("contacts_wing") is False
+        ),
+        "artifact_manifest_self_consistency_contacts_backend_denied": (
+            manifest.get("contacts_backend") is False
+        ),
+        "artifact_manifest_self_consistency_mutates_console_state_denied": (
+            manifest.get("mutates_console_state") is False
+        ),
+        "artifact_manifest_self_consistency_queries_console_denied": (
+            manifest.get("queries_console") is False
+        ),
+        "artifact_manifest_self_consistency_executes_tests_denied": (
+            manifest.get("executes_tests") is False
+        ),
+        "artifact_manifest_self_consistency_readiness_closure_denied": (
+            manifest.get("artifact_manifest_readiness_closure_allowed") is False
+            and manifest.get("readiness_closure_allowed") is False
+        ),
+        "artifact_manifest_self_consistency_live_authority_denied": (
+            manifest.get("artifact_manifest_live_authority_granted") is False
+            and manifest.get("live_authority_granted") is False
+        ),
+    }
+    mismatches = [
+        check_name for check_name, passed in checks.items() if not passed
+    ]
+    return {
+        "artifact_manifest_self_consistency_required": True,
+        **checks,
+        "artifact_manifest_self_consistency_mismatches": mismatches,
+        "artifact_manifest_self_consistency_match": not mismatches,
+        "artifact_manifest_self_consistency_readiness_closure_allowed": False,
+        "artifact_manifest_self_consistency_live_authority_granted": False,
+    }
+
+
+def build_no_wing_artifact_manifest_self_consistency_summary_surface() -> dict[str, object]:
+    return {
+        "artifact_manifest_self_consistency_required": True,
+        "artifact_manifest_self_consistency_artifact_count_matches_required": True,
+        "artifact_manifest_self_consistency_required_artifact_ids_match_contract": True,
+        "artifact_manifest_self_consistency_artifact_ids_match_required": True,
+        "artifact_manifest_self_consistency_artifact_ids_unique": True,
+        "artifact_manifest_self_consistency_required_artifact_paths_match_contract": True,
+        "artifact_manifest_self_consistency_artifact_paths_match_required": True,
+        "artifact_manifest_self_consistency_artifact_paths_unique": True,
+        "artifact_manifest_self_consistency_required_sha_fields_match_contract": True,
+        "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level": True,
+        "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level": True,
+        "artifact_manifest_self_consistency_sha256_availability_matches_entries": True,
+        "artifact_manifest_self_consistency_read_only_required": True,
+        "artifact_manifest_self_consistency_live_write_denied": True,
+        "artifact_manifest_self_consistency_contacts_wing_denied": True,
+        "artifact_manifest_self_consistency_contacts_backend_denied": True,
+        "artifact_manifest_self_consistency_mutates_console_state_denied": True,
+        "artifact_manifest_self_consistency_queries_console_denied": True,
+        "artifact_manifest_self_consistency_executes_tests_denied": True,
+        "artifact_manifest_self_consistency_readiness_closure_denied": True,
+        "artifact_manifest_self_consistency_live_authority_denied": True,
+        "artifact_manifest_self_consistency_mismatches": [],
+        "artifact_manifest_self_consistency_match": True,
+        "artifact_manifest_self_consistency_readiness_closure_allowed": False,
+        "artifact_manifest_self_consistency_live_authority_granted": False,
+    }
+
+
+def build_no_wing_artifact_manifest_self_consistency_summary_surface_check_defaults() -> dict[str, object]:
+    return {
+        "artifact_manifest_self_consistency_summary_surface_required": True,
+        "artifact_manifest_self_consistency_summary_surface_required_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS
+        ),
+        "artifact_manifest_self_consistency_summary_surface_json_mismatches": [],
+        "artifact_manifest_self_consistency_summary_surface_markdown_mismatches": [],
+        "artifact_manifest_self_consistency_summary_surface_mismatches": [],
+        "artifact_manifest_self_consistency_summary_surface_match": True,
+        "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed": False,
+        "artifact_manifest_self_consistency_summary_surface_live_authority_granted": False,
+    }
+
+
+def build_no_wing_artifact_manifest_self_consistency_summary_surface_check(
+    summary_json: Mapping[str, Any],
+    markdown_text: str,
+) -> dict[str, object]:
+    expected = build_no_wing_artifact_manifest_self_consistency_summary_surface()
+    json_mismatches = [
+        field_name
+        for field_name, expected_value in expected.items()
+        if summary_json.get(field_name) != expected_value
+    ]
+    markdown_mismatches = [
+        field_name
+        for field_name, expected_value in expected.items()
+        if _format_markdown_summary_field_line(field_name, expected_value)
+        not in markdown_text
+    ]
+    mismatches = [
+        *(f"summary_json.{field_name}" for field_name in json_mismatches),
+        *(f"summary_md.{field_name}" for field_name in markdown_mismatches),
+    ]
+    return {
+        "artifact_manifest_self_consistency_summary_surface_required": True,
+        "artifact_manifest_self_consistency_summary_surface_required_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS
+        ),
+        "artifact_manifest_self_consistency_summary_surface_json_mismatches": json_mismatches,
+        "artifact_manifest_self_consistency_summary_surface_markdown_mismatches": (
+            markdown_mismatches
+        ),
+        "artifact_manifest_self_consistency_summary_surface_mismatches": mismatches,
+        "artifact_manifest_self_consistency_summary_surface_match": not mismatches,
+        "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed": False,
+        "artifact_manifest_self_consistency_summary_surface_live_authority_granted": False,
+    }
 
 
 def _required_gain_evidence_components() -> list[str]:
@@ -422,6 +1185,15 @@ WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME = (
 WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS = (
     preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
 )
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS = tuple(
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+)
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS = tuple(
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+)
+WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS = tuple(
+    preflight_contract.WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+)
 WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
@@ -476,11 +1248,20 @@ BACKEND_PORT_LISTENER_CONFIRMATION_TEMPLATE_REQUIRED_EDITS = [
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER = (
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
 )
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER = (
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+)
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER = (
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+)
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS = list(
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+)
+WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES = list(
+    preflight_contract.WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX = (
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
@@ -502,6 +1283,14 @@ WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX = (
 )
 WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS = (
     preflight_contract.WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS
+)
+WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP = (
+    preflight_contract.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP
+)
+WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX = (
+    preflight_contract.expected_handoff_operator_sequence().index(
+        WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP
+    )
 )
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
@@ -701,6 +1490,16 @@ def wing_mvp_project_director_selected_action_anchor(
         "current_first_command_baseline_missing_markers": missing_markers,
         "packet_does_not_close_blocker": True,
     }
+
+
+def missing_project_director_selected_action_value_gate_self_check_markers(
+    selected_action: str,
+) -> list[str]:
+    return [
+        marker
+        for marker in PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_REQUIRED_MARKERS
+        if marker not in selected_action
+    ]
 
 
 def wing_readonly_preflight_capture_command_template() -> list[str]:
@@ -1819,6 +2618,13 @@ def _backend_port_markdown_details(result: CheckResult) -> list[str]:
     ):
         if field in detail:
             lines.append(f"  - {field}: `{detail[field]}`")
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        plan_field = f"plan_{field}"
+        match_field = f"{field}_matches_plan"
+        if plan_field in detail:
+            lines.append(f"  - {plan_field}: `{detail[plan_field]}`")
+        if match_field in detail:
+            lines.append(f"  - {match_field}: `{detail[match_field]}`")
     operator_next_step = detail.get("operator_next_step")
     if operator_next_step:
         lines.append(f"  - operator_next_step: `{operator_next_step}`")
@@ -2090,6 +2896,18 @@ def maybe_attach_backend_listener_confirmation_template(
     return replace(result, detail=detail)
 
 
+def _attach_backend_port_required_false_plan_matches(
+    detail: dict[str, object],
+) -> None:
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        plan_field = f"plan_{field}"
+        detail[plan_field] = False
+        detail[f"{field}_matches_plan"] = (
+            isinstance(detail.get(field), bool)
+            and detail.get(field) == detail.get(plan_field)
+        )
+
+
 def check_port_free(
     port: int = DEFAULT_BACKEND_PORT,
     host: str = "127.0.0.1",
@@ -2178,6 +2996,7 @@ def check_port_free(
         and detail.get("listener_confirmation_status") == "accepted"
     ):
         status = WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
+    _attach_backend_port_required_false_plan_matches(detail)
     return CheckResult(
         name=WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_NAME,
         status=status,
@@ -2199,24 +3018,31 @@ def write_wing_readonly_prestart_summary(
     generated_at: str,
     backend_port_result: CheckResult,
 ) -> None:
-    payload = {
-        "type": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
-        "generated_at": generated_at,
-        "status": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
-        "connection_policy": (
-            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
-        ),
-        "live_write": False,
-        "contacts_backend": False,
-        "queries_console": False,
-        "executes_tests": False,
-        "failed_checks": [],
-        "results": [asdict(backend_port_result)],
-    }
+    write_summary(path.parent, [backend_port_result], generated_at=generated_at)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.update(
+        {
+            "type": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+            "status": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
+            "connection_policy": (
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+            ),
+            "read_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "failed_checks": [],
+            "results": [asdict(backend_port_result)],
+        }
+    )
     _write_text(
         path,
         json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
     )
+    write_no_wing_release_check_artifact_manifest(path.parent, generated_at=generated_at)
 
 
 def _coerce_timeout_output(value: str | bytes | None) -> str:
@@ -2271,6 +3097,27 @@ def _restore_preserved_paths(
             f"Preserved command artifact path became a directory: {snapshot.path}"
         )
     return restored
+
+
+def _frontend_e2e_environment_blocked_detail(
+    check: CommandCheck,
+    *,
+    stderr: str,
+) -> dict[str, object] | None:
+    if check.name != "frontend_e2e":
+        return None
+    if "listen EPERM" not in stderr or "127.0.0.1:3000" not in stderr:
+        return None
+    return {
+        "environment_blocked": True,
+        "environment_blocked_reason": "local_dev_server_bind_denied",
+        "environment_blocked_address": "127.0.0.1:3000",
+        "operator_next_step": (
+            "Rerun frontend_e2e in an environment that allows the Playwright "
+            "dev server to bind 127.0.0.1:3000; this no-WING result does not "
+            "grant readiness."
+        ),
+    }
 
 
 def run_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
@@ -2328,6 +3175,17 @@ def run_command_check(check: CommandCheck, log_dir: Path) -> CheckResult:
             "preserve_paths_restore_error": restore_error,
         }
 
+    environment_blocked_detail = _frontend_e2e_environment_blocked_detail(
+        check,
+        stderr=stderr,
+    )
+    if status == "failed" and environment_blocked_detail is not None:
+        status = "environment_blocked"
+        detail = {
+            **(detail or {}),
+            **environment_blocked_detail,
+        }
+
     stdout_log = log_dir / f"{check.name}.stdout.log"
     stderr_log = log_dir / f"{check.name}.stderr.log"
     _write_text(stdout_log, stdout)
@@ -2374,6 +3232,28 @@ def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
 
 
+def _invalid_review_decision_records(records: Any) -> list[dict[str, object]]:
+    if not isinstance(records, list):
+        return []
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if not isinstance(record, Mapping) or record.get("valid") is True:
+            continue
+        rows.append(
+            {
+                "review_id": str(record.get("review_id") or ""),
+                "artifact_source_id": str(record.get("artifact_source_id") or ""),
+                "decision": str(record.get("decision") or ""),
+                "template_status": str(record.get("template_status") or ""),
+                "violations": _string_list(record.get("violations")),
+                "unsafe_authority_flags": _string_list(
+                    record.get("unsafe_authority_flags")
+                ),
+            }
+        )
+    return rows
+
+
 def _string_list_map(value: Any) -> tuple[dict[str, list[str]], bool]:
     if not isinstance(value, Mapping):
         return {}, False
@@ -2389,6 +3269,202 @@ def _string_list_map(value: Any) -> tuple[dict[str, list[str]], bool]:
         if items:
             normalized[key] = items
     return normalized, True
+
+
+def _string_list_map_exact(value: Any) -> tuple[dict[str, list[str]], bool]:
+    if not isinstance(value, Mapping):
+        return {}, False
+    normalized: dict[str, list[str]] = {}
+    for key, raw_items in value.items():
+        if not isinstance(key, str) or not key:
+            return {}, False
+        if not isinstance(raw_items, list):
+            return {}, False
+        items = [str(item) for item in raw_items if isinstance(item, str) and item]
+        if len(items) != len(raw_items):
+            return {}, False
+        normalized[key] = items
+    return normalized, True
+
+
+def _string_value_map(value: Any) -> tuple[dict[str, str], bool]:
+    if not isinstance(value, Mapping):
+        return {}, False
+    normalized: dict[str, str] = {}
+    for key, raw_value in value.items():
+        if not isinstance(key, str) or not key:
+            return {}, False
+        if not isinstance(raw_value, str):
+            return {}, False
+        normalized[key] = raw_value
+    return normalized, True
+
+
+def _bool_value_map(value: Any) -> tuple[dict[str, bool], bool]:
+    if not isinstance(value, Mapping):
+        return {}, False
+    normalized: dict[str, bool] = {}
+    for key, raw_value in value.items():
+        if not isinstance(key, str) or not key:
+            return {}, False
+        if not isinstance(raw_value, bool):
+            return {}, False
+        normalized[key] = raw_value
+    return normalized, True
+
+
+def _mapping_list(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, Mapping)]
+
+
+def _mapping_list_map_exact(value: Any) -> tuple[dict[str, list[dict[str, Any]]], bool]:
+    if not isinstance(value, Mapping):
+        return {}, False
+    normalized: dict[str, list[dict[str, Any]]] = {}
+    for key, raw_items in value.items():
+        if not isinstance(key, str) or not key:
+            return {}, False
+        if not isinstance(raw_items, list):
+            return {}, False
+        items = [dict(item) for item in raw_items if isinstance(item, Mapping)]
+        if len(items) != len(raw_items):
+            return {}, False
+        normalized[key] = items
+    return normalized, True
+
+
+def _accepted_candidate_artifact_root_contract(
+    accepted_source_ids: Sequence[str],
+    candidate_reviews: Sequence[Mapping[str, Any]],
+) -> tuple[list[str], dict[str, list[str]]]:
+    return preflight_contract.wing_readonly_preflight_accepted_candidate_artifact_root_contract(
+        accepted_source_ids,
+        candidate_reviews,
+    )
+
+
+def _accepted_candidate_expected_artifact_trace(
+    accepted_source_ids: Sequence[str],
+    candidate_reviews: Sequence[Mapping[str, Any]],
+) -> dict[str, object]:
+    rows_by_source: dict[str, Mapping[str, Any]] = {}
+    for row in candidate_reviews:
+        source_id = str(row.get("source_id") or "")
+        if source_id:
+            rows_by_source[source_id] = row
+
+    trace_source_ids = [str(source_id) for source_id in accepted_source_ids if source_id]
+    expected_artifacts_by_source: dict[str, list[str]] = {}
+    expected_summary_artifact_by_source: dict[str, str] = {}
+    expected_events_artifact_by_source: dict[str, str] = {}
+    summary_path_matches_by_source: dict[str, bool] = {}
+    events_path_matches_by_source: dict[str, bool] = {}
+    missing_source_ids: list[str] = []
+
+    for source_id in trace_source_ids:
+        row = rows_by_source.get(source_id)
+        if row is None:
+            missing_source_ids.append(source_id)
+            continue
+        expected_artifacts = _string_list(row.get("expected_artifacts"))
+        expected_summary_artifact = str(row.get("expected_summary_artifact") or "")
+        expected_events_artifact = str(row.get("expected_events_artifact") or "")
+        summary_path_matches = row.get("summary_path_matches_expected_artifact") is True
+        events_path_matches = row.get("events_path_matches_expected_artifact") is True
+        expected_artifacts_by_source[source_id] = expected_artifacts
+        expected_summary_artifact_by_source[source_id] = expected_summary_artifact
+        expected_events_artifact_by_source[source_id] = expected_events_artifact
+        summary_path_matches_by_source[source_id] = summary_path_matches
+        events_path_matches_by_source[source_id] = events_path_matches
+        if (
+            len(expected_artifacts) < 2
+            or not expected_summary_artifact
+            or not expected_events_artifact
+            or not summary_path_matches
+            or not events_path_matches
+        ):
+            missing_source_ids.append(source_id)
+
+    return {
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids": (
+            trace_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source": (
+            expected_artifacts_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source": (
+            expected_summary_artifact_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source": (
+            expected_events_artifact_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source": (
+            summary_path_matches_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source": (
+            events_path_matches_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids": (
+            missing_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete": (
+            bool(trace_source_ids) and not missing_source_ids
+        ),
+    }
+
+
+def _accepted_candidate_request_sequence_trace(
+    accepted_source_ids: Sequence[str],
+    candidate_reviews: Sequence[Mapping[str, Any]],
+) -> dict[str, object]:
+    rows_by_source: dict[str, Mapping[str, Any]] = {}
+    for row in candidate_reviews:
+        source_id = str(row.get("source_id") or "")
+        if source_id:
+            rows_by_source[source_id] = row
+
+    trace_source_ids = [str(source_id) for source_id in accepted_source_ids if source_id]
+    request_sequence_by_source: dict[str, list[dict[str, Any]]] = {}
+    plan_request_sequence_by_source: dict[str, list[dict[str, Any]]] = {}
+    matches_plan_by_source: dict[str, bool] = {}
+    missing_source_ids: list[str] = []
+
+    for source_id in trace_source_ids:
+        row = rows_by_source.get(source_id)
+        if row is None:
+            missing_source_ids.append(source_id)
+            continue
+        request_sequence = _mapping_list(row.get("request_sequence"))
+        plan_request_sequence = _mapping_list(row.get("plan_request_sequence"))
+        matches_plan = row.get("request_sequence_matches_plan") is True
+        request_sequence_by_source[source_id] = request_sequence
+        plan_request_sequence_by_source[source_id] = plan_request_sequence
+        matches_plan_by_source[source_id] = matches_plan
+        if not request_sequence or not plan_request_sequence or not matches_plan:
+            missing_source_ids.append(source_id)
+
+    return {
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids": (
+            trace_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source": (
+            request_sequence_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source": (
+            plan_request_sequence_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source": (
+            matches_plan_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids": (
+            missing_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete": (
+            bool(trace_source_ids) and not missing_source_ids
+        ),
+    }
 
 
 def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResult:
@@ -4623,9 +5699,16 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_path_missing"
         )
-    if not str(plan.get("backend_port_prestart_summary_sha256") or ""):
+    plan_prestart_summary_sha256 = str(
+        plan.get("backend_port_prestart_summary_sha256") or ""
+    )
+    if not plan_prestart_summary_sha256:
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_sha256_missing"
+        )
+    elif not preflight_contract.is_sha256_hexdigest(plan_prestart_summary_sha256):
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_summary_sha256_invalid"
         )
     if (
         plan.get("backend_port_prestart_summary_type")
@@ -4648,6 +5731,10 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_policy_mismatch"
         )
+    if plan.get("backend_port_prestart_summary_read_only") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_summary_read_only_not_true"
+        )
     if plan.get("backend_port_prestart_summary_live_write") is not False:
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_live_write_not_false"
@@ -4655,6 +5742,14 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     if plan.get("backend_port_prestart_summary_contacts_backend") is not False:
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_summary_contacts_backend_not_false"
+        )
+    if plan.get("backend_port_prestart_summary_contacts_wing") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_summary_contacts_wing_not_false"
+        )
+    if plan.get("backend_port_prestart_summary_mutates_console_state") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_backend_port_prestart_summary_mutates_console_state_not_false"
         )
     if plan.get("backend_port_prestart_summary_queries_console") is not False:
         violations.append(
@@ -4670,6 +5765,46 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     ):
         violations.append(
             "wing_readonly_preflight_plan_backend_port_prestart_check_status_not_passed"
+        )
+    if plan.get("artifact_manifest_verifier_required") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_not_required"
+        )
+    if not str(plan.get("artifact_manifest_verifier_run_dir") or ""):
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_run_dir_missing"
+        )
+    if plan.get("artifact_manifest_verifier_status") != "passed":
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_status_not_passed"
+        )
+    if plan.get("artifact_manifest_verifier_failed_checks") != []:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_failed_checks_not_empty"
+        )
+    if plan.get("artifact_manifest_verifier_failed_checks_missing_check_entries") != []:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_missing_check_entries_not_empty"
+        )
+    if plan.get("artifact_manifest_verifier_required_fields_missing") != []:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_required_fields_missing_not_empty"
+        )
+    if plan.get("artifact_manifest_verifier_failed_checks_have_check_entries") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_failed_checks_have_check_entries_not_true"
+        )
+    if plan.get("artifact_manifest_verifier_report_required_fields_present") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_report_required_fields_present_not_true"
+        )
+    if plan.get("artifact_manifest_verifier_readiness_closure_allowed") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_readiness_closure_allowed_not_false"
+        )
+    if plan.get("artifact_manifest_verifier_live_authority_granted") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_live_authority_granted_not_false"
         )
     if plan.get("manual_review_required_before_readiness_update") is not True:
         violations.append(
@@ -4688,7 +5823,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         "contacts_backend",
         "queries_console",
         "execution_allowed_by_plan",
-        "live_authority_granted",
+        *WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     ):
         if plan.get(key) is not False:
             violations.append(f"wing_readonly_preflight_plan_{key}_not_false")
@@ -4789,7 +5924,11 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["request_count"] = len(request_sequence)
     detail["expected_request_count"] = len(expected_requests)
     detail["request_sequence"] = list(request_sequence)
+    detail["plan_request_sequence"] = list(request_sequence)
     detail["expected_request_sequence"] = list(expected_requests)
+    detail["request_sequence_matches_plan"] = isinstance(
+        plan.get("request_sequence"), list
+    ) and request_sequence == plan.get("request_sequence")
     detail["request_sequence_matches_expected"] = request_sequence == expected_requests
     detail["expected_artifacts"] = (
         list(expected_artifacts) if isinstance(expected_artifacts, list) else []
@@ -4807,6 +5946,8 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["queries_console"] = plan.get("queries_console")
     detail["execution_allowed_by_plan"] = plan.get("execution_allowed_by_plan")
     detail["live_authority_granted"] = plan.get("live_authority_granted")
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        detail[field] = plan.get(field)
     detail["forbidden_request_types"] = list(forbidden_request_types)
     detail["selected_mvp_blocker"] = plan.get("selected_mvp_blocker")
     detail["selected_mvp_blocker_status"] = plan.get("selected_mvp_blocker_status")
@@ -4850,11 +5991,20 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["backend_port_prestart_summary_connection_policy"] = plan.get(
         "backend_port_prestart_summary_connection_policy"
     )
+    detail["backend_port_prestart_summary_read_only"] = plan.get(
+        "backend_port_prestart_summary_read_only"
+    )
     detail["backend_port_prestart_summary_live_write"] = plan.get(
         "backend_port_prestart_summary_live_write"
     )
     detail["backend_port_prestart_summary_contacts_backend"] = plan.get(
         "backend_port_prestart_summary_contacts_backend"
+    )
+    detail["backend_port_prestart_summary_contacts_wing"] = plan.get(
+        "backend_port_prestart_summary_contacts_wing"
+    )
+    detail["backend_port_prestart_summary_mutates_console_state"] = plan.get(
+        "backend_port_prestart_summary_mutates_console_state"
     )
     detail["backend_port_prestart_summary_queries_console"] = plan.get(
         "backend_port_prestart_summary_queries_console"
@@ -4864,6 +6014,36 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     )
     detail["backend_port_prestart_check_status"] = plan.get(
         "backend_port_prestart_check_status"
+    )
+    detail["artifact_manifest_verifier_required"] = plan.get(
+        "artifact_manifest_verifier_required"
+    )
+    detail["artifact_manifest_verifier_run_dir"] = plan.get(
+        "artifact_manifest_verifier_run_dir"
+    )
+    detail["artifact_manifest_verifier_status"] = plan.get(
+        "artifact_manifest_verifier_status"
+    )
+    detail["artifact_manifest_verifier_failed_checks"] = plan.get(
+        "artifact_manifest_verifier_failed_checks"
+    )
+    detail["artifact_manifest_verifier_failed_checks_missing_check_entries"] = (
+        plan.get("artifact_manifest_verifier_failed_checks_missing_check_entries")
+    )
+    detail["artifact_manifest_verifier_required_fields_missing"] = plan.get(
+        "artifact_manifest_verifier_required_fields_missing"
+    )
+    detail["artifact_manifest_verifier_failed_checks_have_check_entries"] = plan.get(
+        "artifact_manifest_verifier_failed_checks_have_check_entries"
+    )
+    detail["artifact_manifest_verifier_report_required_fields_present"] = plan.get(
+        "artifact_manifest_verifier_report_required_fields_present"
+    )
+    detail["artifact_manifest_verifier_readiness_closure_allowed"] = plan.get(
+        "artifact_manifest_verifier_readiness_closure_allowed"
+    )
+    detail["artifact_manifest_verifier_live_authority_granted"] = plan.get(
+        "artifact_manifest_verifier_live_authority_granted"
     )
     detail["manual_review_required_before_readiness_update"] = plan.get(
         "manual_review_required_before_readiness_update"
@@ -4997,6 +6177,11 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     declared_required_supervised_proof_plan_summary_fields_match_contract = (
         packet.get("required_supervised_proof_plan_summary_fields_match_contract")
     )
+    declared_required_supervised_proof_plan_summary_fields_include_invalid_records = (
+        packet.get(
+            "required_supervised_proof_plan_summary_fields_include_invalid_records"
+        )
+    )
     mvp_blocker_anchor = (
         packet.get("mvp_blocker_anchor")
         if isinstance(packet.get("mvp_blocker_anchor"), Mapping)
@@ -5087,6 +6272,17 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     project_director_anchor_matches_current_directive = (
         dict(project_director_action_anchor) == expected_project_director_action_anchor
     )
+    project_director_selected_action_text = str(
+        project_director_action_anchor.get("selected_action") or ""
+    )
+    project_director_selected_action_value_gate_self_check_missing_markers = (
+        missing_project_director_selected_action_value_gate_self_check_markers(
+            project_director_selected_action_text
+        )
+    )
+    project_director_selected_action_value_gate_self_check_markers_present = (
+        not project_director_selected_action_value_gate_self_check_missing_markers
+    )
     mvp_blocker_anchor_sha256 = (
         str(packet.get("mvp_blocker_anchor_sha256"))
         if isinstance(packet.get("mvp_blocker_anchor_sha256"), str)
@@ -5117,11 +6313,20 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         plan_artifact_detail.get("backend_port_prestart_summary_connection_policy")
         or ""
     )
+    plan_backend_port_prestart_summary_read_only = plan_artifact_detail.get(
+        "backend_port_prestart_summary_read_only"
+    )
     plan_backend_port_prestart_summary_live_write = plan_artifact_detail.get(
         "backend_port_prestart_summary_live_write"
     )
     plan_backend_port_prestart_summary_contacts_backend = plan_artifact_detail.get(
         "backend_port_prestart_summary_contacts_backend"
+    )
+    plan_backend_port_prestart_summary_contacts_wing = plan_artifact_detail.get(
+        "backend_port_prestart_summary_contacts_wing"
+    )
+    plan_backend_port_prestart_summary_mutates_console_state = (
+        plan_artifact_detail.get("backend_port_prestart_summary_mutates_console_state")
     )
     plan_backend_port_prestart_summary_queries_console = plan_artifact_detail.get(
         "backend_port_prestart_summary_queries_console"
@@ -5132,6 +6337,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     plan_backend_port_prestart_check_status = str(
         plan_artifact_detail.get("backend_port_prestart_check_status") or ""
     )
+    plan_backend_port_prestart_required_false_detail = {
+        field: plan_artifact_detail.get(field)
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
     expected_prestart_summary = plan_backend_port_prestart_summary_path
     packet_backend_port_prestart_summary_sha256 = (
         str(packet.get("backend_port_prestart_summary_sha256"))
@@ -5174,6 +6383,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         and packet_backend_port_prestart_summary_connection_policy
         == plan_backend_port_prestart_summary_connection_policy
     )
+    packet_backend_port_prestart_summary_read_only = packet.get(
+        "backend_port_prestart_summary_read_only"
+    )
+    packet_backend_port_prestart_summary_read_only_matches_plan = (
+        packet_backend_port_prestart_summary_read_only
+        == plan_backend_port_prestart_summary_read_only
+    )
     packet_backend_port_prestart_summary_live_write = packet.get(
         "backend_port_prestart_summary_live_write"
     )
@@ -5187,6 +6403,20 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     packet_backend_port_prestart_summary_contacts_backend_matches_plan = (
         packet_backend_port_prestart_summary_contacts_backend
         == plan_backend_port_prestart_summary_contacts_backend
+    )
+    packet_backend_port_prestart_summary_contacts_wing = packet.get(
+        "backend_port_prestart_summary_contacts_wing"
+    )
+    packet_backend_port_prestart_summary_contacts_wing_matches_plan = (
+        packet_backend_port_prestart_summary_contacts_wing
+        == plan_backend_port_prestart_summary_contacts_wing
+    )
+    packet_backend_port_prestart_summary_mutates_console_state = packet.get(
+        "backend_port_prestart_summary_mutates_console_state"
+    )
+    packet_backend_port_prestart_summary_mutates_console_state_matches_plan = (
+        packet_backend_port_prestart_summary_mutates_console_state
+        == plan_backend_port_prestart_summary_mutates_console_state
     )
     packet_backend_port_prestart_summary_queries_console = packet.get(
         "backend_port_prestart_summary_queries_console"
@@ -5210,6 +6440,28 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         and packet_backend_port_prestart_check_status
         == plan_backend_port_prestart_check_status
     )
+    packet_backend_port_prestart_required_false_detail = {
+        field: packet.get(field)
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
+    packet_backend_port_prestart_required_false_plan_detail = {
+        field: packet.get(f"plan_{field}")
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
+    packet_backend_port_prestart_required_false_plan_matches_expected = {
+        field: packet_backend_port_prestart_required_false_plan_detail[field]
+        == plan_backend_port_prestart_required_false_detail[field]
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
+    packet_backend_port_prestart_required_false_detail_matches_plan = {
+        field: packet_backend_port_prestart_required_false_detail[field]
+        == packet_backend_port_prestart_required_false_plan_detail[field]
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
+    declared_packet_backend_port_prestart_required_false_detail_matches_plan = {
+        field: packet.get(f"{field}_matches_plan")
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
     required_checklist = (
         packet.get("required_review_checklist_ids")
         if isinstance(packet.get("required_review_checklist_ids"), list)
@@ -5618,6 +6870,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
             "wing_readonly_preflight_handoff_packet_prestart_summary_policy_mismatch"
         )
     if (
+        not packet_backend_port_prestart_summary_read_only_matches_plan
+        or packet_backend_port_prestart_summary_read_only is not True
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_read_only_not_true"
+        )
+    if (
         not packet_backend_port_prestart_summary_live_write_matches_plan
         or packet_backend_port_prestart_summary_live_write is not False
     ):
@@ -5630,6 +6889,20 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     ):
         violations.append(
             "wing_readonly_preflight_handoff_packet_prestart_summary_contacts_backend_not_false"
+        )
+    if (
+        not packet_backend_port_prestart_summary_contacts_wing_matches_plan
+        or packet_backend_port_prestart_summary_contacts_wing is not False
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_contacts_wing_not_false"
+        )
+    if (
+        not packet_backend_port_prestart_summary_mutates_console_state_matches_plan
+        or packet_backend_port_prestart_summary_mutates_console_state is not False
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_prestart_summary_mutates_console_state_not_false"
         )
     if (
         not packet_backend_port_prestart_summary_queries_console_matches_plan
@@ -5653,6 +6926,29 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_handoff_packet_prestart_check_status_mismatch"
         )
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        if (
+            not packet_backend_port_prestart_required_false_plan_matches_expected[
+                field
+            ]
+            or not packet_backend_port_prestart_required_false_detail_matches_plan[
+                field
+            ]
+        ):
+            violations.append(
+                f"wing_readonly_preflight_handoff_packet_{field}_plan_mismatch"
+            )
+        if (
+            declared_packet_backend_port_prestart_required_false_detail_matches_plan[
+                field
+            ]
+            is not packet_backend_port_prestart_required_false_detail_matches_plan[
+                field
+            ]
+        ):
+            violations.append(
+                f"wing_readonly_preflight_handoff_packet_{field}_match_flag_mismatch"
+            )
     backend_port_prestart_step_index = packet.get(
         "backend_port_prestart_check_operator_sequence_step_index"
     )
@@ -5701,8 +6997,8 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         "execution_allowed_by_packet",
         "readiness_matrix_update_allowed_by_packet",
         "readiness_closure_allowed_by_packet",
-        "live_authority_granted",
         "full_autonomous_ready",
+        *WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     ):
         if packet.get(key) is not False:
             violations.append(f"wing_readonly_preflight_handoff_packet_{key}_not_false")
@@ -5959,9 +7255,20 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         (
             index
             for index, item in enumerate(operator_sequence)
-            if "Run capture_readonly_preflight" in str(item)
+            if WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP == str(item)
         ),
         None,
+    )
+    capture_step = (
+        str(operator_sequence[capture_step_index])
+        if capture_step_index is not None
+        else ""
+    )
+    capture_step_index_matches_contract = (
+        capture_step_index == WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX
+    )
+    capture_step_matches_contract = (
+        capture_step == WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP
     )
     operator_sequence_backend_connection_confirmation_before_capture = (
         operator_sequence_backend_connection_confirmation_step_index is not None
@@ -5983,6 +7290,14 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not operator_sequence_backend_connection_confirmation_before_capture:
         violations.append(
             "wing_readonly_preflight_handoff_packet_backend_connection_confirmation_not_before_capture"
+        )
+    if not capture_step_index_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_capture_step_index_mismatch"
+        )
+    if not capture_step_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_capture_step_mismatch"
         )
     expected_backend_port_prestart_gate = (
         preflight_contract.expected_backend_port_prestart_gate(
@@ -6126,6 +7441,14 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         required_supervised_proof_plan_summary_fields
         == expected_required_supervised_proof_plan_summary_fields
     )
+    required_supervised_proof_plan_summary_fields_include_invalid_records = (
+        "readonly_preflight_review_decision_invalid_records"
+        in required_supervised_proof_plan_summary_fields
+    )
+    if not required_supervised_proof_plan_summary_fields_include_invalid_records:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_supervised_proof_plan_invalid_records_field_missing"
+        )
     if (
         declared_expected_required_supervised_proof_plan_summary_fields
         != expected_required_supervised_proof_plan_summary_fields
@@ -6139,6 +7462,13 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     ):
         violations.append(
             "wing_readonly_preflight_handoff_packet_supervised_proof_plan_summary_fields_match_flag_mismatch"
+        )
+    if (
+        declared_required_supervised_proof_plan_summary_fields_include_invalid_records
+        is not required_supervised_proof_plan_summary_fields_include_invalid_records
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_supervised_proof_plan_invalid_records_flag_mismatch"
         )
     if (
         packet.get("next_manual_artifact_required")
@@ -6181,6 +7511,10 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     ):
         violations.append(
             "wing_readonly_preflight_handoff_packet_project_director_action_source_mismatch"
+        )
+    if project_director_selected_action_value_gate_self_check_missing_markers:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_project_director_value_gate_self_check_marker_missing"
         )
     if dict(declared_expected_project_director_action_anchor) != (
         expected_project_director_action_anchor
@@ -6387,6 +7721,15 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["backend_port_prestart_summary_connection_policy_matches_plan"] = (
         packet_backend_port_prestart_summary_connection_policy_matches_plan
     )
+    detail["backend_port_prestart_summary_read_only"] = (
+        packet_backend_port_prestart_summary_read_only
+    )
+    detail["plan_backend_port_prestart_summary_read_only"] = (
+        plan_backend_port_prestart_summary_read_only
+    )
+    detail["backend_port_prestart_summary_read_only_matches_plan"] = (
+        packet_backend_port_prestart_summary_read_only_matches_plan
+    )
     detail["backend_port_prestart_summary_live_write"] = (
         packet_backend_port_prestart_summary_live_write
     )
@@ -6404,6 +7747,24 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["backend_port_prestart_summary_contacts_backend_matches_plan"] = (
         packet_backend_port_prestart_summary_contacts_backend_matches_plan
+    )
+    detail["backend_port_prestart_summary_contacts_wing"] = (
+        packet_backend_port_prestart_summary_contacts_wing
+    )
+    detail["plan_backend_port_prestart_summary_contacts_wing"] = (
+        plan_backend_port_prestart_summary_contacts_wing
+    )
+    detail["backend_port_prestart_summary_contacts_wing_matches_plan"] = (
+        packet_backend_port_prestart_summary_contacts_wing_matches_plan
+    )
+    detail["backend_port_prestart_summary_mutates_console_state"] = (
+        packet_backend_port_prestart_summary_mutates_console_state
+    )
+    detail["plan_backend_port_prestart_summary_mutates_console_state"] = (
+        plan_backend_port_prestart_summary_mutates_console_state
+    )
+    detail["backend_port_prestart_summary_mutates_console_state_matches_plan"] = (
+        packet_backend_port_prestart_summary_mutates_console_state_matches_plan
     )
     detail["backend_port_prestart_summary_queries_console"] = (
         packet_backend_port_prestart_summary_queries_console
@@ -6432,6 +7793,19 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["backend_port_prestart_check_status_matches_plan"] = (
         packet_backend_port_prestart_check_status_matches_plan
     )
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        detail[field] = packet_backend_port_prestart_required_false_detail[field]
+        detail[f"plan_{field}"] = packet_backend_port_prestart_required_false_plan_detail[
+            field
+        ]
+        detail[f"declared_{field}_matches_plan"] = (
+            declared_packet_backend_port_prestart_required_false_detail_matches_plan[
+                field
+            ]
+        )
+        detail[f"{field}_matches_plan"] = (
+            packet_backend_port_prestart_required_false_detail_matches_plan[field]
+        )
     detail["backend_port_prestart_check_operator_sequence_step_index"] = packet.get(
         "backend_port_prestart_check_operator_sequence_step_index"
     )
@@ -6464,6 +7838,19 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     )
     detail["operator_sequence_capture_readonly_preflight_step_index"] = (
         capture_step_index
+    )
+    detail["expected_operator_sequence_capture_readonly_preflight_step_index"] = (
+        WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX
+    )
+    detail["operator_sequence_capture_readonly_preflight_step_index_matches_contract"] = (
+        capture_step_index_matches_contract
+    )
+    detail["operator_sequence_capture_readonly_preflight_step"] = capture_step
+    detail["expected_operator_sequence_capture_readonly_preflight_step"] = (
+        WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP
+    )
+    detail["operator_sequence_capture_readonly_preflight_step_matches_contract"] = (
+        capture_step_matches_contract
     )
     detail["backend_port_prestart_gate"] = dict(backend_port_prestart_gate)
     detail["expected_backend_port_prestart_gate"] = dict(
@@ -6799,10 +8186,16 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         required_supervised_proof_plan_summary_fields_match_contract
     )
     detail[
+        "required_supervised_proof_plan_summary_fields_include_invalid_records"
+    ] = required_supervised_proof_plan_summary_fields_include_invalid_records
+    detail[
         "declared_required_supervised_proof_plan_summary_fields_match_contract"
     ] = (
         declared_required_supervised_proof_plan_summary_fields_match_contract
     )
+    detail[
+        "declared_required_supervised_proof_plan_summary_fields_include_invalid_records"
+    ] = declared_required_supervised_proof_plan_summary_fields_include_invalid_records
     detail["mvp_blocker_anchor"] = dict(mvp_blocker_anchor)
     detail["expected_mvp_blocker_anchor"] = dict(expected_mvp_blocker_anchor)
     detail["mvp_blocker_anchor_matches_current_first_open"] = (
@@ -6883,6 +8276,22 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         )
         else []
     )
+    detail["project_director_selected_action_value_gate_self_check_required"] = True
+    detail["project_director_selected_action_value_gate_self_check_required_markers"] = (
+        list(PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_REQUIRED_MARKERS)
+    )
+    detail["project_director_selected_action_value_gate_self_check_missing_markers"] = (
+        project_director_selected_action_value_gate_self_check_missing_markers
+    )
+    detail["project_director_selected_action_value_gate_self_check_markers_present"] = (
+        project_director_selected_action_value_gate_self_check_markers_present
+    )
+    detail[
+        "project_director_selected_action_value_gate_self_check_readiness_closure_allowed"
+    ] = False
+    detail[
+        "project_director_selected_action_value_gate_self_check_live_authority_granted"
+    ] = False
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
     return CheckResult(
@@ -7501,6 +8910,7 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}
     safety = ledger.get("safety") if isinstance(ledger.get("safety"), Mapping) else {}
     records = ledger.get("records") if isinstance(ledger.get("records"), list) else []
+    invalid_records = _invalid_review_decision_records(records)
     review_decision_tool_available = (
         REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL
     ).is_file()
@@ -7568,6 +8978,28 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     accepted_candidate_prestart_contract_valid = (
         summary.get("accepted_candidate_prestart_contract_valid") is True
     )
+    accepted_candidate_artifact_roots = (
+        list(summary.get("accepted_candidate_artifact_roots"))
+        if isinstance(summary.get("accepted_candidate_artifact_roots"), list)
+        else []
+    )
+    accepted_candidate_artifact_root_contract_violations_by_source = (
+        dict(
+            summary.get(
+                "accepted_candidate_artifact_root_contract_violations_by_source"
+            )
+        )
+        if isinstance(
+            summary.get(
+                "accepted_candidate_artifact_root_contract_violations_by_source"
+            ),
+            Mapping,
+        )
+        else {}
+    )
+    accepted_candidate_artifact_root_contract_valid = (
+        summary.get("accepted_candidate_artifact_root_contract_valid") is True
+    )
     blocked_by = (
         list(summary.get("blocked_by"))
         if isinstance(summary.get("blocked_by"), list)
@@ -7601,6 +9033,24 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         if summary.get("manual_readiness_update_candidate_available") is True:
             violations.append(
                 "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_prestart"
+            )
+    if accepted_candidate_artifact_root_contract_valid and (
+        len(accepted_candidate_artifact_roots) != len(accepted_source_ids)
+    ):
+        violations.append(
+            "wing_readonly_preflight_review_decision_artifact_roots_count_mismatch"
+        )
+    if accepted_source_ids and not accepted_candidate_artifact_root_contract_valid:
+        if (
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+            not in blocked_by
+        ):
+            violations.append(
+                "wing_readonly_preflight_review_decision_artifact_root_blocker_missing"
+            )
+        if summary.get("manual_readiness_update_candidate_available") is True:
+            violations.append(
+                "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_artifact_root"
             )
 
     detail["ledger_status"] = ledger.get("status")
@@ -7642,6 +9092,13 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     detail["accepted_candidate_prestart_contract_violations_by_source"] = (
         accepted_candidate_prestart_contract_violations_by_source
     )
+    detail["accepted_candidate_artifact_root_contract_valid"] = (
+        accepted_candidate_artifact_root_contract_valid
+    )
+    detail["accepted_candidate_artifact_roots"] = accepted_candidate_artifact_roots
+    detail["accepted_candidate_artifact_root_contract_violations_by_source"] = (
+        accepted_candidate_artifact_root_contract_violations_by_source
+    )
     detail["rejected_source_ids"] = (
         list(summary.get("rejected_source_ids"))
         if isinstance(summary.get("rejected_source_ids"), list)
@@ -7652,6 +9109,7 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         if isinstance(summary.get("invalid_record_ids"), list)
         else []
     )
+    detail["invalid_records"] = invalid_records
     detail["duplicate_source_ids"] = (
         list(summary.get("duplicate_source_ids"))
         if isinstance(summary.get("duplicate_source_ids"), list)
@@ -12263,6 +13721,7 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         "policy": "next_wing_proof_plan_must_be_operator_required_and_non_executing",
     }
     violations: list[str] = []
+    allowed_supervised_live_value_types: list[str] = []
     planned_value_types: list[str] = []
     planned_channels: list[int] = []
     global_blockers: list[str] = []
@@ -12297,12 +13756,37 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     reported_readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: dict[str, list[str]] = {}
     readonly_preflight_review_decision_expected_candidate_prestart_source_ids: list[str] = []
     readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: dict[str, list[str]] = {}
+    readonly_preflight_review_decision_candidate_request_sequence_contract_valid = False
+    readonly_preflight_review_decision_candidate_request_sequence_source_ids: list[str] = []
+    readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source: dict[str, list[str]] = {}
+    reported_readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids: list[str] = []
+    reported_readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source: dict[str, list[str]] = {}
+    readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids: list[str] = []
+    readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source: dict[str, list[str]] = {}
+    readonly_preflight_review_decision_candidate_artifact_root_contract_valid = False
+    readonly_preflight_review_decision_candidate_artifact_roots: list[str] = []
+    readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: dict[str, list[str]] = {}
+    reported_readonly_preflight_review_decision_expected_candidate_artifact_roots: list[str] = []
+    reported_readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: dict[str, list[str]] = {}
+    readonly_preflight_review_decision_expected_candidate_artifact_roots: list[str] = []
+    readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: dict[str, list[str]] = {}
     readonly_preflight_review_decision_rejected_source_ids: list[str] = []
     readonly_preflight_review_decision_invalid_record_count = 0
     readonly_preflight_review_decision_invalid_record_ids: list[str] = []
+    readonly_preflight_review_decision_invalid_records: list[dict[str, object]] = []
     readonly_preflight_review_decision_duplicate_source_ids: list[str] = []
     readonly_preflight_review_decision_conflicting_source_ids: list[str] = []
     readonly_preflight_review_decision_unreviewed_candidate_count = 0
+    accepted_candidate_expected_artifact_trace = (
+        _accepted_candidate_expected_artifact_trace([], [])
+    )
+    accepted_candidate_request_sequence_trace = (
+        _accepted_candidate_request_sequence_trace([], [])
+    )
+    required_supervised_proof_plan_summary_fields = list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
+    missing_required_supervised_proof_plan_summary_fields: list[str] = []
     step_count = 0
     plan_status: object = None
 
@@ -12361,6 +13845,15 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             "blocked_by_readonly_preflight",
         }:
             violations.append("next_wing_proof_plan_status_unknown")
+        missing_required_supervised_proof_plan_summary_fields = [
+            field
+            for field in required_supervised_proof_plan_summary_fields
+            if field not in summary
+        ]
+        if missing_required_supervised_proof_plan_summary_fields:
+            violations.append(
+                "next_wing_proof_plan_required_summary_fields_missing"
+            )
 
         expected_true = ("read_only", "operator_required")
         for key in expected_true:
@@ -12380,7 +13873,30 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         step_count = int(summary.get("step_count") or 0)
         if step_count != len(steps):
             violations.append("next_wing_proof_plan_step_count_mismatch")
+        allowed_supervised_live_value_types = (
+            [
+                str(item)
+                for item in summary.get("allowed_supervised_live_value_types", [])
+                if item
+            ]
+            if isinstance(summary.get("allowed_supervised_live_value_types"), list)
+            else []
+        )
+        if (
+            allowed_supervised_live_value_types
+            != WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
+        ):
+            violations.append(
+                "next_wing_proof_plan_allowed_supervised_live_value_types_mismatch"
+            )
         planned_value_types = [str(item) for item in summary.get("planned_value_types", []) if item] if isinstance(summary.get("planned_value_types"), list) else []
+        unsupported_planned_value_types = sorted(
+            set(planned_value_types) - set(allowed_supervised_live_value_types)
+        )
+        if unsupported_planned_value_types:
+            violations.append(
+                "next_wing_proof_plan_planned_value_types_not_allowed"
+            )
         planned_channels = [
             int(item)
             for item in summary.get("planned_channels", [])
@@ -12510,6 +14026,114 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             violations.append(
                 "next_wing_proof_plan_review_decision_expected_candidate_prestart_violations_by_source_missing"
             )
+        readonly_preflight_review_decision_candidate_request_sequence_contract_valid = (
+            summary.get(
+                "readonly_preflight_review_decision_candidate_request_sequence_contract_valid"
+            )
+            is True
+        )
+        candidate_request_sequence_source_ids = summary.get(
+            "readonly_preflight_review_decision_candidate_request_sequence_source_ids"
+        )
+        readonly_preflight_review_decision_candidate_request_sequence_source_ids = (
+            [str(item) for item in candidate_request_sequence_source_ids if item]
+            if isinstance(candidate_request_sequence_source_ids, list)
+            else []
+        )
+        if not isinstance(candidate_request_sequence_source_ids, list):
+            violations.append(
+                "next_wing_proof_plan_review_decision_candidate_request_sequence_source_ids_missing"
+            )
+        (
+            readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source,
+            candidate_request_sequence_violations_map_valid,
+        ) = _string_list_map(
+            summary.get(
+                "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source"
+            )
+        )
+        if not candidate_request_sequence_violations_map_valid:
+            violations.append(
+                "next_wing_proof_plan_review_decision_candidate_request_sequence_violations_by_source_missing"
+            )
+        expected_candidate_request_sequence_source_ids = summary.get(
+            "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids"
+        )
+        reported_readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids = (
+            [str(item) for item in expected_candidate_request_sequence_source_ids if item]
+            if isinstance(expected_candidate_request_sequence_source_ids, list)
+            else []
+        )
+        if not isinstance(expected_candidate_request_sequence_source_ids, list):
+            violations.append(
+                "next_wing_proof_plan_review_decision_expected_candidate_request_sequence_source_ids_missing"
+            )
+        (
+            reported_readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source,
+            expected_candidate_request_sequence_violations_map_valid,
+        ) = _string_list_map(
+            summary.get(
+                "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source"
+            )
+        )
+        if not expected_candidate_request_sequence_violations_map_valid:
+            violations.append(
+                "next_wing_proof_plan_review_decision_expected_candidate_request_sequence_violations_by_source_missing"
+            )
+        readonly_preflight_review_decision_candidate_artifact_root_contract_valid = (
+            summary.get(
+                "readonly_preflight_review_decision_candidate_artifact_root_contract_valid"
+            )
+            is True
+        )
+        candidate_artifact_roots = summary.get(
+            "readonly_preflight_review_decision_candidate_artifact_roots"
+        )
+        readonly_preflight_review_decision_candidate_artifact_roots = (
+            [str(item) for item in candidate_artifact_roots if item]
+            if isinstance(candidate_artifact_roots, list)
+            else []
+        )
+        if not isinstance(candidate_artifact_roots, list):
+            violations.append(
+                "next_wing_proof_plan_review_decision_candidate_artifact_roots_missing"
+            )
+        (
+            readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source,
+            candidate_artifact_root_violations_map_valid,
+        ) = _string_list_map(
+            summary.get(
+                "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source"
+            )
+        )
+        if not candidate_artifact_root_violations_map_valid:
+            violations.append(
+                "next_wing_proof_plan_review_decision_candidate_artifact_root_violations_by_source_missing"
+            )
+        expected_candidate_artifact_roots = summary.get(
+            "readonly_preflight_review_decision_expected_candidate_artifact_roots"
+        )
+        reported_readonly_preflight_review_decision_expected_candidate_artifact_roots = (
+            [str(item) for item in expected_candidate_artifact_roots if item]
+            if isinstance(expected_candidate_artifact_roots, list)
+            else []
+        )
+        if not isinstance(expected_candidate_artifact_roots, list):
+            violations.append(
+                "next_wing_proof_plan_review_decision_expected_candidate_artifact_roots_missing"
+            )
+        (
+            reported_readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source,
+            expected_candidate_artifact_root_violations_map_valid,
+        ) = _string_list_map(
+            summary.get(
+                "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
+            )
+        )
+        if not expected_candidate_artifact_root_violations_map_valid:
+            violations.append(
+                "next_wing_proof_plan_review_decision_expected_candidate_artifact_root_violations_by_source_missing"
+            )
         readonly_preflight_review_decision_rejected_source_ids = (
             [
                 str(item)
@@ -12530,6 +14154,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             ]
             if isinstance(summary.get("readonly_preflight_review_decision_invalid_record_ids"), list)
             else []
+        )
+        readonly_preflight_review_decision_invalid_records = _invalid_review_decision_records(
+            summary.get("readonly_preflight_review_decision_invalid_records")
         )
         readonly_preflight_review_decision_duplicate_source_ids = (
             [
@@ -12683,6 +14310,276 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             candidate_review_rows = tuple(
                 row for row in candidate_reviews if isinstance(row, Mapping)
             )
+            accepted_candidate_expected_artifact_trace = (
+                _accepted_candidate_expected_artifact_trace(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
+            accepted_candidate_request_sequence_trace = (
+                _accepted_candidate_request_sequence_trace(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
+            trace_source_ids_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids"
+            )
+            expected_artifacts_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source"
+            )
+            expected_summary_artifact_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source"
+            )
+            expected_events_artifact_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source"
+            )
+            summary_match_flags_key = (
+                "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source"
+            )
+            events_match_flags_key = (
+                "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source"
+            )
+            missing_source_ids_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
+            )
+            trace_complete_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+            )
+            reported_trace_source_ids_raw = summary.get(trace_source_ids_key)
+            reported_trace_source_ids = _string_list(reported_trace_source_ids_raw)
+            if not isinstance(reported_trace_source_ids_raw, list):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_source_ids_missing"
+                )
+            if (
+                reported_trace_source_ids
+                != accepted_candidate_expected_artifact_trace[trace_source_ids_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_source_ids_mismatch"
+                )
+            (
+                reported_expected_artifacts_by_source,
+                reported_expected_artifacts_map_valid,
+            ) = _string_list_map_exact(summary.get(expected_artifacts_key))
+            if not reported_expected_artifacts_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifacts_by_source_missing"
+                )
+            if (
+                reported_expected_artifacts_by_source
+                != accepted_candidate_expected_artifact_trace[expected_artifacts_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifacts_mismatch"
+                )
+            (
+                reported_expected_summary_artifact_by_source,
+                reported_expected_summary_artifact_map_valid,
+            ) = _string_value_map(summary.get(expected_summary_artifact_key))
+            if not reported_expected_summary_artifact_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_summary_artifact_by_source_missing"
+                )
+            if (
+                reported_expected_summary_artifact_by_source
+                != accepted_candidate_expected_artifact_trace[expected_summary_artifact_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_summary_artifact_mismatch"
+                )
+            (
+                reported_expected_events_artifact_by_source,
+                reported_expected_events_artifact_map_valid,
+            ) = _string_value_map(summary.get(expected_events_artifact_key))
+            if not reported_expected_events_artifact_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_events_artifact_by_source_missing"
+                )
+            if (
+                reported_expected_events_artifact_by_source
+                != accepted_candidate_expected_artifact_trace[expected_events_artifact_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_events_artifact_mismatch"
+                )
+            (
+                reported_summary_match_flags_by_source,
+                reported_summary_match_flags_map_valid,
+            ) = _bool_value_map(summary.get(summary_match_flags_key))
+            if not reported_summary_match_flags_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_summary_match_flags_by_source_missing"
+                )
+            if (
+                reported_summary_match_flags_by_source
+                != accepted_candidate_expected_artifact_trace[summary_match_flags_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_summary_match_flags_mismatch"
+                )
+            (
+                reported_events_match_flags_by_source,
+                reported_events_match_flags_map_valid,
+            ) = _bool_value_map(summary.get(events_match_flags_key))
+            if not reported_events_match_flags_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_events_match_flags_by_source_missing"
+                )
+            if (
+                reported_events_match_flags_by_source
+                != accepted_candidate_expected_artifact_trace[events_match_flags_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_events_match_flags_mismatch"
+                )
+            reported_missing_source_ids_raw = summary.get(missing_source_ids_key)
+            reported_missing_source_ids = _string_list(reported_missing_source_ids_raw)
+            if not isinstance(reported_missing_source_ids_raw, list):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_missing_source_ids_missing"
+                )
+            if (
+                reported_missing_source_ids
+                != accepted_candidate_expected_artifact_trace[missing_source_ids_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_missing_source_ids_mismatch"
+                )
+            reported_trace_complete = summary.get(trace_complete_key)
+            if not isinstance(reported_trace_complete, bool):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_complete_missing"
+                )
+            if (
+                reported_trace_complete
+                != accepted_candidate_expected_artifact_trace[trace_complete_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_complete_mismatch"
+                )
+            request_trace_source_ids_key = (
+                "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids"
+            )
+            request_sequence_by_source_key = (
+                "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source"
+            )
+            plan_request_sequence_by_source_key = (
+                "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+            )
+            request_sequence_matches_plan_by_source_key = (
+                "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
+            )
+            request_trace_missing_source_ids_key = (
+                "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids"
+            )
+            request_trace_complete_key = (
+                "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
+            )
+            reported_request_trace_source_ids_raw = summary.get(
+                request_trace_source_ids_key
+            )
+            reported_request_trace_source_ids = _string_list(
+                reported_request_trace_source_ids_raw
+            )
+            if not isinstance(reported_request_trace_source_ids_raw, list):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_source_ids_missing"
+                )
+            if (
+                reported_request_trace_source_ids
+                != accepted_candidate_request_sequence_trace[request_trace_source_ids_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_source_ids_mismatch"
+                )
+            (
+                reported_request_sequence_by_source,
+                reported_request_sequence_map_valid,
+            ) = _mapping_list_map_exact(summary.get(request_sequence_by_source_key))
+            if not reported_request_sequence_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_by_source_missing"
+                )
+            if (
+                reported_request_sequence_by_source
+                != accepted_candidate_request_sequence_trace[
+                    request_sequence_by_source_key
+                ]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_mismatch"
+                )
+            (
+                reported_plan_request_sequence_by_source,
+                reported_plan_request_sequence_map_valid,
+            ) = _mapping_list_map_exact(
+                summary.get(plan_request_sequence_by_source_key)
+            )
+            if not reported_plan_request_sequence_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_plan_request_sequence_by_source_missing"
+                )
+            if (
+                reported_plan_request_sequence_by_source
+                != accepted_candidate_request_sequence_trace[
+                    plan_request_sequence_by_source_key
+                ]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_plan_request_sequence_mismatch"
+                )
+            (
+                reported_request_sequence_matches_plan_by_source,
+                reported_request_sequence_matches_plan_map_valid,
+            ) = _bool_value_map(summary.get(request_sequence_matches_plan_by_source_key))
+            if not reported_request_sequence_matches_plan_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_match_flags_by_source_missing"
+                )
+            if (
+                reported_request_sequence_matches_plan_by_source
+                != accepted_candidate_request_sequence_trace[
+                    request_sequence_matches_plan_by_source_key
+                ]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_match_flags_mismatch"
+                )
+            reported_request_trace_missing_source_ids_raw = summary.get(
+                request_trace_missing_source_ids_key
+            )
+            reported_request_trace_missing_source_ids = _string_list(
+                reported_request_trace_missing_source_ids_raw
+            )
+            if not isinstance(reported_request_trace_missing_source_ids_raw, list):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_missing_source_ids_missing"
+                )
+            if (
+                reported_request_trace_missing_source_ids
+                != accepted_candidate_request_sequence_trace[
+                    request_trace_missing_source_ids_key
+                ]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_missing_source_ids_mismatch"
+                )
+            reported_request_trace_complete = summary.get(
+                request_trace_complete_key
+            )
+            if not isinstance(reported_request_trace_complete, bool):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_complete_missing"
+                )
+            if (
+                reported_request_trace_complete
+                != accepted_candidate_request_sequence_trace[request_trace_complete_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_complete_mismatch"
+                )
             expected_candidate_prestart_source_ids = (
                 preflight_contract.wing_readonly_preflight_accepted_candidate_prestart_source_ids(
                     accepted_source_ids,
@@ -12701,11 +14598,53 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 == accepted_source_ids
                 and not expected_candidate_prestart_violations_by_source
             )
+            (
+                expected_candidate_artifact_roots,
+                expected_candidate_artifact_root_violations_by_source,
+            ) = _accepted_candidate_artifact_root_contract(
+                accepted_source_ids,
+                candidate_review_rows,
+            )
+            expected_candidate_artifact_root_contract_valid = (
+                bool(accepted_source_ids)
+                and len(expected_candidate_artifact_roots) == len(accepted_source_ids)
+                and not expected_candidate_artifact_root_violations_by_source
+            )
+            expected_candidate_request_sequence_source_ids = (
+                preflight_contract.wing_readonly_preflight_accepted_candidate_request_sequence_source_ids(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
+            expected_candidate_request_sequence_violations_by_source = (
+                preflight_contract.wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
+            expected_candidate_request_sequence_contract_valid = (
+                bool(accepted_source_ids)
+                and expected_candidate_request_sequence_source_ids
+                == accepted_source_ids
+                and not expected_candidate_request_sequence_violations_by_source
+            )
             readonly_preflight_review_decision_expected_candidate_prestart_source_ids = (
                 list(expected_candidate_prestart_source_ids)
             )
             readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source = (
                 dict(expected_candidate_prestart_violations_by_source)
+            )
+            readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids = (
+                list(expected_candidate_request_sequence_source_ids)
+            )
+            readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source = (
+                dict(expected_candidate_request_sequence_violations_by_source)
+            )
+            readonly_preflight_review_decision_expected_candidate_artifact_roots = (
+                list(expected_candidate_artifact_roots)
+            )
+            readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source = (
+                dict(expected_candidate_artifact_root_violations_by_source)
             )
             (
                 reported_candidate_prestart_violations_by_source,
@@ -12761,6 +14700,95 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 violations.append(
                     "next_wing_proof_plan_review_decision_candidate_prestart_sources_mismatch"
                 )
+            (
+                reported_candidate_request_sequence_violations_by_source,
+                reported_candidate_request_sequence_violations_map_valid,
+            ) = _string_list_map(
+                review_summary.get(
+                    "accepted_candidate_request_sequence_contract_violations_by_source"
+                )
+            )
+            if not reported_candidate_request_sequence_violations_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_request_sequence_violations_source_missing"
+                )
+            if (
+                reported_candidate_request_sequence_violations_by_source
+                != expected_candidate_request_sequence_violations_by_source
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_request_sequence_source_violations_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source
+                != expected_candidate_request_sequence_violations_by_source
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_request_sequence_violations_mismatch"
+                )
+            if (
+                reported_readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids
+                != expected_candidate_request_sequence_source_ids
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_expected_candidate_request_sequence_sources_mismatch"
+                )
+            if (
+                reported_readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source
+                != expected_candidate_request_sequence_violations_by_source
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_expected_candidate_request_sequence_violations_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_request_sequence_contract_valid
+                != expected_candidate_request_sequence_contract_valid
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_request_sequence_contract_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_request_sequence_source_ids
+                != expected_candidate_request_sequence_source_ids
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_request_sequence_sources_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source
+                != expected_candidate_artifact_root_violations_by_source
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_artifact_root_violations_mismatch"
+                )
+            if (
+                reported_readonly_preflight_review_decision_expected_candidate_artifact_roots
+                != expected_candidate_artifact_roots
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_expected_candidate_artifact_roots_mismatch"
+                )
+            if (
+                reported_readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source
+                != expected_candidate_artifact_root_violations_by_source
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_expected_candidate_artifact_root_violations_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_artifact_root_contract_valid
+                != expected_candidate_artifact_root_contract_valid
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_artifact_root_contract_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_artifact_roots
+                != expected_candidate_artifact_roots
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_artifact_roots_mismatch"
+                )
             if (
                 _string_list(review_summary.get("accepted_source_ids"))
                 and not expected_candidate_prestart_contract_valid
@@ -12770,10 +14798,114 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 violations.append(
                     "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
                 )
+            if readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source:
+                if step_count:
+                    violations.append(
+                        "next_wing_proof_plan_steps_with_candidate_prestart_violations"
+                    )
+                if (
+                    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+                    not in global_blockers
+                    and "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
+                    not in violations
+                ):
+                    violations.append(
+                        "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
+                    )
+            if expected_candidate_prestart_violations_by_source:
+                if step_count:
+                    violations.append(
+                        "next_wing_proof_plan_steps_with_expected_candidate_prestart_violations"
+                    )
+                if (
+                    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+                    not in global_blockers
+                    and "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
+                    not in violations
+                ):
+                    violations.append(
+                        "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
+                    )
+            if (
+                _string_list(review_summary.get("accepted_source_ids"))
+                and not expected_candidate_artifact_root_contract_valid
+                and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+                not in global_blockers
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_artifact_root_blocker_missing"
+                )
+            if readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source:
+                if step_count:
+                    violations.append(
+                        "next_wing_proof_plan_steps_with_candidate_artifact_root_violations"
+                    )
+                if (
+                    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+                    not in global_blockers
+                    and "next_wing_proof_plan_review_decision_candidate_artifact_root_blocker_missing"
+                    not in violations
+                ):
+                    violations.append(
+                        "next_wing_proof_plan_review_decision_candidate_artifact_root_blocker_missing"
+                    )
+            if expected_candidate_artifact_root_violations_by_source:
+                if step_count:
+                    violations.append(
+                        "next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations"
+                    )
+                if (
+                    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER
+                    not in global_blockers
+                    and "next_wing_proof_plan_review_decision_candidate_artifact_root_blocker_missing"
+                    not in violations
+                ):
+                    violations.append(
+                        "next_wing_proof_plan_review_decision_candidate_artifact_root_blocker_missing"
+                    )
+            if (
+                _string_list(review_summary.get("accepted_source_ids"))
+                and not expected_candidate_request_sequence_contract_valid
+                and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+                not in global_blockers
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_candidate_request_sequence_blocker_missing"
+                )
+            if readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source:
+                if step_count:
+                    violations.append(
+                        "next_wing_proof_plan_steps_with_candidate_request_sequence_violations"
+                    )
+                if (
+                    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+                    not in global_blockers
+                    and "next_wing_proof_plan_review_decision_candidate_request_sequence_blocker_missing"
+                    not in violations
+                ):
+                    violations.append(
+                        "next_wing_proof_plan_review_decision_candidate_request_sequence_blocker_missing"
+                    )
+            if expected_candidate_request_sequence_violations_by_source:
+                if step_count:
+                    violations.append(
+                        "next_wing_proof_plan_steps_with_expected_candidate_request_sequence_violations"
+                    )
+                if (
+                    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+                    not in global_blockers
+                    and "next_wing_proof_plan_review_decision_candidate_request_sequence_blocker_missing"
+                    not in violations
+                ):
+                    violations.append(
+                        "next_wing_proof_plan_review_decision_candidate_request_sequence_blocker_missing"
+                    )
             expected_decision_accepted = (
                 review_summary.get("manual_readiness_update_candidate_available") is True
                 and int(review_summary.get("accepted_record_count") or 0) > 0
                 and expected_candidate_prestart_contract_valid
+                and expected_candidate_artifact_root_contract_valid
+                and expected_candidate_request_sequence_contract_valid
                 and int(review_summary.get("invalid_record_count") or 0) == 0
                 and int(review_summary.get("unreviewed_candidate_count") or 0) == 0
                 and review_summary.get("readiness_matrix_update_allowed_by_decision") is not True
@@ -12803,6 +14935,14 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 review_summary.get("invalid_record_ids")
             ):
                 violations.append("next_wing_proof_plan_review_decision_invalid_ids_mismatch")
+            expected_invalid_records = (
+                _invalid_review_decision_records(review_summary.get("invalid_records"))
+                or _invalid_review_decision_records(review_decision.get("records"))
+            )
+            if readonly_preflight_review_decision_invalid_records != expected_invalid_records:
+                violations.append(
+                    "next_wing_proof_plan_review_decision_invalid_records_mismatch"
+                )
             if readonly_preflight_review_decision_duplicate_source_ids != _string_list(
                 review_summary.get("duplicate_source_ids")
             ):
@@ -13017,6 +15157,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                         )
 
     detail["plan_status"] = plan_status
+    detail["allowed_supervised_live_value_types"] = (
+        allowed_supervised_live_value_types
+    )
     detail["step_count"] = step_count
     detail["planned_value_types"] = planned_value_types
     detail["planned_channels"] = planned_channels
@@ -13095,6 +15238,36 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     detail[
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
     ] = readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source
+    detail[
+        "readonly_preflight_review_decision_candidate_request_sequence_contract_valid"
+    ] = readonly_preflight_review_decision_candidate_request_sequence_contract_valid
+    detail["readonly_preflight_review_decision_candidate_request_sequence_source_ids"] = (
+        readonly_preflight_review_decision_candidate_request_sequence_source_ids
+    )
+    detail[
+        "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source"
+    ] = readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source
+    detail[
+        "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids"
+    ] = readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids
+    detail[
+        "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source"
+    ] = readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source
+    detail[
+        "readonly_preflight_review_decision_candidate_artifact_root_contract_valid"
+    ] = readonly_preflight_review_decision_candidate_artifact_root_contract_valid
+    detail["readonly_preflight_review_decision_candidate_artifact_roots"] = (
+        readonly_preflight_review_decision_candidate_artifact_roots
+    )
+    detail[
+        "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source"
+    ] = readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source
+    detail["readonly_preflight_review_decision_expected_candidate_artifact_roots"] = (
+        readonly_preflight_review_decision_expected_candidate_artifact_roots
+    )
+    detail[
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
+    ] = readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source
     detail["readonly_preflight_review_decision_rejected_source_ids"] = (
         readonly_preflight_review_decision_rejected_source_ids
     )
@@ -13104,6 +15277,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     detail["readonly_preflight_review_decision_invalid_record_ids"] = (
         readonly_preflight_review_decision_invalid_record_ids
     )
+    detail["readonly_preflight_review_decision_invalid_records"] = (
+        readonly_preflight_review_decision_invalid_records
+    )
     detail["readonly_preflight_review_decision_duplicate_source_ids"] = (
         readonly_preflight_review_decision_duplicate_source_ids
     )
@@ -13112,6 +15288,66 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_review_decision_unreviewed_candidate_count"] = (
         readonly_preflight_review_decision_unreviewed_candidate_count
+    )
+    detail.update(accepted_candidate_expected_artifact_trace)
+    detail.update(accepted_candidate_request_sequence_trace)
+    trace_value_gate_violations = [
+        violation
+        for violation in violations
+        if violation
+        in NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_VIOLATIONS
+    ]
+    request_trace_value_gate_violations = [
+        violation
+        for violation in violations
+        if violation
+        in NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_VIOLATIONS
+    ]
+    detail[
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required"
+    ] = True
+    detail[
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids"
+    ] = list(
+        NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_VIOLATIONS
+    )
+    detail[
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations"
+    ] = trace_value_gate_violations
+    detail[
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed"
+    ] = not trace_value_gate_violations
+    detail[
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed"
+    ] = False
+    detail[
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted"
+    ] = False
+    detail[
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_required"
+    ] = True
+    detail[
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids"
+    ] = list(
+        NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_VIOLATIONS
+    )
+    detail[
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations"
+    ] = request_trace_value_gate_violations
+    detail[
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed"
+    ] = not request_trace_value_gate_violations
+    detail[
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed"
+    ] = False
+    detail[
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted"
+    ] = False
+    detail["required_supervised_proof_plan_summary_fields"] = (
+        required_supervised_proof_plan_summary_fields
+    )
+    detail["missing_required_supervised_proof_plan_summary_fields"] = (
+        missing_required_supervised_proof_plan_summary_fields
     )
     detail["global_blockers"] = global_blockers
     detail["violations"] = violations
@@ -14304,6 +16540,11 @@ def wing_readonly_preflight_plan_artifact_summary(
             "backend_port_prestart_summary_connection_policy": str(
                 detail.get("backend_port_prestart_summary_connection_policy") or ""
             ),
+            "backend_port_prestart_summary_read_only": (
+                detail.get("backend_port_prestart_summary_read_only")
+                if isinstance(detail.get("backend_port_prestart_summary_read_only"), bool)
+                else None
+            ),
             "backend_port_prestart_summary_live_write": (
                 detail.get("backend_port_prestart_summary_live_write")
                 if isinstance(detail.get("backend_port_prestart_summary_live_write"), bool)
@@ -14313,6 +16554,21 @@ def wing_readonly_preflight_plan_artifact_summary(
                 detail.get("backend_port_prestart_summary_contacts_backend")
                 if isinstance(
                     detail.get("backend_port_prestart_summary_contacts_backend"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_contacts_wing": (
+                detail.get("backend_port_prestart_summary_contacts_wing")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_contacts_wing"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_mutates_console_state": (
+                detail.get("backend_port_prestart_summary_mutates_console_state")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_mutates_console_state"),
+                    bool,
                 )
                 else None
             ),
@@ -14333,6 +16589,74 @@ def wing_readonly_preflight_plan_artifact_summary(
             "backend_port_prestart_check_status": str(
                 detail.get("backend_port_prestart_check_status") or ""
             ),
+            "artifact_manifest_verifier_required": (
+                detail.get("artifact_manifest_verifier_required") is True
+            ),
+            "artifact_manifest_verifier_run_dir": str(
+                detail.get("artifact_manifest_verifier_run_dir") or ""
+            ),
+            "artifact_manifest_verifier_status": str(
+                detail.get("artifact_manifest_verifier_status") or ""
+            ),
+            "artifact_manifest_verifier_failed_checks": (
+                list(detail.get("artifact_manifest_verifier_failed_checks"))
+                if isinstance(detail.get("artifact_manifest_verifier_failed_checks"), list)
+                else []
+            ),
+            "artifact_manifest_verifier_failed_checks_missing_check_entries": (
+                list(
+                    detail.get(
+                        "artifact_manifest_verifier_failed_checks_missing_check_entries"
+                    )
+                )
+                if isinstance(
+                    detail.get(
+                        "artifact_manifest_verifier_failed_checks_missing_check_entries"
+                    ),
+                    list,
+                )
+                else []
+            ),
+            "artifact_manifest_verifier_required_fields_missing": (
+                list(detail.get("artifact_manifest_verifier_required_fields_missing"))
+                if isinstance(
+                    detail.get("artifact_manifest_verifier_required_fields_missing"),
+                    list,
+                )
+                else []
+            ),
+            "artifact_manifest_verifier_failed_checks_have_check_entries": (
+                detail.get("artifact_manifest_verifier_failed_checks_have_check_entries")
+                is True
+            ),
+            "artifact_manifest_verifier_report_required_fields_present": (
+                detail.get("artifact_manifest_verifier_report_required_fields_present")
+                is True
+            ),
+            "artifact_manifest_verifier_readiness_closure_allowed": (
+                detail.get("artifact_manifest_verifier_readiness_closure_allowed")
+                if isinstance(
+                    detail.get("artifact_manifest_verifier_readiness_closure_allowed"),
+                    bool,
+                )
+                else None
+            ),
+            "artifact_manifest_verifier_live_authority_granted": (
+                detail.get("artifact_manifest_verifier_live_authority_granted")
+                if isinstance(
+                    detail.get("artifact_manifest_verifier_live_authority_granted"),
+                    bool,
+                )
+                else None
+            ),
+            **{
+                field: (
+                    detail.get(field)
+                    if isinstance(detail.get(field), bool)
+                    else None
+                )
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
             "manual_review_required_before_readiness_update": (
                 detail.get("manual_review_required_before_readiness_update") is True
             ),
@@ -14375,10 +16699,18 @@ def wing_readonly_preflight_plan_artifact_summary(
                 if isinstance(detail.get("request_sequence"), list)
                 else []
             ),
+            "plan_request_sequence": (
+                list(detail.get("plan_request_sequence"))
+                if isinstance(detail.get("plan_request_sequence"), list)
+                else []
+            ),
             "expected_request_sequence": (
                 list(detail.get("expected_request_sequence"))
                 if isinstance(detail.get("expected_request_sequence"), list)
                 else []
+            ),
+            "request_sequence_matches_plan": (
+                detail.get("request_sequence_matches_plan") is True
             ),
             "request_sequence_matches_expected": (
                 detail.get("request_sequence_matches_expected") is True
@@ -14447,11 +16779,60 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
         declared_supervised_prestart_gate_matches_expected = detail.get(
             "declared_supervised_prestart_gate_matches_expected"
         )
+        operator_sequence_supervised_prestart_gate_step = detail.get(
+            "operator_sequence_supervised_prestart_gate_step"
+        )
+        supervised_prestart_gate_operator_sequence_step = (
+            str(supervised_prestart_gate.get("operator_sequence_step") or "")
+            if isinstance(supervised_prestart_gate, Mapping)
+            else ""
+        )
+        required_supervised_prestart_gate_markers = detail.get(
+            "required_supervised_prestart_gate_markers"
+        )
+        supervised_prestart_gate_required_markers = (
+            supervised_prestart_gate.get("required_markers")
+            if isinstance(supervised_prestart_gate, Mapping)
+            else None
+        )
+        supervised_prestart_gate_required_marker_list = (
+            [
+                marker
+                for marker in supervised_prestart_gate_required_markers
+                if isinstance(marker, str)
+            ]
+            if isinstance(supervised_prestart_gate_required_markers, list)
+            else []
+        )
+        expected_supervised_prestart_gate_required_marker_list = list(
+            WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS
+        )
+        required_supervised_prestart_gate_marker_list = (
+            [
+                marker
+                for marker in required_supervised_prestart_gate_markers
+                if isinstance(marker, str)
+            ]
+            if isinstance(required_supervised_prestart_gate_markers, list)
+            else []
+        )
+        supervised_prestart_gate_required_marker_count = len(
+            supervised_prestart_gate_required_marker_list
+        )
+        expected_supervised_prestart_gate_required_marker_count = len(
+            expected_supervised_prestart_gate_required_marker_list
+        )
+        required_supervised_prestart_gate_marker_count = len(
+            required_supervised_prestart_gate_marker_list
+        )
         required_supervised_proof_plan_summary_fields = detail.get(
             "required_supervised_proof_plan_summary_fields"
         )
         expected_required_supervised_proof_plan_summary_fields = detail.get(
             "expected_required_supervised_proof_plan_summary_fields"
+        )
+        declared_expected_required_supervised_proof_plan_summary_fields = detail.get(
+            "declared_expected_required_supervised_proof_plan_summary_fields"
         )
         mvp_blocker_anchor = detail.get("mvp_blocker_anchor")
         expected_mvp_blocker_anchor = detail.get("expected_mvp_blocker_anchor")
@@ -14541,6 +16922,24 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 is True
             ),
+            "backend_port_prestart_summary_read_only": (
+                detail.get("backend_port_prestart_summary_read_only")
+                if isinstance(detail.get("backend_port_prestart_summary_read_only"), bool)
+                else None
+            ),
+            "plan_backend_port_prestart_summary_read_only": (
+                detail.get("plan_backend_port_prestart_summary_read_only")
+                if isinstance(
+                    detail.get("plan_backend_port_prestart_summary_read_only"), bool
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_read_only_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_read_only_matches_plan"
+                )
+                is True
+            ),
             "backend_port_prestart_summary_live_write": (
                 detail.get("backend_port_prestart_summary_live_write")
                 if isinstance(detail.get("backend_port_prestart_summary_live_write"), bool)
@@ -14577,6 +16976,51 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "backend_port_prestart_summary_contacts_backend_matches_plan": (
                 detail.get(
                     "backend_port_prestart_summary_contacts_backend_matches_plan"
+                )
+                is True
+            ),
+            "backend_port_prestart_summary_contacts_wing": (
+                detail.get("backend_port_prestart_summary_contacts_wing")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_contacts_wing"), bool
+                )
+                else None
+            ),
+            "plan_backend_port_prestart_summary_contacts_wing": (
+                detail.get("plan_backend_port_prestart_summary_contacts_wing")
+                if isinstance(
+                    detail.get("plan_backend_port_prestart_summary_contacts_wing"),
+                    bool,
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_contacts_wing_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_contacts_wing_matches_plan"
+                )
+                is True
+            ),
+            "backend_port_prestart_summary_mutates_console_state": (
+                detail.get("backend_port_prestart_summary_mutates_console_state")
+                if isinstance(
+                    detail.get("backend_port_prestart_summary_mutates_console_state"),
+                    bool,
+                )
+                else None
+            ),
+            "plan_backend_port_prestart_summary_mutates_console_state": (
+                detail.get("plan_backend_port_prestart_summary_mutates_console_state")
+                if isinstance(
+                    detail.get(
+                        "plan_backend_port_prestart_summary_mutates_console_state"
+                    ),
+                    bool,
+                )
+                else None
+            ),
+            "backend_port_prestart_summary_mutates_console_state_matches_plan": (
+                detail.get(
+                    "backend_port_prestart_summary_mutates_console_state_matches_plan"
                 )
                 is True
             ),
@@ -14631,6 +17075,46 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "backend_port_prestart_check_status_matches_plan": (
                 detail.get("backend_port_prestart_check_status_matches_plan") is True
             ),
+            "operator_sequence": (
+                [str(item) for item in detail.get("operator_sequence")]
+                if isinstance(detail.get("operator_sequence"), list)
+                else []
+            ),
+            "expected_operator_sequence": (
+                [str(item) for item in detail.get("expected_operator_sequence")]
+                if isinstance(detail.get("expected_operator_sequence"), list)
+                else []
+            ),
+            **{
+                field: (
+                    detail.get(field)
+                    if isinstance(detail.get(field), bool)
+                    else None
+                )
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
+            **{
+                f"plan_{field}": (
+                    detail.get(f"plan_{field}")
+                    if isinstance(detail.get(f"plan_{field}"), bool)
+                    else None
+                )
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
+            **{
+                f"declared_{field}_matches_plan": (
+                    detail.get(f"declared_{field}_matches_plan")
+                    if isinstance(detail.get(f"declared_{field}_matches_plan"), bool)
+                    else None
+                )
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
+            **{
+                f"{field}_matches_plan": (
+                    detail.get(f"{field}_matches_plan") is True
+                )
+                for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+            },
             "backend_port_prestart_check_operator_sequence_step_index": (
                 detail.get("backend_port_prestart_check_operator_sequence_step_index")
             ),
@@ -14672,6 +17156,30 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "operator_sequence_capture_readonly_preflight_step_index": (
                 detail.get("operator_sequence_capture_readonly_preflight_step_index")
+            ),
+            "expected_operator_sequence_capture_readonly_preflight_step_index": (
+                detail.get(
+                    "expected_operator_sequence_capture_readonly_preflight_step_index"
+                )
+            ),
+            "operator_sequence_capture_readonly_preflight_step_index_matches_contract": (
+                detail.get(
+                    "operator_sequence_capture_readonly_preflight_step_index_matches_contract"
+                )
+                is True
+            ),
+            "operator_sequence_capture_readonly_preflight_step": str(
+                detail.get("operator_sequence_capture_readonly_preflight_step") or ""
+            ),
+            "expected_operator_sequence_capture_readonly_preflight_step": str(
+                detail.get("expected_operator_sequence_capture_readonly_preflight_step")
+                or ""
+            ),
+            "operator_sequence_capture_readonly_preflight_step_matches_contract": (
+                detail.get(
+                    "operator_sequence_capture_readonly_preflight_step_matches_contract"
+                )
+                is True
             ),
             "backend_port_prestart_gate": (
                 dict(backend_port_prestart_gate)
@@ -15120,6 +17628,58 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 else []
             ),
+            "project_director_selected_action_value_gate_self_check_required": (
+                detail.get(
+                    "project_director_selected_action_value_gate_self_check_required"
+                )
+                is True
+            ),
+            "project_director_selected_action_value_gate_self_check_required_markers": (
+                list(
+                    detail.get(
+                        "project_director_selected_action_value_gate_self_check_required_markers"
+                    )
+                )
+                if isinstance(
+                    detail.get(
+                        "project_director_selected_action_value_gate_self_check_required_markers"
+                    ),
+                    list,
+                )
+                else []
+            ),
+            "project_director_selected_action_value_gate_self_check_missing_markers": (
+                list(
+                    detail.get(
+                        "project_director_selected_action_value_gate_self_check_missing_markers"
+                    )
+                )
+                if isinstance(
+                    detail.get(
+                        "project_director_selected_action_value_gate_self_check_missing_markers"
+                    ),
+                    list,
+                )
+                else []
+            ),
+            "project_director_selected_action_value_gate_self_check_markers_present": (
+                detail.get(
+                    "project_director_selected_action_value_gate_self_check_markers_present"
+                )
+                is True
+            ),
+            "project_director_selected_action_value_gate_self_check_readiness_closure_allowed": (
+                detail.get(
+                    "project_director_selected_action_value_gate_self_check_readiness_closure_allowed"
+                )
+                is True
+            ),
+            "project_director_selected_action_value_gate_self_check_live_authority_granted": (
+                detail.get(
+                    "project_director_selected_action_value_gate_self_check_live_authority_granted"
+                )
+                is True
+            ),
             "operator_sequence_count": int(detail.get("operator_sequence_count") or 0),
             "expected_operator_sequence_count": int(
                 detail.get("expected_operator_sequence_count") or 0
@@ -15273,6 +17833,31 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 else []
             ),
+            "expected_required_supervised_prestart_gate_markers": (
+                expected_supervised_prestart_gate_required_marker_list
+            ),
+            "required_supervised_prestart_gate_marker_count": (
+                required_supervised_prestart_gate_marker_count
+            ),
+            "expected_required_supervised_prestart_gate_marker_count": (
+                expected_supervised_prestart_gate_required_marker_count
+            ),
+            "required_supervised_prestart_gate_marker_count_matches_contract": (
+                required_supervised_prestart_gate_marker_count
+                == expected_supervised_prestart_gate_required_marker_count
+            ),
+            "required_supervised_prestart_gate_marker_count_matches_supervised_gate": (
+                required_supervised_prestart_gate_marker_count
+                == supervised_prestart_gate_required_marker_count
+            ),
+            "required_supervised_prestart_gate_markers_match_contract": (
+                required_supervised_prestart_gate_marker_list
+                == expected_supervised_prestart_gate_required_marker_list
+            ),
+            "required_supervised_prestart_gate_markers_match_supervised_gate": (
+                required_supervised_prestart_gate_marker_list
+                == supervised_prestart_gate_required_marker_list
+            ),
             "required_supervised_proof_plan_summary_fields": (
                 list(required_supervised_proof_plan_summary_fields)
                 if isinstance(required_supervised_proof_plan_summary_fields, list)
@@ -15286,9 +17871,35 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 else []
             ),
+            "declared_expected_required_supervised_proof_plan_summary_fields": (
+                list(declared_expected_required_supervised_proof_plan_summary_fields)
+                if isinstance(
+                    declared_expected_required_supervised_proof_plan_summary_fields,
+                    list,
+                )
+                else []
+            ),
             "required_supervised_proof_plan_summary_fields_match_contract": (
                 detail.get(
                     "required_supervised_proof_plan_summary_fields_match_contract"
+                )
+                is True
+            ),
+            "required_supervised_proof_plan_summary_fields_include_invalid_records": (
+                detail.get(
+                    "required_supervised_proof_plan_summary_fields_include_invalid_records"
+                )
+                is True
+            ),
+            "declared_required_supervised_proof_plan_summary_fields_match_contract": (
+                detail.get(
+                    "declared_required_supervised_proof_plan_summary_fields_match_contract"
+                )
+                is True
+            ),
+            "declared_required_supervised_proof_plan_summary_fields_include_invalid_records": (
+                detail.get(
+                    "declared_required_supervised_proof_plan_summary_fields_include_invalid_records"
                 )
                 is True
             ),
@@ -15302,6 +17913,109 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 if isinstance(expected_supervised_prestart_gate, Mapping)
                 else {}
             ),
+            "supervised_prestart_gate_required": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get("required") is True
+            ),
+            "supervised_prestart_gate_operator_sequence_step_index": (
+                supervised_prestart_gate.get("operator_sequence_step_index")
+                if isinstance(supervised_prestart_gate, Mapping)
+                and not isinstance(
+                    supervised_prestart_gate.get("operator_sequence_step_index"),
+                    bool,
+                )
+                and isinstance(
+                    supervised_prestart_gate.get("operator_sequence_step_index"),
+                    int,
+                )
+                else None
+            ),
+            "supervised_prestart_gate_operator_sequence_step_must_be_final": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get("operator_sequence_step_must_be_final")
+                is True
+            ),
+            "supervised_prestart_gate_operator_sequence_step": (
+                supervised_prestart_gate_operator_sequence_step
+            ),
+            "supervised_prestart_gate_operator_sequence_step_matches_summary": (
+                isinstance(operator_sequence_supervised_prestart_gate_step, str)
+                and supervised_prestart_gate_operator_sequence_step
+                == operator_sequence_supervised_prestart_gate_step
+            ),
+            "supervised_prestart_gate_required_markers": (
+                supervised_prestart_gate_required_marker_list
+            ),
+            "expected_supervised_prestart_gate_required_markers": (
+                expected_supervised_prestart_gate_required_marker_list
+            ),
+            "supervised_prestart_gate_required_marker_count": (
+                supervised_prestart_gate_required_marker_count
+            ),
+            "expected_supervised_prestart_gate_required_marker_count": (
+                expected_supervised_prestart_gate_required_marker_count
+            ),
+            "supervised_prestart_gate_required_marker_count_matches_contract": (
+                supervised_prestart_gate_required_marker_count
+                == expected_supervised_prestart_gate_required_marker_count
+            ),
+            "supervised_prestart_gate_required_marker_count_matches_summary": (
+                supervised_prestart_gate_required_marker_count
+                == len(required_supervised_prestart_gate_marker_list)
+            ),
+            "supervised_prestart_gate_required_markers_match_contract": (
+                supervised_prestart_gate_required_marker_list
+                == expected_supervised_prestart_gate_required_marker_list
+            ),
+            "supervised_prestart_gate_required_markers_match_summary": (
+                supervised_prestart_gate_required_marker_list
+                == required_supervised_prestart_gate_marker_list
+            ),
+            "supervised_prestart_gate_grants_live_authority": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get("grants_live_authority") is True
+            ),
+            "supervised_prestart_gate_requires_operator_decision_status": (
+                str(
+                    supervised_prestart_gate.get("requires_operator_decision_status")
+                    or ""
+                )
+                if isinstance(supervised_prestart_gate, Mapping)
+                else ""
+            ),
+            "supervised_prestart_gate_unlocks_runbook": (
+                str(supervised_prestart_gate.get("unlocks_runbook") or "")
+                if isinstance(supervised_prestart_gate, Mapping)
+                else ""
+            ),
+            "supervised_prestart_gate_requires_accepted_candidate_prestart_trace": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get(
+                    "requires_accepted_candidate_prestart_trace"
+                )
+                is True
+            ),
+            "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get(
+                    "requires_accepted_candidate_artifact_root_trace"
+                )
+                is True
+            ),
+            "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get(
+                    "requires_accepted_candidate_request_sequence_trace"
+                )
+                is True
+            ),
+            "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get(
+                    "requires_accepted_candidate_expected_artifact_trace"
+                )
+                is True
+            ),
             "supervised_prestart_gate_matches_expected": (
                 supervised_prestart_gate_matches_expected is True
             ),
@@ -15311,6 +18025,1624 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             "violations": list(violations) if isinstance(violations, list) else [],
         }
     return None
+
+
+def build_backend_port_prestart_gate_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    command_text = str(
+        handoff_artifact.get("backend_port_prestart_check_command_text") or ""
+    )
+    command = handoff_artifact.get("backend_port_prestart_check_command")
+    backend_port_prestart_gate = handoff_artifact.get("backend_port_prestart_gate")
+    expected_backend_port_prestart_gate = handoff_artifact.get(
+        "expected_backend_port_prestart_gate"
+    )
+    declared_expected_backend_port_prestart_gate = handoff_artifact.get(
+        "declared_expected_backend_port_prestart_gate"
+    )
+    failure_detail_fields = handoff_artifact.get(
+        "backend_port_prestart_check_failure_detail_fields"
+    )
+    authority_denial_fields = (
+        "safe_to_stop_listener_by_gate",
+        "plan_safe_to_stop_listener_by_gate",
+        "live_authority_granted",
+        "plan_live_authority_granted",
+        "backend_port_prestart_gate_execution_allowed",
+        "plan_backend_port_prestart_gate_execution_allowed",
+        "backend_port_prestart_gate_readiness_closure_allowed",
+        "plan_backend_port_prestart_gate_readiness_closure_allowed",
+        "backend_port_prestart_gate_live_authority_granted",
+        "plan_backend_port_prestart_gate_live_authority_granted",
+    )
+    authority_match_fields = (
+        "safe_to_stop_listener_by_gate_matches_plan",
+        "declared_safe_to_stop_listener_by_gate_matches_plan",
+        "live_authority_granted_matches_plan",
+        "declared_live_authority_granted_matches_plan",
+        "backend_port_prestart_gate_execution_allowed_matches_plan",
+        "declared_backend_port_prestart_gate_execution_allowed_matches_plan",
+        "backend_port_prestart_gate_readiness_closure_allowed_matches_plan",
+        "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan",
+        "backend_port_prestart_gate_live_authority_granted_matches_plan",
+        "declared_backend_port_prestart_gate_live_authority_granted_matches_plan",
+    )
+    return {
+        "backend_port_prestart_gate_summary_surface_required": True,
+        "backend_port_prestart_gate": (
+            dict(backend_port_prestart_gate)
+            if isinstance(backend_port_prestart_gate, Mapping)
+            else {}
+        ),
+        "expected_backend_port_prestart_gate": (
+            dict(expected_backend_port_prestart_gate)
+            if isinstance(expected_backend_port_prestart_gate, Mapping)
+            else {}
+        ),
+        "declared_expected_backend_port_prestart_gate": (
+            dict(declared_expected_backend_port_prestart_gate)
+            if isinstance(declared_expected_backend_port_prestart_gate, Mapping)
+            else {}
+        ),
+        "backend_port_prestart_gate_matches_expected": (
+            handoff_artifact.get("backend_port_prestart_gate_matches_expected")
+            is True
+        ),
+        "declared_backend_port_prestart_gate_matches_expected": (
+            handoff_artifact.get(
+                "declared_backend_port_prestart_gate_matches_expected"
+            )
+            is True
+        ),
+        "backend_port_prestart_check_command": (
+            list(command) if isinstance(command, list) else []
+        ),
+        "backend_port_prestart_check_command_text": command_text,
+        "expected_backend_port_prestart_check_command_text": (
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+        ),
+        "backend_port_prestart_check_command_text_matches_contract": (
+            command_text
+            == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
+        ),
+        "backend_port_prestart_failure_detail_summary_surface_required": True,
+        "backend_port_prestart_check_failure_detail_fields": (
+            list(failure_detail_fields)
+            if isinstance(failure_detail_fields, list)
+            else []
+        ),
+        "expected_backend_port_prestart_check_failure_detail_fields": list(
+            WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
+        ),
+        "backend_port_prestart_check_failure_detail_fields_match_contract": (
+            failure_detail_fields
+            == list(WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS)
+        ),
+        "backend_port_prestart_failure_detail_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "backend_port_prestart_failure_detail_summary_surface_live_authority_granted": (
+            False
+        ),
+        "backend_port_prestart_gate_authority_denial_summary_surface_required": (
+            True
+        ),
+        **{
+            field_name: handoff_artifact.get(field_name)
+            for field_name in authority_denial_fields
+        },
+        **{
+            field_name: handoff_artifact.get(field_name) is True
+            for field_name in authority_match_fields
+        },
+        "backend_port_prestart_gate_authority_denial_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "backend_port_prestart_gate_authority_denial_summary_surface_live_authority_granted": (
+            False
+        ),
+        "backend_port_prestart_gate_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "backend_port_prestart_gate_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_wing_readonly_packet_safety_boundary_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    true_boundary_fields = (
+        "read_only",
+        "operator_required",
+        "expected_plan_required_for_real_run",
+        "physical_preflight_requires_existing_backend_connection",
+        "manual_review_required_before_readiness_update",
+    )
+    false_boundary_fields = (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "readiness_matrix_update_allowed_by_packet",
+        "readiness_closure_allowed_by_packet",
+        "execution_allowed_by_packet",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    )
+    next_manual_artifact_required = str(
+        handoff_artifact.get("next_manual_artifact_required") or ""
+    )
+    return {
+        "wing_readonly_packet_safety_boundary_summary_surface_required": True,
+        **{
+            field_name: handoff_artifact.get(field_name)
+            for field_name in true_boundary_fields
+        },
+        **{
+            field_name: handoff_artifact.get(field_name)
+            for field_name in false_boundary_fields
+        },
+        "next_manual_artifact_required": next_manual_artifact_required,
+        "expected_next_manual_artifact_required": (
+            WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
+        ),
+        "next_manual_artifact_required_matches_contract": (
+            next_manual_artifact_required
+            == WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED
+        ),
+        "wing_readonly_packet_safety_boundary_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_packet_safety_boundary_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_wing_readonly_mvp_blocker_anchor_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    mvp_blocker_anchor = handoff_artifact.get("mvp_blocker_anchor")
+    mvp_blocker_anchor_mapping = (
+        dict(mvp_blocker_anchor) if isinstance(mvp_blocker_anchor, Mapping) else {}
+    )
+    expected_mvp_blocker_anchor = handoff_artifact.get("expected_mvp_blocker_anchor")
+    expected_mvp_blocker_anchor_mapping = (
+        dict(expected_mvp_blocker_anchor)
+        if isinstance(expected_mvp_blocker_anchor, Mapping)
+        else {}
+    )
+    return {
+        "wing_readonly_mvp_blocker_anchor_summary_surface_required": True,
+        "mvp_blocker_anchor": mvp_blocker_anchor_mapping,
+        "expected_mvp_blocker_anchor": expected_mvp_blocker_anchor_mapping,
+        "mvp_blocker_anchor_matches_current_first_open": (
+            handoff_artifact.get("mvp_blocker_anchor_matches_current_first_open")
+            is True
+        ),
+        "mvp_blocker_anchor_sha256": str(
+            handoff_artifact.get("mvp_blocker_anchor_sha256") or ""
+        ),
+        "actual_mvp_blocker_anchor_sha256": str(
+            handoff_artifact.get("actual_mvp_blocker_anchor_sha256") or ""
+        ),
+        "expected_mvp_blocker_anchor_sha256": str(
+            handoff_artifact.get("expected_mvp_blocker_anchor_sha256") or ""
+        ),
+        "mvp_blocker_anchor_sha256_matches_anchor": (
+            handoff_artifact.get("mvp_blocker_anchor_sha256_matches_anchor") is True
+        ),
+        "mvp_blocker_anchor_sha256_matches_current_first_open": (
+            handoff_artifact.get(
+                "mvp_blocker_anchor_sha256_matches_current_first_open"
+            )
+            is True
+        ),
+        "mvp_blocker_anchor_packet_does_not_close_blocker": (
+            mvp_blocker_anchor_mapping.get("packet_does_not_close_blocker") is True
+        ),
+        "wing_readonly_mvp_blocker_anchor_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_mvp_blocker_anchor_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_wing_readonly_expected_artifacts_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = handoff_artifact.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def string_field(name: str) -> str:
+        value = handoff_artifact.get(name)
+        return value if isinstance(value, str) else ""
+
+    return {
+        "wing_readonly_expected_artifacts_summary_surface_required": True,
+        "expected_artifacts": string_list_field("expected_artifacts"),
+        "expected_artifact_globs": string_list_field("expected_artifact_globs"),
+        "plan_expected_artifacts": string_list_field("plan_expected_artifacts"),
+        "expected_artifacts_match_plan": (
+            handoff_artifact.get("expected_artifacts_match_plan") is True
+        ),
+        "expected_run_artifact_glob": string_field("expected_run_artifact_glob"),
+        "expected_event_log_glob": string_field("expected_event_log_glob"),
+        "summary_glob_matches_plan": (
+            handoff_artifact.get("summary_glob_matches_plan") is True
+        ),
+        "event_log_glob_matches_plan": (
+            handoff_artifact.get("event_log_glob_matches_plan") is True
+        ),
+        "wing_readonly_expected_artifacts_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_expected_artifacts_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_backend_port_prestart_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    return {
+        "backend_port_prestart_summary_surface_required": True,
+        "backend_port_prestart_summary_required": (
+            handoff_artifact.get("backend_port_prestart_summary_required") is True
+        ),
+        "backend_port_prestart_summary_path_placeholder": str(
+            handoff_artifact.get("backend_port_prestart_summary_path_placeholder")
+            or ""
+        ),
+        "plan_backend_port_prestart_summary_path": str(
+            handoff_artifact.get("plan_backend_port_prestart_summary_path") or ""
+        ),
+        "backend_port_prestart_summary_sha256": str(
+            handoff_artifact.get("backend_port_prestart_summary_sha256") or ""
+        ),
+        "backend_port_prestart_summary_sha256_available": (
+            handoff_artifact.get("backend_port_prestart_summary_sha256_available")
+            is True
+        ),
+        "backend_port_prestart_summary_sha256_available_matches_digest": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_sha256_available_matches_digest"
+            )
+            is True
+        ),
+        "plan_backend_port_prestart_summary_sha256": str(
+            handoff_artifact.get("plan_backend_port_prestart_summary_sha256") or ""
+        ),
+        "backend_port_prestart_summary_sha256_matches_plan": (
+            handoff_artifact.get("backend_port_prestart_summary_sha256_matches_plan")
+            is True
+        ),
+        "backend_port_prestart_summary_type": str(
+            handoff_artifact.get("backend_port_prestart_summary_type") or ""
+        ),
+        "plan_backend_port_prestart_summary_type": str(
+            handoff_artifact.get("plan_backend_port_prestart_summary_type") or ""
+        ),
+        "backend_port_prestart_summary_type_matches_plan": (
+            handoff_artifact.get("backend_port_prestart_summary_type_matches_plan")
+            is True
+        ),
+        "backend_port_prestart_summary_status": str(
+            handoff_artifact.get("backend_port_prestart_summary_status") or ""
+        ),
+        "plan_backend_port_prestart_summary_status": str(
+            handoff_artifact.get("plan_backend_port_prestart_summary_status") or ""
+        ),
+        "backend_port_prestart_summary_status_matches_plan": (
+            handoff_artifact.get("backend_port_prestart_summary_status_matches_plan")
+            is True
+        ),
+        "backend_port_prestart_summary_connection_policy": str(
+            handoff_artifact.get("backend_port_prestart_summary_connection_policy")
+            or ""
+        ),
+        "plan_backend_port_prestart_summary_connection_policy": str(
+            handoff_artifact.get("plan_backend_port_prestart_summary_connection_policy")
+            or ""
+        ),
+        "backend_port_prestart_summary_connection_policy_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_connection_policy_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_summary_read_only": (
+            handoff_artifact.get("backend_port_prestart_summary_read_only")
+            if isinstance(
+                handoff_artifact.get("backend_port_prestart_summary_read_only"),
+                bool,
+            )
+            else None
+        ),
+        "plan_backend_port_prestart_summary_read_only": (
+            handoff_artifact.get("plan_backend_port_prestart_summary_read_only")
+            if isinstance(
+                handoff_artifact.get("plan_backend_port_prestart_summary_read_only"),
+                bool,
+            )
+            else None
+        ),
+        "backend_port_prestart_summary_read_only_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_read_only_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_summary_live_write": (
+            handoff_artifact.get("backend_port_prestart_summary_live_write")
+            if isinstance(
+                handoff_artifact.get("backend_port_prestart_summary_live_write"),
+                bool,
+            )
+            else None
+        ),
+        "plan_backend_port_prestart_summary_live_write": (
+            handoff_artifact.get("plan_backend_port_prestart_summary_live_write")
+            if isinstance(
+                handoff_artifact.get("plan_backend_port_prestart_summary_live_write"),
+                bool,
+            )
+            else None
+        ),
+        "backend_port_prestart_summary_live_write_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_live_write_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_summary_contacts_backend": (
+            handoff_artifact.get("backend_port_prestart_summary_contacts_backend")
+            if isinstance(
+                handoff_artifact.get("backend_port_prestart_summary_contacts_backend"),
+                bool,
+            )
+            else None
+        ),
+        "plan_backend_port_prestart_summary_contacts_backend": (
+            handoff_artifact.get("plan_backend_port_prestart_summary_contacts_backend")
+            if isinstance(
+                handoff_artifact.get(
+                    "plan_backend_port_prestart_summary_contacts_backend"
+                ),
+                bool,
+            )
+            else None
+        ),
+        "backend_port_prestart_summary_contacts_backend_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_contacts_backend_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_summary_contacts_wing": (
+            handoff_artifact.get("backend_port_prestart_summary_contacts_wing")
+            if isinstance(
+                handoff_artifact.get("backend_port_prestart_summary_contacts_wing"),
+                bool,
+            )
+            else None
+        ),
+        "plan_backend_port_prestart_summary_contacts_wing": (
+            handoff_artifact.get("plan_backend_port_prestart_summary_contacts_wing")
+            if isinstance(
+                handoff_artifact.get(
+                    "plan_backend_port_prestart_summary_contacts_wing"
+                ),
+                bool,
+            )
+            else None
+        ),
+        "backend_port_prestart_summary_contacts_wing_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_contacts_wing_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_summary_mutates_console_state": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_mutates_console_state"
+            )
+            if isinstance(
+                handoff_artifact.get(
+                    "backend_port_prestart_summary_mutates_console_state"
+                ),
+                bool,
+            )
+            else None
+        ),
+        "plan_backend_port_prestart_summary_mutates_console_state": (
+            handoff_artifact.get(
+                "plan_backend_port_prestart_summary_mutates_console_state"
+            )
+            if isinstance(
+                handoff_artifact.get(
+                    "plan_backend_port_prestart_summary_mutates_console_state"
+                ),
+                bool,
+            )
+            else None
+        ),
+        "backend_port_prestart_summary_mutates_console_state_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_mutates_console_state_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_summary_queries_console": (
+            handoff_artifact.get("backend_port_prestart_summary_queries_console")
+            if isinstance(
+                handoff_artifact.get("backend_port_prestart_summary_queries_console"),
+                bool,
+            )
+            else None
+        ),
+        "plan_backend_port_prestart_summary_queries_console": (
+            handoff_artifact.get("plan_backend_port_prestart_summary_queries_console")
+            if isinstance(
+                handoff_artifact.get(
+                    "plan_backend_port_prestart_summary_queries_console"
+                ),
+                bool,
+            )
+            else None
+        ),
+        "backend_port_prestart_summary_queries_console_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_queries_console_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_summary_executes_tests": (
+            handoff_artifact.get("backend_port_prestart_summary_executes_tests")
+            if isinstance(
+                handoff_artifact.get("backend_port_prestart_summary_executes_tests"),
+                bool,
+            )
+            else None
+        ),
+        "plan_backend_port_prestart_summary_executes_tests": (
+            handoff_artifact.get("plan_backend_port_prestart_summary_executes_tests")
+            if isinstance(
+                handoff_artifact.get("plan_backend_port_prestart_summary_executes_tests"),
+                bool,
+            )
+            else None
+        ),
+        "backend_port_prestart_summary_executes_tests_matches_plan": (
+            handoff_artifact.get(
+                "backend_port_prestart_summary_executes_tests_matches_plan"
+            )
+            is True
+        ),
+        "backend_port_prestart_check_status": str(
+            handoff_artifact.get("backend_port_prestart_check_status") or ""
+        ),
+        "plan_backend_port_prestart_check_status": str(
+            handoff_artifact.get("plan_backend_port_prestart_check_status") or ""
+        ),
+        "backend_port_prestart_check_status_matches_plan": (
+            handoff_artifact.get("backend_port_prestart_check_status_matches_plan")
+            is True
+        ),
+        "backend_port_prestart_summary_surface_readiness_closure_allowed": False,
+        "backend_port_prestart_summary_surface_live_authority_granted": False,
+    }
+
+
+def build_wing_readonly_command_binding_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    return {
+        "wing_readonly_command_binding_summary_surface_required": True,
+        "preview_command_uses_plan_only": (
+            handoff_artifact.get("preview_command_uses_plan_only") is True
+        ),
+        "preview_command_prestart_summary": str(
+            handoff_artifact.get("preview_command_prestart_summary") or ""
+        ),
+        "preview_command_prestart_summary_matches_plan": (
+            handoff_artifact.get("preview_command_prestart_summary_matches_plan")
+            is True
+        ),
+        "preview_command_artifact_root": str(
+            handoff_artifact.get("preview_command_artifact_root") or ""
+        ),
+        "preview_command_artifact_root_matches_packet": (
+            handoff_artifact.get("preview_command_artifact_root_matches_packet")
+            is True
+        ),
+        "preview_command_plan_output": str(
+            handoff_artifact.get("preview_command_plan_output") or ""
+        ),
+        "preview_command_plan_output_matches_packet": (
+            handoff_artifact.get("preview_command_plan_output_matches_packet")
+            is True
+        ),
+        "capture_command_requires_physical_readback": (
+            handoff_artifact.get("capture_command_requires_physical_readback")
+            is True
+        ),
+        "capture_command_prestart_summary": str(
+            handoff_artifact.get("capture_command_prestart_summary") or ""
+        ),
+        "capture_command_prestart_summary_matches_plan": (
+            handoff_artifact.get("capture_command_prestart_summary_matches_plan")
+            is True
+        ),
+        "capture_command_artifact_root": str(
+            handoff_artifact.get("capture_command_artifact_root") or ""
+        ),
+        "capture_command_artifact_root_matches_packet": (
+            handoff_artifact.get("capture_command_artifact_root_matches_packet")
+            is True
+        ),
+        "capture_command_expected_plan": str(
+            handoff_artifact.get("capture_command_expected_plan") or ""
+        ),
+        "capture_command_expected_plan_matches_packet": (
+            handoff_artifact.get("capture_command_expected_plan_matches_packet")
+            is True
+        ),
+        "review_command_writes_decision_template": (
+            handoff_artifact.get("review_command_writes_decision_template") is True
+        ),
+        "review_decision_template_output": str(
+            handoff_artifact.get("review_decision_template_output") or ""
+        ),
+        "review_decision_template_output_matches_contract": (
+            handoff_artifact.get("review_decision_template_output_matches_contract")
+            is True
+        ),
+        "review_decision_template_output_contract_flag": (
+            handoff_artifact.get("review_decision_template_output_contract_flag")
+            is True
+        ),
+        "review_command_decision_template_output": str(
+            handoff_artifact.get("review_command_decision_template_output") or ""
+        ),
+        "review_command_decision_template_output_matches_packet": (
+            handoff_artifact.get(
+                "review_command_decision_template_output_matches_packet"
+            )
+            is True
+        ),
+        "review_output": str(handoff_artifact.get("review_output") or ""),
+        "review_output_matches_contract": (
+            handoff_artifact.get("review_output_matches_contract") is True
+        ),
+        "review_output_contract_flag": (
+            handoff_artifact.get("review_output_contract_flag") is True
+        ),
+        "review_command_output": str(
+            handoff_artifact.get("review_command_output") or ""
+        ),
+        "review_command_output_matches_packet": (
+            handoff_artifact.get("review_command_output_matches_packet") is True
+        ),
+        "review_command_artifact_root": str(
+            handoff_artifact.get("review_command_artifact_root") or ""
+        ),
+        "review_command_artifact_root_matches_packet": (
+            handoff_artifact.get("review_command_artifact_root_matches_packet")
+            is True
+        ),
+        "decision_review_output": str(
+            handoff_artifact.get("decision_review_output") or ""
+        ),
+        "decision_review_output_matches_contract": (
+            handoff_artifact.get("decision_review_output_matches_contract") is True
+        ),
+        "decision_review_output_contract_flag": (
+            handoff_artifact.get("decision_review_output_contract_flag") is True
+        ),
+        "decision_review_command_output": str(
+            handoff_artifact.get("decision_review_command_output") or ""
+        ),
+        "decision_review_command_output_matches_packet": (
+            handoff_artifact.get("decision_review_command_output_matches_packet")
+            is True
+        ),
+        "decision_review_command_artifact_root": str(
+            handoff_artifact.get("decision_review_command_artifact_root") or ""
+        ),
+        "decision_review_command_artifact_root_matches_packet": (
+            handoff_artifact.get(
+                "decision_review_command_artifact_root_matches_packet"
+            )
+            is True
+        ),
+        "decision_review_command_decision_root": str(
+            handoff_artifact.get("decision_review_command_decision_root") or ""
+        ),
+        "decision_review_command_decision_root_matches_packet": (
+            handoff_artifact.get("decision_review_command_decision_root_matches_packet")
+            is True
+        ),
+        "wing_readonly_command_binding_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_command_binding_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_wing_readonly_operator_sequence_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    def integer_field(name: str) -> int | None:
+        value = handoff_artifact.get(name)
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        return value
+
+    def string_field(name: str) -> str:
+        value = handoff_artifact.get(name)
+        return value if isinstance(value, str) else ""
+
+    def string_list_field(name: str) -> list[str]:
+        value = handoff_artifact.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def true_field(name: str) -> bool:
+        return handoff_artifact.get(name) is True
+
+    return {
+        "wing_readonly_operator_sequence_summary_surface_required": True,
+        "operator_sequence": string_list_field("operator_sequence"),
+        "expected_operator_sequence": string_list_field("expected_operator_sequence"),
+        "operator_sequence_count": integer_field("operator_sequence_count"),
+        "expected_operator_sequence_count": integer_field(
+            "expected_operator_sequence_count"
+        ),
+        "operator_sequence_count_matches_contract": true_field(
+            "operator_sequence_count_matches_contract"
+        ),
+        "operator_sequence_sha256": string_field("operator_sequence_sha256"),
+        "actual_operator_sequence_sha256": string_field(
+            "actual_operator_sequence_sha256"
+        ),
+        "operator_sequence_sha256_matches_actual": true_field(
+            "operator_sequence_sha256_matches_actual"
+        ),
+        "expected_operator_sequence_sha256": string_field(
+            "expected_operator_sequence_sha256"
+        ),
+        "actual_expected_operator_sequence_sha256": string_field(
+            "actual_expected_operator_sequence_sha256"
+        ),
+        "operator_sequence_matches_contract": true_field(
+            "operator_sequence_matches_contract"
+        ),
+        "operator_sequence_sha256_matches_contract": true_field(
+            "operator_sequence_sha256_matches_contract"
+        ),
+        "declared_expected_operator_sequence_sha256_matches_contract": true_field(
+            "declared_expected_operator_sequence_sha256_matches_contract"
+        ),
+        "declared_operator_sequence_matches_contract_flag": true_field(
+            "declared_operator_sequence_matches_contract_flag"
+        ),
+        "declared_operator_sequence_matches_contract_flag_matches_actual": true_field(
+            "declared_operator_sequence_matches_contract_flag_matches_actual"
+        ),
+        "declared_operator_sequence_sha256_matches_contract_flag": true_field(
+            "declared_operator_sequence_sha256_matches_contract_flag"
+        ),
+        "declared_operator_sequence_sha256_matches_contract_flag_matches_actual": true_field(
+            "declared_operator_sequence_sha256_matches_contract_flag_matches_actual"
+        ),
+        "declared_operator_sequence_count": integer_field(
+            "declared_operator_sequence_count"
+        ),
+        "declared_expected_operator_sequence_count": integer_field(
+            "declared_expected_operator_sequence_count"
+        ),
+        "declared_operator_sequence_count_contract_flag": true_field(
+            "declared_operator_sequence_count_contract_flag"
+        ),
+        "declared_operator_sequence_count_matches_actual": true_field(
+            "declared_operator_sequence_count_matches_actual"
+        ),
+        "declared_operator_sequence_count_matches_contract": true_field(
+            "declared_operator_sequence_count_matches_contract"
+        ),
+        "declared_expected_operator_sequence_count_matches_contract": true_field(
+            "declared_expected_operator_sequence_count_matches_contract"
+        ),
+        "declared_operator_sequence_count_contract_flag_matches_declared_count": true_field(
+            "declared_operator_sequence_count_contract_flag_matches_declared_count"
+        ),
+        "backend_connection_confirmation_step_index": integer_field(
+            "backend_connection_confirmation_step_index"
+        ),
+        "expected_backend_connection_confirmation_step_index": integer_field(
+            "expected_backend_connection_confirmation_step_index"
+        ),
+        "operator_sequence_has_backend_connection_confirmation": true_field(
+            "operator_sequence_has_backend_connection_confirmation"
+        ),
+        "operator_sequence_backend_connection_confirmation_step": string_field(
+            "operator_sequence_backend_connection_confirmation_step"
+        ),
+        "operator_sequence_backend_connection_confirmation_step_index": integer_field(
+            "operator_sequence_backend_connection_confirmation_step_index"
+        ),
+        "operator_sequence_backend_connection_confirmation_before_capture": true_field(
+            "operator_sequence_backend_connection_confirmation_before_capture"
+        ),
+        "operator_sequence_capture_readonly_preflight_step_index": integer_field(
+            "operator_sequence_capture_readonly_preflight_step_index"
+        ),
+        "expected_operator_sequence_capture_readonly_preflight_step_index": integer_field(
+            "expected_operator_sequence_capture_readonly_preflight_step_index"
+        ),
+        "operator_sequence_capture_readonly_preflight_step_index_matches_contract": true_field(
+            "operator_sequence_capture_readonly_preflight_step_index_matches_contract"
+        ),
+        "operator_sequence_capture_readonly_preflight_step": string_field(
+            "operator_sequence_capture_readonly_preflight_step"
+        ),
+        "expected_operator_sequence_capture_readonly_preflight_step": string_field(
+            "expected_operator_sequence_capture_readonly_preflight_step"
+        ),
+        "operator_sequence_capture_readonly_preflight_step_matches_contract": true_field(
+            "operator_sequence_capture_readonly_preflight_step_matches_contract"
+        ),
+        "wing_readonly_operator_sequence_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_operator_sequence_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def _string_list_summary_value(
+    source: Mapping[str, object],
+    field_name: str,
+) -> list[str]:
+    value = source.get(field_name)
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def build_wing_readonly_operator_sequence_list_summary_surface_check(
+    summary: Mapping[str, object],
+) -> dict[str, object]:
+    handoff_artifact = summary.get("wing_readonly_preflight_handoff_packet_artifact")
+    handoff_map: Mapping[str, object]
+    handoff_map = handoff_artifact if isinstance(handoff_artifact, Mapping) else {}
+    expected_sequence = list(preflight_contract.expected_handoff_operator_sequence())
+    operator_sequence = _string_list_summary_value(summary, "operator_sequence")
+    expected_operator_sequence = _string_list_summary_value(
+        summary,
+        "expected_operator_sequence",
+    )
+    artifact_operator_sequence = _string_list_summary_value(
+        handoff_map,
+        "operator_sequence",
+    )
+    artifact_expected_operator_sequence = _string_list_summary_value(
+        handoff_map,
+        "expected_operator_sequence",
+    )
+    mismatches: list[str] = []
+    for field_name in WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_REQUIRED_FIELDS:
+        if field_name not in summary:
+            mismatches.append(f"{field_name}_missing")
+        elif not isinstance(summary.get(field_name), list):
+            mismatches.append(f"{field_name}_not_list")
+        elif not all(isinstance(item, str) for item in summary[field_name]):  # type: ignore[index]
+            mismatches.append(f"{field_name}_contains_non_string")
+
+    if not isinstance(handoff_artifact, Mapping):
+        mismatches.append("wing_readonly_preflight_handoff_packet_artifact_missing")
+    if operator_sequence != artifact_operator_sequence:
+        mismatches.append("operator_sequence_not_matching_handoff_artifact")
+    if expected_operator_sequence != artifact_expected_operator_sequence:
+        mismatches.append(
+            "expected_operator_sequence_not_matching_handoff_artifact"
+        )
+    if operator_sequence != expected_sequence:
+        mismatches.append("operator_sequence_not_matching_contract")
+    if expected_operator_sequence != expected_sequence:
+        mismatches.append("expected_operator_sequence_not_matching_contract")
+    if summary.get("operator_sequence_count") != len(operator_sequence):
+        mismatches.append("operator_sequence_count_not_matching_list_length")
+    if summary.get("expected_operator_sequence_count") != len(expected_operator_sequence):
+        mismatches.append(
+            "expected_operator_sequence_count_not_matching_list_length"
+        )
+
+    return {
+        "wing_readonly_operator_sequence_list_summary_surface_self_check_required": (
+            True
+        ),
+        "wing_readonly_operator_sequence_list_summary_surface_required_fields": (
+            list(WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_REQUIRED_FIELDS)
+        ),
+        "wing_readonly_operator_sequence_list_summary_surface_mismatches": (
+            mismatches
+        ),
+        "wing_readonly_operator_sequence_list_summary_surface_match": not mismatches,
+        "wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_operator_sequence_list_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_wing_readonly_operator_sequence_step_gate_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    def integer_field(name: str) -> int | None:
+        value = handoff_artifact.get(name)
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        return value
+
+    def string_field(name: str) -> str:
+        value = handoff_artifact.get(name)
+        return value if isinstance(value, str) else ""
+
+    def string_list_field(name: str) -> list[str]:
+        value = handoff_artifact.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def mapping_field(name: str) -> dict[str, object]:
+        value = handoff_artifact.get(name)
+        return dict(value) if isinstance(value, Mapping) else {}
+
+    def true_field(name: str) -> bool:
+        return handoff_artifact.get(name) is True
+
+    return {
+        "wing_readonly_operator_sequence_step_gate_summary_surface_required": True,
+        "mvp_blocker_anchor_digest_review_step_index": integer_field(
+            "mvp_blocker_anchor_digest_review_step_index"
+        ),
+        "expected_mvp_blocker_anchor_digest_review_step_index": integer_field(
+            "expected_mvp_blocker_anchor_digest_review_step_index"
+        ),
+        "mvp_blocker_anchor_digest_review_step_index_matches_contract": true_field(
+            "mvp_blocker_anchor_digest_review_step_index_matches_contract"
+        ),
+        "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence": true_field(
+            "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence"
+        ),
+        "operator_sequence_has_mvp_blocker_anchor_digest_review": true_field(
+            "operator_sequence_has_mvp_blocker_anchor_digest_review"
+        ),
+        "operator_sequence_mvp_blocker_anchor_digest_review_step": string_field(
+            "operator_sequence_mvp_blocker_anchor_digest_review_step"
+        ),
+        "operator_sequence_mvp_blocker_anchor_digest_review_step_index": integer_field(
+            "operator_sequence_mvp_blocker_anchor_digest_review_step_index"
+        ),
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index": integer_field(
+            "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index"
+        ),
+        "operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract": true_field(
+            "operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract"
+        ),
+        "operator_sequence_has_supervised_prestart_gate": true_field(
+            "operator_sequence_has_supervised_prestart_gate"
+        ),
+        "operator_sequence_supervised_prestart_gate_step": string_field(
+            "operator_sequence_supervised_prestart_gate_step"
+        ),
+        "operator_sequence_supervised_prestart_gate_step_index": integer_field(
+            "operator_sequence_supervised_prestart_gate_step_index"
+        ),
+        "expected_operator_sequence_supervised_prestart_gate_step_index": integer_field(
+            "expected_operator_sequence_supervised_prestart_gate_step_index"
+        ),
+        "operator_sequence_supervised_prestart_gate_step_index_matches_contract": true_field(
+            "operator_sequence_supervised_prestart_gate_step_index_matches_contract"
+        ),
+        "operator_sequence_supervised_prestart_gate_is_final": true_field(
+            "operator_sequence_supervised_prestart_gate_is_final"
+        ),
+        "required_supervised_prestart_gate_markers": string_list_field(
+            "required_supervised_prestart_gate_markers"
+        ),
+        "expected_required_supervised_prestart_gate_markers": string_list_field(
+            "expected_required_supervised_prestart_gate_markers"
+        ),
+        "required_supervised_prestart_gate_marker_count": integer_field(
+            "required_supervised_prestart_gate_marker_count"
+        ),
+        "expected_required_supervised_prestart_gate_marker_count": integer_field(
+            "expected_required_supervised_prestart_gate_marker_count"
+        ),
+        "required_supervised_prestart_gate_marker_count_matches_contract": true_field(
+            "required_supervised_prestart_gate_marker_count_matches_contract"
+        ),
+        "required_supervised_prestart_gate_marker_count_matches_supervised_gate": true_field(
+            "required_supervised_prestart_gate_marker_count_matches_supervised_gate"
+        ),
+        "required_supervised_prestart_gate_markers_match_contract": true_field(
+            "required_supervised_prestart_gate_markers_match_contract"
+        ),
+        "required_supervised_prestart_gate_markers_match_supervised_gate": true_field(
+            "required_supervised_prestart_gate_markers_match_supervised_gate"
+        ),
+        "supervised_prestart_gate": mapping_field("supervised_prestart_gate"),
+        "expected_supervised_prestart_gate": mapping_field(
+            "expected_supervised_prestart_gate"
+        ),
+        "supervised_prestart_gate_required": true_field(
+            "supervised_prestart_gate_required"
+        ),
+        "supervised_prestart_gate_operator_sequence_step_index": integer_field(
+            "supervised_prestart_gate_operator_sequence_step_index"
+        ),
+        "supervised_prestart_gate_operator_sequence_step_must_be_final": true_field(
+            "supervised_prestart_gate_operator_sequence_step_must_be_final"
+        ),
+        "supervised_prestart_gate_operator_sequence_step": string_field(
+            "supervised_prestart_gate_operator_sequence_step"
+        ),
+        "supervised_prestart_gate_operator_sequence_step_matches_summary": true_field(
+            "supervised_prestart_gate_operator_sequence_step_matches_summary"
+        ),
+        "supervised_prestart_gate_required_markers": string_list_field(
+            "supervised_prestart_gate_required_markers"
+        ),
+        "expected_supervised_prestart_gate_required_markers": string_list_field(
+            "expected_supervised_prestart_gate_required_markers"
+        ),
+        "supervised_prestart_gate_required_marker_count": integer_field(
+            "supervised_prestart_gate_required_marker_count"
+        ),
+        "expected_supervised_prestart_gate_required_marker_count": integer_field(
+            "expected_supervised_prestart_gate_required_marker_count"
+        ),
+        "supervised_prestart_gate_required_marker_count_matches_contract": true_field(
+            "supervised_prestart_gate_required_marker_count_matches_contract"
+        ),
+        "supervised_prestart_gate_required_marker_count_matches_summary": true_field(
+            "supervised_prestart_gate_required_marker_count_matches_summary"
+        ),
+        "supervised_prestart_gate_required_markers_match_contract": true_field(
+            "supervised_prestart_gate_required_markers_match_contract"
+        ),
+        "supervised_prestart_gate_required_markers_match_summary": true_field(
+            "supervised_prestart_gate_required_markers_match_summary"
+        ),
+        "supervised_prestart_gate_grants_live_authority": true_field(
+            "supervised_prestart_gate_grants_live_authority"
+        ),
+        "supervised_prestart_gate_requires_operator_decision_status": string_field(
+            "supervised_prestart_gate_requires_operator_decision_status"
+        ),
+        "supervised_prestart_gate_unlocks_runbook": string_field(
+            "supervised_prestart_gate_unlocks_runbook"
+        ),
+        "supervised_prestart_gate_requires_accepted_candidate_prestart_trace": true_field(
+            "supervised_prestart_gate_requires_accepted_candidate_prestart_trace"
+        ),
+        "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace": true_field(
+            "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace"
+        ),
+        "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace": true_field(
+            "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace"
+        ),
+        "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace": true_field(
+            "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace"
+        ),
+        "supervised_prestart_gate_matches_expected": true_field(
+            "supervised_prestart_gate_matches_expected"
+        ),
+        "declared_supervised_prestart_gate_matches_expected": true_field(
+            "declared_supervised_prestart_gate_matches_expected"
+        ),
+        "wing_readonly_operator_sequence_step_gate_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_operator_sequence_step_gate_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_wing_readonly_supervised_proof_plan_fields_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = handoff_artifact.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def true_field(name: str) -> bool:
+        return handoff_artifact.get(name) is True
+
+    return {
+        "wing_readonly_supervised_proof_plan_fields_summary_surface_required": True,
+        "required_supervised_proof_plan_summary_fields": string_list_field(
+            "required_supervised_proof_plan_summary_fields"
+        ),
+        "expected_required_supervised_proof_plan_summary_fields": string_list_field(
+            "expected_required_supervised_proof_plan_summary_fields"
+        ),
+        "declared_expected_required_supervised_proof_plan_summary_fields": string_list_field(
+            "declared_expected_required_supervised_proof_plan_summary_fields"
+        ),
+        "required_supervised_proof_plan_summary_fields_match_contract": true_field(
+            "required_supervised_proof_plan_summary_fields_match_contract"
+        ),
+        "required_supervised_proof_plan_summary_fields_include_invalid_records": true_field(
+            "required_supervised_proof_plan_summary_fields_include_invalid_records"
+        ),
+        "declared_required_supervised_proof_plan_summary_fields_match_contract": true_field(
+            "declared_required_supervised_proof_plan_summary_fields_match_contract"
+        ),
+        "declared_required_supervised_proof_plan_summary_fields_include_invalid_records": true_field(
+            "declared_required_supervised_proof_plan_summary_fields_include_invalid_records"
+        ),
+        "wing_readonly_supervised_proof_plan_fields_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_supervised_proof_plan_fields_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_candidate_contracts_summary_surface(
+    next_plan: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = next_plan.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def list_field(name: str) -> list[object]:
+        value = next_plan.get(name)
+        return list(value) if isinstance(value, list) else []
+
+    def map_field(name: str) -> dict[str, object]:
+        value = next_plan.get(name)
+        return dict(value) if isinstance(value, Mapping) else {}
+
+    def true_field(name: str) -> bool:
+        return next_plan.get(name) is True
+
+    return {
+        "next_wing_proof_plan_candidate_contracts_summary_surface_required": True,
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid": (
+            true_field(
+                "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+            )
+        ),
+        "readonly_preflight_review_decision_candidate_prestart_source_ids": (
+            string_list_field(
+                "readonly_preflight_review_decision_candidate_prestart_source_ids"
+            )
+        ),
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_expected_candidate_prestart_source_ids": (
+            string_list_field(
+                "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
+            )
+        ),
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_candidate_artifact_root_contract_valid": (
+            true_field(
+                "readonly_preflight_review_decision_candidate_artifact_root_contract_valid"
+            )
+        ),
+        "readonly_preflight_review_decision_candidate_artifact_roots": (
+            string_list_field("readonly_preflight_review_decision_candidate_artifact_roots")
+        ),
+        "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_expected_candidate_artifact_roots": (
+            string_list_field("readonly_preflight_review_decision_expected_candidate_artifact_roots")
+        ),
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_invalid_records": list_field(
+            "readonly_preflight_review_decision_invalid_records"
+        ),
+        "next_wing_proof_plan_candidate_contracts_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_candidate_contracts_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface(
+    next_plan: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = next_plan.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def map_field(name: str) -> dict[str, object]:
+        value = next_plan.get(name)
+        return dict(value) if isinstance(value, Mapping) else {}
+
+    def true_field(name: str) -> bool:
+        return next_plan.get(name) is True
+
+    return {
+        "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_required": (
+            True
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids": (
+            string_list_field(
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids"
+            )
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source": (
+            map_field(
+                "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source"
+            )
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids": (
+            string_list_field(
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
+            )
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete": (
+            true_field(
+                "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface(
+    next_plan: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = next_plan.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def true_field(name: str) -> bool:
+        return next_plan.get(name) is True
+
+    return {
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required": (
+            True
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required": (
+            true_field(
+                "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids": (
+            string_list_field(
+                "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations": (
+            string_list_field(
+                "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed": (
+            true_field(
+                "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_check(
+    summary: Mapping[str, object],
+) -> dict[str, object]:
+    next_plan = summary.get("next_wing_proof_plan")
+    mismatches: list[str] = []
+    if not isinstance(next_plan, Mapping):
+        mismatches.append("next_wing_proof_plan")
+    else:
+        mismatches.extend(
+            field_name
+            for field_name in NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS
+            if summary.get(field_name) != next_plan.get(field_name)
+        )
+
+    return {
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required": (
+            True
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields": (
+            list(
+                NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches": (
+            mismatches
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match": (
+            not mismatches
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface(
+    next_plan: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = next_plan.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def true_field(name: str) -> bool:
+        return next_plan.get(name) is True
+
+    return {
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required": (
+            True
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_required": (
+            true_field(
+                "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_required"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids": (
+            string_list_field(
+                "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations": (
+            string_list_field(
+                "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed": (
+            true_field(
+                "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_check(
+    summary: Mapping[str, object],
+) -> dict[str, object]:
+    next_plan = summary.get("next_wing_proof_plan")
+    mismatches: list[str] = []
+    if not isinstance(next_plan, Mapping):
+        mismatches.append("next_wing_proof_plan")
+    else:
+        mismatches.extend(
+            field_name
+            for field_name in NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS
+            if summary.get(field_name) != next_plan.get(field_name)
+        )
+
+    return {
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required": (
+            True
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields": (
+            list(
+                NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches": (
+            mismatches
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match": (
+            not mismatches
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_required_fields_summary_surface(
+    next_plan: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = next_plan.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    required_fields = string_list_field("required_supervised_proof_plan_summary_fields")
+    missing_fields = string_list_field(
+        "missing_required_supervised_proof_plan_summary_fields"
+    )
+    expected_required_fields = list(
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+    )
+    return {
+        "next_wing_proof_plan_required_fields_summary_surface_required": True,
+        "required_supervised_proof_plan_summary_fields": required_fields,
+        "missing_required_supervised_proof_plan_summary_fields": missing_fields,
+        "next_wing_proof_plan_required_supervised_proof_plan_summary_fields": (
+            required_fields
+        ),
+        "expected_next_wing_proof_plan_required_supervised_proof_plan_summary_fields": (
+            expected_required_fields
+        ),
+        "next_wing_proof_plan_required_supervised_proof_plan_summary_fields_match_contract": (
+            required_fields == expected_required_fields
+        ),
+        "next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields": (
+            missing_fields
+        ),
+        "next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields_empty": (
+            missing_fields == []
+        ),
+        "next_wing_proof_plan_required_fields_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_required_fields_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_project_director_selected_action_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    selected_action_anchor = handoff_artifact.get(
+        "project_director_selected_action_anchor"
+    )
+    if isinstance(selected_action_anchor, Mapping):
+        selected_action = str(selected_action_anchor.get("selected_action") or "")
+    else:
+        selected_action = ""
+    missing_sidecar_markers = [
+        marker
+        for marker in PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS
+        if marker not in selected_action
+    ]
+    missing_denial_markers = [
+        marker
+        for marker in PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_DENIAL_MARKERS
+        if marker not in selected_action
+    ]
+    missing_value_gate_markers = (
+        missing_project_director_selected_action_value_gate_self_check_markers(
+            selected_action
+        )
+    )
+    return {
+        "project_director_selected_action_summary_surface_required": True,
+        "project_director_selected_action_source": str(
+            handoff_artifact.get("project_director_selected_action_source") or ""
+        ),
+        "expected_project_director_selected_action_source": str(
+            handoff_artifact.get("expected_project_director_selected_action_source")
+            or ""
+        ),
+        "project_director_selected_action_source_matches_current_directive": (
+            handoff_artifact.get(
+                "project_director_selected_action_source_matches_current_directive"
+            )
+            is True
+        ),
+        "project_director_selected_action_sha256": str(
+            handoff_artifact.get("project_director_selected_action_sha256") or ""
+        ),
+        "actual_project_director_selected_action_sha256": str(
+            handoff_artifact.get("actual_project_director_selected_action_sha256")
+            or ""
+        ),
+        "expected_project_director_selected_action_sha256": str(
+            handoff_artifact.get("expected_project_director_selected_action_sha256")
+            or ""
+        ),
+        "project_director_selected_action_sha256_available": (
+            handoff_artifact.get("project_director_selected_action_sha256_available")
+            is True
+        ),
+        "project_director_selected_action_sha256_available_matches_digest": (
+            handoff_artifact.get(
+                "project_director_selected_action_sha256_available_matches_digest"
+            )
+            is True
+        ),
+        "project_director_selected_action_sha256_matches_anchor": (
+            handoff_artifact.get(
+                "project_director_selected_action_sha256_matches_anchor"
+            )
+            is True
+        ),
+        "project_director_selected_action_sha256_matches_text": (
+            handoff_artifact.get("project_director_selected_action_sha256_matches_text")
+            is True
+        ),
+        "project_director_selected_action_sha256_matches_current_directive": (
+            handoff_artifact.get(
+                "project_director_selected_action_sha256_matches_current_directive"
+            )
+            is True
+        ),
+        "project_director_selected_action_anchor_matches_current_directive": (
+            handoff_artifact.get(
+                "project_director_selected_action_anchor_matches_current_directive"
+            )
+            is True
+        ),
+        "project_director_current_first_command_baseline_coverage_required": (
+            handoff_artifact.get(
+                "project_director_current_first_command_baseline_coverage_required"
+            )
+            is True
+        ),
+        "project_director_current_first_command_baseline_coverage_passed": (
+            handoff_artifact.get(
+                "project_director_current_first_command_baseline_coverage_passed"
+            )
+            is True
+        ),
+        "project_director_current_first_command_baseline_coverage_marker_count": int(
+            handoff_artifact.get(
+                "project_director_current_first_command_baseline_coverage_marker_count"
+            )
+            or 0
+        ),
+        "project_director_current_first_command_baseline_missing_markers": (
+            list(
+                handoff_artifact.get(
+                    "project_director_current_first_command_baseline_missing_markers"
+                )
+            )
+            if isinstance(
+                handoff_artifact.get(
+                    "project_director_current_first_command_baseline_missing_markers"
+                ),
+                list,
+            )
+            else []
+        ),
+        "project_director_selected_action_manifest_sidecar_required_markers": list(
+            PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS
+        ),
+        "project_director_selected_action_manifest_sidecar_missing_markers": (
+            missing_sidecar_markers
+        ),
+        "project_director_selected_action_manifest_sidecar_checklist_present": (
+            not missing_sidecar_markers
+        ),
+        "project_director_selected_action_manifest_sidecar_denial_markers": list(
+            PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_DENIAL_MARKERS
+        ),
+        "project_director_selected_action_manifest_sidecar_denial_missing_markers": (
+            missing_denial_markers
+        ),
+        "project_director_selected_action_manifest_sidecar_denial_present": (
+            not missing_denial_markers
+        ),
+        "project_director_selected_action_value_gate_self_check_required": True,
+        "project_director_selected_action_value_gate_self_check_required_markers": (
+            list(
+                PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_REQUIRED_MARKERS
+            )
+        ),
+        "project_director_selected_action_value_gate_self_check_missing_markers": (
+            missing_value_gate_markers
+        ),
+        "project_director_selected_action_value_gate_self_check_markers_present": (
+            not missing_value_gate_markers
+        ),
+        "project_director_selected_action_value_gate_self_check_readiness_closure_allowed": (
+            False
+        ),
+        "project_director_selected_action_value_gate_self_check_live_authority_granted": (
+            False
+        ),
+        "project_director_selected_action_value_gate_self_check_markdown_surface_required": (
+            True
+        ),
+        "project_director_selected_action_value_gate_self_check_markdown_surface_required_field_lines": (
+            list(
+                PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES
+            )
+        ),
+        "project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines": (
+            []
+        ),
+        "project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered": (
+            True
+        ),
+        "project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed": (
+            False
+        ),
+        "project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted": (
+            False
+        ),
+    }
 
 
 def wing_readonly_preflight_review_decision_summary(
@@ -15329,8 +19661,15 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_candidate_prestart_contract_violations_by_source = detail.get(
             "accepted_candidate_prestart_contract_violations_by_source"
         )
+        accepted_candidate_artifact_roots = detail.get(
+            "accepted_candidate_artifact_roots"
+        )
+        accepted_candidate_artifact_root_contract_violations_by_source = detail.get(
+            "accepted_candidate_artifact_root_contract_violations_by_source"
+        )
         rejected_source_ids = detail.get("rejected_source_ids")
         invalid_record_ids = detail.get("invalid_record_ids")
+        invalid_records = detail.get("invalid_records")
         duplicate_source_ids = detail.get("duplicate_source_ids")
         conflicting_source_ids = detail.get("conflicting_source_ids")
         unreviewed_candidate_source_ids = detail.get("unreviewed_candidate_source_ids")
@@ -15398,6 +19737,22 @@ def wing_readonly_preflight_review_decision_summary(
                 )
                 else {}
             ),
+            "accepted_candidate_artifact_root_contract_valid": (
+                detail.get("accepted_candidate_artifact_root_contract_valid") is True
+            ),
+            "accepted_candidate_artifact_roots": (
+                list(accepted_candidate_artifact_roots)
+                if isinstance(accepted_candidate_artifact_roots, list)
+                else []
+            ),
+            "accepted_candidate_artifact_root_contract_violations_by_source": (
+                dict(accepted_candidate_artifact_root_contract_violations_by_source)
+                if isinstance(
+                    accepted_candidate_artifact_root_contract_violations_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
             "rejected_source_ids": (
                 list(rejected_source_ids)
                 if isinstance(rejected_source_ids, list)
@@ -15407,6 +19762,9 @@ def wing_readonly_preflight_review_decision_summary(
                 list(invalid_record_ids)
                 if isinstance(invalid_record_ids, list)
                 else []
+            ),
+            "invalid_records": (
+                list(invalid_records) if isinstance(invalid_records, list) else []
             ),
             "duplicate_source_ids": (
                 list(duplicate_source_ids)
@@ -17715,6 +22073,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         if result.name != "next_wing_proof_plan_schema":
             continue
         detail = result.detail if isinstance(result.detail, Mapping) else {}
+        allowed_supervised_live_value_types = detail.get(
+            "allowed_supervised_live_value_types"
+        )
         planned_value_types = detail.get("planned_value_types")
         planned_channels = detail.get("planned_channels")
         readonly_preflight_blocked_by = detail.get("readonly_preflight_blocked_by")
@@ -17736,6 +22097,76 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         readonly_preflight_review_decision_expected_candidate_prestart_source_ids = detail.get(
             "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
         )
+        readonly_preflight_review_decision_candidate_request_sequence_source_ids = detail.get(
+            "readonly_preflight_review_decision_candidate_request_sequence_source_ids"
+        )
+        readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids = detail.get(
+            "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids"
+        )
+        readonly_preflight_review_decision_candidate_artifact_roots = detail.get(
+            "readonly_preflight_review_decision_candidate_artifact_roots"
+        )
+        readonly_preflight_review_decision_expected_candidate_artifact_roots = detail.get(
+            "readonly_preflight_review_decision_expected_candidate_artifact_roots"
+        )
+        required_supervised_proof_plan_summary_fields = detail.get(
+            "required_supervised_proof_plan_summary_fields"
+        )
+        missing_required_supervised_proof_plan_summary_fields = detail.get(
+            "missing_required_supervised_proof_plan_summary_fields"
+        )
+        accepted_candidate_expected_artifact_trace_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids"
+        )
+        accepted_candidate_expected_artifacts_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source"
+        )
+        accepted_candidate_expected_summary_artifact_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source"
+        )
+        accepted_candidate_expected_events_artifact_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source"
+        )
+        accepted_candidate_summary_path_matches_expected_artifact_by_source = (
+            detail.get(
+                "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source"
+            )
+        )
+        accepted_candidate_events_path_matches_expected_artifact_by_source = (
+            detail.get(
+                "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source"
+            )
+        )
+        accepted_candidate_expected_artifact_trace_missing_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
+        )
+        accepted_candidate_request_sequence_trace_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids"
+        )
+        accepted_candidate_request_sequence_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source"
+        )
+        accepted_candidate_plan_request_sequence_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+        )
+        accepted_candidate_request_sequence_matches_plan_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
+        )
+        accepted_candidate_request_sequence_trace_missing_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids"
+        )
+        accepted_candidate_expected_artifact_trace_value_gate_violation_ids = detail.get(
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids"
+        )
+        raw_trace_value_gate_violations = detail.get(
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations"
+        )
+        accepted_candidate_request_sequence_trace_value_gate_violation_ids = detail.get(
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids"
+        )
+        raw_request_trace_value_gate_violations = detail.get(
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations"
+        )
         (
             readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source,
             _,
@@ -17752,8 +22183,134 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                 "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
             )
         )
+        (
+            readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source,
+            _,
+        ) = _string_list_map(
+            detail.get(
+                "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source"
+            )
+        )
+        (
+            readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source,
+            _,
+        ) = _string_list_map(
+            detail.get(
+                "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source"
+            )
+        )
+        (
+            normalized_accepted_candidate_request_sequence_by_source,
+            _,
+        ) = _mapping_list_map_exact(accepted_candidate_request_sequence_by_source)
+        (
+            normalized_accepted_candidate_plan_request_sequence_by_source,
+            _,
+        ) = _mapping_list_map_exact(accepted_candidate_plan_request_sequence_by_source)
+        (
+            normalized_accepted_candidate_request_sequence_matches_plan_by_source,
+            _,
+        ) = _bool_value_map(
+            accepted_candidate_request_sequence_matches_plan_by_source
+        )
+        (
+            readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source,
+            _,
+        ) = _string_list_map(
+            detail.get(
+                "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source"
+            )
+        )
+        (
+            readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source,
+            _,
+        ) = _string_list_map(
+            detail.get(
+                "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
+            )
+        )
         global_blockers = detail.get("global_blockers")
         violations = detail.get("violations")
+        trace_value_gate_violation_ids = (
+            list(accepted_candidate_expected_artifact_trace_value_gate_violation_ids)
+            if isinstance(
+                accepted_candidate_expected_artifact_trace_value_gate_violation_ids,
+                list,
+            )
+            else list(
+                NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_VIOLATIONS
+            )
+        )
+        trace_value_gate_violations = (
+            list(raw_trace_value_gate_violations)
+            if isinstance(raw_trace_value_gate_violations, list)
+            else [
+                violation
+                for violation in violations
+                if violation in trace_value_gate_violation_ids
+            ]
+            if isinstance(violations, list)
+            else []
+        )
+        trace_value_gate_passed = (
+            detail.get(
+                "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed"
+            )
+            is True
+            if "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed"
+            in detail
+            else not trace_value_gate_violations
+        )
+        request_trace_value_gate_violation_ids = (
+            list(accepted_candidate_request_sequence_trace_value_gate_violation_ids)
+            if isinstance(
+                accepted_candidate_request_sequence_trace_value_gate_violation_ids,
+                list,
+            )
+            else list(
+                NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_VIOLATIONS
+            )
+        )
+        request_trace_value_gate_violations = (
+            list(raw_request_trace_value_gate_violations)
+            if isinstance(raw_request_trace_value_gate_violations, list)
+            else [
+                violation
+                for violation in violations
+                if violation in request_trace_value_gate_violation_ids
+            ]
+            if isinstance(violations, list)
+            else []
+        )
+        request_trace_value_gate_passed = (
+            detail.get(
+                "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed"
+            )
+            is True
+            if "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed"
+            in detail
+            else not request_trace_value_gate_violations
+        )
+        normalized_allowed_supervised_live_value_types = (
+            list(allowed_supervised_live_value_types)
+            if isinstance(allowed_supervised_live_value_types, list)
+            else []
+        )
+        expected_allowed_supervised_live_value_types_value = json.dumps(
+            WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
+        )
+        actual_allowed_supervised_live_value_types_value = json.dumps(
+            normalized_allowed_supervised_live_value_types
+        )
+        allowed_supervised_live_value_types_match_contract = (
+            actual_allowed_supervised_live_value_types_value
+            == expected_allowed_supervised_live_value_types_value
+        )
+        allowed_supervised_live_value_type_mismatches = (
+            []
+            if allowed_supervised_live_value_types_match_contract
+            else ["allowed_supervised_live_value_types"]
+        )
         return {
             "status": result.status,
             "read_only": True,
@@ -17762,6 +22319,24 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "operator_required": True,
             "full_autonomous_ready": False,
             "plan_status": detail.get("plan_status"),
+            "allowed_supervised_live_value_types": (
+                normalized_allowed_supervised_live_value_types
+            ),
+            "operator_markdown_summary_allowed_supervised_live_value_types_expected_value": (
+                expected_allowed_supervised_live_value_types_value
+            ),
+            "operator_markdown_summary_allowed_supervised_live_value_types_actual_value": (
+                actual_allowed_supervised_live_value_types_value
+            ),
+            "operator_markdown_summary_allowed_supervised_live_value_types_match_contract": (
+                allowed_supervised_live_value_types_match_contract
+            ),
+            "operator_markdown_summary_values_match_contract": (
+                not allowed_supervised_live_value_type_mismatches
+            ),
+            "operator_markdown_summary_value_mismatches": (
+                allowed_supervised_live_value_type_mismatches
+            ),
             "step_count": int(detail.get("step_count") or 0),
             "planned_value_types": list(planned_value_types) if isinstance(planned_value_types, list) else [],
             "planned_channels": list(planned_channels) if isinstance(planned_channels, list) else [],
@@ -17890,6 +22465,70 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                     readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source
                 )
             ),
+            "readonly_preflight_review_decision_candidate_request_sequence_contract_valid": (
+                detail.get(
+                    "readonly_preflight_review_decision_candidate_request_sequence_contract_valid"
+                )
+                is True
+            ),
+            "readonly_preflight_review_decision_candidate_request_sequence_source_ids": (
+                list(readonly_preflight_review_decision_candidate_request_sequence_source_ids)
+                if isinstance(
+                    readonly_preflight_review_decision_candidate_request_sequence_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source": (
+                dict(
+                    readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source
+                )
+            ),
+            "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids": (
+                list(readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids)
+                if isinstance(
+                    readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source": (
+                dict(
+                    readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source
+                )
+            ),
+            "readonly_preflight_review_decision_candidate_artifact_root_contract_valid": (
+                detail.get(
+                    "readonly_preflight_review_decision_candidate_artifact_root_contract_valid"
+                )
+                is True
+            ),
+            "readonly_preflight_review_decision_candidate_artifact_roots": (
+                list(readonly_preflight_review_decision_candidate_artifact_roots)
+                if isinstance(
+                    readonly_preflight_review_decision_candidate_artifact_roots,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source": (
+                dict(
+                    readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source
+                )
+            ),
+            "readonly_preflight_review_decision_expected_candidate_artifact_roots": (
+                list(readonly_preflight_review_decision_expected_candidate_artifact_roots)
+                if isinstance(
+                    readonly_preflight_review_decision_expected_candidate_artifact_roots,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source": (
+                dict(
+                    readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source
+                )
+            ),
             "readonly_preflight_review_decision_rejected_source_ids": (
                 list(detail.get("readonly_preflight_review_decision_rejected_source_ids"))
                 if isinstance(
@@ -17905,6 +22544,14 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                 list(detail.get("readonly_preflight_review_decision_invalid_record_ids"))
                 if isinstance(
                     detail.get("readonly_preflight_review_decision_invalid_record_ids"),
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_invalid_records": (
+                list(detail.get("readonly_preflight_review_decision_invalid_records"))
+                if isinstance(
+                    detail.get("readonly_preflight_review_decision_invalid_records"),
                     list,
                 )
                 else []
@@ -17928,14 +22575,977 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_review_decision_unreviewed_candidate_count": int(
                 detail.get("readonly_preflight_review_decision_unreviewed_candidate_count") or 0
             ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids": (
+                list(accepted_candidate_expected_artifact_trace_source_ids)
+                if isinstance(
+                    accepted_candidate_expected_artifact_trace_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source": (
+                dict(accepted_candidate_expected_artifacts_by_source)
+                if isinstance(accepted_candidate_expected_artifacts_by_source, Mapping)
+                else {}
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source": (
+                dict(accepted_candidate_expected_summary_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_expected_summary_artifact_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source": (
+                dict(accepted_candidate_expected_events_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_expected_events_artifact_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source": (
+                dict(accepted_candidate_summary_path_matches_expected_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_summary_path_matches_expected_artifact_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source": (
+                dict(accepted_candidate_events_path_matches_expected_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_events_path_matches_expected_artifact_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids": (
+                list(accepted_candidate_expected_artifact_trace_missing_source_ids)
+                if isinstance(
+                    accepted_candidate_expected_artifact_trace_missing_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete": (
+                detail.get(
+                    "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+                )
+                is True
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids": (
+                list(accepted_candidate_request_sequence_trace_source_ids)
+                if isinstance(
+                    accepted_candidate_request_sequence_trace_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source": (
+                dict(normalized_accepted_candidate_request_sequence_by_source)
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source": (
+                dict(normalized_accepted_candidate_plan_request_sequence_by_source)
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source": (
+                dict(
+                    normalized_accepted_candidate_request_sequence_matches_plan_by_source
+                )
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids": (
+                list(accepted_candidate_request_sequence_trace_missing_source_ids)
+                if isinstance(
+                    accepted_candidate_request_sequence_trace_missing_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete": (
+                detail.get(
+                    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
+                )
+                is True
+            ),
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required": (
+                True
+            ),
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids": (
+                trace_value_gate_violation_ids
+            ),
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations": (
+                trace_value_gate_violations
+            ),
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed": (
+                trace_value_gate_passed
+            ),
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed": (
+                False
+            ),
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted": (
+                False
+            ),
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_required": (
+                True
+            ),
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids": (
+                request_trace_value_gate_violation_ids
+            ),
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations": (
+                request_trace_value_gate_violations
+            ),
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed": (
+                request_trace_value_gate_passed
+            ),
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed": (
+                False
+            ),
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted": (
+                False
+            ),
+            "required_supervised_proof_plan_summary_fields": (
+                list(required_supervised_proof_plan_summary_fields)
+                if isinstance(required_supervised_proof_plan_summary_fields, list)
+                else []
+            ),
+            "missing_required_supervised_proof_plan_summary_fields": (
+                list(missing_required_supervised_proof_plan_summary_fields)
+                if isinstance(
+                    missing_required_supervised_proof_plan_summary_fields,
+                    list,
+                )
+                else []
+            ),
+            "operator_markdown_summary_required": True,
+            "operator_markdown_summary_section": (
+                NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SECTION
+            ),
+            "operator_markdown_summary_required_field_lines": list(
+                NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES
+            ),
+            "operator_markdown_summary_required_field_lines_missing_members": [],
+            "operator_markdown_summary_required_field_lines_match_contract": True,
+            "operator_markdown_summary_missing_field_lines": [],
+            "operator_markdown_summary_field_lines_rendered": True,
             "global_blockers": list(global_blockers) if isinstance(global_blockers, list) else [],
             "violations": list(violations) if isinstance(violations, list) else [],
         }
     return None
 
 
+def apply_next_wing_proof_plan_operator_markdown_surface_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    next_plan = summary.get("next_wing_proof_plan")
+    if not isinstance(next_plan, dict):
+        return
+
+    required_lines = list(NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES)
+    missing_lines = [
+        field_name
+        for field_name in required_lines
+        if f"- {field_name}: `" not in markdown_text
+    ]
+    section_present = NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SECTION in markdown_text
+    if not section_present:
+        missing_lines = required_lines
+
+    field_lines_prefix = "- operator_markdown_summary_required_field_lines: `"
+    rendered_required_field_lines: object | None = None
+    for line in markdown_text.splitlines():
+        if line.startswith(field_lines_prefix) and line.endswith("`"):
+            try:
+                rendered_required_field_lines = json.loads(
+                    line[len(field_lines_prefix) : -1]
+                )
+            except json.JSONDecodeError:
+                rendered_required_field_lines = None
+            break
+    missing_required_field_line_members = (
+        [
+            field_name
+            for field_name in required_lines
+            if field_name not in rendered_required_field_lines
+        ]
+        if isinstance(rendered_required_field_lines, list)
+        else required_lines
+    )
+    expected_allowed_supervised_live_value_types_value = json.dumps(
+        WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
+    )
+    actual_allowed_supervised_live_value_types_value = (
+        _extract_markdown_summary_field_value(
+            markdown_text,
+            "allowed_supervised_live_value_types",
+        )
+    )
+    allowed_supervised_live_value_types_match_contract = (
+        actual_allowed_supervised_live_value_types_value
+        == expected_allowed_supervised_live_value_types_value
+    )
+    expected_allowed_value_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "operator_markdown_summary_allowed_supervised_live_value_types_expected_value",
+    )
+    actual_allowed_value_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "operator_markdown_summary_allowed_supervised_live_value_types_actual_value",
+    )
+    allowed_match_contract_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "operator_markdown_summary_allowed_supervised_live_value_types_match_contract",
+    )
+    values_match_contract_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "operator_markdown_summary_values_match_contract",
+    )
+    allowed_match_contract_text = (
+        "true" if allowed_supervised_live_value_types_match_contract else "false"
+    )
+    value_mismatches: list[str] = []
+    if (
+        actual_allowed_supervised_live_value_types_value is not None
+        and not allowed_supervised_live_value_types_match_contract
+    ):
+        value_mismatches.append("allowed_supervised_live_value_types")
+    if (
+        expected_allowed_value_line_value is not None
+        and expected_allowed_value_line_value
+        != expected_allowed_supervised_live_value_types_value
+    ):
+        value_mismatches.append(
+            "operator_markdown_summary_allowed_supervised_live_value_types_expected_value"
+        )
+    if (
+        actual_allowed_value_line_value is not None
+        and actual_allowed_value_line_value
+        != actual_allowed_supervised_live_value_types_value
+    ):
+        value_mismatches.append(
+            "operator_markdown_summary_allowed_supervised_live_value_types_actual_value"
+        )
+    if (
+        allowed_match_contract_line_value is not None
+        and allowed_match_contract_line_value != allowed_match_contract_text
+    ):
+        value_mismatches.append(
+            "operator_markdown_summary_allowed_supervised_live_value_types_match_contract"
+        )
+    values_match_contract_text = (
+        "true"
+        if allowed_supervised_live_value_types_match_contract and not value_mismatches
+        else "false"
+    )
+    if (
+        values_match_contract_line_value is not None
+        and values_match_contract_line_value != values_match_contract_text
+    ):
+        value_mismatches.append("operator_markdown_summary_values_match_contract")
+
+    next_plan["operator_markdown_summary_required"] = True
+    next_plan["operator_markdown_summary_section"] = (
+        NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SECTION
+    )
+    next_plan["operator_markdown_summary_required_field_lines"] = required_lines
+    next_plan["operator_markdown_summary_required_field_lines_missing_members"] = (
+        missing_required_field_line_members
+    )
+    next_plan["operator_markdown_summary_required_field_lines_match_contract"] = (
+        section_present and not missing_required_field_line_members
+    )
+    next_plan[
+        "operator_markdown_summary_allowed_supervised_live_value_types_expected_value"
+    ] = expected_allowed_supervised_live_value_types_value
+    next_plan[
+        "operator_markdown_summary_allowed_supervised_live_value_types_actual_value"
+    ] = actual_allowed_supervised_live_value_types_value
+    next_plan[
+        "operator_markdown_summary_allowed_supervised_live_value_types_match_contract"
+    ] = allowed_supervised_live_value_types_match_contract
+    next_plan["operator_markdown_summary_values_match_contract"] = (
+        allowed_supervised_live_value_types_match_contract and not value_mismatches
+    )
+    next_plan["operator_markdown_summary_value_mismatches"] = value_mismatches
+    next_plan["operator_markdown_summary_missing_field_lines"] = missing_lines
+    next_plan["operator_markdown_summary_field_lines_rendered"] = (
+        section_present and not missing_lines and not missing_required_field_line_members
+    )
+
+    if (
+        missing_lines
+        or missing_required_field_line_members
+        or not allowed_supervised_live_value_types_match_contract
+        or value_mismatches
+    ):
+        failed_checks = summary.setdefault("failed_checks", [])
+        if (
+            isinstance(failed_checks, list)
+            and NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SURFACE_CHECK_NAME
+            not in failed_checks
+        ):
+            failed_checks.append(NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SURFACE_CHECK_NAME)
+        summary["status"] = "failed"
+
+
+def apply_project_director_selected_action_value_gate_self_check_markdown_surface_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    if (
+        summary.get("project_director_selected_action_value_gate_self_check_required")
+        is not True
+    ):
+        return
+
+    required_lines = list(
+        PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES
+    )
+    missing_lines = [
+        field_name
+        for field_name in required_lines
+        if f"- {field_name}: `" not in markdown_text
+    ]
+
+    summary[
+        "project_director_selected_action_value_gate_self_check_markdown_surface_required"
+    ] = True
+    summary[
+        "project_director_selected_action_value_gate_self_check_markdown_surface_required_field_lines"
+    ] = required_lines
+    summary[
+        "project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines"
+    ] = missing_lines
+    summary[
+        "project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered"
+    ] = not missing_lines
+    summary[
+        "project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed"
+    ] = False
+    summary[
+        "project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted"
+    ] = False
+
+    if missing_lines:
+        failed_checks = summary.setdefault("failed_checks", [])
+        if (
+            isinstance(failed_checks, list)
+            and PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_MARKDOWN_SURFACE_CHECK_NAME
+            not in failed_checks
+        ):
+            failed_checks.append(
+                PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_MARKDOWN_SURFACE_CHECK_NAME
+            )
+        summary["status"] = "failed"
+
+
+def apply_no_wing_artifact_manifest_summary_surface_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    required_lines = list(
+        NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELD_LINES
+    )
+    missing_lines = [
+        field_name
+        for field_name in required_lines
+        if f"- {field_name}: `" not in markdown_text
+    ]
+
+    summary["artifact_manifest_summary_surface_required"] = True
+    summary["artifact_manifest_summary_surface_required_fields"] = list(
+        NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS
+    )
+    summary["artifact_manifest_summary_surface_required_field_lines"] = required_lines
+    summary["artifact_manifest_summary_surface_missing_field_lines"] = missing_lines
+    summary["artifact_manifest_summary_surface_field_lines_rendered"] = not missing_lines
+
+    if missing_lines:
+        mark_no_wing_artifact_manifest_summary_surface_failed(summary)
+
+
+def mark_no_wing_artifact_manifest_summary_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
+def mark_wing_readonly_operator_sequence_list_summary_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_CHECK_NAME)
+    summary["status"] = "failed"
+
+
+def mark_wing_readonly_operator_sequence_list_markdown_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
+def mark_no_wing_artifact_manifest_cross_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CROSS_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CROSS_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
+def mark_no_wing_artifact_manifest_self_consistency_summary_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
+def mark_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
+def mark_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
+def _format_markdown_summary_field_line(field_name: str, value: object) -> str:
+    if isinstance(value, bool):
+        rendered_value = "true" if value else "false"
+    elif isinstance(value, (dict, list)):
+        rendered_value = json.dumps(value)
+    else:
+        rendered_value = str(value)
+    return f"- {field_name}: `{rendered_value}`"
+
+
+def _replace_markdown_summary_field_line(
+    lines: list[str],
+    field_name: str,
+    value: object,
+) -> None:
+    prefix = f"- {field_name}: "
+    if isinstance(value, bool):
+        rendered_value = "true" if value else "false"
+    elif isinstance(value, (dict, list)):
+        rendered_value = json.dumps(value)
+    else:
+        rendered_value = str(value)
+    for index, line in enumerate(lines):
+        if line.startswith(prefix):
+            lines[index] = f"{prefix}`{rendered_value}`"
+            return
+
+
+def _extract_markdown_summary_field_value(
+    markdown_text: str,
+    field_name: str,
+) -> str | None:
+    prefix = f"- {field_name}: `"
+    for line in markdown_text.splitlines():
+        if line.startswith(prefix) and line.endswith("`"):
+            return line[len(prefix) : -1]
+    return None
+
+
+def apply_no_wing_artifact_manifest_summary_json_surface_check(
+    summary: dict[str, object],
+) -> None:
+    required_fields = list(
+        NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS
+    )
+    missing_fields = [
+        field_name for field_name in required_fields if field_name not in summary
+    ]
+
+    summary["artifact_manifest_summary_surface_required"] = True
+    summary["artifact_manifest_summary_surface_required_fields"] = required_fields
+    summary["artifact_manifest_summary_surface_missing_fields"] = missing_fields
+
+    if missing_fields:
+        mark_no_wing_artifact_manifest_summary_surface_failed(summary)
+
+
+def apply_no_wing_artifact_manifest_contract_cross_surface_summary_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    check = build_no_wing_artifact_manifest_contract_cross_surface_check_from_surfaces(
+        summary,
+        markdown_text,
+        contract_sha256=no_wing_artifact_manifest_contract_sha256(),
+    )
+    summary.update(check)
+
+    if check["artifact_manifest_contract_cross_surface_match"] is not True:
+        mark_no_wing_artifact_manifest_cross_surface_failed(summary)
+
+
+def apply_no_wing_artifact_manifest_self_consistency_summary_surface_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    check = build_no_wing_artifact_manifest_self_consistency_summary_surface_check(
+        summary,
+        markdown_text,
+    )
+    summary.update(check)
+
+    if check["artifact_manifest_self_consistency_summary_surface_match"] is not True:
+        mark_no_wing_artifact_manifest_self_consistency_summary_surface_failed(summary)
+
+
+def apply_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_check(
+    summary: dict[str, object],
+) -> None:
+    check = build_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_check(
+        summary
+    )
+    summary.update(check)
+
+    if (
+        check[
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match"
+        ]
+        is not True
+    ):
+        mark_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_failed(
+            summary
+        )
+
+
+def apply_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_check(
+    summary: dict[str, object],
+) -> None:
+    check = build_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_check(
+        summary
+    )
+    summary.update(check)
+
+    if (
+        check[
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match"
+        ]
+        is not True
+    ):
+        mark_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_failed(
+            summary
+        )
+
+
+def apply_wing_readonly_operator_sequence_list_summary_surface_check(
+    summary: dict[str, object],
+) -> None:
+    check = build_wing_readonly_operator_sequence_list_summary_surface_check(summary)
+    summary.update(check)
+
+    if (
+        check["wing_readonly_operator_sequence_list_summary_surface_match"]
+        is not True
+    ):
+        mark_wing_readonly_operator_sequence_list_summary_surface_failed(summary)
+
+
+def build_wing_readonly_operator_sequence_list_markdown_surface_check_defaults() -> dict[
+    str, object
+]:
+    required_field_lines_value = json.dumps(
+        list(WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES)
+    )
+    return {
+        "wing_readonly_operator_sequence_list_markdown_surface_required": True,
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines": (
+            list(WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES)
+        ),
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value": (
+            required_field_lines_value
+        ),
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value": (
+            required_field_lines_value
+        ),
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract": (
+            True
+        ),
+        "wing_readonly_operator_sequence_list_markdown_surface_values_match_contract": (
+            True
+        ),
+        "wing_readonly_operator_sequence_list_markdown_surface_value_mismatches": [],
+        "wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines": [],
+        "wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered": True,
+        "wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def apply_wing_readonly_operator_sequence_list_markdown_surface_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    if "wing_readonly_preflight_handoff_packet_artifact" not in summary:
+        return
+
+    required_lines = list(
+        WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES
+    )
+    expected_required_field_lines_value = json.dumps(required_lines)
+    actual_required_field_lines_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines",
+    )
+    required_field_lines_match_contract = (
+        actual_required_field_lines_value == expected_required_field_lines_value
+    )
+    expected_value_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value",
+    )
+    actual_value_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value",
+    )
+    match_contract_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract",
+    )
+    required_field_lines_match_contract_text = (
+        "true" if required_field_lines_match_contract else "false"
+    )
+    value_mismatches: list[str] = []
+    if (
+        expected_value_line_value is not None
+        and expected_value_line_value != expected_required_field_lines_value
+    ):
+        value_mismatches.append(
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value"
+        )
+    if (
+        actual_value_line_value is not None
+        and actual_value_line_value != actual_required_field_lines_value
+    ):
+        value_mismatches.append(
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value"
+        )
+    if (
+        match_contract_line_value is not None
+        and match_contract_line_value != required_field_lines_match_contract_text
+    ):
+        value_mismatches.append(
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract"
+        )
+    missing_lines = [
+        field_name
+        for field_name in required_lines
+        if f"- {field_name}: `" not in markdown_text
+    ]
+    check = build_wing_readonly_operator_sequence_list_markdown_surface_check_defaults()
+    check.update(
+        {
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines": (
+                required_lines
+            ),
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value": (
+                expected_required_field_lines_value
+            ),
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value": (
+                actual_required_field_lines_value
+            ),
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract": (
+                required_field_lines_match_contract
+            ),
+            "wing_readonly_operator_sequence_list_markdown_surface_values_match_contract": (
+                not value_mismatches
+            ),
+            "wing_readonly_operator_sequence_list_markdown_surface_value_mismatches": (
+                value_mismatches
+            ),
+            "wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines": (
+                missing_lines
+            ),
+            "wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered": (
+                not missing_lines
+            ),
+        }
+    )
+    summary.update(check)
+
+    if (
+        missing_lines
+        or not required_field_lines_match_contract
+        or value_mismatches
+    ):
+        mark_wing_readonly_operator_sequence_list_markdown_surface_failed(summary)
+
+
+def bind_next_wing_proof_plan_operator_markdown_artifact(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    next_plan = summary.get("next_wing_proof_plan")
+    if not isinstance(next_plan, dict):
+        return
+
+    next_plan["operator_markdown_summary_artifact"] = (
+        NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT
+    )
+    next_plan["operator_markdown_summary_sha256"] = hashlib.sha256(
+        markdown_text.encode("utf-8")
+    ).hexdigest()
+    next_plan["operator_markdown_summary_sha256_available"] = True
+
+
+def apply_next_wing_proof_plan_operator_markdown_artifact_integrity_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    next_plan = summary.get("next_wing_proof_plan")
+    if not isinstance(next_plan, dict):
+        return
+
+    actual_sha256 = hashlib.sha256(markdown_text.encode("utf-8")).hexdigest()
+    declared_sha256 = str(next_plan.get("operator_markdown_summary_sha256") or "")
+    sha_available = next_plan.get("operator_markdown_summary_sha256_available") is True
+    matches_actual = sha_available and declared_sha256 == actual_sha256
+    next_plan["operator_markdown_summary_actual_sha256"] = actual_sha256
+    next_plan["operator_markdown_summary_sha256_matches_actual"] = matches_actual
+
+    if not matches_actual:
+        failed_checks = summary.setdefault("failed_checks", [])
+        if (
+            isinstance(failed_checks, list)
+            and NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT_INTEGRITY_CHECK_NAME
+            not in failed_checks
+        ):
+            failed_checks.append(
+                NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT_INTEGRITY_CHECK_NAME
+            )
+        summary["status"] = "failed"
+
+
+def write_no_wing_release_check_artifact_manifest(
+    run_dir: Path,
+    *,
+    generated_at: str,
+) -> dict[str, object]:
+    artifact_specs = NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_SPECS
+    required_artifact_ids = [artifact_id for artifact_id, _ in artifact_specs]
+    required_artifact_paths = [relative_path for _, relative_path in artifact_specs]
+    artifacts: list[dict[str, object]] = []
+    for artifact_id, relative_path in artifact_specs:
+        path = run_dir / relative_path
+        content = path.read_bytes()
+        artifacts.append(
+            {
+                "artifact_id": artifact_id,
+                "path": relative_path,
+                "required": True,
+                "byte_count": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+        )
+
+    artifacts_by_id = {str(artifact["artifact_id"]): artifact for artifact in artifacts}
+    artifact_ids = [str(artifact["artifact_id"]) for artifact in artifacts]
+    artifact_paths = [str(artifact["path"]) for artifact in artifacts]
+    summary_json = artifacts_by_id["summary_json"]
+    summary_md = artifacts_by_id["summary_md"]
+    summary_json_sha256 = summary_json["sha256"]
+    summary_md_sha256 = summary_md["sha256"]
+    summary_json_sha256_available = (
+        isinstance(summary_json_sha256, str) and bool(summary_json_sha256)
+    )
+    summary_md_sha256_available = (
+        isinstance(summary_md_sha256, str) and bool(summary_md_sha256)
+    )
+    contract_sha256 = no_wing_artifact_manifest_contract_sha256()
+    contract_cross_surface_check = (
+        build_no_wing_artifact_manifest_contract_cross_surface_check(
+            run_dir,
+            contract_sha256=contract_sha256,
+        )
+    )
+    summary_json_payload = json.loads(
+        (run_dir / preflight_contract.WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    summary_md_text = (
+        run_dir / NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT
+    ).read_text(encoding="utf-8")
+    self_consistency_summary_surface_check = (
+        build_no_wing_artifact_manifest_self_consistency_summary_surface_check(
+            summary_json_payload,
+            summary_md_text,
+        )
+    )
+    manifest = {
+        "type": "no_wing_release_check_artifact_manifest",
+        "schema_version": 1,
+        "generated_at": generated_at,
+        "artifact_manifest_contract_id": (
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_ID
+        ),
+        "artifact_manifest_contract_required": True,
+        "artifact_manifest_contract_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_FIELDS
+        ),
+        "artifact_manifest_contract_sha256": contract_sha256,
+        "artifact_manifest_contract_sha256_available": True,
+        "artifact_manifest_contract_sha256_matches_expected": (
+            contract_sha256 == no_wing_artifact_manifest_contract_sha256()
+        ),
+        **contract_cross_surface_check,
+        **self_consistency_summary_surface_check,
+        "artifact_manifest_path": NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME,
+        "artifact_manifest_required": True,
+        "artifact_manifest_artifact_count": len(artifacts),
+        "artifact_manifest_required_artifact_count": len(required_artifact_ids),
+        "artifact_manifest_artifact_count_matches_required": (
+            len(artifacts) == len(required_artifact_ids)
+        ),
+        "artifact_manifest_required_artifact_ids": required_artifact_ids,
+        "artifact_manifest_artifact_ids": artifact_ids,
+        "artifact_manifest_required_artifacts_present": (
+            artifact_ids == required_artifact_ids
+        ),
+        "artifact_manifest_required_artifact_paths": required_artifact_paths,
+        "artifact_manifest_artifact_paths": artifact_paths,
+        "artifact_manifest_required_artifact_paths_present": (
+            artifact_paths == required_artifact_paths
+        ),
+        "artifact_manifest_required_artifact_sha256_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_SHA256_FIELDS
+        ),
+        "artifact_manifest_required_artifact_sha256_available": (
+            summary_json_sha256_available and summary_md_sha256_available
+        ),
+        "artifact_manifest_summary_json_path": summary_json["path"],
+        "artifact_manifest_summary_json_sha256": summary_json_sha256,
+        "artifact_manifest_summary_json_sha256_available": (
+            summary_json_sha256_available
+        ),
+        "artifact_manifest_summary_md_path": summary_md["path"],
+        "artifact_manifest_summary_md_sha256": summary_md_sha256,
+        "artifact_manifest_summary_md_sha256_available": summary_md_sha256_available,
+        "artifact_manifest_readiness_closure_allowed": False,
+        "artifact_manifest_live_authority_granted": False,
+        "artifact_manifest_verifier_required": True,
+        "artifact_manifest_verifier_command": (
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_COMMAND
+        ),
+        "artifact_manifest_verifier_target_artifact_dir": (
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_TARGET_ARTIFACT_DIR
+        ),
+        "artifact_manifest_verifier_status_required": "passed",
+        "artifact_manifest_verifier_failed_checks_required": [],
+        "artifact_manifest_verifier_report_required_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
+        ),
+        "artifact_manifest_verifier_contacts_wing": False,
+        "artifact_manifest_verifier_mutates_console_state": False,
+        "artifact_manifest_verifier_queries_console": False,
+        "artifact_manifest_verifier_readiness_closure_allowed": False,
+        "artifact_manifest_verifier_live_authority_granted": False,
+        "read_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "artifacts": artifacts,
+    }
+    manifest.update(build_no_wing_artifact_manifest_self_consistency_check(manifest))
+    _write_text(
+        run_dir / NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME,
+        json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+    )
+    return manifest
+
+
 def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at: str) -> dict[str, object]:
     failed = [result.name for result in results if result.status != "passed"]
+    environment_blocked = [
+        result.name for result in results if result.status == "environment_blocked"
+    ]
+    environment_blocked_details: list[dict[str, object]] = []
+    for result in results:
+        if result.status != "environment_blocked":
+            continue
+        detail = result.detail if isinstance(result.detail, dict) else {}
+        environment_blocked_details.append(
+            {
+                "name": result.name,
+                "reason": str(detail.get("environment_blocked_reason") or ""),
+                "address": str(detail.get("environment_blocked_address") or ""),
+                "operator_next_step": str(detail.get("operator_next_step") or ""),
+                "stdout_log": result.stdout_log,
+                "stderr_log": result.stderr_log,
+            }
+        )
     gap_rollup = autonomy_gap_rollup_summary(results)
     autonomy_overlay = autonomy_evidence_overlay_summary(results)
     gain_dry_run = supervised_gain_dry_run_summary(results)
@@ -17997,6 +23607,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         read_surface_physical_readback_fixture_closure_plan_artifact_summary(results)
     )
     next_plan = next_wing_proof_plan_summary(results)
+    artifact_manifest_contract_sha256 = no_wing_artifact_manifest_contract_sha256()
     summary = {
         "type": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
         "generated_at": generated_at,
@@ -18005,7 +23616,89 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
         "live_write": False,
+        "artifact_manifest_summary_surface_required": True,
+        "artifact_manifest_summary_surface_required_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS
+        ),
+        "artifact_manifest_summary_surface_missing_fields": [],
+        "artifact_manifest_summary_surface_required_field_lines": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELD_LINES
+        ),
+        "artifact_manifest_summary_surface_missing_field_lines": [],
+        "artifact_manifest_summary_surface_field_lines_rendered": True,
+        "artifact_manifest_contract_id": (
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_ID
+        ),
+        "artifact_manifest_contract_required": True,
+        "artifact_manifest_contract_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_FIELDS
+        ),
+        "artifact_manifest_contract_sha256": artifact_manifest_contract_sha256,
+        "artifact_manifest_contract_sha256_available": True,
+        "artifact_manifest_contract_sha256_matches_expected": (
+            artifact_manifest_contract_sha256
+            == no_wing_artifact_manifest_contract_sha256()
+        ),
+        "artifact_manifest_contract_cross_surface_required": True,
+        "artifact_manifest_contract_cross_surface_required_surfaces": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_SURFACES
+        ),
+        "artifact_manifest_contract_cross_surface_required_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_FIELDS
+        ),
+        "artifact_manifest_contract_cross_surface_expected_match": True,
+        "artifact_manifest_summary_json_contract_id_matches_manifest": True,
+        "artifact_manifest_summary_json_contract_sha256_matches_manifest": True,
+        "artifact_manifest_summary_json_contract_sha256_match_flag": True,
+        "artifact_manifest_summary_md_contract_id_matches_manifest": True,
+        "artifact_manifest_summary_md_contract_sha256_matches_manifest": True,
+        "artifact_manifest_summary_md_contract_sha256_match_flag": True,
+        "artifact_manifest_summary_json_cross_surface_readiness_closure_denied": True,
+        "artifact_manifest_summary_json_cross_surface_live_authority_denied": True,
+        "artifact_manifest_summary_md_cross_surface_readiness_closure_denied": True,
+        "artifact_manifest_summary_md_cross_surface_live_authority_denied": True,
+        "artifact_manifest_contract_cross_surface_mismatches": [],
+        "artifact_manifest_contract_cross_surface_match": True,
+        "artifact_manifest_contract_cross_surface_readiness_closure_allowed": False,
+        "artifact_manifest_contract_cross_surface_live_authority_granted": False,
+        "artifact_manifest_required": True,
+        "artifact_manifest_path": NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME,
+        "artifact_manifest_required_artifact_count": len(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_IDS
+        ),
+        "artifact_manifest_required_artifact_ids": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_IDS
+        ),
+        "artifact_manifest_required_artifact_paths": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_ARTIFACT_PATHS
+        ),
+        "artifact_manifest_required_artifact_sha256_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_REQUIRED_SHA256_FIELDS
+        ),
+        "artifact_manifest_readiness_closure_allowed": False,
+        "artifact_manifest_live_authority_granted": False,
+        "artifact_manifest_verifier_required": True,
+        "artifact_manifest_verifier_command": (
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_COMMAND
+        ),
+        "artifact_manifest_verifier_target_artifact_dir": (
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_TARGET_ARTIFACT_DIR
+        ),
+        "artifact_manifest_verifier_status_required": "passed",
+        "artifact_manifest_verifier_failed_checks_required": [],
+        "artifact_manifest_verifier_report_required_fields": list(
+            NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
+        ),
+        "artifact_manifest_verifier_contacts_wing": False,
+        "artifact_manifest_verifier_mutates_console_state": False,
+        "artifact_manifest_verifier_queries_console": False,
+        "artifact_manifest_verifier_readiness_closure_allowed": False,
+        "artifact_manifest_verifier_live_authority_granted": False,
+        **build_no_wing_artifact_manifest_self_consistency_summary_surface(),
+        **build_no_wing_artifact_manifest_self_consistency_summary_surface_check_defaults(),
         "failed_checks": failed,
+        "environment_blocked_checks": environment_blocked,
+        "environment_blocked_check_details": environment_blocked_details,
         "results": [asdict(result) for result in results],
     }
     if gap_rollup is not None:
@@ -18037,6 +23730,60 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if wing_readonly_preflight_handoff_packet_artifact is not None:
         summary["wing_readonly_preflight_handoff_packet_artifact"] = (
             wing_readonly_preflight_handoff_packet_artifact
+        )
+        summary.update(
+            build_backend_port_prestart_gate_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_wing_readonly_packet_safety_boundary_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_wing_readonly_mvp_blocker_anchor_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_wing_readonly_expected_artifacts_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_backend_port_prestart_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_wing_readonly_command_binding_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_wing_readonly_operator_sequence_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        apply_wing_readonly_operator_sequence_list_summary_surface_check(summary)
+        summary.update(
+            build_wing_readonly_operator_sequence_list_markdown_surface_check_defaults()
+        )
+        summary.update(
+            build_wing_readonly_operator_sequence_step_gate_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_wing_readonly_supervised_proof_plan_fields_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
+        )
+        summary.update(
+            build_project_director_selected_action_summary_surface(
+                wing_readonly_preflight_handoff_packet_artifact
+            )
         )
     if wing_readonly_preflight_review_decision is not None:
         summary["wing_readonly_preflight_review_decision_ledger"] = (
@@ -18116,8 +23863,35 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         )
     if next_plan is not None:
         summary["next_wing_proof_plan"] = next_plan
+        summary.update(
+            build_next_wing_proof_plan_candidate_contracts_summary_surface(next_plan)
+        )
+        summary.update(
+            build_next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface(
+                next_plan
+            )
+        )
+        summary.update(
+            build_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface(
+                next_plan
+            )
+        )
+        apply_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_check(
+            summary
+        )
+        summary.update(
+            build_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface(
+                next_plan
+            )
+        )
+        apply_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_check(
+            summary
+        )
+        summary.update(
+            build_next_wing_proof_plan_required_fields_summary_surface(next_plan)
+        )
+    apply_no_wing_artifact_manifest_summary_json_surface_check(summary)
     summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
-    _write_text(summary_path, json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
 
     lines = [
         "# No-WING Release Check",
@@ -18126,10 +23900,109 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         f"- status: `{summary['status']}`",
         "- connection_policy: `no_hardware_no_network_no_live_writes`",
         "- live_write: `false`",
+        "- artifact_manifest_summary_surface_required: `true`",
+        "- artifact_manifest_summary_surface_required_fields: "
+        f"`{json.dumps(summary['artifact_manifest_summary_surface_required_fields'])}`",
+        "- artifact_manifest_summary_surface_missing_fields: "
+        f"`{json.dumps(summary['artifact_manifest_summary_surface_missing_fields'])}`",
+        "- artifact_manifest_summary_surface_required_field_lines: "
+        f"`{json.dumps(summary['artifact_manifest_summary_surface_required_field_lines'])}`",
+        "- artifact_manifest_summary_surface_missing_field_lines: `[]`",
+        "- artifact_manifest_summary_surface_field_lines_rendered: `true`",
+        f"- artifact_manifest_contract_id: `{summary['artifact_manifest_contract_id']}`",
+        "- artifact_manifest_contract_required: `true`",
+        "- artifact_manifest_contract_fields: "
+        f"`{json.dumps(summary['artifact_manifest_contract_fields'])}`",
+        "- artifact_manifest_contract_sha256: "
+        f"`{summary['artifact_manifest_contract_sha256']}`",
+        "- artifact_manifest_contract_sha256_available: `true`",
+        "- artifact_manifest_contract_sha256_matches_expected: `true`",
+        "- artifact_manifest_contract_cross_surface_required: `true`",
+        "- artifact_manifest_contract_cross_surface_required_surfaces: "
+        f"`{json.dumps(summary['artifact_manifest_contract_cross_surface_required_surfaces'])}`",
+        "- artifact_manifest_contract_cross_surface_required_fields: "
+        f"`{json.dumps(summary['artifact_manifest_contract_cross_surface_required_fields'])}`",
+        "- artifact_manifest_contract_cross_surface_expected_match: `true`",
+        "- artifact_manifest_summary_json_contract_id_matches_manifest: "
+        "`true`",
+        "- artifact_manifest_summary_json_contract_sha256_matches_manifest: "
+        "`true`",
+        "- artifact_manifest_summary_json_contract_sha256_match_flag: "
+        "`true`",
+        "- artifact_manifest_summary_md_contract_id_matches_manifest: "
+        "`true`",
+        "- artifact_manifest_summary_md_contract_sha256_matches_manifest: "
+        "`true`",
+        "- artifact_manifest_summary_md_contract_sha256_match_flag: "
+        "`true`",
+        "- artifact_manifest_summary_json_cross_surface_readiness_closure_denied: "
+        "`true`",
+        "- artifact_manifest_summary_json_cross_surface_live_authority_denied: "
+        "`true`",
+        "- artifact_manifest_summary_md_cross_surface_readiness_closure_denied: "
+        "`true`",
+        "- artifact_manifest_summary_md_cross_surface_live_authority_denied: "
+        "`true`",
+        "- artifact_manifest_contract_cross_surface_mismatches: `[]`",
+        "- artifact_manifest_contract_cross_surface_match: `true`",
+        "- artifact_manifest_contract_cross_surface_readiness_closure_allowed: "
+        "`false`",
+        "- artifact_manifest_contract_cross_surface_live_authority_granted: "
+        "`false`",
+        "- artifact_manifest_required: `true`",
+        f"- artifact_manifest_path: `{NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME}`",
+        "- artifact_manifest_required_artifact_count: "
+        f"`{summary['artifact_manifest_required_artifact_count']}`",
+        "- artifact_manifest_required_artifact_ids: "
+        f"`{json.dumps(summary['artifact_manifest_required_artifact_ids'])}`",
+        "- artifact_manifest_required_artifact_paths: "
+        f"`{json.dumps(summary['artifact_manifest_required_artifact_paths'])}`",
+        "- artifact_manifest_required_artifact_sha256_fields: "
+        f"`{json.dumps(summary['artifact_manifest_required_artifact_sha256_fields'])}`",
+        "- artifact_manifest_readiness_closure_allowed: `false`",
+        "- artifact_manifest_live_authority_granted: `false`",
+        *[
+            _format_markdown_summary_field_line(field_name, summary[field_name])
+            for field_name in (
+                NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS
+            )
+        ],
+        *[
+            _format_markdown_summary_field_line(field_name, summary[field_name])
+            for field_name in (
+                NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS
+            )
+        ],
+        *[
+            _format_markdown_summary_field_line(field_name, summary[field_name])
+            for field_name in (
+                NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS
+            )
+        ],
         "",
         "## Checks",
         "",
     ]
+    if (
+        summary.get("project_director_selected_action_value_gate_self_check_required")
+        is True
+    ):
+        lines.extend(
+            [
+                "- project_director_selected_action_value_gate_self_check_markdown_surface_required: "
+                "`true`",
+                "- project_director_selected_action_value_gate_self_check_markdown_surface_required_field_lines: "
+                f"`{json.dumps(summary['project_director_selected_action_value_gate_self_check_markdown_surface_required_field_lines'])}`",
+                "- project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines: "
+                "`[]`",
+                "- project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered: "
+                "`true`",
+                "- project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed: "
+                "`false`",
+                "- project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted: "
+                "`false`",
+            ]
+        )
     for result in results:
         lines.append(f"- `{result.name}`: `{result.status}`")
         lines.extend(_backend_port_markdown_details(result))
@@ -18653,16 +24526,47 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_status']}`",
                 "- backend_port_prestart_summary_connection_policy: "
                 f"`{wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_connection_policy']}`",
+                "- backend_port_prestart_summary_read_only: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_read_only']).lower()}`",
                 "- backend_port_prestart_summary_live_write: "
                 f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_live_write']).lower()}`",
                 "- backend_port_prestart_summary_contacts_backend: "
                 f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_contacts_backend']).lower()}`",
+                "- backend_port_prestart_summary_contacts_wing: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_contacts_wing']).lower()}`",
+                "- backend_port_prestart_summary_mutates_console_state: "
+                f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_mutates_console_state']).lower()}`",
                 "- backend_port_prestart_summary_queries_console: "
                 f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_queries_console']).lower()}`",
                 "- backend_port_prestart_summary_executes_tests: "
                 f"`{str(wing_readonly_preflight_plan_artifact['backend_port_prestart_summary_executes_tests']).lower()}`",
                 "- backend_port_prestart_check_status: "
                 f"`{wing_readonly_preflight_plan_artifact['backend_port_prestart_check_status']}`",
+                "- artifact_manifest_verifier_required: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_required']).lower()}`",
+                "- artifact_manifest_verifier_run_dir: "
+                f"`{wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_run_dir']}`",
+                "- artifact_manifest_verifier_status: "
+                f"`{wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_status']}`",
+                "- artifact_manifest_verifier_failed_checks: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_failed_checks'])}`",
+                "- artifact_manifest_verifier_failed_checks_missing_check_entries: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_failed_checks_missing_check_entries'])}`",
+                "- artifact_manifest_verifier_required_fields_missing: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_required_fields_missing'])}`",
+                "- artifact_manifest_verifier_failed_checks_have_check_entries: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_failed_checks_have_check_entries']).lower()}`",
+                "- artifact_manifest_verifier_report_required_fields_present: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_required_fields_present']).lower()}`",
+                "- artifact_manifest_verifier_readiness_closure_allowed: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_readiness_closure_allowed']).lower()}`",
+                "- artifact_manifest_verifier_live_authority_granted: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_live_authority_granted']).lower()}`",
+                *[
+                    f"- {field}: "
+                    f"`{str(wing_readonly_preflight_plan_artifact[field]).lower()}`"
+                    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                ],
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_plan_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- operator_session_confirmation_required: "
@@ -18695,8 +24599,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_plan_artifact['expected_request_count']}`",
                 "- request_sequence_matches_expected: "
                 f"`{str(wing_readonly_preflight_plan_artifact['request_sequence_matches_expected']).lower()}`",
+                "- request_sequence_matches_plan: "
+                f"`{str(wing_readonly_preflight_plan_artifact['request_sequence_matches_plan']).lower()}`",
                 "- request_sequence: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['request_sequence'])}`",
+                "- plan_request_sequence: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['plan_request_sequence'])}`",
                 "- expected_artifacts: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['expected_artifacts'])}`",
                 "- allowed_request_types: "
@@ -18772,6 +24680,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_connection_policy']}`",
                 "- backend_port_prestart_summary_connection_policy_matches_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_connection_policy_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_read_only: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_read_only']).lower()}`",
+                "- plan_backend_port_prestart_summary_read_only: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_read_only']).lower()}`",
+                "- backend_port_prestart_summary_read_only_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_read_only_matches_plan']).lower()}`",
                 "- backend_port_prestart_summary_live_write: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_live_write']).lower()}`",
                 "- plan_backend_port_prestart_summary_live_write: "
@@ -18784,6 +24698,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_contacts_backend']).lower()}`",
                 "- backend_port_prestart_summary_contacts_backend_matches_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_contacts_backend_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_contacts_wing: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_contacts_wing']).lower()}`",
+                "- plan_backend_port_prestart_summary_contacts_wing: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_contacts_wing']).lower()}`",
+                "- backend_port_prestart_summary_contacts_wing_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_contacts_wing_matches_plan']).lower()}`",
+                "- backend_port_prestart_summary_mutates_console_state: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_mutates_console_state']).lower()}`",
+                "- plan_backend_port_prestart_summary_mutates_console_state: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_summary_mutates_console_state']).lower()}`",
+                "- backend_port_prestart_summary_mutates_console_state_matches_plan: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_mutates_console_state_matches_plan']).lower()}`",
                 "- backend_port_prestart_summary_queries_console: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_queries_console']).lower()}`",
                 "- plan_backend_port_prestart_summary_queries_console: "
@@ -18802,6 +24728,26 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_check_status']}`",
                 "- backend_port_prestart_check_status_matches_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_status_matches_plan']).lower()}`",
+                *[
+                    f"- {field}: "
+                    f"`{str(wing_readonly_preflight_handoff_packet_artifact[field]).lower()}`"
+                    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                ],
+                *[
+                    f"- plan_{field}: "
+                    f"`{str(wing_readonly_preflight_handoff_packet_artifact[f'plan_{field}']).lower()}`"
+                    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                ],
+                *[
+                    f"- declared_{field}_matches_plan: "
+                    f"`{str(wing_readonly_preflight_handoff_packet_artifact[f'declared_{field}_matches_plan']).lower()}`"
+                    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                ],
+                *[
+                    f"- {field}_matches_plan: "
+                    f"`{str(wing_readonly_preflight_handoff_packet_artifact[f'{field}_matches_plan']).lower()}`"
+                    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                ],
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['manual_review_required_before_readiness_update']).lower()}`",
                 "- execution_allowed_by_packet: "
@@ -18930,6 +24876,40 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['capture_command_expected_plan']}`",
                 "- capture_command_expected_plan_matches_packet: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['capture_command_expected_plan_matches_packet']).lower()}`",
+                "- operator_sequence: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['operator_sequence'])}`",
+                "- expected_operator_sequence: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence'])}`",
+                "- wing_readonly_operator_sequence_list_summary_surface_self_check_required: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_summary_surface_self_check_required']).lower()}`",
+                "- wing_readonly_operator_sequence_list_summary_surface_required_fields: "
+                f"`{json.dumps(summary['wing_readonly_operator_sequence_list_summary_surface_required_fields'])}`",
+                "- wing_readonly_operator_sequence_list_summary_surface_mismatches: "
+                f"`{json.dumps(summary['wing_readonly_operator_sequence_list_summary_surface_mismatches'])}`",
+                "- wing_readonly_operator_sequence_list_summary_surface_match: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_summary_surface_match']).lower()}`",
+                "- wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- wing_readonly_operator_sequence_list_summary_surface_live_authority_granted: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_summary_surface_live_authority_granted']).lower()}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_required: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_required']).lower()}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_required_field_lines: "
+                f"`{json.dumps(summary['wing_readonly_operator_sequence_list_markdown_surface_required_field_lines'])}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value: "
+                f"`{summary['wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value']}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value: "
+                f"`{summary['wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value']}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract']).lower()}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: "
+                f"`{json.dumps(summary['wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines'])}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered']).lower()}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed']).lower()}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted']).lower()}`",
                 "- prestart_backend_port_check_command: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['prestart_backend_port_check_command'])}`",
                 "- backend_port_prestart_check_command: "
@@ -18956,6 +24936,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_backend_connection_confirmation_before_capture']).lower()}`",
                 "- operator_sequence_capture_readonly_preflight_step_index: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_capture_readonly_preflight_step_index']}`",
+                "- expected_operator_sequence_capture_readonly_preflight_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_capture_readonly_preflight_step_index']}`",
+                "- operator_sequence_capture_readonly_preflight_step_index_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_capture_readonly_preflight_step_index_matches_contract']).lower()}`",
+                "- operator_sequence_capture_readonly_preflight_step: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['operator_sequence_capture_readonly_preflight_step']}`",
+                "- expected_operator_sequence_capture_readonly_preflight_step: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_operator_sequence_capture_readonly_preflight_step']}`",
+                "- operator_sequence_capture_readonly_preflight_step_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_capture_readonly_preflight_step_matches_contract']).lower()}`",
                 "- backend_port_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_gate'])}`",
                 "- expected_backend_port_prestart_gate: "
@@ -19056,6 +25046,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['project_director_current_first_command_baseline_coverage_marker_count']}`",
                 "- project_director_current_first_command_baseline_missing_markers: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['project_director_current_first_command_baseline_missing_markers'])}`",
+                "- project_director_selected_action_value_gate_self_check_required: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_value_gate_self_check_required']).lower()}`",
+                "- project_director_selected_action_value_gate_self_check_required_markers: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_value_gate_self_check_required_markers'])}`",
+                "- project_director_selected_action_value_gate_self_check_missing_markers: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_value_gate_self_check_missing_markers'])}`",
+                "- project_director_selected_action_value_gate_self_check_markers_present: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_value_gate_self_check_markers_present']).lower()}`",
+                "- project_director_selected_action_value_gate_self_check_readiness_closure_allowed: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_value_gate_self_check_readiness_closure_allowed']).lower()}`",
+                "- project_director_selected_action_value_gate_self_check_live_authority_granted: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_value_gate_self_check_live_authority_granted']).lower()}`",
                 "- project_director_selected_action_anchor: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_anchor'])}`",
                 "- expected_project_director_selected_action_anchor: "
@@ -19136,16 +25138,72 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['operator_sequence_supervised_prestart_gate_is_final']).lower()}`",
                 "- required_supervised_prestart_gate_markers: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_markers'])}`",
+                "- expected_required_supervised_prestart_gate_markers: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_required_supervised_prestart_gate_markers'])}`",
+                "- required_supervised_prestart_gate_marker_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_marker_count']}`",
+                "- expected_required_supervised_prestart_gate_marker_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_required_supervised_prestart_gate_marker_count']}`",
+                "- required_supervised_prestart_gate_marker_count_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_marker_count_matches_contract']).lower()}`",
+                "- required_supervised_prestart_gate_marker_count_matches_supervised_gate: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_marker_count_matches_supervised_gate']).lower()}`",
+                "- required_supervised_prestart_gate_markers_match_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_markers_match_contract']).lower()}`",
+                "- required_supervised_prestart_gate_markers_match_supervised_gate: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_prestart_gate_markers_match_supervised_gate']).lower()}`",
                 "- required_supervised_proof_plan_summary_fields: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields'])}`",
                 "- expected_required_supervised_proof_plan_summary_fields: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_required_supervised_proof_plan_summary_fields'])}`",
                 "- required_supervised_proof_plan_summary_fields_match_contract: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields_match_contract']).lower()}`",
+                "- required_supervised_proof_plan_summary_fields_include_invalid_records: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields_include_invalid_records']).lower()}`",
                 "- supervised_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate'])}`",
                 "- expected_supervised_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_supervised_prestart_gate'])}`",
+                "- supervised_prestart_gate_required: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_required']).lower()}`",
+                "- supervised_prestart_gate_operator_sequence_step_index: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_operator_sequence_step_index']}`",
+                "- supervised_prestart_gate_operator_sequence_step_must_be_final: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_operator_sequence_step_must_be_final']).lower()}`",
+                "- supervised_prestart_gate_operator_sequence_step: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_operator_sequence_step']}`",
+                "- supervised_prestart_gate_operator_sequence_step_matches_summary: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_operator_sequence_step_matches_summary']).lower()}`",
+                "- supervised_prestart_gate_required_markers: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_required_markers'])}`",
+                "- expected_supervised_prestart_gate_required_markers: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_supervised_prestart_gate_required_markers'])}`",
+                "- supervised_prestart_gate_required_marker_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_required_marker_count']}`",
+                "- expected_supervised_prestart_gate_required_marker_count: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['expected_supervised_prestart_gate_required_marker_count']}`",
+                "- supervised_prestart_gate_required_marker_count_matches_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_required_marker_count_matches_contract']).lower()}`",
+                "- supervised_prestart_gate_required_marker_count_matches_summary: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_required_marker_count_matches_summary']).lower()}`",
+                "- supervised_prestart_gate_required_markers_match_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_required_markers_match_contract']).lower()}`",
+                "- supervised_prestart_gate_required_markers_match_summary: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_required_markers_match_summary']).lower()}`",
+                "- supervised_prestart_gate_grants_live_authority: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_grants_live_authority']).lower()}`",
+                "- supervised_prestart_gate_requires_operator_decision_status: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_operator_decision_status']}`",
+                "- supervised_prestart_gate_unlocks_runbook: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_unlocks_runbook']}`",
+                "- supervised_prestart_gate_requires_accepted_candidate_prestart_trace: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_prestart_trace']).lower()}`",
+                "- supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace']).lower()}`",
+                "- supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace']).lower()}`",
+                "- supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace']).lower()}`",
                 "- supervised_prestart_gate_matches_expected: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_matches_expected']).lower()}`",
                 "- declared_supervised_prestart_gate_matches_expected: "
@@ -19205,10 +25263,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_candidate_prestart_source_ids'])}`",
                 "- accepted_candidate_prestart_contract_violations_by_source: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_candidate_prestart_contract_violations_by_source'], sort_keys=True)}`",
+                "- accepted_candidate_artifact_root_contract_valid: "
+                f"`{str(wing_readonly_preflight_review_decision['accepted_candidate_artifact_root_contract_valid']).lower()}`",
+                "- accepted_candidate_artifact_roots: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_candidate_artifact_roots'])}`",
+                "- accepted_candidate_artifact_root_contract_violations_by_source: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['accepted_candidate_artifact_root_contract_violations_by_source'], sort_keys=True)}`",
                 "- rejected_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['rejected_source_ids'])}`",
                 "- invalid_record_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['invalid_record_ids'])}`",
+                "- invalid_records: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['invalid_records'], sort_keys=True)}`",
                 "- duplicate_source_ids: "
                 f"`{json.dumps(wing_readonly_preflight_review_decision['duplicate_source_ids'])}`",
                 "- conflicting_source_ids: "
@@ -20723,6 +26789,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- operator_required: `{str(next_plan['operator_required']).lower()}`",
                 f"- full_autonomous_ready: `{str(next_plan['full_autonomous_ready']).lower()}`",
                 f"- plan_status: `{next_plan['plan_status']}`",
+                "- allowed_supervised_live_value_types: "
+                f"`{json.dumps(next_plan['allowed_supervised_live_value_types'])}`",
+                "- operator_markdown_summary_allowed_supervised_live_value_types_expected_value: "
+                f"`{next_plan['operator_markdown_summary_allowed_supervised_live_value_types_expected_value']}`",
+                "- operator_markdown_summary_allowed_supervised_live_value_types_actual_value: "
+                f"`{next_plan['operator_markdown_summary_allowed_supervised_live_value_types_actual_value']}`",
+                "- operator_markdown_summary_allowed_supervised_live_value_types_match_contract: "
+                f"`{str(next_plan['operator_markdown_summary_allowed_supervised_live_value_types_match_contract']).lower()}`",
+                "- operator_markdown_summary_values_match_contract: "
+                f"`{str(next_plan['operator_markdown_summary_values_match_contract']).lower()}`",
+                "- operator_markdown_summary_value_mismatches: "
+                f"`{json.dumps(next_plan['operator_markdown_summary_value_mismatches'])}`",
                 f"- step_count: `{next_plan['step_count']}`",
                 f"- planned_value_types: `{json.dumps(next_plan['planned_value_types'])}`",
                 f"- planned_channels: `{json.dumps(next_plan['planned_channels'])}`",
@@ -20784,18 +26862,134 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_prestart_source_ids'])}`",
                 "- readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_candidate_artifact_root_contract_valid: "
+                f"`{str(next_plan['readonly_preflight_review_decision_candidate_artifact_root_contract_valid']).lower()}`",
+                "- readonly_preflight_review_decision_candidate_artifact_roots: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_candidate_artifact_roots'])}`",
+                "- readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_expected_candidate_artifact_roots: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_artifact_roots'])}`",
+                "- readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_candidate_request_sequence_contract_valid: "
+                f"`{str(next_plan['readonly_preflight_review_decision_candidate_request_sequence_contract_valid']).lower()}`",
+                "- readonly_preflight_review_decision_candidate_request_sequence_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_candidate_request_sequence_source_ids'])}`",
+                "- readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids'])}`",
+                "- readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids'])}`",
+                "- readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids'])}`",
+                "- readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: "
+                f"`{str(next_plan['readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_required: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_required']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids: "
+                f"`{json.dumps(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violation_ids'])}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations: "
+                f"`{json.dumps(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations'])}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields: "
+                f"`{json.dumps(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields'])}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches: "
+                f"`{json.dumps(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches'])}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted']).lower()}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids'])}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids'])}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete: "
+                f"`{str(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids: "
+                f"`{json.dumps(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids'])}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations: "
+                f"`{json.dumps(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations'])}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields: "
+                f"`{json.dumps(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields'])}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches: "
+                f"`{json.dumps(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches'])}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted']).lower()}`",
                 "- readonly_preflight_review_decision_rejected_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_rejected_source_ids'])}`",
                 "- readonly_preflight_review_decision_invalid_record_count: "
                 f"`{next_plan['readonly_preflight_review_decision_invalid_record_count']}`",
                 "- readonly_preflight_review_decision_invalid_record_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_invalid_record_ids'])}`",
+                "- readonly_preflight_review_decision_invalid_records: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_invalid_records'], sort_keys=True)}`",
                 "- readonly_preflight_review_decision_duplicate_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_duplicate_source_ids'])}`",
                 "- readonly_preflight_review_decision_conflicting_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_conflicting_source_ids'])}`",
                 "- readonly_preflight_review_decision_unreviewed_candidate_count: "
                 f"`{next_plan['readonly_preflight_review_decision_unreviewed_candidate_count']}`",
+                "- required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(next_plan['required_supervised_proof_plan_summary_fields'])}`",
+                "- missing_required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(next_plan['missing_required_supervised_proof_plan_summary_fields'])}`",
+                "- operator_markdown_summary_required: "
+                f"`{str(next_plan['operator_markdown_summary_required']).lower()}`",
+                "- operator_markdown_summary_section: "
+                f"`{next_plan['operator_markdown_summary_section']}`",
+                "- operator_markdown_summary_required_field_lines: "
+                f"`{json.dumps(next_plan['operator_markdown_summary_required_field_lines'])}`",
+                "- operator_markdown_summary_required_field_lines_missing_members: "
+                f"`{json.dumps(next_plan['operator_markdown_summary_required_field_lines_missing_members'])}`",
+                "- operator_markdown_summary_required_field_lines_match_contract: "
+                f"`{str(next_plan['operator_markdown_summary_required_field_lines_match_contract']).lower()}`",
+                "- operator_markdown_summary_field_lines_rendered: "
+                f"`{str(next_plan['operator_markdown_summary_field_lines_rendered']).lower()}`",
+                "- operator_markdown_summary_missing_field_lines: "
+                f"`{json.dumps(next_plan['operator_markdown_summary_missing_field_lines'])}`",
                 f"- global_blockers: `{json.dumps(next_plan['global_blockers'])}`",
                 f"- violations: `{json.dumps(next_plan['violations'])}`",
             ]
@@ -20803,7 +26997,162 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if failed:
         lines.extend(["", "## Failed Checks", ""])
         lines.extend(f"- `{name}`" for name in failed)
-    _write_text(run_dir / "summary.md", "\n".join(lines) + "\n")
+    if environment_blocked:
+        lines.extend(["", "## Environment Blocked Checks", ""])
+        for item in environment_blocked_details:
+            lines.extend(
+                [
+                    f"- `{item['name']}`",
+                    f"  - reason: `{item['reason']}`",
+                    f"  - address: `{item['address']}`",
+                    f"  - operator_next_step: `{item['operator_next_step']}`",
+            ]
+        )
+    markdown_text = "\n".join(lines) + "\n"
+    apply_no_wing_artifact_manifest_summary_surface_check(
+        summary,
+        markdown_text,
+    )
+    apply_next_wing_proof_plan_operator_markdown_surface_check(
+        summary,
+        markdown_text,
+    )
+    apply_project_director_selected_action_value_gate_self_check_markdown_surface_check(
+        summary,
+        markdown_text,
+    )
+    apply_wing_readonly_operator_sequence_list_markdown_surface_check(
+        summary,
+        markdown_text,
+    )
+    apply_no_wing_artifact_manifest_contract_cross_surface_summary_check(
+        summary,
+        markdown_text,
+    )
+    apply_no_wing_artifact_manifest_self_consistency_summary_surface_check(
+        summary,
+        markdown_text,
+    )
+    lines[3] = f"- status: `{summary['status']}`"
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_surface_missing_field_lines",
+        summary["artifact_manifest_summary_surface_missing_field_lines"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_surface_field_lines_rendered",
+        summary["artifact_manifest_summary_surface_field_lines_rendered"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_json_contract_id_matches_manifest",
+        summary["artifact_manifest_summary_json_contract_id_matches_manifest"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_json_contract_sha256_matches_manifest",
+        summary["artifact_manifest_summary_json_contract_sha256_matches_manifest"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_json_contract_sha256_match_flag",
+        summary["artifact_manifest_summary_json_contract_sha256_match_flag"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_md_contract_id_matches_manifest",
+        summary["artifact_manifest_summary_md_contract_id_matches_manifest"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_md_contract_sha256_matches_manifest",
+        summary["artifact_manifest_summary_md_contract_sha256_matches_manifest"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_md_contract_sha256_match_flag",
+        summary["artifact_manifest_summary_md_contract_sha256_match_flag"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_json_cross_surface_readiness_closure_denied",
+        summary["artifact_manifest_summary_json_cross_surface_readiness_closure_denied"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_json_cross_surface_live_authority_denied",
+        summary["artifact_manifest_summary_json_cross_surface_live_authority_denied"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_md_cross_surface_readiness_closure_denied",
+        summary["artifact_manifest_summary_md_cross_surface_readiness_closure_denied"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_summary_md_cross_surface_live_authority_denied",
+        summary["artifact_manifest_summary_md_cross_surface_live_authority_denied"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_contract_cross_surface_mismatches",
+        summary["artifact_manifest_contract_cross_surface_mismatches"],
+    )
+    _replace_markdown_summary_field_line(
+        lines,
+        "artifact_manifest_contract_cross_surface_match",
+        summary["artifact_manifest_contract_cross_surface_match"],
+    )
+    if isinstance(summary.get("next_wing_proof_plan"), dict):
+        next_plan = summary["next_wing_proof_plan"]
+        for field_name in NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_POST_CHECK_FIELD_LINES:
+            _replace_markdown_summary_field_line(
+                lines,
+                field_name,
+                next_plan[field_name],
+            )
+    for field_name in (
+        NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS
+    ):
+        _replace_markdown_summary_field_line(lines, field_name, summary[field_name])
+    if (
+        summary.get("project_director_selected_action_value_gate_self_check_required")
+        is True
+    ):
+        for field_name in (
+            "project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines",
+            "project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered",
+        ):
+            _replace_markdown_summary_field_line(lines, field_name, summary[field_name])
+    if (
+        summary.get("wing_readonly_operator_sequence_list_markdown_surface_required")
+        is True
+    ):
+        for field_name in (
+            "wing_readonly_operator_sequence_list_markdown_surface_required",
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines",
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value",
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value",
+            "wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract",
+            "wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines",
+            "wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered",
+            "wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed",
+            "wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted",
+        ):
+            _replace_markdown_summary_field_line(lines, field_name, summary[field_name])
+    markdown_text = "\n".join(lines) + "\n"
+    bind_next_wing_proof_plan_operator_markdown_artifact(summary, markdown_text)
+    apply_next_wing_proof_plan_operator_markdown_artifact_integrity_check(
+        summary,
+        markdown_text,
+    )
+    _write_text(
+        summary_path,
+        json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+    )
+    _write_text(run_dir / "summary.md", markdown_text)
+    write_no_wing_release_check_artifact_manifest(run_dir, generated_at=generated_at)
     return summary
 
 
