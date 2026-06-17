@@ -239,6 +239,7 @@ def test_parser_defaults_use_shared_target_contract() -> None:
     assert args.channels == WING_READONLY_PREFLIGHT_RUNNER_CHANNELS
     assert args.value_types == WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES
     assert args.artifact_root == WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+    assert args.validate_run_inputs_only is False
     assert runner.SUPPORTED_VALUE_TYPES == set(
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
     )
@@ -247,6 +248,20 @@ def test_parser_defaults_use_shared_target_contract() -> None:
     )
     assert runner.PHYSICAL_READBACK_SOURCES == set(
         WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES
+    )
+
+
+def test_validate_args_rejects_plan_only_with_validate_run_inputs_only(
+    tmp_path: Path,
+) -> None:
+    args = parse_args(
+        tmp_path,
+        "--plan-only",
+        "--validate-run-inputs-only",
+    )
+
+    assert runner.validate_args(args) == (
+        "--plan-only and --validate-run-inputs-only cannot be combined"
     )
 
 
@@ -1153,6 +1168,107 @@ async def test_readonly_preflight_requires_expected_plan_before_websocket(
     assert summary["expected_plan_violations"] == ["expected_plan_missing"]
     assert "--plan-only" in summary["operator_next_step"]
     assert "--expected-plan" in summary["operator_next_step"]
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_validate_run_inputs_only_requires_expected_plan_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(
+            f"validate-run-inputs-only missing expected-plan must not open WebSocket: {url}"
+        )
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--validate-run-inputs-only",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "expected_plan_missing"
+    assert summary["validation_only"] is True
+    assert summary["websocket_opened"] is False
+    assert summary["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    assert (
+        summary["selected_mvp_blocker_status"]
+        == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
+async def test_validate_run_inputs_only_passes_ready_command_without_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(
+            f"validate-run-inputs-only must not open WebSocket: {url}"
+        )
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+        "--validate-run-inputs-only",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "ready_for_websocket"
+    assert summary["reason"] == "run_inputs_validated_no_websocket"
+    assert summary["selected_mvp_blocker"] == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER
+    assert (
+        summary["selected_mvp_blocker_status"]
+        == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
+    )
+    assert summary["validation_only"] is True
+    assert summary["websocket_opened"] is False
+    assert summary["expected_plan_match"] is True
+    assert summary["expected_plan_violations"] == []
+    assert summary["contacts_backend"] is False
+    assert summary["queries_console"] is False
+    assert summary["execution_allowed_by_validation"] is False
+    assert summary["live_authority_granted"] is False
+    assert "--validate-run-inputs-only" in summary["operator_next_step"]
+    assert "real read-only preflight artifact" in summary["operator_next_step"]
     assert summary["sent_request_types"] == []
 
 

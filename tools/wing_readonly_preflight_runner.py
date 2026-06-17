@@ -476,6 +476,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Validate inputs and print the offline read-only request plan without opening WebSocket.",
     )
     parser.add_argument(
+        "--validate-run-inputs-only",
+        action="store_true",
+        help=(
+            "Validate the real-run inputs, expected plan, and prestart summary, "
+            "then exit before opening WebSocket."
+        ),
+    )
+    parser.add_argument(
         "--plan-output",
         default=None,
         help="Optional JSON output path for --plan-only.",
@@ -504,6 +512,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def validate_args(args: argparse.Namespace) -> Optional[str]:
+    if args.plan_only and args.validate_run_inputs_only:
+        return "--plan-only and --validate-run-inputs-only cannot be combined"
     try:
         channels = parse_csv_ints(args.channels)
     except ValueError:
@@ -986,6 +996,8 @@ async def run(args: argparse.Namespace) -> int:
         "status": "started",
         "proof_artifact_schema": WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA,
         "proof_runner": PROOF_RUNNER,
+        "selected_mvp_blocker": SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": SELECTED_MVP_BLOCKER_STATUS,
         "url": args.url,
         "artifact_root": str(args.artifact_root),
         "channels": list(channels),
@@ -997,6 +1009,8 @@ async def run(args: argparse.Namespace) -> int:
         "operator_confirmed_session_ready": bool(args.operator_confirm_session_ready),
         "value_types": list(value_types),
         "require_physical_readback": bool(args.require_physical_readback),
+        "validation_only": bool(args.validate_run_inputs_only),
+        "websocket_opened": False,
         "expected_plan_required_for_real_run": True,
         "read_only": True,
         "live_write": False,
@@ -1103,8 +1117,30 @@ async def run(args: argparse.Namespace) -> int:
             print(json.dumps(summary, indent=2, sort_keys=True))
             return 2
 
+    if args.validate_run_inputs_only:
+        summary.update(
+            {
+                "status": "ready_for_websocket",
+                "reason": "run_inputs_validated_no_websocket",
+                "expected_plan_match": True,
+                "contacts_backend": False,
+                "queries_console": False,
+                "execution_allowed_by_validation": False,
+                "live_authority_granted": False,
+                "operator_next_step": (
+                    "Only after the operator confirms the intended backend/WING "
+                    "session is ready, rerun without --validate-run-inputs-only "
+                    "to capture the real read-only preflight artifact."
+                ),
+            }
+        )
+        recorder.write_summary(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 0
+
     try:
         async with websockets.connect(args.url) as ws:
+            summary["websocket_opened"] = True
             mode = await send_and_wait(
                 ws,
                 recorder,
