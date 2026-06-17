@@ -346,6 +346,10 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["artifact_manifest_verifier_mutates_console_state"] is False
     assert packet["artifact_manifest_verifier_queries_console"] is False
     assert packet["artifact_manifest_verifier_executes_tests"] is False
+    assert (
+        packet["artifact_manifest_verifier_readiness_matrix_update_allowed"]
+        is False
+    )
     assert packet["artifact_manifest_verifier_readiness_closure_allowed"] is False
     assert packet["artifact_manifest_verifier_live_authority_granted"] is False
     assert packet["mvp_blocker_anchor"] == (
@@ -927,6 +931,10 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "artifact_manifest_verifier_mutates_console_state: `false`" in markdown
     assert "artifact_manifest_verifier_queries_console: `false`" in markdown
     assert "artifact_manifest_verifier_executes_tests: `false`" in markdown
+    assert (
+        "artifact_manifest_verifier_readiness_matrix_update_allowed: `false`"
+        in markdown
+    )
     assert (
         "artifact_manifest_verifier_readiness_closure_allowed: `false`"
         in markdown

@@ -736,6 +736,7 @@ def build_handoff_packet(
         "artifact_manifest_verifier_mutates_console_state": False,
         "artifact_manifest_verifier_queries_console": False,
         "artifact_manifest_verifier_executes_tests": False,
+        "artifact_manifest_verifier_readiness_matrix_update_allowed": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
         "artifact_manifest_verifier_operator_sequence_step_index": (
@@ -1039,6 +1040,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['artifact_manifest_verifier_queries_console']).lower()}`",
         "- artifact_manifest_verifier_executes_tests: "
         f"`{str(packet['artifact_manifest_verifier_executes_tests']).lower()}`",
+        "- artifact_manifest_verifier_readiness_matrix_update_allowed: "
+        f"`{str(packet['artifact_manifest_verifier_readiness_matrix_update_allowed']).lower()}`",
         "- artifact_manifest_verifier_readiness_closure_allowed: "
         f"`{str(packet['artifact_manifest_verifier_readiness_closure_allowed']).lower()}`",
         "- artifact_manifest_verifier_live_authority_granted: "
