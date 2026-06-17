@@ -16046,16 +16046,19 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_matches_summary: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_summary: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_summary: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_matches_summary: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_summary: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_summary: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true",
         "artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true",
@@ -17309,6 +17312,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert (
         json_summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed"
+        ]
+        is False
+    )
+    assert (
+        json_summary[
             "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed"
         ]
         is False
@@ -17329,6 +17338,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert (
         "wing_readonly_handoff_plan_verifier_summary_surface_match: `true`"
+        in markdown_summary
+    )
+    assert (
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed: `false`"
         in markdown_summary
     )
     assert (
@@ -17713,6 +17726,12 @@ def test_wing_readonly_handoff_plan_verifier_summary_surface_check_detects_misma
     ]
     assert (
         summary["wing_readonly_handoff_plan_verifier_summary_surface_match"]
+        is False
+    )
+    assert (
+        summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed"
+        ]
         is False
     )
     assert (
@@ -23145,6 +23164,9 @@ def test_no_wing_release_check_fails_when_manifest_summary_surface_missing_line(
                             "wing_readonly_handoff_plan_verifier_summary_surface_match": (
                                 True
                             ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed": (
+                                False
+                            ),
                             "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": (
                                 False
                             ),
@@ -23352,6 +23374,9 @@ def test_no_wing_release_check_fails_when_manifest_contract_digest_line_missing(
                             "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
                             "wing_readonly_handoff_plan_verifier_summary_surface_match": (
                                 True
+                            ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed": (
+                                False
                             ),
                             "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": (
                                 False

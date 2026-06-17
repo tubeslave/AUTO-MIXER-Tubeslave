@@ -2865,6 +2865,7 @@ async def test_readonly_preflight_reports_verifier_summary_surface_mismatches_be
                 "stale_summary_surface"
             ],
             "wing_readonly_handoff_plan_verifier_summary_surface_match": False,
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed": True,
             "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": True,
             "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": True,
         }
@@ -2909,6 +2910,7 @@ async def test_readonly_preflight_reports_verifier_summary_surface_mismatches_be
     for summary_surface_field in (
         "wing_readonly_handoff_plan_verifier_summary_surface_mismatches",
         "wing_readonly_handoff_plan_verifier_summary_surface_match",
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed",
         "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
         "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
     ):
@@ -2919,6 +2921,7 @@ async def test_readonly_preflight_reports_verifier_summary_surface_mismatches_be
     assert summary["artifact_manifest_verifier_report_value_mismatches"] == [
         "wing_readonly_handoff_plan_verifier_summary_surface_mismatches",
         "wing_readonly_handoff_plan_verifier_summary_surface_match",
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed",
         "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
         "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
     ]
@@ -2930,6 +2933,12 @@ async def test_readonly_preflight_reports_verifier_summary_surface_mismatches_be
             "artifact_manifest_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match"
         ]
         is False
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed"
+        ]
+        is True
     )
     assert (
         summary[

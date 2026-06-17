@@ -29,6 +29,7 @@ VERIFIER_REPORT_STATIC_SAFETY_FIELDS = {
 VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS = {
     "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
     "wing_readonly_handoff_plan_verifier_summary_surface_match": True,
+    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed": False,
     "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": False,
     "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": False,
 }
@@ -44,6 +45,7 @@ SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
     "artifact_manifest_verifier_readiness_closure_allowed",
     "artifact_manifest_verifier_readiness_matrix_update_allowed",
     "artifact_manifest_verifier_live_authority_granted",
+    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed",
     "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
     "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
 )
@@ -372,6 +374,7 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         "wing_readonly_handoff_plan_verifier_summary_surface_required": False,
         "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
         "wing_readonly_handoff_plan_verifier_summary_surface_match": False,
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed": False,
         "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": False,
         "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": False,
         "artifact_manifest_self_consistency_match": False,
