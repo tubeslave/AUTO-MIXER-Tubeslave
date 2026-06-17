@@ -1526,6 +1526,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "artifact_manifest_verifier_mutates_console_state": False,
         "artifact_manifest_verifier_queries_console": False,
         "artifact_manifest_verifier_executes_tests": False,
+        "artifact_manifest_verifier_readiness_matrix_update_allowed": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
         "artifact_manifest_verifier_operator_sequence_step_index": (
@@ -15987,6 +15988,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "artifact_manifest_verifier_live_write: false",
         "artifact_manifest_verifier_contacts_backend: false",
         "artifact_manifest_verifier_executes_tests: false",
+        "artifact_manifest_verifier_readiness_matrix_update_allowed: false",
         "artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_read_only_matches_expected: true",
         "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_read_only_matches_expected: true",
         "artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_read_only_matches_expected: true",
@@ -16008,6 +16010,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_queries_console_matches_expected: true",
         "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_queries_console_matches_expected: true",
         "artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_queries_console_matches_expected: true",
+        "artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_readiness_matrix_update_allowed_matches_expected: true",
+        "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_matches_expected: true",
+        "artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_readiness_matrix_update_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_readiness_closure_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_readiness_closure_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_readiness_closure_allowed_matches_expected: true",
@@ -16023,6 +16028,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "artifact_manifest_verifier_check_verifier_report_mutates_console_state_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_queries_console_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true",
+        "artifact_manifest_verifier_check_verifier_report_readiness_matrix_update_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_live_authority_granted_matches_expected: true",
         "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_fields_present: true",
@@ -21226,6 +21232,10 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert json_summary["artifact_manifest_verifier_queries_console"] is False
     assert json_summary["artifact_manifest_verifier_executes_tests"] is False
     assert (
+        json_summary["artifact_manifest_verifier_readiness_matrix_update_allowed"]
+        is False
+    )
+    assert (
         json_summary["artifact_manifest_verifier_readiness_closure_allowed"]
         is False
     )
@@ -21422,6 +21432,10 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert manifest["artifact_manifest_verifier_queries_console"] is False
     assert manifest["artifact_manifest_verifier_executes_tests"] is False
     assert (
+        manifest["artifact_manifest_verifier_readiness_matrix_update_allowed"]
+        is False
+    )
+    assert (
         manifest["artifact_manifest_verifier_readiness_closure_allowed"]
         is False
     )
@@ -21551,6 +21565,10 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert "artifact_manifest_verifier_executes_tests: `false`" in markdown_summary
+    assert (
+        "artifact_manifest_verifier_readiness_matrix_update_allowed: `false`"
+        in markdown_summary
+    )
     assert (
         "artifact_manifest_verifier_live_authority_granted: `false`"
         in markdown_summary
@@ -23111,6 +23129,9 @@ def test_no_wing_release_check_fails_when_manifest_summary_surface_missing_line(
                             "artifact_manifest_verifier_mutates_console_state": False,
                             "artifact_manifest_verifier_queries_console": False,
                             "artifact_manifest_verifier_executes_tests": False,
+                            "artifact_manifest_verifier_readiness_matrix_update_allowed": (
+                                False
+                            ),
                             "artifact_manifest_verifier_readiness_closure_allowed": (
                                 False
                             ),
@@ -23312,6 +23333,9 @@ def test_no_wing_release_check_fails_when_manifest_contract_digest_line_missing(
                             "artifact_manifest_verifier_mutates_console_state": False,
                             "artifact_manifest_verifier_queries_console": False,
                             "artifact_manifest_verifier_executes_tests": False,
+                            "artifact_manifest_verifier_readiness_matrix_update_allowed": (
+                                False
+                            ),
                             "artifact_manifest_verifier_readiness_closure_allowed": (
                                 False
                             ),
@@ -23701,6 +23725,7 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert report["mutates_console_state"] is False
     assert report["queries_console"] is False
     assert report["executes_tests"] is False
+    assert report["readiness_matrix_update_allowed"] is False
     assert report["readiness_closure_allowed"] is False
     assert report["live_authority_granted"] is False
     assert report["artifact_manifest_self_consistency_match"] is True
@@ -23764,6 +23789,7 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert checks["verifier_report_mutates_console_state_matches_expected"] is True
     assert checks["verifier_report_queries_console_matches_expected"] is True
     assert checks["verifier_report_executes_tests_matches_expected"] is True
+    assert checks["verifier_report_readiness_matrix_update_allowed_matches_expected"] is True
     assert checks["verifier_report_readiness_closure_allowed_matches_expected"] is True
     assert checks["verifier_report_live_authority_granted_matches_expected"] is True
     assert (
@@ -23873,6 +23899,7 @@ def test_verify_no_wing_artifact_manifest_missing_bundle_stays_no_authority(tmp_
     assert report["mutates_console_state"] is False
     assert report["queries_console"] is False
     assert report["executes_tests"] is False
+    assert report["readiness_matrix_update_allowed"] is False
     assert report["readiness_closure_allowed"] is False
     assert report["live_authority_granted"] is False
     assert report["artifact_manifest_self_consistency_match"] is False
@@ -23913,6 +23940,7 @@ def test_verify_no_wing_artifact_manifest_cli_missing_bundle_fails_closed(
     assert output["checks"]["artifact_manifest_exists"] is False
     assert output["checks"]["failed_checks_have_check_entries"] is True
     assert output["checks"]["verifier_report_required_fields_present"] is True
+    assert output["readiness_matrix_update_allowed"] is False
     assert output["readiness_closure_allowed"] is False
     assert output["live_authority_granted"] is False
 
@@ -23937,6 +23965,7 @@ def test_verify_no_wing_artifact_manifest_load_error_stays_full_shape_no_authori
     assert report["mutates_console_state"] is False
     assert report["queries_console"] is False
     assert report["executes_tests"] is False
+    assert report["readiness_matrix_update_allowed"] is False
     assert report["readiness_closure_allowed"] is False
     assert report["live_authority_granted"] is False
     assert report["artifact_manifest_self_consistency_match"] is False
@@ -24014,6 +24043,9 @@ def test_verify_no_wing_artifact_manifest_fails_summary_md_authority_claim_even_
     summary_md_text = summary_md_path.read_text(encoding="utf-8").replace(
         "- artifact_manifest_verifier_live_authority_granted: `false`",
         "- artifact_manifest_verifier_live_authority_granted: `true`",
+    ).replace(
+        "- artifact_manifest_verifier_readiness_matrix_update_allowed: `false`",
+        "- artifact_manifest_verifier_readiness_matrix_update_allowed: `true`",
     )
     summary_md_path.write_text(summary_md_text, encoding="utf-8")
     fresh_summary_md_sha = hashlib.sha256(
@@ -24040,9 +24072,17 @@ def test_verify_no_wing_artifact_manifest_fails_summary_md_authority_claim_even_
         "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority"
         in report["failed_checks"]
     )
+    assert (
+        "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority"
+        in report["failed_checks"]
+    )
     assert report["checks"][
         "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority"
     ] is False
+    assert report["checks"][
+        "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority"
+    ] is False
+    assert report["readiness_matrix_update_allowed"] is False
     assert report["readiness_closure_allowed"] is False
     assert report["live_authority_granted"] is False
 

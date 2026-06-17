@@ -24,6 +24,7 @@ VERIFIER_REPORT_STATIC_SAFETY_FIELDS = {
     "mutates_console_state": False,
     "queries_console": False,
     "executes_tests": False,
+    "readiness_matrix_update_allowed": False,
 }
 VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS = {
     "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
@@ -39,6 +40,7 @@ SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
     "artifact_manifest_readiness_closure_allowed",
     "artifact_manifest_live_authority_granted",
     "artifact_manifest_verifier_readiness_closure_allowed",
+    "artifact_manifest_verifier_readiness_matrix_update_allowed",
     "artifact_manifest_verifier_live_authority_granted",
     "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
     "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
@@ -104,6 +106,7 @@ def _expected_verifier_summary_surface() -> dict[str, object]:
         "artifact_manifest_verifier_mutates_console_state": False,
         "artifact_manifest_verifier_queries_console": False,
         "artifact_manifest_verifier_executes_tests": False,
+        "artifact_manifest_verifier_readiness_matrix_update_allowed": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
     }
