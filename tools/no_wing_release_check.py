@@ -352,6 +352,9 @@ WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_CHECK_NAME = (
 WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_CHECK_NAME = (
     "wing_readonly_operator_sequence_list_markdown_surface"
 )
+WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_CHECK_NAME = (
+    "wing_readonly_handoff_plan_verifier_summary_surface"
+)
 NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_CHECK_NAME = (
     "no_wing_release_check_artifact_manifest_summary_surface"
 )
@@ -18446,6 +18449,47 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
     return None
 
 
+def build_wing_readonly_handoff_plan_verifier_summary_surface(
+    handoff_artifact: Mapping[str, object],
+) -> dict[str, object]:
+    report_value_mismatches = handoff_artifact.get(
+        "plan_artifact_manifest_verifier_report_value_mismatches"
+    )
+    check_mismatches = handoff_artifact.get(
+        "plan_artifact_manifest_verifier_check_mismatches"
+    )
+    required_fields_match_contract = (
+        handoff_artifact.get(
+            "plan_artifact_manifest_verifier_report_required_fields_match_contract"
+        )
+        is True
+    )
+    mismatches: list[str] = []
+    if report_value_mismatches != []:
+        mismatches.append("plan_artifact_manifest_verifier_report_value_mismatches")
+    if check_mismatches != []:
+        mismatches.append("plan_artifact_manifest_verifier_check_mismatches")
+    if not required_fields_match_contract:
+        mismatches.append(
+            "plan_artifact_manifest_verifier_report_required_fields_match_contract"
+        )
+    return {
+        "wing_readonly_handoff_plan_verifier_summary_surface_required": True,
+        "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": (
+            mismatches
+        ),
+        "wing_readonly_handoff_plan_verifier_summary_surface_match": (
+            not mismatches
+        ),
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
 def build_backend_port_prestart_gate_summary_surface(
     handoff_artifact: Mapping[str, object],
 ) -> dict[str, object]:
@@ -23467,6 +23511,21 @@ def mark_wing_readonly_operator_sequence_list_markdown_surface_failed(
     summary["status"] = "failed"
 
 
+def mark_wing_readonly_handoff_plan_verifier_summary_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
 def mark_no_wing_artifact_manifest_cross_surface_failed(
     summary: dict[str, object],
 ) -> None:
@@ -23662,6 +23721,24 @@ def apply_wing_readonly_operator_sequence_list_summary_surface_check(
         is not True
     ):
         mark_wing_readonly_operator_sequence_list_summary_surface_failed(summary)
+
+
+def apply_wing_readonly_handoff_plan_verifier_summary_surface_check(
+    summary: dict[str, object],
+) -> None:
+    handoff_artifact = summary.get("wing_readonly_preflight_handoff_packet_artifact")
+    if not isinstance(handoff_artifact, Mapping):
+        return
+    check = build_wing_readonly_handoff_plan_verifier_summary_surface(
+        handoff_artifact
+    )
+    summary.update(check)
+
+    if (
+        check["wing_readonly_handoff_plan_verifier_summary_surface_match"]
+        is not True
+    ):
+        mark_wing_readonly_handoff_plan_verifier_summary_surface_failed(summary)
 
 
 def build_wing_readonly_operator_sequence_list_markdown_surface_check_defaults() -> dict[
@@ -24193,6 +24270,7 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         summary["wing_readonly_preflight_handoff_packet_artifact"] = (
             wing_readonly_preflight_handoff_packet_artifact
         )
+        apply_wing_readonly_handoff_plan_verifier_summary_surface_check(summary)
         summary.update(
             build_backend_port_prestart_gate_summary_surface(
                 wing_readonly_preflight_handoff_packet_artifact

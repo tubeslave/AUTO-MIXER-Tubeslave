@@ -16904,6 +16904,30 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "plan_artifact_manifest_verifier_report_required_fields_match_contract: `true`"
         in markdown_summary
     )
+    assert (
+        json_summary["wing_readonly_handoff_plan_verifier_summary_surface_required"]
+        is True
+    )
+    assert (
+        json_summary["wing_readonly_handoff_plan_verifier_summary_surface_mismatches"]
+        == []
+    )
+    assert (
+        json_summary["wing_readonly_handoff_plan_verifier_summary_surface_match"]
+        is True
+    )
+    assert (
+        json_summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed"
+        ]
+        is False
+    )
+    assert (
+        json_summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted"
+        ]
+        is False
+    )
     assert "proof_artifact_schema_matches_plan: `true`" in markdown_summary
     assert "proof_runner_matches_plan: `true`" in markdown_summary
     assert "## WING Read-Only MVP Blocker Summary" in markdown_summary
@@ -17241,6 +17265,57 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "valid accepted-candidate request-sequence trace" in markdown_summary
     assert "expected-artifact-bound accepted source id" in markdown_summary
     assert "physical_console_readback_proof" in markdown_summary
+
+
+def test_wing_readonly_handoff_plan_verifier_summary_surface_check_detects_mismatch():
+    summary = {
+        "status": "passed",
+        "failed_checks": [],
+        "wing_readonly_preflight_handoff_packet_artifact": {
+            "plan_artifact_manifest_verifier_report_value_mismatches": [
+                "readiness_closure_allowed"
+            ],
+            "plan_artifact_manifest_verifier_check_mismatches": [
+                "verifier_report_readiness_closure_allowed_matches_expected"
+            ],
+            "plan_artifact_manifest_verifier_report_required_fields_match_contract": (
+                False
+            ),
+        },
+    }
+
+    release_check.apply_wing_readonly_handoff_plan_verifier_summary_surface_check(
+        summary
+    )
+
+    assert summary["status"] == "failed"
+    assert (
+        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_CHECK_NAME
+        in summary["failed_checks"]
+    )
+    assert summary[
+        "wing_readonly_handoff_plan_verifier_summary_surface_mismatches"
+    ] == [
+        "plan_artifact_manifest_verifier_report_value_mismatches",
+        "plan_artifact_manifest_verifier_check_mismatches",
+        "plan_artifact_manifest_verifier_report_required_fields_match_contract",
+    ]
+    assert (
+        summary["wing_readonly_handoff_plan_verifier_summary_surface_match"]
+        is False
+    )
+    assert (
+        summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted"
+        ]
+        is False
+    )
 
 
 def test_wing_readonly_operator_sequence_list_summary_surface_check_detects_mismatch():
