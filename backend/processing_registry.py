@@ -71,6 +71,8 @@ try:
         build_read_surface_physical_readback_capture_plan,
     )
     from read_surface_remediation_plan import build_read_surface_remediation_plan
+    from routing_group_read_map import build_routing_group_read_map
+    from scene_preset_read_inventory import build_scene_preset_read_inventory
     from raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
     )
@@ -393,6 +395,8 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_read_surface_physical_readback_capture_plan,
     )
     from backend.read_surface_remediation_plan import build_read_surface_remediation_plan
+    from backend.routing_group_read_map import build_routing_group_read_map
+    from backend.scene_preset_read_inventory import build_scene_preset_read_inventory
     from backend.raw_mixer_state_physical_readback_contract import (
         build_raw_mixer_state_physical_readback_contract,
     )
@@ -4113,6 +4117,51 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("transport_free", "read_remediation_only", "no_live_writes", "mutates_console_state_false"),
     ),
     ProcessingMethod(
+        id="routing_group_read_map",
+        label="Routing / Group Read-only Topology Map",
+        domain="routing",
+        status="shadow_only",
+        summary=(
+            "Transport-free topology map that normalizes cached/static routing, "
+            "bus/group/DCA, and matrix read rows before any routing or group "
+            "proposal can claim full context."
+        ),
+        module="backend/routing_group_read_map.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="read_map_only_needs_fresh_product_snapshots_physical_fixtures_and_no_live_execution",
+        promotion_next=(
+            "feed fresh routing/group topology evidence into routing and "
+            "bus/group proposal review; keep all route/group writes out of the live executor"
+        ),
+        notes=("transport_free", "read_only_map", "topology_evidence", "no_live_writes"),
+    ),
+    ProcessingMethod(
+        id="scene_preset_read_inventory",
+        label="Scene / Preset Read-only Inventory",
+        domain="scene_preset",
+        status="shadow_only",
+        summary=(
+            "Transport-free inventory that normalizes cached scene and user-preset "
+            "catalog rows before any scene/preset proposal can claim scoped context."
+        ),
+        module="backend/scene_preset_read_inventory.py",
+        can_analyze=True,
+        pipeline_profiles=("shadow_quality", "lab_dsp"),
+        blocked_reason="read_inventory_only_needs_fresh_scene_preset_snapshots_scoped_diffs_physical_fixtures_and_no_live_execution",
+        promotion_next=(
+            "feed fresh scene/preset inventory evidence into scene/preset proposal "
+            "review; keep load, save, recall, and store operations out of the live executor"
+        ),
+        notes=(
+            "transport_free",
+            "read_only_inventory",
+            "scene_preset_catalog_evidence",
+            "no_snapshot_loads",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
         id="read_surface_physical_readback_capture_plan",
         label="Read Surface Physical Readback Capture Plan",
         domain="evaluation",
@@ -6267,6 +6316,16 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "ui_surface": "Processing registry, console read coverage remediation",
         "next_step": "Use only to plan read DTO and fixture work; do not query or mutate a live console from this plan.",
     },
+    "routing_group_read_map": {
+        "entrypoint": "build_routing_group_read_map",
+        "ui_surface": "Processing registry, routing/group topology evidence, future Routing panel",
+        "next_step": "Use only as read-only topology evidence; require fresh snapshots, physical fixtures, and manual review before route/group writes.",
+    },
+    "scene_preset_read_inventory": {
+        "entrypoint": "build_scene_preset_read_inventory",
+        "ui_surface": "Processing registry, scene/preset inventory evidence, future Scene panel",
+        "next_step": "Use only as read-only scene/preset inventory evidence; require fresh snapshots, scoped diffs, rollback evidence, and manual review before load/save/recall.",
+    },
     "read_surface_physical_readback_capture_plan": {
         "entrypoint": "build_read_surface_physical_readback_capture_plan",
         "ui_surface": "Processing registry, operator readback capture checklist",
@@ -6715,6 +6774,8 @@ def build_processing_registry_snapshot(
         "autonomy_mode_transition_gate": autonomy_mode_transition_gate,
         "read_surface_inventory": build_read_surface_inventory_snapshot(),
         "read_surface_remediation_plan": build_read_surface_remediation_plan(),
+        "routing_group_read_map": build_routing_group_read_map(),
+        "scene_preset_read_inventory": build_scene_preset_read_inventory(),
         "read_surface_physical_readback_capture_plan": (
             build_read_surface_physical_readback_capture_plan()
         ),

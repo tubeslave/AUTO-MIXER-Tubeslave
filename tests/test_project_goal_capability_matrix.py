@@ -267,6 +267,8 @@ def test_console_read_parameters_tracks_physical_readback_capture_plan():
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "analysis"
     assert "read_surface_remediation_plan" in row.method_ids
+    assert "routing_group_read_map" in row.method_ids
+    assert "scene_preset_read_inventory" in row.method_ids
     assert "read_surface_physical_readback_capture_plan" in row.method_ids
     assert "read_surface_fixture_evidence" in row.method_ids
     assert "snapshots_scenes_physical_readback_artifact_intake" in row.method_ids
@@ -274,6 +276,8 @@ def test_console_read_parameters_tracks_physical_readback_capture_plan():
     assert "read_surface_physical_readback_fixture_acceptance_ledger" in row.method_ids
     assert "read_surface_physical_readback_fixture_closure_plan" in row.method_ids
     assert "backend/read_surface_physical_readback_capture_plan.py" in row.support_paths
+    assert "backend/routing_group_read_map.py" in row.support_paths
+    assert "backend/scene_preset_read_inventory.py" in row.support_paths
     assert (
         "backend/snapshots_scenes_physical_readback_artifact_intake.py"
         in row.support_paths
@@ -805,10 +809,13 @@ def test_bus_group_balance_is_tracked_as_proposal_layer_without_live_widening():
     assert console is not None
     assert console.status == "proposal_only"
     assert console.autonomy_mode_ceiling == "assisted"
+    assert "routing_group_read_map" in console.method_ids
     assert "bus_group_balance_proposal" in console.method_ids
+    assert "backend/routing_group_read_map.py" in console.support_paths
     assert "backend/autofoh_safety.py" in console.support_paths
     assert "blocked evidence only" in console.blocker
     assert console.current_live_write_kinds == ()
+    assert "topology map" in console.next_step
 
 
 def test_fader_control_stays_product_layer_only_with_autosoundcheck_restore_evidence():
@@ -841,8 +848,11 @@ def test_routing_control_is_tracked_as_proposal_layer_without_live_widening():
     assert row is not None
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "assisted"
+    assert "routing_group_read_map" in row.method_ids
     assert "routing_management_proposal" in row.method_ids
+    assert "backend/routing_group_read_map.py" in row.support_paths
     assert row.current_live_write_kinds == ()
+    assert "topology map" in row.next_step
     assert "operator review" in row.next_step
 
 
@@ -852,7 +862,9 @@ def test_scene_preset_control_is_tracked_as_proposal_layer_without_live_widening
     assert row is not None
     assert row.status == "proposal_only"
     assert row.autonomy_mode_ceiling == "assisted"
+    assert "scene_preset_read_inventory" in row.method_ids
     assert "scene_preset_management_proposal" in row.method_ids
+    assert "backend/scene_preset_read_inventory.py" in row.support_paths
     assert "backend/operator_product_state.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "operator review" in row.next_step

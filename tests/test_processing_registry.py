@@ -425,6 +425,10 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["read_surface_inventory"]["safety"]["live_write"] is False
     assert snapshot["read_surface_remediation_plan"]["type"] == "read_surface_remediation_plan"
     assert snapshot["read_surface_remediation_plan"]["safety"]["live_write"] is False
+    assert snapshot["routing_group_read_map"]["type"] == "routing_group_read_map"
+    assert snapshot["routing_group_read_map"]["safety"]["live_write"] is False
+    assert snapshot["scene_preset_read_inventory"]["type"] == "scene_preset_read_inventory"
+    assert snapshot["scene_preset_read_inventory"]["safety"]["live_write"] is False
     assert snapshot["read_surface_remediation_plan"]["summary"]["incomplete_surface_count"] >= 1
     assert (
         snapshot["read_surface_physical_readback_capture_plan"]["type"]

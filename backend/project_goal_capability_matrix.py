@@ -521,6 +521,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         method_ids=(
             "product_operator_state",
             "read_surface_remediation_plan",
+            "routing_group_read_map",
+            "scene_preset_read_inventory",
             "read_surface_physical_readback_capture_plan",
             "read_surface_fixture_evidence",
             "wing_readonly_preflight_evidence",
@@ -551,6 +553,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         support_paths=(
             "backend/read_surface_inventory.py",
             "backend/read_surface_remediation_plan.py",
+            "backend/routing_group_read_map.py",
+            "backend/scene_preset_read_inventory.py",
             "backend/read_surface_physical_readback_capture_plan.py",
             "backend/read_surface_fixture_evidence.py",
             "backend/wing_readonly_preflight_evidence.py",
@@ -582,8 +586,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         blocker="Read coverage is inventoried but still partial for matrix, routing/send, scene contents, presets, and dLive parity.",
         next_step=(
-            "Close partial read surfaces with physical fixtures, stale-cache evidence, "
-            "scene/preset diffs, and dLive/WING parity before claiming full console-state awareness."
+            "Close partial read surfaces with read-only topology maps, physical fixtures, stale-cache evidence, "
+            "scene/preset inventories and diffs, and dLive/WING parity before claiming full console-state awareness."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -722,14 +726,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Control routing.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("routing_management_proposal",),
+        method_ids=("routing_group_read_map", "routing_management_proposal"),
         support_paths=(
+            "backend/routing_group_read_map.py",
             "backend/routing_management_proposal.py",
             "backend/source_identity_downstream_gate.py",
         ),
         target_console_surfaces=("routing",),
         blocker="Routing writes can rewrite broad mixer state.",
-        next_step="Route routing diffs to operator review; require trusted source identity, fresh full route readback, rollback, scope limits, and hardware proof before any routing write promotion.",
+        next_step="Route routing diffs to operator review only after read-only topology map evidence; require trusted source identity, fresh full route readback, rollback, scope limits, and hardware proof before any routing write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="console_dca_group_matrix_control",
@@ -738,15 +743,16 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Control DCA, groups, and matrices.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("bus_group_balance_proposal",),
+        method_ids=("routing_group_read_map", "bus_group_balance_proposal"),
         support_paths=(
+            "backend/routing_group_read_map.py",
             "backend/bus_group_balance_proposal.py",
             "backend/autofoh_safety.py",
             "backend/source_identity_downstream_gate.py",
         ),
         target_console_surfaces=("dca", "groups", "matrices"),
         blocker="Group/DCA/matrix writes have no supervised proof path; AutoFOH bus/DCA/master typed actions are blocked evidence only.",
-        next_step="Keep DCA/group/matrix settings proposal-only until trusted source identity, fresh assignment/fader readback, true-peak safety, rollback, and hardware proof are complete.",
+        next_step="Keep DCA/group/matrix settings proposal-only until read-only topology map evidence, trusted source identity, fresh assignment/fader readback, true-peak safety, rollback, and hardware proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="console_fx_control",
@@ -773,9 +779,10 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Control scenes and user presets.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("scene_preset_management_proposal",),
+        method_ids=("scene_preset_read_inventory", "scene_preset_management_proposal"),
         support_paths=(
             "backend/operator_product_state.py",
+            "backend/scene_preset_read_inventory.py",
             "backend/scene_preset_management_proposal.py",
         ),
         target_console_surfaces=("scenes", "presets"),
