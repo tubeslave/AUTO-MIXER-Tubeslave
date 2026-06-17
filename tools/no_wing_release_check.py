@@ -588,8 +588,11 @@ PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "artifact_manifest_contract_cross_surface_mismatches: []",
     "verifier_report_required_fields_present: true",
     "verifier_report_required_fields_missing: []",
+    "artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true",
     "verifier_report_required_fields_match_contract: true",
+    "artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true",
     "failed_checks_have_check_entries: true",
+    "artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true",
     "failed_checks_missing_check_entries: []",
 )
 PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_DENIAL_MARKERS = (

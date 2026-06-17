@@ -15589,6 +15589,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "project_director_selected_action_manifest_sidecar_required_markers"
         ]
     )
+    for marker in (
+        "artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true",
+        "artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true",
+        "artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true",
+    ):
+        assert marker in json_summary[
+            "project_director_selected_action_manifest_sidecar_required_markers"
+        ]
     assert (
         json_summary[
             "project_director_selected_action_manifest_sidecar_missing_markers"
