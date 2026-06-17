@@ -534,6 +534,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
         in packet["required_supervised_proof_plan_summary_fields"]
     )
+    for field_name in (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+    ):
+        assert field_name in packet["required_supervised_proof_plan_summary_fields"]
     assert packet["expected_required_supervised_proof_plan_summary_fields"] == list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
@@ -660,6 +666,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "required_supervised_proof_plan_summary_fields_include_invalid_records: `true`"
         in rendered
     )
+    for field_name in (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+    ):
+        assert field_name in rendered
     assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in rendered
     assert "readonly_preflight_review_decision_invalid_records" in rendered
     assert (
