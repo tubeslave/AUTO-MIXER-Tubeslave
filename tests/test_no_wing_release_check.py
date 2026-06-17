@@ -1345,8 +1345,11 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "artifact_manifest_verifier_failed_checks": [],
         "artifact_manifest_verifier_failed_checks_missing_check_entries": [],
         "artifact_manifest_verifier_required_fields_missing": [],
+        "artifact_manifest_verifier_report_value_mismatches": [],
+        "artifact_manifest_verifier_check_mismatches": [],
         "artifact_manifest_verifier_failed_checks_have_check_entries": True,
         "artifact_manifest_verifier_report_required_fields_present": True,
+        "artifact_manifest_verifier_report_required_fields_match_contract": True,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
         **{
@@ -3078,12 +3081,20 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
         == []
     )
     assert result.detail["artifact_manifest_verifier_required_fields_missing"] == []
+    assert result.detail["artifact_manifest_verifier_report_value_mismatches"] == []
+    assert result.detail["artifact_manifest_verifier_check_mismatches"] == []
     assert (
         result.detail["artifact_manifest_verifier_failed_checks_have_check_entries"]
         is True
     )
     assert (
         result.detail["artifact_manifest_verifier_report_required_fields_present"]
+        is True
+    )
+    assert (
+        result.detail[
+            "artifact_manifest_verifier_report_required_fields_match_contract"
+        ]
         is True
     )
     assert (
@@ -3144,8 +3155,15 @@ def test_no_wing_release_check_rejects_wing_preflight_plan_stale_manifest_verifi
     payload["artifact_manifest_verifier_required_fields_missing"] = [
         "checks"
     ]
+    payload["artifact_manifest_verifier_report_value_mismatches"] = [
+        "readiness_closure_allowed"
+    ]
+    payload["artifact_manifest_verifier_check_mismatches"] = [
+        "verifier_report_readiness_closure_allowed_matches_expected"
+    ]
     payload["artifact_manifest_verifier_failed_checks_have_check_entries"] = False
     payload["artifact_manifest_verifier_report_required_fields_present"] = False
+    payload["artifact_manifest_verifier_report_required_fields_match_contract"] = False
     payload["artifact_manifest_verifier_readiness_closure_allowed"] = True
     payload["artifact_manifest_verifier_live_authority_granted"] = True
     plan_path.write_text(json.dumps(payload), encoding="utf-8")
@@ -3174,11 +3192,23 @@ def test_no_wing_release_check_rejects_wing_preflight_plan_stale_manifest_verifi
         in result.detail["violations"]
     )
     assert (
+        "wing_readonly_preflight_plan_artifact_manifest_verifier_report_value_mismatches_not_empty"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_artifact_manifest_verifier_check_mismatches_not_empty"
+        in result.detail["violations"]
+    )
+    assert (
         "wing_readonly_preflight_plan_artifact_manifest_verifier_failed_checks_have_check_entries_not_true"
         in result.detail["violations"]
     )
     assert (
         "wing_readonly_preflight_plan_artifact_manifest_verifier_report_required_fields_present_not_true"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_plan_artifact_manifest_verifier_report_required_fields_match_contract_not_true"
         in result.detail["violations"]
     )
     assert (

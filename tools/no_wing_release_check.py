@@ -5926,6 +5926,14 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_artifact_manifest_verifier_required_fields_missing_not_empty"
         )
+    if plan.get("artifact_manifest_verifier_report_value_mismatches") != []:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_report_value_mismatches_not_empty"
+        )
+    if plan.get("artifact_manifest_verifier_check_mismatches") != []:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_check_mismatches_not_empty"
+        )
     if plan.get("artifact_manifest_verifier_failed_checks_have_check_entries") is not True:
         violations.append(
             "wing_readonly_preflight_plan_artifact_manifest_verifier_failed_checks_have_check_entries_not_true"
@@ -5933,6 +5941,10 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     if plan.get("artifact_manifest_verifier_report_required_fields_present") is not True:
         violations.append(
             "wing_readonly_preflight_plan_artifact_manifest_verifier_report_required_fields_present_not_true"
+        )
+    if plan.get("artifact_manifest_verifier_report_required_fields_match_contract") is not True:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_report_required_fields_match_contract_not_true"
         )
     if plan.get("artifact_manifest_verifier_readiness_closure_allowed") is not False:
         violations.append(
@@ -6169,11 +6181,20 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["artifact_manifest_verifier_required_fields_missing"] = plan.get(
         "artifact_manifest_verifier_required_fields_missing"
     )
+    detail["artifact_manifest_verifier_report_value_mismatches"] = plan.get(
+        "artifact_manifest_verifier_report_value_mismatches"
+    )
+    detail["artifact_manifest_verifier_check_mismatches"] = plan.get(
+        "artifact_manifest_verifier_check_mismatches"
+    )
     detail["artifact_manifest_verifier_failed_checks_have_check_entries"] = plan.get(
         "artifact_manifest_verifier_failed_checks_have_check_entries"
     )
     detail["artifact_manifest_verifier_report_required_fields_present"] = plan.get(
         "artifact_manifest_verifier_report_required_fields_present"
+    )
+    detail["artifact_manifest_verifier_report_required_fields_match_contract"] = (
+        plan.get("artifact_manifest_verifier_report_required_fields_match_contract")
     )
     detail["artifact_manifest_verifier_readiness_closure_allowed"] = plan.get(
         "artifact_manifest_verifier_readiness_closure_allowed"
