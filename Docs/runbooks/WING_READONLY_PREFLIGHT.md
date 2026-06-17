@@ -104,6 +104,9 @@ It does not approve live writes.
   `verifier_report_required_fields_missing: []`, and
   `verifier_report_required_fields_match_contract: true`. Its `checks` must
   also show `manifest_artifact_manifest_verifier_fields_present: true`,
+  `summary_md_artifact_manifest_verifier_fields_rendered: true`,
+  `summary_json_artifact_manifest_verifier_command_matches_expected: true`,
+  `summary_md_artifact_manifest_verifier_command_matches_expected: true`,
   `manifest_artifact_manifest_verifier_command_matches_expected: true`,
   `summary_json_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
   `summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
@@ -587,6 +590,9 @@ Then update:
   `verifier_report_required_fields_missing: []`, and
   `verifier_report_required_fields_match_contract: true`,
   `manifest_artifact_manifest_verifier_fields_present: true`,
+  `summary_md_artifact_manifest_verifier_fields_rendered: true`,
+  `summary_json_artifact_manifest_verifier_command_matches_expected: true`,
+  `summary_md_artifact_manifest_verifier_command_matches_expected: true`,
   `manifest_artifact_manifest_verifier_command_matches_expected: true`,
   `summary_json_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
   `summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
