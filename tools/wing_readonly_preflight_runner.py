@@ -940,6 +940,10 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
             )
+        if not isinstance(verifier_checks, dict):
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_checks_not_object"
+            )
         if not isinstance(verifier_failed_checks, list):
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_failed_checks_not_list"
