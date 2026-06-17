@@ -383,6 +383,9 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
     "operator_markdown_summary_value_mismatches",
     "required_supervised_proof_plan_summary_fields",
     "missing_required_supervised_proof_plan_summary_fields",
+    "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+    "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+    "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
     "readonly_preflight_review_decision_candidate_request_sequence_contract_valid",
     "readonly_preflight_review_decision_candidate_request_sequence_source_ids",
     "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source",
@@ -22400,6 +22403,9 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         readonly_preflight_review_decision_expected_candidate_prestart_source_ids = detail.get(
             "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
         )
+        readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids = detail.get(
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+        )
         readonly_preflight_review_decision_candidate_request_sequence_source_ids = detail.get(
             "readonly_preflight_review_decision_candidate_request_sequence_source_ids"
         )
@@ -22484,6 +22490,14 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         ) = _string_list_map(
             detail.get(
                 "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+            )
+        )
+        (
+            readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source,
+            _,
+        ) = _string_list_map(
+            detail.get(
+                "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
             )
         )
         (
@@ -22767,6 +22781,27 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                 dict(
                     readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source
                 )
+            ),
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids": (
+                list(
+                    readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids
+                )
+                if isinstance(
+                    readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source": (
+                dict(
+                    readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source
+                )
+            ),
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete": (
+                detail.get(
+                    "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+                )
+                is True
             ),
             "readonly_preflight_review_decision_candidate_request_sequence_contract_valid": (
                 detail.get(
@@ -27182,6 +27217,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_prestart_source_ids'])}`",
                 "- readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: "
+                f"`{json.dumps(next_plan.get('readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids') or [])}`",
+                "- readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: "
+                f"`{json.dumps(next_plan.get('readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source') or {}, sort_keys=True)}`",
+                "- readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: "
+                f"`{str(next_plan.get('readonly_preflight_review_decision_candidate_verifier_ws_proof_complete') is True).lower()}`",
                 "- readonly_preflight_review_decision_candidate_artifact_root_contract_valid: "
                 f"`{str(next_plan['readonly_preflight_review_decision_candidate_artifact_root_contract_valid']).lower()}`",
                 "- readonly_preflight_review_decision_candidate_artifact_roots: "

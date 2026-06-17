@@ -20352,6 +20352,11 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
                 "artifacts/wing_readonly_preflight/run/summary.json"
             ],
             "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source": {},
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids": [
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ],
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source": {},
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete": True,
             "readonly_preflight_review_decision_candidate_artifact_root_contract_valid": True,
             "readonly_preflight_review_decision_candidate_artifact_roots": [
                 "artifacts/wing_readonly_preflight"
@@ -21163,6 +21168,24 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         ]
     )
     assert (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed"
         in json_summary["next_wing_proof_plan"][
             "operator_markdown_summary_required_field_lines"
@@ -21873,6 +21896,18 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted: `false`"
         in markdown_summary
     )
+    assert (
+        'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: `["artifacts/wing_readonly_preflight/run/summary.json"]`'
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: `{}`"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: `true`"
+        in markdown_summary
+    )
     assert "readonly_preflight_review_decision_rejected_source_ids: `[]`" in markdown_summary
     assert "readonly_preflight_review_decision_invalid_records: `[]`" in markdown_summary
     assert "readonly_preflight_review_decision_duplicate_source_ids: `[]`" in markdown_summary
@@ -21946,6 +21981,9 @@ def test_no_wing_release_check_fails_when_operator_markdown_required_field_lines
             "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted",
             "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed",
             "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted",
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
         }
     ]
     markdown_lines = [
@@ -21982,6 +22020,9 @@ def test_no_wing_release_check_fails_when_operator_markdown_required_field_lines
     assert next_plan["operator_markdown_summary_field_lines_rendered"] is False
     assert next_plan["operator_markdown_summary_required_field_lines_match_contract"] is False
     assert next_plan["operator_markdown_summary_required_field_lines_missing_members"] == [
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed",
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted",
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed",
