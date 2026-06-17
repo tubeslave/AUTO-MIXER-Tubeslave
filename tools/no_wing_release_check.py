@@ -623,6 +623,18 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS = (
     "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
     "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
 )
+WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES = {
+    "validate_run_inputs_only_read_only": True,
+    "validate_run_inputs_only_live_write": False,
+    "validate_run_inputs_only_contacts_backend": False,
+    "validate_run_inputs_only_contacts_wing": False,
+    "validate_run_inputs_only_queries_console": False,
+    "validate_run_inputs_only_transport_opened": False,
+    "validate_run_inputs_only_write_request_sent": False,
+    "validate_run_inputs_only_proposal_request_sent": False,
+    "validate_run_inputs_only_readiness_closure_allowed": False,
+    "validate_run_inputs_only_grants_live_authority": False,
+}
 PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "same no-WING artifact directory",
     "artifact_manifest_self_consistency_summary_surface_match: true",
@@ -6890,18 +6902,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         bool(validate_inputs_command_prestart_summary)
         and validate_inputs_command_prestart_summary == expected_prestart_summary
     )
-    required_validate_run_inputs_only_values = {
-        "validate_run_inputs_only_read_only": True,
-        "validate_run_inputs_only_live_write": False,
-        "validate_run_inputs_only_contacts_backend": False,
-        "validate_run_inputs_only_contacts_wing": False,
-        "validate_run_inputs_only_queries_console": False,
-        "validate_run_inputs_only_transport_opened": False,
-        "validate_run_inputs_only_write_request_sent": False,
-        "validate_run_inputs_only_proposal_request_sent": False,
-        "validate_run_inputs_only_readiness_closure_allowed": False,
-        "validate_run_inputs_only_grants_live_authority": False,
-    }
+    required_validate_run_inputs_only_values = (
+        WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES
+    )
     validate_run_inputs_only_values_match_expected = {
         key: packet.get(key) == expected
         for key, expected in required_validate_run_inputs_only_values.items()
@@ -18051,6 +18054,20 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
             },
+            **{
+                field: (
+                    detail.get(field)
+                    if isinstance(detail.get(field), bool)
+                    else None
+                )
+                for field in WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES
+            },
+            **{
+                f"{field}_matches_expected": (
+                    detail.get(f"{field}_matches_expected") is True
+                )
+                for field in WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES
+            },
             "backend_port_prestart_check_operator_sequence_step_index": (
                 detail.get("backend_port_prestart_check_operator_sequence_step_index")
             ),
@@ -26168,6 +26185,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                     f"- {field}_matches_plan: "
                     f"`{str(wing_readonly_preflight_handoff_packet_artifact[f'{field}_matches_plan']).lower()}`"
                     for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                ],
+                *[
+                    f"- {field}: "
+                    f"`{str(wing_readonly_preflight_handoff_packet_artifact[field]).lower()}`"
+                    for field in WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES
+                ],
+                *[
+                    f"- {field}_matches_expected: "
+                    f"`{str(wing_readonly_preflight_handoff_packet_artifact[f'{field}_matches_expected']).lower()}`"
+                    for field in WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES
                 ],
                 "- manual_review_required_before_readiness_update: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['manual_review_required_before_readiness_update']).lower()}`",

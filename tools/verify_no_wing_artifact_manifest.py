@@ -223,6 +223,82 @@ def _record_verifier_report_handoff_plan_summary_surface_checks(
         )
 
 
+def _record_handoff_validate_run_inputs_only_safety_checks(
+    checks: dict[str, bool],
+    *,
+    summary_json: Mapping[str, Any],
+    summary_md_text: str,
+) -> None:
+    handoff = summary_json.get("wing_readonly_preflight_handoff_packet_artifact")
+    if not isinstance(handoff, Mapping):
+        handoff = {}
+    summary_md_lines = set(summary_md_text.splitlines())
+    handoff_section_present = (
+        "## WING Read-Only Preflight Handoff Packet Artifact" in summary_md_lines
+    )
+    expected = (
+        no_wing_release_check.WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES
+    )
+    if not handoff and not handoff_section_present:
+        _record_check(
+            checks,
+            "summary_json_handoff_validate_run_inputs_only_surface_present",
+            True,
+        )
+        _record_check(
+            checks,
+            "summary_md_handoff_validate_run_inputs_only_surface_rendered",
+            True,
+        )
+        return
+    _record_check(
+        checks,
+        "summary_json_handoff_validate_run_inputs_only_surface_present",
+        bool(handoff) and all(field_name in handoff for field_name in expected),
+    )
+    _record_check(
+        checks,
+        "summary_md_handoff_validate_run_inputs_only_surface_rendered",
+        all(
+            no_wing_release_check._format_markdown_summary_field_line(
+                field_name,
+                expected_value,
+            )
+            in summary_md_lines
+            for field_name, expected_value in expected.items()
+        ),
+    )
+    for field_name, expected_value in expected.items():
+        _record_check(
+            checks,
+            f"summary_json_handoff_{field_name}_matches_expected",
+            handoff.get(field_name) == expected_value,
+        )
+        _record_check(
+            checks,
+            f"summary_json_handoff_{field_name}_match_flag_true",
+            handoff.get(f"{field_name}_matches_expected") is True,
+        )
+        _record_check(
+            checks,
+            f"summary_md_handoff_{field_name}_matches_expected",
+            no_wing_release_check._format_markdown_summary_field_line(
+                field_name,
+                expected_value,
+            )
+            in summary_md_lines,
+        )
+        _record_check(
+            checks,
+            f"summary_md_handoff_{field_name}_match_flag_true",
+            no_wing_release_check._format_markdown_summary_field_line(
+                f"{field_name}_matches_expected",
+                True,
+            )
+            in summary_md_lines,
+        )
+
+
 def _record_manifest_handoff_plan_summary_surface_checks(
     checks: dict[str, bool],
     *,
@@ -579,6 +655,11 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         checks,
         report=report,
         summary_json=summary_json,
+    )
+    _record_handoff_validate_run_inputs_only_safety_checks(
+        checks,
+        summary_json=summary_json,
+        summary_md_text=summary_md_text,
     )
     _record_summary_md_safety_checks(
         checks,

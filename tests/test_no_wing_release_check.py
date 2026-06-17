@@ -513,6 +513,65 @@ def test_wing_readonly_prestart_summary_writer_creates_verifiable_bundle(tmp_pat
     assert verifier_report["failed_checks"] == []
 
 
+def test_no_wing_manifest_verifier_rejects_handoff_validate_inputs_safety_drift(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "wing_readonly_preflight_handoff_packet.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    packet_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_handoff_packet_payload(plan_path)),
+        encoding="utf-8",
+    )
+    handoff_result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+    assert handoff_result.status == "passed"
+    release_check.write_summary(
+        tmp_path,
+        [handoff_result],
+        generated_at="2026-06-13T00:00:00Z",
+    )
+
+    verifier_report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+    assert verifier_report["status"] == "passed"
+    assert verifier_report["failed_checks"] == []
+    assert (
+        verifier_report["checks"][
+            "summary_json_handoff_validate_run_inputs_only_live_write_matches_expected"
+        ]
+        is True
+    )
+
+    summary_path = tmp_path / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["wing_readonly_preflight_handoff_packet_artifact"][
+        "validate_run_inputs_only_live_write"
+    ] = True
+    summary_path.write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    verifier_report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    assert verifier_report["status"] == "failed"
+    assert (
+        "summary_json_handoff_validate_run_inputs_only_live_write_matches_expected"
+        in verifier_report["failed_checks"]
+    )
+    assert (
+        verifier_report["checks"][
+            "summary_json_handoff_validate_run_inputs_only_live_write_matches_expected"
+        ]
+        is False
+    )
+
+
 def test_wing_readonly_preflight_runbook_lists_prestart_failure_detail_fields():
     runbook_text = Path("Docs/runbooks/WING_READONLY_PREFLIGHT.md").read_text()
 
