@@ -20727,6 +20727,7 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         "executes_tests",
         "readiness_closure_allowed",
         "live_authority_granted",
+        *release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS,
     ):
         assert field_name in json_summary["artifact_manifest_contract_fields"]
     assert (
