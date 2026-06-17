@@ -709,6 +709,8 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS = (
     "artifact_manifest_required_artifact_ids",
     "artifact_manifest_required_artifact_paths",
     "artifact_manifest_required_artifact_sha256_fields",
+    "readiness_closure_allowed_by_packet",
+    "live_authority_granted",
     "artifact_manifest_readiness_closure_allowed",
     "artifact_manifest_live_authority_granted",
     *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS,
@@ -23967,6 +23969,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
         "live_write": False,
+        "readiness_closure_allowed_by_packet": False,
+        "live_authority_granted": False,
         "artifact_manifest_summary_surface_required": True,
         "artifact_manifest_summary_surface_required_fields": list(
             NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS
@@ -24251,6 +24255,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         f"- status: `{summary['status']}`",
         "- connection_policy: `no_hardware_no_network_no_live_writes`",
         "- live_write: `false`",
+        "- readiness_closure_allowed_by_packet: `false`",
+        "- live_authority_granted: `false`",
         "- artifact_manifest_summary_surface_required: `true`",
         "- artifact_manifest_summary_surface_required_fields: "
         f"`{json.dumps(summary['artifact_manifest_summary_surface_required_fields'])}`",

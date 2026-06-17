@@ -22946,7 +22946,7 @@ def test_no_wing_release_check_fails_summary_when_operator_markdown_sha_stale():
 
 
 def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
-    write_summary(
+    summary = write_summary(
         tmp_path,
         [
             CheckResult(
@@ -22962,6 +22962,9 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
         ],
         generated_at="2026-06-15T00:00:00Z",
     )
+
+    assert summary["readiness_closure_allowed_by_packet"] is False
+    assert summary["live_authority_granted"] is False
 
     report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
 
@@ -23014,6 +23017,8 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert checks["summary_md_sha256_matches_manifest"] is True
     assert checks["manifest_denies_readiness_closure"] is True
     assert checks["manifest_denies_live_authority"] is True
+    assert checks["summary_denies_readiness_closure"] is True
+    assert checks["summary_denies_live_authority"] is True
     assert checks["verifier_report_read_only_matches_expected"] is True
     assert checks["verifier_report_live_write_matches_expected"] is True
     assert checks["verifier_report_contacts_wing_matches_expected"] is True
