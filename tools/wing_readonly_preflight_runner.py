@@ -940,6 +940,14 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_report_value_mismatch"
             )
+        if verifier_report.get("readiness_closure_allowed") is not False:
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_readiness_closure_allowed_not_false"
+            )
+        if verifier_report.get("live_authority_granted") is not False:
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_live_authority_granted_not_false"
+            )
         if verifier_required_fields_missing:
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_required_field_missing"
