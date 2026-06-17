@@ -569,6 +569,84 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_verifies_manifest_before_opening_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    order: list[str] = []
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+        ]
+    )
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    verifier_report = runner.verify_no_wing_artifact_manifest(tmp_path)
+
+    def verify_before_websocket(run_dir: Path) -> dict:
+        order.append("verifier")
+        assert run_dir == tmp_path
+        return verifier_report
+
+    def connect_after_verifier(url: str) -> FakeWebSocketConnect:
+        order.append("connect")
+        websocket.url = url
+        return FakeWebSocketConnect(websocket)
+
+    monkeypatch.setattr(
+        runner,
+        "verify_no_wing_artifact_manifest",
+        verify_before_websocket,
+    )
+    monkeypatch.setattr(runner.websockets, "connect", connect_after_verifier)
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    assert order.count("verifier") >= 1
+    assert order[-1] == "connect"
+    assert "connect" not in order[:-1]
+    assert websocket.url == "ws://fake-backend"
+    summary = read_summary(tmp_path)
+    assert summary["websocket_opened"] is True
+    assert summary["artifact_manifest_verifier_status"] == "passed"
+    assert summary["artifact_manifest_verifier_failed_checks"] == []
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_passes_with_state_unavailable_but_readbacks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
