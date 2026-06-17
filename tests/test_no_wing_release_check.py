@@ -9670,6 +9670,11 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "artifacts/wing_readonly_preflight/run/summary.json"
                 ],
                 "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source": {},
+                "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids": [
+                    "artifacts/wing_readonly_preflight/run/summary.json"
+                ],
+                "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source": {},
+                "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete": True,
                 "readonly_preflight_review_decision_candidate_request_sequence_contract_valid": True,
                 "readonly_preflight_review_decision_candidate_request_sequence_source_ids": [
                     WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID
@@ -9849,6 +9854,18 @@ def set_empty_accepted_candidate_request_sequence_trace(summary: dict) -> None:
     ] = False
 
 
+def set_empty_candidate_verifier_ws_proof(summary: dict) -> None:
+    summary[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+    ] = []
+    summary[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+    ] = {}
+    summary[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+    ] = False
+
+
 def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path):
     report_path = tmp_path / "supervised_proof_artifact_report.json"
     report_path.write_text(json.dumps(valid_proof_report_with_gap_rollup()), encoding="utf-8")
@@ -9976,6 +9993,21 @@ def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
             "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
         ]
         == {}
+    )
+    assert result.detail[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+    ] == ["artifacts/wing_readonly_preflight/run/summary.json"]
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+        ]
+        is True
     )
     assert (
         result.detail[
@@ -10168,6 +10200,45 @@ def test_no_wing_release_check_rejects_next_wing_plan_steps_with_expected_candid
     assert (
         "next_wing_proof_plan_review_decision_candidate_prestart_blocker_missing"
         in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_next_wing_plan_with_stale_verifier_ws_proof(
+    tmp_path,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["wing_readonly_preflight_review_decision_ledger"]["summary"][
+        "candidate_reviews"
+    ][0]["artifact_manifest_verifier_websocket_opened_after_pass"] = False
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        "next_wing_proof_plan_review_decision_verifier_websocket_proof_sources_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_verifier_websocket_proof_violations_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_verifier_websocket_proof_complete_mismatch"
+        in result.detail["violations"]
+    )
+    assert result.detail[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+    ] == ["artifacts/wing_readonly_preflight/run/summary.json"]
+    assert result.detail[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+    ] == {}
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+        ]
+        is True
     )
 
 
@@ -11296,6 +11367,7 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_preflight(tmp_pa
     plan["summary"]["readonly_preflight_review_decision_invalid_record_count"] = 0
     plan["summary"]["readonly_preflight_review_decision_invalid_records"] = []
     plan["summary"]["readonly_preflight_review_decision_unreviewed_candidate_count"] = 0
+    set_empty_candidate_verifier_ws_proof(plan["summary"])
     set_empty_accepted_candidate_expected_artifact_trace(plan["summary"])
     set_empty_accepted_candidate_request_sequence_trace(plan["summary"])
     plan["summary"]["global_blockers"] = [
@@ -11424,6 +11496,7 @@ def test_no_wing_release_check_allows_next_wing_plan_waiting_on_review_decision(
     plan["summary"]["readonly_preflight_review_decision_invalid_record_count"] = 0
     plan["summary"]["readonly_preflight_review_decision_invalid_records"] = []
     plan["summary"]["readonly_preflight_review_decision_unreviewed_candidate_count"] = 1
+    set_empty_candidate_verifier_ws_proof(plan["summary"])
     set_empty_accepted_candidate_expected_artifact_trace(plan["summary"])
     set_empty_accepted_candidate_request_sequence_trace(plan["summary"])
     plan["summary"]["global_blockers"] = [

@@ -478,6 +478,21 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
         plan["summary"]["readonly_preflight_review_decision_accepted_source_ids"],
         accepted_review_decision_ledger()["summary"]["candidate_reviews"],
     )
+    assert plan["summary"][
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+    ] == ["artifacts/wing_readonly_preflight/run/summary.json"]
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+        ]
+        == {}
+    )
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+        ]
+        is True
+    )
     assert (
         plan["summary"][
             "readonly_preflight_review_decision_candidate_request_sequence_contract_valid"

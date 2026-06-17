@@ -13963,6 +13963,9 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     reported_readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: dict[str, list[str]] = {}
     readonly_preflight_review_decision_expected_candidate_prestart_source_ids: list[str] = []
     readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: dict[str, list[str]] = {}
+    readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: list[str] = []
+    readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: dict[str, list[str]] = {}
+    readonly_preflight_review_decision_candidate_verifier_ws_proof_complete = False
     readonly_preflight_review_decision_candidate_request_sequence_contract_valid = False
     readonly_preflight_review_decision_candidate_request_sequence_source_ids: list[str] = []
     readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source: dict[str, list[str]] = {}
@@ -14232,6 +14235,45 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         if not expected_candidate_prestart_violations_map_valid:
             violations.append(
                 "next_wing_proof_plan_review_decision_expected_candidate_prestart_violations_by_source_missing"
+            )
+        verifier_websocket_proof_source_ids = summary.get(
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+        )
+        readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids = (
+            [str(item) for item in verifier_websocket_proof_source_ids if item]
+            if isinstance(verifier_websocket_proof_source_ids, list)
+            else []
+        )
+        if not isinstance(verifier_websocket_proof_source_ids, list):
+            violations.append(
+                "next_wing_proof_plan_review_decision_verifier_websocket_proof_source_ids_missing"
+            )
+        (
+            readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source,
+            verifier_websocket_proof_violations_map_valid,
+        ) = _string_list_map(
+            summary.get(
+                "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+            )
+        )
+        if not verifier_websocket_proof_violations_map_valid:
+            violations.append(
+                "next_wing_proof_plan_review_decision_verifier_websocket_proof_violations_by_source_missing"
+            )
+        readonly_preflight_review_decision_candidate_verifier_ws_proof_complete = (
+            summary.get(
+                "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+            )
+            is True
+        )
+        if not isinstance(
+            summary.get(
+                "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+            ),
+            bool,
+        ):
+            violations.append(
+                "next_wing_proof_plan_review_decision_verifier_websocket_proof_complete_missing"
             )
         readonly_preflight_review_decision_candidate_request_sequence_contract_valid = (
             summary.get(
@@ -14805,6 +14847,24 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 == accepted_source_ids
                 and not expected_candidate_prestart_violations_by_source
             )
+            expected_candidate_verifier_ws_proof_source_ids = (
+                preflight_contract.wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
+            expected_candidate_verifier_ws_proof_violations_by_source = (
+                preflight_contract.wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
+            expected_candidate_verifier_ws_proof_complete = (
+                bool(accepted_source_ids)
+                and expected_candidate_verifier_ws_proof_source_ids
+                == accepted_source_ids
+                and not expected_candidate_verifier_ws_proof_violations_by_source
+            )
             (
                 expected_candidate_artifact_roots,
                 expected_candidate_artifact_root_violations_by_source,
@@ -14906,6 +14966,27 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             ):
                 violations.append(
                     "next_wing_proof_plan_review_decision_candidate_prestart_sources_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids
+                != expected_candidate_verifier_ws_proof_source_ids
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_verifier_websocket_proof_sources_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source
+                != expected_candidate_verifier_ws_proof_violations_by_source
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_verifier_websocket_proof_violations_mismatch"
+                )
+            if (
+                readonly_preflight_review_decision_candidate_verifier_ws_proof_complete
+                != expected_candidate_verifier_ws_proof_complete
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_verifier_websocket_proof_complete_mismatch"
                 )
             (
                 reported_candidate_request_sequence_violations_by_source,
@@ -15445,6 +15526,15 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     detail[
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
     ] = readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source
+    detail[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids"
+    ] = readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids
+    detail[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source"
+    ] = readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source
+    detail[
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete"
+    ] = readonly_preflight_review_decision_candidate_verifier_ws_proof_complete
     detail[
         "readonly_preflight_review_decision_candidate_request_sequence_contract_valid"
     ] = readonly_preflight_review_decision_candidate_request_sequence_contract_valid

@@ -47,6 +47,8 @@ try:
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
         wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
         wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -67,6 +69,8 @@ except ImportError:  # pragma: no cover - package import compatibility
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
         wing_readonly_preflight_accepted_candidate_request_sequence_source_ids,
         wing_readonly_preflight_accepted_candidate_request_sequence_violations_by_source,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids,
+        wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
         wing_readonly_preflight_accepted_candidate_prestart_source_ids,
     )
@@ -383,6 +387,36 @@ def _accepted_candidate_prestart_violations_by_source(
             if source_id
         }
     return {source_id: ["candidate_reviews_missing"] for source_id in accepted_source_ids}
+
+
+def _accepted_candidate_verifier_ws_proof_source_ids(
+    summary: Mapping[str, Any],
+) -> list[str]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    if not accepted_source_ids:
+        return []
+    rows = summary.get("candidate_reviews")
+    if not isinstance(rows, list):
+        return []
+    return wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids(
+        accepted_source_ids,
+        tuple(row for row in rows if isinstance(row, Mapping)),
+    )
+
+
+def _accepted_candidate_verifier_ws_proof_violations_by_source(
+    summary: Mapping[str, Any],
+) -> dict[str, list[str]]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    if not accepted_source_ids:
+        return {}
+    rows = summary.get("candidate_reviews")
+    if not isinstance(rows, list):
+        return {source_id: ["candidate_reviews_missing"] for source_id in accepted_source_ids}
+    return wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source(
+        accepted_source_ids,
+        tuple(row for row in rows if isinstance(row, Mapping)),
+    )
 
 
 def _accepted_candidate_request_sequence_source_ids(
@@ -859,6 +893,20 @@ def build_supervised_wing_proof_plan(
     )
     if accepted_candidate_prestart_violations_by_source:
         candidate_prestart_contract_valid = False
+    accepted_candidate_verifier_ws_proof_source_ids = (
+        _accepted_candidate_verifier_ws_proof_source_ids(review_summary)
+    )
+    accepted_candidate_verifier_ws_proof_violations_by_source = (
+        _accepted_candidate_verifier_ws_proof_violations_by_source(
+            review_summary
+        )
+    )
+    accepted_candidate_verifier_ws_proof_complete = (
+        bool(accepted_source_ids)
+        and accepted_candidate_verifier_ws_proof_source_ids
+        == accepted_source_ids
+        and not accepted_candidate_verifier_ws_proof_violations_by_source
+    )
     accepted_candidate_request_sequence_source_ids = (
         _accepted_candidate_request_sequence_source_ids(review_summary)
     )
@@ -1055,6 +1103,15 @@ def build_supervised_wing_proof_plan(
             ),
             "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source": (
                 accepted_candidate_prestart_violations_by_source
+            ),
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids": (
+                accepted_candidate_verifier_ws_proof_source_ids
+            ),
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source": (
+                accepted_candidate_verifier_ws_proof_violations_by_source
+            ),
+            "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete": (
+                accepted_candidate_verifier_ws_proof_complete
             ),
             "readonly_preflight_review_decision_candidate_request_sequence_contract_valid": (
                 candidate_request_sequence_contract_valid

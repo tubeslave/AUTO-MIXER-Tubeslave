@@ -131,6 +131,11 @@ WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS = tup
     f"{field}_matches_plan"
     for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
 )
+WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
+    "artifact_manifest_verifier_must_pass_before_websocket",
+    "artifact_manifest_verifier_passed_before_websocket",
+    "artifact_manifest_verifier_websocket_opened_after_pass",
+)
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS = "passed"
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON = "wing_readonly_preflight_passed"
 WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY = (
@@ -264,6 +269,9 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS =
     "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source",
     "readonly_preflight_review_decision_expected_candidate_prestart_source_ids",
     "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source",
+    "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+    "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
+    "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
     "readonly_preflight_review_decision_candidate_request_sequence_contract_valid",
     "readonly_preflight_review_decision_candidate_request_sequence_source_ids",
     "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source",
@@ -597,6 +605,18 @@ def wing_readonly_preflight_candidate_prestart_contract_violations(
     return violations
 
 
+def wing_readonly_preflight_candidate_verifier_websocket_proof_violations(
+    row: Mapping[str, Any],
+) -> list[str]:
+    """Return verifier-before-WebSocket proof violations for one candidate row."""
+
+    violations: list[str] = []
+    for field in WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS:
+        if row.get(field) is not True:
+            violations.append(f"{field}_not_true")
+    return violations
+
+
 def wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
     accepted_source_ids: Iterable[str],
     candidate_reviews: Iterable[Mapping[str, Any]],
@@ -650,6 +670,78 @@ def wing_readonly_preflight_accepted_candidate_prestart_source_ids(
             continue
         valid_source_ids.append(str(source_id))
     return valid_source_ids
+
+
+def wing_readonly_preflight_accepted_candidate_verifier_websocket_proof_violations_by_source(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> dict[str, list[str]]:
+    """Return accepted source ids lacking verifier-before-WebSocket proof."""
+
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    violations_by_source: dict[str, list[str]] = {}
+    for source_id in accepted_source_ids:
+        if not source_id:
+            continue
+        normalized_source_id = str(source_id)
+        row = rows_by_source.get(normalized_source_id)
+        if not isinstance(row, Mapping):
+            violations_by_source[normalized_source_id] = ["candidate_review_missing"]
+            continue
+        violations = (
+            wing_readonly_preflight_candidate_verifier_websocket_proof_violations(row)
+        )
+        if violations:
+            violations_by_source[normalized_source_id] = violations
+    return violations_by_source
+
+
+def wing_readonly_preflight_accepted_candidate_verifier_websocket_proof_source_ids(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> list[str]:
+    """Return accepted source ids with complete verifier-before-WebSocket proof."""
+
+    rows_by_source = {
+        str(row.get("source_id")): row
+        for row in candidate_reviews
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    valid_source_ids: list[str] = []
+    for source_id in accepted_source_ids:
+        if not source_id:
+            continue
+        row = rows_by_source.get(str(source_id))
+        if not isinstance(row, Mapping):
+            continue
+        if wing_readonly_preflight_candidate_verifier_websocket_proof_violations(row):
+            continue
+        valid_source_ids.append(str(source_id))
+    return valid_source_ids
+
+
+def wing_readonly_preflight_accepted_candidate_verifier_ws_proof_violations_by_source(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> dict[str, list[str]]:
+    return wing_readonly_preflight_accepted_candidate_verifier_websocket_proof_violations_by_source(
+        accepted_source_ids,
+        candidate_reviews,
+    )
+
+
+def wing_readonly_preflight_accepted_candidate_verifier_ws_proof_source_ids(
+    accepted_source_ids: Iterable[str],
+    candidate_reviews: Iterable[Mapping[str, Any]],
+) -> list[str]:
+    return wing_readonly_preflight_accepted_candidate_verifier_websocket_proof_source_ids(
+        accepted_source_ids,
+        candidate_reviews,
+    )
 
 
 def wing_readonly_preflight_candidate_request_sequence_plan_violations(
