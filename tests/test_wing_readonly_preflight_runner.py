@@ -1460,12 +1460,16 @@ async def test_validate_run_inputs_only_passes_ready_command_without_websocket(
     )
     assert summary["validation_only"] is True
     assert summary["websocket_opened"] is False
+    assert summary["read_only"] is True
+    assert summary["live_write"] is False
     assert summary["expected_plan_match"] is True
     assert summary["expected_plan_violations"] == []
     assert summary["contacts_backend"] is False
     assert summary["queries_console"] is False
     assert summary["mutates_console_state"] is False
     assert summary["executes_tests"] is False
+    assert summary["write_request_sent"] is False
+    assert summary["proposal_request_sent"] is False
     assert summary["execution_allowed_by_validation"] is False
     assert summary["readiness_matrix_update_allowed"] is False
     assert summary["readiness_closure_allowed"] is False
