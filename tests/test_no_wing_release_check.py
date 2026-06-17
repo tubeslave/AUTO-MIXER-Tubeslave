@@ -3499,6 +3499,17 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
     assert result.detail["packet_status"] == "operator_hardware_step_required"
     assert result.detail["plan_artifact_status"] == "passed"
     assert result.detail["plan_artifact_violations"] == []
+    assert (
+        result.detail["plan_artifact_manifest_verifier_report_value_mismatches"]
+        == []
+    )
+    assert result.detail["plan_artifact_manifest_verifier_check_mismatches"] == []
+    assert (
+        result.detail[
+            "plan_artifact_manifest_verifier_report_required_fields_match_contract"
+        ]
+        is True
+    )
     assert result.detail["read_only"] is True
     assert result.detail["live_write"] is False
     assert result.detail["mutates_console_state"] is False
@@ -14389,6 +14400,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "packet_status": "operator_hardware_step_required",
             "plan_artifact_status": "passed",
             "plan_artifact_violations": [],
+            "plan_artifact_manifest_verifier_report_value_mismatches": [],
+            "plan_artifact_manifest_verifier_check_mismatches": [],
+            "plan_artifact_manifest_verifier_report_required_fields_match_contract": True,
             "read_only": True,
             "live_write": False,
             "mutates_console_state": False,
@@ -15471,6 +15485,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["packet_status"] == "operator_hardware_step_required"
     assert artifact["plan_artifact_status"] == "passed"
     assert artifact["plan_artifact_violations"] == []
+    assert artifact["plan_artifact_manifest_verifier_report_value_mismatches"] == []
+    assert artifact["plan_artifact_manifest_verifier_check_mismatches"] == []
+    assert (
+        artifact[
+            "plan_artifact_manifest_verifier_report_required_fields_match_contract"
+        ]
+        is True
+    )
     assert artifact["proof_artifact_schema"] == (
         WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
     )
@@ -16870,6 +16892,18 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
+    assert (
+        "plan_artifact_manifest_verifier_report_value_mismatches: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "plan_artifact_manifest_verifier_check_mismatches: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "plan_artifact_manifest_verifier_report_required_fields_match_contract: `true`"
+        in markdown_summary
+    )
     assert "proof_artifact_schema_matches_plan: `true`" in markdown_summary
     assert "proof_runner_matches_plan: `true`" in markdown_summary
     assert "## WING Read-Only MVP Blocker Summary" in markdown_summary

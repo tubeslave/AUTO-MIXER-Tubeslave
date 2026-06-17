@@ -7876,6 +7876,30 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["packet_status"] = packet.get("status")
     detail["plan_artifact_status"] = plan_artifact_result.status
     detail["plan_artifact_violations"] = list(plan_artifact_violations)
+    detail["plan_artifact_manifest_verifier_report_value_mismatches"] = (
+        list(plan_artifact_detail.get("artifact_manifest_verifier_report_value_mismatches"))
+        if isinstance(
+            plan_artifact_detail.get("artifact_manifest_verifier_report_value_mismatches"),
+            list,
+        )
+        else []
+    )
+    detail["plan_artifact_manifest_verifier_check_mismatches"] = (
+        list(plan_artifact_detail.get("artifact_manifest_verifier_check_mismatches"))
+        if isinstance(
+            plan_artifact_detail.get("artifact_manifest_verifier_check_mismatches"),
+            list,
+        )
+        else []
+    )
+    detail[
+        "plan_artifact_manifest_verifier_report_required_fields_match_contract"
+    ] = (
+        plan_artifact_detail.get(
+            "artifact_manifest_verifier_report_required_fields_match_contract"
+        )
+        is True
+    )
     detail["read_only"] = packet.get("read_only")
     detail["live_write"] = packet.get("live_write")
     detail["mutates_console_state"] = packet.get("mutates_console_state")
@@ -17608,6 +17632,34 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 if isinstance(detail.get("plan_artifact_violations"), list)
                 else []
             ),
+            "plan_artifact_manifest_verifier_report_value_mismatches": (
+                list(
+                    detail.get(
+                        "plan_artifact_manifest_verifier_report_value_mismatches"
+                    )
+                )
+                if isinstance(
+                    detail.get(
+                        "plan_artifact_manifest_verifier_report_value_mismatches"
+                    ),
+                    list,
+                )
+                else []
+            ),
+            "plan_artifact_manifest_verifier_check_mismatches": (
+                list(detail.get("plan_artifact_manifest_verifier_check_mismatches"))
+                if isinstance(
+                    detail.get("plan_artifact_manifest_verifier_check_mismatches"),
+                    list,
+                )
+                else []
+            ),
+            "plan_artifact_manifest_verifier_report_required_fields_match_contract": (
+                detail.get(
+                    "plan_artifact_manifest_verifier_report_required_fields_match_contract"
+                )
+                is True
+            ),
             "plan_output": detail.get("plan_output"),
             "expected_plan_output": detail.get("expected_plan_output"),
             "channels": (
@@ -25205,6 +25257,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_artifact_status']}`",
                 "- plan_artifact_violations: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_violations'])}`",
+                "- plan_artifact_manifest_verifier_report_value_mismatches: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_manifest_verifier_report_value_mismatches'])}`",
+                "- plan_artifact_manifest_verifier_check_mismatches: "
+                f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_manifest_verifier_check_mismatches'])}`",
+                "- plan_artifact_manifest_verifier_report_required_fields_match_contract: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_manifest_verifier_report_required_fields_match_contract']).lower()}`",
                 "- plan_output: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_output']}`",
                 "- proof_artifact_schema: "
