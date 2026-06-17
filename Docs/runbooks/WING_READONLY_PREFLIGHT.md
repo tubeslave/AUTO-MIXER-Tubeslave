@@ -166,14 +166,14 @@ anchor with the exact blocker-row digest. The packet operator sequence must
 include a dedicated review step that names `mvp_blocker_anchor`,
 `mvp_blocker_anchor_sha256`, and the current first open blocker before
 supervised proof planning. The no-WING handoff summary must expose that review
-step as `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` so
+step as `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9` so
 reviewers can confirm the digest check occurs immediately before the final
 supervised prestart gate. The same summary must show
-`mvp_blocker_anchor_digest_review_step_index: 8`,
-`expected_mvp_blocker_anchor_digest_review_step_index: 8`,
+`mvp_blocker_anchor_digest_review_step_index: 9`,
+`expected_mvp_blocker_anchor_digest_review_step_index: 9`,
 `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`,
 `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`,
-`expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8` and
+`expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9` and
 `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
 Before any supervised proof, the handoff summary must also show
 `required_supervised_proof_plan_summary_fields_include_invalid_records: true`
@@ -238,11 +238,31 @@ python3 tools/wing_readonly_preflight_runner.py \
 ```
 
 Then run the real read-only preflight only when the intended backend/WING
-session is ready. The real run must point at the offline plan generated above
-with `--expected-plan`; if the flag is omitted, or if the runtime arguments or
-request sequence do not match that plan, the runner fails closed before opening
-WebSocket and writes `operator_next_step` in `summary.json`. It must also point
-at the same no-WING prestart summary used for the plan:
+session is ready. Before opening WING transport, validate the exact real-run
+inputs against the offline plan with `--validate-run-inputs-only`. This step
+must use the same URL, channels, value types, artifact root, no-WING prestart
+summary, and expected plan as the real capture command:
+
+```bash
+python3 tools/wing_readonly_preflight_runner.py \
+  --url ws://localhost:8765 \
+  --channels 3 \
+  --operator-confirm-channels 3 \
+  --operator-confirm-session-ready \
+  --value-types fader,gain,pan \
+  --require-physical-readback \
+  --prestart-summary "$PRESTART_SUMMARY" \
+  --artifact-root artifacts/wing_readonly_preflight \
+  --expected-plan artifacts/wing_readonly_preflight_plan/latest_plan.json \
+  --validate-run-inputs-only
+```
+
+After the validation-only command passes, run the real read-only preflight. The
+real run must point at the offline plan generated above with `--expected-plan`;
+if the flag is omitted, or if the runtime arguments or request sequence do not
+match that plan, the runner fails closed before opening WebSocket and writes
+`operator_next_step` in `summary.json`. It must also point at the same no-WING
+prestart summary used for the plan and validation-only command:
 
 ```bash
 python3 tools/wing_readonly_preflight_runner.py \
@@ -570,7 +590,7 @@ continue to:
 
 The handoff validation must report:
 
-- `operator_sequence_count: 10`
+- `operator_sequence_count: 11`
 - `operator_sequence_sha256`
 - `actual_operator_sequence_sha256`
 - `operator_sequence_sha256_matches_actual: true`
@@ -583,8 +603,8 @@ The handoff validation must report:
 - `declared_operator_sequence_matches_contract_flag_matches_actual: true`
 - `declared_operator_sequence_sha256_matches_contract_flag: true`
 - `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`
-- `declared_operator_sequence_count: 10`
-- `declared_expected_operator_sequence_count: 10`
+- `declared_operator_sequence_count: 11`
+- `declared_expected_operator_sequence_count: 11`
 - `declared_operator_sequence_count_contract_flag: true`
 - `declared_operator_sequence_count_matches_actual: true`
 - `declared_operator_sequence_count_matches_contract: true`
@@ -695,6 +715,8 @@ The handoff validation must report:
   no-WING prestart `summary.json`,
   `preview_command_prestart_summary` matching that path,
   `preview_command_prestart_summary_matches_plan: true`,
+  `validate_inputs_command_prestart_summary` matching that path,
+  `validate_inputs_command_prestart_summary_matches_plan: true`,
   `capture_command_prestart_summary` matching that path, and
   `capture_command_prestart_summary_matches_plan: true`
 - `execution_allowed_by_packet: false`
@@ -726,6 +748,10 @@ contract; if any are missing, do not open the WING session.
 - `event_log_glob_matches_plan: true`
 - `preview_command_artifact_root_matches_packet: true`
 - `preview_command_plan_output_matches_packet: true`
+- `validate_inputs_command_uses_validate_run_inputs_only: true`
+- `validate_inputs_command_uses_plan_only: false`
+- `validate_inputs_command_artifact_root_matches_packet: true`
+- `validate_inputs_command_expected_plan_matches_packet: true`
 - `capture_command_artifact_root_matches_packet: true`
 - `capture_command_expected_plan_matches_packet: true`
 - `review_command_artifact_root_matches_packet: true`
@@ -736,12 +762,12 @@ contract; if any are missing, do not open the WING session.
 - `mvp_blocker_anchor_sha256_matches_current_first_open: true`
 - `mvp_blocker_anchor.packet_does_not_close_blocker: true`
 - `operator_sequence_has_mvp_blocker_anchor_digest_review: true`
-- `mvp_blocker_anchor_digest_review_step_index: 8`
-- `expected_mvp_blocker_anchor_digest_review_step_index: 8`
+- `mvp_blocker_anchor_digest_review_step_index: 9`
+- `expected_mvp_blocker_anchor_digest_review_step_index: 9`
 - `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`
 - `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`
-- `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
-- `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
+- `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`
+- `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`
 - `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`
 - `operator_sequence_mvp_blocker_anchor_digest_review_step` includes
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
@@ -754,8 +780,14 @@ contract; if any are missing, do not open the WING session.
 - `operator_sequence_backend_connection_confirmation_step` includes
   `existing backend connection`, `intended WING Rack`, and
   `read-only inspection`
-- `operator_sequence_capture_readonly_preflight_step_index: 4`
-- `expected_operator_sequence_capture_readonly_preflight_step_index: 4`
+- `operator_sequence_validate_readonly_preflight_inputs_step_index: 4`
+- `expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 4`
+- `operator_sequence_validate_readonly_preflight_inputs_step_index_matches_contract: true`
+- `operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`
+- `expected_operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`
+- `operator_sequence_validate_readonly_preflight_inputs_step_matches_contract: true`
+- `operator_sequence_capture_readonly_preflight_step_index: 5`
+- `expected_operator_sequence_capture_readonly_preflight_step_index: 5`
 - `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`
 - `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`
 - `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`
@@ -763,7 +795,7 @@ contract; if any are missing, do not open the WING session.
 - the final handoff operator-sequence step contains the supervised prestart gate
 - `operator_sequence_has_supervised_prestart_gate: true`
 - `operator_sequence_supervised_prestart_gate_is_final: true`
-- `operator_sequence_supervised_prestart_gate_step_index: 9`
+- `operator_sequence_supervised_prestart_gate_step_index: 10`
 - `operator_sequence_supervised_prestart_gate_step` includes
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
   `valid accepted-candidate artifact-root trace`,
@@ -779,7 +811,7 @@ contract; if any are missing, do not open the WING session.
 - `supervised_prestart_gate` exactly matches
   `expected_supervised_prestart_gate`
 - `supervised_prestart_gate.grants_live_authority: false`
-- `supervised_prestart_gate.operator_sequence_step_index: 9`
+- `supervised_prestart_gate.operator_sequence_step_index: 10`
 - `supervised_prestart_gate.operator_sequence_step_must_be_final: true`
 - `supervised_prestart_gate.requires_operator_decision_status:
   accepted_decision_ready`

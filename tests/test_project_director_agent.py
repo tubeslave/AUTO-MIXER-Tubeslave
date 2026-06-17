@@ -548,7 +548,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "existing backend connection" in directive["selected_action"]
     assert "intended WING Rack" in directive["selected_action"]
     assert "read-only inspection" in directive["selected_action"]
-    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in directive[
+    assert "operator_sequence_capture_readonly_preflight_step_index: 5" in directive[
         "selected_action"
     ]
     assert "mvp_blocker_anchor" in directive["selected_action"]
@@ -630,8 +630,8 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in directive[
         "selected_action"
     ]
-    assert "operator_sequence_count: 10" in directive["selected_action"]
-    assert "expected_operator_sequence_count: 10" in directive["selected_action"]
+    assert "operator_sequence_count: 11" in directive["selected_action"]
+    assert "expected_operator_sequence_count: 11" in directive["selected_action"]
     assert (
         "operator_sequence_count_matches_contract: true"
         in directive["selected_action"]
@@ -662,8 +662,8 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true"
         in directive["selected_action"]
     )
-    assert "declared_operator_sequence_count: 10" in directive["selected_action"]
-    assert "declared_expected_operator_sequence_count: 10" in directive[
+    assert "declared_operator_sequence_count: 11" in directive["selected_action"]
+    assert "declared_expected_operator_sequence_count: 11" in directive[
         "selected_action"
     ]
     assert "declared_operator_sequence_count_contract_flag: true" in directive[
@@ -683,11 +683,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "declared_operator_sequence_count_contract_flag_matches_declared_count: true"
         in directive["selected_action"]
     )
-    assert "mvp_blocker_anchor_digest_review_step_index: 8" in directive[
+    assert "mvp_blocker_anchor_digest_review_step_index: 9" in directive[
         "selected_action"
     ]
     assert (
-        "expected_mvp_blocker_anchor_digest_review_step_index: 8"
+        "expected_mvp_blocker_anchor_digest_review_step_index: 9"
         in directive["selected_action"]
     )
     assert (
@@ -701,11 +701,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in directive[
         "selected_action"
     ]
-    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8" in directive[
+    assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9" in directive[
         "selected_action"
     ]
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
         in directive["selected_action"]
     )
     assert (
@@ -723,11 +723,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "operator_sequence_supervised_prestart_gate_step" in directive[
         "selected_action"
     ]
-    assert "operator_sequence_supervised_prestart_gate_step_index: 9" in directive[
+    assert "operator_sequence_supervised_prestart_gate_step_index: 10" in directive[
         "selected_action"
     ]
     assert (
-        "expected_operator_sequence_supervised_prestart_gate_step_index: 9"
+        "expected_operator_sequence_supervised_prestart_gate_step_index: 10"
         in directive["selected_action"]
     )
     assert (
@@ -746,7 +746,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "supervised_prestart_gate.grants_live_authority: false" in directive[
         "selected_action"
     ]
-    assert "supervised_prestart_gate.operator_sequence_step_index: 9" in directive[
+    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in directive[
         "selected_action"
     ]
     assert (
@@ -755,7 +755,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert "supervised_prestart_gate_required: true" in directive["selected_action"]
     assert (
-        "supervised_prestart_gate_operator_sequence_step_index: 9"
+        "supervised_prestart_gate_operator_sequence_step_index: 10"
         in directive["selected_action"]
     )
     assert (
@@ -1249,7 +1249,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "existing backend connection" in prompt
     assert "intended WING Rack" in prompt
     assert "read-only inspection" in prompt
-    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in prompt
+    assert "operator_sequence_capture_readonly_preflight_step_index: 5" in prompt
     assert "backend_port_prestart_gate" in readme
     assert "expected_backend_port_prestart_gate" in readme
     assert "backend_port_prestart_gate.grants_live_authority: false" in readme
@@ -1354,14 +1354,14 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "existing backend connection" in readme
     assert "intended WING Rack" in readme
     assert "read-only inspection" in readme
-    assert "operator_sequence_capture_readonly_preflight_step_index: 4" in readme
+    assert "operator_sequence_capture_readonly_preflight_step_index: 5" in readme
     assert "supervised_prestart_gate" in prompt
     assert "expected_supervised_prestart_gate" in prompt
     assert "supervised_prestart_gate.grants_live_authority: false" in prompt
-    assert "supervised_prestart_gate.operator_sequence_step_index: 9" in prompt
+    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in prompt
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in prompt
     assert "supervised_prestart_gate_required: true" in prompt
-    assert "supervised_prestart_gate_operator_sequence_step_index: 9" in prompt
+    assert "supervised_prestart_gate_operator_sequence_step_index: 10" in prompt
     assert (
         "supervised_prestart_gate_operator_sequence_step_must_be_final: true"
         in prompt
@@ -1405,13 +1405,13 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "accepted_decision_ready" in prompt
     assert "supervised_prestart_gate.unlocks_runbook:" in prompt
     assert "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md" in prompt
-    assert "supervised_prestart_gate.operator_sequence_step_index: 9" in readme
+    assert "supervised_prestart_gate.operator_sequence_step_index: 10" in readme
     assert (
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in readme
     )
     assert "supervised_prestart_gate_required: true" in readme
-    assert "supervised_prestart_gate_operator_sequence_step_index: 9" in readme
+    assert "supervised_prestart_gate_operator_sequence_step_index: 10" in readme
     assert (
         "supervised_prestart_gate_operator_sequence_step_must_be_final: true"
         in readme
@@ -1499,8 +1499,8 @@ def test_prompt_and_readme_document_project_director_agent():
     )
     assert "project_director_current_first_command_baseline_missing_markers: []" in prompt
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in prompt
-    assert "operator_sequence_count: 10" in prompt
-    assert "expected_operator_sequence_count: 10" in prompt
+    assert "operator_sequence_count: 11" in prompt
+    assert "expected_operator_sequence_count: 11" in prompt
     assert "operator_sequence_count_matches_contract: true" in prompt
     assert "operator_sequence_sha256_matches_actual: true" in prompt
     assert "operator_sequence_matches_contract: true" in prompt
@@ -1516,8 +1516,8 @@ def test_prompt_and_readme_document_project_director_agent():
         "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true"
         in prompt
     )
-    assert "declared_operator_sequence_count: 10" in prompt
-    assert "declared_expected_operator_sequence_count: 10" in prompt
+    assert "declared_operator_sequence_count: 11" in prompt
+    assert "declared_expected_operator_sequence_count: 11" in prompt
     assert "declared_operator_sequence_count_contract_flag: true" in prompt
     assert "declared_operator_sequence_count_matches_actual: true" in prompt
     assert "declared_operator_sequence_count_matches_contract: true" in prompt
@@ -1526,8 +1526,8 @@ def test_prompt_and_readme_document_project_director_agent():
         "declared_operator_sequence_count_contract_flag_matches_declared_count: true"
         in prompt
     )
-    assert "mvp_blocker_anchor_digest_review_step_index: 8" in prompt
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in prompt
+    assert "mvp_blocker_anchor_digest_review_step_index: 9" in prompt
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in prompt
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in prompt
     assert (
         "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
@@ -1536,7 +1536,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in prompt
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in prompt
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
         in prompt
     )
     assert (
@@ -1783,8 +1783,8 @@ def test_prompt_and_readme_document_project_director_agent():
     )
     assert "project_director_current_first_command_baseline_missing_markers: []" in readme
     assert "operator_sequence_has_mvp_blocker_anchor_digest_review: true" in readme
-    assert "operator_sequence_count: 10" in readme
-    assert "expected_operator_sequence_count: 10" in readme
+    assert "operator_sequence_count: 11" in readme
+    assert "expected_operator_sequence_count: 11" in readme
     assert "operator_sequence_count_matches_contract: true" in readme
     assert "operator_sequence_sha256_matches_actual: true" in readme
     assert "operator_sequence_matches_contract: true" in readme
@@ -1800,8 +1800,8 @@ def test_prompt_and_readme_document_project_director_agent():
         "declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true"
         in readme
     )
-    assert "declared_operator_sequence_count: 10" in readme
-    assert "declared_expected_operator_sequence_count: 10" in readme
+    assert "declared_operator_sequence_count: 11" in readme
+    assert "declared_expected_operator_sequence_count: 11" in readme
     assert "declared_operator_sequence_count_contract_flag: true" in readme
     assert "declared_operator_sequence_count_matches_actual: true" in readme
     assert "declared_operator_sequence_count_matches_contract: true" in readme
@@ -1810,8 +1810,8 @@ def test_prompt_and_readme_document_project_director_agent():
         "declared_operator_sequence_count_contract_flag_matches_declared_count: true"
         in readme
     )
-    assert "mvp_blocker_anchor_digest_review_step_index: 8" in readme
-    assert "expected_mvp_blocker_anchor_digest_review_step_index: 8" in readme
+    assert "mvp_blocker_anchor_digest_review_step_index: 9" in readme
+    assert "expected_mvp_blocker_anchor_digest_review_step_index: 9" in readme
     assert "mvp_blocker_anchor_digest_review_step_index_matches_contract: true" in readme
     assert (
         "mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true"
@@ -1820,7 +1820,7 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in readme
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step_index" in readme
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9"
         in readme
     )
     assert (

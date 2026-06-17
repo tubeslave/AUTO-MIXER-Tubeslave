@@ -334,6 +334,8 @@ you want the background automation active.
   no-WING prestart `summary.json`, plus matching
   `preview_command_prestart_summary`,
   `preview_command_prestart_summary_matches_plan: true`, matching
+  `validate_inputs_command_prestart_summary`,
+  `validate_inputs_command_prestart_summary_matches_plan: true`, matching
   `capture_command_prestart_summary`, and
   `capture_command_prestart_summary_matches_plan: true`.
   This keeps the operator handoff commands aligned with the runner prestart
@@ -379,9 +381,13 @@ you want the background automation active.
   This keeps the packet artifact list, named summary/events globs, and expected
   plan artifact list tied to the same real-run outputs.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `preview_command_artifact_root_matches_packet: true`,
-  `preview_command_plan_output_matches_packet: true`,
-  `capture_command_artifact_root_matches_packet: true`,
+`preview_command_artifact_root_matches_packet: true`,
+`preview_command_plan_output_matches_packet: true`,
+`validate_inputs_command_uses_validate_run_inputs_only: true`,
+`validate_inputs_command_uses_plan_only: false`,
+`validate_inputs_command_artifact_root_matches_packet: true`,
+`validate_inputs_command_expected_plan_matches_packet: true`,
+`capture_command_artifact_root_matches_packet: true`,
   `capture_command_expected_plan_matches_packet: true`,
   `review_command_artifact_root_matches_packet: true`,
   `decision_review_command_artifact_root_matches_packet: true`, and
@@ -405,8 +411,14 @@ you want the background automation active.
   `operator_sequence_backend_connection_confirmation_step` including
   `existing backend connection`, `intended WING Rack`, and
   `read-only inspection`, and
-  `operator_sequence_capture_readonly_preflight_step_index: 4`,
-  `expected_operator_sequence_capture_readonly_preflight_step_index: 4`,
+  `operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
+  `expected_operator_sequence_validate_readonly_preflight_inputs_step_index: 4`,
+  `operator_sequence_validate_readonly_preflight_inputs_step_index_matches_contract: true`,
+  `operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
+  `expected_operator_sequence_validate_readonly_preflight_inputs_step: Run validate_readonly_preflight_inputs before capture; it must validate real-run inputs and expected-plan bindings without opening transport.`,
+  `operator_sequence_validate_readonly_preflight_inputs_step_matches_contract: true`,
+  `operator_sequence_capture_readonly_preflight_step_index: 5`,
+  `expected_operator_sequence_capture_readonly_preflight_step_index: 5`,
   `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`,
   `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
   `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
@@ -421,7 +433,7 @@ you want the background automation active.
   is evidence for the proof boundary only and does not grant live authority.
 - Before any supervised fader/gain proof, the structured
   `supervised_prestart_gate` must also show
-  `supervised_prestart_gate.operator_sequence_step_index: 9` and
+  `supervised_prestart_gate.operator_sequence_step_index: 10` and
   `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
   These fields keep the supervised gate aligned with the final operator step.
 - Before any supervised fader/gain proof, the structured
@@ -445,7 +457,7 @@ you want the background automation active.
   `supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`.
   It must also expose top-level
   `supervised_prestart_gate_required: true`,
-  `supervised_prestart_gate_operator_sequence_step_index: 9`,
+  `supervised_prestart_gate_operator_sequence_step_index: 10`,
   `supervised_prestart_gate_operator_sequence_step_must_be_final: true`,
   `supervised_prestart_gate_operator_sequence_step`,
   `supervised_prestart_gate_operator_sequence_step_matches_summary: true`,
@@ -477,7 +489,7 @@ you want the background automation active.
   valid accepted-candidate prestart trace and artifact-root trace; they do not
   grant live authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `operator_sequence_count: 10`.
+  `operator_sequence_count: 11`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   top-level `operator_sequence` and top-level `expected_operator_sequence`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
@@ -494,7 +506,7 @@ you want the background automation active.
 - Before any supervised fader/gain proof, the no-WING `summary.md` must show
   `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_operator_sequence_count: 10` and
+  `expected_operator_sequence_count: 11` and
   `operator_sequence_count_matches_contract: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `operator_sequence_sha256`, `actual_operator_sequence_sha256`, and
@@ -510,23 +522,23 @@ you want the background automation active.
   `declared_operator_sequence_sha256_matches_contract_flag: true`, and
   `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `declared_operator_sequence_count: 10`,
-  `declared_expected_operator_sequence_count: 10`,
+  `declared_operator_sequence_count: 11`,
+  `declared_expected_operator_sequence_count: 11`,
   `declared_operator_sequence_count_contract_flag: true`,
   `declared_operator_sequence_count_matches_actual: true`,
   `declared_operator_sequence_count_matches_contract: true`,
   `declared_expected_operator_sequence_count_matches_contract: true`, and
   `declared_operator_sequence_count_contract_flag_matches_declared_count: true`.
 - Before any supervised fader/gain proof, the
-  `mvp_blocker_anchor_digest_review_step_index` must be `8`.
+  `mvp_blocker_anchor_digest_review_step_index` must be `9`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_mvp_blocker_anchor_digest_review_step_index: 8`,
+  `expected_mvp_blocker_anchor_digest_review_step_index: 9`,
   `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`, and
   `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`.
 - Before any supervised fader/gain proof, the
-  `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `8`.
+  `operator_sequence_mvp_blocker_anchor_digest_review_step_index` must be `9`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`
+  `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 9`
   and
   `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the
@@ -534,9 +546,9 @@ you want the background automation active.
   `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and
   `current first open blocker`.
 - Before any supervised fader/gain proof, the
-  `operator_sequence_supervised_prestart_gate_step_index` must be `9`.
+  `operator_sequence_supervised_prestart_gate_step_index` must be `10`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
-  `expected_operator_sequence_supervised_prestart_gate_step_index: 9` and
+  `expected_operator_sequence_supervised_prestart_gate_step_index: 10` and
   `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
