@@ -1,6 +1,6 @@
 # WING Read-Only Preflight Handoff Packet
 
-Generated: `2026-06-17T11:17:45Z`
+Generated: `2026-06-17T11:22:27Z`
 Status: `operator_hardware_step_required`
 
 ## Safety Boundary
@@ -154,6 +154,12 @@ Status: `operator_hardware_step_required`
 
 ```bash
 PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick
+```
+
+### verify_no_wing_artifact_manifest
+
+```bash
+PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>
 ```
 
 ### preview_readonly_request_plan

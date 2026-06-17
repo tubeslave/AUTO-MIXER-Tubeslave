@@ -324,6 +324,12 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["commands"]["prestart_backend_port_check"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )
+    assert packet["commands"]["verify_no_wing_artifact_manifest"] == [
+        "PYTHONPATH=backend",
+        "python3",
+        "tools/verify_no_wing_artifact_manifest.py",
+        "<no_wing_artifact_dir>",
+    ]
     assert packet["mvp_blocker_anchor"] == (
         no_wing_release_check.wing_mvp_first_open_blocker_anchor()
     )
@@ -876,6 +882,13 @@ def test_handoff_markdown_renders_commands_and_boundaries():
         assert field_name in markdown
     assert "prestart_backend_port_check" in markdown
     assert "tools/no_wing_release_check.py" in markdown
+    assert "verify_no_wing_artifact_manifest" in markdown
+    assert "tools/verify_no_wing_artifact_manifest.py" in markdown
+    assert (
+        markdown.index("### prestart_backend_port_check")
+        < markdown.index("### verify_no_wing_artifact_manifest")
+        < markdown.index("### preview_readonly_request_plan")
+    )
     assert "manual_review_required_before_readiness_update: `true`" in markdown
     assert "preview_readonly_request_plan" in markdown
     assert "--plan-only" in markdown

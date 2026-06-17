@@ -105,6 +105,12 @@ FOCUSED_VALIDATION_COMMAND = [
     "tests/test_wing_readonly_preflight_review_decision_tool.py",
     "tests/test_no_wing_release_check.py",
 ]
+ARTIFACT_MANIFEST_VERIFIER_COMMAND = [
+    "PYTHONPATH=backend",
+    "python3",
+    "tools/verify_no_wing_artifact_manifest.py",
+    "<no_wing_artifact_dir>",
+]
 REQUEST_ID_POLICY = WING_READONLY_PREFLIGHT_REQUEST_ID_POLICY
 PROOF_ARTIFACT_SCHEMA = WING_READONLY_PREFLIGHT_PROOF_ARTIFACT_SCHEMA
 PROOF_RUNNER = WING_READONLY_PREFLIGHT_PROOF_RUNNER
@@ -758,6 +764,9 @@ def build_handoff_packet(
             "review_artifact_and_write_pending_decision_template": review,
             "review_edited_decision_json": decision,
             "prestart_backend_port_check": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
+            "verify_no_wing_artifact_manifest": list(
+                ARTIFACT_MANIFEST_VERIFIER_COMMAND
+            ),
             "focused_validation": list(FOCUSED_VALIDATION_COMMAND),
         },
         "mvp_blocker_anchor": mvp_blocker_anchor,
@@ -1145,6 +1154,7 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
     lines.extend(["", "## Commands", ""])
     for name in (
         "prestart_backend_port_check",
+        "verify_no_wing_artifact_manifest",
         "preview_readonly_request_plan",
         "validate_readonly_preflight_inputs",
         "capture_readonly_preflight",
