@@ -944,6 +944,10 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_required_field_missing"
             )
+        if verifier_missing_check_entries:
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_failed_check_entry_missing"
+            )
         if verifier_check_mismatches:
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_check_mismatch"
