@@ -7650,6 +7650,77 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     capture_step_matches_contract = (
         capture_step == WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP
     )
+    expected_artifact_manifest_verifier_step = (
+        preflight_contract.WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+    )
+    expected_artifact_manifest_verifier_step_index = (
+        preflight_contract.WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX
+    )
+    artifact_manifest_verifier_step_index = next(
+        (
+            index
+            for index, item in enumerate(operator_sequence)
+            if str(item) == expected_artifact_manifest_verifier_step
+        ),
+        None,
+    )
+    artifact_manifest_verifier_step = (
+        str(operator_sequence[artifact_manifest_verifier_step_index])
+        if artifact_manifest_verifier_step_index is not None
+        else ""
+    )
+    artifact_manifest_verifier_step_index_matches_contract = (
+        artifact_manifest_verifier_step_index
+        == expected_artifact_manifest_verifier_step_index
+    )
+    artifact_manifest_verifier_step_matches_contract = (
+        artifact_manifest_verifier_step == expected_artifact_manifest_verifier_step
+    )
+    preview_step_index = next(
+        (
+            index
+            for index, item in enumerate(operator_sequence)
+            if str(item)
+            == preflight_contract.WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP
+        ),
+        None,
+    )
+    artifact_manifest_verifier_before_preview = (
+        artifact_manifest_verifier_step_index is not None
+        and preview_step_index is not None
+        and artifact_manifest_verifier_step_index < preview_step_index
+    )
+    declared_artifact_manifest_verifier_step_index = packet.get(
+        "artifact_manifest_verifier_operator_sequence_step_index"
+    )
+    declared_expected_artifact_manifest_verifier_step_index = packet.get(
+        "expected_artifact_manifest_verifier_operator_sequence_step_index"
+    )
+    declared_artifact_manifest_verifier_step_index_matches_contract = packet.get(
+        "artifact_manifest_verifier_operator_sequence_step_index_matches_contract"
+    )
+    declared_artifact_manifest_verifier_step = packet.get(
+        "artifact_manifest_verifier_operator_sequence_step"
+    )
+    declared_expected_artifact_manifest_verifier_step = packet.get(
+        "expected_artifact_manifest_verifier_operator_sequence_step"
+    )
+    declared_artifact_manifest_verifier_step_matches_contract = packet.get(
+        "artifact_manifest_verifier_operator_sequence_step_matches_contract"
+    )
+    declared_artifact_manifest_verifier_before_preview = packet.get(
+        "artifact_manifest_verifier_operator_sequence_before_preview"
+    )
+    declared_artifact_manifest_verifier_required_markers = packet.get(
+        "artifact_manifest_verifier_required_markers"
+    )
+    artifact_manifest_verifier_required_markers = list(
+        preflight_contract.WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS
+    )
+    artifact_manifest_verifier_required_markers_present = all(
+        marker in artifact_manifest_verifier_step
+        for marker in artifact_manifest_verifier_required_markers
+    )
     operator_sequence_backend_connection_confirmation_before_capture = (
         operator_sequence_backend_connection_confirmation_step_index is not None
         and capture_step_index is not None
@@ -7678,6 +7749,70 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not capture_step_matches_contract:
         violations.append(
             "wing_readonly_preflight_handoff_packet_capture_step_mismatch"
+        )
+    if artifact_manifest_verifier_step_index is None:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_step_missing"
+        )
+    if not artifact_manifest_verifier_step_index_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_step_index_mismatch"
+        )
+    if not artifact_manifest_verifier_step_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_step_mismatch"
+        )
+    if declared_artifact_manifest_verifier_step_index != artifact_manifest_verifier_step_index:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_declared_step_index_mismatch"
+        )
+    if (
+        declared_expected_artifact_manifest_verifier_step_index
+        != expected_artifact_manifest_verifier_step_index
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_expected_step_index_mismatch"
+        )
+    if (
+        declared_artifact_manifest_verifier_step_index_matches_contract
+        is not artifact_manifest_verifier_step_index_matches_contract
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_step_index_flag_mismatch"
+        )
+    if declared_artifact_manifest_verifier_step != artifact_manifest_verifier_step:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_declared_step_mismatch"
+        )
+    if (
+        declared_expected_artifact_manifest_verifier_step
+        != expected_artifact_manifest_verifier_step
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_expected_step_mismatch"
+        )
+    if (
+        declared_artifact_manifest_verifier_step_matches_contract
+        is not artifact_manifest_verifier_step_matches_contract
+    ):
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_step_flag_mismatch"
+        )
+    if declared_artifact_manifest_verifier_before_preview is not artifact_manifest_verifier_before_preview:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_before_preview_flag_mismatch"
+        )
+    if not artifact_manifest_verifier_before_preview:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_not_before_preview"
+        )
+    if declared_artifact_manifest_verifier_required_markers != artifact_manifest_verifier_required_markers:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_required_markers_mismatch"
+        )
+    if not artifact_manifest_verifier_required_markers_present:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_required_marker_missing"
         )
     expected_backend_port_prestart_gate = (
         preflight_contract.expected_backend_port_prestart_gate(
@@ -8539,6 +8674,54 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail[
         "declared_operator_sequence_count_contract_flag_matches_declared_count"
     ] = declared_operator_sequence_count_contract_flag_matches_declared_count
+    detail["artifact_manifest_verifier_operator_sequence_step_index"] = (
+        artifact_manifest_verifier_step_index
+    )
+    detail[
+        "expected_artifact_manifest_verifier_operator_sequence_step_index"
+    ] = expected_artifact_manifest_verifier_step_index
+    detail[
+        "artifact_manifest_verifier_operator_sequence_step_index_matches_contract"
+    ] = artifact_manifest_verifier_step_index_matches_contract
+    detail["artifact_manifest_verifier_operator_sequence_step"] = (
+        artifact_manifest_verifier_step
+    )
+    detail["expected_artifact_manifest_verifier_operator_sequence_step"] = (
+        expected_artifact_manifest_verifier_step
+    )
+    detail[
+        "artifact_manifest_verifier_operator_sequence_step_matches_contract"
+    ] = artifact_manifest_verifier_step_matches_contract
+    detail["artifact_manifest_verifier_operator_sequence_before_preview"] = (
+        artifact_manifest_verifier_before_preview
+    )
+    detail["artifact_manifest_verifier_required_markers"] = (
+        artifact_manifest_verifier_required_markers
+    )
+    detail["artifact_manifest_verifier_required_markers_present"] = (
+        artifact_manifest_verifier_required_markers_present
+    )
+    detail["declared_artifact_manifest_verifier_operator_sequence_step_index"] = (
+        declared_artifact_manifest_verifier_step_index
+    )
+    detail[
+        "declared_expected_artifact_manifest_verifier_operator_sequence_step_index"
+    ] = declared_expected_artifact_manifest_verifier_step_index
+    detail[
+        "declared_artifact_manifest_verifier_operator_sequence_step_index_matches_contract"
+    ] = declared_artifact_manifest_verifier_step_index_matches_contract
+    detail["declared_artifact_manifest_verifier_operator_sequence_step"] = (
+        declared_artifact_manifest_verifier_step
+    )
+    detail["declared_expected_artifact_manifest_verifier_operator_sequence_step"] = (
+        declared_expected_artifact_manifest_verifier_step
+    )
+    detail[
+        "declared_artifact_manifest_verifier_operator_sequence_step_matches_contract"
+    ] = declared_artifact_manifest_verifier_step_matches_contract
+    detail["declared_artifact_manifest_verifier_operator_sequence_before_preview"] = (
+        declared_artifact_manifest_verifier_before_preview
+    )
     detail["mvp_blocker_anchor_digest_review_step_index"] = (
         mvp_blocker_anchor_digest_review_step_index
     )

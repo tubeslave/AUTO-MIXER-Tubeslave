@@ -11,6 +11,9 @@ from backend.operator_mode_policy import MODE_SUPERVISED, build_operator_mode_st
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_ALLOWED_REQUEST_TYPES,
+    WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP,
+    WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX,
+    WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
@@ -38,6 +41,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
+    WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_STATUS,
@@ -1509,6 +1513,41 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "validate_run_inputs_only_contacts_backend": False,
         "validate_run_inputs_only_queries_console": False,
         "validate_run_inputs_only_grants_live_authority": False,
+        "artifact_manifest_verifier_required": True,
+        "artifact_manifest_verifier_command": (
+            "PYTHONPATH=backend python3 "
+            "tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>"
+        ),
+        "artifact_manifest_verifier_must_pass_before_backend_wing_session": True,
+        "artifact_manifest_verifier_read_only": True,
+        "artifact_manifest_verifier_live_write": False,
+        "artifact_manifest_verifier_contacts_backend": False,
+        "artifact_manifest_verifier_contacts_wing": False,
+        "artifact_manifest_verifier_mutates_console_state": False,
+        "artifact_manifest_verifier_queries_console": False,
+        "artifact_manifest_verifier_executes_tests": False,
+        "artifact_manifest_verifier_readiness_closure_allowed": False,
+        "artifact_manifest_verifier_live_authority_granted": False,
+        "artifact_manifest_verifier_operator_sequence_step_index": (
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX
+        ),
+        "expected_artifact_manifest_verifier_operator_sequence_step_index": (
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX
+        ),
+        "artifact_manifest_verifier_operator_sequence_step_index_matches_contract": (
+            True
+        ),
+        "artifact_manifest_verifier_operator_sequence_step": (
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+        ),
+        "expected_artifact_manifest_verifier_operator_sequence_step": (
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+        ),
+        "artifact_manifest_verifier_operator_sequence_step_matches_contract": True,
+        "artifact_manifest_verifier_operator_sequence_before_preview": True,
+        "artifact_manifest_verifier_required_markers": list(
+            WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS
+        ),
         "mvp_blocker_anchor_digest_review_step_index": (
             WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
         ),
@@ -1585,6 +1624,12 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "python3",
                 "tools/no_wing_release_check.py",
                 "--quick",
+            ],
+            "verify_no_wing_artifact_manifest": [
+                "PYTHONPATH=backend",
+                "python3",
+                "tools/verify_no_wing_artifact_manifest.py",
+                "<no_wing_artifact_dir>",
             ],
             "preview_readonly_request_plan": [
                 "python3",
@@ -5977,6 +6022,107 @@ def test_no_wing_release_check_rejects_handoff_packet_with_declared_anchor_diges
     )
     assert (
         "wing_readonly_preflight_handoff_packet_mvp_blocker_anchor_digest_review_declared_step_index_not_matching_operator_sequence"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_handoff_packet_with_manifest_verifier_after_preview(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-verifier-after-preview.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    verifier_index = WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX
+    preview_index = payload["operator_sequence"].index(
+        WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP
+    )
+    payload["operator_sequence"][verifier_index], payload["operator_sequence"][
+        preview_index
+    ] = (
+        payload["operator_sequence"][preview_index],
+        payload["operator_sequence"][verifier_index],
+    )
+    payload["operator_sequence_sha256"] = (
+        release_check.wing_readonly_operator_sequence_sha256(
+            payload["operator_sequence"]
+        )
+    )
+    payload["operator_sequence_matches_contract"] = False
+    payload["operator_sequence_sha256_matches_contract"] = False
+    payload["artifact_manifest_verifier_operator_sequence_step_index"] = (
+        verifier_index
+    )
+    payload["expected_artifact_manifest_verifier_operator_sequence_step_index"] = (
+        verifier_index
+    )
+    payload[
+        "artifact_manifest_verifier_operator_sequence_step_index_matches_contract"
+    ] = True
+    payload["artifact_manifest_verifier_operator_sequence_step"] = (
+        WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+    )
+    payload["expected_artifact_manifest_verifier_operator_sequence_step"] = (
+        WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP
+    )
+    payload["artifact_manifest_verifier_operator_sequence_step_matches_contract"] = (
+        True
+    )
+    payload["artifact_manifest_verifier_operator_sequence_before_preview"] = True
+    payload["artifact_manifest_verifier_required_markers"] = list(
+        WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS
+    )
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    assert result.status == "failed"
+    assert (
+        result.detail["artifact_manifest_verifier_operator_sequence_step_index"]
+        == preview_index
+    )
+    assert (
+        result.detail[
+            "expected_artifact_manifest_verifier_operator_sequence_step_index"
+        ]
+        == verifier_index
+    )
+    assert (
+        result.detail[
+            "artifact_manifest_verifier_operator_sequence_step_index_matches_contract"
+        ]
+        is False
+    )
+    assert (
+        result.detail["artifact_manifest_verifier_operator_sequence_before_preview"]
+        is False
+    )
+    assert (
+        result.detail[
+            "declared_artifact_manifest_verifier_operator_sequence_step_index"
+        ]
+        == verifier_index
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_step_index_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_declared_step_index_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_before_preview_flag_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_handoff_packet_artifact_manifest_verifier_not_before_preview"
         in result.detail["violations"]
     )
 
