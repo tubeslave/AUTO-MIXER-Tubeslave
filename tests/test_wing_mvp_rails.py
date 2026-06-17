@@ -941,6 +941,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "artifact_manifest_verifier_queries_console: false" in readonly
     assert "artifact_manifest_verifier_readiness_closure_allowed: false" in readonly
     assert "artifact_manifest_verifier_live_authority_granted: false" in readonly
+    assert "summary_json_artifact_manifest_verifier_fields_present: true" in readonly
     assert "manifest_artifact_manifest_verifier_fields_present: true" in readonly
     assert "summary_md_artifact_manifest_verifier_fields_rendered: true" in readonly
     assert (
@@ -971,6 +972,11 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "verifier_report_mutates_console_state_matches_expected: true" in readonly
     assert "verifier_report_queries_console_matches_expected: true" in readonly
     assert "verifier_report_executes_tests_matches_expected: true" in readonly
+    assert (
+        "verifier_report_readiness_closure_allowed_matches_expected: true"
+        in readonly
+    )
+    assert "verifier_report_live_authority_granted_matches_expected: true" in readonly
     assert "artifact_manifest_verifier_must_pass_before_websocket: true" in readonly
     assert "artifact_manifest_verifier_passed_before_websocket: true" in readonly
     assert "artifact_manifest_verifier_websocket_opened_after_pass: true" in readonly

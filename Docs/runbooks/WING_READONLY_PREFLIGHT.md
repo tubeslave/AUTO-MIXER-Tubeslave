@@ -103,7 +103,8 @@ It does not approve live writes.
   show `verifier_report_required_fields_present: true`,
   `verifier_report_required_fields_missing: []`, and
   `verifier_report_required_fields_match_contract: true`. Its `checks` must
-  also show `manifest_artifact_manifest_verifier_fields_present: true`,
+  also show `summary_json_artifact_manifest_verifier_fields_present: true`,
+  `manifest_artifact_manifest_verifier_fields_present: true`,
   `summary_md_artifact_manifest_verifier_fields_rendered: true`,
   `summary_json_artifact_manifest_verifier_command_matches_expected: true`,
   `summary_md_artifact_manifest_verifier_command_matches_expected: true`,
@@ -119,7 +120,9 @@ It does not approve live writes.
   `verifier_report_contacts_backend_matches_expected: true`,
   `verifier_report_mutates_console_state_matches_expected: true`,
   `verifier_report_queries_console_matches_expected: true`, and
-  `verifier_report_executes_tests_matches_expected: true`.
+  `verifier_report_executes_tests_matches_expected: true`,
+  `verifier_report_readiness_closure_allowed_matches_expected: true`, and
+  `verifier_report_live_authority_granted_matches_expected: true`.
   The published
   no-WING summary and detached sidecar must show
   `artifact_manifest_verifier_required: true`,
@@ -589,6 +592,7 @@ Then update:
   `verifier_report_required_fields_present: true`,
   `verifier_report_required_fields_missing: []`, and
   `verifier_report_required_fields_match_contract: true`,
+  `summary_json_artifact_manifest_verifier_fields_present: true`,
   `manifest_artifact_manifest_verifier_fields_present: true`,
   `summary_md_artifact_manifest_verifier_fields_rendered: true`,
   `summary_json_artifact_manifest_verifier_command_matches_expected: true`,
@@ -605,6 +609,8 @@ Then update:
   `verifier_report_mutates_console_state_matches_expected: true`,
   `verifier_report_queries_console_matches_expected: true`, and
   `verifier_report_executes_tests_matches_expected: true`,
+  `verifier_report_readiness_closure_allowed_matches_expected: true`, and
+  `verifier_report_live_authority_granted_matches_expected: true`,
   or does
   not show `artifact_manifest_self_consistency_summary_surface_match: true`,
   `artifact_manifest_self_consistency_summary_surface_json_mismatches: []`,
