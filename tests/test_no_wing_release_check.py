@@ -1357,6 +1357,7 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "artifact_manifest_verifier_failed_checks_have_check_entries": True,
         "artifact_manifest_verifier_report_required_fields_present": True,
         "artifact_manifest_verifier_report_required_fields_match_contract": True,
+        "artifact_manifest_verifier_readiness_matrix_update_allowed": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
         **{
@@ -14508,6 +14509,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "artifact_manifest_verifier_failed_checks_have_check_entries": True,
             "artifact_manifest_verifier_report_required_fields_present": True,
             "artifact_manifest_verifier_report_required_fields_match_contract": True,
+            "artifact_manifest_verifier_readiness_matrix_update_allowed": False,
             "artifact_manifest_verifier_readiness_closure_allowed": False,
             "artifact_manifest_verifier_live_authority_granted": False,
             **{
@@ -14580,6 +14582,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert (
         artifact["artifact_manifest_verifier_report_required_fields_match_contract"]
         is True
+    )
+    assert (
+        artifact["artifact_manifest_verifier_readiness_matrix_update_allowed"]
+        is False
     )
     assert artifact["artifact_manifest_verifier_readiness_closure_allowed"] is False
     assert artifact["artifact_manifest_verifier_live_authority_granted"] is False
@@ -14663,6 +14669,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     )
     assert (
         "artifact_manifest_verifier_report_required_fields_match_contract: `true`"
+        in markdown_summary
+    )
+    assert (
+        "artifact_manifest_verifier_readiness_matrix_update_allowed: `false`"
         in markdown_summary
     )
     assert (
@@ -14831,6 +14841,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "manual_review_required_before_readiness_update": True,
             "execution_allowed_by_packet": False,
             "readiness_matrix_update_allowed_by_packet": False,
+            "artifact_manifest_verifier_readiness_matrix_update_allowed": False,
             "readiness_closure_allowed_by_packet": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,

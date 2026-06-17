@@ -942,6 +942,9 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             "artifact_manifest_verifier_report_required_fields_match_contract": (
                 verifier_report.get("verifier_report_required_fields_match_contract")
             ),
+            "artifact_manifest_verifier_readiness_matrix_update_allowed": (
+                verifier_report.get("readiness_matrix_update_allowed")
+            ),
             "artifact_manifest_verifier_readiness_closure_allowed": (
                 verifier_report.get("readiness_closure_allowed")
             ),
@@ -982,6 +985,7 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         is not True
         or verifier_report_value_mismatches
         or verifier_check_mismatches
+        or verifier_report.get("readiness_matrix_update_allowed") is not False
         or verifier_report.get("readiness_closure_allowed") is not False
         or verifier_report.get("live_authority_granted") is not False
     ):
@@ -1048,6 +1052,10 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         if not isinstance(verifier_required_fields_missing, list):
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_required_fields_missing_not_list"
+            )
+        if verifier_report.get("readiness_matrix_update_allowed") is not False:
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_readiness_matrix_update_allowed_not_false"
             )
         if verifier_report.get("readiness_closure_allowed") is not False:
             violations.append(
@@ -1265,6 +1273,8 @@ def artifact_manifest_verifier_passed(detail: Dict[str, Any]) -> bool:
         is True
         and detail.get("artifact_manifest_verifier_report_value_mismatches") == []
         and detail.get("artifact_manifest_verifier_check_mismatches") == []
+        and detail.get("artifact_manifest_verifier_readiness_matrix_update_allowed")
+        is False
         and detail.get("artifact_manifest_verifier_readiness_closure_allowed") is False
         and detail.get("artifact_manifest_verifier_live_authority_granted") is False
     )

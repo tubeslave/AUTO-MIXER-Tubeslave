@@ -6133,6 +6133,10 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_artifact_manifest_verifier_report_required_fields_match_contract_not_true"
         )
+    if plan.get("artifact_manifest_verifier_readiness_matrix_update_allowed") is not False:
+        violations.append(
+            "wing_readonly_preflight_plan_artifact_manifest_verifier_readiness_matrix_update_allowed_not_false"
+        )
     if plan.get("artifact_manifest_verifier_readiness_closure_allowed") is not False:
         violations.append(
             "wing_readonly_preflight_plan_artifact_manifest_verifier_readiness_closure_allowed_not_false"
@@ -6382,6 +6386,9 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     )
     detail["artifact_manifest_verifier_report_required_fields_match_contract"] = (
         plan.get("artifact_manifest_verifier_report_required_fields_match_contract")
+    )
+    detail["artifact_manifest_verifier_readiness_matrix_update_allowed"] = plan.get(
+        "artifact_manifest_verifier_readiness_matrix_update_allowed"
     )
     detail["artifact_manifest_verifier_readiness_closure_allowed"] = plan.get(
         "artifact_manifest_verifier_readiness_closure_allowed"
@@ -8227,6 +8234,9 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["mutates_console_state"] = packet.get("mutates_console_state")
     detail["queries_console"] = packet.get("queries_console")
     detail["executes_tests"] = packet.get("executes_tests")
+    detail["artifact_manifest_verifier_readiness_matrix_update_allowed"] = (
+        packet.get("artifact_manifest_verifier_readiness_matrix_update_allowed")
+    )
     detail["operator_required"] = packet.get("operator_required")
     detail["expected_plan_required_for_real_run"] = packet.get(
         "expected_plan_required_for_real_run"
@@ -17514,6 +17524,18 @@ def wing_readonly_preflight_plan_artifact_summary(
                 )
                 is True
             ),
+            "artifact_manifest_verifier_readiness_matrix_update_allowed": (
+                detail.get(
+                    "artifact_manifest_verifier_readiness_matrix_update_allowed"
+                )
+                if isinstance(
+                    detail.get(
+                        "artifact_manifest_verifier_readiness_matrix_update_allowed"
+                    ),
+                    bool,
+                )
+                else None
+            ),
             "artifact_manifest_verifier_readiness_closure_allowed": (
                 detail.get("artifact_manifest_verifier_readiness_closure_allowed")
                 if isinstance(
@@ -18107,6 +18129,18 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
             ),
             "readiness_matrix_update_allowed_by_packet": (
                 detail.get("readiness_matrix_update_allowed_by_packet") is True
+            ),
+            "artifact_manifest_verifier_readiness_matrix_update_allowed": (
+                detail.get(
+                    "artifact_manifest_verifier_readiness_matrix_update_allowed"
+                )
+                if isinstance(
+                    detail.get(
+                        "artifact_manifest_verifier_readiness_matrix_update_allowed"
+                    ),
+                    bool,
+                )
+                else None
             ),
             "readiness_closure_allowed_by_packet": (
                 detail.get("readiness_closure_allowed_by_packet") is True
@@ -25887,6 +25921,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_required_fields_present']).lower()}`",
                 "- artifact_manifest_verifier_report_required_fields_match_contract: "
                 f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_required_fields_match_contract']).lower()}`",
+                "- artifact_manifest_verifier_readiness_matrix_update_allowed: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_readiness_matrix_update_allowed']).lower()}`",
                 "- artifact_manifest_verifier_readiness_closure_allowed: "
                 f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_readiness_closure_allowed']).lower()}`",
                 "- artifact_manifest_verifier_live_authority_granted: "
@@ -26100,6 +26136,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['execution_allowed_by_packet']).lower()}`",
                 "- readiness_matrix_update_allowed_by_packet: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['readiness_matrix_update_allowed_by_packet']).lower()}`",
+                "- artifact_manifest_verifier_readiness_matrix_update_allowed: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['artifact_manifest_verifier_readiness_matrix_update_allowed']).lower()}`",
                 "- readiness_closure_allowed_by_packet: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['readiness_closure_allowed_by_packet']).lower()}`",
                 "- live_authority_granted: "
