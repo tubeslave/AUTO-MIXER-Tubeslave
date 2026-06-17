@@ -1196,6 +1196,7 @@ def test_project_director_markdown_is_operator_readable():
     assert "Current first command baseline coverage required: `true`" in markdown
     assert "Current first command baseline coverage passed: `true`" in markdown
     assert "Current first command baseline missing marker count: `0`" in markdown
+    assert "Current first command baseline missing markers: `[]`" in markdown
     assert "Selected evidence file count: `1`" in markdown
     assert "## Selected Evidence Files" in markdown
     assert "tools/wing_readonly_preflight_runner.py" in markdown

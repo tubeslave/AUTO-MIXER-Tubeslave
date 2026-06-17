@@ -155,6 +155,10 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
 
 
 def render_markdown(directive: dict) -> str:
+    missing_markers_json = json.dumps(
+        directive.get("current_first_command_baseline_missing_markers", []),
+        ensure_ascii=False,
+    )
     lines = [
         "# Project Director Agent Directive",
         "",
@@ -179,6 +183,8 @@ def render_markdown(directive: dict) -> str:
         f"`{directive.get('current_first_command_baseline_coverage_marker_count', 0)}`",
         "- Current first command baseline missing marker count: "
         f"`{len(directive.get('current_first_command_baseline_missing_markers', []))}`",
+        "- Current first command baseline missing markers: "
+        f"`{missing_markers_json}`",
         f"- Selected action: {directive['selected_action']}",
         f"- Selected evidence file count: `{directive.get('selected_evidence_file_count', 0)}`",
         "",
