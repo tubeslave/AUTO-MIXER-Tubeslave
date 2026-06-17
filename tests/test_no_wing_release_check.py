@@ -1780,12 +1780,13 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
                 "Only after accepted_decision_ready, a valid accepted-candidate "
-                "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+                "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
                 "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
             "required_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "valid accepted-candidate verifier WebSocket proof",
                 "valid accepted-candidate artifact-root trace",
                 "valid accepted-candidate request-sequence trace",
                 "expected-artifact-bound accepted source id",
@@ -1795,6 +1796,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "grants_live_authority": False,
             "requires_operator_decision_status": "accepted_decision_ready",
             "requires_accepted_candidate_prestart_trace": True,
+            "requires_accepted_candidate_verifier_ws_proof": True,
             "requires_accepted_candidate_artifact_root_trace": True,
             "requires_accepted_candidate_request_sequence_trace": True,
             "requires_accepted_candidate_expected_artifact_trace": True,
@@ -1807,12 +1809,13 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
                 "Only after accepted_decision_ready, a valid accepted-candidate "
-                "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+                "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
                 "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
             "required_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "valid accepted-candidate verifier WebSocket proof",
                 "valid accepted-candidate artifact-root trace",
                 "valid accepted-candidate request-sequence trace",
                 "expected-artifact-bound accepted source id",
@@ -1822,6 +1825,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             "grants_live_authority": False,
             "requires_operator_decision_status": "accepted_decision_ready",
             "requires_accepted_candidate_prestart_trace": True,
+            "requires_accepted_candidate_verifier_ws_proof": True,
             "requires_accepted_candidate_artifact_root_trace": True,
             "requires_accepted_candidate_request_sequence_trace": True,
             "requires_accepted_candidate_expected_artifact_trace": True,
@@ -4007,7 +4011,7 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         result.detail["operator_sequence_supervised_prestart_gate_step"]
         == (
             "Only after accepted_decision_ready, a valid accepted-candidate "
-            "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+            "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
             "to WING_SUPERVISED_FADER_GAIN_PROOF."
         )
     )
@@ -4051,13 +4055,14 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         is True
     )
     assert result.detail["required_supervised_prestart_gate_markers"] == [
-                "accepted_decision_ready",
-                "valid accepted-candidate prestart trace",
-                "valid accepted-candidate artifact-root trace",
-                "valid accepted-candidate request-sequence trace",
-                "expected-artifact-bound accepted source id",
-                "WING_SUPERVISED_FADER_GAIN_PROOF",
-            ]
+        "accepted_decision_ready",
+        "valid accepted-candidate prestart trace",
+        "valid accepted-candidate verifier WebSocket proof",
+        "valid accepted-candidate artifact-root trace",
+        "valid accepted-candidate request-sequence trace",
+        "expected-artifact-bound accepted source id",
+        "WING_SUPERVISED_FADER_GAIN_PROOF",
+    ]
     assert result.detail["required_supervised_proof_plan_summary_fields"] == list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
@@ -14815,7 +14820,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "operator_sequence_has_supervised_prestart_gate": True,
             "operator_sequence_supervised_prestart_gate_step": (
                 "Only after accepted_decision_ready, a valid accepted-candidate "
-                "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+                "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
                 "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
             "operator_sequence_supervised_prestart_gate_step_index": (
@@ -14836,12 +14841,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
                     "Only after accepted_decision_ready, a valid accepted-candidate "
-                    "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+                    "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
                     "to WING_SUPERVISED_FADER_GAIN_PROOF."
                 ),
                 "required_markers": [
                     "accepted_decision_ready",
                     "valid accepted-candidate prestart trace",
+                    "valid accepted-candidate verifier WebSocket proof",
                     "valid accepted-candidate artifact-root trace",
                     "valid accepted-candidate request-sequence trace",
                     "expected-artifact-bound accepted source id",
@@ -14851,6 +14857,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "grants_live_authority": False,
                 "requires_operator_decision_status": "accepted_decision_ready",
                 "requires_accepted_candidate_prestart_trace": True,
+                "requires_accepted_candidate_verifier_ws_proof": True,
                 "requires_accepted_candidate_artifact_root_trace": True,
                 "requires_accepted_candidate_request_sequence_trace": True,
                 "requires_accepted_candidate_expected_artifact_trace": True,
@@ -14863,12 +14870,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
                     "Only after accepted_decision_ready, a valid accepted-candidate "
-                    "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+                    "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
                     "to WING_SUPERVISED_FADER_GAIN_PROOF."
                 ),
                 "required_markers": [
                     "accepted_decision_ready",
                     "valid accepted-candidate prestart trace",
+                    "valid accepted-candidate verifier WebSocket proof",
                     "valid accepted-candidate artifact-root trace",
                     "valid accepted-candidate request-sequence trace",
                     "expected-artifact-bound accepted source id",
@@ -14878,6 +14886,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "grants_live_authority": False,
                 "requires_operator_decision_status": "accepted_decision_ready",
                 "requires_accepted_candidate_prestart_trace": True,
+                "requires_accepted_candidate_verifier_ws_proof": True,
                 "requires_accepted_candidate_artifact_root_trace": True,
                 "requires_accepted_candidate_request_sequence_trace": True,
                 "requires_accepted_candidate_expected_artifact_trace": True,
@@ -14889,13 +14898,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "supervised_prestart_gate_operator_sequence_step_must_be_final": True,
             "supervised_prestart_gate_operator_sequence_step": (
                 "Only after accepted_decision_ready, a valid accepted-candidate "
-                "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+                "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
                 "to WING_SUPERVISED_FADER_GAIN_PROOF."
             ),
             "supervised_prestart_gate_operator_sequence_step_matches_summary": True,
             "supervised_prestart_gate_required_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "valid accepted-candidate verifier WebSocket proof",
                 "valid accepted-candidate artifact-root trace",
                 "valid accepted-candidate request-sequence trace",
                 "expected-artifact-bound accepted source id",
@@ -14904,13 +14914,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "expected_supervised_prestart_gate_required_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "valid accepted-candidate verifier WebSocket proof",
                 "valid accepted-candidate artifact-root trace",
                 "valid accepted-candidate request-sequence trace",
                 "expected-artifact-bound accepted source id",
                 "WING_SUPERVISED_FADER_GAIN_PROOF",
             ],
-            "supervised_prestart_gate_required_marker_count": 6,
-            "expected_supervised_prestart_gate_required_marker_count": 6,
+            "supervised_prestart_gate_required_marker_count": 7,
+            "expected_supervised_prestart_gate_required_marker_count": 7,
             "supervised_prestart_gate_required_marker_count_matches_contract": True,
             "supervised_prestart_gate_required_marker_count_matches_summary": True,
             "supervised_prestart_gate_required_markers_match_contract": True,
@@ -14923,6 +14934,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
             ),
             "supervised_prestart_gate_requires_accepted_candidate_prestart_trace": (
+                True
+            ),
+            "supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof": (
                 True
             ),
             "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace": (
@@ -14939,6 +14953,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "required_supervised_prestart_gate_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "valid accepted-candidate verifier WebSocket proof",
                 "valid accepted-candidate artifact-root trace",
                 "valid accepted-candidate request-sequence trace",
                 "expected-artifact-bound accepted source id",
@@ -14947,13 +14962,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "expected_required_supervised_prestart_gate_markers": [
                 "accepted_decision_ready",
                 "valid accepted-candidate prestart trace",
+                "valid accepted-candidate verifier WebSocket proof",
                 "valid accepted-candidate artifact-root trace",
                 "valid accepted-candidate request-sequence trace",
                 "expected-artifact-bound accepted source id",
                 "WING_SUPERVISED_FADER_GAIN_PROOF",
             ],
-            "required_supervised_prestart_gate_marker_count": 6,
-            "expected_required_supervised_prestart_gate_marker_count": 6,
+            "required_supervised_prestart_gate_marker_count": 7,
+            "expected_required_supervised_prestart_gate_marker_count": 7,
             "required_supervised_prestart_gate_marker_count_matches_contract": True,
             "required_supervised_prestart_gate_marker_count_matches_supervised_gate": True,
             "required_supervised_prestart_gate_markers_match_contract": True,
@@ -16227,7 +16243,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["operator_sequence_has_supervised_prestart_gate"] is True
     assert artifact["operator_sequence_supervised_prestart_gate_step"] == (
         "Only after accepted_decision_ready, a valid accepted-candidate "
-        "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
+        "prestart trace, a valid accepted-candidate verifier WebSocket proof, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
         "to WING_SUPERVISED_FADER_GAIN_PROOF."
     )
     assert (
@@ -16272,6 +16288,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["supervised_prestart_gate_required_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
+        "valid accepted-candidate verifier WebSocket proof",
         "valid accepted-candidate artifact-root trace",
         "valid accepted-candidate request-sequence trace",
         "expected-artifact-bound accepted source id",
@@ -16280,6 +16297,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["expected_supervised_prestart_gate_required_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
+        "valid accepted-candidate verifier WebSocket proof",
         "valid accepted-candidate artifact-root trace",
         "valid accepted-candidate request-sequence trace",
         "expected-artifact-bound accepted source id",
@@ -16288,8 +16306,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["supervised_prestart_gate_required_markers"] == artifact[
         "required_supervised_prestart_gate_markers"
     ]
-    assert artifact["supervised_prestart_gate_required_marker_count"] == 6
-    assert artifact["expected_supervised_prestart_gate_required_marker_count"] == 6
+    assert artifact["supervised_prestart_gate_required_marker_count"] == 7
+    assert artifact["expected_supervised_prestart_gate_required_marker_count"] == 7
     assert (
         artifact["supervised_prestart_gate_required_marker_count_matches_contract"]
         is True
@@ -16315,6 +16333,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert (
         artifact[
             "supervised_prestart_gate_requires_accepted_candidate_prestart_trace"
+        ]
+        is True
+    )
+    assert artifact["supervised_prestart_gate"][
+        "requires_accepted_candidate_verifier_ws_proof"
+    ] is True
+    assert (
+        artifact[
+            "supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof"
         ]
         is True
     )
@@ -16348,6 +16375,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
+        "valid accepted-candidate verifier WebSocket proof",
         "valid accepted-candidate artifact-root trace",
         "valid accepted-candidate request-sequence trace",
         "expected-artifact-bound accepted source id",
@@ -16356,13 +16384,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["expected_required_supervised_prestart_gate_markers"] == [
         "accepted_decision_ready",
         "valid accepted-candidate prestart trace",
+        "valid accepted-candidate verifier WebSocket proof",
         "valid accepted-candidate artifact-root trace",
         "valid accepted-candidate request-sequence trace",
         "expected-artifact-bound accepted source id",
         "WING_SUPERVISED_FADER_GAIN_PROOF",
     ]
-    assert artifact["required_supervised_prestart_gate_marker_count"] == 6
-    assert artifact["expected_required_supervised_prestart_gate_marker_count"] == 6
+    assert artifact["required_supervised_prestart_gate_marker_count"] == 7
+    assert artifact["expected_required_supervised_prestart_gate_marker_count"] == 7
     assert (
         artifact["required_supervised_prestart_gate_marker_count_matches_contract"]
         is True
@@ -16427,6 +16456,7 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "supervised_prestart_gate_requires_operator_decision_status",
         "supervised_prestart_gate_unlocks_runbook",
         "supervised_prestart_gate_requires_accepted_candidate_prestart_trace",
+        "supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof",
         "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace",
         "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace",
         "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace",
@@ -16988,11 +17018,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "required_supervised_prestart_gate_markers" in markdown_summary
     assert "expected_required_supervised_prestart_gate_markers" in markdown_summary
     assert (
-        "required_supervised_prestart_gate_marker_count: `6`"
+        "required_supervised_prestart_gate_marker_count: `7`"
         in markdown_summary
     )
     assert (
-        "expected_required_supervised_prestart_gate_marker_count: `6`"
+        "expected_required_supervised_prestart_gate_marker_count: `7`"
         in markdown_summary
     )
     assert (
@@ -17036,11 +17066,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "supervised_prestart_gate_required_markers" in markdown_summary
     assert "expected_supervised_prestart_gate_required_markers" in markdown_summary
     assert (
-        "supervised_prestart_gate_required_marker_count: `6`"
+        "supervised_prestart_gate_required_marker_count: `7`"
         in markdown_summary
     )
     assert (
-        "expected_supervised_prestart_gate_required_marker_count: `6`"
+        "expected_supervised_prestart_gate_required_marker_count: `7`"
         in markdown_summary
     )
     assert (
@@ -17070,6 +17100,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert (
         "supervised_prestart_gate_requires_accepted_candidate_prestart_trace: `true`"
+        in markdown_summary
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof: `true`"
         in markdown_summary
     )
     assert (

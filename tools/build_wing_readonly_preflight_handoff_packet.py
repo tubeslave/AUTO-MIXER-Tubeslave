@@ -1215,6 +1215,8 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
                 f"`{supervised_gate.get('requires_operator_decision_status')}`",
                 "- requires_accepted_candidate_prestart_trace: "
                 f"`{str(supervised_gate.get('requires_accepted_candidate_prestart_trace')).lower()}`",
+                "- requires_accepted_candidate_verifier_ws_proof: "
+                f"`{str(supervised_gate.get('requires_accepted_candidate_verifier_ws_proof')).lower()}`",
                 f"- unlocks_runbook: `{supervised_gate.get('unlocks_runbook')}`",
                 f"- grants_live_authority: `{str(supervised_gate.get('grants_live_authority')).lower()}`",
                 "- required_markers: "

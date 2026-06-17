@@ -469,14 +469,14 @@ you want the background automation active.
   `supervised_prestart_gate_required_markers`,
   `expected_supervised_prestart_gate_required_markers`,
   `expected_required_supervised_prestart_gate_markers`,
-  `required_supervised_prestart_gate_marker_count: 6`,
-  `expected_required_supervised_prestart_gate_marker_count: 6`,
+  `required_supervised_prestart_gate_marker_count: 7`,
+  `expected_required_supervised_prestart_gate_marker_count: 7`,
   `required_supervised_prestart_gate_marker_count_matches_contract: true`,
   `required_supervised_prestart_gate_marker_count_matches_supervised_gate: true`,
   `required_supervised_prestart_gate_markers_match_contract: true`,
   `required_supervised_prestart_gate_markers_match_supervised_gate: true`,
-  `supervised_prestart_gate_required_marker_count: 6`,
-  `expected_supervised_prestart_gate_required_marker_count: 6`,
+  `supervised_prestart_gate_required_marker_count: 7`,
+  `expected_supervised_prestart_gate_required_marker_count: 7`,
   `supervised_prestart_gate_required_marker_count_matches_contract: true`,
   `supervised_prestart_gate_required_marker_count_matches_summary: true`,
   `supervised_prestart_gate_required_markers_match_contract: true`,
@@ -558,12 +558,14 @@ you want the background automation active.
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate verifier WebSocket proof`,
   `valid accepted-candidate artifact-root trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Before any supervised fader/gain proof,
   `required_supervised_prestart_gate_markers` must exactly list
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate verifier WebSocket proof`,
   `valid accepted-candidate artifact-root trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.

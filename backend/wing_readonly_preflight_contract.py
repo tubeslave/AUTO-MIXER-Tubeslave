@@ -242,7 +242,8 @@ WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT = (
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
     "Only after accepted_decision_ready, a valid accepted-candidate "
-    "prestart trace, a valid accepted-candidate artifact-root trace, and "
+    "prestart trace, a valid accepted-candidate verifier WebSocket proof, "
+    "a valid accepted-candidate artifact-root trace, and "
     "a valid accepted-candidate request-sequence trace, plus "
     "expected-artifact-bound accepted source id, move to "
     "WING_SUPERVISED_FADER_GAIN_PROOF."
@@ -250,6 +251,7 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS = (
     "accepted_decision_ready",
     "valid accepted-candidate prestart trace",
+    "valid accepted-candidate verifier WebSocket proof",
     "valid accepted-candidate artifact-root trace",
     "valid accepted-candidate request-sequence trace",
     "expected-artifact-bound accepted source id",
@@ -430,6 +432,7 @@ def expected_supervised_prestart_gate(
             WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS
         ),
         "requires_accepted_candidate_prestart_trace": True,
+        "requires_accepted_candidate_verifier_ws_proof": True,
         "requires_accepted_candidate_artifact_root_trace": True,
         "requires_accepted_candidate_request_sequence_trace": True,
         "requires_accepted_candidate_expected_artifact_trace": True,

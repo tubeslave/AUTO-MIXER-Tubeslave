@@ -656,14 +656,14 @@ It must also expose top-level
 `supervised_prestart_gate_required_markers`,
 `expected_supervised_prestart_gate_required_markers`,
 `expected_required_supervised_prestart_gate_markers`,
-`required_supervised_prestart_gate_marker_count: 6`,
-`expected_required_supervised_prestart_gate_marker_count: 6`,
+`required_supervised_prestart_gate_marker_count: 7`,
+`expected_required_supervised_prestart_gate_marker_count: 7`,
 `required_supervised_prestart_gate_marker_count_matches_contract: true`,
 `required_supervised_prestart_gate_marker_count_matches_supervised_gate: true`,
 `required_supervised_prestart_gate_markers_match_contract: true`,
 `required_supervised_prestart_gate_markers_match_supervised_gate: true`,
-`supervised_prestart_gate_required_marker_count: 6`,
-`expected_supervised_prestart_gate_required_marker_count: 6`,
+`supervised_prestart_gate_required_marker_count: 7`,
+`expected_supervised_prestart_gate_required_marker_count: 7`,
 `supervised_prestart_gate_required_marker_count_matches_contract: true`,
 `supervised_prestart_gate_required_marker_count_matches_summary: true`,
 `supervised_prestart_gate_required_markers_match_contract: true`, and
@@ -697,7 +697,8 @@ nested object.
 The handoff summary must also show `required_supervised_prestart_gate_markers`
 exactly listing `accepted_decision_ready`,
 `valid accepted-candidate prestart trace`,
-`valid accepted-candidate artifact-root trace`,
+  `valid accepted-candidate verifier WebSocket proof`,
+  `valid accepted-candidate artifact-root trace`,
 `valid accepted-candidate request-sequence trace`,
 `expected-artifact-bound accepted source id`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`.

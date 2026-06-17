@@ -18298,6 +18298,13 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 is True
             ),
+            "supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get(
+                    "requires_accepted_candidate_verifier_ws_proof"
+                )
+                is True
+            ),
             "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace": (
                 isinstance(supervised_prestart_gate, Mapping)
                 and supervised_prestart_gate.get(
@@ -19352,6 +19359,9 @@ def build_wing_readonly_operator_sequence_step_gate_summary_surface(
         ),
         "supervised_prestart_gate_requires_accepted_candidate_prestart_trace": true_field(
             "supervised_prestart_gate_requires_accepted_candidate_prestart_trace"
+        ),
+        "supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof": true_field(
+            "supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof"
         ),
         "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace": true_field(
             "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace"
@@ -25556,6 +25566,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_unlocks_runbook']}`",
                 "- supervised_prestart_gate_requires_accepted_candidate_prestart_trace: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_prestart_trace']).lower()}`",
+                "- supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof']).lower()}`",
                 "- supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace']).lower()}`",
                 "- supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: "
