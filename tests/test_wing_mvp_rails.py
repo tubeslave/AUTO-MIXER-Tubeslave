@@ -930,6 +930,9 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "artifact_operator_next_steps" in readonly
     assert "before opening a backend/WING WebSocket" in readonly
     assert "they do not approve live writes or close readiness rows" in readonly
+    assert "artifact_manifest_verifier_must_pass_before_websocket: true" in readonly
+    assert "artifact_manifest_verifier_passed_before_websocket: true" in readonly
+    assert "artifact_manifest_verifier_websocket_opened_after_pass: true" in readonly
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readonly
     assert "backend_port_prestart_check_operator_sequence_step" in readonly
     assert "prestart_backend_port_check" in readonly

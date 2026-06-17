@@ -125,6 +125,10 @@ It does not approve live writes.
   authority. The read-only preflight runner repeats this verifier against the
   artifact directory that contains `--prestart-summary` and fails closed before
   opening a backend/WING WebSocket when the detached manifest verifier fails.
+  A real captured artifact must later prove the ordering with
+  `artifact_manifest_verifier_must_pass_before_websocket: true`,
+  `artifact_manifest_verifier_passed_before_websocket: true`, and
+  `artifact_manifest_verifier_websocket_opened_after_pass: true`.
 - If the no-WING release summary includes
   `wing_readonly_preflight_evidence.artifact_operator_next_steps`, inspect and
   complete those repair instructions before opening a backend/WING WebSocket.
@@ -328,6 +332,9 @@ The summary must show:
 - `backend_port_prestart_summary_queries_console: false`
 - `backend_port_prestart_summary_executes_tests: false`
 - `backend_port_prestart_check_status: passed`
+- `artifact_manifest_verifier_must_pass_before_websocket: true`
+- `artifact_manifest_verifier_passed_before_websocket: true`
+- `artifact_manifest_verifier_websocket_opened_after_pass: true`
 - referenced offline plan fields and `request_sequence` match the captured
   summary, operator-confirmed channels, value types, and readback identities
 - `physical_readback_count == readback_count`
@@ -561,6 +568,10 @@ Then update:
   `wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []`
   and
   `wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: true`;
+- the captured read-only summary does not show
+  `artifact_manifest_verifier_must_pass_before_websocket: true`,
+  `artifact_manifest_verifier_passed_before_websocket: true`, and
+  `artifact_manifest_verifier_websocket_opened_after_pass: true`;
 - the expected offline plan uses a stale backend-port prestart failure-detail
   contract, including missing `listener_confirmation_checklist`;
 - the referenced offline plan file is missing or its SHA256 does not match
@@ -694,6 +705,10 @@ The handoff validation must report:
 - `operator_required: true`
 - `expected_plan_required_for_real_run: true`
 - `physical_preflight_requires_existing_backend_connection: true`
+- the accepted read-only preflight artifact shows
+  `artifact_manifest_verifier_must_pass_before_websocket: true`,
+  `artifact_manifest_verifier_passed_before_websocket: true`, and
+  `artifact_manifest_verifier_websocket_opened_after_pass: true`
 - the no-WING handoff summary also shows the same
   `backend_port_prestart_check_required: true` and
   `backend_port_prestart_check_must_pass_before_starting_backend: true`
