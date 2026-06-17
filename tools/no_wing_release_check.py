@@ -18217,6 +18217,12 @@ def build_wing_readonly_mvp_blocker_anchor_summary_surface(
     )
     return {
         "wing_readonly_mvp_blocker_anchor_summary_surface_required": True,
+        "selected_mvp_blocker": str(
+            handoff_artifact.get("selected_mvp_blocker") or ""
+        ),
+        "selected_mvp_blocker_status": str(
+            handoff_artifact.get("selected_mvp_blocker_status") or ""
+        ),
         "mvp_blocker_anchor": mvp_blocker_anchor_mapping,
         "expected_mvp_blocker_anchor": expected_mvp_blocker_anchor_mapping,
         "mvp_blocker_anchor_matches_current_first_open": (

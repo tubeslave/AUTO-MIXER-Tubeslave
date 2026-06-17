@@ -14867,6 +14867,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         json_summary["wing_readonly_mvp_blocker_anchor_summary_surface_required"]
         is True
     )
+    assert json_summary["selected_mvp_blocker"] == artifact["selected_mvp_blocker"]
+    assert json_summary["selected_mvp_blocker_status"] == artifact[
+        "selected_mvp_blocker_status"
+    ]
     assert json_summary["mvp_blocker_anchor"] == artifact["mvp_blocker_anchor"]
     assert json_summary["expected_mvp_blocker_anchor"] == artifact[
         "expected_mvp_blocker_anchor"
