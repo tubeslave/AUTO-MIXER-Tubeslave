@@ -425,9 +425,7 @@ def _valid_expected_plan(summary: dict) -> dict:
         "artifact_manifest_verifier_passed_before_websocket": summary[
             "artifact_manifest_verifier_passed_before_websocket"
         ],
-        "artifact_manifest_verifier_websocket_opened_after_pass": summary[
-            "artifact_manifest_verifier_websocket_opened_after_pass"
-        ],
+        "artifact_manifest_verifier_websocket_opened_after_pass": False,
         **{
             field: summary[field]
             for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -1183,6 +1181,50 @@ def test_file_preflight_artifact_requires_summary_prestart_contract(tmp_path):
     assert "backend_port_prestart_check_command_mismatch" in violations
     assert "backend_port_prestart_check_command_text_mismatch" in violations
     assert "backend_port_prestart_check_failure_detail_fields_mismatch" in violations
+
+
+def test_file_preflight_artifact_accepts_plan_before_websocket_and_summary_after_pass(
+    tmp_path,
+):
+    artifact_path = _write_file_artifact(
+        tmp_path / "preflight" / "manifest-verifier-websocket-order"
+    )
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    plan = json.loads(Path(summary["expected_plan_path"]).read_text(encoding="utf-8"))
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert summary["artifact_manifest_verifier_websocket_opened_after_pass"] is True
+    assert plan["artifact_manifest_verifier_websocket_opened_after_pass"] is False
+    assert evidence["summary"]["valid_candidate_count"] == 1
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is True
+    assert evidence["artifacts"][0]["violations"] == []
+
+
+def test_file_preflight_artifact_rejects_plan_claiming_websocket_already_opened(
+    tmp_path,
+):
+    artifact_path = _write_file_artifact(
+        tmp_path / "preflight" / "manifest-verifier-stale-websocket-plan"
+    )
+    summary = json.loads(artifact_path.read_text(encoding="utf-8"))
+    plan = _valid_expected_plan(summary)
+    plan["artifact_manifest_verifier_websocket_opened_after_pass"] = True
+    _write_expected_plan(artifact_path, plan)
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert (
+        "expected_plan_artifact_manifest_verifier_websocket_opened_after_pass_not_false"
+        in evidence["summary"]["violations"]
+    )
 
 
 def test_preflight_evidence_rejects_missing_manifest_verifier_websocket_proof():

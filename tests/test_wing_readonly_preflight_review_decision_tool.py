@@ -337,9 +337,7 @@ def _valid_expected_plan(summary: dict) -> dict:
         "artifact_manifest_verifier_passed_before_websocket": summary[
             "artifact_manifest_verifier_passed_before_websocket"
         ],
-        "artifact_manifest_verifier_websocket_opened_after_pass": summary[
-            "artifact_manifest_verifier_websocket_opened_after_pass"
-        ],
+        "artifact_manifest_verifier_websocket_opened_after_pass": False,
         **{
             field: summary[field]
             for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS

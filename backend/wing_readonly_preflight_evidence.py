@@ -252,7 +252,6 @@ EXPECTED_PLAN_SUMMARY_FIELDS = (
     "backend_port_prestart_summary_queries_console",
     "backend_port_prestart_summary_executes_tests",
     "backend_port_prestart_check_status",
-    *ARTIFACT_MANIFEST_VERIFIER_WEBSOCKET_PROOF_FIELDS,
     *EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     "request_id_policy",
     "expected_response_types_by_request_type",
@@ -770,6 +769,20 @@ def _validate_expected_plan_payload(
     for field in EXPECTED_PLAN_SUMMARY_FIELDS:
         if plan.get(field) != summary.get(field):
             violations.append(f"expected_plan_{field}_mismatch")
+    if plan.get(ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD) is not True:
+        violations.append(
+            f"expected_plan_{ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD}_not_true"
+        )
+    if plan.get(ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD) != summary.get(
+        ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD
+    ):
+        violations.append(
+            f"expected_plan_{ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD}_mismatch"
+        )
+    if plan.get(ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD) is not False:
+        violations.append(
+            f"expected_plan_{ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD}_not_false"
+        )
     if plan.get("request_sequence") != _expected_plan_request_sequence(summary):
         violations.append("expected_plan_request_sequence_mismatch")
     for field in (
