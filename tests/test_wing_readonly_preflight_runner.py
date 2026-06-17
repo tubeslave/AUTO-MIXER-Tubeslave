@@ -171,6 +171,7 @@ def test_runner_requires_manifest_verifier_readiness_matrix_denials_before_webso
     required_denial_checks = {
         "manifest_denies_readiness_matrix_update",
         "summary_denies_readiness_matrix_update",
+        "summary_md_artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed_denies_authority",
         "summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority",
         "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority",
     }
@@ -3640,6 +3641,9 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     verifier_checks["summary_json_sha256_matches_manifest"] = False
     verifier_checks["summary_denies_readiness_matrix_update"] = False
     verifier_checks[
+        "summary_md_artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed_denies_authority"
+    ] = False
+    verifier_checks[
         "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority"
     ] = False
     verifier_checks[
@@ -3699,6 +3703,7 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     assert summary["artifact_manifest_verifier_check_mismatches"] == [
         "summary_json_sha256_matches_manifest",
         "summary_denies_readiness_matrix_update",
+        "summary_md_artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed_denies_authority",
         "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority",
         "verifier_report_readiness_matrix_update_allowed_matches_expected",
     ]
@@ -3711,6 +3716,12 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     assert (
         summary[
             "artifact_manifest_verifier_check_summary_denies_readiness_matrix_update"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_check_summary_md_artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed_denies_authority"
         ]
         is False
     )

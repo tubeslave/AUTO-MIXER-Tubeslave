@@ -167,6 +167,7 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "summary_md_readiness_closure_allowed_by_packet_denies_authority",
     "summary_md_live_authority_granted_denies_authority",
     "summary_md_artifact_manifest_contract_cross_surface_readiness_closure_allowed_denies_authority",
+    "summary_md_artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed_denies_authority",
     "summary_md_artifact_manifest_contract_cross_surface_live_authority_granted_denies_authority",
     "summary_md_artifact_manifest_readiness_closure_allowed_denies_authority",
     "summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority",
