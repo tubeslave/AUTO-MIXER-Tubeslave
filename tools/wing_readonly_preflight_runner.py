@@ -940,7 +940,7 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_status_not_passed"
             )
-        if verifier_failed_checks:
+        if isinstance(verifier_failed_checks, list) and verifier_failed_checks:
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_failed_checks_not_empty"
             )
@@ -1007,7 +1007,10 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_live_authority_granted_not_false"
             )
-        if verifier_required_fields_missing:
+        if (
+            isinstance(verifier_required_fields_missing, list)
+            and verifier_required_fields_missing
+        ):
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_required_field_missing"
             )
@@ -1025,7 +1028,10 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_required_fields_contract_flag_not_true"
             )
-        if verifier_missing_check_entries:
+        if (
+            isinstance(verifier_missing_check_entries, list)
+            and verifier_missing_check_entries
+        ):
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_failed_check_entry_missing"
             )

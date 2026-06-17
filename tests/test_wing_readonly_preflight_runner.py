@@ -2751,6 +2751,22 @@ async def test_readonly_preflight_reports_malformed_verifier_list_fields_before_
         "prestart_summary_artifact_manifest_verifier_required_fields_missing_not_list"
         in summary["prestart_summary_violations"]
     )
+    assert (
+        "prestart_summary_artifact_manifest_verifier_failed_checks_not_empty"
+        not in summary["prestart_summary_violations"]
+    )
+    assert (
+        "prestart_summary_artifact_manifest_verifier_failed_check_entry_missing"
+        not in summary["prestart_summary_violations"]
+    )
+    assert (
+        "prestart_summary_artifact_manifest_verifier_failed_checks_missing_check_entries_not_empty"
+        not in summary["prestart_summary_violations"]
+    )
+    assert (
+        "prestart_summary_artifact_manifest_verifier_required_field_missing"
+        not in summary["prestart_summary_violations"]
+    )
     assert summary["artifact_manifest_verifier_failed_checks"] == []
     assert summary["artifact_manifest_verifier_failed_checks_missing_check_entries"] == []
     assert summary["artifact_manifest_verifier_required_fields_missing"] == []
