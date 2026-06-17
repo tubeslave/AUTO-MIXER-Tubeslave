@@ -3768,9 +3768,12 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
 
     assert exit_code == 2
     printed = json.loads(capsys.readouterr().out)
+    written = json.loads(plan_output.read_text(encoding="utf-8"))
     assert printed["type"] == "wing_readonly_preflight_offline_plan"
     assert printed["status"] == "blocked"
     assert printed["reason"] == "--operator-confirm-channels must exactly match --channels"
+    assert printed["plan_output"] == str(plan_output)
+    assert written == printed
     assert printed["validation_violations"] == [
         "validation_operator_confirm_channels_must_exactly_match_channels"
     ]
@@ -3780,4 +3783,3 @@ async def test_plan_only_blocks_invalid_channel_confirmation_before_websocket(
     assert printed["queries_console"] is False
     assert printed["manual_review_required_before_readiness_update"] is True
     assert printed["live_authority_granted"] is False
-    assert not plan_output.exists()

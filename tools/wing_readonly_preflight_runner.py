@@ -1171,6 +1171,18 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
+def write_plan_output_if_requested(args: argparse.Namespace, plan: Dict[str, Any]) -> None:
+    if not args.plan_output:
+        return
+    output_path = Path(args.plan_output)
+    plan["plan_output"] = str(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def validate_expected_plan(args: argparse.Namespace, plan: Dict[str, Any]) -> list[str]:
     expected = build_offline_preflight_plan(args)
     violations: list[str] = []
@@ -1251,6 +1263,7 @@ async def run(args: argparse.Namespace) -> int:
                 "live_authority_granted": False,
                 "manual_review_required_before_readiness_update": True,
             }
+            write_plan_output_if_requested(args, plan)
             print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
             return 2
         if prestart_violations:
@@ -1273,17 +1286,11 @@ async def run(args: argparse.Namespace) -> int:
                 ),
             }
             plan.update(prestart_detail)
+            write_plan_output_if_requested(args, plan)
             print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
             return 2
         plan = build_offline_preflight_plan(args)
-        if args.plan_output:
-            output_path = Path(args.plan_output)
-            plan["plan_output"] = str(output_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(
-                json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
+        write_plan_output_if_requested(args, plan)
         print(json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
     channels = parse_csv_ints(args.channels) if validation_error is None else ()
