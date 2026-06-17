@@ -948,6 +948,13 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_failed_check_entry_missing"
             )
+        if (
+            detail["artifact_manifest_verifier_failed_checks_have_check_entries"]
+            is not True
+        ):
+            violations.append(
+                "prestart_summary_artifact_manifest_verifier_failed_check_entry_flag_not_true"
+            )
         if verifier_check_mismatches:
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_check_mismatch"
