@@ -171,6 +171,7 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "summary_md_artifact_manifest_readiness_closure_allowed_denies_authority",
     "summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority",
     "summary_md_artifact_manifest_live_authority_granted_denies_authority",
+    "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority",
     "summary_md_artifact_manifest_verifier_readiness_closure_allowed_denies_authority",
     "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority",
     "summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_denies_authority",
