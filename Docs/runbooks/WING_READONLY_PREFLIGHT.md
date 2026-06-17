@@ -109,6 +109,14 @@ It does not approve live writes.
   `summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
   and
   `manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true`.
+  The same `checks` must show verifier report safety values match the contract:
+  `verifier_report_read_only_matches_expected: true`,
+  `verifier_report_live_write_matches_expected: true`,
+  `verifier_report_contacts_wing_matches_expected: true`,
+  `verifier_report_contacts_backend_matches_expected: true`,
+  `verifier_report_mutates_console_state_matches_expected: true`,
+  `verifier_report_queries_console_matches_expected: true`, and
+  `verifier_report_executes_tests_matches_expected: true`.
   The published
   no-WING summary and detached sidecar must show
   `artifact_manifest_verifier_target_artifact_dir`,
@@ -581,6 +589,13 @@ Then update:
   `summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
   and
   `manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  `verifier_report_read_only_matches_expected: true`,
+  `verifier_report_live_write_matches_expected: true`,
+  `verifier_report_contacts_wing_matches_expected: true`,
+  `verifier_report_contacts_backend_matches_expected: true`,
+  `verifier_report_mutates_console_state_matches_expected: true`,
+  `verifier_report_queries_console_matches_expected: true`, and
+  `verifier_report_executes_tests_matches_expected: true`,
   or does
   not show `artifact_manifest_self_consistency_summary_surface_match: true`,
   `artifact_manifest_self_consistency_summary_surface_json_mismatches: []`,
