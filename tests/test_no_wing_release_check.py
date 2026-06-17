@@ -20750,6 +20750,12 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     ] == list(
         release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_FIELDS
     )
+    for field_name in (
+        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+    ):
+        assert field_name in json_summary[
+            "artifact_manifest_contract_cross_surface_required_fields"
+        ]
     assert (
         json_summary["artifact_manifest_contract_cross_surface_expected_match"]
         is True

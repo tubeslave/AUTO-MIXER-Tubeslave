@@ -721,6 +721,7 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_CROSS_SURFACE_FIELDS = (
     "artifact_manifest_contract_sha256_matches_expected",
     "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
     "artifact_manifest_contract_cross_surface_live_authority_granted",
+    *WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS,
 )
 NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS = (
     "artifact_manifest_contract_id",
