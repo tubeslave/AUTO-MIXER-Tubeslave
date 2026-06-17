@@ -652,6 +652,7 @@ PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true",
     "verifier_report_required_fields_match_contract: true",
     "artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true",
+    "artifact_manifest_verifier_check_summary_md_artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed_denies_authority: true",
     "artifact_manifest_verifier_read_only: true",
     "artifact_manifest_verifier_live_write: false",
     "artifact_manifest_verifier_contacts_backend: false",
