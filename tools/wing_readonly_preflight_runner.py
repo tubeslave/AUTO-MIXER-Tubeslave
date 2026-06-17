@@ -954,6 +954,17 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
                     "prestart_summary_artifact_manifest_verifier_"
                     f"{safety_field}_mismatch"
                 )
+        for summary_surface_field in (
+            "wing_readonly_handoff_plan_verifier_summary_surface_mismatches",
+            "wing_readonly_handoff_plan_verifier_summary_surface_match",
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
+            "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
+        ):
+            if summary_surface_field in verifier_report_value_mismatches:
+                violations.append(
+                    "prestart_summary_artifact_manifest_verifier_"
+                    f"{summary_surface_field}_mismatch"
+                )
         if not isinstance(verifier_checks, dict):
             violations.append(
                 "prestart_summary_artifact_manifest_verifier_checks_not_object"
