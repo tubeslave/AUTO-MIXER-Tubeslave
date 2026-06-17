@@ -103,6 +103,15 @@ It does not approve live writes.
   show `verifier_report_required_fields_present: true`,
   `verifier_report_required_fields_missing: []`, and
   `verifier_report_required_fields_match_contract: true`. The published
+  no-WING summary and detached sidecar must show
+  `artifact_manifest_verifier_target_artifact_dir`,
+  `artifact_manifest_verifier_status_required: passed`,
+  `artifact_manifest_verifier_failed_checks_required: []`,
+  `artifact_manifest_verifier_contacts_wing: false`,
+  `artifact_manifest_verifier_mutates_console_state: false`,
+  `artifact_manifest_verifier_queries_console: false`,
+  `artifact_manifest_verifier_readiness_closure_allowed: false`, and
+  `artifact_manifest_verifier_live_authority_granted: false`. The published
   `artifact_manifest_verifier_report_required_fields` list must include
   `checks`, `verifier_report_required_fields`,
   `verifier_report_required_fields_missing`, and
@@ -569,6 +578,15 @@ Then update:
   `artifact_manifest_self_consistency_mismatches: []`,
   `artifact_manifest_contract_cross_surface_match: true`, and
   `artifact_manifest_contract_cross_surface_mismatches: []`, and the referenced
+  no-WING summary or detached sidecar does not show
+  `artifact_manifest_verifier_target_artifact_dir`,
+  `artifact_manifest_verifier_status_required: passed`,
+  `artifact_manifest_verifier_failed_checks_required: []`,
+  `artifact_manifest_verifier_contacts_wing: false`,
+  `artifact_manifest_verifier_mutates_console_state: false`,
+  `artifact_manifest_verifier_queries_console: false`,
+  `artifact_manifest_verifier_readiness_closure_allowed: false`, and
+  `artifact_manifest_verifier_live_authority_granted: false`, and the referenced
   `artifact_manifest_verifier_report_required_fields` list does not include
   `checks`, `verifier_report_required_fields`,
   `verifier_report_required_fields_missing`, and
