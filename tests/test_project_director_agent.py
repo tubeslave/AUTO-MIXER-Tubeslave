@@ -281,22 +281,25 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert "execution_allowed_by_packet: false" in directive["selected_action"]
     assert "live_authority_granted: false" in directive["selected_action"]
-    assert (
-        "summary_md_readiness_closure_allowed_by_packet_denies_authority: true"
-        in directive["selected_action"]
-    )
-    assert (
-        "summary_md_live_authority_granted_denies_authority: true"
-        in directive["selected_action"]
-    )
-    assert (
-        "artifact_manifest_verifier_check_summary_md_readiness_closure_allowed_by_packet_denies_authority: true"
-        in directive["selected_action"]
-    )
-    assert (
-        "artifact_manifest_verifier_check_summary_md_live_authority_granted_denies_authority: true"
-        in directive["selected_action"]
-    )
+    for marker in (
+        "summary_md_readiness_closure_allowed_by_packet_denies_authority: true",
+        "summary_md_live_authority_granted_denies_authority: true",
+        "summary_md_artifact_manifest_contract_cross_surface_readiness_closure_allowed_denies_authority: true",
+        "summary_md_artifact_manifest_contract_cross_surface_live_authority_granted_denies_authority: true",
+        "summary_md_artifact_manifest_readiness_closure_allowed_denies_authority: true",
+        "summary_md_artifact_manifest_live_authority_granted_denies_authority: true",
+        "summary_md_artifact_manifest_verifier_readiness_closure_allowed_denies_authority: true",
+        "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_readiness_closure_allowed_by_packet_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_live_authority_granted_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_artifact_manifest_contract_cross_surface_readiness_closure_allowed_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_artifact_manifest_contract_cross_surface_live_authority_granted_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_artifact_manifest_readiness_closure_allowed_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_artifact_manifest_live_authority_granted_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_readiness_closure_allowed_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority: true",
+    ):
+        assert marker in directive["selected_action"]
     assert "full_autonomous_ready: false" in directive["selected_action"]
     assert (
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"

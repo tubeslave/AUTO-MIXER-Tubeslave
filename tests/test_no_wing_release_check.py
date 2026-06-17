@@ -23024,6 +23024,8 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
         is True
     )
     assert checks["summary_md_live_authority_granted_denies_authority"] is True
+    for field_name in manifest_verifier.SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS:
+        assert checks[f"summary_md_{field_name}_denies_authority"] is True
     assert checks["verifier_report_read_only_matches_expected"] is True
     assert checks["verifier_report_live_write_matches_expected"] is True
     assert checks["verifier_report_contacts_wing_matches_expected"] is True
