@@ -490,8 +490,14 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["validate_run_inputs_only_step"] == validate_step
     assert packet["validate_run_inputs_only_before_capture"] is True
     assert packet["validate_run_inputs_only_transport_opened"] is False
+    assert packet["validate_run_inputs_only_read_only"] is True
+    assert packet["validate_run_inputs_only_live_write"] is False
     assert packet["validate_run_inputs_only_contacts_backend"] is False
+    assert packet["validate_run_inputs_only_contacts_wing"] is False
     assert packet["validate_run_inputs_only_queries_console"] is False
+    assert packet["validate_run_inputs_only_write_request_sent"] is False
+    assert packet["validate_run_inputs_only_proposal_request_sent"] is False
+    assert packet["validate_run_inputs_only_readiness_closure_allowed"] is False
     assert packet["validate_run_inputs_only_grants_live_authority"] is False
     assert packet["operator_sequence"].index(validate_step) < packet[
         "operator_sequence"
@@ -652,6 +658,17 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert "validate_readonly_preflight_inputs" in rendered
     assert "validate_run_inputs_only_before_capture: `true`" in rendered
     assert "validate_run_inputs_only_transport_opened: `false`" in rendered
+    assert "validate_run_inputs_only_read_only: `true`" in rendered
+    assert "validate_run_inputs_only_live_write: `false`" in rendered
+    assert "validate_run_inputs_only_contacts_backend: `false`" in rendered
+    assert "validate_run_inputs_only_contacts_wing: `false`" in rendered
+    assert "validate_run_inputs_only_queries_console: `false`" in rendered
+    assert "validate_run_inputs_only_write_request_sent: `false`" in rendered
+    assert "validate_run_inputs_only_proposal_request_sent: `false`" in rendered
+    assert (
+        "validate_run_inputs_only_readiness_closure_allowed: `false`" in rendered
+    )
+    assert "validate_run_inputs_only_grants_live_authority: `false`" in rendered
     assert "tools/wing_readonly_preflight_runner.py" in rendered
     assert "actual_matches_expected: `true`" in rendered
     assert "operator_sequence_step_must_be_final: `true`" in rendered

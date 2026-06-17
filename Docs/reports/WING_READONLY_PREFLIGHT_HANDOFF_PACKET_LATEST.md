@@ -1,6 +1,6 @@
 # WING Read-Only Preflight Handoff Packet
 
-Generated: `2026-06-17T22:55:25Z`
+Generated: `2026-06-17T23:16:08Z`
 Status: `operator_hardware_step_required`
 
 ## Safety Boundary
@@ -116,8 +116,14 @@ Status: `operator_hardware_step_required`
 - validate_run_inputs_only_step_index: `5`
 - validate_run_inputs_only_before_capture: `true`
 - validate_run_inputs_only_transport_opened: `false`
+- validate_run_inputs_only_read_only: `true`
+- validate_run_inputs_only_live_write: `false`
 - validate_run_inputs_only_contacts_backend: `false`
+- validate_run_inputs_only_contacts_wing: `false`
 - validate_run_inputs_only_queries_console: `false`
+- validate_run_inputs_only_write_request_sent: `false`
+- validate_run_inputs_only_proposal_request_sent: `false`
+- validate_run_inputs_only_readiness_closure_allowed: `false`
 - validate_run_inputs_only_grants_live_authority: `false`
 
 1. Before starting the intended backend/WING session, run prestart_backend_port_check and resolve only confirmed unexpected listeners.

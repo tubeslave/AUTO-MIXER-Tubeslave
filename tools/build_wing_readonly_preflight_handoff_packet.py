@@ -904,8 +904,14 @@ def build_handoff_packet(
             < operator_sequence.index(WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP)
         ),
         "validate_run_inputs_only_transport_opened": False,
+        "validate_run_inputs_only_read_only": True,
+        "validate_run_inputs_only_live_write": False,
         "validate_run_inputs_only_contacts_backend": False,
+        "validate_run_inputs_only_contacts_wing": False,
         "validate_run_inputs_only_queries_console": False,
+        "validate_run_inputs_only_write_request_sent": False,
+        "validate_run_inputs_only_proposal_request_sent": False,
+        "validate_run_inputs_only_readiness_closure_allowed": False,
         "validate_run_inputs_only_grants_live_authority": False,
         "backend_port_prestart_gate": backend_port_prestart_gate,
         "expected_backend_port_prestart_gate": expected_backend_port_prestart_gate_dict,
@@ -1139,10 +1145,22 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['validate_run_inputs_only_before_capture']).lower()}`",
         "- validate_run_inputs_only_transport_opened: "
         f"`{str(packet['validate_run_inputs_only_transport_opened']).lower()}`",
+        "- validate_run_inputs_only_read_only: "
+        f"`{str(packet['validate_run_inputs_only_read_only']).lower()}`",
+        "- validate_run_inputs_only_live_write: "
+        f"`{str(packet['validate_run_inputs_only_live_write']).lower()}`",
         "- validate_run_inputs_only_contacts_backend: "
         f"`{str(packet['validate_run_inputs_only_contacts_backend']).lower()}`",
+        "- validate_run_inputs_only_contacts_wing: "
+        f"`{str(packet['validate_run_inputs_only_contacts_wing']).lower()}`",
         "- validate_run_inputs_only_queries_console: "
         f"`{str(packet['validate_run_inputs_only_queries_console']).lower()}`",
+        "- validate_run_inputs_only_write_request_sent: "
+        f"`{str(packet['validate_run_inputs_only_write_request_sent']).lower()}`",
+        "- validate_run_inputs_only_proposal_request_sent: "
+        f"`{str(packet['validate_run_inputs_only_proposal_request_sent']).lower()}`",
+        "- validate_run_inputs_only_readiness_closure_allowed: "
+        f"`{str(packet['validate_run_inputs_only_readiness_closure_allowed']).lower()}`",
         "- validate_run_inputs_only_grants_live_authority: "
         f"`{str(packet['validate_run_inputs_only_grants_live_authority']).lower()}`",
         "",
