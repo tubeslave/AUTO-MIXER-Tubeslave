@@ -399,7 +399,9 @@ def test_panning_is_tracked_as_transport_free_proposal_layer():
     assert "backend/auto_panner.py" in row.support_paths
     assert "backend/auto_panner_adaptive.py" in row.support_paths
     assert "fail-closed" in row.blocker
+    assert "mono/phase check" in row.blocker
     assert "operator review" in row.next_step
+    assert "mono/phase-safe" in row.next_step
     assert console is not None
     assert console.status == "proposal_only"
     assert "pan_spatial_proposal" in console.method_ids
@@ -407,6 +409,7 @@ def test_panning_is_tracked_as_transport_free_proposal_layer():
     assert "backend/auto_panner_adaptive.py" in console.support_paths
     assert "adaptive panner" in console.blocker
     assert "blocked evidence" in console.blocker
+    assert "mono/phase compatibility" in console.next_step
 
 
 def test_phase_correction_tracks_fail_closed_delay_polarity_boundary():

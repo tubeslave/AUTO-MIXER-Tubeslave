@@ -335,8 +335,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_downstream_gate.py",
         ),
         target_console_surfaces=("pan",),
-        blocker="Pan live writes need stage/stereo evidence, mono check, readback, and rollback proof; AutoPanner and adaptive panner direct apply are fail-closed.",
-        next_step="Route AutoPanner/adaptive evidence and spatial pan proposals to operator review before any supervised pan-write proof.",
+        blocker="Pan live writes need stage/stereo evidence, mono/phase check, readback, and rollback proof; AutoPanner and adaptive panner direct apply are fail-closed.",
+        next_step="Route AutoPanner/adaptive evidence and mono/phase-safe spatial pan proposals to operator review before any supervised pan-write proof.",
     ),
     ProjectGoalCapabilityRow(
         id="frequency_separation",

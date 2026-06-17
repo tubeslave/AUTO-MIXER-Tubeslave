@@ -20,9 +20,13 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 PAN_METHOD_ID = "pan_spatial_proposal"
 PAN_VERSION = "pan_spatial_proposal_v1"
+PAN_READ_REQUIRED_SOURCE = "cached_or_physical_pan_read_required_before_promotion"
+PAN_PHASE_REQUIRED_SOURCE = "fresh_mono_phase_check_required_before_non_center_pan_promotion"
 MAX_PAN_PERCENT = 70.0
 MIN_PAN_DELTA_PERCENT = 8.0
 HIGH_MONO_RISK = 0.65
+MIN_SAFE_PHASE_CORRELATION = 0.15
+MIN_MONO_SUM_DELTA_DB = -3.0
 
 CENTER_FAMILIES = {"lead_vocal", "kick", "snare", "bass", "master", "sub"}
 LOW_FREQUENCY_FAMILIES = {"kick", "bass", "sub", "floor_tom"}
@@ -54,6 +58,16 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         return default
     return numeric if math.isfinite(numeric) else default
+
+
+def _optional_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def _clip(value: float, minimum: float, maximum: float) -> float:
@@ -106,6 +120,9 @@ class PanAnalysisInput:
     spectral_centroid_hz: float = 1000.0
     low_frequency_share: float = 0.0
     mono_compatibility_risk: float = 0.0
+    phase_correlation: Optional[float] = None
+    mono_sum_delta_db: Optional[float] = None
+    mono_phase_check_freshness: Optional[Dict[str, Any]] = None
     contribution_share: float = 0.0
     role_confidence: float = 0.7
     arrangement_role: str = ""
@@ -144,6 +161,15 @@ class PanRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
+        evidence = {
+            **self.evidence,
+            "old_value_source": PAN_READ_REQUIRED_SOURCE,
+            "rollback_value_source": PAN_READ_REQUIRED_SOURCE,
+            "live_write": False,
+            "queue_mutation": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
         return {
             "id": self.id,
             "method_id": PAN_METHOD_ID,
@@ -170,13 +196,15 @@ class PanRecommendation:
                 "target_pan_percent": self.target_pan_percent,
                 "delta_pan_percent": self.delta_pan_percent,
             },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
+            "old_value": {
+                "source": PAN_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
             },
+            "rollback_value": {
+                "source": PAN_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
+            },
+            "evidence": evidence,
         }
 
 
@@ -188,6 +216,11 @@ def _severity_from_delta(delta: float, blockers: Iterable[str] = ()) -> str:
     ):
         return "high"
     if "source_identity_not_trusted_for_downstream" in blocker_set:
+        return "medium"
+    if blocker_set & {
+        "pan_current_state_cache_live_authority_present",
+        "pan_mono_phase_check_live_authority_present",
+    }:
         return "medium"
     magnitude = abs(delta)
     if magnitude >= 35.0:
@@ -226,6 +259,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     normalized["provided"] = True
     normalized.setdefault("status", _freshness_status(payload))
     return normalized
+
+
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
 
 
 def _target_from_context(analysis: PanAnalysisInput, family: str) -> Tuple[float, str, Tuple[str, ...]]:
@@ -268,6 +309,14 @@ def analyze_pan_need(
     persistence = max(1, int(analysis.persistence_cycles or 1))
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
+    mono_phase_freshness = _freshness_payload(analysis.mono_phase_check_freshness)
+    mono_phase_freshness_status = str(mono_phase_freshness.get("status") or "unknown")
+    mono_phase_no_authority = _freshness_is_no_authority(mono_phase_freshness)
+    phase_correlation = _optional_float(analysis.phase_correlation)
+    if phase_correlation is not None:
+        phase_correlation = _clip(phase_correlation, -1.0, 1.0)
+    mono_sum_delta_db = _optional_float(analysis.mono_sum_delta_db)
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=f"ch:{int(analysis.channel_id)}",
         source_type=str(analysis.source_role or "unknown"),
@@ -286,9 +335,36 @@ def analyze_pan_need(
         blocker_list.append("pan_change_not_needed")
     if target != 0.0 and mono_risk >= HIGH_MONO_RISK:
         blocker_list.append("mono_compatibility_risk_high")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blocker_list.append("pan_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blocker_list.append("pan_current_state_cache_live_authority_present")
+    non_center_pan_requires_phase = target != 0.0 and abs(delta) >= MIN_PAN_DELTA_PERCENT
+    if non_center_pan_requires_phase:
+        if phase_correlation is None:
+            blocker_list.append("mono_phase_check_missing")
+        elif phase_correlation < MIN_SAFE_PHASE_CORRELATION:
+            blocker_list.append("pan_phase_correlation_unsafe")
+        if mono_sum_delta_db is not None and mono_sum_delta_db < MIN_MONO_SUM_DELTA_DB:
+            blocker_list.append("pan_mono_sum_loss_high")
+        if mono_phase_freshness_status != "fresh":
+            blocker_list.append("pan_mono_phase_check_not_fresh")
+        if mono_phase_freshness_status == "fresh" and not mono_phase_no_authority:
+            blocker_list.append("pan_mono_phase_check_live_authority_present")
     blocker_list.extend(source_identity_trust.blockers)
+
+    phase_safety_blockers = {
+        "mono_phase_check_missing",
+        "pan_phase_correlation_unsafe",
+        "pan_mono_sum_loss_high",
+        "pan_mono_phase_check_not_fresh",
+    }
+    if not non_center_pan_requires_phase:
+        mono_phase_status = "not_required_for_center_or_noop"
+    elif phase_safety_blockers.intersection(blocker_list):
+        mono_phase_status = "blocked"
+    else:
+        mono_phase_status = "passed"
 
     confidence = _clip01(
         0.40 * role_confidence
@@ -309,13 +385,34 @@ def analyze_pan_need(
         "spectral_centroid_hz": round(_safe_float(analysis.spectral_centroid_hz), 1),
         "low_frequency_share": round(_clip01(analysis.low_frequency_share), 3),
         "mono_compatibility_risk": round(mono_risk, 3),
+        "phase_correlation": None if phase_correlation is None else round(phase_correlation, 3),
+        "mono_sum_delta_db": None if mono_sum_delta_db is None else round(mono_sum_delta_db, 2),
+        "mono_phase_check_freshness_status": mono_phase_freshness_status,
+        "mono_phase_check_freshness": mono_phase_freshness,
+        "mono_phase_safety": {
+            "status": mono_phase_status,
+            "required_for_non_center_pan": non_center_pan_requires_phase,
+            "phase_evidence_source": PAN_PHASE_REQUIRED_SOURCE,
+            "min_safe_phase_correlation": MIN_SAFE_PHASE_CORRELATION,
+            "min_mono_sum_delta_db": MIN_MONO_SUM_DELTA_DB,
+        },
         "contribution_share": round(contribution, 3),
         "role_confidence": round(role_confidence, 3),
         "arrangement_role": analysis.arrangement_role,
         "persistence_cycles": persistence,
+        "current_pan_percent": current,
+        "target_pan_percent": target,
+        "delta_pan_percent": delta,
+        "current_pan_cache_freshness": current_state_freshness,
+        "current_pan_cache_no_live_authority": current_state_no_authority,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "mono_phase_check_no_live_authority": mono_phase_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
+        "old_value_source": PAN_READ_REQUIRED_SOURCE,
+        "rollback_value_source": PAN_READ_REQUIRED_SOURCE,
+        "readback_required_before_promotion": True,
+        "rollback_required_before_promotion": True,
         "transport_free": True,
     }
 

@@ -11,7 +11,7 @@ offline, dry-run, proposal-only, read-only, and tested artifacts.
 | --- | --- | --- | --- |
 | Gain / Trim | supervised_candidate_partial | Finish current WING read-only preflight, then supervised gain-down proof with physical readback and rollback. | `Docs/MVP_WING_SUPERVISED.md` |
 | Fader / Balance | supervised_candidate_partial | Finish current WING read-only preflight, then supervised fader proof with physical readback and rollback. | `Docs/MVP_WING_SUPERVISED.md` |
-| Pan / Stereo Placement | proposal_only_needed | Build offline/proposal pan suggestions with mono/phase safety and no live apply. | separate ADR after WING MVP |
+| Pan / Stereo Placement | proposal_only | Keep spatial pan proposals non-queueable with fresh current-pan context, mono/phase safety for non-center moves, source-identity trust, and rollback/readback requirements. | separate ADR after WING MVP |
 | EQ | proposal_only | Keep corrective EQ proposals non-queueable with fresh EQ-band identity, feedback-notch/manual-band protection, bounded gain/headroom, fresh phase context, source-identity trust, and rollback/readback requirements. | separate ADR after WING MVP |
 | Compressor | proposal_only | Keep dynamics proposals non-queueable with GR estimate, true-peak bounded makeup gain, feedback safety, fresh dynamics context, source-identity trust, and rollback/readback requirements. | separate ADR after WING MVP |
 | Gate / Expander | proposal_only_needed | Build gate proposals with source-identity freshness and chatter/hysteresis protection. | separate ADR after WING MVP |
