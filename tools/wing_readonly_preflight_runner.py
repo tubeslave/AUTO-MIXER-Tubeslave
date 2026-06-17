@@ -1200,6 +1200,11 @@ def block_plan_output_write_error(
             "plan_output_violations": [
                 f"plan_output_write_error:{error['type']}"
             ],
+            "operator_next_step": (
+                "Choose a writable --plan-output path for the plan-only "
+                "expected-plan artifact, then rerun the read-only preflight "
+                "with --plan-only before opening the backend/WING WebSocket."
+            ),
             "expected_plan_match": False,
             "expected_plan_violations": ["plan_output_write_error"],
             "execution_allowed_by_plan": False,

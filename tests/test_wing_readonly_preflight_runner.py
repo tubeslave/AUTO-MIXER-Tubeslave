@@ -1884,6 +1884,9 @@ async def test_plan_only_blocks_plan_output_write_error_before_websocket(
     ]
     assert printed["expected_plan_match"] is False
     assert printed["expected_plan_violations"] == ["plan_output_write_error"]
+    assert "writable --plan-output" in printed["operator_next_step"]
+    assert "--plan-only" in printed["operator_next_step"]
+    assert "backend/WING WebSocket" in printed["operator_next_step"]
     assert printed["contacts_backend"] is False
     assert printed["queries_console"] is False
     assert printed["execution_allowed_by_plan"] is False
