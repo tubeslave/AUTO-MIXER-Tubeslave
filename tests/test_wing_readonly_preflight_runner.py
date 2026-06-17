@@ -1370,6 +1370,7 @@ async def test_validate_run_inputs_only_requires_expected_plan_before_websocket(
         summary["selected_mvp_blocker_status"]
         == WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS
     )
+    assert summary["contacts_wing"] is False
     assert summary["sent_request_types"] == []
 
 
@@ -1407,6 +1408,7 @@ async def test_readonly_preflight_reports_validation_violation_before_websocket(
     assert "--validate-run-inputs-only" in summary["operator_next_step"]
     assert "backend/WING WebSocket" in summary["operator_next_step"]
     assert summary["websocket_opened"] is False
+    assert summary["contacts_wing"] is False
     assert summary["sent_request_types"] == []
 
 
@@ -1519,6 +1521,7 @@ async def test_readonly_preflight_reports_invalid_expected_plan_next_step_before
     assert "Regenerate the offline expected plan" in summary["operator_next_step"]
     assert "--expected-plan" in summary["operator_next_step"]
     assert summary["contacts_backend"] is False
+    assert summary["contacts_wing"] is False
     assert summary["queries_console"] is False
     assert summary["live_authority_granted"] is False
     assert summary["sent_request_types"] == []
@@ -1570,6 +1573,7 @@ async def test_readonly_preflight_blocks_expected_plan_mismatch_before_websocket
     assert "current runtime arguments" in summary["operator_next_step"]
     assert "backend/WING WebSocket" in summary["operator_next_step"]
     assert summary["contacts_backend"] is False
+    assert summary["contacts_wing"] is False
     assert summary["queries_console"] is False
     assert summary["live_authority_granted"] is False
     assert summary["sent_request_types"] == []

@@ -1416,6 +1416,7 @@ async def run(args: argparse.Namespace) -> int:
         "validation_only": bool(args.validate_run_inputs_only),
         "websocket_opened": False,
         "contacts_backend": False,
+        "contacts_wing": False,
         "queries_console": False,
         "expected_plan_required_for_real_run": True,
         "read_only": True,
