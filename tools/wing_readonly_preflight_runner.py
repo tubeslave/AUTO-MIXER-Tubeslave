@@ -1378,6 +1378,9 @@ async def run(args: argparse.Namespace) -> int:
                     "status": "blocked",
                     "reason": "expected_plan_missing_or_invalid",
                     "expected_plan_match": False,
+                    "expected_plan_violations": [
+                        "expected_plan_missing_or_invalid"
+                    ],
                     "expected_plan_error": {
                         "type": type(exc).__name__,
                         "message": str(exc),

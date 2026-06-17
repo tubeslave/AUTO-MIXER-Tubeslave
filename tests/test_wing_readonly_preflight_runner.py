@@ -1433,6 +1433,9 @@ async def test_readonly_preflight_reports_invalid_expected_plan_next_step_before
     assert summary["status"] == "blocked"
     assert summary["reason"] == "expected_plan_missing_or_invalid"
     assert summary["expected_plan_match"] is False
+    assert summary["expected_plan_violations"] == [
+        "expected_plan_missing_or_invalid"
+    ]
     assert summary["expected_plan_error"]["type"] == "JSONDecodeError"
     assert "Regenerate the offline expected plan" in summary["operator_next_step"]
     assert "--expected-plan" in summary["operator_next_step"]
