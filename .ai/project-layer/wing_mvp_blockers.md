@@ -58,7 +58,9 @@ also expose `artifact_manifest_verifier_required: true`,
 `artifact_manifest_verifier_live_authority_granted: false`. The detached
 `artifact-manifest.json` sidecar must mirror the same verifier/no-authority
 fields, and the verifier report must show
-`manifest_artifact_manifest_verifier_fields_present: true` and
+`summary_json_artifact_manifest_verifier_fields_present: true`,
+`manifest_artifact_manifest_verifier_fields_present: true`,
+`summary_md_artifact_manifest_verifier_fields_rendered: true`, and
 `manifest_artifact_manifest_verifier_command_matches_expected: true`,
 `summary_json_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
 `summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
@@ -66,6 +68,8 @@ fields, and the verifier report must show
 `verifier_report_required_fields_present: true`,
 `verifier_report_required_fields_missing: []`, and
 `verifier_report_required_fields_match_contract: true`, and
+`verifier_report_readiness_closure_allowed_matches_expected: true`, and
+`verifier_report_live_authority_granted_matches_expected: true`, and
 `failed_checks_have_check_entries: true`, and
 `failed_checks_missing_check_entries: []`. The no-WING handoff operator
 sequence must place this verifier before preview and expose
