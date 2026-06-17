@@ -16928,6 +16928,26 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         ]
         is False
     )
+    assert (
+        "wing_readonly_handoff_plan_verifier_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "wing_readonly_handoff_plan_verifier_summary_surface_mismatches: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "wing_readonly_handoff_plan_verifier_summary_surface_match: `true`"
+        in markdown_summary
+    )
+    assert (
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
     assert "proof_artifact_schema_matches_plan: `true`" in markdown_summary
     assert "proof_runner_matches_plan: `true`" in markdown_summary
     assert "## WING Read-Only MVP Blocker Summary" in markdown_summary

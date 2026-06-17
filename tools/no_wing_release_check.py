@@ -25341,6 +25341,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_manifest_verifier_check_mismatches'])}`",
                 "- plan_artifact_manifest_verifier_report_required_fields_match_contract: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['plan_artifact_manifest_verifier_report_required_fields_match_contract']).lower()}`",
+                "- wing_readonly_handoff_plan_verifier_summary_surface_required: "
+                f"`{str(summary['wing_readonly_handoff_plan_verifier_summary_surface_required']).lower()}`",
+                "- wing_readonly_handoff_plan_verifier_summary_surface_mismatches: "
+                f"`{json.dumps(summary['wing_readonly_handoff_plan_verifier_summary_surface_mismatches'])}`",
+                "- wing_readonly_handoff_plan_verifier_summary_surface_match: "
+                f"`{str(summary['wing_readonly_handoff_plan_verifier_summary_surface_match']).lower()}`",
+                "- wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted: "
+                f"`{str(summary['wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted']).lower()}`",
                 "- plan_output: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_output']}`",
                 "- proof_artifact_schema: "
