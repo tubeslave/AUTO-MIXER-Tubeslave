@@ -1882,6 +1882,8 @@ async def test_plan_only_blocks_plan_output_write_error_before_websocket(
     assert printed["plan_output_violations"] == [
         "plan_output_write_error:IsADirectoryError"
     ]
+    assert printed["expected_plan_match"] is False
+    assert printed["expected_plan_violations"] == ["plan_output_write_error"]
     assert printed["contacts_backend"] is False
     assert printed["queries_console"] is False
     assert printed["execution_allowed_by_plan"] is False

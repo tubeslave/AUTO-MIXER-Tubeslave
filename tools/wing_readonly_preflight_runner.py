@@ -1200,6 +1200,8 @@ def block_plan_output_write_error(
             "plan_output_violations": [
                 f"plan_output_write_error:{error['type']}"
             ],
+            "expected_plan_match": False,
+            "expected_plan_violations": ["plan_output_write_error"],
             "execution_allowed_by_plan": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
