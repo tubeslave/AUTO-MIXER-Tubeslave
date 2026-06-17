@@ -156,6 +156,7 @@ def test_runner_requires_manifest_verifier_surface_value_checks_before_websocket
             "contacts_wing",
             "mutates_console_state",
             "queries_console",
+            "readiness_matrix_update_allowed",
             "readiness_closure_allowed",
             "live_authority_granted",
         )
@@ -175,6 +176,13 @@ def test_runner_requires_manifest_verifier_readiness_matrix_denials_before_webso
 
     assert required_denial_checks <= set(
         runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+    )
+
+
+def test_runner_requires_manifest_verifier_report_readiness_matrix_check_before_websocket() -> None:
+    assert (
+        "verifier_report_readiness_matrix_update_allowed_matches_expected"
+        in runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
     )
 
 
@@ -3586,6 +3594,9 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     verifier_checks = dict(verifier_report["checks"])
     verifier_checks["summary_json_sha256_matches_manifest"] = False
     verifier_checks["summary_denies_readiness_matrix_update"] = False
+    verifier_checks[
+        "verifier_report_readiness_matrix_update_allowed_matches_expected"
+    ] = False
     verifier_report.update(
         {
             "status": "passed",
@@ -3640,6 +3651,7 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     assert summary["artifact_manifest_verifier_check_mismatches"] == [
         "summary_json_sha256_matches_manifest",
         "summary_denies_readiness_matrix_update",
+        "verifier_report_readiness_matrix_update_allowed_matches_expected",
     ]
     assert (
         summary[
@@ -3650,6 +3662,12 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     assert (
         summary[
             "artifact_manifest_verifier_check_summary_denies_readiness_matrix_update"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_check_verifier_report_readiness_matrix_update_allowed_matches_expected"
         ]
         is False
     )
