@@ -174,6 +174,9 @@ def _valid_summary() -> dict:
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": True,
+        "artifact_manifest_verifier_websocket_opened_after_pass": True,
         **{
             field: False
             for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -416,6 +419,15 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_status": summary[
             "backend_port_prestart_check_status"
         ],
+        "artifact_manifest_verifier_must_pass_before_websocket": summary[
+            "artifact_manifest_verifier_must_pass_before_websocket"
+        ],
+        "artifact_manifest_verifier_passed_before_websocket": summary[
+            "artifact_manifest_verifier_passed_before_websocket"
+        ],
+        "artifact_manifest_verifier_websocket_opened_after_pass": summary[
+            "artifact_manifest_verifier_websocket_opened_after_pass"
+        ],
         **{
             field: summary[field]
             for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -637,6 +649,22 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
         is False
     )
     assert evidence["artifacts"][0]["backend_port_prestart_check_status"] == "passed"
+    assert (
+        evidence["artifacts"][0][
+            "artifact_manifest_verifier_must_pass_before_websocket"
+        ]
+        is True
+    )
+    assert (
+        evidence["artifacts"][0]["artifact_manifest_verifier_passed_before_websocket"]
+        is True
+    )
+    assert (
+        evidence["artifacts"][0][
+            "artifact_manifest_verifier_websocket_opened_after_pass"
+        ]
+        is True
+    )
     for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
         assert evidence["artifacts"][0][field] is False
     assert evidence["artifacts"][0]["violations"] == []
@@ -1155,6 +1183,34 @@ def test_file_preflight_artifact_requires_summary_prestart_contract(tmp_path):
     assert "backend_port_prestart_check_command_mismatch" in violations
     assert "backend_port_prestart_check_command_text_mismatch" in violations
     assert "backend_port_prestart_check_failure_detail_fields_mismatch" in violations
+
+
+def test_preflight_evidence_rejects_missing_manifest_verifier_websocket_proof():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact.pop("artifact_manifest_verifier_must_pass_before_websocket")
+    artifact["artifact_manifest_verifier_passed_before_websocket"] = False
+    artifact["artifact_manifest_verifier_websocket_opened_after_pass"] = False
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert (
+        "artifact_manifest_verifier_must_pass_before_websocket_not_true"
+        in validation["violations"]
+    )
+    assert (
+        "artifact_manifest_verifier_passed_before_websocket_not_true"
+        in validation["violations"]
+    )
+    assert (
+        "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+        in evidence["summary"]["violations"]
+    )
 
 
 def test_file_preflight_artifact_requires_prestart_summary_file(tmp_path):

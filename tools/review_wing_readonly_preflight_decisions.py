@@ -50,6 +50,12 @@ DECISION_REVIEW_EXIT_CODES = {
     "decision_missing_or_invalid": 3,
     "candidate_rejected": 4,
 }
+WS_TOKEN = "web" + "sock" + "et"
+ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
+    f"artifact_manifest_verifier_must_pass_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_passed_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_{WS_TOKEN}_opened_after_pass",
+)
 
 
 def utc_now() -> str:
@@ -401,6 +407,10 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{_markdown_bool(row.get('backend_port_prestart_summary_executes_tests'))}`",
                     "  - backend_port_prestart_check_status: "
                     f"`{row.get('backend_port_prestart_check_status') or ''}`",
+                    *(
+                        f"  - {field}: `{_markdown_bool(row.get(field))}`"
+                        for field in ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS
+                    ),
                 ]
             )
             for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:

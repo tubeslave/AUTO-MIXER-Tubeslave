@@ -99,6 +99,9 @@ def _valid_summary() -> dict:
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": True,
+        "artifact_manifest_verifier_websocket_opened_after_pass": True,
         **{
             field: False
             for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -328,6 +331,15 @@ def _valid_expected_plan(summary: dict) -> dict:
         "backend_port_prestart_check_status": summary[
             "backend_port_prestart_check_status"
         ],
+        "artifact_manifest_verifier_must_pass_before_websocket": summary[
+            "artifact_manifest_verifier_must_pass_before_websocket"
+        ],
+        "artifact_manifest_verifier_passed_before_websocket": summary[
+            "artifact_manifest_verifier_passed_before_websocket"
+        ],
+        "artifact_manifest_verifier_websocket_opened_after_pass": summary[
+            "artifact_manifest_verifier_websocket_opened_after_pass"
+        ],
         **{
             field: summary[field]
             for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -530,6 +542,15 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
         assert candidate_review[field] is False
     for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS:
         assert candidate_review[field] is True
+    assert (
+        candidate_review["artifact_manifest_verifier_must_pass_before_websocket"]
+        is True
+    )
+    assert candidate_review["artifact_manifest_verifier_passed_before_websocket"] is True
+    assert (
+        candidate_review["artifact_manifest_verifier_websocket_opened_after_pass"]
+        is True
+    )
     assert decision_tool.exit_code_for_report(report) == 0
     markdown = decision_tool.render_markdown(report)
     assert decision_tool.ACCEPTED_DECISION_READY_STATUS in markdown
@@ -568,6 +589,15 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert "backend_port_prestart_summary_queries_console: `false`" in markdown
     assert "backend_port_prestart_summary_executes_tests: `false`" in markdown
     assert "backend_port_prestart_check_status: `passed`" in markdown
+    assert (
+        "artifact_manifest_verifier_must_pass_before_websocket: `true`"
+        in markdown
+    )
+    assert "artifact_manifest_verifier_passed_before_websocket: `true`" in markdown
+    assert (
+        "artifact_manifest_verifier_websocket_opened_after_pass: `true`"
+        in markdown
+    )
     for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
         assert f"{field}: `false`" in markdown
     for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS:

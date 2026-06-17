@@ -86,6 +86,9 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": True,
+        "artifact_manifest_verifier_websocket_opened_after_pass": True,
         **{
             field: False
             for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -326,6 +329,9 @@ def _valid_summary() -> dict:
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": True,
+        "artifact_manifest_verifier_websocket_opened_after_pass": True,
         **{
             field: False
             for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -549,6 +555,9 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
             "backend_port_prestart_summary_queries_console": False,
             "backend_port_prestart_summary_executes_tests": False,
             "backend_port_prestart_check_status": "passed",
+            "artifact_manifest_verifier_must_pass_before_websocket": True,
+            "artifact_manifest_verifier_passed_before_websocket": True,
+            "artifact_manifest_verifier_websocket_opened_after_pass": True,
             **{
                 field: False
                 for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS

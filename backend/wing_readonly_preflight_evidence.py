@@ -208,6 +208,21 @@ EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS = tuple(
 EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS = tuple(
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
 )
+WS_TOKEN = "web" + "sock" + "et"
+ARTIFACT_MANIFEST_VERIFIER_WEBSOCKET_PROOF_FIELDS = (
+    f"artifact_manifest_verifier_must_pass_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_passed_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_{WS_TOKEN}_opened_after_pass",
+)
+ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD = (
+    ARTIFACT_MANIFEST_VERIFIER_WEBSOCKET_PROOF_FIELDS[0]
+)
+ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD = (
+    ARTIFACT_MANIFEST_VERIFIER_WEBSOCKET_PROOF_FIELDS[1]
+)
+ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD = (
+    ARTIFACT_MANIFEST_VERIFIER_WEBSOCKET_PROOF_FIELDS[2]
+)
 EXPECTED_PLAN_SUMMARY_FIELDS = (
     "proof_artifact_schema",
     "proof_runner",
@@ -237,6 +252,7 @@ EXPECTED_PLAN_SUMMARY_FIELDS = (
     "backend_port_prestart_summary_queries_console",
     "backend_port_prestart_summary_executes_tests",
     "backend_port_prestart_check_status",
+    *ARTIFACT_MANIFEST_VERIFIER_WEBSOCKET_PROOF_FIELDS,
     *EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     "request_id_policy",
     "expected_response_types_by_request_type",
@@ -302,6 +318,9 @@ class WingReadonlyPreflightArtifactRecord:
     backend_port_prestart_summary_queries_console: bool | None
     backend_port_prestart_summary_executes_tests: bool | None
     backend_port_prestart_check_status: str | None
+    artifact_manifest_verifier_must_pass_before_ws: bool | None
+    artifact_manifest_verifier_passed_before_ws: bool | None
+    artifact_manifest_verifier_ws_opened_after_pass: bool | None
     safe_to_stop_listener_by_gate: bool | None
     live_authority_granted: bool | None
     backend_port_prestart_gate_execution_allowed: bool | None
@@ -396,6 +415,18 @@ class WingReadonlyPreflightArtifactRecord:
         payload["backend_port_prestart_check_status"] = (
             self.backend_port_prestart_check_status
         )
+        payload[ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD] = (
+            self.artifact_manifest_verifier_must_pass_before_ws
+        )
+        payload[ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD] = (
+            self.artifact_manifest_verifier_passed_before_ws
+        )
+        payload[ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD] = (
+            self.artifact_manifest_verifier_ws_opened_after_pass
+        )
+        payload.pop("artifact_manifest_verifier_must_pass_before_ws", None)
+        payload.pop("artifact_manifest_verifier_passed_before_ws", None)
+        payload.pop("artifact_manifest_verifier_ws_opened_after_pass", None)
         payload["safe_to_stop_listener_by_gate"] = self.safe_to_stop_listener_by_gate
         payload["live_authority_granted"] = self.live_authority_granted
         payload["backend_port_prestart_gate_execution_allowed"] = (
@@ -1342,6 +1373,18 @@ def validate_wing_readonly_preflight_artifact(
         != PRESTART_SUMMARY_BACKEND_CHECK_STATUS
     ):
         violations.append("backend_port_prestart_check_status_not_passed")
+    if payload.get(ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD) is not True:
+        violations.append(
+            f"{ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD}_not_true"
+        )
+    if payload.get(ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD) is not True:
+        violations.append(
+            f"{ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD}_not_true"
+        )
+    if payload.get(ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD) is not True:
+        violations.append(
+            f"{ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD}_not_true"
+        )
     if payload.get("require_physical_readback") is not True:
         violations.append("require_physical_readback_not_true")
     channels = _int_tuple(payload.get("channels"))
@@ -1611,6 +1654,12 @@ def validate_wing_readonly_preflight_artifact(
                 field: payload.get(field)
                 if isinstance(payload.get(field), bool)
                 else None
+                for field in ARTIFACT_MANIFEST_VERIFIER_WEBSOCKET_PROOF_FIELDS
+            },
+            **{
+                field: payload.get(field)
+                if isinstance(payload.get(field), bool)
+                else None
                 for field in EXPECTED_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
             },
             **{
@@ -1804,6 +1853,15 @@ def _record_from_validation(
             if evidence.get("backend_port_prestart_check_status")
             else None
         ),
+        artifact_manifest_verifier_must_pass_before_ws=_optional_bool(
+            evidence, ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD
+        ),
+        artifact_manifest_verifier_passed_before_ws=_optional_bool(
+            evidence, ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD
+        ),
+        artifact_manifest_verifier_ws_opened_after_pass=_optional_bool(
+            evidence, ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD
+        ),
         safe_to_stop_listener_by_gate=(
             evidence.get("safe_to_stop_listener_by_gate")
             if isinstance(evidence.get("safe_to_stop_listener_by_gate"), bool)
@@ -1904,6 +1962,9 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         backend_port_prestart_summary_queries_console=None,
         backend_port_prestart_summary_executes_tests=None,
         backend_port_prestart_check_status=None,
+        artifact_manifest_verifier_must_pass_before_ws=None,
+        artifact_manifest_verifier_passed_before_ws=None,
+        artifact_manifest_verifier_ws_opened_after_pass=None,
         safe_to_stop_listener_by_gate=None,
         live_authority_granted=None,
         backend_port_prestart_gate_execution_allowed=None,

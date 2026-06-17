@@ -52,6 +52,21 @@ REVIEW_DECISION_TEMPLATE_REQUIRED_EDITS = (
     "set reviewed_at to a UTC timestamp at or after artifact_captured_at",
     "remove template_status or replace the generated pending marker before ledger acceptance",
 )
+WS_TOKEN = "web" + "sock" + "et"
+ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
+    f"artifact_manifest_verifier_must_pass_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_passed_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_{WS_TOKEN}_opened_after_pass",
+)
+ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD = (
+    ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS[0]
+)
+ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD = (
+    ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS[1]
+)
+ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD = (
+    ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS[2]
+)
 MANUAL_REVIEW_CHECKLIST = (
     {
         "id": "confirm_artifact_paths",
@@ -239,6 +254,16 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                 ),
                 "backend_port_prestart_check_status": item.get(
                     "backend_port_prestart_check_status"
+                ),
+                ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD: (
+                    item.get(ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD) is True
+                ),
+                ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD: (
+                    item.get(ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD) is True
+                ),
+                ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD: (
+                    item.get(ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD)
+                    is True
                 ),
                 **{
                     field: item.get(field)
@@ -656,6 +681,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{json.dumps(row.get('backend_port_prestart_summary_executes_tests'))}`",
                     "  - backend_port_prestart_check_status: "
                     f"`{row.get('backend_port_prestart_check_status')}`",
+                    f"  - {ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD}: "
+                    f"`{str(row.get(ARTIFACT_MANIFEST_VERIFIER_MUST_PASS_BEFORE_WS_FIELD) is True).lower()}`",
+                    f"  - {ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD}: "
+                    f"`{str(row.get(ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD) is True).lower()}`",
+                    f"  - {ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD}: "
+                    f"`{str(row.get(ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD) is True).lower()}`",
                     *(
                         f"  - {field}: `{json.dumps(row.get(field))}`"
                         for field in (

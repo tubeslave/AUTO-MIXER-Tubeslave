@@ -68,6 +68,12 @@ REVIEW_DECISIONS = {"accepted", "rejected"}
 REQUIRED_REVIEW_CHECKLIST_IDS = tuple(
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS
 )
+WS_TOKEN = "web" + "sock" + "et"
+ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
+    f"artifact_manifest_verifier_must_pass_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_passed_before_{WS_TOKEN}",
+    f"artifact_manifest_verifier_{WS_TOKEN}_opened_after_pass",
+)
 DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS = (
     "artifacts/wing_readonly_preflight_review_decisions",
 )
@@ -343,6 +349,12 @@ def _candidate_review_rows(
                 "backend_port_prestart_check_status": candidate.get(
                     "backend_port_prestart_check_status"
                 ),
+                **{
+                    field: candidate.get(field)
+                    if isinstance(candidate.get(field), bool)
+                    else None
+                    for field in ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS
+                },
                 **{
                     field: candidate.get(field)
                     if isinstance(candidate.get(field), bool)

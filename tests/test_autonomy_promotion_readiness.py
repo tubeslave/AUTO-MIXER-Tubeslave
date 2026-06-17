@@ -12,6 +12,9 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
 )
@@ -62,11 +65,26 @@ def _valid_wing_preflight_summary() -> dict:
         "backend_port_prestart_summary_connection_policy": (
             "no_hardware_no_network_no_live_writes"
         ),
+        "backend_port_prestart_summary_read_only": True,
         "backend_port_prestart_summary_live_write": False,
         "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_contacts_wing": False,
+        "backend_port_prestart_summary_mutates_console_state": False,
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: True
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
         "read_only": True,
         "live_write": False,
         "write_request_sent": False,
@@ -464,7 +482,7 @@ def test_readiness_snapshot_groups_autonomy_gaps_without_granting_authority():
     assert any("Keep scene apply blocked" in item for item in next_by_family["scene_preset"])
 
 
-def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_rows():
+def test_readiness_snapshot_requires_replacement_for_unbound_wing_preflight_artifact():
     evidence = build_wing_readonly_preflight_evidence(
         artifact_payloads=(_valid_wing_preflight_summary(),),
         artifact_roots=(),
@@ -475,11 +493,11 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
     )
     preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
 
-    assert preflight["evidence_status"] == "readonly_preflight_candidate_available"
+    assert preflight["evidence_status"] == "readonly_preflight_artifact_replacement_required"
     assert preflight["artifact_count"] == 1
-    assert preflight["valid_candidate_count"] == 1
-    assert preflight["invalid_candidate_count"] == 0
-    assert preflight["readiness_update_candidate_available"] is True
+    assert preflight["valid_candidate_count"] == 0
+    assert preflight["invalid_candidate_count"] == 1
+    assert preflight["readiness_update_candidate_available"] is False
     assert preflight["prestart_backend_port_check_required"] is True
     assert preflight["prestart_backend_port_check_must_pass_before_starting_backend"] is True
     assert preflight["prestart_backend_port_check_command"] == [
@@ -495,44 +513,33 @@ def test_readiness_snapshot_surfaces_wing_preflight_candidate_without_closing_ro
     assert preflight["prestart_backend_port_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
-    assert preflight["prestart_backend_port_summary_required"] is True
+    assert preflight["prestart_backend_port_summary_required"] is False
+    assert preflight["prestart_backend_port_summary_type"] is None
+    assert preflight["prestart_backend_port_summary_type_matches_contract"] is False
+    assert preflight["prestart_backend_port_summary_status"] is None
+    assert preflight["prestart_backend_port_summary_connection_policy"] is None
     assert (
-        preflight["prestart_backend_port_summary_type"]
-        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
-    )
-    assert preflight["prestart_backend_port_summary_type_matches_contract"] is True
-    assert preflight["prestart_backend_port_summary_status"] == "passed"
-    assert (
-        preflight["prestart_backend_port_summary_connection_policy"]
-        == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
-    )
-    assert (
-        preflight[
-            "prestart_backend_port_summary_connection_policy_matches_contract"
-        ]
-        is True
+        preflight["prestart_backend_port_summary_connection_policy_matches_contract"]
+        is False
     )
     assert preflight["prestart_backend_port_summary_contract_valid"] is False
     assert preflight["prestart_backend_port_summary_contract_violations"] == [
-        "expected_artifacts_count_mismatch",
-        "expected_summary_artifact_missing",
-        "expected_events_artifact_missing",
-        "summary_path_not_bound_to_expected_artifact",
-        "events_path_not_bound_to_expected_artifact",
+        "no_valid_readonly_preflight_candidate",
     ]
-    assert preflight["prestart_backend_port_summary_live_write"] is False
-    assert preflight["prestart_backend_port_summary_contacts_backend"] is False
-    assert preflight["prestart_backend_port_summary_queries_console"] is False
-    assert preflight["prestart_backend_port_summary_executes_tests"] is False
-    assert preflight["prestart_backend_port_check_status"] == "passed"
-    assert preflight["candidate_blocker_ids"] == [
-        "wing_readonly_connection_proof",
-        "physical_console_readback_proof",
-        "operator_visible_evidence_report",
-        "readiness_matrix_update_based_on_real_proof",
+    assert preflight["violations"] == [
+        "artifact_manifest_verifier_must_pass_before_websocket_not_true",
+        "artifact_manifest_verifier_passed_before_websocket_not_true",
+        "artifact_manifest_verifier_websocket_opened_after_pass_not_true",
+        "artifact_root_missing",
     ]
+    assert preflight["prestart_backend_port_summary_live_write"] is None
+    assert preflight["prestart_backend_port_summary_contacts_backend"] is None
+    assert preflight["prestart_backend_port_summary_queries_console"] is None
+    assert preflight["prestart_backend_port_summary_executes_tests"] is None
+    assert preflight["prestart_backend_port_check_status"] is None
+    assert preflight["candidate_blocker_ids"] == []
     assert preflight["closed_blocker_ids"] == []
-    assert preflight["latest_valid_candidate_run_id"] == "20260606T150000Z_wing_readonly_preflight"
+    assert preflight["latest_valid_candidate_run_id"] is None
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False
