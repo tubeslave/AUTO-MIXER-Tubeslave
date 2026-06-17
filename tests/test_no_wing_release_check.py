@@ -23004,7 +23004,10 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert checks["artifact_manifest_exists"] is True
     assert checks["artifact_bundle_loadable"] is True
     assert checks["failed_checks_have_check_entries"] is True
+    assert checks["failed_checks_missing_check_entries_empty"] is True
     assert checks["verifier_report_required_fields_present"] is True
+    assert checks["verifier_report_required_fields_missing_empty"] is True
+    assert checks["verifier_report_required_fields_match_contract"] is True
     assert checks["manifest_type"] is True
     assert checks["manifest_required_artifact_ids_match_contract"] is True
     assert checks["manifest_required_artifact_paths_match_contract"] is True
@@ -23462,6 +23465,8 @@ def test_verify_no_wing_artifact_manifest_fails_missing_required_report_field(
     ]
     assert report["verifier_report_required_fields_match_contract"] is False
     assert report["checks"]["verifier_report_required_fields_present"] is False
+    assert report["checks"]["verifier_report_required_fields_missing_empty"] is False
+    assert report["checks"]["verifier_report_required_fields_match_contract"] is False
     assert report["readiness_closure_allowed"] is False
     assert report["live_authority_granted"] is False
 

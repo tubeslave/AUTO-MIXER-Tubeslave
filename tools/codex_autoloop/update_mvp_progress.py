@@ -349,6 +349,8 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true",
     "manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true",
     "verifier_report_required_fields_present: true",
+    "artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true",
+    "artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true",
     "artifact_manifest_verifier_check_verifier_report_read_only_matches_expected: true",
     "artifact_manifest_verifier_check_verifier_report_live_write_matches_expected: true",
     "artifact_manifest_verifier_check_verifier_report_contacts_wing_matches_expected: true",
@@ -359,6 +361,7 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "verifier_report_required_fields_missing: []",
     "verifier_report_required_fields_match_contract: true",
     "failed_checks_have_check_entries: true",
+    "artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true",
     "failed_checks_missing_check_entries: []",
 )
 

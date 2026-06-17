@@ -178,6 +178,8 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "summary_md_artifact_manifest_verifier_report_required_fields_matches_expected",
     "manifest_artifact_manifest_verifier_report_required_fields_matches_expected",
     "verifier_report_required_fields_present",
+    "verifier_report_required_fields_missing_empty",
+    "verifier_report_required_fields_match_contract",
     "verifier_report_read_only_matches_expected",
     "verifier_report_live_write_matches_expected",
     "verifier_report_contacts_wing_matches_expected",
@@ -188,6 +190,7 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "verifier_report_readiness_closure_allowed_matches_expected",
     "verifier_report_live_authority_granted_matches_expected",
     "failed_checks_have_check_entries",
+    "failed_checks_missing_check_entries_empty",
 )
 EXPECTED_PLAN_MATCH_KEYS = (
     "type",

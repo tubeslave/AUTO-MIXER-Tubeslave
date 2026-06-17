@@ -134,6 +134,8 @@ mirror those detached verifier checks before any WebSocket with
 `artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
 `artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_required_fields_present: true`,
+`artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true`,
+`artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true`,
 `artifact_manifest_verifier_check_verifier_report_read_only_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_live_write_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_contacts_wing_matches_expected: true`,
@@ -143,7 +145,8 @@ mirror those detached verifier checks before any WebSocket with
 `artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_live_authority_granted_matches_expected: true`,
-and `artifact_manifest_verifier_check_failed_checks_have_check_entries: true`. The no-WING handoff operator
+`artifact_manifest_verifier_check_failed_checks_have_check_entries: true`, and
+`artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true`. The no-WING handoff operator
 sequence must place this verifier before preview and expose
 `artifact_manifest_verifier_operator_sequence_step_index: 1`,
 `expected_artifact_manifest_verifier_operator_sequence_step_index: 1`,

@@ -217,6 +217,16 @@ def _record_verifier_report_required_field_checks(
         "verifier_report_required_fields_present",
         not missing_fields,
     )
+    _record_check(
+        checks,
+        "verifier_report_required_fields_missing_empty",
+        missing_fields == [],
+    )
+    _record_check(
+        checks,
+        "verifier_report_required_fields_match_contract",
+        report["verifier_report_required_fields_match_contract"] is True,
+    )
 
 
 def _finalize_verifier_report(
@@ -236,6 +246,11 @@ def _finalize_verifier_report(
         checks,
         "failed_checks_have_check_entries",
         not missing_check_entries,
+    )
+    _record_check(
+        checks,
+        "failed_checks_missing_check_entries_empty",
+        missing_check_entries == [],
     )
     check_failures = [name for name, passed in sorted(checks.items()) if not passed]
     all_failed_checks = list(dict.fromkeys((failed_checks or []) + check_failures))
