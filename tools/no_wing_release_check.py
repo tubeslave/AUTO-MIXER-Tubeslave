@@ -664,6 +664,13 @@ WING_READONLY_OPERATOR_SEQUENCE_LIST_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES = (
     "wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed",
     "wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted",
 )
+WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS = (
+    "wing_readonly_handoff_plan_verifier_summary_surface_required",
+    "wing_readonly_handoff_plan_verifier_summary_surface_mismatches",
+    "wing_readonly_handoff_plan_verifier_summary_surface_match",
+    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
+    "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
+)
 NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_CONTRACT_FIELDS = (
     "artifact_manifest_path",
     "artifact_manifest_required_artifact_ids",
@@ -728,6 +735,7 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS = (
     "live_authority_granted",
     "artifact_manifest_readiness_closure_allowed",
     "artifact_manifest_live_authority_granted",
+    *WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS,
     *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS,
     *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS,
     *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS,
@@ -771,6 +779,7 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELD_LINES = (
     "artifact_manifest_required_artifact_sha256_fields",
     "artifact_manifest_readiness_closure_allowed",
     "artifact_manifest_live_authority_granted",
+    *WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS,
     *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS,
     *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_FIELDS,
     *NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS,
@@ -24200,6 +24209,15 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "artifact_manifest_contract_cross_surface_match": True,
         "artifact_manifest_contract_cross_surface_readiness_closure_allowed": False,
         "artifact_manifest_contract_cross_surface_live_authority_granted": False,
+        "wing_readonly_handoff_plan_verifier_summary_surface_required": False,
+        "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
+        "wing_readonly_handoff_plan_verifier_summary_surface_match": True,
+        "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": (
+            False
+        ),
         "artifact_manifest_required": True,
         "artifact_manifest_path": NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME,
         "artifact_manifest_required_artifact_count": len(
@@ -24503,6 +24521,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         f"`{json.dumps(summary['artifact_manifest_required_artifact_sha256_fields'])}`",
         "- artifact_manifest_readiness_closure_allowed: `false`",
         "- artifact_manifest_live_authority_granted: `false`",
+        *[
+            _format_markdown_summary_field_line(field_name, summary[field_name])
+            for field_name in (
+                WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+            )
+        ],
         *[
             _format_markdown_summary_field_line(field_name, summary[field_name])
             for field_name in (

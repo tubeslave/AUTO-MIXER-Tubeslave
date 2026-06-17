@@ -20855,6 +20855,16 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             "artifact_manifest_summary_surface_required_field_lines"
         ]
         assert f"{field_name}: `" in markdown_summary
+    for field_name in (
+        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+    ):
+        assert field_name in json_summary[
+            "artifact_manifest_summary_surface_required_fields"
+        ]
+        assert field_name in json_summary[
+            "artifact_manifest_summary_surface_required_field_lines"
+        ]
+        assert f"{field_name}: `" in markdown_summary
     assert manifest["type"] == "no_wing_release_check_artifact_manifest"
     assert (
         manifest["artifact_manifest_path"]
@@ -22594,6 +22604,29 @@ def test_no_wing_release_check_fails_when_manifest_summary_surface_missing_line(
                     release_check._format_markdown_summary_field_line(
                         field_name,
                         {
+                            "wing_readonly_handoff_plan_verifier_summary_surface_required": (
+                                False
+                            ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
+                            "wing_readonly_handoff_plan_verifier_summary_surface_match": (
+                                True
+                            ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": (
+                                False
+                            ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": (
+                                False
+                            ),
+                        }[field_name],
+                    )
+                    for field_name in (
+                        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+                    )
+                ],
+                *[
+                    release_check._format_markdown_summary_field_line(
+                        field_name,
+                        {
                             "artifact_manifest_verifier_required": True,
                             "artifact_manifest_verifier_command": (
                                 release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_COMMAND
@@ -22764,6 +22797,29 @@ def test_no_wing_release_check_fails_when_manifest_contract_digest_line_missing(
                 "- artifact_manifest_required_artifact_sha256_fields: `[]`",
                 "- artifact_manifest_readiness_closure_allowed: `false`",
                 "- artifact_manifest_live_authority_granted: `false`",
+                *[
+                    release_check._format_markdown_summary_field_line(
+                        field_name,
+                        {
+                            "wing_readonly_handoff_plan_verifier_summary_surface_required": (
+                                False
+                            ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
+                            "wing_readonly_handoff_plan_verifier_summary_surface_match": (
+                                True
+                            ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": (
+                                False
+                            ),
+                            "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": (
+                                False
+                            ),
+                        }[field_name],
+                    )
+                    for field_name in (
+                        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+                    )
+                ],
                 *[
                     release_check._format_markdown_summary_field_line(
                         field_name,
