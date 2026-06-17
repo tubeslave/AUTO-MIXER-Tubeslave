@@ -25,6 +25,14 @@ VERIFIER_REPORT_STATIC_SAFETY_FIELDS = {
     "queries_console": False,
     "executes_tests": False,
 }
+SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
+    "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
+    "artifact_manifest_contract_cross_surface_live_authority_granted",
+    "artifact_manifest_readiness_closure_allowed",
+    "artifact_manifest_live_authority_granted",
+    "artifact_manifest_verifier_readiness_closure_allowed",
+    "artifact_manifest_verifier_live_authority_granted",
+)
 
 
 def _sha256_file(path: Path) -> str:
@@ -165,6 +173,24 @@ def _record_verifier_report_safety_checks(
             checks,
             f"verifier_report_{field_name}_matches_expected",
             actual.get(field_name) == expected_value,
+        )
+
+
+def _record_summary_md_safety_checks(
+    checks: dict[str, bool],
+    *,
+    summary_md_text: str,
+) -> None:
+    summary_md_lines = set(summary_md_text.splitlines())
+    for field_name in SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS:
+        expected_line = no_wing_release_check._format_markdown_summary_field_line(
+            field_name,
+            False,
+        )
+        _record_check(
+            checks,
+            f"summary_md_{field_name}_denies_authority",
+            expected_line in summary_md_lines,
         )
 
 
@@ -417,6 +443,10 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         report=report,
         readiness_closure_allowed=readiness_closure_allowed,
         live_authority_granted=live_authority_granted,
+    )
+    _record_summary_md_safety_checks(
+        checks,
+        summary_md_text=summary_md_text,
     )
 
     report.update(

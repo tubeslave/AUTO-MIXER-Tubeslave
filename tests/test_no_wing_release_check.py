@@ -22955,6 +22955,62 @@ def test_verify_no_wing_artifact_manifest_fails_stale_summary_md(tmp_path):
     assert report["live_authority_granted"] is False
 
 
+def test_verify_no_wing_artifact_manifest_fails_summary_md_authority_claim_even_with_fresh_sha(
+    tmp_path,
+):
+    write_summary(
+        tmp_path,
+        [
+            CheckResult(
+                name="unit_check",
+                status="passed",
+                started_at="2026-06-15T00:00:00Z",
+                finished_at="2026-06-15T00:00:01Z",
+                duration_sec=1.0,
+                command="python -m pytest",
+                cwd=str(tmp_path),
+                returncode=0,
+            )
+        ],
+        generated_at="2026-06-15T00:00:00Z",
+    )
+    summary_md_path = tmp_path / "summary.md"
+    summary_md_text = summary_md_path.read_text(encoding="utf-8").replace(
+        "- artifact_manifest_verifier_live_authority_granted: `false`",
+        "- artifact_manifest_verifier_live_authority_granted: `true`",
+    )
+    summary_md_path.write_text(summary_md_text, encoding="utf-8")
+    fresh_summary_md_sha = hashlib.sha256(
+        summary_md_text.encode("utf-8")
+    ).hexdigest()
+
+    manifest_path = tmp_path / "artifact-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_manifest_summary_md_sha256"] = fresh_summary_md_sha
+    for artifact in manifest["artifacts"]:
+        if artifact["artifact_id"] == "summary_md":
+            artifact["sha256"] = fresh_summary_md_sha
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    assert report["status"] == "failed"
+    assert "summary_md_sha256_matches_actual" not in report["failed_checks"]
+    assert "summary_md_sha256_matches_manifest" not in report["failed_checks"]
+    assert (
+        "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority"
+        in report["failed_checks"]
+    )
+    assert report["checks"][
+        "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority"
+    ] is False
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_authority_granted"] is False
+
+
 def test_verify_no_wing_artifact_manifest_fails_stale_verifier_command(tmp_path):
     write_summary(
         tmp_path,
