@@ -14176,8 +14176,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "artifact_manifest_verifier_failed_checks": [],
             "artifact_manifest_verifier_failed_checks_missing_check_entries": [],
             "artifact_manifest_verifier_required_fields_missing": [],
+            "artifact_manifest_verifier_report_value_mismatches": [],
+            "artifact_manifest_verifier_check_mismatches": [],
             "artifact_manifest_verifier_failed_checks_have_check_entries": True,
             "artifact_manifest_verifier_report_required_fields_present": True,
+            "artifact_manifest_verifier_report_required_fields_match_contract": True,
             "artifact_manifest_verifier_readiness_closure_allowed": False,
             "artifact_manifest_verifier_live_authority_granted": False,
             **{
@@ -14243,8 +14246,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["artifact_manifest_verifier_failed_checks"] == []
     assert artifact["artifact_manifest_verifier_failed_checks_missing_check_entries"] == []
     assert artifact["artifact_manifest_verifier_required_fields_missing"] == []
+    assert artifact["artifact_manifest_verifier_report_value_mismatches"] == []
+    assert artifact["artifact_manifest_verifier_check_mismatches"] == []
     assert artifact["artifact_manifest_verifier_failed_checks_have_check_entries"] is True
     assert artifact["artifact_manifest_verifier_report_required_fields_present"] is True
+    assert (
+        artifact["artifact_manifest_verifier_report_required_fields_match_contract"]
+        is True
+    )
     assert artifact["artifact_manifest_verifier_readiness_closure_allowed"] is False
     assert artifact["artifact_manifest_verifier_live_authority_granted"] is False
     assert artifact["manual_review_required_before_readiness_update"] is True
@@ -14313,11 +14322,20 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert "artifact_manifest_verifier_status: `passed`" in markdown_summary
     assert "artifact_manifest_verifier_failed_checks: `[]`" in markdown_summary
     assert (
+        "artifact_manifest_verifier_report_value_mismatches: `[]`"
+        in markdown_summary
+    )
+    assert "artifact_manifest_verifier_check_mismatches: `[]`" in markdown_summary
+    assert (
         "artifact_manifest_verifier_failed_checks_have_check_entries: `true`"
         in markdown_summary
     )
     assert (
         "artifact_manifest_verifier_report_required_fields_present: `true`"
+        in markdown_summary
+    )
+    assert (
+        "artifact_manifest_verifier_report_required_fields_match_contract: `true`"
         in markdown_summary
     )
     assert (

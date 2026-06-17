@@ -16963,12 +16963,34 @@ def wing_readonly_preflight_plan_artifact_summary(
                 )
                 else []
             ),
+            "artifact_manifest_verifier_report_value_mismatches": (
+                list(detail.get("artifact_manifest_verifier_report_value_mismatches"))
+                if isinstance(
+                    detail.get("artifact_manifest_verifier_report_value_mismatches"),
+                    list,
+                )
+                else []
+            ),
+            "artifact_manifest_verifier_check_mismatches": (
+                list(detail.get("artifact_manifest_verifier_check_mismatches"))
+                if isinstance(
+                    detail.get("artifact_manifest_verifier_check_mismatches"),
+                    list,
+                )
+                else []
+            ),
             "artifact_manifest_verifier_failed_checks_have_check_entries": (
                 detail.get("artifact_manifest_verifier_failed_checks_have_check_entries")
                 is True
             ),
             "artifact_manifest_verifier_report_required_fields_present": (
                 detail.get("artifact_manifest_verifier_report_required_fields_present")
+                is True
+            ),
+            "artifact_manifest_verifier_report_required_fields_match_contract": (
+                detail.get(
+                    "artifact_manifest_verifier_report_required_fields_match_contract"
+                )
                 is True
             ),
             "artifact_manifest_verifier_readiness_closure_allowed": (
@@ -24944,10 +24966,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_failed_checks_missing_check_entries'])}`",
                 "- artifact_manifest_verifier_required_fields_missing: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_required_fields_missing'])}`",
+                "- artifact_manifest_verifier_report_value_mismatches: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_value_mismatches'])}`",
+                "- artifact_manifest_verifier_check_mismatches: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_check_mismatches'])}`",
                 "- artifact_manifest_verifier_failed_checks_have_check_entries: "
                 f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_failed_checks_have_check_entries']).lower()}`",
                 "- artifact_manifest_verifier_report_required_fields_present: "
                 f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_required_fields_present']).lower()}`",
+                "- artifact_manifest_verifier_report_required_fields_match_contract: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_required_fields_match_contract']).lower()}`",
                 "- artifact_manifest_verifier_readiness_closure_allowed: "
                 f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_readiness_closure_allowed']).lower()}`",
                 "- artifact_manifest_verifier_live_authority_granted: "
