@@ -102,7 +102,14 @@ It does not approve live writes.
   `failed_checks_have_check_entries: true` in `checks`. Its report must also
   show `verifier_report_required_fields_present: true`,
   `verifier_report_required_fields_missing: []`, and
-  `verifier_report_required_fields_match_contract: true`. The published
+  `verifier_report_required_fields_match_contract: true`. Its `checks` must
+  also show `manifest_artifact_manifest_verifier_fields_present: true`,
+  `manifest_artifact_manifest_verifier_command_matches_expected: true`,
+  `summary_json_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  `summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  and
+  `manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true`.
+  The published
   no-WING summary and detached sidecar must show
   `artifact_manifest_verifier_target_artifact_dir`,
   `artifact_manifest_verifier_status_required: passed`,
@@ -567,7 +574,14 @@ Then update:
   `failed_checks_have_check_entries: true`,
   `verifier_report_required_fields_present: true`,
   `verifier_report_required_fields_missing: []`, and
-  `verifier_report_required_fields_match_contract: true`, or does
+  `verifier_report_required_fields_match_contract: true`,
+  `manifest_artifact_manifest_verifier_fields_present: true`,
+  `manifest_artifact_manifest_verifier_command_matches_expected: true`,
+  `summary_json_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  `summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  and
+  `manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true`,
+  or does
   not show `artifact_manifest_self_consistency_summary_surface_match: true`,
   `artifact_manifest_self_consistency_summary_surface_json_mismatches: []`,
   `artifact_manifest_self_consistency_summary_surface_markdown_mismatches: []`,
