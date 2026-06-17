@@ -713,6 +713,20 @@ def build_handoff_packet(
         "backend_port_prestart_check_command_text": (
             BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
         ),
+        "artifact_manifest_verifier_required": True,
+        "artifact_manifest_verifier_command": _command_text(
+            ARTIFACT_MANIFEST_VERIFIER_COMMAND
+        ),
+        "artifact_manifest_verifier_must_pass_before_backend_wing_session": True,
+        "artifact_manifest_verifier_read_only": True,
+        "artifact_manifest_verifier_live_write": False,
+        "artifact_manifest_verifier_contacts_backend": False,
+        "artifact_manifest_verifier_contacts_wing": False,
+        "artifact_manifest_verifier_mutates_console_state": False,
+        "artifact_manifest_verifier_queries_console": False,
+        "artifact_manifest_verifier_executes_tests": False,
+        "artifact_manifest_verifier_readiness_closure_allowed": False,
+        "artifact_manifest_verifier_live_authority_granted": False,
         "backend_port_prestart_check_failure_detail_fields": list(
             BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
         ),
@@ -967,6 +981,30 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{_command_text(packet['backend_port_prestart_check_command'])}`",
         "- backend_port_prestart_check_command_text: "
         f"`{packet['backend_port_prestart_check_command_text']}`",
+        "- artifact_manifest_verifier_required: "
+        f"`{str(packet['artifact_manifest_verifier_required']).lower()}`",
+        "- artifact_manifest_verifier_command: "
+        f"`{packet['artifact_manifest_verifier_command']}`",
+        "- artifact_manifest_verifier_must_pass_before_backend_wing_session: "
+        f"`{str(packet['artifact_manifest_verifier_must_pass_before_backend_wing_session']).lower()}`",
+        "- artifact_manifest_verifier_read_only: "
+        f"`{str(packet['artifact_manifest_verifier_read_only']).lower()}`",
+        "- artifact_manifest_verifier_live_write: "
+        f"`{str(packet['artifact_manifest_verifier_live_write']).lower()}`",
+        "- artifact_manifest_verifier_contacts_backend: "
+        f"`{str(packet['artifact_manifest_verifier_contacts_backend']).lower()}`",
+        "- artifact_manifest_verifier_contacts_wing: "
+        f"`{str(packet['artifact_manifest_verifier_contacts_wing']).lower()}`",
+        "- artifact_manifest_verifier_mutates_console_state: "
+        f"`{str(packet['artifact_manifest_verifier_mutates_console_state']).lower()}`",
+        "- artifact_manifest_verifier_queries_console: "
+        f"`{str(packet['artifact_manifest_verifier_queries_console']).lower()}`",
+        "- artifact_manifest_verifier_executes_tests: "
+        f"`{str(packet['artifact_manifest_verifier_executes_tests']).lower()}`",
+        "- artifact_manifest_verifier_readiness_closure_allowed: "
+        f"`{str(packet['artifact_manifest_verifier_readiness_closure_allowed']).lower()}`",
+        "- artifact_manifest_verifier_live_authority_granted: "
+        f"`{str(packet['artifact_manifest_verifier_live_authority_granted']).lower()}`",
         "- backend_port_prestart_check_failure_detail_fields: "
         f"`{json.dumps(packet['backend_port_prestart_check_failure_detail_fields'])}`",
         "- manual_review_required_before_readiness_update: "

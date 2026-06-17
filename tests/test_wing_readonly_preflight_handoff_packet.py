@@ -330,6 +330,24 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "tools/verify_no_wing_artifact_manifest.py",
         "<no_wing_artifact_dir>",
     ]
+    assert packet["artifact_manifest_verifier_required"] is True
+    assert packet["artifact_manifest_verifier_command"] == (
+        "PYTHONPATH=backend python3 "
+        "tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>"
+    )
+    assert (
+        packet["artifact_manifest_verifier_must_pass_before_backend_wing_session"]
+        is True
+    )
+    assert packet["artifact_manifest_verifier_read_only"] is True
+    assert packet["artifact_manifest_verifier_live_write"] is False
+    assert packet["artifact_manifest_verifier_contacts_backend"] is False
+    assert packet["artifact_manifest_verifier_contacts_wing"] is False
+    assert packet["artifact_manifest_verifier_mutates_console_state"] is False
+    assert packet["artifact_manifest_verifier_queries_console"] is False
+    assert packet["artifact_manifest_verifier_executes_tests"] is False
+    assert packet["artifact_manifest_verifier_readiness_closure_allowed"] is False
+    assert packet["artifact_manifest_verifier_live_authority_granted"] is False
     assert packet["mvp_blocker_anchor"] == (
         no_wing_release_check.wing_mvp_first_open_blocker_anchor()
     )
@@ -884,6 +902,24 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     assert "tools/no_wing_release_check.py" in markdown
     assert "verify_no_wing_artifact_manifest" in markdown
     assert "tools/verify_no_wing_artifact_manifest.py" in markdown
+    assert "artifact_manifest_verifier_required: `true`" in markdown
+    assert "artifact_manifest_verifier_command" in markdown
+    assert (
+        "artifact_manifest_verifier_must_pass_before_backend_wing_session: `true`"
+        in markdown
+    )
+    assert "artifact_manifest_verifier_read_only: `true`" in markdown
+    assert "artifact_manifest_verifier_live_write: `false`" in markdown
+    assert "artifact_manifest_verifier_contacts_backend: `false`" in markdown
+    assert "artifact_manifest_verifier_contacts_wing: `false`" in markdown
+    assert "artifact_manifest_verifier_mutates_console_state: `false`" in markdown
+    assert "artifact_manifest_verifier_queries_console: `false`" in markdown
+    assert "artifact_manifest_verifier_executes_tests: `false`" in markdown
+    assert (
+        "artifact_manifest_verifier_readiness_closure_allowed: `false`"
+        in markdown
+    )
+    assert "artifact_manifest_verifier_live_authority_granted: `false`" in markdown
     assert (
         markdown.index("### prestart_backend_port_check")
         < markdown.index("### verify_no_wing_artifact_manifest")

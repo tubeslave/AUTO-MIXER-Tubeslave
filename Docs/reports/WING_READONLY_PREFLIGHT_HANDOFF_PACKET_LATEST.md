@@ -1,6 +1,6 @@
 # WING Read-Only Preflight Handoff Packet
 
-Generated: `2026-06-17T11:22:27Z`
+Generated: `2026-06-17T11:26:01Z`
 Status: `operator_hardware_step_required`
 
 ## Safety Boundary
@@ -51,6 +51,18 @@ Status: `operator_hardware_step_required`
 - backend_port_prestart_check_must_be_first_operator_step: `true`
 - backend_port_prestart_check_command: `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
 - backend_port_prestart_check_command_text: `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
+- artifact_manifest_verifier_required: `true`
+- artifact_manifest_verifier_command: `PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>`
+- artifact_manifest_verifier_must_pass_before_backend_wing_session: `true`
+- artifact_manifest_verifier_read_only: `true`
+- artifact_manifest_verifier_live_write: `false`
+- artifact_manifest_verifier_contacts_backend: `false`
+- artifact_manifest_verifier_contacts_wing: `false`
+- artifact_manifest_verifier_mutates_console_state: `false`
+- artifact_manifest_verifier_queries_console: `false`
+- artifact_manifest_verifier_executes_tests: `false`
+- artifact_manifest_verifier_readiness_closure_allowed: `false`
+- artifact_manifest_verifier_live_authority_granted: `false`
 - backend_port_prestart_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
 - manual_review_required_before_readiness_update: `true`
 - execution_allowed_by_packet: `false`
