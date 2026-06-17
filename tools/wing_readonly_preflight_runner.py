@@ -1345,6 +1345,12 @@ async def run(args: argparse.Namespace) -> int:
                         "reason": "backend_not_in_wing_mode",
                         "fail_closed": True,
                         "blockers": ["event_log_wing_mode_not_proven"],
+                        "contacts_backend": True,
+                        "queries_console": False,
+                        "operator_next_step": (
+                            "Connect the intended backend to WING mode, then "
+                            "rerun the expected-plan read-only preflight."
+                        ),
                     }
                 )
                 recorder.write_summary(summary)
@@ -1396,6 +1402,15 @@ async def run(args: argparse.Namespace) -> int:
                     "physical_readback_count": physical_count,
                     "readbacks": readbacks,
                     "blockers": blockers,
+                    "contacts_backend": True,
+                    "queries_console": bool(readbacks),
+                    "operator_next_step": (
+                        "Review the read-only preflight blockers, correct the "
+                        "backend/WING readback path, then rerun the "
+                        "expected-plan preflight."
+                        if blockers
+                        else None
+                    ),
                     "write_request_sent": bool(set(recorder.sent_request_types).intersection(LIVE_WRITE_REQUEST_TYPES)),
                     "proposal_request_sent": bool(set(recorder.sent_request_types).intersection(PROPOSAL_REQUEST_TYPES)),
                 }
@@ -1404,12 +1419,19 @@ async def run(args: argparse.Namespace) -> int:
             print(json.dumps(summary, indent=2, sort_keys=True))
             return 0 if status == "passed" else 4
     except UnexpectedResponseError as exc:
+        sent_request_types = list(recorder.sent_request_types)
         summary.update(
             {
                 "status": "blocked",
                 "reason": "unexpected_response_type",
                 "fail_closed": True,
                 "blockers": ["unexpected_response_type"],
+                "contacts_backend": bool(sent_request_types),
+                "queries_console": "query_mixer_parameter" in sent_request_types,
+                "operator_next_step": (
+                    "Verify the backend WebSocket response contract and rerun "
+                    "the expected-plan read-only preflight."
+                ),
                 "unexpected_response": {
                     "request_type": exc.request.get("type"),
                     "expected_types": list(exc.expected_types),

@@ -842,6 +842,9 @@ async def test_readonly_preflight_blocks_when_backend_is_not_wing(
     assert summary["reason"] == "backend_not_in_wing_mode"
     assert summary["fail_closed"] is True
     assert summary["blockers"] == ["event_log_wing_mode_not_proven"]
+    assert summary["contacts_backend"] is True
+    assert summary["queries_console"] is False
+    assert "WING mode" in summary["operator_next_step"]
     assert summary["connection_mode"] == "offline"
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False
@@ -897,6 +900,9 @@ async def test_readonly_preflight_blocks_unexpected_response_type(
     assert summary["reason"] == "unexpected_response_type"
     assert summary["fail_closed"] is True
     assert summary["blockers"] == ["unexpected_response_type"]
+    assert summary["contacts_backend"] is True
+    assert summary["queries_console"] is False
+    assert "response contract" in summary["operator_next_step"]
     assert summary["unexpected_response"] == {
         "request_type": "get_state",
         "expected_types": ["state_update"],
@@ -1133,6 +1139,9 @@ async def test_readonly_preflight_blocks_missing_physical_readback(
     assert summary["reason"] == "wing_readonly_preflight_blocked"
     assert summary["physical_readback_count"] == 0
     assert summary["blockers"] == ["physical_readback_missing:ch3:fader"]
+    assert summary["contacts_backend"] is True
+    assert summary["queries_console"] is True
+    assert "read-only preflight blockers" in summary["operator_next_step"]
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False
 
