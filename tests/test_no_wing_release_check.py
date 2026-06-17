@@ -1492,6 +1492,17 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "backend_connection_confirmation_step_index": (
             WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
         ),
+        "validate_run_inputs_only_step_index": (
+            release_check.WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX
+        ),
+        "validate_run_inputs_only_step": (
+            release_check.WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP
+        ),
+        "validate_run_inputs_only_before_capture": True,
+        "validate_run_inputs_only_transport_opened": False,
+        "validate_run_inputs_only_contacts_backend": False,
+        "validate_run_inputs_only_queries_console": False,
+        "validate_run_inputs_only_grants_live_authority": False,
         "mvp_blocker_anchor_digest_review_step_index": (
             WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX
         ),
@@ -1589,6 +1600,27 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "--plan-only",
                 "--plan-output",
                 str(plan_path),
+            ],
+            "validate_readonly_preflight_inputs": [
+                "python3",
+                "tools/wing_readonly_preflight_runner.py",
+                "--url",
+                "ws://localhost:8765",
+                "--channels",
+                "3",
+                "--operator-confirm-channels",
+                "3",
+                "--operator-confirm-session-ready",
+                "--value-types",
+                WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+                "--require-physical-readback",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--prestart-summary",
+                WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+                "--expected-plan",
+                str(plan_path),
+                "--validate-run-inputs-only",
             ],
             "capture_readonly_preflight": [
                 "python3",
@@ -1695,29 +1727,7 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
                 "current_first_command_baseline_missing_markers"
             ]
         ),
-        "operator_sequence": [
-            (
-                "Before starting the intended backend/WING session, run "
-                "prestart_backend_port_check and resolve only confirmed "
-                "unexpected listeners."
-            ),
-            "Run preview_readonly_request_plan and confirm the request sequence is read-only.",
-            WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP,
-            "Confirm the selected channel numbers are safe to inspect.",
-            "Run capture_readonly_preflight.",
-            "Run review_artifact_and_write_pending_decision_template.",
-            "Edit the pending decision template into an accepted or rejected JSON record.",
-            "Run review_edited_decision_json.",
-            (
-                "Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the "
-                "current first open blocker before supervised proof planning."
-            ),
-            (
-                "Only after accepted_decision_ready, a valid accepted-candidate "
-                "prestart trace, a valid accepted-candidate artifact-root trace, and a valid accepted-candidate request-sequence trace, plus expected-artifact-bound accepted source id, move "
-                "to WING_SUPERVISED_FADER_GAIN_PROOF."
-            ),
-        ],
+        "operator_sequence": expected_handoff_operator_sequence(),
         "operator_sequence_count": (
             WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
         ),
@@ -1764,7 +1774,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
         "backend_port_prestart_gate_matches_expected": True,
         "supervised_prestart_gate": {
             "required": True,
-            "operator_sequence_step_index": 9,
+            "operator_sequence_step_index": (
+                WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+            ),
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
                 "Only after accepted_decision_ready, a valid accepted-candidate "
@@ -1789,7 +1801,9 @@ def valid_wing_readonly_preflight_handoff_packet_payload(plan_path: Path) -> dic
             },
         "expected_supervised_prestart_gate": {
             "required": True,
-            "operator_sequence_step_index": 9,
+            "operator_sequence_step_index": (
+                WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+            ),
             "operator_sequence_step_must_be_final": True,
             "operator_sequence_step": (
                 "Only after accepted_decision_ready, a valid accepted-candidate "
@@ -3705,7 +3719,9 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         result.detail["operator_sequence_backend_connection_confirmation_before_capture"]
         is True
     )
-    assert result.detail["operator_sequence_capture_readonly_preflight_step_index"] == 4
+    assert result.detail["operator_sequence_capture_readonly_preflight_step_index"] == (
+        release_check.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX
+    )
     for marker in WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_REQUIRED_MARKERS:
         assert (
             marker
@@ -4835,7 +4851,9 @@ def test_no_wing_release_check_rejects_handoff_packet_without_anchor_digest_revi
     )
 
     assert result.status == "failed"
-    assert result.detail["operator_sequence_count"] == 9
+    assert result.detail["operator_sequence_count"] == (
+        WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT - 1
+    )
     assert (
         result.detail["operator_sequence_has_mvp_blocker_anchor_digest_review"]
         is False
@@ -5565,7 +5583,9 @@ def test_no_wing_release_check_rejects_handoff_packet_with_nonfinal_supervised_p
 
     assert result.status == "failed"
     assert result.detail["operator_sequence_has_supervised_prestart_gate"] is True
-    assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == 9
+    assert result.detail["operator_sequence_supervised_prestart_gate_step_index"] == (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
     assert result.detail["operator_sequence_supervised_prestart_gate_is_final"] is False
     assert (
         "wing_readonly_preflight_handoff_packet_supervised_prestart_gate_not_final"
@@ -14272,8 +14292,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 WING_READONLY_PREFLIGHT_BACKEND_CONNECTION_CONFIRMATION_STEP_INDEX
             ),
             "operator_sequence_backend_connection_confirmation_before_capture": True,
-            "operator_sequence_capture_readonly_preflight_step_index": 4,
-            "expected_operator_sequence_capture_readonly_preflight_step_index": 4,
+            "operator_sequence_capture_readonly_preflight_step_index": (
+                release_check.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX
+            ),
+            "expected_operator_sequence_capture_readonly_preflight_step_index": (
+                release_check.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX
+            ),
             "operator_sequence_capture_readonly_preflight_step_index_matches_contract": (
                 True
             ),
@@ -14484,15 +14508,30 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "request_count": 1,
             "request_sequence_matches_plan": True,
             "request_sequence_matches_expected": True,
-            "command_names": [
-                "capture_readonly_preflight",
-                "focused_validation",
-                "prestart_backend_port_check",
-                "preview_readonly_request_plan",
-                "review_artifact_and_write_pending_decision_template",
-                "review_edited_decision_json",
-            ],
-            "preview_command_uses_plan_only": True,
+                "command_names": [
+                    "capture_readonly_preflight",
+                    "focused_validation",
+                    "prestart_backend_port_check",
+                    "preview_readonly_request_plan",
+                    "review_artifact_and_write_pending_decision_template",
+                    "review_edited_decision_json",
+                    "validate_readonly_preflight_inputs",
+                ],
+                "preview_command_uses_plan_only": True,
+                "validate_inputs_command_uses_validate_run_inputs_only": True,
+                "validate_inputs_command_uses_plan_only": False,
+                "validate_inputs_command_prestart_summary": (
+                    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
+                ),
+                "validate_inputs_command_prestart_summary_matches_plan": True,
+                "validate_inputs_command_artifact_root": (
+                    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+                ),
+                "validate_inputs_command_artifact_root_matches_packet": True,
+                "validate_inputs_command_expected_plan": (
+                    "/tmp/wing_readonly_preflight_plan.json"
+                ),
+                "validate_inputs_command_expected_plan_matches_packet": True,
             "backend_port_prestart_summary_required": True,
             "backend_port_prestart_summary_path_placeholder": (
                 WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
@@ -14715,7 +14754,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "operator_sequence_supervised_prestart_gate_is_final": True,
             "supervised_prestart_gate": {
                 "required": True,
-                "operator_sequence_step_index": 9,
+                    "operator_sequence_step_index": (
+                        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+                    ),
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
                     "Only after accepted_decision_ready, a valid accepted-candidate "
@@ -14740,7 +14781,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 },
             "expected_supervised_prestart_gate": {
                 "required": True,
-                "operator_sequence_step_index": 9,
+                    "operator_sequence_step_index": (
+                        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+                    ),
                 "operator_sequence_step_must_be_final": True,
                 "operator_sequence_step": (
                     "Only after accepted_decision_ready, a valid accepted-candidate "
@@ -14764,7 +14807,9 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
                 "requires_accepted_candidate_expected_artifact_trace": True,
                 },
             "supervised_prestart_gate_required": True,
-            "supervised_prestart_gate_operator_sequence_step_index": 9,
+                "supervised_prestart_gate_operator_sequence_step_index": (
+                    WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+                ),
             "supervised_prestart_gate_operator_sequence_step_must_be_final": True,
             "supervised_prestart_gate_operator_sequence_step": (
                 "Only after accepted_decision_ready, a valid accepted-candidate "
@@ -14983,10 +15028,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact[
         "operator_sequence_backend_connection_confirmation_before_capture"
     ] is True
-    assert artifact["operator_sequence_capture_readonly_preflight_step_index"] == 4
+    assert artifact["operator_sequence_capture_readonly_preflight_step_index"] == (
+        release_check.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX
+    )
     assert artifact[
         "expected_operator_sequence_capture_readonly_preflight_step_index"
-    ] == 4
+    ] == release_check.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX
     assert (
         artifact[
             "operator_sequence_capture_readonly_preflight_step_index_matches_contract"
@@ -16125,12 +16172,16 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert artifact["supervised_prestart_gate"] == artifact[
         "expected_supervised_prestart_gate"
     ]
-    assert artifact["supervised_prestart_gate"]["operator_sequence_step_index"] == 9
+    assert artifact["supervised_prestart_gate"]["operator_sequence_step_index"] == (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
     assert artifact["supervised_prestart_gate"][
         "operator_sequence_step_must_be_final"
     ] is True
     assert artifact["supervised_prestart_gate_required"] is True
-    assert artifact["supervised_prestart_gate_operator_sequence_step_index"] == 9
+    assert artifact["supervised_prestart_gate_operator_sequence_step_index"] == (
+        WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX
+    )
     assert (
         artifact["supervised_prestart_gate_operator_sequence_step_must_be_final"]
         is True
@@ -16568,11 +16619,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "operator_sequence_backend_connection_confirmation_before_capture: `true`"
         in markdown_summary
     )
-    assert "operator_sequence_capture_readonly_preflight_step_index: `4`" in (
-        markdown_summary
+    assert (
+        "operator_sequence_capture_readonly_preflight_step_index: "
+        f"`{release_check.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX}`"
+        in markdown_summary
     )
-    assert "expected_operator_sequence_capture_readonly_preflight_step_index: `4`" in (
-        markdown_summary
+    assert (
+        "expected_operator_sequence_capture_readonly_preflight_step_index: "
+        f"`{release_check.WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX}`"
+        in markdown_summary
     )
     assert (
         "operator_sequence_capture_readonly_preflight_step_index_matches_contract: `true`"
@@ -16757,11 +16812,23 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "execution_allowed_by_packet: `false`" in markdown_summary
     assert "preview_command_uses_plan_only: `true`" in markdown_summary
     assert "capture_command_requires_physical_readback: `true`" in markdown_summary
-    assert "operator_sequence_count: `10`" in markdown_summary
-    assert "expected_operator_sequence_count: `10`" in markdown_summary
+    assert (
+        f"operator_sequence_count: `{WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT}`"
+        in markdown_summary
+    )
+    assert (
+        f"expected_operator_sequence_count: `{WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT}`"
+        in markdown_summary
+    )
     assert "operator_sequence_count_matches_contract: `true`" in markdown_summary
-    assert "declared_operator_sequence_count: `10`" in markdown_summary
-    assert "declared_expected_operator_sequence_count: `10`" in markdown_summary
+    assert (
+        f"declared_operator_sequence_count: `{WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT}`"
+        in markdown_summary
+    )
+    assert (
+        f"declared_expected_operator_sequence_count: `{WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT}`"
+        in markdown_summary
+    )
     assert (
         "declared_operator_sequence_count_contract_flag: `true`"
         in markdown_summary
@@ -16783,10 +16850,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         in markdown_summary
     )
     assert (
-        "mvp_blocker_anchor_digest_review_step_index: `8`" in markdown_summary
+        "mvp_blocker_anchor_digest_review_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX}`"
+        in markdown_summary
     )
     assert (
-        "expected_mvp_blocker_anchor_digest_review_step_index: `8`"
+        "expected_mvp_blocker_anchor_digest_review_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX}`"
         in markdown_summary
     )
     assert (
@@ -16804,11 +16874,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "operator_sequence_mvp_blocker_anchor_digest_review_step" in markdown_summary
     assert (
-        "operator_sequence_mvp_blocker_anchor_digest_review_step_index: `8`"
+        "operator_sequence_mvp_blocker_anchor_digest_review_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX}`"
         in markdown_summary
     )
     assert (
-        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: `8`"
+        "expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_MVP_BLOCKER_ANCHOR_DIGEST_REVIEW_STEP_INDEX}`"
         in markdown_summary
     )
     assert (
@@ -16816,9 +16888,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         in markdown_summary
     )
     assert "operator_sequence_supervised_prestart_gate_step" in markdown_summary
-    assert "operator_sequence_supervised_prestart_gate_step_index: `9`" in markdown_summary
     assert (
-        "expected_operator_sequence_supervised_prestart_gate_step_index: `9`"
+        "operator_sequence_supervised_prestart_gate_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX}`"
+        in markdown_summary
+    )
+    assert (
+        "expected_operator_sequence_supervised_prestart_gate_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX}`"
         in markdown_summary
     )
     assert (
@@ -16860,7 +16937,11 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "supervised_prestart_gate" in markdown_summary
     assert "expected_supervised_prestart_gate" in markdown_summary
     assert "supervised_prestart_gate_required: `true`" in markdown_summary
-    assert "supervised_prestart_gate_operator_sequence_step_index: `9`" in markdown_summary
+    assert (
+        "supervised_prestart_gate_operator_sequence_step_index: "
+        f"`{WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX}`"
+        in markdown_summary
+    )
     assert (
         "supervised_prestart_gate_operator_sequence_step_must_be_final: `true`"
         in markdown_summary

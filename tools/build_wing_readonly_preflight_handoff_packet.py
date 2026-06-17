@@ -25,6 +25,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+    WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
@@ -62,6 +63,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS,
+    WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP,
+    WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX,
     expected_backend_port_prestart_gate,
     expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
@@ -339,6 +342,38 @@ def plan_command(
     ]
 
 
+def validate_inputs_command(
+    *,
+    url: str,
+    channels: str,
+    value_types: str,
+    artifact_root: str,
+    expected_plan: str,
+    prestart_summary: str,
+) -> list[str]:
+    return [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        url,
+        "--channels",
+        channels,
+        "--operator-confirm-channels",
+        channels,
+        "--operator-confirm-session-ready",
+        "--value-types",
+        value_types,
+        "--require-physical-readback",
+        "--artifact-root",
+        artifact_root,
+        "--prestart-summary",
+        prestart_summary,
+        "--expected-plan",
+        expected_plan,
+        "--validate-run-inputs-only",
+    ]
+
+
 def artifact_review_command(
     *,
     artifact_root: str,
@@ -422,6 +457,14 @@ def build_handoff_packet(
         value_types=value_types,
         artifact_root=artifact_root,
         plan_output=plan_output,
+        prestart_summary=prestart_summary,
+    )
+    validate_inputs = validate_inputs_command(
+        url=url,
+        channels=channels,
+        value_types=value_types,
+        artifact_root=artifact_root,
+        expected_plan=plan_output,
         prestart_summary=prestart_summary,
     )
     capture = capture_command(
@@ -710,6 +753,7 @@ def build_handoff_packet(
         ),
         "commands": {
             "preview_readonly_request_plan": preview,
+            "validate_readonly_preflight_inputs": validate_inputs,
             "capture_readonly_preflight": capture,
             "review_artifact_and_write_pending_decision_template": review,
             "review_edited_decision_json": decision,
@@ -787,6 +831,20 @@ def build_handoff_packet(
             == WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
         ),
         "backend_connection_confirmation_step_index": backend_connection_step_index,
+        "validate_run_inputs_only_step_index": (
+            WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX
+        ),
+        "validate_run_inputs_only_step": (
+            WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP
+        ),
+        "validate_run_inputs_only_before_capture": (
+            operator_sequence.index(WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP)
+            < operator_sequence.index(WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP)
+        ),
+        "validate_run_inputs_only_transport_opened": False,
+        "validate_run_inputs_only_contacts_backend": False,
+        "validate_run_inputs_only_queries_console": False,
+        "validate_run_inputs_only_grants_live_authority": False,
         "backend_port_prestart_gate": backend_port_prestart_gate,
         "expected_backend_port_prestart_gate": expected_backend_port_prestart_gate_dict,
         "backend_port_prestart_gate_matches_expected": (
@@ -971,6 +1029,18 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         f"`{str(packet['operator_sequence_sha256_matches_contract']).lower()}`",
         "- mvp_blocker_anchor_digest_review_step_index: "
         f"`{packet['mvp_blocker_anchor_digest_review_step_index']}`",
+        "- validate_run_inputs_only_step_index: "
+        f"`{packet['validate_run_inputs_only_step_index']}`",
+        "- validate_run_inputs_only_before_capture: "
+        f"`{str(packet['validate_run_inputs_only_before_capture']).lower()}`",
+        "- validate_run_inputs_only_transport_opened: "
+        f"`{str(packet['validate_run_inputs_only_transport_opened']).lower()}`",
+        "- validate_run_inputs_only_contacts_backend: "
+        f"`{str(packet['validate_run_inputs_only_contacts_backend']).lower()}`",
+        "- validate_run_inputs_only_queries_console: "
+        f"`{str(packet['validate_run_inputs_only_queries_console']).lower()}`",
+        "- validate_run_inputs_only_grants_live_authority: "
+        f"`{str(packet['validate_run_inputs_only_grants_live_authority']).lower()}`",
         "",
     ]
     for index, item in enumerate(packet.get("operator_sequence") or [], start=1):
@@ -1076,6 +1146,7 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
     for name in (
         "prestart_backend_port_check",
         "preview_readonly_request_plan",
+        "validate_readonly_preflight_inputs",
         "capture_readonly_preflight",
         "review_artifact_and_write_pending_decision_template",
         "review_edited_decision_json",

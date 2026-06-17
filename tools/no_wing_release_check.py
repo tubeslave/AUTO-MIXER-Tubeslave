@@ -1292,6 +1292,12 @@ WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP_INDEX = (
         WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP
     )
 )
+WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP = (
+    preflight_contract.WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP
+)
+WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX = (
+    preflight_contract.WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX
+)
 WING_READONLY_PREFLIGHT_REVIEW_TOOL = "tools/review_wing_readonly_preflight_artifacts.py"
 WING_READONLY_PREFLIGHT_REVIEW_ARTIFACT_ROOT = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
 WING_READONLY_PREFLIGHT_REVIEW_OUTPUT = (
@@ -1546,6 +1552,30 @@ def wing_readonly_preflight_plan_command() -> list[str]:
         "--plan-only",
         "--plan-output",
         WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+    ]
+
+
+def wing_readonly_preflight_validate_inputs_command_template() -> list[str]:
+    return [
+        "python3",
+        WING_READONLY_PREFLIGHT_RUNNER_TOOL,
+        "--url",
+        WING_READONLY_PREFLIGHT_RUNNER_URL,
+        "--channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-session-ready",
+        "--value-types",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "--require-physical-readback",
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        "--prestart-summary",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY,
+        "--expected-plan",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+        "--validate-run-inputs-only",
     ]
 
 
@@ -4908,6 +4938,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     review_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_REVIEW_TOOL).is_file()
     handoff_tool_available = (REPO_ROOT / WING_READONLY_PREFLIGHT_HANDOFF_PACKET_TOOL).is_file()
     plan_command = wing_readonly_preflight_plan_command()
+    validate_inputs_command = wing_readonly_preflight_validate_inputs_command_template()
     capture_command = wing_readonly_preflight_capture_command_template()
     review_command = wing_readonly_preflight_review_command()
     handoff_command = wing_readonly_preflight_handoff_packet_command()
@@ -4967,6 +4998,34 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     plan_output_matches_contract = (
         plan_output == WING_READONLY_PREFLIGHT_PLAN_OUTPUT
     )
+    validate_inputs_channels = command_value_after_flag(
+        validate_inputs_command,
+        "--channels",
+    )
+    validate_inputs_confirmed_channels = command_value_after_flag(
+        validate_inputs_command,
+        "--operator-confirm-channels",
+    )
+    validate_inputs_url = command_value_after_flag(validate_inputs_command, "--url")
+    validate_inputs_value_types = command_value_after_flag(
+        validate_inputs_command,
+        "--value-types",
+    )
+    validate_inputs_artifact_root = command_value_after_flag(
+        validate_inputs_command,
+        "--artifact-root",
+    )
+    validate_inputs_prestart_summary = command_value_after_flag(
+        validate_inputs_command,
+        "--prestart-summary",
+    )
+    validate_inputs_expected_plan = command_value_after_flag(
+        validate_inputs_command,
+        "--expected-plan",
+    )
+    validate_inputs_expected_plan_matches_contract = (
+        validate_inputs_expected_plan == WING_READONLY_PREFLIGHT_PLAN_OUTPUT
+    )
     capture_value_types = command_value_after_flag(capture_command, "--value-types")
     capture_artifact_root = command_value_after_flag(capture_command, "--artifact-root")
     capture_prestart_summary = command_value_after_flag(
@@ -4986,6 +5045,17 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         and plan_artifact_root == capture_artifact_root
         and bool(plan_prestart_summary)
         and plan_prestart_summary == capture_prestart_summary
+    )
+    validate_inputs_matches_capture = (
+        bool(validate_inputs_channels)
+        and bool(validate_inputs_confirmed_channels)
+        and validate_inputs_channels == capture_channels
+        and validate_inputs_confirmed_channels == capture_confirmed_channels
+        and validate_inputs_url == capture_url
+        and validate_inputs_value_types == capture_value_types
+        and validate_inputs_artifact_root == capture_artifact_root
+        and validate_inputs_prestart_summary == capture_prestart_summary
+        and validate_inputs_expected_plan == capture_expected_plan
     )
     handoff_channels = command_value_after_flag(handoff_command, "--channels")
     handoff_value_types = command_value_after_flag(handoff_command, "--value-types")
@@ -5201,6 +5271,20 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         )
     if not plan_matches_capture:
         violations.append("wing_readonly_preflight_plan_command_mismatch")
+    if "--validate-run-inputs-only" not in validate_inputs_command:
+        violations.append("wing_readonly_preflight_validate_inputs_only_missing")
+    if "--plan-only" in validate_inputs_command:
+        violations.append("wing_readonly_preflight_validate_inputs_plan_only_present")
+    if "--expected-plan" not in validate_inputs_command or not validate_inputs_expected_plan:
+        violations.append("wing_readonly_preflight_validate_inputs_expected_plan_missing")
+    elif not validate_inputs_expected_plan_matches_contract:
+        violations.append(
+            "wing_readonly_preflight_validate_inputs_expected_plan_output_mismatch"
+        )
+    if validate_inputs_expected_plan != plan_output:
+        violations.append("wing_readonly_preflight_validate_inputs_expected_plan_mismatch")
+    if not validate_inputs_matches_capture:
+        violations.append("wing_readonly_preflight_validate_inputs_command_mismatch")
     if "--channels" not in handoff_command:
         violations.append("wing_readonly_preflight_handoff_packet_channels_missing")
     if "--output" not in handoff_command:
@@ -5447,6 +5531,38 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["plan_command_artifact_root"] = plan_artifact_root
     detail["plan_command_prestart_summary"] = plan_prestart_summary
     detail["plan_command_matches_capture"] = plan_matches_capture
+    detail["validate_inputs_command_template"] = validate_inputs_command
+    detail["validate_inputs_command_uses_validate_run_inputs_only"] = (
+        "--validate-run-inputs-only" in validate_inputs_command
+    )
+    detail["validate_inputs_command_uses_plan_only"] = (
+        "--plan-only" in validate_inputs_command
+    )
+    detail["validate_inputs_command_url"] = validate_inputs_url
+    detail["validate_inputs_command_channels"] = validate_inputs_channels
+    detail["validate_inputs_command_operator_confirmed_channels"] = (
+        validate_inputs_confirmed_channels
+    )
+    detail["validate_inputs_command_value_types"] = validate_inputs_value_types
+    detail["validate_inputs_command_artifact_root"] = validate_inputs_artifact_root
+    detail["validate_inputs_command_prestart_summary"] = (
+        validate_inputs_prestart_summary
+    )
+    detail["validate_inputs_command_expected_plan"] = validate_inputs_expected_plan
+    detail["validate_inputs_command_expected_plan_matches_contract"] = (
+        validate_inputs_expected_plan_matches_contract
+    )
+    detail["validate_inputs_command_expected_plan_matches_plan_output"] = (
+        bool(validate_inputs_expected_plan)
+        and validate_inputs_expected_plan == plan_output
+    )
+    detail["validate_inputs_command_matches_capture"] = (
+        validate_inputs_matches_capture
+    )
+    detail["validate_inputs_command_opens_websocket"] = False
+    detail["validate_inputs_command_contacts_backend"] = False
+    detail["validate_inputs_command_queries_console"] = False
+    detail["validate_inputs_command_grants_live_authority"] = False
     detail["prestart_backend_port_check_required"] = True
     detail["prestart_backend_port_check_must_pass_before_starting_backend"] = True
     detail["prestart_backend_port_check_command"] = list(
@@ -6480,6 +6596,7 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         packet.get("decision_template_output_matches_contract") is True
     )
     preview_command = commands.get("preview_readonly_request_plan", [])
+    validate_inputs_command = commands.get("validate_readonly_preflight_inputs", [])
     capture_command = commands.get("capture_readonly_preflight", [])
     review_command = commands.get(
         "review_artifact_and_write_pending_decision_template", []
@@ -6508,6 +6625,30 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     preview_command_prestart_summary_matches_plan = (
         bool(preview_command_prestart_summary)
         and preview_command_prestart_summary == expected_prestart_summary
+    )
+    validate_inputs_command_artifact_root = command_value_after_flag(
+        validate_inputs_command,
+        "--artifact-root",
+    )
+    validate_inputs_command_artifact_root_matches_packet = (
+        bool(validate_inputs_command_artifact_root)
+        and validate_inputs_command_artifact_root == packet.get("artifact_root")
+    )
+    validate_inputs_command_expected_plan = command_value_after_flag(
+        validate_inputs_command,
+        "--expected-plan",
+    )
+    validate_inputs_command_expected_plan_matches_packet = (
+        bool(validate_inputs_command_expected_plan)
+        and validate_inputs_command_expected_plan == packet.get("plan_output")
+    )
+    validate_inputs_command_prestart_summary = command_value_after_flag(
+        validate_inputs_command,
+        "--prestart-summary",
+    )
+    validate_inputs_command_prestart_summary_matches_plan = (
+        bool(validate_inputs_command_prestart_summary)
+        and validate_inputs_command_prestart_summary == expected_prestart_summary
     )
     capture_command_artifact_root = command_value_after_flag(
         capture_command,
@@ -6653,11 +6794,33 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
         "--expected-plan",
         str(expected_plan_path),
     ]
+    expected_validate_inputs_command = [
+        "python3",
+        WING_READONLY_PREFLIGHT_RUNNER_TOOL,
+        "--url",
+        WING_READONLY_PREFLIGHT_RUNNER_URL,
+        "--channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-channels",
+        WING_READONLY_PREFLIGHT_RUNNER_CHANNELS,
+        "--operator-confirm-session-ready",
+        "--value-types",
+        WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        "--require-physical-readback",
+        "--artifact-root",
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+        "--prestart-summary",
+        expected_prestart_summary,
+        "--expected-plan",
+        str(expected_plan_path),
+        "--validate-run-inputs-only",
+    ]
     expected_commands = {
         "prestart_backend_port_check": (
             WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
         ),
         "preview_readonly_request_plan": expected_preview_command,
+        "validate_readonly_preflight_inputs": expected_validate_inputs_command,
         "capture_readonly_preflight": expected_capture_command,
         "review_artifact_and_write_pending_decision_template": (
             wing_readonly_preflight_review_command()
@@ -7024,6 +7187,26 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     if not preview_command_prestart_summary_matches_plan:
         violations.append(
             "wing_readonly_preflight_handoff_packet_preview_prestart_summary_mismatch"
+        )
+    if "--validate-run-inputs-only" not in validate_inputs_command:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_validate_inputs_only_missing"
+        )
+    if "--plan-only" in validate_inputs_command:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_validate_inputs_plan_only_present"
+        )
+    if not validate_inputs_command_artifact_root_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_validate_inputs_artifact_root_mismatch"
+        )
+    if not validate_inputs_command_expected_plan_matches_packet:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_validate_inputs_expected_plan_mismatch"
+        )
+    if not validate_inputs_command_prestart_summary_matches_plan:
+        violations.append(
+            "wing_readonly_preflight_handoff_packet_validate_inputs_prestart_summary_mismatch"
         )
     if commands.get("prestart_backend_port_check") != (
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
@@ -7977,6 +8160,30 @@ def validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
     detail["preview_command_plan_output"] = preview_command_plan_output
     detail["preview_command_plan_output_matches_packet"] = (
         preview_command_plan_output_matches_packet
+    )
+    detail["validate_inputs_command_uses_validate_run_inputs_only"] = (
+        "--validate-run-inputs-only" in validate_inputs_command
+    )
+    detail["validate_inputs_command_uses_plan_only"] = (
+        "--plan-only" in validate_inputs_command
+    )
+    detail["validate_inputs_command_prestart_summary"] = (
+        validate_inputs_command_prestart_summary
+    )
+    detail["validate_inputs_command_prestart_summary_matches_plan"] = (
+        validate_inputs_command_prestart_summary_matches_plan
+    )
+    detail["validate_inputs_command_artifact_root"] = (
+        validate_inputs_command_artifact_root
+    )
+    detail["validate_inputs_command_artifact_root_matches_packet"] = (
+        validate_inputs_command_artifact_root_matches_packet
+    )
+    detail["validate_inputs_command_expected_plan"] = (
+        validate_inputs_command_expected_plan
+    )
+    detail["validate_inputs_command_expected_plan_matches_packet"] = (
+        validate_inputs_command_expected_plan_matches_packet
     )
     detail["capture_command_requires_physical_readback"] = (
         "--require-physical-readback" in capture_command

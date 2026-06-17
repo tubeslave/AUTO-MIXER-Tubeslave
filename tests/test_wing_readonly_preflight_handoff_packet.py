@@ -16,11 +16,13 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+    WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_FORBIDDEN_REQUEST_TYPES,
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS,
     WING_READONLY_PREFLIGHT_HANDOFF_PACKET_OUTPUT,
+    WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT,
     WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED,
     WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     WING_READONLY_PREFLIGHT_PLAN_FAIL_CLOSED_CONDITIONS,
@@ -51,6 +53,8 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP_INDEX,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS,
+    WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP,
+    WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX,
     expected_backend_port_prestart_gate,
     expected_handoff_operator_sequence,
     expected_supervised_prestart_gate,
@@ -276,6 +280,27 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "--plan-output",
         WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
     ]
+    assert packet["commands"]["validate_readonly_preflight_inputs"] == [
+        "python3",
+        "tools/wing_readonly_preflight_runner.py",
+        "--url",
+        "ws://localhost:8765",
+        "--channels",
+        "3",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--value-types",
+        "fader,gain,pan",
+        "--require-physical-readback",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+        "--prestart-summary",
+        WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER,
+        "--expected-plan",
+        WING_READONLY_PREFLIGHT_PLAN_OUTPUT,
+        "--validate-run-inputs-only",
+    ]
     assert packet["commands"]["capture_readonly_preflight"] == [
         "python3",
         "tools/wing_readonly_preflight_runner.py",
@@ -381,7 +406,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         packet["operator_sequence"][0]
         == WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_STEP
     )
-    assert len(packet["operator_sequence"]) == 10
+    assert len(packet["operator_sequence"]) == (
+        WING_READONLY_PREFLIGHT_HANDOFF_OPERATOR_SEQUENCE_COUNT
+    )
     assert packet["operator_sequence_sha256"] == (
         no_wing_release_check.wing_readonly_operator_sequence_sha256(
             packet["operator_sequence"]
@@ -425,6 +452,22 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["operator_sequence"].index(backend_connection_step) < packet[
         "operator_sequence"
     ].index("Run capture_readonly_preflight.")
+    validate_step = packet["operator_sequence"][
+        WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX
+    ]
+    assert validate_step == WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP
+    assert packet["validate_run_inputs_only_step_index"] == (
+        WING_READONLY_PREFLIGHT_VALIDATE_INPUTS_OPERATOR_STEP_INDEX
+    )
+    assert packet["validate_run_inputs_only_step"] == validate_step
+    assert packet["validate_run_inputs_only_before_capture"] is True
+    assert packet["validate_run_inputs_only_transport_opened"] is False
+    assert packet["validate_run_inputs_only_contacts_backend"] is False
+    assert packet["validate_run_inputs_only_queries_console"] is False
+    assert packet["validate_run_inputs_only_grants_live_authority"] is False
+    assert packet["operator_sequence"].index(validate_step) < packet[
+        "operator_sequence"
+    ].index(WING_READONLY_PREFLIGHT_CAPTURE_OPERATOR_STEP)
     supervised_gate_step = packet["operator_sequence"][-1]
     assert "accepted_decision_ready" in supervised_gate_step
     assert "valid accepted-candidate prestart trace" in supervised_gate_step
@@ -572,6 +615,9 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     assert packet["expected_operator_sequence_sha256"] in rendered
     assert "operator_sequence_matches_contract: `true`" in rendered
     assert "operator_sequence_sha256_matches_contract: `true`" in rendered
+    assert "validate_readonly_preflight_inputs" in rendered
+    assert "validate_run_inputs_only_before_capture: `true`" in rendered
+    assert "validate_run_inputs_only_transport_opened: `false`" in rendered
     assert "tools/wing_readonly_preflight_runner.py" in rendered
     assert "actual_matches_expected: `true`" in rendered
     assert "operator_sequence_step_must_be_final: `true`" in rendered
