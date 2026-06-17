@@ -1465,6 +1465,7 @@ async def test_readonly_preflight_blocks_stale_prestart_detail_plan_before_webso
         for field in plan_payload["backend_port_prestart_check_failure_detail_fields"]
         if field != "listener_confirmation_checklist"
     ]
+    plan_payload["artifact_manifest_verifier_passed_before_websocket"] = False
     expected_plan.write_text(
         json.dumps(plan_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -1493,6 +1494,10 @@ async def test_readonly_preflight_blocks_stale_prestart_detail_plan_before_webso
     assert summary["expected_plan_match"] is False
     assert "expected_plan_backend_port_prestart_check_failure_detail_fields_mismatch" in (
         summary["expected_plan_violations"]
+    )
+    assert (
+        "expected_plan_artifact_manifest_verifier_passed_before_websocket_mismatch"
+        in summary["expected_plan_violations"]
     )
     assert "prestart contract" in summary["operator_next_step"]
     assert "backend/WING WebSocket" in summary["operator_next_step"]
@@ -1550,6 +1555,9 @@ async def test_plan_only_outputs_readonly_request_plan_without_websocket_or_arti
     assert written["physical_preflight_requires_existing_backend_connection"] is True
     assert written["backend_port_prestart_check_required"] is True
     assert written["backend_port_prestart_check_must_pass_before_starting_backend"] is True
+    assert written["artifact_manifest_verifier_must_pass_before_websocket"] is True
+    assert written["artifact_manifest_verifier_passed_before_websocket"] is True
+    assert written["artifact_manifest_verifier_websocket_opened_after_pass"] is False
     assert written["backend_port_prestart_check_command"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
     )

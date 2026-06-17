@@ -166,6 +166,9 @@ EXPECTED_PLAN_MATCH_KEYS = (
     "physical_preflight_requires_existing_backend_connection",
     "backend_port_prestart_check_required",
     "backend_port_prestart_check_must_pass_before_starting_backend",
+    "artifact_manifest_verifier_must_pass_before_websocket",
+    "artifact_manifest_verifier_passed_before_websocket",
+    "artifact_manifest_verifier_websocket_opened_after_pass",
     "backend_port_prestart_check_command",
     "backend_port_prestart_check_command_text",
     "backend_port_prestart_check_failure_detail_fields",
@@ -822,6 +825,9 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
     read_requests = build_read_requests(channels, value_types)
     artifact_root = str(args.artifact_root)
     prestart_detail, _ = load_backend_port_prestart_summary(args.prestart_summary)
+    verifier_passed_before_websocket = artifact_manifest_verifier_passed(
+        prestart_detail
+    )
     return {
         "type": "wing_readonly_preflight_offline_plan",
         "status": "ready_for_operator_review",
@@ -845,6 +851,11 @@ def build_offline_preflight_plan(args: argparse.Namespace) -> Dict[str, Any]:
         "physical_preflight_requires_existing_backend_connection": True,
         "backend_port_prestart_check_required": True,
         "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": (
+            verifier_passed_before_websocket
+        ),
+        "artifact_manifest_verifier_websocket_opened_after_pass": False,
         "backend_port_prestart_check_command": list(BACKEND_PORT_PRESTART_CHECK_COMMAND),
         "backend_port_prestart_check_command_text": (
             BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT
