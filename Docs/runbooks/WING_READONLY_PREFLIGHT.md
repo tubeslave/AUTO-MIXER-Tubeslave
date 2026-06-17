@@ -183,6 +183,16 @@ Before any supervised proof, the handoff summary must also show
 `required_supervised_proof_plan_summary_fields_include_invalid_records: true`
 so invalid review-decision record diagnostics cannot be hidden behind a stale
 proof-plan field list.
+The same summary must show the detached no-WING manifest verifier as the
+operator-sequence step before preview:
+`artifact_manifest_verifier_operator_sequence_step_index: 1`,
+`expected_artifact_manifest_verifier_operator_sequence_step_index: 1`,
+`artifact_manifest_verifier_operator_sequence_step_index_matches_contract: true`,
+`artifact_manifest_verifier_operator_sequence_step`,
+`expected_artifact_manifest_verifier_operator_sequence_step`,
+`artifact_manifest_verifier_operator_sequence_step_matches_contract: true`,
+`artifact_manifest_verifier_required_markers`, and
+`artifact_manifest_verifier_operator_sequence_before_preview: true`.
 The same summary must also show the Project Director selected-action value-gate
 self-check fields before supervised proof planning:
 `project_director_selected_action_value_gate_self_check_required: true`,
@@ -663,6 +673,15 @@ The handoff validation must report:
   `backend_port_prestart_gate_execution_allowed_matches_plan: true`,
   `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`,
   and `backend_port_prestart_gate_live_authority_granted_matches_plan: true`
+- the no-WING handoff summary shows
+  `artifact_manifest_verifier_operator_sequence_step_index: 1`,
+  `expected_artifact_manifest_verifier_operator_sequence_step_index: 1`,
+  `artifact_manifest_verifier_operator_sequence_step_index_matches_contract: true`,
+  `artifact_manifest_verifier_operator_sequence_step`,
+  `expected_artifact_manifest_verifier_operator_sequence_step`,
+  `artifact_manifest_verifier_operator_sequence_step_matches_contract: true`,
+  `artifact_manifest_verifier_required_markers`, and
+  `artifact_manifest_verifier_operator_sequence_before_preview: true`
 - the same summaries also show `backend_port_prestart_check_failure_detail_fields`
   exactly listing
   `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`,

@@ -933,6 +933,23 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "artifact_manifest_verifier_must_pass_before_websocket: true" in readonly
     assert "artifact_manifest_verifier_passed_before_websocket: true" in readonly
     assert "artifact_manifest_verifier_websocket_opened_after_pass: true" in readonly
+    assert "artifact_manifest_verifier_operator_sequence_step_index: 1" in readonly
+    assert (
+        "expected_artifact_manifest_verifier_operator_sequence_step_index: 1"
+        in readonly
+    )
+    assert (
+        "artifact_manifest_verifier_operator_sequence_step_index_matches_contract: true"
+        in readonly
+    )
+    assert "artifact_manifest_verifier_operator_sequence_step" in readonly
+    assert "expected_artifact_manifest_verifier_operator_sequence_step" in readonly
+    assert (
+        "artifact_manifest_verifier_operator_sequence_step_matches_contract: true"
+        in readonly
+    )
+    assert "artifact_manifest_verifier_required_markers" in readonly
+    assert "artifact_manifest_verifier_operator_sequence_before_preview: true" in readonly
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readonly
     assert "backend_port_prestart_check_operator_sequence_step" in readonly
     assert "prestart_backend_port_check" in readonly
