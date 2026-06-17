@@ -265,9 +265,11 @@ It does not approve live writes.
   `manifest_denies_readiness_matrix_update: true`,
   `summary_denies_readiness_matrix_update: true`,
   `summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority: true`,
+  `summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_denies_authority: true`,
   `artifact_manifest_verifier_check_manifest_denies_readiness_matrix_update: true`,
   `artifact_manifest_verifier_check_summary_denies_readiness_matrix_update: true`,
   `artifact_manifest_verifier_check_summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority: true`,
+  `artifact_manifest_verifier_check_summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_denies_authority: true`,
   `artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_readiness_matrix_update_allowed_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true`,
@@ -276,16 +278,19 @@ It does not approve live writes.
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_matches_summary: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_summary: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_summary: true`,
+  `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_matches_summary: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_summary: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_summary: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true`,
+  `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_matches_expected: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true`,
   `artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true`,
   `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true`,
+  `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true`,
   `artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true`,
   `artifact_manifest_verifier_check_failed_checks_have_check_entries: true`, and
@@ -738,10 +743,15 @@ Then update:
   `summary_md_sha256_matches_actual: true`,
   `summary_json_sha256_matches_manifest: true`,
   `summary_md_sha256_matches_manifest: true`,
+  `manifest_denies_readiness_matrix_update: true`,
   `manifest_denies_readiness_closure: true`,
   `manifest_denies_live_authority: true`,
+  `summary_denies_readiness_matrix_update: true`,
   `summary_denies_readiness_closure: true`,
   `summary_denies_live_authority: true`,
+  `summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority: true`,
+  `summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority: true`,
+  `summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_denies_authority: true`,
   `summary_json_artifact_manifest_verifier_fields_present: true`,
   `manifest_artifact_manifest_verifier_fields_present: true`,
   `summary_md_artifact_manifest_verifier_fields_rendered: true`,
@@ -759,11 +769,13 @@ Then update:
   `verifier_report_mutates_console_state_matches_expected: true`,
   `verifier_report_queries_console_matches_expected: true`, and
   `verifier_report_executes_tests_matches_expected: true`,
+  `verifier_report_readiness_matrix_update_allowed_matches_expected: true`,
   `verifier_report_readiness_closure_allowed_matches_expected: true`, and
   `verifier_report_live_authority_granted_matches_expected: true`,
   `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true`,
   `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true`,
   `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true`,
+  `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_matches_expected: true`,
   `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true`, and
   `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true`,
   or does
@@ -787,6 +799,7 @@ Then update:
   `artifact_manifest_verifier_contacts_wing: false`,
   `artifact_manifest_verifier_mutates_console_state: false`,
   `artifact_manifest_verifier_queries_console: false`,
+  `artifact_manifest_verifier_readiness_matrix_update_allowed: false`,
   `artifact_manifest_verifier_readiness_closure_allowed: false`, and
   `artifact_manifest_verifier_live_authority_granted: false`, and the referenced
   `artifact_manifest_verifier_report_required_fields` list does not include
@@ -796,6 +809,7 @@ Then update:
   `wing_readonly_handoff_plan_verifier_summary_surface_required`,
   `wing_readonly_handoff_plan_verifier_summary_surface_mismatches`,
   `wing_readonly_handoff_plan_verifier_summary_surface_match`,
+  `wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed`,
   `wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed`,
   and
   `wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted`,
