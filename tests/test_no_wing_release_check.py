@@ -16640,6 +16640,28 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "plan_artifact_status: `passed`" in markdown_summary
     assert "proof_artifact_schema_matches_plan: `true`" in markdown_summary
     assert "proof_runner_matches_plan: `true`" in markdown_summary
+    assert "## WING Read-Only MVP Blocker Summary" in markdown_summary
+    assert (
+        "wing_readonly_mvp_blocker_anchor_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        f"selected_mvp_blocker: `{WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER}`"
+        in markdown_summary
+    )
+    assert (
+        "selected_mvp_blocker_status: "
+        f"`{WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS}`"
+        in markdown_summary
+    )
+    assert (
+        "mvp_blocker_anchor_matches_current_first_open: `true`"
+        in markdown_summary
+    )
+    assert (
+        "mvp_blocker_anchor_packet_does_not_close_blocker: `true`"
+        in markdown_summary
+    )
     assert "selected_mvp_blocker_matches_plan: `true`" in markdown_summary
     assert "selected_mvp_blocker_status_matches_plan: `true`" in markdown_summary
     assert (

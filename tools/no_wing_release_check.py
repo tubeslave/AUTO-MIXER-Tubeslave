@@ -24630,6 +24630,23 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         lines.extend(
             [
                 "",
+                "## WING Read-Only MVP Blocker Summary",
+                "",
+                "- wing_readonly_mvp_blocker_anchor_summary_surface_required: "
+                "`true`",
+                "- selected_mvp_blocker: "
+                f"`{summary['selected_mvp_blocker']}`",
+                "- selected_mvp_blocker_status: "
+                f"`{summary['selected_mvp_blocker_status']}`",
+                "- mvp_blocker_anchor_matches_current_first_open: "
+                f"`{str(summary['mvp_blocker_anchor_matches_current_first_open']).lower()}`",
+                "- mvp_blocker_anchor_packet_does_not_close_blocker: "
+                f"`{str(summary['mvp_blocker_anchor_packet_does_not_close_blocker']).lower()}`",
+                "- wing_readonly_mvp_blocker_anchor_summary_surface_readiness_closure_allowed: "
+                "`false`",
+                "- wing_readonly_mvp_blocker_anchor_summary_surface_live_authority_granted: "
+                "`false`",
+                "",
                 "## WING Read-Only Preflight Handoff Packet Artifact",
                 "",
                 "- schema_check: "
