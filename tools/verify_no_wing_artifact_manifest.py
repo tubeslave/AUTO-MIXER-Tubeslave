@@ -97,9 +97,13 @@ def _expected_verifier_summary_surface() -> dict[str, object]:
         "artifact_manifest_verifier_report_required_fields": list(
             no_wing_release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
         ),
+        "artifact_manifest_verifier_read_only": True,
+        "artifact_manifest_verifier_live_write": False,
         "artifact_manifest_verifier_contacts_wing": False,
+        "artifact_manifest_verifier_contacts_backend": False,
         "artifact_manifest_verifier_mutates_console_state": False,
         "artifact_manifest_verifier_queries_console": False,
+        "artifact_manifest_verifier_executes_tests": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
     }

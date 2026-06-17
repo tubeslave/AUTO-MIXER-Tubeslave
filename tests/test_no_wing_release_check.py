@@ -20860,9 +20860,13 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert json_summary["artifact_manifest_verifier_report_required_fields"] == list(
         release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
     )
+    assert json_summary["artifact_manifest_verifier_read_only"] is True
+    assert json_summary["artifact_manifest_verifier_live_write"] is False
     assert json_summary["artifact_manifest_verifier_contacts_wing"] is False
+    assert json_summary["artifact_manifest_verifier_contacts_backend"] is False
     assert json_summary["artifact_manifest_verifier_mutates_console_state"] is False
     assert json_summary["artifact_manifest_verifier_queries_console"] is False
+    assert json_summary["artifact_manifest_verifier_executes_tests"] is False
     assert (
         json_summary["artifact_manifest_verifier_readiness_closure_allowed"]
         is False
@@ -21052,9 +21056,13 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert manifest["artifact_manifest_verifier_report_required_fields"] == list(
         release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
     )
+    assert manifest["artifact_manifest_verifier_read_only"] is True
+    assert manifest["artifact_manifest_verifier_live_write"] is False
     assert manifest["artifact_manifest_verifier_contacts_wing"] is False
+    assert manifest["artifact_manifest_verifier_contacts_backend"] is False
     assert manifest["artifact_manifest_verifier_mutates_console_state"] is False
     assert manifest["artifact_manifest_verifier_queries_console"] is False
+    assert manifest["artifact_manifest_verifier_executes_tests"] is False
     assert (
         manifest["artifact_manifest_verifier_readiness_closure_allowed"]
         is False
@@ -21177,7 +21185,14 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert "artifact_manifest_verifier_report_required_fields: `" in markdown_summary
     assert "artifact_manifest_verifier_required: `true`" in markdown_summary
+    assert "artifact_manifest_verifier_read_only: `true`" in markdown_summary
+    assert "artifact_manifest_verifier_live_write: `false`" in markdown_summary
     assert "artifact_manifest_verifier_contacts_wing: `false`" in markdown_summary
+    assert (
+        "artifact_manifest_verifier_contacts_backend: `false`"
+        in markdown_summary
+    )
+    assert "artifact_manifest_verifier_executes_tests: `false`" in markdown_summary
     assert (
         "artifact_manifest_verifier_live_authority_granted: `false`"
         in markdown_summary
@@ -22667,9 +22682,13 @@ def test_no_wing_release_check_fails_when_manifest_summary_surface_missing_line(
                             "artifact_manifest_verifier_report_required_fields": list(
                                 release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
                             ),
+                            "artifact_manifest_verifier_read_only": True,
+                            "artifact_manifest_verifier_live_write": False,
                             "artifact_manifest_verifier_contacts_wing": False,
+                            "artifact_manifest_verifier_contacts_backend": False,
                             "artifact_manifest_verifier_mutates_console_state": False,
                             "artifact_manifest_verifier_queries_console": False,
+                            "artifact_manifest_verifier_executes_tests": False,
                             "artifact_manifest_verifier_readiness_closure_allowed": (
                                 False
                             ),
@@ -22864,9 +22883,13 @@ def test_no_wing_release_check_fails_when_manifest_contract_digest_line_missing(
                             "artifact_manifest_verifier_report_required_fields": list(
                                 release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
                             ),
+                            "artifact_manifest_verifier_read_only": True,
+                            "artifact_manifest_verifier_live_write": False,
                             "artifact_manifest_verifier_contacts_wing": False,
+                            "artifact_manifest_verifier_contacts_backend": False,
                             "artifact_manifest_verifier_mutates_console_state": False,
                             "artifact_manifest_verifier_queries_console": False,
+                            "artifact_manifest_verifier_executes_tests": False,
                             "artifact_manifest_verifier_readiness_closure_allowed": (
                                 False
                             ),

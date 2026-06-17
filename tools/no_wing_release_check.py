@@ -550,9 +550,13 @@ NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_SUMMARY_SURFACE_FIELDS = (
     "artifact_manifest_verifier_status_required",
     "artifact_manifest_verifier_failed_checks_required",
     "artifact_manifest_verifier_report_required_fields",
+    "artifact_manifest_verifier_read_only",
+    "artifact_manifest_verifier_live_write",
     "artifact_manifest_verifier_contacts_wing",
+    "artifact_manifest_verifier_contacts_backend",
     "artifact_manifest_verifier_mutates_console_state",
     "artifact_manifest_verifier_queries_console",
+    "artifact_manifest_verifier_executes_tests",
     "artifact_manifest_verifier_readiness_closure_allowed",
     "artifact_manifest_verifier_live_authority_granted",
 )
@@ -24071,9 +24075,13 @@ def write_no_wing_release_check_artifact_manifest(
         "artifact_manifest_verifier_report_required_fields": list(
             NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
         ),
+        "artifact_manifest_verifier_read_only": True,
+        "artifact_manifest_verifier_live_write": False,
         "artifact_manifest_verifier_contacts_wing": False,
+        "artifact_manifest_verifier_contacts_backend": False,
         "artifact_manifest_verifier_mutates_console_state": False,
         "artifact_manifest_verifier_queries_console": False,
+        "artifact_manifest_verifier_executes_tests": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
         **{
@@ -24273,9 +24281,13 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "artifact_manifest_verifier_report_required_fields": list(
             NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_VERIFIER_REPORT_REQUIRED_FIELDS
         ),
+        "artifact_manifest_verifier_read_only": True,
+        "artifact_manifest_verifier_live_write": False,
         "artifact_manifest_verifier_contacts_wing": False,
+        "artifact_manifest_verifier_contacts_backend": False,
         "artifact_manifest_verifier_mutates_console_state": False,
         "artifact_manifest_verifier_queries_console": False,
+        "artifact_manifest_verifier_executes_tests": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
         **build_no_wing_artifact_manifest_self_consistency_summary_surface(),
