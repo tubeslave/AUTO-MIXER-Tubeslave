@@ -25,7 +25,10 @@ from backend.wing_readonly_preflight_contract import (
     wing_readonly_preflight_accepted_candidate_prestart_violations_by_source,
     wing_readonly_preflight_accepted_candidate_prestart_source_ids,
 )
-from backend.supervised_wing_proof_plan import build_supervised_wing_proof_plan
+from backend.supervised_wing_proof_plan import (
+    READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER,
+    build_supervised_wing_proof_plan,
+)
 
 PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
@@ -215,6 +218,8 @@ def accepted_review_decision_ledger() -> dict:
                     ),
                     "summary_path_matches_expected_artifact": True,
                     "events_path_matches_expected_artifact": True,
+                    "contacts_backend": True,
+                    "queries_console": True,
                     "request_sequence": list(READONLY_PREFLIGHT_REQUEST_SEQUENCE),
                     "plan_request_sequence": list(READONLY_PREFLIGHT_REQUEST_SEQUENCE),
                     "request_sequence_matches_plan": True,
@@ -584,6 +589,24 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
         ]
         is True
     )
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
+    ] == [accepted_source_id]
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
+    ] == {accepted_source_id: True}
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+    ] == {accepted_source_id: True}
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
+    ] == []
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+        ]
+        is True
+    )
     assert plan["summary"]["readonly_preflight_review_decision_rejected_source_ids"] == []
     assert plan["readonly_preflight_steps"] == []
 
@@ -808,6 +831,47 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_request_
     )
     assert (
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_contact_trace():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    candidate = ledger["summary"]["candidate_reviews"][0]
+    candidate["queries_console"] = False
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    accepted_source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
+    ] == [accepted_source_id]
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
+    ] == {accepted_source_id: True}
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+    ] == {accepted_source_id: False}
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
+    ] == [accepted_source_id]
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+        ]
+        is False
+    )
+    assert (
+        READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER
         in plan["summary"]["global_blockers"]
     )
     assert plan["steps"] == []

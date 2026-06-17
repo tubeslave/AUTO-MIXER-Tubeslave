@@ -100,6 +100,9 @@ READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER = (
 READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER = (
     "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
 )
+READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER = (
+    "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
+)
 PLAN_STATUSES = {
     "operator_proof_required",
     "manual_review_ready",
@@ -618,6 +621,56 @@ def _accepted_candidate_request_sequence_trace(
     }
 
 
+def _accepted_candidate_contact_trace(
+    summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    rows = summary.get("candidate_reviews")
+    candidate_rows = (
+        tuple(row for row in rows if isinstance(row, Mapping))
+        if isinstance(rows, list)
+        else ()
+    )
+    rows_by_source: dict[str, Mapping[str, Any]] = {
+        str(row.get("source_id")): row
+        for row in candidate_rows
+        if isinstance(row.get("source_id"), str) and row.get("source_id")
+    }
+    contacts_backend_by_source: dict[str, bool] = {}
+    queries_console_by_source: dict[str, bool] = {}
+    missing_source_ids: list[str] = []
+
+    for source_id in accepted_source_ids:
+        row = rows_by_source.get(source_id)
+        if row is None:
+            missing_source_ids.append(source_id)
+            continue
+        contacts_backend = row.get("contacts_backend") is True
+        queries_console = row.get("queries_console") is True
+        contacts_backend_by_source[source_id] = contacts_backend
+        queries_console_by_source[source_id] = queries_console
+        if not contacts_backend or not queries_console:
+            missing_source_ids.append(source_id)
+
+    return {
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids": (
+            accepted_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": (
+            contacts_backend_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source": (
+            queries_console_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids": (
+            missing_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete": (
+            bool(accepted_source_ids) and not missing_source_ids
+        ),
+    }
+
+
 def _row_by_value_type(evidence_snapshot: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
     return {
         str(row.get("value_type")): row
@@ -945,6 +998,13 @@ def build_supervised_wing_proof_plan(
         ]
         is True
     )
+    accepted_candidate_contact_trace = _accepted_candidate_contact_trace(review_summary)
+    accepted_candidate_contact_trace_complete = (
+        accepted_candidate_contact_trace[
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+        ]
+        is True
+    )
     candidate_artifact_root_contract_valid = (
         bool(accepted_source_ids)
         and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
@@ -957,6 +1017,7 @@ def build_supervised_wing_proof_plan(
         and candidate_artifact_root_contract_valid
         and accepted_candidate_expected_artifact_trace_complete
         and accepted_candidate_request_sequence_trace_complete
+        and accepted_candidate_contact_trace_complete
     )
     preflight_steps: Tuple[WingReadonlyPreflightPlanStep, ...] = ()
     if invalid:
@@ -1007,6 +1068,11 @@ def build_supervised_wing_proof_plan(
         if accepted_source_ids and not accepted_candidate_expected_artifact_trace_complete:
             review_blockers = [
                 READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER,
+                *review_blockers,
+            ]
+        if accepted_source_ids and not accepted_candidate_contact_trace_complete:
+            review_blockers = [
+                READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER,
                 *review_blockers,
             ]
         global_blockers = [
@@ -1156,6 +1222,7 @@ def build_supervised_wing_proof_plan(
             ),
             **accepted_candidate_expected_artifact_trace,
             **accepted_candidate_request_sequence_trace,
+            **accepted_candidate_contact_trace,
             "readonly_preflight_review_decision_rejected_source_ids": _string_list(
                 review_summary.get("rejected_source_ids")
             ),
