@@ -212,6 +212,43 @@ def _record_verifier_report_handoff_plan_summary_surface_checks(
         )
 
 
+def _record_manifest_handoff_plan_summary_surface_checks(
+    checks: dict[str, bool],
+    *,
+    manifest: Mapping[str, Any],
+    summary_json: Mapping[str, Any],
+) -> None:
+    required_fields = (
+        no_wing_release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+    )
+    _record_check(
+        checks,
+        "manifest_wing_readonly_handoff_plan_verifier_summary_surface_fields_present",
+        all(field_name in manifest for field_name in required_fields),
+    )
+    for field_name in required_fields:
+        _record_check(
+            checks,
+            f"manifest_{field_name}_matches_summary",
+            manifest.get(field_name) == summary_json.get(field_name),
+        )
+
+    required_field = "wing_readonly_handoff_plan_verifier_summary_surface_required"
+    _record_check(
+        checks,
+        f"manifest_{required_field}_is_boolean",
+        isinstance(manifest.get(required_field), bool),
+    )
+    for field_name, expected_value in (
+        VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS.items()
+    ):
+        _record_check(
+            checks,
+            f"manifest_{field_name}_matches_expected",
+            manifest.get(field_name) == expected_value,
+        )
+
+
 def _record_summary_md_safety_checks(
     checks: dict[str, bool],
     *,
@@ -449,6 +486,11 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
     _record_verifier_manifest_surface_checks(
         checks,
         manifest=manifest,
+    )
+    _record_manifest_handoff_plan_summary_surface_checks(
+        checks,
+        manifest=manifest,
+        summary_json=summary_json,
     )
 
     _record_check(

@@ -608,6 +608,17 @@ PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true",
     "artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true",
     "artifact_manifest_verifier_check_verifier_report_live_authority_granted_matches_expected: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_fields_present: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_matches_summary: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_summary: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_summary: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_summary: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_summary: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true",
+    "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true",
     "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
     "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
     "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
@@ -24063,6 +24074,10 @@ def write_no_wing_release_check_artifact_manifest(
         "artifact_manifest_verifier_queries_console": False,
         "artifact_manifest_verifier_readiness_closure_allowed": False,
         "artifact_manifest_verifier_live_authority_granted": False,
+        **{
+            field_name: summary_json_payload.get(field_name)
+            for field_name in WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+        },
         "read_only": True,
         "live_write": False,
         "contacts_wing": False,

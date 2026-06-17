@@ -15671,6 +15671,17 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "artifact_manifest_verifier_check_verifier_report_executes_tests_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_readiness_closure_allowed_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_live_authority_granted_matches_expected: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_fields_present: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_matches_summary: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_summary: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_summary: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_summary: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_summary: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_matches_expected: true",
+        "artifact_manifest_verifier_check_manifest_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_expected: true",
         "artifact_manifest_verifier_check_verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_match_matches_expected: true",
@@ -21042,6 +21053,11 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         is False
     )
     assert manifest["artifact_manifest_verifier_live_authority_granted"] is False
+    for field_name in (
+        release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
+    ):
+        assert field_name in manifest
+        assert manifest[field_name] == json_summary[field_name]
     assert manifest["artifact_manifest_self_consistency_required"] is True
     assert (
         manifest["artifact_manifest_self_consistency_artifact_count_matches_required"]
@@ -23304,11 +23320,20 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
         ]
         is True
     )
+    assert (
+        checks[
+            "manifest_wing_readonly_handoff_plan_verifier_summary_surface_fields_present"
+        ]
+        is True
+    )
     for field_name in (
         release_check.WING_READONLY_HANDOFF_PLAN_VERIFIER_SUMMARY_SURFACE_FIELDS
     ):
+        assert checks[f"manifest_{field_name}_matches_summary"] is True
         if field_name.endswith("_required"):
+            assert checks[f"manifest_{field_name}_is_boolean"] is True
             continue
+        assert checks[f"manifest_{field_name}_matches_expected"] is True
         assert checks[f"verifier_report_{field_name}_matches_expected"] is True
     assert checks["summary_json_artifact_manifest_verifier_fields_present"] is True
     assert checks["summary_md_artifact_manifest_verifier_fields_rendered"] is True
