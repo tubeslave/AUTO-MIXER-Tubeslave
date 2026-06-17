@@ -249,6 +249,9 @@ def accepted_review_decision_ledger() -> dict:
                     "backend_port_prestart_summary_queries_console": False,
                     "backend_port_prestart_summary_executes_tests": False,
                     "backend_port_prestart_check_status": "passed",
+                    "artifact_manifest_verifier_must_pass_before_websocket": True,
+                    "artifact_manifest_verifier_passed_before_websocket": True,
+                    "artifact_manifest_verifier_websocket_opened_after_pass": True,
                     **{
                         field: False
                         for field in PRESTART_BACKEND_PORT_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -689,6 +692,9 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart
             "backend_port_prestart_summary_queries_console": False,
             "backend_port_prestart_summary_executes_tests": False,
             "backend_port_prestart_check_status": "passed",
+            "artifact_manifest_verifier_must_pass_before_websocket": True,
+            "artifact_manifest_verifier_passed_before_websocket": True,
+            "artifact_manifest_verifier_websocket_opened_after_pass": True,
             **{
                 field: False
                 for field in PRESTART_BACKEND_PORT_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -1092,6 +1098,44 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_has_unsafe_pre
     ] == {
         "artifacts/wing_readonly_preflight/run/summary.json": [
             "backend_port_prestart_gate_live_authority_granted_not_false"
+        ]
+    }
+    assert (
+        "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_verifier_websocket_proof():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"]["candidate_reviews"][0][
+        "artifact_manifest_verifier_websocket_opened_after_pass"
+    ] = False
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_candidate_prestart_contract_valid"
+        ]
+        is False
+    )
+    assert plan["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_source_ids"
+    ] == []
+    assert plan["summary"][
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source"
+    ] == {
+        "artifacts/wing_readonly_preflight/run/summary.json": [
+            "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
         ]
     }
     assert (

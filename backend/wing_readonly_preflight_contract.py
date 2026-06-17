@@ -570,6 +570,18 @@ def wing_readonly_preflight_candidate_prestart_contract_violations(
         violations.append("backend_port_prestart_summary_queries_console_not_false")
     if row.get("backend_port_prestart_summary_executes_tests") is not False:
         violations.append("backend_port_prestart_summary_executes_tests_not_false")
+    if row.get("artifact_manifest_verifier_must_pass_before_websocket") is not True:
+        violations.append(
+            "artifact_manifest_verifier_must_pass_before_websocket_not_true"
+        )
+    if row.get("artifact_manifest_verifier_passed_before_websocket") is not True:
+        violations.append(
+            "artifact_manifest_verifier_passed_before_websocket_not_true"
+        )
+    if row.get("artifact_manifest_verifier_websocket_opened_after_pass") is not True:
+        violations.append(
+            "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+        )
     if (
         row.get("backend_port_prestart_check_status")
         != WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS

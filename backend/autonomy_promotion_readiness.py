@@ -350,14 +350,6 @@ def _wing_readonly_preflight_readiness_overlay(
     closure_allowed = summary.get("readiness_closure_allowed_by_evidence") is True
     live_authority = summary.get("live_authority_granted") is True
     full_auto = summary.get("full_autonomous_ready") is True
-    candidate_available = (
-        valid_candidate_count > 0
-        and invalid_candidate_count == 0
-        and update_allowed
-        and not closure_allowed
-        and not live_authority
-        and not full_auto
-    )
     matrix_rows = [row for row in matrix if isinstance(row, dict)]
     artifacts = (
         evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
@@ -383,6 +375,18 @@ def _wing_readonly_preflight_readiness_overlay(
         wing_readonly_preflight_candidate_prestart_contract_violations(latest_candidate)
         if latest_candidate
         else ["no_valid_readonly_preflight_candidate"]
+    )
+    prestart_summary_contract_valid = (
+        bool(latest_candidate) and not prestart_summary_contract_violations
+    )
+    candidate_available = (
+        valid_candidate_count > 0
+        and invalid_candidate_count == 0
+        and update_allowed
+        and prestart_summary_contract_valid
+        and not closure_allowed
+        and not live_authority
+        and not full_auto
     )
     next_actions = (
         [
@@ -446,9 +450,7 @@ def _wing_readonly_preflight_readiness_overlay(
             latest_candidate.get("backend_port_prestart_summary_connection_policy")
             == WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
-        "prestart_backend_port_summary_contract_valid": (
-            bool(latest_candidate) and not prestart_summary_contract_violations
-        ),
+        "prestart_backend_port_summary_contract_valid": prestart_summary_contract_valid,
         "prestart_backend_port_summary_contract_violations": list(
             prestart_summary_contract_violations
         ),

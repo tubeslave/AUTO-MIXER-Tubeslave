@@ -148,6 +148,50 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
         )
         == {source_id: ["backend_port_prestart_summary_sha256_invalid"]}
     )
+    missing_verifier_pass_review = dict(
+        candidate_review,
+        artifact_manifest_verifier_passed_before_websocket=False,
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            [source_id],
+            [missing_verifier_pass_review],
+        )
+        == []
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [missing_verifier_pass_review],
+        )
+        == {
+            source_id: [
+                "artifact_manifest_verifier_passed_before_websocket_not_true"
+            ]
+        }
+    )
+    missing_verifier_websocket_review = dict(
+        candidate_review,
+        artifact_manifest_verifier_websocket_opened_after_pass=False,
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_source_ids(
+            [source_id],
+            [missing_verifier_websocket_review],
+        )
+        == []
+    )
+    assert (
+        wing_readonly_preflight_accepted_candidate_prestart_violations_by_source(
+            [source_id],
+            [missing_verifier_websocket_review],
+        )
+        == {
+            source_id: [
+                "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+            ]
+        }
+    )
     unbound_review = dict(
         candidate_review,
         summary_path_matches_expected_artifact=False,
@@ -791,6 +835,33 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_required_false
     ] == {
         "inline_payload_0": [
             "backend_port_prestart_gate_live_authority_granted_not_false"
+        ]
+    }
+    assert (
+        WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER
+        in ledger["summary"]["blocked_by"]
+    )
+
+
+def test_review_decision_ledger_blocks_accepted_candidate_without_verifier_websocket_proof():
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["artifact_manifest_verifier_websocket_opened_after_pass"] = False
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    assert ledger["status"] == "operator_review_decision_records_available"
+    assert ledger["summary"]["accepted_record_count"] == 1
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is False
+    assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == []
+    assert ledger["summary"][
+        "accepted_candidate_prestart_contract_violations_by_source"
+    ] == {
+        "inline_payload_0": [
+            "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
         ]
     }
     assert (

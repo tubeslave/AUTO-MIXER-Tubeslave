@@ -73,6 +73,9 @@ def _valid_wing_preflight_summary() -> dict:
         "backend_port_prestart_summary_queries_console": False,
         "backend_port_prestart_summary_executes_tests": False,
         "backend_port_prestart_check_status": "passed",
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": True,
+        "artifact_manifest_verifier_websocket_opened_after_pass": True,
         **{
             field: False
             for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
@@ -526,12 +529,7 @@ def test_readiness_snapshot_requires_replacement_for_unbound_wing_preflight_arti
     assert preflight["prestart_backend_port_summary_contract_violations"] == [
         "no_valid_readonly_preflight_candidate",
     ]
-    assert preflight["violations"] == [
-        "artifact_manifest_verifier_must_pass_before_websocket_not_true",
-        "artifact_manifest_verifier_passed_before_websocket_not_true",
-        "artifact_manifest_verifier_websocket_opened_after_pass_not_true",
-        "artifact_root_missing",
-    ]
+    assert preflight["violations"] == ["artifact_root_missing"]
     assert preflight["prestart_backend_port_summary_live_write"] is None
     assert preflight["prestart_backend_port_summary_contacts_backend"] is None
     assert preflight["prestart_backend_port_summary_queries_console"] is None
@@ -564,6 +562,26 @@ def test_readiness_snapshot_accepts_artifact_bound_prestart_summary_contract():
     assert preflight["readiness_update_candidate_available"] is True
     assert preflight["prestart_backend_port_summary_contract_valid"] is True
     assert preflight["prestart_backend_port_summary_contract_violations"] == []
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
+
+
+def test_readiness_snapshot_fails_closed_without_verifier_websocket_proof():
+    candidate = _artifact_bound_preflight_candidate_row()
+    candidate["artifact_manifest_verifier_websocket_opened_after_pass"] = False
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        wing_readonly_preflight_evidence_snapshot=(
+            _readiness_evidence_snapshot_with_candidate(candidate)
+        ),
+    )
+    preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
+
+    assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["prestart_backend_port_summary_contract_valid"] is False
+    assert preflight["prestart_backend_port_summary_contract_violations"] == [
+        "artifact_manifest_verifier_websocket_opened_after_pass_not_true"
+    ]
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False

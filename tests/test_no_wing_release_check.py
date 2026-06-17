@@ -9562,6 +9562,9 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         "backend_port_prestart_check_status": (
                             WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_STATUS
                         ),
+                        "artifact_manifest_verifier_must_pass_before_websocket": True,
+                        "artifact_manifest_verifier_passed_before_websocket": True,
+                        "artifact_manifest_verifier_websocket_opened_after_pass": True,
                         **{
                             field: False
                             for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
