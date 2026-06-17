@@ -839,6 +839,13 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
     assert "required_supervised_prestart_gate_markers" in rows[0]["next action"]
     assert "accepted_decision_ready" in rows[0]["next action"]
     assert "valid accepted-candidate prestart trace" in rows[0]["next action"]
+    assert "valid accepted-candidate verifier WebSocket proof" in rows[0][
+        "next action"
+    ]
+    assert "valid accepted-candidate artifact-root trace" in rows[0]["next action"]
+    assert "valid accepted-candidate request-sequence trace" in rows[0][
+        "next action"
+    ]
     assert "expected-artifact-bound accepted source id" in rows[0]["next action"]
     assert "WING_SUPERVISED_FADER_GAIN_PROOF" in rows[0]["next action"]
     assert "supervised_prestart_gate" in rows[0]["next action"]
@@ -885,6 +892,12 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         assert "without live authority" in row["next action"]
         assert "final handoff operator-sequence step" in row["next action"]
         assert "valid accepted-candidate prestart trace" in row["next action"]
+        assert "valid accepted-candidate verifier WebSocket proof" in row[
+            "next action"
+        ]
+        assert "valid accepted-candidate artifact-root trace" in row["next action"]
+        assert "valid accepted-candidate request-sequence trace" in row["next action"]
+        assert "expected-artifact-bound accepted source id" in row["next action"]
         assert "supervised_prestart_gate" in row["next action"]
         assert "expected_supervised_prestart_gate" in row["next action"]
     assert all(row["status"] != "closed" for row in rows)
@@ -1114,7 +1127,25 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "--execute" in supervised
     assert "blocked until a clean read-only preflight" in supervised
     assert "valid accepted-candidate prestart trace" in supervised
+    assert "valid accepted-candidate verifier WebSocket proof" in supervised
+    assert "valid accepted-candidate artifact-root trace" in supervised
+    assert "valid accepted-candidate request-sequence trace" in supervised
     assert "expected-artifact-bound accepted source id" in supervised
+    assert "supervised_prestart_gate" in supervised
+    assert "expected_supervised_prestart_gate" in supervised
+    assert "WING_SUPERVISED_FADER_GAIN_PROOF" in supervised
+    assert (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true"
+        in supervised
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: true"
+        in supervised
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true"
+        in supervised
+    )
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in supervised

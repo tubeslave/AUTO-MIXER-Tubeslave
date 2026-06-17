@@ -1,8 +1,9 @@
 # Runbook: WING Supervised Fader/Gain Proof
 
 Status: blocked until a clean read-only preflight candidate is manually reviewed
-and its accepted decision has a valid accepted-candidate prestart trace with an
-expected-artifact-bound accepted source id
+and its accepted decision has a valid accepted-candidate prestart trace,
+valid accepted-candidate verifier WebSocket proof, valid accepted-candidate artifact-root trace,
+valid accepted-candidate request-sequence trace, and an expected-artifact-bound accepted source id.
 
 ## Goal
 
@@ -42,14 +43,31 @@ Forbidden live writes:
 - The read-only artifact was manually reviewed.
 - The review decision ledger has exactly one accepted decision for the clean
   preflight candidate and no duplicate or conflicting decision records.
-- Accepted review source ids have a valid accepted-candidate prestart trace from
-  read-only preflight review and are expected-artifact-bound accepted source ids.
+- Accepted review source ids have a valid accepted-candidate prestart trace,
+  valid accepted-candidate verifier WebSocket proof,
+  valid accepted-candidate artifact-root trace,
+  valid accepted-candidate request-sequence trace, and expected-artifact-bound
+  accepted source ids from read-only preflight review.
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`.
+- The next supervised proof plan has
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`.
+- The next supervised proof plan has
+  `readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: true`.
+- The next supervised proof plan has
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`.
 - The next supervised proof plan lists the accepted read-only preflight
   `summary.json` source id that anchors the physical proof.
+- The final handoff `supervised_prestart_gate` exactly matches
+  `expected_supervised_prestart_gate`, grants no live authority, and requires:
+  `accepted_decision_ready`, valid accepted-candidate prestart trace,
+  valid accepted-candidate verifier WebSocket proof,
+  valid accepted-candidate artifact-root trace,
+  valid accepted-candidate request-sequence trace,
+  `expected-artifact-bound accepted source id`, and
+  `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - `.ai/project-layer/wing_mvp_blockers.md` shows read-only preflight as reviewed
   or ready for supervised proof.
 - The operator explicitly approves the exact channel, value type, and delta.
@@ -120,12 +138,24 @@ The artifact must show:
 - read-only preflight was not reviewed first;
 - duplicate or conflicting read-only preflight review decision JSON files are
   still present;
-- accepted review source ids lack a valid accepted-candidate prestart trace or
-  expected-artifact-bound accepted source id;
+- accepted review source ids lack a valid accepted-candidate prestart trace,
+  valid accepted-candidate verifier WebSocket proof,
+  valid accepted-candidate artifact-root trace,
+  valid accepted-candidate request-sequence trace, or expected-artifact-bound
+  accepted source id;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`;
+- the proof plan does not show
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`;
+- the proof plan does not show
+  `readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: true`;
+- the proof plan does not show
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`;
+- the handoff `supervised_prestart_gate` differs from
+  `expected_supervised_prestart_gate` or grants live authority before the
+  explicit supervised proof command;
 - operator approval is not explicit;
 - operator confirmation flags are missing or do not match the requested
   channel, value type, and delta;
