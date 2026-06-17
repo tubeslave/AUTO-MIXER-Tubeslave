@@ -23002,6 +23002,14 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert checks["artifact_bundle_loadable"] is True
     assert checks["failed_checks_have_check_entries"] is True
     assert checks["verifier_report_required_fields_present"] is True
+    assert checks["manifest_type"] is True
+    assert checks["manifest_required_artifact_ids_match_contract"] is True
+    assert checks["manifest_required_artifact_paths_match_contract"] is True
+    assert checks["manifest_records_required_artifact_ids"] is True
+    assert checks["summary_json_path_matches_contract"] is True
+    assert checks["summary_json_sha256_matches_actual"] is True
+    assert checks["summary_md_path_matches_contract"] is True
+    assert checks["summary_md_sha256_matches_actual"] is True
     assert checks["summary_json_sha256_matches_manifest"] is True
     assert checks["summary_md_sha256_matches_manifest"] is True
     assert checks["manifest_denies_readiness_closure"] is True

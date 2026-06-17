@@ -58,6 +58,18 @@ also expose `artifact_manifest_verifier_required: true`,
 `artifact_manifest_verifier_live_authority_granted: false`. The detached
 `artifact-manifest.json` sidecar must mirror the same verifier/no-authority
 fields, and the verifier report must show
+`summary_json_exists: true`,
+`summary_md_exists: true`,
+`artifact_manifest_exists: true`,
+`artifact_bundle_loadable: true`,
+`manifest_type: true`,
+`manifest_required_artifact_ids_match_contract: true`,
+`manifest_required_artifact_paths_match_contract: true`,
+`manifest_records_required_artifact_ids: true`,
+`summary_json_path_matches_contract: true`,
+`summary_json_sha256_matches_actual: true`,
+`summary_md_path_matches_contract: true`,
+`summary_md_sha256_matches_actual: true`,
 `summary_json_sha256_matches_manifest: true`,
 `summary_md_sha256_matches_manifest: true`,
 `manifest_denies_readiness_closure: true`,
