@@ -576,6 +576,12 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match: true",
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed: false",
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted: false",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required: true",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches: []",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match: true",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: false",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: false",
         "project_director_selected_action_value_gate_self_check_required: true",
         "project_director_selected_action_value_gate_self_check_required_markers",
         "project_director_selected_action_value_gate_self_check_missing_markers: []",
@@ -868,11 +874,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "selected_action"
     ]
     assert (
-        "required_supervised_prestart_gate_marker_count: 7"
+        "required_supervised_prestart_gate_marker_count: 8"
         in directive["selected_action"]
     )
     assert (
-        "expected_required_supervised_prestart_gate_marker_count: 7"
+        "expected_required_supervised_prestart_gate_marker_count: 8"
         in directive["selected_action"]
     )
     assert (
@@ -892,11 +898,11 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["selected_action"]
     )
     assert (
-        "supervised_prestart_gate_required_marker_count: 7"
+        "supervised_prestart_gate_required_marker_count: 8"
         in directive["selected_action"]
     )
     assert (
-        "expected_supervised_prestart_gate_required_marker_count: 7"
+        "expected_supervised_prestart_gate_required_marker_count: 8"
         in directive["selected_action"]
     )
     assert (
@@ -962,10 +968,19 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true"
         in directive["selected_action"]
     )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_contact_trace: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_contact_trace: true"
+        in directive["selected_action"]
+    )
     assert "accepted-candidate prestart trace" in directive["selected_action"]
     assert "valid accepted-candidate request-sequence trace" in directive[
         "selected_action"
     ]
+    assert "valid accepted-candidate contact trace" in directive["selected_action"]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in directive["selected_action"]
@@ -1465,8 +1480,8 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "supervised_prestart_gate_required_markers" in prompt
     assert "expected_supervised_prestart_gate_required_markers" in prompt
     assert "expected_required_supervised_prestart_gate_markers" in prompt
-    assert "required_supervised_prestart_gate_marker_count: 7" in prompt
-    assert "expected_required_supervised_prestart_gate_marker_count: 7" in prompt
+    assert "required_supervised_prestart_gate_marker_count: 8" in prompt
+    assert "expected_required_supervised_prestart_gate_marker_count: 8" in prompt
     assert (
         "required_supervised_prestart_gate_marker_count_matches_contract: true"
         in prompt
@@ -1480,8 +1495,8 @@ def test_prompt_and_readme_document_project_director_agent():
         "required_supervised_prestart_gate_markers_match_supervised_gate: true"
         in prompt
     )
-    assert "supervised_prestart_gate_required_marker_count: 7" in prompt
-    assert "expected_supervised_prestart_gate_required_marker_count: 7" in prompt
+    assert "supervised_prestart_gate_required_marker_count: 8" in prompt
+    assert "expected_supervised_prestart_gate_required_marker_count: 8" in prompt
     assert (
         "supervised_prestart_gate_required_marker_count_matches_contract: true"
         in prompt
@@ -1515,8 +1530,8 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "supervised_prestart_gate_required_markers" in readme
     assert "expected_supervised_prestart_gate_required_markers" in readme
     assert "expected_required_supervised_prestart_gate_markers" in readme
-    assert "required_supervised_prestart_gate_marker_count: 7" in readme
-    assert "expected_required_supervised_prestart_gate_marker_count: 7" in readme
+    assert "required_supervised_prestart_gate_marker_count: 8" in readme
+    assert "expected_required_supervised_prestart_gate_marker_count: 8" in readme
     assert (
         "required_supervised_prestart_gate_marker_count_matches_contract: true"
         in readme
@@ -1530,8 +1545,8 @@ def test_prompt_and_readme_document_project_director_agent():
         "required_supervised_prestart_gate_markers_match_supervised_gate: true"
         in readme
     )
-    assert "supervised_prestart_gate_required_marker_count: 7" in readme
-    assert "expected_supervised_prestart_gate_required_marker_count: 7" in readme
+    assert "supervised_prestart_gate_required_marker_count: 8" in readme
+    assert "expected_supervised_prestart_gate_required_marker_count: 8" in readme
     assert (
         "supervised_prestart_gate_required_marker_count_matches_contract: true"
         in readme

@@ -459,7 +459,8 @@ you want the background automation active.
   plus `supervised_prestart_gate.requires_accepted_candidate_artifact_root_trace: true`,
   `supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true`,
   and
-  `supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`.
+  `supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`, and
+  `supervised_prestart_gate.requires_accepted_candidate_contact_trace: true`.
   It must also expose top-level
   `supervised_prestart_gate_required: true`,
   `supervised_prestart_gate_operator_sequence_step_index: 11`,
@@ -469,14 +470,14 @@ you want the background automation active.
   `supervised_prestart_gate_required_markers`,
   `expected_supervised_prestart_gate_required_markers`,
   `expected_required_supervised_prestart_gate_markers`,
-  `required_supervised_prestart_gate_marker_count: 7`,
-  `expected_required_supervised_prestart_gate_marker_count: 7`,
+  `required_supervised_prestart_gate_marker_count: 8`,
+  `expected_required_supervised_prestart_gate_marker_count: 8`,
   `required_supervised_prestart_gate_marker_count_matches_contract: true`,
   `required_supervised_prestart_gate_marker_count_matches_supervised_gate: true`,
   `required_supervised_prestart_gate_markers_match_contract: true`,
   `required_supervised_prestart_gate_markers_match_supervised_gate: true`,
-  `supervised_prestart_gate_required_marker_count: 7`,
-  `expected_supervised_prestart_gate_required_marker_count: 7`,
+  `supervised_prestart_gate_required_marker_count: 8`,
+  `expected_supervised_prestart_gate_required_marker_count: 8`,
   `supervised_prestart_gate_required_marker_count_matches_contract: true`,
   `supervised_prestart_gate_required_marker_count_matches_summary: true`,
   `supervised_prestart_gate_required_markers_match_contract: true`,
@@ -487,8 +488,8 @@ you want the background automation active.
   `supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true`,
   `supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true`,
   `supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true`,
-  and
-  `supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`.
+  `supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`, and
+  `supervised_prestart_gate_requires_accepted_candidate_contact_trace: true`.
   These fields prove only that the offline handoff packet still points at the
   current first WING MVP blocker and keeps supervised proof planning behind a
   valid accepted-candidate prestart trace and artifact-root trace; they do not

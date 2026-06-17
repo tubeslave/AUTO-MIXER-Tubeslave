@@ -543,6 +543,7 @@ the final `operator_sequence_supervised_prestart_gate_step` must include
   `valid accepted-candidate verifier WebSocket proof`,
   `valid accepted-candidate artifact-root trace`,
 `valid accepted-candidate request-sequence trace`,
+`valid accepted-candidate contact trace`,
 `expected-artifact-bound accepted source id`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`;
 the no-WING handoff summary must also show
@@ -551,6 +552,7 @@ the no-WING handoff summary must also show
   `valid accepted-candidate verifier WebSocket proof`,
   `valid accepted-candidate artifact-root trace`,
 `valid accepted-candidate request-sequence trace`,
+`valid accepted-candidate contact trace`,
 `expected-artifact-bound accepted source id`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`;
 the no-WING handoff summary must show `supervised_prestart_gate` exactly
@@ -576,14 +578,14 @@ the no-WING handoff summary must also show top-level
 `supervised_prestart_gate_required_markers`,
 `expected_supervised_prestart_gate_required_markers`,
 `expected_required_supervised_prestart_gate_markers`,
-`required_supervised_prestart_gate_marker_count: 7`,
-`expected_required_supervised_prestart_gate_marker_count: 7`,
+`required_supervised_prestart_gate_marker_count: 8`,
+`expected_required_supervised_prestart_gate_marker_count: 8`,
 `required_supervised_prestart_gate_marker_count_matches_contract: true`,
 `required_supervised_prestart_gate_marker_count_matches_supervised_gate: true`,
 `required_supervised_prestart_gate_markers_match_contract: true`,
 `required_supervised_prestart_gate_markers_match_supervised_gate: true`,
-`supervised_prestart_gate_required_marker_count: 7`,
-`expected_supervised_prestart_gate_required_marker_count: 7`,
+`supervised_prestart_gate_required_marker_count: 8`,
+`expected_supervised_prestart_gate_required_marker_count: 8`,
 `supervised_prestart_gate_required_marker_count_matches_contract: true`,
 `supervised_prestart_gate_required_marker_count_matches_summary: true`,
 `supervised_prestart_gate_required_markers_match_contract: true`,
@@ -600,11 +602,13 @@ the no-WING handoff summary must also show
 `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`; it must also show `supervised_prestart_gate.requires_accepted_candidate_verifier_ws_proof: true`; it must also show `supervised_prestart_gate.requires_accepted_candidate_artifact_root_trace: true`;
 it must also show `supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true`;
 it must also show `supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`;
+it must also show `supervised_prestart_gate.requires_accepted_candidate_contact_trace: true`;
 it must also show top-level `supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true`,
 top-level `supervised_prestart_gate_requires_accepted_candidate_verifier_ws_proof: true`,
 top-level `supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true`,
 top-level `supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true`,
-and top-level `supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`;
+top-level `supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`,
+and top-level `supervised_prestart_gate_requires_accepted_candidate_contact_trace: true`;
 the no-WING handoff summary must also show
 `required_supervised_proof_plan_summary_fields`,
 `expected_required_supervised_proof_plan_summary_fields`, and
@@ -636,6 +640,13 @@ the no-WING proof plan summary must also expose
 `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match: true`,
 `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed: false`,
 and `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted: false`;
+the no-WING proof plan summary must also expose
+`next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required: true`,
+`next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields`,
+`next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches: []`,
+`next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match: true`,
+`next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: false`,
+and `next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: false`;
 the no-WING proof plan summary must also show
 `operator_markdown_summary_required: true`,
 `operator_markdown_summary_required_field_lines`,

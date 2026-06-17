@@ -346,6 +346,9 @@ NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_TRACE_VALUE_GATE_SUMMA
 NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME = (
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface"
 )
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME = (
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface"
+)
 WING_READONLY_OPERATOR_SEQUENCE_LIST_SUMMARY_SURFACE_CHECK_NAME = (
     "wing_readonly_operator_sequence_list_summary_surface"
 )
@@ -406,6 +409,17 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted",
+    "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted",
     "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source",
     "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source",
     "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source",
@@ -477,6 +491,26 @@ NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMAR
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted",
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_VIOLATIONS = (
+    "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_missing",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_mismatch",
+    "next_wing_proof_plan_accepted_candidate_contacts_backend_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_contacts_backend_mismatch",
+    "next_wing_proof_plan_accepted_candidate_queries_console_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_queries_console_mismatch",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_missing_source_ids_missing",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_missing_source_ids_mismatch",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_complete_missing",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_complete_mismatch",
+)
+NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS = (
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted",
 )
 NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT = "summary.md"
 NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME = "artifact-manifest.json"
@@ -688,6 +722,12 @@ PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_REQUIRED_MARKERS = (
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match: true",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed: false",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted: false",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required: true",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches: []",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match: true",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: false",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: false",
 )
 PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_MARKDOWN_SURFACE_REQUIRED_FIELD_LINES = (
     "project_director_selected_action_value_gate_self_check_required",
@@ -3582,6 +3622,52 @@ def _accepted_candidate_request_sequence_trace(
             missing_source_ids
         ),
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete": (
+            bool(trace_source_ids) and not missing_source_ids
+        ),
+    }
+
+
+def _accepted_candidate_contact_trace(
+    accepted_source_ids: Sequence[str],
+    candidate_reviews: Sequence[Mapping[str, Any]],
+) -> dict[str, object]:
+    rows_by_source: dict[str, Mapping[str, Any]] = {}
+    for row in candidate_reviews:
+        source_id = str(row.get("source_id") or "")
+        if source_id:
+            rows_by_source[source_id] = row
+
+    trace_source_ids = [str(source_id) for source_id in accepted_source_ids if source_id]
+    contacts_backend_by_source: dict[str, bool] = {}
+    queries_console_by_source: dict[str, bool] = {}
+    missing_source_ids: list[str] = []
+
+    for source_id in trace_source_ids:
+        row = rows_by_source.get(source_id)
+        if row is None:
+            missing_source_ids.append(source_id)
+            continue
+        contacts_backend = row.get("contacts_backend") is True
+        queries_console = row.get("queries_console") is True
+        contacts_backend_by_source[source_id] = contacts_backend
+        queries_console_by_source[source_id] = queries_console
+        if not contacts_backend or not queries_console:
+            missing_source_ids.append(source_id)
+
+    return {
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids": (
+            trace_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": (
+            contacts_backend_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source": (
+            queries_console_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids": (
+            missing_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete": (
             bool(trace_source_ids) and not missing_source_ids
         ),
     }
@@ -14128,6 +14214,7 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     accepted_candidate_request_sequence_trace = (
         _accepted_candidate_request_sequence_trace([], [])
     )
+    accepted_candidate_contact_trace = _accepted_candidate_contact_trace([], [])
     required_supervised_proof_plan_summary_fields = list(
         WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
     )
@@ -14706,6 +14793,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                     candidate_review_rows,
                 )
             )
+            accepted_candidate_contact_trace = (
+                _accepted_candidate_contact_trace(
+                    accepted_source_ids,
+                    candidate_review_rows,
+                )
+            )
             trace_source_ids_key = (
                 "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids"
             )
@@ -14963,6 +15056,99 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             ):
                 violations.append(
                     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_complete_mismatch"
+                )
+            contact_trace_source_ids_key = (
+                "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
+            )
+            contacts_backend_by_source_key = (
+                "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
+            )
+            queries_console_by_source_key = (
+                "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+            )
+            contact_trace_missing_source_ids_key = (
+                "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
+            )
+            contact_trace_complete_key = (
+                "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+            )
+            reported_contact_trace_source_ids_raw = summary.get(
+                contact_trace_source_ids_key
+            )
+            reported_contact_trace_source_ids = _string_list(
+                reported_contact_trace_source_ids_raw
+            )
+            if not isinstance(reported_contact_trace_source_ids_raw, list):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_missing"
+                )
+            if (
+                reported_contact_trace_source_ids
+                != accepted_candidate_contact_trace[contact_trace_source_ids_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_mismatch"
+                )
+            (
+                reported_contacts_backend_by_source,
+                reported_contacts_backend_map_valid,
+            ) = _bool_value_map(summary.get(contacts_backend_by_source_key))
+            if not reported_contacts_backend_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contacts_backend_by_source_missing"
+                )
+            if (
+                reported_contacts_backend_by_source
+                != accepted_candidate_contact_trace[contacts_backend_by_source_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contacts_backend_mismatch"
+                )
+            (
+                reported_queries_console_by_source,
+                reported_queries_console_map_valid,
+            ) = _bool_value_map(summary.get(queries_console_by_source_key))
+            if not reported_queries_console_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_queries_console_by_source_missing"
+                )
+            if (
+                reported_queries_console_by_source
+                != accepted_candidate_contact_trace[queries_console_by_source_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_queries_console_mismatch"
+                )
+            reported_contact_trace_missing_source_ids_raw = summary.get(
+                contact_trace_missing_source_ids_key
+            )
+            reported_contact_trace_missing_source_ids = _string_list(
+                reported_contact_trace_missing_source_ids_raw
+            )
+            if not isinstance(reported_contact_trace_missing_source_ids_raw, list):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contact_trace_missing_source_ids_missing"
+                )
+            if (
+                reported_contact_trace_missing_source_ids
+                != accepted_candidate_contact_trace[
+                    contact_trace_missing_source_ids_key
+                ]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contact_trace_missing_source_ids_mismatch"
+                )
+            reported_contact_trace_complete = summary.get(contact_trace_complete_key)
+            if not isinstance(reported_contact_trace_complete, bool):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contact_trace_complete_missing"
+                )
+            if (
+                reported_contact_trace_complete
+                != accepted_candidate_contact_trace[contact_trace_complete_key]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_contact_trace_complete_mismatch"
                 )
             expected_candidate_prestart_source_ids = (
                 preflight_contract.wing_readonly_preflight_accepted_candidate_prestart_source_ids(
@@ -15723,6 +15909,7 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail.update(accepted_candidate_expected_artifact_trace)
     detail.update(accepted_candidate_request_sequence_trace)
+    detail.update(accepted_candidate_contact_trace)
     trace_value_gate_violations = [
         violation
         for violation in violations
@@ -15734,6 +15921,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         for violation in violations
         if violation
         in NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_VIOLATIONS
+    ]
+    contact_trace_value_gate_violations = [
+        violation
+        for violation in violations
+        if violation
+        in NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_VIOLATIONS
     ]
     detail[
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required"
@@ -15774,6 +15967,26 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     ] = False
     detail[
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted"
+    ] = False
+    detail[
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required"
+    ] = True
+    detail[
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids"
+    ] = list(
+        NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_VIOLATIONS
+    )
+    detail[
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations"
+    ] = contact_trace_value_gate_violations
+    detail[
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed"
+    ] = not contact_trace_value_gate_violations
+    detail[
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed"
+    ] = False
+    detail[
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted"
     ] = False
     detail["required_supervised_proof_plan_summary_fields"] = (
         required_supervised_proof_plan_summary_fields
@@ -18505,6 +18718,13 @@ def wing_readonly_preflight_handoff_packet_artifact_summary(
                 )
                 is True
             ),
+            "supervised_prestart_gate_requires_accepted_candidate_contact_trace": (
+                isinstance(supervised_prestart_gate, Mapping)
+                and supervised_prestart_gate.get(
+                    "requires_accepted_candidate_contact_trace"
+                )
+                is True
+            ),
             "supervised_prestart_gate_matches_expected": (
                 supervised_prestart_gate_matches_expected is True
             ),
@@ -19592,6 +19812,9 @@ def build_wing_readonly_operator_sequence_step_gate_summary_surface(
         "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace": true_field(
             "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace"
         ),
+        "supervised_prestart_gate_requires_accepted_candidate_contact_trace": true_field(
+            "supervised_prestart_gate_requires_accepted_candidate_contact_trace"
+        ),
         "supervised_prestart_gate_matches_expected": true_field(
             "supervised_prestart_gate_matches_expected"
         ),
@@ -19961,6 +20184,89 @@ def build_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_g
             False
         ),
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface(
+    next_plan: Mapping[str, object],
+) -> dict[str, object]:
+    def string_list_field(name: str) -> list[str]:
+        value = next_plan.get(name)
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    def true_field(name: str) -> bool:
+        return next_plan.get(name) is True
+
+    return {
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required": (
+            True
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required": (
+            true_field(
+                "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids": (
+            string_list_field(
+                "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations": (
+            string_list_field(
+                "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed": (
+            true_field(
+                "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed"
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted": (
+            False
+        ),
+    }
+
+
+def build_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_check(
+    summary: Mapping[str, object],
+) -> dict[str, object]:
+    next_plan = summary.get("next_wing_proof_plan")
+    mismatches: list[str] = []
+    if not isinstance(next_plan, Mapping):
+        mismatches.append("next_wing_proof_plan")
+    else:
+        mismatches.extend(
+            field_name
+            for field_name in NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS
+            if summary.get(field_name) != next_plan.get(field_name)
+        )
+
+    return {
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required": (
+            True
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields": (
+            list(
+                NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_FIELDS
+            )
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches": (
+            mismatches
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match": (
+            not mismatches
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed": (
+            False
+        ),
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted": (
             False
         ),
     }
@@ -22697,6 +23003,18 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         accepted_candidate_request_sequence_trace_missing_source_ids = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids"
         )
+        accepted_candidate_contact_trace_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
+        )
+        accepted_candidate_contacts_backend_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
+        )
+        accepted_candidate_queries_console_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+        )
+        accepted_candidate_contact_trace_missing_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
+        )
         accepted_candidate_expected_artifact_trace_value_gate_violation_ids = detail.get(
             "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids"
         )
@@ -22708,6 +23026,12 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         )
         raw_request_trace_value_gate_violations = detail.get(
             "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_violations"
+        )
+        accepted_candidate_contact_trace_value_gate_violation_ids = detail.get(
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids"
+        )
+        raw_contact_trace_value_gate_violations = detail.get(
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations"
         )
         (
             readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source,
@@ -22763,6 +23087,14 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         ) = _bool_value_map(
             accepted_candidate_request_sequence_matches_plan_by_source
         )
+        (
+            normalized_accepted_candidate_contacts_backend_by_source,
+            _,
+        ) = _bool_value_map(accepted_candidate_contacts_backend_by_source)
+        (
+            normalized_accepted_candidate_queries_console_by_source,
+            _,
+        ) = _bool_value_map(accepted_candidate_queries_console_by_source)
         (
             readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source,
             _,
@@ -22840,6 +23172,36 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             if "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed"
             in detail
             else not request_trace_value_gate_violations
+        )
+        contact_trace_value_gate_violation_ids = (
+            list(accepted_candidate_contact_trace_value_gate_violation_ids)
+            if isinstance(
+                accepted_candidate_contact_trace_value_gate_violation_ids,
+                list,
+            )
+            else list(
+                NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_VIOLATIONS
+            )
+        )
+        contact_trace_value_gate_violations = (
+            list(raw_contact_trace_value_gate_violations)
+            if isinstance(raw_contact_trace_value_gate_violations, list)
+            else [
+                violation
+                for violation in violations
+                if violation in contact_trace_value_gate_violation_ids
+            ]
+            if isinstance(violations, list)
+            else []
+        )
+        contact_trace_value_gate_passed = (
+            detail.get(
+                "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed"
+            )
+            is True
+            if "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed"
+            in detail
+            else not contact_trace_value_gate_violations
         )
         normalized_allowed_supervised_live_value_types = (
             list(allowed_supervised_live_value_types)
@@ -23238,6 +23600,34 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                 )
                 is True
             ),
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids": (
+                list(accepted_candidate_contact_trace_source_ids)
+                if isinstance(
+                    accepted_candidate_contact_trace_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": (
+                dict(normalized_accepted_candidate_contacts_backend_by_source)
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source": (
+                dict(normalized_accepted_candidate_queries_console_by_source)
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids": (
+                list(accepted_candidate_contact_trace_missing_source_ids)
+                if isinstance(
+                    accepted_candidate_contact_trace_missing_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete": (
+                detail.get(
+                    "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+                )
+                is True
+            ),
             "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required": (
                 True
             ),
@@ -23272,6 +23662,24 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                 False
             ),
             "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted": (
+                False
+            ),
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required": (
+                True
+            ),
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids": (
+                contact_trace_value_gate_violation_ids
+            ),
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations": (
+                contact_trace_value_gate_violations
+            ),
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed": (
+                contact_trace_value_gate_passed
+            ),
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed": (
+                False
+            ),
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted": (
                 False
             ),
             "required_supervised_proof_plan_summary_fields": (
@@ -23653,6 +24061,21 @@ def mark_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_ga
     summary["status"] = "failed"
 
 
+def mark_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_failed(
+    summary: dict[str, object],
+) -> None:
+    failed_checks = summary.setdefault("failed_checks", [])
+    if (
+        isinstance(failed_checks, list)
+        and NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME
+        not in failed_checks
+    ):
+        failed_checks.append(
+            NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_SUMMARY_SURFACE_CHECK_NAME
+        )
+    summary["status"] = "failed"
+
+
 def _format_markdown_summary_field_line(field_name: str, value: object) -> str:
     if isinstance(value, bool):
         rendered_value = "true" if value else "false"
@@ -23773,6 +24196,25 @@ def apply_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_g
         is not True
     ):
         mark_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_failed(
+            summary
+        )
+
+
+def apply_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_check(
+    summary: dict[str, object],
+) -> None:
+    check = build_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_check(
+        summary
+    )
+    summary.update(check)
+
+    if (
+        check[
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match"
+        ]
+        is not True
+    ):
+        mark_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_failed(
             summary
         )
 
@@ -24520,6 +24962,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
             )
         )
         apply_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_check(
+            summary
+        )
+        summary.update(
+            build_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface(
+                next_plan
+            )
+        )
+        apply_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_check(
             summary
         )
         summary.update(
@@ -25888,6 +26338,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace']).lower()}`",
                 "- supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace']).lower()}`",
+                "- supervised_prestart_gate_requires_accepted_candidate_contact_trace: "
+                f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_requires_accepted_candidate_contact_trace']).lower()}`",
                 "- supervised_prestart_gate_matches_expected: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['supervised_prestart_gate_matches_expected']).lower()}`",
                 "- declared_supervised_prestart_gate_matches_expected: "
@@ -27608,6 +28060,40 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted: "
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted']).lower()}`",
+                "- readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids'])}`",
+                "- readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_queries_console_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_queries_console_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids'])}`",
+                "- readonly_preflight_review_decision_accepted_candidate_contact_trace_complete: "
+                f"`{str(next_plan['readonly_preflight_review_decision_accepted_candidate_contact_trace_complete']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids: "
+                f"`{json.dumps(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violation_ids'])}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations: "
+                f"`{json.dumps(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations'])}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted: "
+                f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields: "
+                f"`{json.dumps(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields'])}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches: "
+                f"`{json.dumps(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches'])}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted']).lower()}`",
                 "- readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids'])}`",
                 "- readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source: "

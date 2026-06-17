@@ -244,7 +244,8 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
     "Only after accepted_decision_ready, a valid accepted-candidate "
     "prestart trace, a valid accepted-candidate verifier WebSocket proof, "
     "a valid accepted-candidate artifact-root trace, and "
-    "a valid accepted-candidate request-sequence trace, plus "
+    "a valid accepted-candidate request-sequence trace, a valid "
+    "accepted-candidate contact trace, plus "
     "expected-artifact-bound accepted source id, move to "
     "WING_SUPERVISED_FADER_GAIN_PROOF."
 )
@@ -254,6 +255,7 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS = (
     "valid accepted-candidate verifier WebSocket proof",
     "valid accepted-candidate artifact-root trace",
     "valid accepted-candidate request-sequence trace",
+    "valid accepted-candidate contact trace",
     "expected-artifact-bound accepted source id",
     "WING_SUPERVISED_FADER_GAIN_PROOF",
 )
@@ -301,6 +303,11 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS =
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source",
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids",
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete",
+    "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete",
     "readonly_preflight_review_decision_invalid_records",
 )
 WING_READONLY_PREFLIGHT_PREVIEW_PLAN_OPERATOR_STEP = (
@@ -436,6 +443,7 @@ def expected_supervised_prestart_gate(
         "requires_accepted_candidate_artifact_root_trace": True,
         "requires_accepted_candidate_request_sequence_trace": True,
         "requires_accepted_candidate_expected_artifact_trace": True,
+        "requires_accepted_candidate_contact_trace": True,
     }
 
 
