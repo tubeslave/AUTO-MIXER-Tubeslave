@@ -172,6 +172,11 @@ blockers выше.
    `backend_port_prestart_gate_readiness_closure_allowed`,
    `backend_port_prestart_gate_live_authority_granted`,
    `fail_closed_reason`, and `operator_next_step`;
+10a. if no-WING quick reports `environment_blocked_checks`, verify the no-WING
+   summary also exposes `environment_blocked_check_details` with
+   `local_dev_server_bind_denied`, `127.0.0.1:3000`, log paths, and
+   `operator_next_step`, and treat that result as failed until rerun in an
+   environment that can bind the frontend dev server;
 11. when a backend listener is already present, verify the failed no-WING
    summary exposes `listener_confirmation_template_path`, while the generated
    template remains pending with
@@ -212,19 +217,49 @@ blockers выше.
 30a. verify `backend_port_prestart_summary_type: no_wing_release_check`;
 30b. verify `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`;
 31. verify `backend_port_prestart_summary_status: passed`;
-32. verify `backend_port_prestart_summary_live_write: false`;
-33. verify `backend_port_prestart_summary_contacts_backend: false`;
-34. verify `backend_port_prestart_summary_queries_console: false`;
-35. verify `backend_port_prestart_summary_executes_tests: false`;
+32. verify `backend_port_prestart_summary_read_only: true`;
+33. verify `backend_port_prestart_summary_live_write: false`;
+34. verify `backend_port_prestart_summary_contacts_backend: false`;
+35. verify `backend_port_prestart_summary_contacts_wing: false`;
+35a. verify `backend_port_prestart_summary_mutates_console_state: false`;
+35b. verify `backend_port_prestart_summary_queries_console: false`;
+35c. verify `backend_port_prestart_summary_executes_tests: false`;
 36. verify `backend_port_prestart_check_status: passed`;
+36aa. verify `plan_safe_to_stop_listener_by_gate: false`;
+36ab. verify `plan_live_authority_granted: false`;
+36ac. verify
+   `plan_backend_port_prestart_gate_execution_allowed: false`;
+36ad. verify
+   `plan_backend_port_prestart_gate_readiness_closure_allowed: false`;
+36ae. verify
+   `plan_backend_port_prestart_gate_live_authority_granted: false`;
 36a. verify `backend_port_prestart_summary_type_matches_plan: true`;
 36b. verify `backend_port_prestart_summary_status_matches_plan: true`;
 36c. verify `backend_port_prestart_summary_connection_policy_matches_plan: true`;
-36d. verify `backend_port_prestart_summary_live_write_matches_plan: true`;
-36e. verify `backend_port_prestart_summary_contacts_backend_matches_plan: true`;
-36f. verify `backend_port_prestart_summary_queries_console_matches_plan: true`;
-36g. verify `backend_port_prestart_summary_executes_tests_matches_plan: true`;
-36h. verify `backend_port_prestart_check_status_matches_plan: true`;
+36d. verify `backend_port_prestart_summary_read_only_matches_plan: true`;
+36e. verify `backend_port_prestart_summary_live_write_matches_plan: true`;
+36f. verify `backend_port_prestart_summary_contacts_backend_matches_plan: true`;
+36g. verify `backend_port_prestart_summary_contacts_wing_matches_plan: true`;
+36h. verify `backend_port_prestart_summary_mutates_console_state_matches_plan: true`;
+36i. verify `backend_port_prestart_summary_queries_console_matches_plan: true`;
+36j. verify `backend_port_prestart_summary_executes_tests_matches_plan: true`;
+36k. verify `backend_port_prestart_check_status_matches_plan: true`;
+36l. verify `safe_to_stop_listener_by_gate_matches_plan: true`;
+36m. verify `live_authority_granted_matches_plan: true`;
+36n. verify
+   `backend_port_prestart_gate_execution_allowed_matches_plan: true`;
+36o. verify
+   `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`;
+36p. verify
+   `backend_port_prestart_gate_live_authority_granted_matches_plan: true`;
+36q. verify `declared_safe_to_stop_listener_by_gate_matches_plan: true`;
+36r. verify `declared_live_authority_granted_matches_plan: true`;
+36s. verify
+   `declared_backend_port_prestart_gate_execution_allowed_matches_plan: true`;
+36t. verify
+   `declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`;
+36u. verify
+   `declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true`;
 37. verify `physical_preflight_requires_existing_backend_connection: true`;
 38. verify `backend_port_prestart_check_required: true`;
 39. verify
@@ -247,13 +282,19 @@ blockers выше.
    `backend_port_prestart_check_must_be_first_operator_step: true`, and
    `backend_port_prestart_check_operator_sequence_step_is_first: true`;
 45. verify `backend_connection_confirmation_step_index: 2`,
+   `expected_backend_connection_confirmation_step_index: 2`,
    `operator_sequence_has_backend_connection_confirmation: true`,
    `operator_sequence_backend_connection_confirmation_step_index: 2`,
    `operator_sequence_backend_connection_confirmation_before_capture: true`,
    `operator_sequence_backend_connection_confirmation_step` includes
    `existing backend connection`, `intended WING Rack`, and
    `read-only inspection`, and
-   `operator_sequence_capture_readonly_preflight_step_index: 4`;
+   `operator_sequence_capture_readonly_preflight_step_index: 4`,
+   `expected_operator_sequence_capture_readonly_preflight_step_index: 4`,
+   `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`,
+   `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
+   `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
+   and `operator_sequence_capture_readonly_preflight_step_matches_contract: true`;
 46. verify `expected_artifacts` exactly matches `expected_artifact_globs` and
    `plan_expected_artifacts`, and verify
    `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`,
@@ -284,6 +325,16 @@ blockers выше.
    in the supervised proof plan summary;
 52. verify `mvp_blocker_anchor.packet_does_not_close_blocker: true`;
 53. verify `operator_sequence_count: 10`;
+53a. verify top-level `operator_sequence`;
+53b. verify top-level `expected_operator_sequence`;
+53c. verify `wing_readonly_operator_sequence_list_summary_surface_match: true`;
+53d. verify `wing_readonly_operator_sequence_list_summary_surface_mismatches: []`;
+53e. verify `wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: true`;
+53f. verify `wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []`;
+53g. verify `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines`;
+53h. verify `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value`;
+53i. verify `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value`;
+53j. verify `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: true`;
 54. verify `expected_operator_sequence_count: 10`;
 55. verify `operator_sequence_count_matches_contract: true`;
 56. verify `operator_sequence_sha256_matches_actual: true`;
@@ -333,17 +384,116 @@ blockers выше.
 84. verify the no-WING handoff summary has
    `required_supervised_proof_plan_summary_fields`,
    `expected_required_supervised_proof_plan_summary_fields`, and
-   `required_supervised_proof_plan_summary_fields_match_contract: true`;
+   `required_supervised_proof_plan_summary_fields_match_contract: true`, plus
+   `required_supervised_proof_plan_summary_fields_include_invalid_records: true`;
 85. verify `required_supervised_proof_plan_summary_fields` includes
-   `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`
+   `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
+   `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`,
+   `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`,
+   `readonly_preflight_review_decision_candidate_artifact_roots`,
+   `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`,
+   `readonly_preflight_review_decision_expected_candidate_artifact_roots`,
    and
-   `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`;
-86. run dry-run recommendation;
-87. require explicit operator approval for the exact action;
-88. apply only bounded supervised fader/gain action;
-89. read back the result;
-90. test rollback;
-91. record proof artifact.
+   `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`,
+   and `readonly_preflight_review_decision_invalid_records`;
+86. verify the operator-readable no-WING `summary.md` proof plan section renders
+   those canonical helper fields;
+87. verify the no-WING `next_wing_proof_plan` summary shows
+   `operator_markdown_summary_required: true`,
+   `operator_markdown_summary_required_field_lines`,
+   `operator_markdown_summary_required_field_lines_missing_members: []`,
+   `operator_markdown_summary_required_field_lines_match_contract: true`,
+   `operator_markdown_summary_field_lines_rendered: true`, and
+   `operator_markdown_summary_missing_field_lines: []`;
+88. verify the no-WING `next_wing_proof_plan` summary binds the operator
+   markdown artifact with `operator_markdown_summary_artifact: summary.md`,
+   `operator_markdown_summary_sha256`, and
+   `operator_markdown_summary_sha256_available: true`;
+89. verify the no-WING `next_wing_proof_plan` summary verifies that binding
+   with `operator_markdown_summary_actual_sha256` and
+   `operator_markdown_summary_sha256_matches_actual: true`;
+90. verify the no-WING `summary.json` and operator-readable `summary.md`
+   expose the manifest summary surface with
+   `artifact_manifest_summary_surface_required: true`,
+   `artifact_manifest_summary_surface_missing_fields: []`,
+   `artifact_manifest_summary_surface_required_field_lines`,
+   `artifact_manifest_summary_surface_missing_field_lines: []`,
+   `artifact_manifest_summary_surface_field_lines_rendered: true`, and
+   `artifact_manifest_contract_id`, `artifact_manifest_contract_required: true`,
+   `artifact_manifest_contract_fields`, `artifact_manifest_contract_sha256`,
+   `artifact_manifest_contract_sha256_available: true`,
+   `artifact_manifest_contract_sha256_matches_expected: true`,
+   `artifact_manifest_contract_cross_surface_required: true`,
+   `artifact_manifest_contract_cross_surface_required_surfaces`,
+   `artifact_manifest_contract_cross_surface_required_fields`,
+   `artifact_manifest_contract_cross_surface_expected_match: true`,
+   `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`,
+   `artifact_manifest_contract_cross_surface_live_authority_granted: false`, and
+   `artifact_manifest_required_artifact_sha256_fields`;
+91. verify the no-WING run artifact bundle writes `artifact-manifest.json` with
+   `artifact_manifest_contract_id`,
+   `artifact_manifest_contract_required: true`,
+   `artifact_manifest_contract_fields`,
+   `artifact_manifest_contract_sha256`,
+   `artifact_manifest_contract_sha256_available: true`,
+   `artifact_manifest_contract_sha256_matches_expected: true`,
+   `artifact_manifest_contract_cross_surface_required: true`,
+   `artifact_manifest_contract_cross_surface_required_surfaces`,
+   `artifact_manifest_contract_cross_surface_required_fields`,
+   `artifact_manifest_contract_cross_surface_expected_match: true`,
+   `artifact_manifest_contract_cross_surface_match: true`,
+   `artifact_manifest_summary_json_contract_sha256_matches_manifest: true`,
+   `artifact_manifest_summary_md_contract_sha256_matches_manifest: true`,
+   `artifact_manifest_contract_cross_surface_mismatches: []`,
+   `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`,
+   `artifact_manifest_contract_cross_surface_live_authority_granted: false`,
+   `artifact_manifest_path: artifact-manifest.json`,
+   `artifact_manifest_artifact_count: 2`,
+   `artifact_manifest_required_artifact_count: 2`,
+   `artifact_manifest_artifact_count_matches_required: true`,
+   `artifact_manifest_required_artifact_ids`,
+   `artifact_manifest_artifact_ids`,
+   `artifact_manifest_required_artifacts_present: true`,
+   `artifact_manifest_required_artifact_paths`,
+   `artifact_manifest_artifact_paths`,
+   `artifact_manifest_required_artifact_paths_present: true`,
+   `artifact_manifest_required_artifact_sha256_available: true`,
+   `artifact_manifest_summary_json_sha256`,
+   `artifact_manifest_summary_json_sha256_available: true`,
+   `artifact_manifest_summary_md_sha256`,
+   `artifact_manifest_summary_md_sha256_available: true`,
+   `artifact_manifest_readiness_closure_allowed: false`, and
+   `artifact_manifest_live_authority_granted: false`;
+92. verify the operator can run
+   `PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>`
+   on the same passed no-WING artifact directory before opening the
+   backend/WING session, and require `status: passed`, `failed_checks: []`,
+   `artifact_manifest_self_consistency_match: true`,
+   `artifact_manifest_contract_cross_surface_match: true`,
+   `artifact_manifest_self_consistency_summary_surface_match: true`,
+   `readiness_closure_allowed: false`, and `live_authority_granted: false`;
+   the no-WING summary must also expose
+   `artifact_manifest_verifier_required: true`,
+   `artifact_manifest_verifier_command`,
+   `artifact_manifest_verifier_status_required: passed`,
+   `artifact_manifest_verifier_failed_checks_required: []`,
+   `artifact_manifest_verifier_contacts_wing: false`,
+   `artifact_manifest_verifier_mutates_console_state: false`,
+   `artifact_manifest_verifier_queries_console: false`,
+   `artifact_manifest_verifier_readiness_closure_allowed: false`, and
+   `artifact_manifest_verifier_live_authority_granted: false`;
+92. verify the no-WING `next_wing_proof_plan` summary exposes
+   `required_supervised_proof_plan_summary_fields` and
+   `missing_required_supervised_proof_plan_summary_fields`;
+92. verify `next_wing_proof_plan_schema` fails closed with
+   `next_wing_proof_plan_required_summary_fields_missing` when any required
+   summary field is absent;
+90. run dry-run recommendation;
+91. require explicit operator approval for the exact action;
+92. apply only bounded supervised fader/gain action;
+93. read back the result;
+94. test rollback;
+93. record proof artifact.
 
 До отдельного ADR и hardware proof запрещены live writes для:
 
@@ -478,6 +628,11 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_gate_readiness_closure_allowed`,
   `backend_port_prestart_gate_live_authority_granted`,
   `fail_closed_reason`, and `operator_next_step`.
+- If no-WING quick reports `environment_blocked_checks`, the no-WING summary
+  must also expose `environment_blocked_check_details` with
+  `local_dev_server_bind_denied`, `127.0.0.1:3000`, log paths, and
+  `operator_next_step`. That result remains failed until rerun in an
+  environment that can bind the frontend dev server.
 - When the backend-port prestart check detects an existing listener, the failed
   no-WING summary must expose `listener_confirmation_template_path`, and the
   generated template must remain pending with
@@ -523,18 +678,41 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_summary_type_matches_plan: true`,
   `backend_port_prestart_summary_status_matches_plan: true`,
   `backend_port_prestart_summary_connection_policy_matches_plan: true`,
+  `backend_port_prestart_summary_read_only_matches_plan: true`,
   `backend_port_prestart_summary_live_write_matches_plan: true`,
   `backend_port_prestart_summary_contacts_backend_matches_plan: true`,
+  `backend_port_prestart_summary_contacts_wing_matches_plan: true`,
+  `backend_port_prestart_summary_mutates_console_state_matches_plan: true`,
   `backend_port_prestart_summary_queries_console_matches_plan: true`,
-  `backend_port_prestart_summary_executes_tests_matches_plan: true`, and
-  `backend_port_prestart_check_status_matches_plan: true`.
+  `backend_port_prestart_summary_executes_tests_matches_plan: true`,
+  `plan_safe_to_stop_listener_by_gate: false`,
+  `plan_live_authority_granted: false`,
+  `plan_backend_port_prestart_gate_execution_allowed: false`,
+  `plan_backend_port_prestart_gate_readiness_closure_allowed: false`,
+  `plan_backend_port_prestart_gate_live_authority_granted: false`,
+  `backend_port_prestart_check_status_matches_plan: true`,
+  `safe_to_stop_listener_by_gate_matches_plan: true`,
+  `live_authority_granted_matches_plan: true`,
+  `backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+  `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`, and
+  `backend_port_prestart_gate_live_authority_granted_matches_plan: true`;
+  it must also show
+  `declared_safe_to_stop_listener_by_gate_matches_plan: true`,
+  `declared_live_authority_granted_matches_plan: true`,
+  `declared_backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+  `declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`,
+  and
+  `declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true`.
 - Before any supervised fader/gain proof, the accepted-candidate prestart trace
 	  must show `backend_port_prestart_summary_required: true`,
 	  `backend_port_prestart_summary_type: no_wing_release_check`,
 	  `backend_port_prestart_summary_status: passed`,
 	  `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`,
+	  `backend_port_prestart_summary_read_only: true`,
 	  `backend_port_prestart_summary_live_write: false`,
 	  `backend_port_prestart_summary_contacts_backend: false`,
+	  `backend_port_prestart_summary_contacts_wing: false`,
+	  `backend_port_prestart_summary_mutates_console_state: false`,
 	  `backend_port_prestart_summary_queries_console: false`,
 	  `backend_port_prestart_summary_executes_tests: false`, and
 	  `backend_port_prestart_check_status: passed`.
@@ -544,7 +722,33 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`
   in the supervised proof plan summary. A non-empty map keeps
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`
-  in force and grants no live authority.
+  in force, must trigger
+  `next_wing_proof_plan_steps_with_candidate_prestart_violations` if proof
+  steps are still present, and grants no live authority.
+- The recomputed
+  `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`
+  map must also stay `{}`. A non-empty expected map must trigger
+  `next_wing_proof_plan_steps_with_expected_candidate_prestart_violations` if
+  proof steps are still present.
+- Accepted review source ids must also show
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`
+  in the supervised proof plan summary. A non-empty map keeps
+  `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`
+  in force, must trigger
+  `next_wing_proof_plan_steps_with_candidate_artifact_root_violations` if proof
+  steps are still present, and grants no live authority.
+- The recomputed
+  `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`
+  map must also stay `{}`. A non-empty expected map must trigger
+  `next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations`
+  if proof steps are still present.
+- Accepted review source ids must also expose an expected-artifact trace in the
+  supervised proof plan summary. Missing or mismatched expected-artifact trace
+  evidence keeps
+  `accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof`
+  in force, must trigger
+  `next_wing_proof_plan_steps_with_expected_artifact_trace_violations` if proof
+  steps are still present, and grants no live authority.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_port_prestart_summary_path_placeholder` pointing to the passed
   no-WING prestart `summary.json`, plus matching
@@ -583,13 +787,19 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `backend_port_prestart_check_operator_sequence_step_is_first: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `backend_connection_confirmation_step_index: 2`,
+  `expected_backend_connection_confirmation_step_index: 2`,
   `operator_sequence_has_backend_connection_confirmation: true`,
   `operator_sequence_backend_connection_confirmation_step_index: 2`,
   `operator_sequence_backend_connection_confirmation_before_capture: true`,
   `operator_sequence_backend_connection_confirmation_step` including
   `existing backend connection`, `intended WING Rack`, and
   `read-only inspection`, and
-  `operator_sequence_capture_readonly_preflight_step_index: 4`.
+  `operator_sequence_capture_readonly_preflight_step_index: 4`,
+  `expected_operator_sequence_capture_readonly_preflight_step_index: 4`,
+  `operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`,
+  `operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
+  `expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
+  and `operator_sequence_capture_readonly_preflight_step_matches_contract: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `supervised_prestart_gate` exactly matching
   `expected_supervised_prestart_gate` and
@@ -610,9 +820,57 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `operator_sequence_has_mvp_blocker_anchor_digest_review: true`,
   `operator_sequence_has_supervised_prestart_gate: true`,
   `operator_sequence_supervised_prestart_gate_is_final: true`, and
-  `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`.
+  `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`,
+  plus `supervised_prestart_gate.requires_accepted_candidate_artifact_root_trace: true`,
+  `supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true`,
+  and
+  `supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`.
+  It must also expose top-level
+  `supervised_prestart_gate_required: true`,
+  `supervised_prestart_gate_operator_sequence_step_index: 9`,
+  `supervised_prestart_gate_operator_sequence_step_must_be_final: true`,
+  `supervised_prestart_gate_operator_sequence_step`,
+  `supervised_prestart_gate_operator_sequence_step_matches_summary: true`,
+  `supervised_prestart_gate_required_markers`,
+  `expected_supervised_prestart_gate_required_markers`,
+  `expected_required_supervised_prestart_gate_markers`,
+  `required_supervised_prestart_gate_marker_count: 6`,
+  `expected_required_supervised_prestart_gate_marker_count: 6`,
+  `required_supervised_prestart_gate_marker_count_matches_contract: true`,
+  `required_supervised_prestart_gate_marker_count_matches_supervised_gate: true`,
+  `required_supervised_prestart_gate_markers_match_contract: true`,
+  `required_supervised_prestart_gate_markers_match_supervised_gate: true`,
+  `supervised_prestart_gate_required_marker_count: 6`,
+  `expected_supervised_prestart_gate_required_marker_count: 6`,
+  `supervised_prestart_gate_required_marker_count_matches_contract: true`,
+  `supervised_prestart_gate_required_marker_count_matches_summary: true`,
+  `supervised_prestart_gate_required_markers_match_contract: true`,
+  `supervised_prestart_gate_required_markers_match_summary: true`,
+  `supervised_prestart_gate_grants_live_authority: false`,
+  `supervised_prestart_gate_requires_operator_decision_status: accepted_decision_ready`,
+  `supervised_prestart_gate_unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`,
+  `supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true`,
+  `supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true`,
+  `supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true`,
+  and
+  `supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `operator_sequence_count: 10`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  top-level `operator_sequence` and top-level `expected_operator_sequence`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `wing_readonly_operator_sequence_list_summary_surface_match: true` and
+  `wing_readonly_operator_sequence_list_summary_surface_mismatches: []`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: true`
+  and `wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value`
+  and `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: true`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `expected_operator_sequence_count: 10` and
   `operator_sequence_count_matches_contract: true`.
@@ -661,22 +919,121 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the final
   `operator_sequence_supervised_prestart_gate_step` must include
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate artifact-root trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Before any supervised fader/gain proof,
   `required_supervised_prestart_gate_markers` must exactly list
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate artifact-root trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`.
 - Before any supervised fader/gain proof, the no-WING handoff summary must show
   `required_supervised_proof_plan_summary_fields`,
   `expected_required_supervised_proof_plan_summary_fields`, and
   `required_supervised_proof_plan_summary_fields_match_contract: true`.
+- Before any supervised fader/gain proof, the no-WING handoff summary must show
+  `required_supervised_proof_plan_summary_fields_include_invalid_records: true`.
 - Before any supervised fader/gain proof,
   `required_supervised_proof_plan_summary_fields` must include
-  `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`
-  and
-  `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`.
+  `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
+  `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`,
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`,
+  `readonly_preflight_review_decision_candidate_artifact_roots`,
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`,
+  `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and
+  `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`,
+  and `readonly_preflight_review_decision_invalid_records`.
+- Before any supervised fader/gain proof, the operator-readable no-WING
+  `summary.md` proof plan section must render those canonical helper fields.
+- Before any supervised fader/gain proof, the no-WING `next_wing_proof_plan`
+  summary must show `operator_markdown_summary_required: true`,
+  `operator_markdown_summary_required_field_lines`,
+  `operator_markdown_summary_required_field_lines_missing_members: []`,
+  `operator_markdown_summary_required_field_lines_match_contract: true`,
+  `operator_markdown_summary_field_lines_rendered: true`, and
+  `operator_markdown_summary_missing_field_lines: []`.
+- Before any supervised fader/gain proof, the no-WING `next_wing_proof_plan`
+  summary must bind the operator markdown artifact with
+  `operator_markdown_summary_artifact: summary.md`,
+  `operator_markdown_summary_sha256`, and
+  `operator_markdown_summary_sha256_available: true`.
+- Before any supervised fader/gain proof, the no-WING `next_wing_proof_plan`
+  summary must verify that binding with
+  `operator_markdown_summary_actual_sha256` and
+  `operator_markdown_summary_sha256_matches_actual: true`.
+- Before any supervised fader/gain proof, the no-WING `summary.json` and
+  operator-readable `summary.md` must expose the manifest summary surface with
+  `artifact_manifest_summary_surface_required: true`,
+  `artifact_manifest_summary_surface_missing_fields: []`,
+  `artifact_manifest_summary_surface_required_field_lines`,
+  `artifact_manifest_summary_surface_missing_field_lines: []`,
+  `artifact_manifest_summary_surface_field_lines_rendered: true`, and
+  `artifact_manifest_contract_id`, `artifact_manifest_contract_required: true`,
+  `artifact_manifest_contract_fields`, `artifact_manifest_contract_sha256`,
+  `artifact_manifest_contract_sha256_available: true`,
+  `artifact_manifest_contract_sha256_matches_expected: true`,
+  `artifact_manifest_contract_cross_surface_required: true`,
+  `artifact_manifest_contract_cross_surface_required_surfaces`,
+  `artifact_manifest_contract_cross_surface_required_fields`,
+  `artifact_manifest_contract_cross_surface_expected_match: true`,
+  `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`,
+  `artifact_manifest_contract_cross_surface_live_authority_granted: false`, and
+  `artifact_manifest_required_artifact_sha256_fields`.
+- Before any supervised fader/gain proof, the no-WING run artifact bundle must
+  write `artifact-manifest.json` with
+  `artifact_manifest_contract_id`, `artifact_manifest_contract_required: true`,
+  `artifact_manifest_contract_fields`, `artifact_manifest_contract_sha256`,
+  `artifact_manifest_contract_sha256_available: true`,
+  `artifact_manifest_contract_sha256_matches_expected: true`,
+  `artifact_manifest_contract_cross_surface_required: true`,
+  `artifact_manifest_contract_cross_surface_required_surfaces`,
+  `artifact_manifest_contract_cross_surface_required_fields`,
+  `artifact_manifest_contract_cross_surface_expected_match: true`,
+  `artifact_manifest_contract_cross_surface_match: true`,
+  `artifact_manifest_summary_json_contract_sha256_matches_manifest: true`,
+  `artifact_manifest_summary_md_contract_sha256_matches_manifest: true`,
+  `artifact_manifest_contract_cross_surface_mismatches: []`,
+  `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`,
+  `artifact_manifest_contract_cross_surface_live_authority_granted: false`,
+  `artifact_manifest_path: artifact-manifest.json`,
+  `artifact_manifest_artifact_count: 2`,
+  `artifact_manifest_required_artifact_count: 2`,
+  `artifact_manifest_artifact_count_matches_required: true`,
+  `artifact_manifest_required_artifact_ids`, `artifact_manifest_artifact_ids`,
+  `artifact_manifest_required_artifacts_present: true`,
+  `artifact_manifest_required_artifact_paths`, `artifact_manifest_artifact_paths`,
+  `artifact_manifest_required_artifact_paths_present: true`,
+  `artifact_manifest_required_artifact_sha256_available: true`,
+  `artifact_manifest_summary_json_sha256`,
+  `artifact_manifest_summary_json_sha256_available: true`,
+  `artifact_manifest_summary_md_sha256`,
+  `artifact_manifest_summary_md_sha256_available: true`,
+  `artifact_manifest_readiness_closure_allowed: false`, and
+  `artifact_manifest_live_authority_granted: false`.
+- Before opening the backend/WING session, the operator must run
+  `PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>`
+  against the same passed no-WING artifact directory and require
+  `status: passed`, `failed_checks: []`,
+  `artifact_manifest_self_consistency_match: true`,
+  `artifact_manifest_contract_cross_surface_match: true`,
+  `artifact_manifest_self_consistency_summary_surface_match: true`,
+  `readiness_closure_allowed: false`, and `live_authority_granted: false`.
+  The no-WING summary must also expose `artifact_manifest_verifier_required:
+  true`, `artifact_manifest_verifier_command`,
+  `artifact_manifest_verifier_status_required: passed`,
+  `artifact_manifest_verifier_failed_checks_required: []`,
+  `artifact_manifest_verifier_contacts_wing: false`,
+  `artifact_manifest_verifier_mutates_console_state: false`,
+  `artifact_manifest_verifier_queries_console: false`,
+  `artifact_manifest_verifier_readiness_closure_allowed: false`, and
+  `artifact_manifest_verifier_live_authority_granted: false`.
+- Before any supervised fader/gain proof, the no-WING `next_wing_proof_plan`
+  summary must expose `required_supervised_proof_plan_summary_fields` and
+  `missing_required_supervised_proof_plan_summary_fields`.
+- Before any supervised fader/gain proof, `next_wing_proof_plan_schema` must
+  fail closed with `next_wing_proof_plan_required_summary_fields_missing` when
+  any required summary field is absent.
 - Если WING Rack не подключен, разрешена только работа, которая прямо готовит
   физический read-only/supervised proof и имеет тест.
 - Методы коррекций Gain/Trim, Pan, EQ, Comp, FX, Balance и другие продолжай

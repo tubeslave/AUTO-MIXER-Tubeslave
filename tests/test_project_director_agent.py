@@ -11,6 +11,13 @@ PROMPT_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md
 README_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "README.md"
 DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
 
+ENVIRONMENT_BLOCKED_FRONTEND_MARKERS = (
+    "environment_blocked_checks",
+    "environment_blocked_check_details",
+    "local_dev_server_bind_denied",
+    "127.0.0.1:3000",
+)
+
 
 def load_director_module():
     sys.path.insert(0, str(DIRECTOR_PATH.parent))
@@ -138,6 +145,8 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert "fail_closed_reason" in directive["selected_action"]
     assert "operator_next_step" in directive["selected_action"]
+    for marker in ENVIRONMENT_BLOCKED_FRONTEND_MARKERS:
+        assert marker in directive["selected_action"]
     assert "listener_confirmation_template_path" in directive["selected_action"]
     assert "listener_confirmation_template_status: pending_operator_edit" in directive[
         "selected_action"
@@ -206,10 +215,19 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "backend_port_prestart_summary_connection_policy: "
         "no_hardware_no_network_no_live_writes"
     ) in directive["selected_action"]
+    assert "backend_port_prestart_summary_read_only: true" in directive[
+        "selected_action"
+    ]
     assert "backend_port_prestart_summary_live_write: false" in directive[
         "selected_action"
     ]
     assert "backend_port_prestart_summary_contacts_backend: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_summary_contacts_wing: false" in directive[
+        "selected_action"
+    ]
+    assert "backend_port_prestart_summary_mutates_console_state: false" in directive[
         "selected_action"
     ]
     assert "backend_port_prestart_summary_queries_console: false" in directive[
@@ -225,11 +243,29 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "backend_port_prestart_summary_type_matches_plan: true",
         "backend_port_prestart_summary_status_matches_plan: true",
         "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_read_only_matches_plan: true",
         "backend_port_prestart_summary_live_write_matches_plan: true",
         "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+        "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
         "backend_port_prestart_summary_queries_console_matches_plan: true",
         "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "plan_safe_to_stop_listener_by_gate: false",
+        "plan_live_authority_granted: false",
+        "plan_backend_port_prestart_gate_execution_allowed: false",
+        "plan_backend_port_prestart_gate_readiness_closure_allowed: false",
+        "plan_backend_port_prestart_gate_live_authority_granted: false",
         "backend_port_prestart_check_status_matches_plan: true",
+        "safe_to_stop_listener_by_gate_matches_plan: true",
+        "live_authority_granted_matches_plan: true",
+        "backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "backend_port_prestart_gate_live_authority_granted_matches_plan: true",
+        "declared_safe_to_stop_listener_by_gate_matches_plan: true",
+        "declared_live_authority_granted_matches_plan: true",
+        "declared_backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true",
     ):
         assert marker in directive["selected_action"]
     assert (
@@ -305,6 +341,182 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in directive[
         "selected_action"
     ]
+    assert (
+        "required_supervised_proof_plan_summary_fields_include_invalid_records: true"
+        in directive["selected_action"]
+    )
+    assert "operator-readable no-WING `summary.md`" in directive["selected_action"]
+    assert "operator_markdown_summary_required: true" in directive["selected_action"]
+    assert "operator_markdown_summary_required_field_lines" in directive[
+        "selected_action"
+    ]
+    assert "operator_markdown_summary_required_field_lines_missing_members: []" in directive[
+        "selected_action"
+    ]
+    assert "operator_markdown_summary_required_field_lines_match_contract: true" in directive[
+        "selected_action"
+    ]
+    assert (
+        "operator_markdown_summary_field_lines_rendered: true"
+        in directive["selected_action"]
+    )
+    assert "operator_markdown_summary_missing_field_lines: []" in directive[
+        "selected_action"
+    ]
+    assert "operator_markdown_summary_artifact: summary.md" in directive[
+        "selected_action"
+    ]
+    assert "operator_markdown_summary_sha256" in directive["selected_action"]
+    assert "operator_markdown_summary_sha256_available: true" in directive[
+        "selected_action"
+    ]
+    assert "operator_markdown_summary_actual_sha256" in directive["selected_action"]
+    assert "operator_markdown_summary_sha256_matches_actual: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_summary_surface_required: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_summary_surface_missing_fields: []" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_summary_surface_required_field_lines" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_summary_surface_missing_field_lines: []" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_summary_surface_field_lines_rendered: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_contract_id" in directive["selected_action"]
+    assert "artifact_manifest_contract_required: true" in directive["selected_action"]
+    assert "artifact_manifest_contract_fields" in directive["selected_action"]
+    assert "artifact_manifest_contract_sha256" in directive["selected_action"]
+    assert "artifact_manifest_contract_sha256_available: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_contract_sha256_matches_expected: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_contract_cross_surface_required: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_contract_cross_surface_required_surfaces" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_contract_cross_surface_required_fields" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_contract_cross_surface_expected_match: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_contract_cross_surface_match: true" in directive[
+        "selected_action"
+    ]
+    assert (
+        "artifact_manifest_summary_json_contract_sha256_matches_manifest: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "artifact_manifest_summary_md_contract_sha256_matches_manifest: true"
+        in directive["selected_action"]
+    )
+    assert "artifact_manifest_contract_cross_surface_mismatches: []" in directive[
+        "selected_action"
+    ]
+    assert (
+        "artifact_manifest_contract_cross_surface_readiness_closure_allowed: false"
+        in directive["selected_action"]
+    )
+    assert (
+        "artifact_manifest_contract_cross_surface_live_authority_granted: false"
+        in directive["selected_action"]
+    )
+    assert "artifact_manifest_required_artifact_sha256_fields" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_path: artifact-manifest.json" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_artifact_count: 2" in directive["selected_action"]
+    assert "artifact_manifest_required_artifact_count: 2" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_artifact_count_matches_required: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_required_artifact_ids" in directive["selected_action"]
+    assert "artifact_manifest_artifact_ids" in directive["selected_action"]
+    assert "artifact_manifest_required_artifacts_present: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_required_artifact_paths" in directive["selected_action"]
+    assert "artifact_manifest_artifact_paths" in directive["selected_action"]
+    assert "artifact_manifest_required_artifact_paths_present: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_required_artifact_sha256_available: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_summary_json_sha256" in directive["selected_action"]
+    assert "artifact_manifest_summary_json_sha256_available: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_summary_md_sha256" in directive["selected_action"]
+    assert "artifact_manifest_summary_md_sha256_available: true" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_readiness_closure_allowed: false" in directive[
+        "selected_action"
+    ]
+    assert "artifact_manifest_live_authority_granted: false" in directive[
+        "selected_action"
+    ]
+    assert "readonly_preflight_review_decision_expected_candidate_artifact_roots" in directive[
+        "selected_action"
+    ]
+    assert "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source" in directive[
+        "selected_action"
+    ]
+    assert "readonly_preflight_review_decision_invalid_records" in directive[
+        "selected_action"
+    ]
+    assert (
+        "next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations"
+        in directive["selected_action"]
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof"
+        in directive["selected_action"]
+    )
+    for marker in (
+        "backend_port_prestart_summary_read_only: true",
+        "backend_port_prestart_summary_read_only_matches_plan: true",
+        "backend_port_prestart_summary_contacts_wing: false",
+        "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+        "backend_port_prestart_summary_mutates_console_state: false",
+        "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required: true",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches: []",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match: true",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed: false",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted: false",
+        "project_director_selected_action_value_gate_self_check_required: true",
+        "project_director_selected_action_value_gate_self_check_required_markers",
+        "project_director_selected_action_value_gate_self_check_missing_markers: []",
+        "project_director_selected_action_value_gate_self_check_markers_present: true",
+        "project_director_selected_action_value_gate_self_check_readiness_closure_allowed: false",
+        "project_director_selected_action_value_gate_self_check_live_authority_granted: false",
+        "project_director_selected_action_value_gate_self_check_markdown_surface_required: true",
+        "project_director_selected_action_value_gate_self_check_markdown_surface_required_field_lines",
+        "project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines: []",
+        "project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered: true",
+        "project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed: false",
+        "project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted: false",
+    ):
+        assert marker in directive["selected_action"]
     assert "backend_port_prestart_gate_matches_expected: true" in directive[
         "selected_action"
     ]
@@ -541,6 +753,79 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in directive["selected_action"]
     )
+    assert "supervised_prestart_gate_required: true" in directive["selected_action"]
+    assert (
+        "supervised_prestart_gate_operator_sequence_step_index: 9"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_operator_sequence_step_must_be_final: true"
+        in directive["selected_action"]
+    )
+    assert "supervised_prestart_gate_operator_sequence_step" in directive[
+        "selected_action"
+    ]
+    assert (
+        "supervised_prestart_gate_operator_sequence_step_matches_summary: true"
+        in directive["selected_action"]
+    )
+    assert "supervised_prestart_gate_required_markers" in directive[
+        "selected_action"
+    ]
+    assert "expected_supervised_prestart_gate_required_markers" in directive[
+        "selected_action"
+    ]
+    assert "expected_required_supervised_prestart_gate_markers" in directive[
+        "selected_action"
+    ]
+    assert (
+        "required_supervised_prestart_gate_marker_count: 6"
+        in directive["selected_action"]
+    )
+    assert (
+        "expected_required_supervised_prestart_gate_marker_count: 6"
+        in directive["selected_action"]
+    )
+    assert (
+        "required_supervised_prestart_gate_marker_count_matches_contract: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "required_supervised_prestart_gate_marker_count_matches_supervised_gate: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "required_supervised_prestart_gate_markers_match_contract: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "required_supervised_prestart_gate_markers_match_supervised_gate: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_required_marker_count: 6"
+        in directive["selected_action"]
+    )
+    assert (
+        "expected_supervised_prestart_gate_required_marker_count: 6"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_required_marker_count_matches_contract: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_required_marker_count_matches_summary: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_required_markers_match_contract: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_required_markers_match_summary: true"
+        in directive["selected_action"]
+    )
     assert (
         "supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready"
         in directive["selected_action"]
@@ -549,13 +834,55 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
         in directive["selected_action"]
     )
+    assert "supervised_prestart_gate_grants_live_authority: false" in directive[
+        "selected_action"
+    ]
+    assert (
+        "supervised_prestart_gate_requires_operator_decision_status: accepted_decision_ready"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+        in directive["selected_action"]
+    )
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
         in directive["selected_action"]
     )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true"
+        in directive["selected_action"]
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true"
+        in directive["selected_action"]
+    )
     assert "accepted-candidate prestart trace" in directive["selected_action"]
+    assert "valid accepted-candidate request-sequence trace" in directive[
+        "selected_action"
+    ]
     assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
+        in directive["selected_action"]
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
         in directive["selected_action"]
     )
     assert directive["selected_evidence_file_count"] == len(directive["selected_evidence_files"])
@@ -567,6 +894,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     assert missing_index_reports == []
     assert (
         "tools/build_wing_readonly_preflight_handoff_packet.py"
+        in directive["selected_evidence_files"]
+    )
+    assert (
+        "tools/verify_no_wing_artifact_manifest.py"
         in directive["selected_evidence_files"]
     )
     assert (
@@ -715,6 +1046,10 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CARDINALITY_20260614.md"
         in directive["selected_evidence_files"]
     )
+    assert (
+        "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_VERIFIER_20260615.md"
+        in directive["selected_evidence_files"]
+    )
     assert directive["stop_broad_work"] is True
     assert directive["continue_goal_mode"] is True
     assert "Docs/MVP_WING_SUPERVISED.md" in directive["required_files"]
@@ -736,6 +1071,7 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         in directive["required_files"]
     )
     assert "tools/no_wing_release_check.py" in directive["required_files"]
+    assert "tools/verify_no_wing_artifact_manifest.py" in directive["required_files"]
     assert any("Develop correction methods" in item for item in directive["allowed_scope"])
 
 
@@ -776,7 +1112,9 @@ def test_project_director_markdown_is_operator_readable():
         "selected_action_sha256": "a" * 64,
         "current_first_command_baseline_coverage_required": True,
         "current_first_command_baseline_coverage_passed": True,
-        "current_first_command_baseline_coverage_marker_count": 68,
+        "current_first_command_baseline_coverage_marker_count": len(
+            director.update_mvp_progress.CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS
+        ),
         "current_first_command_baseline_missing_markers": [],
         "selected_action": "Run read-only preflight.",
         "selected_evidence_file_count": 1,
@@ -845,6 +1183,8 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_confirmation_template_path" in prompt
     assert "listener_confirmation_template_acceptance_status" in prompt
     assert "operator_next_step" in prompt
+    for marker in ENVIRONMENT_BLOCKED_FRONTEND_MARKERS:
+        assert marker in prompt
     assert "listener_confirmation_template_accepted_by_template: false" in prompt
     assert "listener_confirmation_template_operator_placeholder_fields" in prompt
     assert "listener_confirmation_template_required_edits" in prompt
@@ -942,6 +1282,8 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "listener_confirmation_template_path" in readme
     assert "listener_confirmation_template_acceptance_status" in readme
     assert "operator_next_step" in readme
+    for marker in ENVIRONMENT_BLOCKED_FRONTEND_MARKERS:
+        assert marker in readme
     assert "listener_confirmation_template_accepted_by_template: false" in readme
     assert "listener_confirmation_template_operator_placeholder_fields" in readme
     assert "listener_confirmation_template_required_edits" in readme
@@ -1018,6 +1360,44 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "supervised_prestart_gate.grants_live_authority: false" in prompt
     assert "supervised_prestart_gate.operator_sequence_step_index: 9" in prompt
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in prompt
+    assert "supervised_prestart_gate_required: true" in prompt
+    assert "supervised_prestart_gate_operator_sequence_step_index: 9" in prompt
+    assert (
+        "supervised_prestart_gate_operator_sequence_step_must_be_final: true"
+        in prompt
+    )
+    assert "supervised_prestart_gate_operator_sequence_step" in prompt
+    assert "supervised_prestart_gate_operator_sequence_step_matches_summary: true" in prompt
+    assert "supervised_prestart_gate_required_markers" in prompt
+    assert "expected_supervised_prestart_gate_required_markers" in prompt
+    assert "expected_required_supervised_prestart_gate_markers" in prompt
+    assert "required_supervised_prestart_gate_marker_count: 6" in prompt
+    assert "expected_required_supervised_prestart_gate_marker_count: 6" in prompt
+    assert (
+        "required_supervised_prestart_gate_marker_count_matches_contract: true"
+        in prompt
+    )
+    assert (
+        "required_supervised_prestart_gate_marker_count_matches_supervised_gate: true"
+        in prompt
+    )
+    assert "required_supervised_prestart_gate_markers_match_contract: true" in prompt
+    assert (
+        "required_supervised_prestart_gate_markers_match_supervised_gate: true"
+        in prompt
+    )
+    assert "supervised_prestart_gate_required_marker_count: 6" in prompt
+    assert "expected_supervised_prestart_gate_required_marker_count: 6" in prompt
+    assert (
+        "supervised_prestart_gate_required_marker_count_matches_contract: true"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate_required_marker_count_matches_summary: true"
+        in prompt
+    )
+    assert "supervised_prestart_gate_required_markers_match_contract: true" in prompt
+    assert "supervised_prestart_gate_required_markers_match_summary: true" in prompt
     assert (
         "supervised_prestart_gate.requires_operator_decision_status:"
         in prompt
@@ -1030,6 +1410,44 @@ def test_prompt_and_readme_document_project_director_agent():
         "supervised_prestart_gate.operator_sequence_step_must_be_final: true"
         in readme
     )
+    assert "supervised_prestart_gate_required: true" in readme
+    assert "supervised_prestart_gate_operator_sequence_step_index: 9" in readme
+    assert (
+        "supervised_prestart_gate_operator_sequence_step_must_be_final: true"
+        in readme
+    )
+    assert "supervised_prestart_gate_operator_sequence_step" in readme
+    assert "supervised_prestart_gate_operator_sequence_step_matches_summary: true" in readme
+    assert "supervised_prestart_gate_required_markers" in readme
+    assert "expected_supervised_prestart_gate_required_markers" in readme
+    assert "expected_required_supervised_prestart_gate_markers" in readme
+    assert "required_supervised_prestart_gate_marker_count: 6" in readme
+    assert "expected_required_supervised_prestart_gate_marker_count: 6" in readme
+    assert (
+        "required_supervised_prestart_gate_marker_count_matches_contract: true"
+        in readme
+    )
+    assert (
+        "required_supervised_prestart_gate_marker_count_matches_supervised_gate: true"
+        in readme
+    )
+    assert "required_supervised_prestart_gate_markers_match_contract: true" in readme
+    assert (
+        "required_supervised_prestart_gate_markers_match_supervised_gate: true"
+        in readme
+    )
+    assert "supervised_prestart_gate_required_marker_count: 6" in readme
+    assert "expected_supervised_prestart_gate_required_marker_count: 6" in readme
+    assert (
+        "supervised_prestart_gate_required_marker_count_matches_contract: true"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate_required_marker_count_matches_summary: true"
+        in readme
+    )
+    assert "supervised_prestart_gate_required_markers_match_contract: true" in readme
+    assert "supervised_prestart_gate_required_markers_match_summary: true" in readme
     assert (
         "supervised_prestart_gate.requires_operator_decision_status:"
         in readme
@@ -1138,6 +1556,74 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "required_supervised_proof_plan_summary_fields" in prompt
     assert "expected_required_supervised_proof_plan_summary_fields" in prompt
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in prompt
+    assert (
+        "required_supervised_proof_plan_summary_fields_include_invalid_records: true"
+        in prompt
+    )
+    assert "operator-readable no-WING" in prompt
+    assert "`summary.md` proof plan section" in prompt
+    assert "operator_markdown_summary_required: true" in prompt
+    assert "operator_markdown_summary_required_field_lines" in prompt
+    assert "operator_markdown_summary_required_field_lines_missing_members: []" in prompt
+    assert "operator_markdown_summary_required_field_lines_match_contract: true" in prompt
+    assert "operator_markdown_summary_field_lines_rendered: true" in prompt
+    assert "operator_markdown_summary_missing_field_lines: []" in prompt
+    assert "operator_markdown_summary_artifact: summary.md" in prompt
+    assert "operator_markdown_summary_sha256" in prompt
+    assert "operator_markdown_summary_sha256_available: true" in prompt
+    assert "operator_markdown_summary_actual_sha256" in prompt
+    assert "operator_markdown_summary_sha256_matches_actual: true" in prompt
+    assert "artifact_manifest_summary_surface_required: true" in prompt
+    assert "artifact_manifest_summary_surface_missing_fields: []" in prompt
+    assert "artifact_manifest_summary_surface_required_field_lines" in prompt
+    assert "artifact_manifest_summary_surface_missing_field_lines: []" in prompt
+    assert "artifact_manifest_summary_surface_field_lines_rendered: true" in prompt
+    assert "artifact_manifest_contract_id" in prompt
+    assert "artifact_manifest_contract_required: true" in prompt
+    assert "artifact_manifest_contract_fields" in prompt
+    assert "artifact_manifest_contract_sha256" in prompt
+    assert "artifact_manifest_contract_sha256_available: true" in prompt
+    assert "artifact_manifest_contract_sha256_matches_expected: true" in prompt
+    assert "artifact_manifest_contract_cross_surface_required: true" in prompt
+    assert "artifact_manifest_contract_cross_surface_required_surfaces" in prompt
+    assert "artifact_manifest_contract_cross_surface_required_fields" in prompt
+    assert "artifact_manifest_contract_cross_surface_expected_match: true" in prompt
+    assert "artifact_manifest_contract_cross_surface_match: true" in prompt
+    assert (
+        "artifact_manifest_summary_json_contract_sha256_matches_manifest: true"
+        in prompt
+    )
+    assert (
+        "artifact_manifest_summary_md_contract_sha256_matches_manifest: true"
+        in prompt
+    )
+    assert "artifact_manifest_contract_cross_surface_mismatches: []" in prompt
+    assert (
+        "artifact_manifest_contract_cross_surface_readiness_closure_allowed: false"
+        in prompt
+    )
+    assert (
+        "artifact_manifest_contract_cross_surface_live_authority_granted: false"
+        in prompt
+    )
+    assert "artifact_manifest_required_artifact_sha256_fields" in prompt
+    assert "artifact_manifest_path: artifact-manifest.json" in prompt
+    assert "artifact_manifest_artifact_count: 2" in prompt
+    assert "artifact_manifest_required_artifact_count: 2" in prompt
+    assert "artifact_manifest_artifact_count_matches_required: true" in prompt
+    assert "artifact_manifest_required_artifact_ids" in prompt
+    assert "artifact_manifest_artifact_ids" in prompt
+    assert "artifact_manifest_required_artifacts_present: true" in prompt
+    assert "artifact_manifest_required_artifact_paths" in prompt
+    assert "artifact_manifest_artifact_paths" in prompt
+    assert "artifact_manifest_required_artifact_paths_present: true" in prompt
+    assert "artifact_manifest_required_artifact_sha256_available: true" in prompt
+    assert "artifact_manifest_summary_json_sha256" in prompt
+    assert "artifact_manifest_summary_json_sha256_available: true" in prompt
+    assert "artifact_manifest_summary_md_sha256" in prompt
+    assert "artifact_manifest_summary_md_sha256_available: true" in prompt
+    assert "artifact_manifest_readiness_closure_allowed: false" in prompt
+    assert "artifact_manifest_live_authority_granted: false" in prompt
     assert "backend_port_prestart_gate_matches_expected: true" in prompt
     assert "declared_backend_port_prestart_gate_matches_expected: true" in prompt
     assert "supervised_prestart_gate_matches_expected: true" in prompt
@@ -1148,6 +1634,23 @@ def test_prompt_and_readme_document_project_director_agent():
     )
     assert (
         "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        in prompt
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
+        in prompt
+    )
+    assert "readonly_preflight_review_decision_invalid_records" in prompt
+    assert (
+        "next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations"
+        in prompt
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof"
+        in prompt
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
         in prompt
     )
     assert "accepted_decision_ready" in prompt
@@ -1163,16 +1666,67 @@ def test_prompt_and_readme_document_project_director_agent():
         "backend_port_prestart_summary_type_matches_plan: true",
         "backend_port_prestart_summary_status_matches_plan: true",
         "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_read_only_matches_plan: true",
         "backend_port_prestart_summary_live_write_matches_plan: true",
         "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+        "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
         "backend_port_prestart_summary_queries_console_matches_plan: true",
         "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "plan_safe_to_stop_listener_by_gate: false",
+        "plan_live_authority_granted: false",
+        "plan_backend_port_prestart_gate_execution_allowed: false",
+        "plan_backend_port_prestart_gate_readiness_closure_allowed: false",
+        "plan_backend_port_prestart_gate_live_authority_granted: false",
         "backend_port_prestart_check_status_matches_plan: true",
+        "safe_to_stop_listener_by_gate_matches_plan: true",
+        "live_authority_granted_matches_plan: true",
+        "backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "backend_port_prestart_gate_live_authority_granted_matches_plan: true",
+        "declared_safe_to_stop_listener_by_gate_matches_plan: true",
+        "declared_live_authority_granted_matches_plan: true",
+        "declared_backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true",
     ):
         assert marker in prompt
     assert "current first open blocker" in prompt
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
+        in prompt
+    )
+    assert "supervised_prestart_gate_grants_live_authority: false" in prompt
+    assert (
+        "supervised_prestart_gate_requires_operator_decision_status: accepted_decision_ready"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate_unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true"
+        in prompt
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true"
         in prompt
     )
     assert "accepted_candidate_prestart_contract_violations_by_source: {}" in prompt
@@ -1286,6 +1840,75 @@ def test_prompt_and_readme_document_project_director_agent():
     assert "required_supervised_proof_plan_summary_fields" in readme
     assert "expected_required_supervised_proof_plan_summary_fields" in readme
     assert "required_supervised_proof_plan_summary_fields_match_contract: true" in readme
+    assert (
+        "required_supervised_proof_plan_summary_fields_include_invalid_records: true"
+        in readme
+    )
+    assert "readonly_preflight_review_decision_invalid_records" in readme
+    assert "operator-readable no-WING" in readme
+    assert "`summary.md` proof plan section" in readme
+    assert "operator_markdown_summary_required: true" in readme
+    assert "operator_markdown_summary_required_field_lines" in readme
+    assert "operator_markdown_summary_required_field_lines_missing_members: []" in readme
+    assert "operator_markdown_summary_required_field_lines_match_contract: true" in readme
+    assert "operator_markdown_summary_field_lines_rendered: true" in readme
+    assert "operator_markdown_summary_missing_field_lines: []" in readme
+    assert "operator_markdown_summary_artifact: summary.md" in readme
+    assert "operator_markdown_summary_sha256" in readme
+    assert "operator_markdown_summary_sha256_available: true" in readme
+    assert "operator_markdown_summary_actual_sha256" in readme
+    assert "operator_markdown_summary_sha256_matches_actual: true" in readme
+    assert "artifact_manifest_summary_surface_required: true" in readme
+    assert "artifact_manifest_summary_surface_missing_fields: []" in readme
+    assert "artifact_manifest_summary_surface_required_field_lines" in readme
+    assert "artifact_manifest_summary_surface_missing_field_lines: []" in readme
+    assert "artifact_manifest_summary_surface_field_lines_rendered: true" in readme
+    assert "artifact_manifest_contract_id" in readme
+    assert "artifact_manifest_contract_required: true" in readme
+    assert "artifact_manifest_contract_fields" in readme
+    assert "artifact_manifest_contract_sha256" in readme
+    assert "artifact_manifest_contract_sha256_available: true" in readme
+    assert "artifact_manifest_contract_sha256_matches_expected: true" in readme
+    assert "artifact_manifest_contract_cross_surface_required: true" in readme
+    assert "artifact_manifest_contract_cross_surface_required_surfaces" in readme
+    assert "artifact_manifest_contract_cross_surface_required_fields" in readme
+    assert "artifact_manifest_contract_cross_surface_expected_match: true" in readme
+    assert "artifact_manifest_contract_cross_surface_match: true" in readme
+    assert (
+        "artifact_manifest_summary_json_contract_sha256_matches_manifest: true"
+        in readme
+    )
+    assert (
+        "artifact_manifest_summary_md_contract_sha256_matches_manifest: true"
+        in readme
+    )
+    assert "artifact_manifest_contract_cross_surface_mismatches: []" in readme
+    assert (
+        "artifact_manifest_contract_cross_surface_readiness_closure_allowed: false"
+        in readme
+    )
+    assert (
+        "artifact_manifest_contract_cross_surface_live_authority_granted: false"
+        in readme
+    )
+    assert "artifact_manifest_required_artifact_sha256_fields" in readme
+    assert "artifact_manifest_path: artifact-manifest.json" in readme
+    assert "artifact_manifest_artifact_count: 2" in readme
+    assert "artifact_manifest_required_artifact_count: 2" in readme
+    assert "artifact_manifest_artifact_count_matches_required: true" in readme
+    assert "artifact_manifest_required_artifact_ids" in readme
+    assert "artifact_manifest_artifact_ids" in readme
+    assert "artifact_manifest_required_artifacts_present: true" in readme
+    assert "artifact_manifest_required_artifact_paths" in readme
+    assert "artifact_manifest_artifact_paths" in readme
+    assert "artifact_manifest_required_artifact_paths_present: true" in readme
+    assert "artifact_manifest_required_artifact_sha256_available: true" in readme
+    assert "artifact_manifest_summary_json_sha256" in readme
+    assert "artifact_manifest_summary_json_sha256_available: true" in readme
+    assert "artifact_manifest_summary_md_sha256" in readme
+    assert "artifact_manifest_summary_md_sha256_available: true" in readme
+    assert "artifact_manifest_readiness_closure_allowed: false" in readme
+    assert "artifact_manifest_live_authority_granted: false" in readme
     assert "backend_port_prestart_gate_matches_expected: true" in readme
     assert "declared_backend_port_prestart_gate_matches_expected: true" in readme
     assert "supervised_prestart_gate_matches_expected: true" in readme
@@ -1311,16 +1934,67 @@ def test_prompt_and_readme_document_project_director_agent():
         "backend_port_prestart_summary_type_matches_plan: true",
         "backend_port_prestart_summary_status_matches_plan: true",
         "backend_port_prestart_summary_connection_policy_matches_plan: true",
+        "backend_port_prestart_summary_read_only_matches_plan: true",
         "backend_port_prestart_summary_live_write_matches_plan: true",
         "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+        "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+        "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
         "backend_port_prestart_summary_queries_console_matches_plan: true",
         "backend_port_prestart_summary_executes_tests_matches_plan: true",
+        "plan_safe_to_stop_listener_by_gate: false",
+        "plan_live_authority_granted: false",
+        "plan_backend_port_prestart_gate_execution_allowed: false",
+        "plan_backend_port_prestart_gate_readiness_closure_allowed: false",
+        "plan_backend_port_prestart_gate_live_authority_granted: false",
         "backend_port_prestart_check_status_matches_plan: true",
+        "safe_to_stop_listener_by_gate_matches_plan: true",
+        "live_authority_granted_matches_plan: true",
+        "backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "backend_port_prestart_gate_live_authority_granted_matches_plan: true",
+        "declared_safe_to_stop_listener_by_gate_matches_plan: true",
+        "declared_live_authority_granted_matches_plan: true",
+        "declared_backend_port_prestart_gate_execution_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+        "declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true",
     ):
         assert marker in readme
     assert "current first open blocker" in readme
     assert (
         "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true"
+        in readme
+    )
+    assert "supervised_prestart_gate_grants_live_authority: false" in readme
+    assert (
+        "supervised_prestart_gate_requires_operator_decision_status: accepted_decision_ready"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate_unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true"
+        in readme
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true"
         in readme
     )
     assert "accepted_candidate_prestart_contract_violations_by_source: {}" in readme

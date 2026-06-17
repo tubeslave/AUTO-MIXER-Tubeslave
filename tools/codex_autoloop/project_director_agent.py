@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,30 +25,14 @@ import update_mvp_progress  # noqa: E402
 
 
 DEFAULT_OUTPUT = PROJECT_ROOT / ".paperclip" / "reports" / "project_director_latest.md"
-EVIDENCE_PATH_RE = re.compile(r"`([^`]+)`")
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def unique_ordered(items: Sequence[str]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for item in items:
-        if item in seen:
-            continue
-        seen.add(item)
-        result.append(item)
-    return result
-
-
 def extract_evidence_files(evidence_text: str) -> list[str]:
-    return unique_ordered(
-        match.group(1)
-        for match in EVIDENCE_PATH_RE.finditer(evidence_text)
-        if "/" in match.group(1)
-    )
+    return update_mvp_progress.extract_evidence_files(evidence_text)
 
 
 def required_file_candidates_from_evidence(evidence_files: Sequence[str]) -> list[str]:
@@ -90,7 +73,9 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
             )
         )
         selected_status = first_open["status"]
-        selected_evidence_files = extract_evidence_files(first_open["evidence"])
+        selected_evidence_files = update_mvp_progress.extract_evidence_files(
+            first_open["evidence"]
+        )
     else:
         selected_blocker = "none"
         selected_action = "All MVP blockers are closed; prepare operator review before widening scope."
@@ -104,7 +89,7 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         and current_first_command != first_open["next action"]
     )
     stop_broad_work = bool(guard_report["stop_the_line"]) or selected_status != "closed"
-    required_files = unique_ordered(
+    required_files = update_mvp_progress.unique_ordered(
         [
             "Docs/MVP_WING_SUPERVISED.md",
             ".ai/project-layer/wing_mvp_blockers.md",

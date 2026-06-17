@@ -8,6 +8,8 @@ repo-local blocker table and writes a compact operator-facing status report.
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +21,7 @@ DEFAULT_BLOCKERS = PROJECT_ROOT / ".ai" / "project-layer" / "wing_mvp_blockers.m
 DEFAULT_OUTPUT = PROJECT_ROOT / "Docs" / "reports" / "MVP_PROGRESS_LATEST.md"
 CLOSED_STATUS = "closed"
 CURRENT_FIRST_COMMAND_HEADING = "## Current First Command"
+EVIDENCE_PATH_RE = re.compile(r"`([^`]+)`")
 CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick",
     "Docs/runbooks/WING_READONLY_PREFLIGHT.md",
@@ -40,6 +43,10 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "backend_port_prestart_gate_readiness_closure_allowed: false",
     "backend_port_prestart_gate_live_authority_granted: false",
     "backend_port_prestart_check_failure_detail_fields",
+    "environment_blocked_checks",
+    "environment_blocked_check_details",
+    "local_dev_server_bind_denied",
+    "127.0.0.1:3000",
     "listener_confirmation_template_status: pending_operator_edit",
     "listener_confirmation_template_safe_to_stop_listener_by_gate: false",
     "listener_confirmation_template_live_authority_granted: false",
@@ -65,24 +72,69 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "backend_port_prestart_summary_connection_policy_matches_plan: true",
     "backend_port_prestart_summary_status: passed",
     "backend_port_prestart_summary_status_matches_plan: true",
+    "backend_port_prestart_summary_read_only: true",
+    "backend_port_prestart_summary_read_only_matches_plan: true",
     "backend_port_prestart_summary_live_write: false",
     "backend_port_prestart_summary_live_write_matches_plan: true",
     "backend_port_prestart_summary_contacts_backend: false",
     "backend_port_prestart_summary_contacts_backend_matches_plan: true",
+    "backend_port_prestart_summary_contacts_wing: false",
+    "backend_port_prestart_summary_contacts_wing_matches_plan: true",
+    "backend_port_prestart_summary_mutates_console_state: false",
+    "backend_port_prestart_summary_mutates_console_state_matches_plan: true",
     "backend_port_prestart_summary_queries_console: false",
     "backend_port_prestart_summary_queries_console_matches_plan: true",
     "backend_port_prestart_summary_executes_tests: false",
     "backend_port_prestart_summary_executes_tests_matches_plan: true",
     "backend_port_prestart_check_status: passed",
+    "plan_safe_to_stop_listener_by_gate: false",
+    "plan_live_authority_granted: false",
+    "plan_backend_port_prestart_gate_execution_allowed: false",
+    "plan_backend_port_prestart_gate_readiness_closure_allowed: false",
+    "plan_backend_port_prestart_gate_live_authority_granted: false",
     "backend_port_prestart_check_status_matches_plan: true",
+    "safe_to_stop_listener_by_gate_matches_plan: true",
+    "live_authority_granted_matches_plan: true",
+    "backend_port_prestart_gate_execution_allowed_matches_plan: true",
+    "backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+    "backend_port_prestart_gate_live_authority_granted_matches_plan: true",
+    "declared_safe_to_stop_listener_by_gate_matches_plan: true",
+    "declared_live_authority_granted_matches_plan: true",
+    "declared_backend_port_prestart_gate_execution_allowed_matches_plan: true",
+    "declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true",
+    "declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true",
     "execution_allowed_by_packet: false",
     "live_authority_granted: false",
     "full_autonomous_ready: false",
     "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json",
+    "operator_sequence",
+    "expected_operator_sequence",
+    "wing_readonly_operator_sequence_list_summary_surface_self_check_required: true",
+    "wing_readonly_operator_sequence_list_summary_surface_mismatches: []",
+    "wing_readonly_operator_sequence_list_summary_surface_match: true",
+    "wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed: false",
+    "wing_readonly_operator_sequence_list_summary_surface_live_authority_granted: false",
+    "wing_readonly_operator_sequence_list_markdown_surface_required: true",
+    "wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []",
+    "wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: true",
+    "wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed: false",
+    "wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted: false",
     "expected_artifacts",
     "expected_artifacts_match_plan: true",
     "summary_glob_matches_plan: true",
     "event_log_glob_matches_plan: true",
+    "backend_connection_confirmation_step_index: 2",
+    "expected_backend_connection_confirmation_step_index: 2",
+    "operator_sequence_has_backend_connection_confirmation: true",
+    "operator_sequence_backend_connection_confirmation_step",
+    "operator_sequence_backend_connection_confirmation_step_index: 2",
+    "operator_sequence_backend_connection_confirmation_before_capture: true",
+    "operator_sequence_capture_readonly_preflight_step_index: 4",
+    "expected_operator_sequence_capture_readonly_preflight_step_index: 4",
+    "operator_sequence_capture_readonly_preflight_step_index_matches_contract: true",
+    "operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.",
+    "expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.",
+    "operator_sequence_capture_readonly_preflight_step_matches_contract: true",
     "mvp_blocker_anchor_matches_current_first_open: true",
     "mvp_blocker_anchor_sha256_matches_current_first_open: true",
     "mvp_blocker_anchor.packet_does_not_close_blocker: true",
@@ -104,6 +156,18 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "project_director_current_first_command_baseline_coverage_passed: true",
     "project_director_current_first_command_baseline_coverage_marker_count",
     "project_director_current_first_command_baseline_missing_markers: []",
+    "project_director_selected_action_value_gate_self_check_required: true",
+    "project_director_selected_action_value_gate_self_check_required_markers",
+    "project_director_selected_action_value_gate_self_check_missing_markers: []",
+    "project_director_selected_action_value_gate_self_check_markers_present: true",
+    "project_director_selected_action_value_gate_self_check_readiness_closure_allowed: false",
+    "project_director_selected_action_value_gate_self_check_live_authority_granted: false",
+    "project_director_selected_action_value_gate_self_check_markdown_surface_required: true",
+    "project_director_selected_action_value_gate_self_check_markdown_surface_required_field_lines",
+    "project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines: []",
+    "project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered: true",
+    "project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed: false",
+    "project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted: false",
     "operator_sequence_has_supervised_prestart_gate: true",
     "operator_sequence_supervised_prestart_gate_is_final: true",
     "required_supervised_prestart_gate_markers",
@@ -111,19 +175,166 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "expected_supervised_prestart_gate",
     "supervised_prestart_gate_matches_expected: true",
     "declared_supervised_prestart_gate_matches_expected: true",
+    "supervised_prestart_gate_required: true",
+    "supervised_prestart_gate_operator_sequence_step_index: 9",
+    "supervised_prestart_gate_operator_sequence_step_must_be_final: true",
+    "supervised_prestart_gate_operator_sequence_step",
+    "supervised_prestart_gate_operator_sequence_step_matches_summary: true",
+    "supervised_prestart_gate_required_markers",
+    "expected_supervised_prestart_gate_required_markers",
+    "expected_required_supervised_prestart_gate_markers",
+    "required_supervised_prestart_gate_marker_count: 6",
+    "expected_required_supervised_prestart_gate_marker_count: 6",
+    "required_supervised_prestart_gate_marker_count_matches_contract: true",
+    "required_supervised_prestart_gate_marker_count_matches_supervised_gate: true",
+    "required_supervised_prestart_gate_markers_match_contract: true",
+    "required_supervised_prestart_gate_markers_match_supervised_gate: true",
+    "supervised_prestart_gate_required_marker_count: 6",
+    "expected_supervised_prestart_gate_required_marker_count: 6",
+    "supervised_prestart_gate_required_marker_count_matches_contract: true",
+    "supervised_prestart_gate_required_marker_count_matches_summary: true",
+    "supervised_prestart_gate_required_markers_match_contract: true",
+    "supervised_prestart_gate_required_markers_match_summary: true",
     "supervised_prestart_gate.grants_live_authority: false",
+    "supervised_prestart_gate_grants_live_authority: false",
     "supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true",
+    "supervised_prestart_gate.requires_accepted_candidate_artifact_root_trace: true",
+    "supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true",
+    "supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true",
+    "supervised_prestart_gate_requires_operator_decision_status: accepted_decision_ready",
+    "supervised_prestart_gate_unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md",
+    "supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true",
+    "supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true",
+    "supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true",
+    "supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true",
+    "valid accepted-candidate artifact-root trace",
+    "valid accepted-candidate request-sequence trace",
     "required_supervised_proof_plan_summary_fields",
     "expected_required_supervised_proof_plan_summary_fields",
     "required_supervised_proof_plan_summary_fields_match_contract: true",
+    "required_supervised_proof_plan_summary_fields_include_invalid_records: true",
+    "operator-readable no-WING `summary.md`",
     "readonly_preflight_review_decision_expected_candidate_prestart_source_ids",
     "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source",
+    "readonly_preflight_review_decision_invalid_records",
     "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof",
+    "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source",
+    "next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations",
+    "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof",
+    "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required: true",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches: []",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match: true",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed: false",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted: false",
+    "operator_markdown_summary_required: true",
+    "operator_markdown_summary_required_field_lines",
+    "operator_markdown_summary_required_field_lines_missing_members: []",
+    "operator_markdown_summary_required_field_lines_match_contract: true",
+    "operator_markdown_summary_field_lines_rendered: true",
+    "operator_markdown_summary_missing_field_lines: []",
+    "operator_markdown_summary_artifact: summary.md",
+    "operator_markdown_summary_sha256",
+    "operator_markdown_summary_sha256_available: true",
+    "operator_markdown_summary_actual_sha256",
+    "operator_markdown_summary_sha256_matches_actual: true",
+    "artifact_manifest_summary_surface_required: true",
+    "artifact_manifest_summary_surface_missing_fields: []",
+    "artifact_manifest_summary_surface_required_field_lines",
+    "artifact_manifest_summary_surface_missing_field_lines: []",
+    "artifact_manifest_summary_surface_field_lines_rendered: true",
+    "artifact_manifest_contract_id",
+    "artifact_manifest_contract_required: true",
+    "artifact_manifest_contract_fields",
+    "artifact_manifest_contract_sha256",
+    "artifact_manifest_contract_sha256_available: true",
+    "artifact_manifest_contract_sha256_matches_expected: true",
+    "artifact_manifest_contract_cross_surface_required: true",
+    "artifact_manifest_contract_cross_surface_required_surfaces",
+    "artifact_manifest_contract_cross_surface_required_fields",
+    "artifact_manifest_contract_cross_surface_expected_match: true",
+    "artifact_manifest_contract_cross_surface_match: true",
+    "artifact_manifest_summary_json_contract_sha256_matches_manifest: true",
+    "artifact_manifest_summary_md_contract_sha256_matches_manifest: true",
+    "artifact_manifest_contract_cross_surface_mismatches: []",
+    "artifact_manifest_contract_cross_surface_readiness_closure_allowed: false",
+    "artifact_manifest_contract_cross_surface_live_authority_granted: false",
+    "artifact_manifest_path: artifact-manifest.json",
+    "artifact_manifest_artifact_count: 2",
+    "artifact_manifest_required_artifact_count: 2",
+    "artifact_manifest_artifact_count_matches_required: true",
+    "artifact_manifest_required_artifact_ids",
+    "artifact_manifest_artifact_ids",
+    "artifact_manifest_required_artifacts_present: true",
+    "artifact_manifest_required_artifact_paths",
+    "artifact_manifest_artifact_paths",
+    "artifact_manifest_required_artifact_paths_present: true",
+    "artifact_manifest_required_artifact_sha256_available: true",
+    "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_summary_json_sha256",
+    "artifact_manifest_summary_json_sha256_available: true",
+    "artifact_manifest_summary_md_sha256",
+    "artifact_manifest_summary_md_sha256_available: true",
+    "artifact_manifest_readiness_closure_allowed: false",
+    "artifact_manifest_live_authority_granted: false",
+    "PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>",
+    "status: passed",
+    "failed_checks: []",
+    "artifact_manifest_self_consistency_match: true",
+    "artifact_manifest_self_consistency_summary_surface_match: true",
+    "read_only: true",
+    "live_write: false",
+    "contacts_wing: false",
+    "contacts_backend: false",
+    "mutates_console_state: false",
+    "queries_console: false",
+    "executes_tests: false",
+    "artifact_manifest_verifier_required: true",
+    "artifact_manifest_verifier_command",
+    "artifact_manifest_verifier_status_required: passed",
+    "artifact_manifest_verifier_failed_checks_required: []",
+    "artifact_manifest_verifier_report_required_fields",
+    "artifact_manifest_verifier_contacts_wing: false",
+    "artifact_manifest_verifier_mutates_console_state: false",
+    "artifact_manifest_verifier_queries_console: false",
+    "artifact_manifest_verifier_readiness_closure_allowed: false",
+    "artifact_manifest_verifier_live_authority_granted: false",
+    "artifact-manifest.json",
+    "manifest_artifact_manifest_verifier_fields_present: true",
+    "manifest_artifact_manifest_verifier_command_matches_expected: true",
+    "summary_json_artifact_manifest_verifier_report_required_fields_matches_expected: true",
+    "summary_md_artifact_manifest_verifier_report_required_fields_matches_expected: true",
+    "manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true",
+    "verifier_report_required_fields_present: true",
+    "verifier_report_required_fields_missing: []",
+    "verifier_report_required_fields_match_contract: true",
+    "failed_checks_have_check_entries: true",
+    "failed_checks_missing_check_entries: []",
 )
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def unique_ordered(items: Sequence[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def extract_evidence_files(evidence_text: str) -> list[str]:
+    return unique_ordered(
+        match.group(1)
+        for match in EVIDENCE_PATH_RE.finditer(evidence_text)
+        if "/" in match.group(1)
+    )
 
 
 def split_markdown_row(line: str) -> list[str]:
@@ -236,6 +447,20 @@ def build_progress_report(
         blocker_next_action=first_open["next action"] if first_open else None,
         current_first_command=current_first_command if first_open else None,
     )
+    missing_markers = current_first_command_missing_baseline_markers(
+        current_first_command if first_open else None
+    )
+    baseline_coverage_required = bool(
+        first_open
+        and current_first_command
+        and current_first_command != first_open["next action"]
+    )
+    baseline_coverage_passed = bool(
+        current_first_command and not missing_markers
+    )
+    selected_evidence_files = (
+        extract_evidence_files(first_open["evidence"]) if first_open else []
+    )
 
     lines = [
         "# MVP Progress Latest",
@@ -253,6 +478,13 @@ def build_progress_report(
         f"- Current first open blocker: {first_name}",
         f"- Next required action source: {next_action_source}",
         f"- Next required action: {next_action}",
+        f"- Current First Command baseline coverage required: {str(baseline_coverage_required).lower()}",
+        f"- Current First Command baseline coverage passed: {str(baseline_coverage_passed).lower()}",
+        "- Current First Command baseline coverage marker count: "
+        f"{len(CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS)}",
+        "- Current First Command baseline missing markers: "
+        f"{json.dumps(missing_markers)}",
+        f"- Selected evidence file count: {len(selected_evidence_files)}",
         "",
         "## Blockers",
         "",

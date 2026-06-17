@@ -102,6 +102,9 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while accepted review source ids lack a valid
   accepted-candidate prestart trace, or while the proof plan still carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
+- A supervised proof is planned while accepted review source ids lack a valid
+  accepted-candidate artifact-root trace, or while the proof plan still carries
+  `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`.
 - A supervised proof is planned while
   `accepted_candidate_prestart_contract_violations_by_source` or
   `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`
@@ -112,11 +115,18 @@ Stop the current Codex work direction and return to the first open blocker if:
 	  `backend_port_prestart_summary_type: no_wing_release_check`,
 	  `backend_port_prestart_summary_status: passed`,
 	  `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`,
+	  `backend_port_prestart_summary_read_only: true`,
 	  `backend_port_prestart_summary_live_write: false`,
 	  `backend_port_prestart_summary_contacts_backend: false`,
+	  `backend_port_prestart_summary_contacts_wing: false`,
+	  `backend_port_prestart_summary_mutates_console_state: false`,
 	  `backend_port_prestart_summary_queries_console: false`,
 	  `backend_port_prestart_summary_executes_tests: false`, and
 	  `backend_port_prestart_check_status: passed`.
+- A supervised proof is planned while
+  `accepted_candidate_artifact_root_contract_violations_by_source` or
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`
+  is non-empty.
 - A supervised proof is planned while the no-WING handoff summary does not show
   command bindings to the packet roots:
   `preview_command_artifact_root_matches_packet: true`,
@@ -132,15 +142,70 @@ Stop the current Codex work direction and return to the first open blocker if:
   `backend_port_prestart_summary_sha256_available: true` and
   `backend_port_prestart_summary_sha256_available_matches_digest: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
+  `required_supervised_proof_plan_summary_fields_include_invalid_records: true`.
+- A supervised proof is planned while the no-WING handoff summary does not show
+  `project_director_selected_action_value_gate_self_check_required: true`,
+  `project_director_selected_action_value_gate_self_check_missing_markers: []`,
+  `project_director_selected_action_value_gate_self_check_markers_present: true`,
+  `project_director_selected_action_value_gate_self_check_readiness_closure_allowed: false`,
+  and
+  `project_director_selected_action_value_gate_self_check_live_authority_granted: false`.
+- A supervised proof is planned while the no-WING operator Markdown does not
+  show
+  `operator_markdown_summary_required_field_lines` containing
+  `readonly_preflight_review_decision_candidate_request_sequence_contract_valid`,
+  `readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source`,
+  `readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted`,
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed`
+  and
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted`,
+  `operator_markdown_summary_required_field_lines_missing_members: []`, and
+  `operator_markdown_summary_required_field_lines_match_contract: true`,
+  `project_director_selected_action_value_gate_self_check_markdown_surface_required: true`,
+  `project_director_selected_action_value_gate_self_check_markdown_surface_missing_field_lines: []`,
+  `project_director_selected_action_value_gate_self_check_markdown_surface_field_lines_rendered: true`,
+  `project_director_selected_action_value_gate_self_check_markdown_surface_readiness_closure_allowed: false`,
+  and
+  `project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted: false`.
+- A supervised proof is planned while the no-WING summary surface does not show
+  `artifact_manifest_summary_json_contract_sha256_matches_manifest: true`,
+  `artifact_manifest_summary_md_contract_sha256_matches_manifest: true`,
+  `artifact_manifest_contract_cross_surface_mismatches: []`, and
+  `artifact_manifest_contract_cross_surface_match: true`.
+- A supervised proof is planned while the no-WING handoff summary does not show
   `backend_port_prestart_summary_type_matches_plan: true`,
   `backend_port_prestart_summary_status_matches_plan: true`,
   `backend_port_prestart_summary_connection_policy_matches_plan: true`,
+  `backend_port_prestart_summary_read_only_matches_plan: true`,
   `backend_port_prestart_summary_live_write_matches_plan: true`,
   `backend_port_prestart_summary_contacts_backend_matches_plan: true`,
+  `backend_port_prestart_summary_contacts_wing_matches_plan: true`,
+  `backend_port_prestart_summary_mutates_console_state_matches_plan: true`,
   `backend_port_prestart_summary_queries_console_matches_plan: true`,
-  `backend_port_prestart_summary_executes_tests_matches_plan: true`, and
-  `backend_port_prestart_check_status_matches_plan: true`.
+  `backend_port_prestart_summary_executes_tests_matches_plan: true`,
+  `plan_safe_to_stop_listener_by_gate: false`,
+  `plan_live_authority_granted: false`,
+  `plan_backend_port_prestart_gate_execution_allowed: false`,
+  `plan_backend_port_prestart_gate_readiness_closure_allowed: false`,
+  `plan_backend_port_prestart_gate_live_authority_granted: false`,
+  `backend_port_prestart_check_status_matches_plan: true`,
+  `safe_to_stop_listener_by_gate_matches_plan: true`,
+  `live_authority_granted_matches_plan: true`,
+  `backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+  `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`, and
+  `backend_port_prestart_gate_live_authority_granted_matches_plan: true`;
+  it must also show
+  `declared_safe_to_stop_listener_by_gate_matches_plan: true`,
+  `declared_live_authority_granted_matches_plan: true`,
+  `declared_backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+  `declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`,
+  and
+  `declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true`.
 - A supervised proof is planned while the no-WING handoff summary does not show
+  `operator_sequence`,
+  `expected_operator_sequence`,
   `expected_operator_sequence_count: 10`,
   `operator_sequence_count_matches_contract: true`,
   `operator_sequence_sha256`,
@@ -225,6 +290,12 @@ Stop the current Codex work direction and return to the first open blocker if:
   `backend_port_prestart_gate_readiness_closure_allowed`,
   `backend_port_prestart_gate_live_authority_granted`,
   `fail_closed_reason`, and `operator_next_step`.
+- A supervised proof is planned while no-WING quick reports
+  `environment_blocked_checks` without
+  `environment_blocked_check_details`, `local_dev_server_bind_denied`,
+  `127.0.0.1:3000`, log paths, and `operator_next_step`. Such a no-WING result
+  remains failed until rerun in an environment that can bind the frontend dev
+  server.
 - A WING read-only preflight is planned from an existing backend listener while
   the failed no-WING prestart summary lacks a pending
   `listener_confirmation_template_path`, or while the generated template does
@@ -360,7 +431,24 @@ The decision-review ledger/report must expose
 `accepted_candidate_prestart_contract_violations_by_source`, and the supervised
 proof plan summary must expose
 `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`.
-Both maps must be `{}` before supervised proof steps are planned.
+Both maps must be `{}` before supervised proof steps are planned; no-WING
+validation must fail with
+`next_wing_proof_plan_steps_with_candidate_prestart_violations` if the proof
+plan carries a non-empty map while proof steps are present.
+The recomputed
+`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`
+map must also stay `{}`; no-WING validation must fail with
+`next_wing_proof_plan_steps_with_expected_candidate_prestart_violations` if
+that expected map is non-empty while proof steps are present.
+No-WING validation must also fail with
+`next_wing_proof_plan_steps_with_candidate_artifact_root_violations` if the
+proof plan carries a non-empty accepted-candidate artifact-root violations map
+while proof steps are present.
+The recomputed
+`readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`
+map must also stay `{}`; no-WING validation must fail with
+`next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations`
+if that expected map is non-empty while proof steps are present.
 
 The no-WING handoff summary must also show `backend_port_prestart_gate` exactly
 matching `expected_backend_port_prestart_gate`, with
@@ -416,6 +504,12 @@ The same summaries must also show
 `backend_port_prestart_gate_readiness_closure_allowed`,
 `backend_port_prestart_gate_live_authority_granted`, `fail_closed_reason`, and
 `operator_next_step`.
+
+If no-WING quick reports `environment_blocked_checks`, the no-WING summary must
+also expose `environment_blocked_check_details` with
+`local_dev_server_bind_denied`, `127.0.0.1:3000`, log paths, and
+`operator_next_step`; that result remains failed until rerun in an environment
+that can bind the frontend dev server.
 
 When the prestart gate fails closed on an existing listener, the no-WING summary
 must expose the generated `listener_confirmation_template_path` and show
@@ -474,6 +568,28 @@ The no-WING handoff summary must also show
 `backend_port_prestart_gate_live_authority_granted: false`.
 
 The no-WING handoff summary must also show
+`plan_safe_to_stop_listener_by_gate: false`,
+`plan_live_authority_granted: false`,
+`plan_backend_port_prestart_gate_execution_allowed: false`,
+`plan_backend_port_prestart_gate_readiness_closure_allowed: false`, and
+`plan_backend_port_prestart_gate_live_authority_granted: false`.
+
+The no-WING handoff summary must also show
+`safe_to_stop_listener_by_gate_matches_plan: true`,
+`live_authority_granted_matches_plan: true`,
+`backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+`backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`, and
+`backend_port_prestart_gate_live_authority_granted_matches_plan: true`.
+
+The no-WING handoff summary must also show
+`declared_safe_to_stop_listener_by_gate_matches_plan: true`,
+`declared_live_authority_granted_matches_plan: true`,
+`declared_backend_port_prestart_gate_execution_allowed_matches_plan: true`,
+`declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`,
+and
+`declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true`.
+
+The no-WING handoff summary must also show
 `execution_allowed_by_packet: false`.
 
 The no-WING handoff summary must also show
@@ -509,15 +625,59 @@ It must also show `supervised_prestart_gate` exactly matching
 The same `supervised_prestart_gate` must show
 `supervised_prestart_gate.operator_sequence_step_index: 9` and
 `supervised_prestart_gate.operator_sequence_step_must_be_final: true`.
+It must also expose top-level
+`supervised_prestart_gate_required: true`,
+`supervised_prestart_gate_operator_sequence_step_index: 9`, and
+`supervised_prestart_gate_operator_sequence_step_must_be_final: true`.
+It must also expose top-level `supervised_prestart_gate_operator_sequence_step`
+and `supervised_prestart_gate_operator_sequence_step_matches_summary: true`.
+It must also expose top-level
+`supervised_prestart_gate_required_markers`,
+`expected_supervised_prestart_gate_required_markers`,
+`expected_required_supervised_prestart_gate_markers`,
+`required_supervised_prestart_gate_marker_count: 6`,
+`expected_required_supervised_prestart_gate_marker_count: 6`,
+`required_supervised_prestart_gate_marker_count_matches_contract: true`,
+`required_supervised_prestart_gate_marker_count_matches_supervised_gate: true`,
+`required_supervised_prestart_gate_markers_match_contract: true`,
+`required_supervised_prestart_gate_markers_match_supervised_gate: true`,
+`supervised_prestart_gate_required_marker_count: 6`,
+`expected_supervised_prestart_gate_required_marker_count: 6`,
+`supervised_prestart_gate_required_marker_count_matches_contract: true`,
+`supervised_prestart_gate_required_marker_count_matches_summary: true`,
+`supervised_prestart_gate_required_markers_match_contract: true`, and
+`supervised_prestart_gate_required_markers_match_summary: true`.
 
 It must also show
 `supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready`
 and
 `supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`.
+It must also expose top-level
+`supervised_prestart_gate_grants_live_authority: false`,
+`supervised_prestart_gate_requires_operator_decision_status: accepted_decision_ready`,
+and
+`supervised_prestart_gate_unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`.
+
+It must also show
+`supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`,
+`supervised_prestart_gate.requires_accepted_candidate_artifact_root_trace: true`,
+`supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true`,
+and
+`supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`.
+It must also expose top-level
+`supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true`,
+`supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true`,
+`supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true`,
+and
+`supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`
+so release checks can grep the supervised prestart gates without parsing the
+nested object.
 
 The handoff summary must also show `required_supervised_prestart_gate_markers`
 exactly listing `accepted_decision_ready`,
 `valid accepted-candidate prestart trace`,
+`valid accepted-candidate artifact-root trace`,
+`valid accepted-candidate request-sequence trace`,
 `expected-artifact-bound accepted source id`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`.
 
@@ -534,6 +694,35 @@ and
 
 The handoff summary must also show `operator_sequence_count: 10` so reviewers
 can reject packets with missing or extra operator steps.
+It must also show `operator_sequence` and `expected_operator_sequence` so
+reviewers can inspect the ordered checklist directly from the flat no-WING
+summary before opening a backend/WING WebSocket.
+
+It must also show
+`wing_readonly_operator_sequence_list_summary_surface_self_check_required: true`,
+`wing_readonly_operator_sequence_list_summary_surface_mismatches: []`,
+`wing_readonly_operator_sequence_list_summary_surface_match: true`,
+`wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed: false`,
+and
+`wing_readonly_operator_sequence_list_summary_surface_live_authority_granted: false`
+so the promoted ordered lists fail closed if they drift from the handoff artifact
+or contract.
+
+It must also show
+`wing_readonly_operator_sequence_list_markdown_surface_required: true`,
+`wing_readonly_operator_sequence_list_markdown_surface_required_field_lines`,
+`wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_expected_value`,
+`wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_actual_value`,
+`wing_readonly_operator_sequence_list_markdown_surface_required_field_lines_match_contract: true`,
+`wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines: []`,
+`wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: true`,
+`wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed: false`,
+and
+`wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted: false`
+so the operator-readable `summary.md` fails closed if it stops rendering the
+ordered list review fields or the Markdown-surface verdict fields themselves.
+It also fails closed if the rendered `required_field_lines` value drifts from
+the runtime contract.
 It must also show `operator_sequence_sha256`,
 `actual_operator_sequence_sha256`, and
 `operator_sequence_sha256_matches_actual: true` so reviewers can reject
@@ -564,13 +753,20 @@ The first operator step text must also be explicit:
 The handoff summary must also prove the backend/WING connection confirmation
 step is explicit and occurs before capture:
 `backend_connection_confirmation_step_index: 2`,
+`expected_backend_connection_confirmation_step_index: 2`,
 `operator_sequence_has_backend_connection_confirmation: true`,
 `operator_sequence_backend_connection_confirmation_step_index: 2`,
 `operator_sequence_backend_connection_confirmation_before_capture: true`,
 `operator_sequence_backend_connection_confirmation_step` includes
 `existing backend connection`, `intended WING Rack`, and
 `read-only inspection`, and
-`operator_sequence_capture_readonly_preflight_step_index: 4`.
+`operator_sequence_capture_readonly_preflight_step_index: 4`,
+`expected_operator_sequence_capture_readonly_preflight_step_index: 4`,
+`operator_sequence_capture_readonly_preflight_step_index_matches_contract: true`,
+`operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
+`expected_operator_sequence_capture_readonly_preflight_step: Run capture_readonly_preflight.`,
+and
+`operator_sequence_capture_readonly_preflight_step_matches_contract: true`.
 
 ## Autonomy Budget Rule
 
