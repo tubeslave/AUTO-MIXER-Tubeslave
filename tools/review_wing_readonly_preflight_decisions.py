@@ -406,6 +406,10 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{_markdown_bool(row.get('summary_path_matches_expected_artifact'))}`",
                     "  - events_path_matches_expected_artifact: "
                     f"`{_markdown_bool(row.get('events_path_matches_expected_artifact'))}`",
+                    "  - contacts_backend: "
+                    f"`{_markdown_bool(row.get('contacts_backend'))}`",
+                    "  - queries_console: "
+                    f"`{_markdown_bool(row.get('queries_console'))}`",
                     "  - backend_port_prestart_check_required: "
                     f"`{_markdown_bool(row.get('backend_port_prestart_check_required'))}`",
                     "  - backend_port_prestart_check_must_pass_before_starting_backend: "

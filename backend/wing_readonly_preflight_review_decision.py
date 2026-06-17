@@ -287,6 +287,16 @@ def _candidate_review_rows(
                 "events_path_matches_expected_artifact": (
                     candidate.get("events_path_matches_expected_artifact") is True
                 ),
+                "contacts_backend": (
+                    candidate.get("contacts_backend")
+                    if isinstance(candidate.get("contacts_backend"), bool)
+                    else None
+                ),
+                "queries_console": (
+                    candidate.get("queries_console")
+                    if isinstance(candidate.get("queries_console"), bool)
+                    else None
+                ),
                 "request_sequence": _mapping_list(candidate.get("request_sequence")),
                 "plan_request_sequence": _mapping_list(
                     candidate.get("plan_request_sequence")

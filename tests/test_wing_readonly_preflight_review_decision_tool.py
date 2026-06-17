@@ -126,6 +126,8 @@ def _valid_summary() -> dict:
             "query_mixer_parameter",
             "query_mixer_parameter",
         ],
+        "contacts_backend": True,
+        "queries_console": True,
         "forbidden_request_types_sent": [],
         "readback_count": 3,
         "physical_readback_count": 3,
@@ -533,6 +535,8 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     )
     assert candidate_review["summary_path_matches_expected_artifact"] is True
     assert candidate_review["events_path_matches_expected_artifact"] is True
+    assert candidate_review["contacts_backend"] is True
+    assert candidate_review["queries_console"] is True
     assert candidate_review["backend_port_prestart_check_required"] is True
     assert (
         candidate_review[
@@ -570,6 +574,8 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert "expected_artifacts" in markdown
     assert "summary_path_matches_expected_artifact: `true`" in markdown
     assert "events_path_matches_expected_artifact: `true`" in markdown
+    assert "contacts_backend: `true`" in markdown
+    assert "queries_console: `true`" in markdown
     assert "backend_port_prestart_check_command" in markdown
     assert "backend_port_prestart_check_command_text" in markdown
     assert EXPECTED_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT in markdown
