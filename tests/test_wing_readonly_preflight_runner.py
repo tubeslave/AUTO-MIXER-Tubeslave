@@ -166,6 +166,18 @@ def test_runner_requires_manifest_verifier_surface_value_checks_before_websocket
     )
 
 
+def test_runner_requires_manifest_verifier_readiness_matrix_denials_before_websocket() -> None:
+    required_denial_checks = {
+        "manifest_denies_readiness_matrix_update",
+        "summary_denies_readiness_matrix_update",
+        "summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority",
+    }
+
+    assert required_denial_checks <= set(
+        runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+    )
+
+
 def prestart_summary_path(tmp_path: Path) -> Path:
     return tmp_path / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
 
@@ -3573,6 +3585,7 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     )
     verifier_checks = dict(verifier_report["checks"])
     verifier_checks["summary_json_sha256_matches_manifest"] = False
+    verifier_checks["summary_denies_readiness_matrix_update"] = False
     verifier_report.update(
         {
             "status": "passed",
@@ -3625,11 +3638,18 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
     assert summary["artifact_manifest_verifier_status"] == "passed"
     assert summary["artifact_manifest_verifier_failed_checks"] == []
     assert summary["artifact_manifest_verifier_check_mismatches"] == [
-        "summary_json_sha256_matches_manifest"
+        "summary_json_sha256_matches_manifest",
+        "summary_denies_readiness_matrix_update",
     ]
     assert (
         summary[
             "artifact_manifest_verifier_check_summary_json_sha256_matches_manifest"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "artifact_manifest_verifier_check_summary_denies_readiness_matrix_update"
         ]
         is False
     )
