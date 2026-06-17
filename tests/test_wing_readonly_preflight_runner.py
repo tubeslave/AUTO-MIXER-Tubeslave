@@ -955,6 +955,9 @@ async def test_readonly_preflight_writes_fail_closed_timeout_artifact(
     assert summary["blockers"] == ["transport_timeout_or_connection_loss"]
     assert summary["timeout_sec"] == 0.2
     assert summary["transport_failure"]["type"] == "TimeoutError"
+    assert summary["contacts_backend"] is True
+    assert summary["queries_console"] is False
+    assert "backend WebSocket responsiveness" in summary["operator_next_step"]
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == ["get_operator_mode"]
@@ -1004,6 +1007,10 @@ async def test_readonly_preflight_writes_fail_closed_send_error(
     assert summary["blockers"] == ["transport_timeout_or_connection_loss"]
     assert summary["transport_failure"]["type"] == "RuntimeError"
     assert summary["transport_failure"]["message"] == "send failed"
+    assert summary["contacts_backend"] is False
+    assert summary["queries_console"] is False
+    assert summary["transport_context"]["preflight_requests_sent"] is False
+    assert "backend WebSocket reachability" in summary["operator_next_step"]
     assert summary["write_request_sent"] is False
     assert summary["proposal_request_sent"] is False
     assert summary["sent_request_types"] == []
@@ -1054,6 +1061,11 @@ async def test_readonly_preflight_writes_fail_closed_handshake_rejection(
     assert summary["blockers"] == ["ws_handshake_rejected"]
     assert summary["transport_context"]["handshake_rejected_before_request"] is True
     assert summary["transport_context"]["preflight_requests_sent"] is False
+    assert summary["contacts_backend"] is False
+    assert summary["queries_console"] is False
+    assert summary["operator_next_step"] == summary["transport_context"][
+        "operator_next_step"
+    ]
     assert "intended Automixer backend WebSocket" in summary["transport_context"][
         "operator_next_step"
     ]

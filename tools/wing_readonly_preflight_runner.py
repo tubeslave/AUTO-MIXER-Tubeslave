@@ -1422,6 +1422,7 @@ async def run(args: argparse.Namespace) -> int:
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 4
     except asyncio.TimeoutError as exc:
+        sent_request_types = list(recorder.sent_request_types)
         summary.update(
             {
                 "status": "blocked",
@@ -1429,6 +1430,12 @@ async def run(args: argparse.Namespace) -> int:
                 "fail_closed": True,
                 "blockers": ["transport_timeout_or_connection_loss"],
                 "timeout_sec": args.timeout,
+                "contacts_backend": bool(sent_request_types),
+                "queries_console": "query_mixer_parameter" in sent_request_types,
+                "operator_next_step": (
+                    "Verify backend WebSocket responsiveness and rerun the "
+                    "expected-plan preflight."
+                ),
                 "transport_failure": {
                     "type": type(exc).__name__,
                     "message": str(exc),
@@ -1440,12 +1447,18 @@ async def run(args: argparse.Namespace) -> int:
         return 1
     except Exception as exc:
         reason, blockers, transport_context = transport_failure_classification(exc)
+        sent_request_types = list(recorder.sent_request_types)
+        preflight_requests_sent = bool(sent_request_types)
+        transport_context.setdefault("preflight_requests_sent", preflight_requests_sent)
         summary.update(
             {
                 "status": "blocked",
                 "reason": reason,
                 "fail_closed": True,
                 "blockers": blockers,
+                "contacts_backend": preflight_requests_sent,
+                "queries_console": "query_mixer_parameter" in sent_request_types,
+                "operator_next_step": transport_context.get("operator_next_step"),
                 "transport_context": transport_context,
                 "transport_failure": {"type": type(exc).__name__, "message": str(exc)},
             }
