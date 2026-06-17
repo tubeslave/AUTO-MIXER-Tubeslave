@@ -24227,7 +24227,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
         "connection_policy": (
             WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
         ),
+        "read_only": True,
         "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "readiness_closure_allowed": False,
         "readiness_closure_allowed_by_packet": False,
         "live_authority_granted": False,
         "artifact_manifest_summary_surface_required": True,

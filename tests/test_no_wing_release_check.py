@@ -499,6 +499,9 @@ def test_wing_readonly_prestart_summary_writer_creates_verifiable_bundle(tmp_pat
     assert payload["mutates_console_state"] is False
     assert payload["queries_console"] is False
     assert payload["executes_tests"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["readiness_closure_allowed_by_packet"] is False
+    assert payload["live_authority_granted"] is False
     assert (tmp_path / release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_ARTIFACT).exists()
     assert (tmp_path / release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME).exists()
     verifier_report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)

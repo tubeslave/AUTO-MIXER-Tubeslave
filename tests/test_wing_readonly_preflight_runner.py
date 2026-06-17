@@ -144,6 +144,28 @@ def test_runner_uses_shared_run_summary_contract() -> None:
     assert runner.RUN_SUMMARY_REASON == WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON
 
 
+def test_runner_requires_manifest_verifier_surface_value_checks_before_websocket() -> None:
+    required_surface_value_checks = {
+        f"{surface}_artifact_manifest_verifier_{field}_matches_expected"
+        for surface in ("summary_json", "summary_md", "manifest")
+        for field in (
+            "read_only",
+            "live_write",
+            "contacts_backend",
+            "executes_tests",
+            "contacts_wing",
+            "mutates_console_state",
+            "queries_console",
+            "readiness_closure_allowed",
+            "live_authority_granted",
+        )
+    }
+
+    assert required_surface_value_checks <= set(
+        runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+    )
+
+
 def prestart_summary_path(tmp_path: Path) -> Path:
     return tmp_path / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
 
