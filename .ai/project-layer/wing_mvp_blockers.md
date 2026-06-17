@@ -76,6 +76,8 @@ fields, and the verifier report must show
 `manifest_denies_live_authority: true`,
 `summary_denies_readiness_closure: true`,
 `summary_denies_live_authority: true`,
+`summary_md_readiness_closure_allowed_by_packet_denies_authority: true`,
+`summary_md_live_authority_granted_denies_authority: true`,
 `summary_json_artifact_manifest_verifier_fields_present: true`,
 `manifest_artifact_manifest_verifier_fields_present: true`,
 `summary_md_artifact_manifest_verifier_fields_rendered: true`, and
@@ -110,6 +112,8 @@ mirror those detached verifier checks before any WebSocket with
 `artifact_manifest_verifier_check_manifest_denies_live_authority: true`,
 `artifact_manifest_verifier_check_summary_denies_readiness_closure: true`,
 `artifact_manifest_verifier_check_summary_denies_live_authority: true`,
+`artifact_manifest_verifier_check_summary_md_readiness_closure_allowed_by_packet_denies_authority: true`,
+`artifact_manifest_verifier_check_summary_md_live_authority_granted_denies_authority: true`,
 `artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_fields_present: true`,
 `artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_fields_present: true`,
 `artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_fields_rendered: true`,
