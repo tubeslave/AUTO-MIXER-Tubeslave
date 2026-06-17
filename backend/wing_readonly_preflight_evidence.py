@@ -293,6 +293,9 @@ class WingReadonlyPreflightArtifactRecord:
     readback_count: int
     physical_readback_count: int
     sent_request_types: Tuple[str, ...]
+    write_request_sent: bool | None
+    proposal_request_sent: bool | None
+    forbidden_request_types_sent: Tuple[str, ...]
     request_sequence: Tuple[Dict[str, Any], ...]
     plan_request_sequence: Tuple[Dict[str, Any], ...]
     request_sequence_matches_plan: bool | None
@@ -352,6 +355,7 @@ class WingReadonlyPreflightArtifactRecord:
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
         payload["sent_request_types"] = list(self.sent_request_types)
+        payload["forbidden_request_types_sent"] = list(self.forbidden_request_types_sent)
         payload["request_sequence"] = [dict(row) for row in self.request_sequence]
         payload["plan_request_sequence"] = [
             dict(row) for row in self.plan_request_sequence
@@ -1042,22 +1046,22 @@ def _validate_event_log(
     payload: Mapping[str, Any],
     summary_path: Path,
     violations: list[str],
-) -> bool | None:
+) -> tuple[bool | None, Tuple[str, ...]]:
     event_path = _summary_event_path(payload, summary_path)
     if event_path is None:
         violations.append("event_log_path_missing")
-        return None
+        return None, ()
     if not event_path.exists():
         violations.append("event_log_missing")
-        return None
+        return None, ()
     try:
         events = _load_jsonl_events(event_path)
     except Exception as exc:
         violations.append(f"event_log_load_error:{type(exc).__name__}")
-        return None
+        return None, ()
     if not events:
         violations.append("event_log_empty")
-        return None
+        return None, ()
     summary_run_id = str(payload.get("run_id") or "")
     event_log_run_id_matches_summary = True
     for index, event in enumerate(events):
@@ -1122,9 +1126,12 @@ def _validate_event_log(
     unexpected_event_request_types = tuple(
         sorted(set(event_request_types) - ALLOWED_SENT_REQUEST_TYPES)
     )
+    forbidden_event_request_types = tuple(
+        sorted(set(event_request_types).intersection(FORBIDDEN_REQUEST_TYPES))
+    )
     if unexpected_event_request_types:
         violations.append("event_log_unexpected_sent_request_types")
-    if set(event_request_types).intersection(FORBIDDEN_REQUEST_TYPES):
+    if forbidden_event_request_types:
         violations.append("event_log_forbidden_request_type_sent")
         violations.append("forbidden_request_types_sent_not_empty")
     if (
@@ -1222,7 +1229,7 @@ def _validate_event_log(
         )
         if response_type not in expected_response_types:
             violations.append(f"event_log_response_type_mismatch:{index // 2}")
-    return event_log_run_id_matches_summary
+    return event_log_run_id_matches_summary, forbidden_event_request_types
 
 
 def _readback_is_physical(payload: Mapping[str, Any]) -> bool:
@@ -1467,6 +1474,7 @@ def validate_wing_readonly_preflight_artifact(
 
     expected_plan_payload: Mapping[str, Any] | None = None
     event_log_run_id_matches_summary: bool | None = None
+    event_log_forbidden_request_types_sent: Tuple[str, ...] = ()
     if summary_path is not None:
         expected_plan_payload = _validate_expected_plan_file(
             payload,
@@ -1479,7 +1487,10 @@ def validate_wing_readonly_preflight_artifact(
             violations,
         )
         _validate_prestart_summary_file(payload, summary_path, violations)
-        event_log_run_id_matches_summary = _validate_event_log(
+        (
+            event_log_run_id_matches_summary,
+            event_log_forbidden_request_types_sent,
+        ) = _validate_event_log(
             payload,
             summary_path,
             violations,
@@ -1562,6 +1573,12 @@ def validate_wing_readonly_preflight_artifact(
             "readback_count": readback_count,
             "physical_readback_count": physical_readback_count,
             "sent_request_types": list(sent_request_types),
+            "write_request_sent": payload.get("write_request_sent") is True,
+            "proposal_request_sent": payload.get("proposal_request_sent") is True,
+            "forbidden_request_types_sent": sorted(
+                set(_string_tuple(payload.get("forbidden_request_types_sent")))
+                | set(event_log_forbidden_request_types_sent)
+            ),
             "request_sequence": [dict(row) for row in request_sequence],
             "plan_request_sequence": [dict(row) for row in plan_request_sequence],
             "request_sequence_matches_plan": request_sequence_matches_plan,
@@ -1770,6 +1787,11 @@ def _record_from_validation(
         readback_count=_safe_int(evidence.get("readback_count")),
         physical_readback_count=_safe_int(evidence.get("physical_readback_count")),
         sent_request_types=_string_tuple(evidence.get("sent_request_types")),
+        write_request_sent=_optional_bool(evidence, "write_request_sent"),
+        proposal_request_sent=_optional_bool(evidence, "proposal_request_sent"),
+        forbidden_request_types_sent=_string_tuple(
+            evidence.get("forbidden_request_types_sent")
+        ),
         request_sequence=_request_sequence_tuple(evidence.get("request_sequence")),
         plan_request_sequence=_request_sequence_tuple(
             evidence.get("plan_request_sequence")
@@ -1967,6 +1989,9 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         readback_count=0,
         physical_readback_count=0,
         sent_request_types=(),
+        write_request_sent=None,
+        proposal_request_sent=None,
+        forbidden_request_types_sent=(),
         request_sequence=(),
         plan_request_sequence=(),
         request_sequence_matches_plan=None,

@@ -530,6 +530,16 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "events_path_matches_expected_artifact": True,
             "contacts_backend": True,
             "queries_console": True,
+            "write_request_sent": False,
+            "proposal_request_sent": False,
+            "sent_request_types": [
+                "get_operator_mode",
+                "get_state",
+                "query_mixer_parameter",
+                "query_mixer_parameter",
+                "query_mixer_parameter",
+            ],
+            "forbidden_request_types_sent": [],
             "channels": [3],
             "operator_confirmed_channels": [3],
             "operator_session_confirmation_required": True,
@@ -604,6 +614,13 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "events_path_matches_expected_artifact: `true`" in markdown
     assert "contacts_backend: `true`" in markdown
     assert "queries_console: `true`" in markdown
+    assert "write_request_sent: `false`" in markdown
+    assert "proposal_request_sent: `false`" in markdown
+    assert (
+        'sent_request_types: `["get_operator_mode", "get_state", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter"]`'
+        in markdown
+    )
+    assert "forbidden_request_types_sent: `[]`" in markdown
     assert "operator_confirmed_channels: `[3]`" in markdown
     assert "operator_session_confirmation_required: `true`" in markdown
     assert "operator_confirmed_session_ready: `true`" in markdown
@@ -861,8 +878,13 @@ def test_review_report_blocks_tampered_event_log(tmp_path: Path):
     assert report["invalid_candidate_count"] == 1
     assert report["artifact_reviews"][0]["operator_confirmed_channels"] == [3]
     assert report["artifact_reviews"][0]["operator_confirmed_session_ready"] is True
+    assert report["artifact_reviews"][0]["forbidden_request_types_sent"] == ["set_gain"]
+    assert report["artifact_reviews"][0]["write_request_sent"] is False
+    assert report["artifact_reviews"][0]["proposal_request_sent"] is False
     assert "event_log_forbidden_request_type_sent" in report["violations"]
     assert "forbidden_request_types_sent_not_empty" in report["violations"]
+    markdown = review_tool.render_markdown(report)
+    assert 'forbidden_request_types_sent: `["set_gain"]`' in markdown
     assert review_tool.exit_code_for_report(report) == 3
 
 

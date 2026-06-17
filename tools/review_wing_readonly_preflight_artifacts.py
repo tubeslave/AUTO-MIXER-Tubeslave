@@ -190,6 +190,20 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                     if isinstance(item.get("queries_console"), bool)
                     else None
                 ),
+                "write_request_sent": (
+                    item.get("write_request_sent")
+                    if isinstance(item.get("write_request_sent"), bool)
+                    else None
+                ),
+                "proposal_request_sent": (
+                    item.get("proposal_request_sent")
+                    if isinstance(item.get("proposal_request_sent"), bool)
+                    else None
+                ),
+                "sent_request_types": _string_list(item.get("sent_request_types")),
+                "forbidden_request_types_sent": _string_list(
+                    item.get("forbidden_request_types_sent")
+                ),
                 "channels": _int_list(item.get("channels")),
                 "operator_confirmed_channels": _int_list(
                     item.get("operator_confirmed_channels")
@@ -650,6 +664,14 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{json.dumps(row.get('contacts_backend'))}`",
                     "  - queries_console: "
                     f"`{json.dumps(row.get('queries_console'))}`",
+                    "  - write_request_sent: "
+                    f"`{json.dumps(row.get('write_request_sent'))}`",
+                    "  - proposal_request_sent: "
+                    f"`{json.dumps(row.get('proposal_request_sent'))}`",
+                    "  - sent_request_types: "
+                    f"`{json.dumps(row.get('sent_request_types') or [])}`",
+                    "  - forbidden_request_types_sent: "
+                    f"`{json.dumps(row.get('forbidden_request_types_sent') or [])}`",
                     f"  - channels: `{json.dumps(row.get('channels') or [])}`",
                     "  - operator_confirmed_channels: "
                     f"`{json.dumps(row.get('operator_confirmed_channels') or [])}`",
