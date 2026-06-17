@@ -1554,6 +1554,7 @@ async def run(args: argparse.Namespace) -> int:
                 "reason": "run_inputs_validated_no_websocket",
                 "expected_plan_match": True,
                 "contacts_backend": False,
+                "contacts_wing": False,
                 "queries_console": False,
                 "execution_allowed_by_validation": False,
                 "readiness_matrix_update_allowed": False,

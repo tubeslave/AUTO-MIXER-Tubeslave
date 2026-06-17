@@ -1465,6 +1465,7 @@ async def test_validate_run_inputs_only_passes_ready_command_without_websocket(
     assert summary["expected_plan_match"] is True
     assert summary["expected_plan_violations"] == []
     assert summary["contacts_backend"] is False
+    assert summary["contacts_wing"] is False
     assert summary["queries_console"] is False
     assert summary["mutates_console_state"] is False
     assert summary["executes_tests"] is False
