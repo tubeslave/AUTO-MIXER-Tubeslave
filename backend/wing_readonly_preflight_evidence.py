@@ -288,6 +288,8 @@ class WingReadonlyPreflightArtifactRecord:
     summary_path_matches_expected_artifact: bool | None
     events_path_matches_expected_artifact: bool | None
     connection_mode: str | None
+    contacts_backend: bool | None
+    queries_console: bool | None
     readback_count: int
     physical_readback_count: int
     sent_request_types: Tuple[str, ...]
@@ -363,6 +365,8 @@ class WingReadonlyPreflightArtifactRecord:
         payload["event_log_run_id_matches_summary"] = (
             self.event_log_run_id_matches_summary
         )
+        payload["contacts_backend"] = self.contacts_backend
+        payload["queries_console"] = self.queries_console
         payload["backend_port_prestart_check_command"] = list(
             self.backend_port_prestart_check_command
         )
@@ -1545,6 +1549,16 @@ def validate_wing_readonly_preflight_artifact(
                 )
             ),
             "connection_mode": payload.get("connection_mode"),
+            "contacts_backend": (
+                payload.get("contacts_backend")
+                if isinstance(payload.get("contacts_backend"), bool)
+                else None
+            ),
+            "queries_console": (
+                payload.get("queries_console")
+                if isinstance(payload.get("queries_console"), bool)
+                else None
+            ),
             "readback_count": readback_count,
             "physical_readback_count": physical_readback_count,
             "sent_request_types": list(sent_request_types),
@@ -1751,6 +1765,8 @@ def _record_from_validation(
             else None
         ),
         connection_mode=str(evidence.get("connection_mode")) if evidence.get("connection_mode") else None,
+        contacts_backend=_optional_bool(evidence, "contacts_backend"),
+        queries_console=_optional_bool(evidence, "queries_console"),
         readback_count=_safe_int(evidence.get("readback_count")),
         physical_readback_count=_safe_int(evidence.get("physical_readback_count")),
         sent_request_types=_string_tuple(evidence.get("sent_request_types")),
@@ -1946,6 +1962,8 @@ def _record_from_load_error(source_id: str, exc: Exception) -> WingReadonlyPrefl
         summary_path_matches_expected_artifact=None,
         events_path_matches_expected_artifact=None,
         connection_mode=None,
+        contacts_backend=None,
+        queries_console=None,
         readback_count=0,
         physical_readback_count=0,
         sent_request_types=(),

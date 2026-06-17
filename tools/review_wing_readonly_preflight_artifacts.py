@@ -180,6 +180,16 @@ def _artifact_review_rows(artifacts: list[Any]) -> list[dict[str, Any]]:
                 "events_path_matches_expected_artifact": (
                     item.get("events_path_matches_expected_artifact") is True
                 ),
+                "contacts_backend": (
+                    item.get("contacts_backend")
+                    if isinstance(item.get("contacts_backend"), bool)
+                    else None
+                ),
+                "queries_console": (
+                    item.get("queries_console")
+                    if isinstance(item.get("queries_console"), bool)
+                    else None
+                ),
                 "channels": _int_list(item.get("channels")),
                 "operator_confirmed_channels": _int_list(
                     item.get("operator_confirmed_channels")
@@ -636,6 +646,10 @@ def render_markdown(report: Mapping[str, Any]) -> str:
                     f"`{str(row.get('summary_path_matches_expected_artifact') is True).lower()}`",
                     "  - events_path_matches_expected_artifact: "
                     f"`{str(row.get('events_path_matches_expected_artifact') is True).lower()}`",
+                    "  - contacts_backend: "
+                    f"`{json.dumps(row.get('contacts_backend'))}`",
+                    "  - queries_console: "
+                    f"`{json.dumps(row.get('queries_console'))}`",
                     f"  - channels: `{json.dumps(row.get('channels') or [])}`",
                     "  - operator_confirmed_channels: "
                     f"`{json.dumps(row.get('operator_confirmed_channels') or [])}`",

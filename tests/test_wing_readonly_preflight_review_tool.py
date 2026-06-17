@@ -151,6 +151,8 @@ def _valid_summary() -> dict:
             "query_mixer_parameter",
             "query_mixer_parameter",
         ],
+        "contacts_backend": True,
+        "queries_console": True,
         "forbidden_request_types_sent": [],
         "readback_count": 3,
         "physical_readback_count": 3,
@@ -526,6 +528,8 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
             "expected_events_artifact": str(summary_path.parent / "events.jsonl"),
             "summary_path_matches_expected_artifact": True,
             "events_path_matches_expected_artifact": True,
+            "contacts_backend": True,
+            "queries_console": True,
             "channels": [3],
             "operator_confirmed_channels": [3],
             "operator_session_confirmation_required": True,
@@ -598,6 +602,8 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert f"expected_events_artifact: `{summary_path.parent / 'events.jsonl'}`" in markdown
     assert "summary_path_matches_expected_artifact: `true`" in markdown
     assert "events_path_matches_expected_artifact: `true`" in markdown
+    assert "contacts_backend: `true`" in markdown
+    assert "queries_console: `true`" in markdown
     assert "operator_confirmed_channels: `[3]`" in markdown
     assert "operator_session_confirmation_required: `true`" in markdown
     assert "operator_confirmed_session_ready: `true`" in markdown
@@ -870,6 +876,8 @@ def test_review_report_surfaces_blocked_runner_operator_next_step(tmp_path: Path
             "expected_plan_violations": [
                 "expected_plan_backend_port_prestart_check_failure_detail_fields_mismatch",
             ],
+            "contacts_backend": True,
+            "queries_console": True,
             "operator_next_step": (
                 "Regenerate the offline expected plan with the current runtime args "
                 "and prestart contract before opening the backend WebSocket."
@@ -886,6 +894,8 @@ def test_review_report_surfaces_blocked_runner_operator_next_step(tmp_path: Path
         "Regenerate the offline expected plan with the current runtime args "
         "and prestart contract before opening the backend WebSocket."
     )
+    assert report["artifact_reviews"][0]["contacts_backend"] is True
+    assert report["artifact_reviews"][0]["queries_console"] is True
     assert report["artifact_operator_next_steps"] == [
         "Regenerate the offline expected plan with the current runtime args "
         "and prestart contract before opening the backend WebSocket."
@@ -898,6 +908,8 @@ def test_review_report_surfaces_blocked_runner_operator_next_step(tmp_path: Path
     markdown = review_tool.render_markdown(report)
     assert "operator_next_step" in markdown
     assert "artifact_operator_next_steps" in markdown
+    assert "contacts_backend: `true`" in markdown
+    assert "queries_console: `true`" in markdown
     assert "before opening the backend WebSocket" in markdown
     assert "live_authority_granted: `false`" in markdown
 
