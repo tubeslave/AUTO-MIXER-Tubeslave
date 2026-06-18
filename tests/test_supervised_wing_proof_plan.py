@@ -402,6 +402,32 @@ def test_readonly_preflight_step_rejects_stray_command_arguments():
         readonly_preflight_step(readonly_preflight_command(tail=("operator-note",)))
 
 
+def test_readonly_preflight_step_rejects_swapped_plan_and_prestart_bindings():
+    command = list(readonly_preflight_command())
+    command[command.index("--prestart-summary") + 1] = READONLY_PREFLIGHT_EXPECTED_PLAN
+    command[command.index("--expected-plan") + 1] = READONLY_PREFLIGHT_PRESTART_SUMMARY
+
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step must bind --expected-plan",
+    ):
+        readonly_preflight_step(tuple(command))
+
+
+def test_readonly_preflight_step_requires_physical_readback_flag():
+    command = tuple(
+        token
+        for token in readonly_preflight_command()
+        if token != "--require-physical-readback"
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step must require physical readback",
+    ):
+        readonly_preflight_step(command)
+
+
 def evidence_snapshot(*rows):
     return {
         "type": "supervised_promotion_evidence",

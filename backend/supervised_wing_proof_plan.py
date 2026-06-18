@@ -360,10 +360,14 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError(
                 "Read-only preflight step command must not include stray arguments"
             )
-        if "--expected-plan" not in command or self.expected_plan not in command:
+        if _command_value(command, "--expected-plan") != self.expected_plan:
             raise ValueError("Read-only preflight step must bind --expected-plan")
-        if "--prestart-summary" not in command or self.prestart_summary not in command:
+        if _command_value(command, "--prestart-summary") != self.prestart_summary:
             raise ValueError("Read-only preflight step must bind --prestart-summary")
+        if "--require-physical-readback" not in command:
+            raise ValueError(
+                "Read-only preflight step must require physical readback"
+            )
         if _command_value(command, "--channels") != WING_READONLY_PREFLIGHT_RUNNER_CHANNELS:
             raise ValueError("Read-only preflight step must bind canonical --channels")
         if (
