@@ -1889,6 +1889,52 @@ def test_proof_step_rejects_mismatched_expected_artifacts():
         )
 
 
+def test_proof_step_rejects_mismatched_abort_conditions():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step abort conditions must match safety contract",
+    ):
+        WingProofPlanStep(
+            id="fader_physical_proof_ch2",
+            value_type="fader",
+            channel=2,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=(
+                "python3",
+                "tools/wing_operator_proposal_validation_runner.py",
+                "--channel",
+                "2",
+                "--operator-confirm-channel",
+                "2",
+                "--value-type",
+                "fader",
+                "--operator-confirm-value-type",
+                "fader",
+                "--delta-db",
+                "-0.25",
+                "--operator-confirm-delta-db",
+                "-0.25",
+                "--execute",
+                "--prove-blocked-apply",
+                "--prove-emergency-stop",
+            ),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=("Feedback, clipping, or operator concern appears at any point.",),
+            expected_artifacts=(
+                "summary.json with value_type=fader and channel=2",
+                "events.jsonl with proposal/apply/rollback/emergency-stop sequence",
+                "proof report row with proof_mode=physical and status=supervised_candidate",
+                "promotion evidence row marked safety_review_candidate only after manual artifact review",
+            ),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_plan_is_manual_review_ready_when_all_value_types_have_candidates():
     plan = build_supervised_wing_proof_plan(
         evidence_snapshot(

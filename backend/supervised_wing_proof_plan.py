@@ -213,6 +213,8 @@ class WingProofPlanStep:
             raise ValueError(
                 "Physical proof step expected artifacts must match value type and channel"
             )
+        if tuple(self.abort_conditions) != _abort_conditions():
+            raise ValueError("Physical proof step abort conditions must match safety contract")
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
