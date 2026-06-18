@@ -660,7 +660,7 @@ the operator-readable no-WING `summary.md` proof plan section must render those
 canonical helper fields;
 the no-WING proof plan summary must also expose
 `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required: true`,
-`readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids`,
+`readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
 `readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source`,
 `readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source`,
 `readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source`,

@@ -255,7 +255,7 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations",
     "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof",
     "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof",
-    "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids",
+    'readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
     "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source",
     "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source",
     "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source",
