@@ -599,7 +599,7 @@ the no-WING handoff summary must also show top-level
 the no-WING handoff summary must also show top-level
 `supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]`,
 `expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]`,
-`expected_required_supervised_prestart_gate_markers`,
+`expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]`,
 `required_supervised_prestart_gate_marker_count: 8`,
 `expected_required_supervised_prestart_gate_marker_count: 8`,
 `required_supervised_prestart_gate_marker_count_matches_contract: true`,
