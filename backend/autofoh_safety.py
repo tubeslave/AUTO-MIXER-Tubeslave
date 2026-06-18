@@ -548,8 +548,6 @@ class AutoFOHSafetyController:
         return payload
 
     def _is_direct_write_allowed(self, action: TypedCorrectionAction) -> bool:
-        if isinstance(action, ChannelMuteMove):
-            return bool(self.config.allow_direct_mute_writes)
         return isinstance(action, AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES)
 
     def _blocked_direct_write_payload(self, action: TypedCorrectionAction) -> Dict[str, Any] | None:
@@ -571,6 +569,8 @@ class AutoFOHSafetyController:
             "can_apply_live": False,
             "mutates_mixer": False,
         })
+        if isinstance(action, ChannelMuteMove) and self.config.allow_direct_mute_writes:
+            payload["direct_mute_override_ignored"] = True
         return payload
 
     def _blocked_calls_for(self, action: TypedCorrectionAction) -> List[Dict[str, Any]]:
@@ -1013,11 +1013,6 @@ class AutoFOHSafetyController:
             return self._require_method("set_gain", lambda a: self.mixer_client.set_gain(a.channel_id, a.target_db))
         if isinstance(action, ChannelFaderMove):
             return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
-        if isinstance(action, ChannelMuteMove):
-            return self._require_method(
-                "set_channel_mute",
-                lambda a: self.mixer_client.set_channel_mute(a.channel_id, a.muted),
-            )
         return None
 
     def _require_method(self, method_name: str, callback):

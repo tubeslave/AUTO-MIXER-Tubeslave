@@ -188,7 +188,7 @@ def test_failed_readback_rolls_back_and_demotes_action_type():
     assert blocked.message == "action_not_promoted_for_live_write"
 
 
-def test_promoted_mute_move_with_direct_write_path_is_pre_read_verified_and_rollback_ready():
+def test_promoted_mute_move_remains_quarantined_with_rollback_evidence():
     mixer = ProofMixer()
     executor = _executor(
         mixer,
@@ -201,12 +201,18 @@ def test_promoted_mute_move_with_direct_write_path_is_pre_read_verified_and_roll
         RuntimeState.SOURCE_LEARNING,
     )
 
-    assert result.sent is True
-    assert result.write_sent is True
+    assert result.sent is False
+    assert result.write_sent is False
+    assert result.allowed is False
+    assert result.message == "blocked by AutoFOH proposal-only direct-write policy"
+    assert result.safety_decision is not None
+    assert result.safety_decision.blocked is True
+    assert result.safety_decision.payload["direct_mute_override_ignored"] is True
+    assert result.safety_decision.payload["blocked_calls"][0]["cmd"] == "set_channel_mute"
     assert result.pre_read_ok is True
-    assert result.readback_ok is True
+    assert result.readback_ok is False
     assert result.rollback_available is True
     assert result.rollback_action is not None
     assert isinstance(result.rollback_action, ChannelMuteMove)
     assert result.rollback_action.muted is False
-    assert mixer.calls == [("set_channel_mute", 1, True)]
+    assert mixer.calls == []

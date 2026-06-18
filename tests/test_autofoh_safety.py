@@ -244,7 +244,7 @@ def test_mute_action_is_quarantined_as_proposal_and_keeps_payload_shape():
     assert mixer.calls == []
 
 
-def test_mute_action_can_be_allowed_for_live_write_when_configured():
+def test_direct_mute_override_is_ignored_by_current_supervised_rail():
     mixer = FakeMixer()
     controller = AutoFOHSafetyController(
         mixer,
@@ -263,11 +263,10 @@ def test_mute_action_can_be_allowed_for_live_write_when_configured():
         runtime_state=RuntimeState.SOURCE_LEARNING,
     )
 
-    assert decision.allowed is True
-    assert decision.blocked is False
-    assert decision.sent is True
-    assert decision.message == "sent"
-    assert mixer.calls == [("set_channel_mute", 2, True)]
+    assert_blocked_evidence(decision, "set_channel_mute")
+    assert decision.payload["direct_mute_override_ignored"] is True
+    assert decision.payload["blocked_calls"][0]["muted"] is True
+    assert mixer.calls == []
 
 
 def test_mute_action_is_bounded_to_bool():
@@ -650,6 +649,7 @@ def test_autofoh_safety_source_has_no_direct_non_fader_gain_writes():
     assert "self.mixer_client.set_gain(" in source
     assert "self.mixer_client.set_fader(" in source
     for forbidden in (
+        "self.mixer_client.set_channel_mute(",
         "self.mixer_client.set_bus_fader(",
         "self.mixer_client.set_dca_fader(",
         "self.mixer_client.set_main_fader(",
