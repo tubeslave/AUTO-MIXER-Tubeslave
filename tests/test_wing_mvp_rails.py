@@ -1615,6 +1615,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids: []"
+        in current_command
+    )
+    assert (
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: true"
         in current_command
     )
@@ -1796,6 +1800,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed: true"
         in progress.current_first_command_missing_baseline_markers(
             failing_request_sequence_value_gate_command
+        )
+    )
+    missing_request_sequence_source_trace_command = current_command.replace(
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids: []",
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids: ['stale_source']",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_request_sequence_source_trace_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids: []"
+        in progress.current_first_command_missing_baseline_markers(
+            missing_request_sequence_source_trace_command
         )
     )
     failing_expected_artifact_value_gate_command = current_command.replace(
