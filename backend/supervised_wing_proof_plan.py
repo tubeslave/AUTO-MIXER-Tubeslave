@@ -577,6 +577,8 @@ def _is_ws_backend_url(value: str | None) -> bool:
         return False
     if value != value.strip():
         return False
+    if any(char.isspace() for char in value):
+        return False
     parsed = urlparse(value)
     try:
         port = parsed.port
@@ -586,6 +588,7 @@ def _is_ws_backend_url(value: str | None) -> bool:
         parsed.scheme in {"ws", "wss"}
         and bool(parsed.hostname)
         and port is not None
+        and port > 0
         and not parsed.username
         and not parsed.password
         and not parsed.path
