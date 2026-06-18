@@ -1680,6 +1680,87 @@ def test_proof_step_rejects_out_of_range_channel():
         )
 
 
+def test_proof_step_rejects_mismatched_command_channel_confirmation():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step command must bind matching channel confirmation",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=(
+                "python3",
+                "tools/wing_operator_proposal_validation_runner.py",
+                "--channel",
+                "3",
+                "--operator-confirm-channel",
+                "4",
+                "--value-type",
+                "gain",
+                "--operator-confirm-value-type",
+                "gain",
+                "--delta-db",
+                "-0.25",
+                "--operator-confirm-delta-db",
+                "-0.25",
+                "--execute",
+                "--prove-blocked-apply",
+                "--prove-emergency-stop",
+            ),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
+def test_proof_step_rejects_command_without_safety_flags():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step command must include proof safety flags",
+    ):
+        WingProofPlanStep(
+            id="fader_physical_proof_ch2",
+            value_type="fader",
+            channel=2,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=(
+                "python3",
+                "tools/wing_operator_proposal_validation_runner.py",
+                "--channel",
+                "2",
+                "--operator-confirm-channel",
+                "2",
+                "--value-type",
+                "fader",
+                "--operator-confirm-value-type",
+                "fader",
+                "--delta-db",
+                "-0.25",
+                "--operator-confirm-delta-db",
+                "-0.25",
+                "--execute",
+                "--prove-blocked-apply",
+            ),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_plan_is_manual_review_ready_when_all_value_types_have_candidates():
     plan = build_supervised_wing_proof_plan(
         evidence_snapshot(

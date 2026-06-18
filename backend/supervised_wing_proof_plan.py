@@ -171,6 +171,38 @@ class WingProofPlanStep:
             raise ValueError("Physical proof plan only supports negative dB deltas")
         if abs(self.delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB:
             raise ValueError("Physical proof plan only supports deltas up to 0.5 dB")
+        command = tuple(self.command)
+        expected_delta = f"{self.delta_db:.2f}"
+        if (
+            _command_value(command, "--channel") != str(channel)
+            or _command_value(command, "--operator-confirm-channel") != str(channel)
+        ):
+            raise ValueError(
+                "Physical proof step command must bind matching channel confirmation"
+            )
+        if (
+            _command_value(command, "--value-type") != self.value_type
+            or _command_value(command, "--operator-confirm-value-type") != self.value_type
+        ):
+            raise ValueError(
+                "Physical proof step command must bind matching value type confirmation"
+            )
+        if (
+            _command_value(command, "--delta-db") != expected_delta
+            or _command_value(command, "--operator-confirm-delta-db") != expected_delta
+        ):
+            raise ValueError(
+                "Physical proof step command must bind matching delta confirmation"
+            )
+        for required_flag in (
+            "--execute",
+            "--prove-blocked-apply",
+            "--prove-emergency-stop",
+        ):
+            if required_flag not in command:
+                raise ValueError(
+                    "Physical proof step command must include proof safety flags"
+                )
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
