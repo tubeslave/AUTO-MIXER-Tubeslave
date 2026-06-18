@@ -325,6 +325,30 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError("Read-only preflight plan must require an expected plan")
         if self.prestart_summary_required is not True:
             raise ValueError("Read-only preflight plan must require a prestart summary")
+        if self.id != "wing_readonly_preflight_required":
+            raise ValueError("Read-only preflight step id must match safety contract")
+        if tuple(self.prerequisites) != _readonly_preflight_prerequisites():
+            raise ValueError(
+                "Read-only preflight step prerequisites must match safety contract"
+            )
+        abort_conditions = tuple(self.abort_conditions)
+        if abort_conditions[:3] != _readonly_preflight_base_abort_conditions():
+            raise ValueError(
+                "Read-only preflight step abort conditions must match safety contract"
+            )
+        if any(not str(condition).strip() for condition in abort_conditions[3:]):
+            raise ValueError(
+                "Read-only preflight step abort blockers must be explicit"
+            )
+        expected_artifacts = tuple(self.expected_artifacts)
+        if expected_artifacts[:2] != _readonly_preflight_base_expected_artifacts():
+            raise ValueError(
+                "Read-only preflight step expected artifacts must match safety contract"
+            )
+        if any(not str(artifact).strip() for artifact in expected_artifacts[2:]):
+            raise ValueError(
+                "Read-only preflight step next-action artifacts must be explicit"
+            )
         command = tuple(self.command)
         readonly_flags = (
             "--url",
@@ -1063,12 +1087,6 @@ def _readonly_preflight_step(
     blockers: Tuple[str, ...],
     next_actions: Tuple[str, ...],
 ) -> WingReadonlyPreflightPlanStep:
-    prerequisites = (
-        "Operator is physically present at the intended WING Rack.",
-        "Backend is already connected in WING mode.",
-        "No supervised apply, proposal, rollback, emergency-stop, connect, or disconnect request is sent by this step.",
-        "Move or replace invalid preflight artifacts before trusting a readiness candidate.",
-    )
     return WingReadonlyPreflightPlanStep(
         id="wing_readonly_preflight_required",
         live_execution_required=False,
@@ -1089,20 +1107,41 @@ def _readonly_preflight_step(
             "Read-only WING connection and physical readback evidence is required before "
             "any supervised fader/gain proof step can be planned."
         ),
-        prerequisites=prerequisites,
+        prerequisites=_readonly_preflight_prerequisites(),
         abort_conditions=(
-            "Backend is not connected to the intended WING Rack.",
-            "Any response is not verified from physical readback.",
-            "Any forbidden write, proposal, rollback, emergency, connect, or disconnect request is observed.",
+            *_readonly_preflight_base_abort_conditions(),
             *blockers,
         ),
         expected_artifacts=(
-            WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
-            (
-                f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME} with "
-                "get_operator_mode/get_state/query_mixer_parameter only"
-            ),
+            *_readonly_preflight_base_expected_artifacts(),
             *next_actions,
+        ),
+    )
+
+
+def _readonly_preflight_prerequisites() -> Tuple[str, ...]:
+    return (
+        "Operator is physically present at the intended WING Rack.",
+        "Backend is already connected in WING mode.",
+        "No supervised apply, proposal, rollback, emergency-stop, connect, or disconnect request is sent by this step.",
+        "Move or replace invalid preflight artifacts before trusting a readiness candidate.",
+    )
+
+
+def _readonly_preflight_base_abort_conditions() -> Tuple[str, ...]:
+    return (
+        "Backend is not connected to the intended WING Rack.",
+        "Any response is not verified from physical readback.",
+        "Any forbidden write, proposal, rollback, emergency, connect, or disconnect request is observed.",
+    )
+
+
+def _readonly_preflight_base_expected_artifacts() -> Tuple[str, ...]:
+    return (
+        WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+        (
+            f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME} with "
+            "get_operator_mode/get_state/query_mixer_parameter only"
         ),
     )
 

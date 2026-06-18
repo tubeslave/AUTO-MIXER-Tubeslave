@@ -177,15 +177,40 @@ def readonly_preflight_command(*, runner="tools/wing_readonly_preflight_runner.p
 def readonly_preflight_step(
     command,
     *,
+    id="wing_readonly_preflight_required",
     live_execution_required=False,
     execution_allowed_by_plan=False,
     operator_approval_required=True,
     read_only=True,
     expected_plan_required_for_real_run=True,
     prestart_summary_required=True,
+    prerequisites=None,
+    abort_conditions=None,
+    expected_artifacts=None,
 ):
+    if prerequisites is None:
+        prerequisites = (
+            "Operator is physically present at the intended WING Rack.",
+            "Backend is already connected in WING mode.",
+            "No supervised apply, proposal, rollback, emergency-stop, connect, or disconnect request is sent by this step.",
+            "Move or replace invalid preflight artifacts before trusting a readiness candidate.",
+        )
+    if abort_conditions is None:
+        abort_conditions = (
+            "Backend is not connected to the intended WING Rack.",
+            "Any response is not verified from physical readback.",
+            "Any forbidden write, proposal, rollback, emergency, connect, or disconnect request is observed.",
+        )
+    if expected_artifacts is None:
+        expected_artifacts = (
+            WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+            (
+                f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME} with "
+                "get_operator_mode/get_state/query_mixer_parameter only"
+            ),
+        )
     return WingReadonlyPreflightPlanStep(
-        id="wing_readonly_preflight_required",
+        id=id,
         live_execution_required=live_execution_required,
         execution_allowed_by_plan=execution_allowed_by_plan,
         operator_approval_required=operator_approval_required,
@@ -196,9 +221,9 @@ def readonly_preflight_step(
         prestart_summary=READONLY_PREFLIGHT_PRESTART_SUMMARY,
         command=command,
         rationale="unit regression",
-        prerequisites=(),
-        abort_conditions=(),
-        expected_artifacts=(),
+        prerequisites=prerequisites,
+        abort_conditions=abort_conditions,
+        expected_artifacts=expected_artifacts,
     )
 
 
@@ -426,6 +451,69 @@ def test_readonly_preflight_step_requires_physical_readback_flag():
         match="Read-only preflight step must require physical readback",
     ):
         readonly_preflight_step(command)
+
+
+@pytest.mark.parametrize(
+    ("override", "expected_error"),
+    [
+        (
+            {"id": "wing_readonly_preflight_optional"},
+            "Read-only preflight step id must match safety contract",
+        ),
+        (
+            {"prerequisites": ()},
+            "Read-only preflight step prerequisites must match safety contract",
+        ),
+        (
+            {"abort_conditions": ()},
+            "Read-only preflight step abort conditions must match safety contract",
+        ),
+        (
+            {"expected_artifacts": ()},
+            "Read-only preflight step expected artifacts must match safety contract",
+        ),
+    ],
+)
+def test_readonly_preflight_step_rejects_truncated_operator_checklist(
+    override,
+    expected_error,
+):
+    with pytest.raises(ValueError, match=expected_error):
+        readonly_preflight_step(readonly_preflight_command(), **override)
+
+
+def test_readonly_preflight_step_rejects_empty_abort_blocker():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step abort blockers must be explicit",
+    ):
+        readonly_preflight_step(
+            readonly_preflight_command(),
+            abort_conditions=(
+                "Backend is not connected to the intended WING Rack.",
+                "Any response is not verified from physical readback.",
+                "Any forbidden write, proposal, rollback, emergency, connect, or disconnect request is observed.",
+                "",
+            ),
+        )
+
+
+def test_readonly_preflight_step_rejects_empty_next_action_artifact():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step next-action artifacts must be explicit",
+    ):
+        readonly_preflight_step(
+            readonly_preflight_command(),
+            expected_artifacts=(
+                WING_READONLY_PREFLIGHT_PROOF_SUMMARY_ARTIFACT,
+                (
+                    f"{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME} with "
+                    "get_operator_mode/get_state/query_mixer_parameter only"
+                ),
+                "",
+            ),
+        )
 
 
 def evidence_snapshot(*rows):
