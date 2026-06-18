@@ -57,6 +57,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 from tools.verify_no_wing_artifact_manifest import (  # noqa: E402
+    NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
     verify_no_wing_artifact_manifest,
 )
 
@@ -254,12 +255,10 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "failed_checks_missing_check_entries_empty",
 )
 ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS = (
-    "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed_denies_authority",
-    "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted_denies_authority",
-    "summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed_denies_authority",
-    "summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted_denies_authority",
-    "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed_denies_authority",
-    "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted_denies_authority",
+    *(
+        f"summary_md_{field_name}_denies_authority"
+        for field_name in NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
+    ),
 )
 EXPECTED_PLAN_MATCH_KEYS = (
     "type",
