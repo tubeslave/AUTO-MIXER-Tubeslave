@@ -74,6 +74,7 @@ def proof_command(
     runner="tools/wing_operator_proposal_validation_runner.py",
     backend_url="ws://localhost:8765",
     delta="-0.25",
+    artifact_root="artifacts/proof",
     operator_channel=None,
     include_safety_flags=True,
     tail=None,
@@ -109,7 +110,7 @@ def proof_command(
             "--rollback-delay-sec",
             "0",
             "--artifact-root",
-            "artifacts/proof",
+            artifact_root,
             "--reason",
             f"supervised_physical_{value_type}_proof",
         )
@@ -2431,6 +2432,42 @@ def test_proof_step_rejects_non_websocket_backend_url(backend_url):
             execution_allowed_by_plan=False,
             operator_approval_required=True,
             command=proof_command(backend_url=backend_url),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
+@pytest.mark.parametrize(
+    "artifact_root",
+    [
+        "",
+        "/tmp/wing_physical_proof",
+        "artifacts/proof/..",
+        "reports/wing_physical_proof",
+    ],
+)
+def test_proof_step_rejects_unsafe_artifact_root(artifact_root):
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Physical proof step command must bind artifact root"
+            if not artifact_root
+            else "Physical proof step artifact root must stay under artifacts"
+        ),
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=proof_command(artifact_root=artifact_root),
             rationale="unit regression",
             prerequisites=(),
             abort_conditions=(),

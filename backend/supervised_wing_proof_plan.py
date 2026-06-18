@@ -262,8 +262,14 @@ class WingProofPlanStep:
             )
         if _command_value(command, "--rollback-delay-sec") != "0":
             raise ValueError("Physical proof step command must bind zero rollback delay")
-        if not _command_value(command, "--artifact-root"):
+        artifact_root = _command_value(command, "--artifact-root")
+        if not artifact_root:
             raise ValueError("Physical proof step command must bind artifact root")
+        artifact_root_parts = artifact_root.replace("\\", "/").split("/")
+        if not artifact_root.startswith("artifacts/") or ".." in artifact_root_parts:
+            raise ValueError(
+                "Physical proof step artifact root must stay under artifacts"
+            )
         if _command_value(command, "--reason") != f"supervised_physical_{self.value_type}_proof":
             raise ValueError("Physical proof step command must bind supervised proof reason")
         if tuple(self.expected_artifacts) != _expected_artifacts(self.value_type, channel):
