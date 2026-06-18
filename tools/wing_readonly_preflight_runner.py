@@ -253,6 +253,14 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "failed_checks_have_check_entries",
     "failed_checks_missing_check_entries_empty",
 )
+ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS = (
+    "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed_denies_authority",
+    "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted_denies_authority",
+    "summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed_denies_authority",
+    "summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted_denies_authority",
+    "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed_denies_authority",
+    "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted_denies_authority",
+)
 EXPECTED_PLAN_MATCH_KEYS = (
     "type",
     "status",
@@ -921,9 +929,16 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
         )
         if verifier_report.get(field_name) != expected_value
     ]
+    verifier_required_check_names = list(ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS)
+    if isinstance(verifier_checks, dict):
+        verifier_required_check_names.extend(
+            check_name
+            for check_name in ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS
+            if check_name in verifier_checks
+        )
     verifier_check_mismatches = [
         check_name
-        for check_name in ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+        for check_name in verifier_required_check_names
         if not isinstance(verifier_checks, dict)
         or verifier_checks.get(check_name) is not True
     ]
@@ -981,7 +996,7 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
                     isinstance(verifier_checks, dict)
                     and verifier_checks.get(check_name) is True
                 )
-                for check_name in ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+                for check_name in verifier_required_check_names
             },
         }
     )

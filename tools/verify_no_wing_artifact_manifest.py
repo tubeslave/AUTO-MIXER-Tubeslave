@@ -49,6 +49,14 @@ SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
     "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed",
     "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted",
 )
+NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted",
+)
 
 
 def _sha256_file(path: Path) -> str:
@@ -343,6 +351,21 @@ def _record_summary_md_safety_checks(
 ) -> None:
     summary_md_lines = set(summary_md_text.splitlines())
     for field_name in SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS:
+        expected_line = no_wing_release_check._format_markdown_summary_field_line(
+            field_name,
+            False,
+        )
+        _record_check(
+            checks,
+            f"summary_md_{field_name}_denies_authority",
+            expected_line in summary_md_lines,
+        )
+    if (
+        no_wing_release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SECTION
+        not in summary_md_lines
+    ):
+        return
+    for field_name in NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS:
         expected_line = no_wing_release_check._format_markdown_summary_field_line(
             field_name,
             False,

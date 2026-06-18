@@ -16254,6 +16254,12 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "artifact_manifest_verifier_check_summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_denies_authority: true",
         "artifact_manifest_verifier_check_summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_denies_authority: true",
         "artifact_manifest_verifier_check_summary_md_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed_denies_authority: true",
+        "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted_denies_authority: true",
         "artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_fields_present: true",
         "artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_fields_present: true",
         "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_fields_rendered: true",
@@ -24567,6 +24573,74 @@ def test_verify_no_wing_artifact_manifest_fails_summary_md_top_level_authority_c
         report["checks"]["summary_md_live_authority_granted_denies_authority"]
         is False
     )
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_authority_granted"] is False
+
+
+def test_verify_no_wing_artifact_manifest_fails_summary_md_value_gate_authority_claim(
+    tmp_path,
+):
+    write_summary(
+        tmp_path,
+        [
+            CheckResult(
+                name="unit_check",
+                status="passed",
+                started_at="2026-06-15T00:00:00Z",
+                finished_at="2026-06-15T00:00:01Z",
+                duration_sec=1.0,
+                command="python -m pytest",
+                cwd=str(tmp_path),
+                returncode=0,
+            )
+        ],
+        generated_at="2026-06-15T00:00:00Z",
+    )
+    summary_md_path = tmp_path / "summary.md"
+    summary_md_text = summary_md_path.read_text(encoding="utf-8")
+    summary_md_text = "\n".join(
+        [
+            summary_md_text.rstrip(),
+            "",
+            "## Next WING Proof Plan",
+            "",
+            *[
+                release_check._format_markdown_summary_field_line(field_name, False)
+                for field_name in manifest_verifier.NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
+            ],
+        ]
+    )
+    summary_md_text = summary_md_text.replace(
+        "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted: `false`",
+        "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted: `true`",
+        1,
+    )
+    summary_md_path.write_text(summary_md_text, encoding="utf-8")
+    fresh_summary_md_sha = hashlib.sha256(
+        summary_md_text.encode("utf-8")
+    ).hexdigest()
+
+    manifest_path = tmp_path / "artifact-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_manifest_summary_md_sha256"] = fresh_summary_md_sha
+    for artifact in manifest["artifacts"]:
+        if artifact["artifact_id"] == "summary_md":
+            artifact["sha256"] = fresh_summary_md_sha
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    failed_check = (
+        "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted_denies_authority"
+    )
+    assert report["status"] == "failed"
+    assert "summary_md_sha256_matches_actual" not in report["failed_checks"]
+    assert "summary_md_sha256_matches_manifest" not in report["failed_checks"]
+    assert failed_check in report["failed_checks"]
+    assert report["checks"][failed_check] is False
     assert report["readiness_closure_allowed"] is False
     assert report["live_authority_granted"] is False
 
