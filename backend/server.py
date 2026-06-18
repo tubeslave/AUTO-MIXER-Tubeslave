@@ -64,6 +64,7 @@ from operator_mode_policy import (
     build_operator_mode_status,
     MANUAL_LIVE_WRITE_KIND_ALIASES,
     SUPPORTED_MANUAL_LIVE_WRITE_KINDS,
+    WING_DEPLOYMENT_LIVE_WRITE_KINDS,
     normalize_operator_mode,
 )
 from operator_proposal_queue import OperatorProposalQueue
@@ -793,7 +794,8 @@ class AutoMixerServer:
         operator_capabilities = operator_mode.get("capabilities", {})
         allowed = list(operator_capabilities.get("allowed_live_write_kinds") or [])
         if self._is_wing_deployment_write_boundary_active():
-            allowed = [kind for kind in allowed if kind in {"fader", "gain"}]
+            wing_allowed = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
+            allowed = [kind for kind in allowed if kind in wing_allowed]
         return allowed
 
     @staticmethod

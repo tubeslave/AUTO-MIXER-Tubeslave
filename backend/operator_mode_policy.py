@@ -19,6 +19,7 @@ MODE_AUTO = "auto"
 DEFAULT_OPERATOR_MODE = MODE_ASSIST
 VALID_OPERATOR_MODES = (MODE_ANALYZE, MODE_ASSIST, MODE_SUPERVISED, MODE_AUTO)
 CURRENT_PROVEN_LIVE_WRITE_KINDS = ("fader", "gain", "pan")
+WING_DEPLOYMENT_LIVE_WRITE_KINDS = ("fader", "gain")
 SUPPORTED_MANUAL_LIVE_WRITE_KINDS = ("fader", "gain", "mute", "pan")
 MANUAL_LIVE_WRITE_KIND_ALIASES = {
     "trim": "gain",
@@ -259,7 +260,10 @@ def build_operator_mode_status(
     elif normalized == MODE_SUPERVISED:
         live_write_policy = "supervised_approval_required"
         apply_path = "supervised_manual_gate"
-        current_live_write_kinds = list(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+        if wing_deployment:
+            current_live_write_kinds = list(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
+        else:
+            current_live_write_kinds = list(CURRENT_PROVEN_LIVE_WRITE_KINDS)
     elif normalized == MODE_AUTO:
         apply_path = "autonomous_controller"
         if wing_deployment:

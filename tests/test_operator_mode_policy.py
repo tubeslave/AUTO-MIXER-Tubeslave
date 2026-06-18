@@ -118,6 +118,33 @@ def test_supervised_mode_maps_to_target_architecture_but_current_scope_stays_pro
     ]
 
 
+def test_supervised_wing_deployment_scope_is_limited_to_fader_gain():
+    status = build_operator_mode_status(
+        mode="supervised_automix_mode",
+        connection_mode="wing",
+        wing_boundary_active=True,
+    )
+
+    assert status["mode"] == "supervised"
+    assert status["project_mode"]["target_live_write_surfaces"] == list(
+        FULL_AUTONOMOUS_TARGET_SURFACES
+    )
+    assert status["capabilities"]["can_apply_to_console"] is True
+    assert status["capabilities"]["requires_approval"] is True
+    assert status["capabilities"]["allowed_live_write_kinds"] == ["fader", "gain"]
+    assert status["capabilities"]["allowed_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
+    assert status["project_mode"]["current_live_write_kinds"] == ["fader", "gain"]
+    assert status["project_mode"]["effective_live_write_surfaces"] == [
+        "preamp",
+        "trim",
+        "fader",
+    ]
+
+
 def test_full_autonomous_mode_is_locked_on_wing_even_if_runtime_unlock_is_set():
     status = build_operator_mode_status(
         mode="full_autonomous_mixing_mode",

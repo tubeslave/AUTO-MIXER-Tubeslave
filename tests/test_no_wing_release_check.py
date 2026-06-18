@@ -830,11 +830,11 @@ def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy(
     assert current_supervised_live_write_kinds() == tuple(
         policy_status["capabilities"]["allowed_live_write_kinds"]
     )
-    assert current_supervised_live_write_kinds() == ("fader", "gain", "pan")
+    assert current_supervised_live_write_kinds() == ("fader", "gain")
     assert current_supervised_live_write_surfaces() == tuple(
         policy_status["capabilities"]["allowed_live_write_surfaces"]
     )
-    assert current_supervised_live_write_surfaces() == ("preamp", "trim", "fader", "pan")
+    assert current_supervised_live_write_surfaces() == ("preamp", "trim", "fader")
 
 
 def test_no_wing_release_check_validates_read_surface_fixture_evidence_snapshot():
@@ -10002,8 +10002,8 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         "Add fresh mute-state intent and physical proof before promotion.",
                     ],
                 },
-                "supervised_current_live_write_kinds": ["fader", "gain", "pan"],
-                "supervised_current_live_write_surfaces": ["preamp", "trim", "fader", "pan"],
+                "supervised_current_live_write_kinds": ["fader", "gain"],
+                "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
                 "next_required_evidence": [
                     "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
                     "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists.",
@@ -10629,19 +10629,17 @@ def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path
         "hardware_readback_rollback_and_emergency_proof",
     ]
     assert "bus_group_matrix" in result.detail["next_required_evidence_by_action_family"]
-    assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain", "pan"]
+    assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain"]
     assert result.detail["supervised_current_live_write_surfaces"] == [
         "preamp",
         "trim",
         "fader",
-        "pan",
     ]
-    assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain", "pan"]
+    assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain"]
     assert result.detail["policy_supervised_live_write_surfaces"] == [
         "preamp",
         "trim",
         "fader",
-        "pan",
     ]
 
 
@@ -13868,10 +13866,10 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
                 "bus_group_matrix": ["Add bus/group/matrix safety review before promotion."],
                 "mute": ["Add fresh mute-state intent before promotion."],
             },
-            "supervised_current_live_write_kinds": ["fader", "gain", "pan"],
-            "policy_supervised_live_write_kinds": ["fader", "gain", "pan"],
-            "supervised_current_live_write_surfaces": ["preamp", "trim", "fader", "pan"],
-            "policy_supervised_live_write_surfaces": ["preamp", "trim", "fader", "pan"],
+            "supervised_current_live_write_kinds": ["fader", "gain"],
+            "policy_supervised_live_write_kinds": ["fader", "gain"],
+            "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
+            "policy_supervised_live_write_surfaces": ["preamp", "trim", "fader"],
             "unexpected_supervised_live_write_surfaces": [],
             "unexpected_supervised_live_write_kinds": [],
             "violations": [],
@@ -13915,15 +13913,15 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert "bus_group_assignment_cache_freshness" in markdown_summary
     assert "next_required_evidence_by_action_family" in markdown_summary
     assert (
-        'supervised_current_live_write_kinds: `["fader", "gain", "pan"]`'
+        'supervised_current_live_write_kinds: `["fader", "gain"]`'
         in markdown_summary
     )
     assert (
-        'supervised_current_live_write_surfaces: `["preamp", "trim", "fader", "pan"]`'
+        'supervised_current_live_write_surfaces: `["preamp", "trim", "fader"]`'
         in markdown_summary
     )
     assert (
-        'policy_supervised_live_write_surfaces: `["preamp", "trim", "fader", "pan"]`'
+        'policy_supervised_live_write_surfaces: `["preamp", "trim", "fader"]`'
         in markdown_summary
     )
 

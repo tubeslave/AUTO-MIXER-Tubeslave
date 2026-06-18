@@ -335,7 +335,6 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert report["autonomy_mode_transition_gate"]["summary"]["supervised_current_live_write_kinds"] == [
         "fader",
         "gain",
-        "pan",
     ]
     assert report["autonomy_mode_transition_gate"]["rows"][2]["mode"] == "supervised"
     assert report["autonomy_mode_transition_gate"]["rows"][2]["status"] == "limited_available"
@@ -380,13 +379,11 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert gap_rollup["supervised_current_live_write_kinds"] == [
         "fader",
         "gain",
-        "pan",
     ]
     assert gap_rollup["supervised_current_live_write_surfaces"] == [
         "preamp",
         "trim",
         "fader",
-        "pan",
     ]
     assert "Full Autonomous remains blocked" in gap_rollup["claim"]
     assert report["next_wing_proof_plan"]["safety"]["execution_allowed_by_plan"] is False

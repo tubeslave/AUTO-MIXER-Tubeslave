@@ -616,11 +616,10 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["autonomy_mode_transition_gate"]["summary"]["supervised_current_live_write_kinds"] == [
         "fader",
         "gain",
-        "pan",
     ]
     assert snapshot["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_surfaces"
-    ] == ["preamp", "trim", "fader", "pan"]
+    ] == ["preamp", "trim", "fader"]
     assert "auto" in snapshot["autonomy_mode_transition_gate"]["summary"]["blocked_modes"]
     assert "deessing" not in snapshot["project_goal_capability_matrix"]["summary"][
         "missing_capability_ids"
