@@ -14562,6 +14562,8 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_review_decision_accepted = False
     readonly_preflight_review_decision_source_authority_denied = False
     readonly_preflight_review_decision_source_authority_flags: dict[str, object] = {}
+    reported_readonly_preflight_review_decision_source_authority_denied = False
+    reported_readonly_preflight_review_decision_source_authority_flags: dict[str, object] = {}
     readonly_preflight_review_decision_status: object = None
     readonly_preflight_review_decision_blocked_by: list[str] = []
     readonly_preflight_review_decision_accepted_record_count = 0
@@ -14774,6 +14776,24 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
         )
         readonly_preflight_review_decision_accepted = (
             summary.get("readonly_preflight_review_decision_accepted") is True
+        )
+        reported_readonly_preflight_review_decision_source_authority_denied = (
+            summary.get("readonly_preflight_review_decision_source_authority_denied")
+            is True
+        )
+        reported_readonly_preflight_review_decision_source_authority_flags = (
+            dict(
+                summary.get(
+                    "readonly_preflight_review_decision_source_authority_flags"
+                )
+            )
+            if isinstance(
+                summary.get(
+                    "readonly_preflight_review_decision_source_authority_flags"
+                ),
+                Mapping,
+            )
+            else {}
         )
         readonly_preflight_review_decision_status = summary.get(
             "readonly_preflight_review_decision_status"
@@ -15919,6 +15939,20 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             )
             if readonly_preflight_review_decision_accepted != expected_decision_accepted:
                 violations.append("next_wing_proof_plan_review_decision_accepted_mismatch")
+            if (
+                reported_readonly_preflight_review_decision_source_authority_denied
+                != readonly_preflight_review_decision_source_authority_denied
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_source_authority_denied_mismatch"
+                )
+            if (
+                reported_readonly_preflight_review_decision_source_authority_flags
+                != readonly_preflight_review_decision_source_authority_flags
+            ):
+                violations.append(
+                    "next_wing_proof_plan_review_decision_source_authority_flags_mismatch"
+                )
             if readonly_preflight_review_decision_accepted_record_count != int(
                 review_summary.get("accepted_record_count") or 0
             ):
@@ -16220,6 +16254,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_review_decision_source_authority_flags"] = (
         readonly_preflight_review_decision_source_authority_flags
+    )
+    detail["reported_readonly_preflight_review_decision_source_authority_denied"] = (
+        reported_readonly_preflight_review_decision_source_authority_denied
+    )
+    detail["reported_readonly_preflight_review_decision_source_authority_flags"] = (
+        reported_readonly_preflight_review_decision_source_authority_flags
     )
     detail["readonly_preflight_review_decision_status"] = (
         readonly_preflight_review_decision_status

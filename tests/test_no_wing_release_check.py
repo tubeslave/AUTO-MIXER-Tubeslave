@@ -12007,6 +12007,66 @@ def test_no_wing_release_check_next_wing_plan_requires_review_decision_source_au
     )
 
 
+def test_no_wing_release_check_rejects_next_wing_plan_stale_review_decision_source_authority_denied(
+    tmp_path,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["next_wing_proof_plan"]["summary"][
+        "readonly_preflight_review_decision_source_authority_denied"
+    ] = False
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        result.detail["readonly_preflight_review_decision_source_authority_denied"]
+        is True
+    )
+    assert (
+        result.detail[
+            "reported_readonly_preflight_review_decision_source_authority_denied"
+        ]
+        is False
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_source_authority_denied_mismatch"
+        in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_rejects_next_wing_plan_stale_review_decision_source_authority_flags(
+    tmp_path,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["next_wing_proof_plan"]["summary"][
+        "readonly_preflight_review_decision_source_authority_flags"
+    ]["live_authority_granted"] = True
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        result.detail["readonly_preflight_review_decision_source_authority_flags"][
+            "live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        result.detail[
+            "reported_readonly_preflight_review_decision_source_authority_flags"
+        ]["live_authority_granted"]
+        is True
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_source_authority_flags_mismatch"
+        in result.detail["violations"]
+    )
+
+
 def test_no_wing_release_check_allows_next_wing_plan_blocked_by_candidate_prestart_trace(
     tmp_path,
 ):
