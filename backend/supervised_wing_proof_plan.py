@@ -154,6 +154,10 @@ class WingProofPlanStep:
             raise ValueError("The proof plan must not authorize execution")
         if not self.operator_approval_required:
             raise ValueError("Physical proof steps require explicit operator approval")
+        if self.value_type not in ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES:
+            raise ValueError(
+                "Physical proof plan only supports supervised WING proof value types"
+            )
         try:
             channel = int(self.channel)
         except (TypeError, ValueError):

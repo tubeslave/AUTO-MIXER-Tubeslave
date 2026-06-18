@@ -1680,6 +1680,47 @@ def test_proof_step_rejects_out_of_range_channel():
         )
 
 
+def test_proof_step_rejects_unsupported_value_type():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof plan only supports supervised WING proof value types",
+    ):
+        WingProofPlanStep(
+            id="pan_physical_proof_ch3",
+            value_type="pan",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=(
+                "python3",
+                "tools/wing_operator_proposal_validation_runner.py",
+                "--channel",
+                "3",
+                "--operator-confirm-channel",
+                "3",
+                "--value-type",
+                "pan",
+                "--operator-confirm-value-type",
+                "pan",
+                "--delta-db",
+                "-0.25",
+                "--operator-confirm-delta-db",
+                "-0.25",
+                "--execute",
+                "--prove-blocked-apply",
+                "--prove-emergency-stop",
+            ),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_proof_step_rejects_mismatched_command_channel_confirmation():
     with pytest.raises(
         ValueError,
