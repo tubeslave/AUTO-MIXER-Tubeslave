@@ -1116,6 +1116,23 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true"
         in readonly
     )
+    for marker in (
+        "summary_json_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_present: true",
+        "summary_md_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_rendered: true",
+        "summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_emission_status_matches_expected: true",
+        "summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_fields_present_matches_expected: true",
+        "summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_fields_missing_matches_expected: true",
+        "summary_md_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_emission_status_matches_expected: true",
+        "summary_md_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_missing_count_matches_expected: true",
+        "artifact_manifest_verifier_check_summary_json_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_present: true",
+        "artifact_manifest_verifier_check_summary_md_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_rendered: true",
+        "artifact_manifest_verifier_check_summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_emission_status_matches_expected: true",
+        "artifact_manifest_verifier_check_summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_fields_present_matches_expected: true",
+        "artifact_manifest_verifier_check_summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_fields_missing_matches_expected: true",
+        "artifact_manifest_verifier_check_summary_md_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_emission_status_matches_expected: true",
+        "artifact_manifest_verifier_check_summary_md_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_missing_count_matches_expected: true",
+    ):
+        assert marker in readonly
     assert "verifier_report_read_only_matches_expected: true" in readonly
     assert "verifier_report_live_write_matches_expected: true" in readonly
     assert "verifier_report_contacts_wing_matches_expected: true" in readonly
