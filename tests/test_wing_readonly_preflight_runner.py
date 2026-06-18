@@ -3772,6 +3772,91 @@ async def test_readonly_preflight_blocks_bad_verifier_check_before_websocket(
 
 
 @pytest.mark.asyncio
+async def test_readonly_preflight_blocks_emitted_next_wing_verifier_check_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_connect(url: str):  # pragma: no cover - exercised only on regression
+        raise AssertionError(f"bad optional verifier check must not open WebSocket: {url}")
+
+    monkeypatch.setattr(runner.websockets, "connect", fail_connect)
+    prestart_path = ensure_prestart_summary(tmp_path)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    failed_check = (
+        "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted_denies_authority"
+    )
+    verifier_report = dict(
+        runner.verify_no_wing_artifact_manifest(prestart_path.parent)
+    )
+    verifier_checks = dict(verifier_report["checks"])
+    verifier_checks[failed_check] = False
+    verifier_report.update(
+        {
+            "status": "passed",
+            "failed_checks": [],
+            "failed_checks_missing_check_entries": [],
+            "checks": verifier_checks,
+        }
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify_no_wing_artifact_manifest",
+        lambda _run_dir: verifier_report,
+    )
+    args = runner.build_parser().parse_args(
+        [
+            "--url",
+            "ws://fake-backend",
+            "--artifact-root",
+            str(tmp_path),
+            "--timeout",
+            "0.2",
+            "--channels",
+            "3",
+            "--value-types",
+            "fader",
+            "--require-physical-readback",
+            "--operator-confirm-channels",
+            "3",
+            "--operator-confirm-session-ready",
+            "--prestart-summary",
+            str(prestart_path),
+            "--expected-plan",
+            str(expected_plan),
+        ]
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "prestart_summary_missing_or_invalid"
+    assert "prestart_summary_artifact_manifest_verifier_failed" in summary[
+        "prestart_summary_violations"
+    ]
+    assert (
+        "prestart_summary_artifact_manifest_verifier_check_mismatch"
+        in summary["prestart_summary_violations"]
+    )
+    assert summary["artifact_manifest_verifier_check_mismatches"] == [
+        failed_check
+    ]
+    assert summary[f"artifact_manifest_verifier_check_{failed_check}"] is False
+    assert summary["sent_request_types"] == []
+
+
+@pytest.mark.asyncio
 async def test_readonly_preflight_blocks_unsafe_prestart_summary_safety_fields(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
