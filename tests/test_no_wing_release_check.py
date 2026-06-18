@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import socket
 import sys
@@ -177,6 +178,18 @@ from tools.no_wing_release_check import (
     wing_readonly_preflight_prestart_summary_path_for_run,
     write_summary,
 )
+
+
+RUNNER_PATH = (
+    Path(__file__).resolve().parents[1] / "tools" / "wing_readonly_preflight_runner.py"
+)
+RUNNER_SPEC = importlib.util.spec_from_file_location(
+    "wing_readonly_preflight_runner_for_no_wing_release_check_tests", RUNNER_PATH
+)
+assert RUNNER_SPEC is not None
+wing_readonly_preflight_runner = importlib.util.module_from_spec(RUNNER_SPEC)
+assert RUNNER_SPEC.loader is not None
+RUNNER_SPEC.loader.exec_module(wing_readonly_preflight_runner)
 
 
 def bind_local_test_server_or_skip() -> socket.socket:
@@ -14838,6 +14851,28 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME in markdown_summary
     assert WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME in markdown_summary
     assert "set_gain" in markdown_summary
+
+
+def test_project_director_sidecar_markers_cover_runner_verifier_checks():
+    required_markers = set(
+        release_check.PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS
+    )
+    covered_checks: set[str] = set()
+    for marker in required_markers:
+        if not marker.endswith(": true"):
+            continue
+        raw_marker = marker.removesuffix(": true")
+        covered_checks.add(raw_marker)
+        if raw_marker.startswith("artifact_manifest_verifier_check_"):
+            covered_checks.add(
+                raw_marker.removeprefix("artifact_manifest_verifier_check_")
+            )
+
+    missing_checks = sorted(
+        set(wing_readonly_preflight_runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS)
+        - covered_checks
+    )
+    assert missing_checks == []
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_artifact(
