@@ -147,6 +147,11 @@ BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT = (
 BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
 )
+ARTIFACT_MANIFEST_VERIFIER_SAFETY_VALUE_FIELDS = (
+    *VERIFIER_REPORT_STATIC_SAFETY_FIELDS,
+    "readiness_closure_allowed",
+    "live_authority_granted",
+)
 ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "summary_json_exists",
     "summary_md_exists",
@@ -188,36 +193,11 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "summary_json_artifact_manifest_verifier_fields_present",
     "manifest_artifact_manifest_verifier_fields_present",
     "summary_md_artifact_manifest_verifier_fields_rendered",
-    "summary_json_artifact_manifest_verifier_read_only_matches_expected",
-    "summary_md_artifact_manifest_verifier_read_only_matches_expected",
-    "manifest_artifact_manifest_verifier_read_only_matches_expected",
-    "summary_json_artifact_manifest_verifier_live_write_matches_expected",
-    "summary_md_artifact_manifest_verifier_live_write_matches_expected",
-    "manifest_artifact_manifest_verifier_live_write_matches_expected",
-    "summary_json_artifact_manifest_verifier_contacts_backend_matches_expected",
-    "summary_md_artifact_manifest_verifier_contacts_backend_matches_expected",
-    "manifest_artifact_manifest_verifier_contacts_backend_matches_expected",
-    "summary_json_artifact_manifest_verifier_executes_tests_matches_expected",
-    "summary_md_artifact_manifest_verifier_executes_tests_matches_expected",
-    "manifest_artifact_manifest_verifier_executes_tests_matches_expected",
-    "summary_json_artifact_manifest_verifier_contacts_wing_matches_expected",
-    "summary_md_artifact_manifest_verifier_contacts_wing_matches_expected",
-    "manifest_artifact_manifest_verifier_contacts_wing_matches_expected",
-    "summary_json_artifact_manifest_verifier_mutates_console_state_matches_expected",
-    "summary_md_artifact_manifest_verifier_mutates_console_state_matches_expected",
-    "manifest_artifact_manifest_verifier_mutates_console_state_matches_expected",
-    "summary_json_artifact_manifest_verifier_queries_console_matches_expected",
-    "summary_md_artifact_manifest_verifier_queries_console_matches_expected",
-    "manifest_artifact_manifest_verifier_queries_console_matches_expected",
-    "summary_json_artifact_manifest_verifier_readiness_matrix_update_allowed_matches_expected",
-    "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_matches_expected",
-    "manifest_artifact_manifest_verifier_readiness_matrix_update_allowed_matches_expected",
-    "summary_json_artifact_manifest_verifier_readiness_closure_allowed_matches_expected",
-    "summary_md_artifact_manifest_verifier_readiness_closure_allowed_matches_expected",
-    "manifest_artifact_manifest_verifier_readiness_closure_allowed_matches_expected",
-    "summary_json_artifact_manifest_verifier_live_authority_granted_matches_expected",
-    "summary_md_artifact_manifest_verifier_live_authority_granted_matches_expected",
-    "manifest_artifact_manifest_verifier_live_authority_granted_matches_expected",
+    *(
+        f"{surface}_artifact_manifest_verifier_{field_name}_matches_expected"
+        for field_name in ARTIFACT_MANIFEST_VERIFIER_SAFETY_VALUE_FIELDS
+        for surface in ("summary_json", "summary_md", "manifest")
+    ),
     "manifest_artifact_manifest_verifier_command_matches_expected",
     "summary_json_artifact_manifest_verifier_report_required_fields_matches_expected",
     "summary_md_artifact_manifest_verifier_report_required_fields_matches_expected",
