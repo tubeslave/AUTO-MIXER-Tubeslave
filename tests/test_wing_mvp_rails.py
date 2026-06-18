@@ -1567,6 +1567,26 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: true"
+        in current_command
+    )
+    assert (
         "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
         in current_command
     )
@@ -1662,6 +1682,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete: true"
         in progress.current_first_command_missing_baseline_markers(
             missing_expected_artifact_trace_command
+        )
+    )
+    missing_request_sequence_trace_command = current_command.replace(
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: true",
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_request_sequence_trace_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete: true"
+        in progress.current_first_command_missing_baseline_markers(
+            missing_request_sequence_trace_command
         )
     )
     missing_markdown_summary_command = current_command.replace(
