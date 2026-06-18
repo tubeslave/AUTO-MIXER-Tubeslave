@@ -206,6 +206,13 @@ It does not approve live writes.
   `artifact_manifest_self_consistency_summary_surface_live_authority_granted: false`,
   `artifact_manifest_self_consistency_match: true`,
   `artifact_manifest_self_consistency_mismatches: []`,
+  `artifact_manifest_path`,
+  `artifact_manifest_required_artifact_ids`,
+  `artifact_manifest_required_artifact_paths`,
+  `artifact_manifest_required_artifact_sha256_fields`,
+  `artifact_manifest_contract_id`,
+  `artifact_manifest_contract_sha256`,
+  `artifact_manifest_contract_sha256_matches_expected`,
   `artifact_manifest_contract_cross_surface_match: true`, and
   `artifact_manifest_contract_cross_surface_mismatches: []`. The Project
   Director selected action value-gate self-check must also preserve the
