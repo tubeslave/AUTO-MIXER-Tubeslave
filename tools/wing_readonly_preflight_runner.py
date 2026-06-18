@@ -58,6 +58,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
 )
 from tools.verify_no_wing_artifact_manifest import (  # noqa: E402
     NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
+    VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS,
+    VERIFIER_REPORT_STATIC_SAFETY_FIELDS,
     verify_no_wing_artifact_manifest,
 )
 
@@ -360,21 +362,10 @@ ARTIFACT_MANIFEST_VERIFIER_REPORT_EXPECTED_VALUES = {
     "artifact_manifest_self_consistency_match": True,
     "artifact_manifest_contract_cross_surface_match": True,
     "artifact_manifest_self_consistency_summary_surface_match": True,
-    "read_only": True,
-    "live_write": False,
-    "contacts_wing": False,
-    "contacts_backend": False,
-    "mutates_console_state": False,
-    "queries_console": False,
-    "executes_tests": False,
-    "readiness_matrix_update_allowed": False,
+    **VERIFIER_REPORT_STATIC_SAFETY_FIELDS,
     "readiness_closure_allowed": False,
     "live_authority_granted": False,
-    "wing_readonly_handoff_plan_verifier_summary_surface_mismatches": [],
-    "wing_readonly_handoff_plan_verifier_summary_surface_match": True,
-    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed": False,
-    "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed": False,
-    "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted": False,
+    **VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS,
 }
 
 
