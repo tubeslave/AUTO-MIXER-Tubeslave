@@ -1680,6 +1680,75 @@ def test_proof_step_rejects_non_live_execution_flag():
         )
 
 
+def test_proof_step_rejects_non_bool_live_execution_flag():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof steps must be marked as live execution",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=1,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=("python3", "tools/wing_operator_proposal_validation_runner.py"),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
+def test_proof_step_rejects_non_bool_execution_authority():
+    with pytest.raises(
+        ValueError,
+        match="The proof plan must not authorize execution",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=0,
+            operator_approval_required=True,
+            command=("python3", "tools/wing_operator_proposal_validation_runner.py"),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
+def test_proof_step_rejects_non_bool_operator_approval():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof steps require explicit operator approval",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=1,
+            command=("python3", "tools/wing_operator_proposal_validation_runner.py"),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_proof_step_rejects_out_of_range_channel():
     with pytest.raises(
         ValueError,
