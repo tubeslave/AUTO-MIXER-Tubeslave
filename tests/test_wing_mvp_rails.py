@@ -1450,6 +1450,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in current_command
     )
+    assert (
+        'readonly_preflight_review_decision_accepted_candidate_queries_console_by_source: {"artifacts/wing_readonly_preflight/run/summary.json": false}'
+        in current_command
+    )
     for marker in (
         'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}",
@@ -1869,6 +1873,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in progress.current_first_command_missing_baseline_markers(
             missing_expected_required_supervised_contact_marker_command
+        )
+    )
+    querying_console_contact_trace_command = current_command.replace(
+        'readonly_preflight_review_decision_accepted_candidate_queries_console_by_source: {"artifacts/wing_readonly_preflight/run/summary.json": false}',
+        'readonly_preflight_review_decision_accepted_candidate_queries_console_by_source: {"artifacts/wing_readonly_preflight/run/summary.json": true}',
+    )
+    assert not progress.current_first_command_covers_baseline(
+        querying_console_contact_trace_command
+    )
+    assert (
+        'readonly_preflight_review_decision_accepted_candidate_queries_console_by_source: {"artifacts/wing_readonly_preflight/run/summary.json": false}'
+        in progress.current_first_command_missing_baseline_markers(
+            querying_console_contact_trace_command
         )
     )
     missing_proof_plan_fields_command = current_command.replace(
