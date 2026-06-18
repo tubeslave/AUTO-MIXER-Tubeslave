@@ -1028,6 +1028,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["next action"]
     )
     assert (
+        "supervised_prestart_gate.requires_accepted_candidate_contact_trace: true"
+        in rows[0]["next action"]
+    )
+    assert (
         "accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof"
         in rows[0]["next action"]
     )
@@ -1035,6 +1039,15 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
         in rows[0]["next action"]
     )
+    assert (
+        "accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof"
+        in rows[0]["next action"]
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
+        in rows[0]["next action"]
+    )
+    assert "valid accepted-candidate contact trace" in rows[0]["next action"]
     fader_row = next(row for row in rows if row["blocker"] == "Supervised fader write proof")
     gain_row = next(
         row for row in rows if row["blocker"] == "Supervised gain-down / trim proof"
@@ -1052,6 +1065,7 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         ]
         assert "valid accepted-candidate artifact-root trace" in row["next action"]
         assert "valid accepted-candidate request-sequence trace" in row["next action"]
+        assert "valid accepted-candidate contact trace" in row["next action"]
         assert "expected-artifact-bound accepted source id" in row["next action"]
         assert "supervised_prestart_gate" in row["next action"]
         assert "expected_supervised_prestart_gate" in row["next action"]
