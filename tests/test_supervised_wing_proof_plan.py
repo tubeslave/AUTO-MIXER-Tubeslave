@@ -159,6 +159,8 @@ def readonly_preflight_command(
     runner="tools/wing_readonly_preflight_runner.py",
     backend_url="ws://localhost:8765",
     artifact_root="artifacts/wing_readonly_preflight",
+    expected_plan=READONLY_PREFLIGHT_EXPECTED_PLAN,
+    prestart_summary=READONLY_PREFLIGHT_PRESTART_SUMMARY,
     tail=(),
 ):
     return (
@@ -177,9 +179,9 @@ def readonly_preflight_command(
         "--artifact-root",
         artifact_root,
         "--prestart-summary",
-        READONLY_PREFLIGHT_PRESTART_SUMMARY,
+        prestart_summary,
         "--expected-plan",
-        READONLY_PREFLIGHT_EXPECTED_PLAN,
+        expected_plan,
         *tail,
     )
 
@@ -194,6 +196,8 @@ def readonly_preflight_step(
     read_only=True,
     expected_plan_required_for_real_run=True,
     prestart_summary_required=True,
+    expected_plan=READONLY_PREFLIGHT_EXPECTED_PLAN,
+    prestart_summary=READONLY_PREFLIGHT_PRESTART_SUMMARY,
     prerequisites=None,
     abort_conditions=None,
     expected_artifacts=None,
@@ -227,8 +231,8 @@ def readonly_preflight_step(
         read_only=read_only,
         expected_plan_required_for_real_run=expected_plan_required_for_real_run,
         prestart_summary_required=prestart_summary_required,
-        expected_plan=READONLY_PREFLIGHT_EXPECTED_PLAN,
-        prestart_summary=READONLY_PREFLIGHT_PRESTART_SUMMARY,
+        expected_plan=expected_plan,
+        prestart_summary=prestart_summary,
         command=command,
         rationale="unit regression",
         prerequisites=prerequisites,
@@ -447,6 +451,46 @@ def test_readonly_preflight_step_rejects_swapped_plan_and_prestart_bindings():
         match="Read-only preflight step must bind --expected-plan",
     ):
         readonly_preflight_step(tuple(command))
+
+
+@pytest.mark.parametrize(
+    "expected_plan",
+    [
+        "",
+        "/tmp/wing_readonly_preflight_plan.json",
+        "artifacts/wing_readonly_preflight_plan/../latest_plan.json",
+        "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md",
+    ],
+)
+def test_readonly_preflight_step_rejects_unsafe_expected_plan(expected_plan):
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step expected plan must stay under artifacts",
+    ):
+        readonly_preflight_step(
+            readonly_preflight_command(expected_plan=expected_plan),
+            expected_plan=expected_plan,
+        )
+
+
+@pytest.mark.parametrize(
+    "prestart_summary",
+    [
+        "",
+        "/tmp/no_wing_release_check_summary.json",
+        "artifacts/no_wing_release_check/../summary.json",
+        "Docs/reports/NO_WING_RELEASE_CHECK_LATEST.md",
+    ],
+)
+def test_readonly_preflight_step_rejects_unsafe_prestart_summary(prestart_summary):
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step prestart summary must stay under artifacts",
+    ):
+        readonly_preflight_step(
+            readonly_preflight_command(prestart_summary=prestart_summary),
+            prestart_summary=prestart_summary,
+        )
 
 
 def test_readonly_preflight_step_requires_physical_readback_flag():

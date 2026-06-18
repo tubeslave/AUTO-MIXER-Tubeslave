@@ -400,6 +400,14 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError("Read-only preflight step must bind --expected-plan")
         if _command_value(command, "--prestart-summary") != self.prestart_summary:
             raise ValueError("Read-only preflight step must bind --prestart-summary")
+        if not _is_artifacts_path(self.expected_plan):
+            raise ValueError(
+                "Read-only preflight step expected plan must stay under artifacts"
+            )
+        if not _is_artifacts_path(self.prestart_summary):
+            raise ValueError(
+                "Read-only preflight step prestart summary must stay under artifacts"
+            )
         if "--require-physical-readback" not in command:
             raise ValueError(
                 "Read-only preflight step must require physical readback"
@@ -412,8 +420,7 @@ class WingReadonlyPreflightPlanStep:
         artifact_root = _command_value(command, "--artifact-root")
         if not artifact_root:
             raise ValueError("Read-only preflight step must bind artifact root")
-        artifact_root_parts = artifact_root.replace("\\", "/").split("/")
-        if not artifact_root.startswith("artifacts/") or ".." in artifact_root_parts:
+        if not _is_artifacts_path(artifact_root):
             raise ValueError(
                 "Read-only preflight step artifact root must stay under artifacts"
             )
@@ -571,6 +578,14 @@ def _is_ws_backend_url(value: str | None) -> bool:
         return False
     parsed = urlparse(value)
     return parsed.scheme in {"ws", "wss"} and bool(parsed.netloc)
+
+
+def _is_artifacts_path(value: str | None) -> bool:
+    if not value:
+        return False
+    normalized = value.replace("\\", "/")
+    parts = normalized.split("/")
+    return normalized.startswith("artifacts/") and ".." not in parts
 
 
 def _duplicate_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -> Tuple[str, ...]:
