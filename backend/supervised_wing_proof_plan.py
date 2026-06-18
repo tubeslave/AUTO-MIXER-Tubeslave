@@ -11,6 +11,7 @@ import math
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Tuple
+from urllib.parse import urlparse
 
 try:
     from autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
@@ -256,7 +257,7 @@ class WingProofPlanStep:
         ):
             raise ValueError("Physical proof step command must use canonical proof runner")
         backend_url = _command_value(command, "--url")
-        if not backend_url or not backend_url.startswith(("ws://", "wss://")):
+        if not _is_ws_backend_url(backend_url):
             raise ValueError(
                 "Physical proof step command must bind a WebSocket backend URL"
             )
@@ -404,7 +405,7 @@ class WingReadonlyPreflightPlanStep:
                 "Read-only preflight step must require physical readback"
             )
         backend_url = _command_value(command, "--url")
-        if not backend_url or not backend_url.startswith(("ws://", "wss://")):
+        if not _is_ws_backend_url(backend_url):
             raise ValueError(
                 "Read-only preflight step must bind a WebSocket backend URL"
             )
@@ -563,6 +564,13 @@ def _command_value(command: Tuple[str, ...], flag: str) -> str | None:
     if index + 1 >= len(command):
         return None
     return command[index + 1]
+
+
+def _is_ws_backend_url(value: str | None) -> bool:
+    if not value:
+        return False
+    parsed = urlparse(value)
+    return parsed.scheme in {"ws", "wss"} and bool(parsed.netloc)
 
 
 def _duplicate_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -> Tuple[str, ...]:

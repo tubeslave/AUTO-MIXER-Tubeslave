@@ -463,7 +463,10 @@ def test_readonly_preflight_step_requires_physical_readback_flag():
         readonly_preflight_step(command)
 
 
-@pytest.mark.parametrize("backend_url", ["", "http://localhost:8765", "localhost:8765"])
+@pytest.mark.parametrize(
+    "backend_url",
+    ["", "http://localhost:8765", "localhost:8765", "ws://", "wss://"],
+)
 def test_readonly_preflight_step_rejects_non_websocket_backend_url(backend_url):
     with pytest.raises(
         ValueError,
@@ -2417,7 +2420,10 @@ def test_proof_step_rejects_non_canonical_runner_command():
         )
 
 
-@pytest.mark.parametrize("backend_url", ["", "http://localhost:8765", "localhost:8765"])
+@pytest.mark.parametrize(
+    "backend_url",
+    ["", "http://localhost:8765", "localhost:8765", "ws://", "wss://"],
+)
 def test_proof_step_rejects_non_websocket_backend_url(backend_url):
     with pytest.raises(
         ValueError,
