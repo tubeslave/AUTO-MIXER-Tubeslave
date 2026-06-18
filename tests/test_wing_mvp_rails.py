@@ -420,9 +420,18 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
     assert "required_supervised_prestart_gate_markers" in text
+    assert "required_supervised_prestart_gate_marker_count: 8" in text
+    assert "expected_required_supervised_prestart_gate_marker_count: 8" in text
+    assert "supervised_prestart_gate_required_marker_count: 8" in text
+    assert "expected_supervised_prestart_gate_required_marker_count: 8" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
     assert "supervised_prestart_gate.operator_sequence_step_index: 11" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
+    assert "valid accepted-candidate contact trace" in text
+    assert (
+        "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
+        in text
+    )
     assert "operator_sequence_count: 12" in text
     for marker in OPERATOR_SEQUENCE_SHA_MARKERS:
         assert marker in text
@@ -453,6 +462,14 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     )
     assert (
         "supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"
+        in text
+    )
+    assert (
+        "supervised_prestart_gate.requires_accepted_candidate_contact_trace: true"
+        in text
+    )
+    assert (
+        "supervised_prestart_gate_requires_accepted_candidate_contact_trace: true"
         in text
     )
     assert "grants_live_authority: true" in text
@@ -1459,6 +1476,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "valid accepted-candidate verifier WebSocket proof" in supervised
     assert "valid accepted-candidate artifact-root trace" in supervised
     assert "valid accepted-candidate request-sequence trace" in supervised
+    assert "valid accepted-candidate contact trace" in supervised
     assert "expected-artifact-bound accepted source id" in supervised
     assert "supervised_prestart_gate" in supervised
     assert "expected_supervised_prestart_gate" in supervised
@@ -1472,6 +1490,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         in supervised
     )
     assert (
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete: true"
+        in supervised
+    )
+    assert (
         "readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true"
         in supervised
     )
@@ -1481,6 +1503,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     )
     assert (
         "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
+        in supervised
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
         in supervised
     )
     assert "accepted_candidate_prestart_contract_violations_by_source" in readonly

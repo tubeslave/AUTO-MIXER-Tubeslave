@@ -108,6 +108,12 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while accepted review source ids lack a valid
   accepted-candidate artifact-root trace, or while the proof plan still carries
   `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`.
+- A supervised proof is planned while accepted review source ids lack a valid
+  accepted-candidate request-sequence trace, or while the proof plan still carries
+  `accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof`.
+- A supervised proof is planned while accepted review source ids lack a valid
+  accepted-candidate contact trace, or while the proof plan still carries
+  `accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof`.
 - A supervised proof is planned while
   `accepted_candidate_prestart_contract_violations_by_source` or
   `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`
@@ -658,14 +664,14 @@ It must also expose top-level
 `supervised_prestart_gate_required_markers`,
 `expected_supervised_prestart_gate_required_markers`,
 `expected_required_supervised_prestart_gate_markers`,
-`required_supervised_prestart_gate_marker_count: 7`,
-`expected_required_supervised_prestart_gate_marker_count: 7`,
+`required_supervised_prestart_gate_marker_count: 8`,
+`expected_required_supervised_prestart_gate_marker_count: 8`,
 `required_supervised_prestart_gate_marker_count_matches_contract: true`,
 `required_supervised_prestart_gate_marker_count_matches_supervised_gate: true`,
 `required_supervised_prestart_gate_markers_match_contract: true`,
 `required_supervised_prestart_gate_markers_match_supervised_gate: true`,
-`supervised_prestart_gate_required_marker_count: 7`,
-`expected_supervised_prestart_gate_required_marker_count: 7`,
+`supervised_prestart_gate_required_marker_count: 8`,
+`expected_supervised_prestart_gate_required_marker_count: 8`,
 `supervised_prestart_gate_required_marker_count_matches_contract: true`,
 `supervised_prestart_gate_required_marker_count_matches_summary: true`,
 `supervised_prestart_gate_required_markers_match_contract: true`, and
@@ -685,12 +691,14 @@ It must also show
 `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`,
 `supervised_prestart_gate.requires_accepted_candidate_artifact_root_trace: true`,
 `supervised_prestart_gate.requires_accepted_candidate_request_sequence_trace: true`,
+`supervised_prestart_gate.requires_accepted_candidate_contact_trace: true`,
 and
 `supervised_prestart_gate.requires_accepted_candidate_expected_artifact_trace: true`.
 It must also expose top-level
 `supervised_prestart_gate_requires_accepted_candidate_prestart_trace: true`,
 `supervised_prestart_gate_requires_accepted_candidate_artifact_root_trace: true`,
 `supervised_prestart_gate_requires_accepted_candidate_request_sequence_trace: true`,
+`supervised_prestart_gate_requires_accepted_candidate_contact_trace: true`,
 and
 `supervised_prestart_gate_requires_accepted_candidate_expected_artifact_trace: true`
 so release checks can grep the supervised prestart gates without parsing the
@@ -702,6 +710,7 @@ exactly listing `accepted_decision_ready`,
   `valid accepted-candidate verifier WebSocket proof`,
   `valid accepted-candidate artifact-root trace`,
 `valid accepted-candidate request-sequence trace`,
+`valid accepted-candidate contact trace`,
 `expected-artifact-bound accepted source id`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`.
 
