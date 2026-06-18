@@ -107,6 +107,11 @@ READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER = (
 READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER = (
     "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
 )
+READONLY_PREFLIGHT_EVIDENCE_AUTHORITY_FLAGS = (
+    "readiness_closure_allowed_by_evidence",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
 READONLY_PREFLIGHT_REVIEW_DECISION_SUMMARY_AUTHORITY_FLAGS = (
     "readiness_matrix_update_allowed_by_decision",
     "readiness_closure_allowed_by_decision",
@@ -504,9 +509,14 @@ def _readonly_preflight_candidate_available(overlay: Mapping[str, Any]) -> bool:
         and valid_candidate_count is not None
         and valid_candidate_count > 0
         and invalid_candidate_count == 0
-        and overlay.get("readiness_closure_allowed_by_evidence") is not True
-        and overlay.get("live_authority_granted") is not True
-        and overlay.get("full_autonomous_ready") is not True
+        and _readonly_preflight_evidence_denies_authority(overlay)
+    )
+
+
+def _readonly_preflight_evidence_denies_authority(overlay: Mapping[str, Any]) -> bool:
+    return all(
+        overlay.get(flag) is False
+        for flag in READONLY_PREFLIGHT_EVIDENCE_AUTHORITY_FLAGS
     )
 
 
@@ -1640,6 +1650,13 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_required": True,
             "readonly_preflight_candidate_available": preflight_candidate,
             "readonly_preflight_evidence_status": preflight.get("evidence_status"),
+            "readonly_preflight_evidence_authority_denied": (
+                _readonly_preflight_evidence_denies_authority(preflight)
+            ),
+            "readonly_preflight_evidence_authority_flags": {
+                flag: preflight.get(flag)
+                for flag in READONLY_PREFLIGHT_EVIDENCE_AUTHORITY_FLAGS
+            },
             "readonly_preflight_blocked_by": _string_list(preflight.get("blocked_by")),
             "readonly_preflight_prestart_check_required": (
                 preflight.get("prestart_backend_port_check_required") is True

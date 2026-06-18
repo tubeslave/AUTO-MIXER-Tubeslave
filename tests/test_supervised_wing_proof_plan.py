@@ -947,6 +947,12 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert plan["summary"]["readonly_preflight_required"] is True
     assert plan["summary"]["readonly_preflight_candidate_available"] is True
     assert plan["summary"]["readonly_preflight_evidence_status"] == "readonly_preflight_candidate_available"
+    assert plan["summary"]["readonly_preflight_evidence_authority_denied"] is True
+    assert plan["summary"]["readonly_preflight_evidence_authority_flags"] == {
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert_prestart_check(plan["summary"])
     assert plan["summary"]["readonly_preflight_step_count"] == 0
     assert plan["summary"]["readonly_preflight_review_decision_required"] is True
@@ -1188,6 +1194,39 @@ def test_plan_blocks_readonly_preflight_when_candidate_counts_are_malformed(
     assert plan["status"] == "blocked_by_readonly_preflight"
     assert plan["summary"]["step_count"] == 0
     assert plan["summary"]["readonly_preflight_candidate_available"] is False
+    assert plan["summary"]["readonly_preflight_step_count"] == 1
+    assert (
+        "readonly_preflight_candidate_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("readiness_closure_allowed_by_evidence", None),
+        ("live_authority_granted", "false"),
+        ("full_autonomous_ready", 0),
+    ],
+)
+def test_plan_blocks_readonly_preflight_when_evidence_authority_flag_is_not_false(
+    field,
+    value,
+):
+    readiness = preflight_ready_snapshot()
+    readiness["summary"]["wing_readonly_preflight_evidence"][field] = value
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "blocked_by_readonly_preflight"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_candidate_available"] is False
+    assert plan["summary"]["readonly_preflight_evidence_authority_denied"] is False
+    assert plan["summary"]["readonly_preflight_evidence_authority_flags"][field] == value
     assert plan["summary"]["readonly_preflight_step_count"] == 1
     assert (
         "readonly_preflight_candidate_required_before_supervised_proof"
