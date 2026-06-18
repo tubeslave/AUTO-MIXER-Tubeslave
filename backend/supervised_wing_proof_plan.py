@@ -584,7 +584,7 @@ def _is_artifacts_path(value: str | None) -> bool:
         return False
     normalized = value.replace("\\", "/")
     parts = normalized.split("/")
-    return normalized.startswith("artifacts/") and ".." not in parts
+    return parts[0] == "artifacts" and all(parts[1:]) and ".." not in parts[1:]
 
 
 def _duplicate_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -> Tuple[str, ...]:
