@@ -83,6 +83,11 @@ def test_dynamic_vocal_creates_proposal_only_compressor_recommendation():
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 10
     assert recommendation.evidence["feedback_safety"]["status"] == "passed"
     assert recommendation.evidence["feedback_risk"] == 0.0
+    assert recommendation.evidence["makeup_gain_headroom_reserve_db"] == 1.0
+    assert recommendation.evidence["requested_makeup_gain_db"] == (
+        recommendation.makeup_gain_db
+    )
+    assert recommendation.evidence["makeup_gain_feedback_limited"] is False
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
 
     proposal = recommendation.to_operator_proposal()
@@ -166,9 +171,16 @@ def test_high_feedback_risk_blocks_compressor_makeup_proposal():
 
     assert recommendation.status == "analysis_only"
     assert "feedback_risk_blocks_compressor_makeup" in recommendation.blockers
+    assert recommendation.makeup_gain_db == 0.0
+    assert recommendation.evidence["requested_makeup_gain_db"] > 0.0
+    assert recommendation.evidence["makeup_gain_feedback_limited"] is True
     assert recommendation.evidence["feedback_safety"]["status"] == "blocked"
     assert recommendation.evidence["feedback_safety"]["blocks_makeup_gain"] is True
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert proposal["proposed_action"]["makeup_gain_db"] == 0.0
+    assert proposal["evidence"]["requested_makeup_gain_db"] > 0.0
+    assert proposal["evidence"]["makeup_gain_feedback_limited"] is True
 
 
 def test_stale_current_compressor_state_blocks_proposal_only_recommendation():

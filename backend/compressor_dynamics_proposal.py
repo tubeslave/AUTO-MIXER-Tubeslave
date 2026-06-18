@@ -30,6 +30,7 @@ MAX_ATTACK_MS = 120.0
 MIN_RELEASE_MS = 40.0
 MAX_RELEASE_MS = 1200.0
 MAX_MAKEUP_DB = 3.0
+TRUE_PEAK_MAKEUP_RESERVE_DB = 1.0
 HIGH_FEEDBACK_RISK = 0.45
 
 
@@ -320,8 +321,14 @@ def analyze_compressor_need(
     attack = _clip(preset.attack_ms * (0.85 if cf_excess > 4.0 else 1.0), MIN_ATTACK_MS, MAX_ATTACK_MS)
     release = _clip(preset.release_ms * (1.0 + instability * 0.35), MIN_RELEASE_MS, MAX_RELEASE_MS)
     threshold = _clip(rms_dbfs + 3.0 - score * 4.0, MIN_THRESHOLD_DB, MAX_THRESHOLD_DB)
-    makeup_budget = max(0.0, headroom - 1.0)
-    makeup = _clip(min(target_gr * 0.45, makeup_budget, MAX_MAKEUP_DB), 0.0, MAX_MAKEUP_DB)
+    makeup_budget = max(0.0, headroom - TRUE_PEAK_MAKEUP_RESERVE_DB)
+    requested_makeup = _clip(
+        min(target_gr * 0.45, makeup_budget, MAX_MAKEUP_DB),
+        0.0,
+        MAX_MAKEUP_DB,
+    )
+    feedback_blocks_makeup = feedback_risk >= HIGH_FEEDBACK_RISK and requested_makeup > 0.0
+    makeup = 0.0 if feedback_blocks_makeup else requested_makeup
 
     blockers = []
     if peak_dbfs < -55.0 or rms_dbfs < -70.0:
@@ -332,7 +339,7 @@ def analyze_compressor_need(
         blockers.append("existing_compression_already_heavy")
     if headroom < 1.0:
         blockers.append("insufficient_true_peak_headroom_for_makeup")
-    if feedback_risk >= HIGH_FEEDBACK_RISK and makeup > 0.0:
+    if feedback_blocks_makeup:
         blockers.append("feedback_risk_blocks_compressor_makeup")
     if current_state_freshness_status != "fresh":
         blockers.append("compressor_current_state_cache_not_fresh")
@@ -344,8 +351,9 @@ def analyze_compressor_need(
         "status": "blocked" if "feedback_risk_blocks_compressor_makeup" in blockers else "passed",
         "feedback_risk": round(feedback_risk, 3),
         "high_feedback_risk_threshold": HIGH_FEEDBACK_RISK,
+        "requested_makeup_gain_db": round(requested_makeup, 1),
         "makeup_gain_db": round(makeup, 1),
-        "blocks_makeup_gain": feedback_risk >= HIGH_FEEDBACK_RISK and makeup > 0.0,
+        "blocks_makeup_gain": feedback_blocks_makeup,
     }
 
     evidence = {
@@ -376,6 +384,9 @@ def analyze_compressor_need(
         "rollback_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
         "transport_free": True,
         "makeup_gain_is_bounded_by_headroom": True,
+        "makeup_gain_headroom_reserve_db": TRUE_PEAK_MAKEUP_RESERVE_DB,
+        "requested_makeup_gain_db": round(requested_makeup, 1),
+        "makeup_gain_feedback_limited": feedback_blocks_makeup,
     }
 
     status = "proposal_only" if not blockers and confidence >= min_confidence else "analysis_only"
