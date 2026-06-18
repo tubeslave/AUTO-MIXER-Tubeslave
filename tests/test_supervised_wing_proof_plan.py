@@ -525,6 +525,7 @@ def test_readonly_preflight_step_rejects_non_websocket_backend_url(backend_url):
         "",
         "/tmp/wing_readonly_preflight",
         "artifacts/wing_readonly_preflight/..",
+        "artifacts\\wing_readonly_preflight\\..",
         "reports/wing_readonly_preflight",
     ],
 )
@@ -2497,6 +2498,7 @@ def test_proof_step_rejects_non_websocket_backend_url(backend_url):
         "",
         "/tmp/wing_physical_proof",
         "artifacts/proof/..",
+        "artifacts\\proof\\..",
         "reports/wing_physical_proof",
     ],
 )

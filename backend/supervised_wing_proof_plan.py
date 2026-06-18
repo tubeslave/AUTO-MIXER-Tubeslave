@@ -266,8 +266,7 @@ class WingProofPlanStep:
         artifact_root = _command_value(command, "--artifact-root")
         if not artifact_root:
             raise ValueError("Physical proof step command must bind artifact root")
-        artifact_root_parts = artifact_root.replace("\\", "/").split("/")
-        if not artifact_root.startswith("artifacts/") or ".." in artifact_root_parts:
+        if not _is_artifacts_path(artifact_root):
             raise ValueError(
                 "Physical proof step artifact root must stay under artifacts"
             )
