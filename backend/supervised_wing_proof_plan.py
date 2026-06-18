@@ -169,6 +169,8 @@ class WingProofPlanStep:
             or self.channel != channel
         ):
             raise ValueError("Physical proof plan only supports WING channels 1..48")
+        if self.id != f"{self.value_type}_physical_proof_ch{channel}":
+            raise ValueError("Physical proof step id must match value type and channel")
         if not math.isfinite(self.delta_db):
             raise ValueError("Physical proof plan only supports finite dB deltas")
         if self.delta_db >= 0:
