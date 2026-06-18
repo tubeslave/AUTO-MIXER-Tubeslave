@@ -1262,6 +1262,7 @@ contract; if any are missing, do not open the WING session.
   `valid accepted-candidate artifact-root trace`,
   `valid accepted-candidate request-sequence trace`,
   `valid accepted-candidate contact trace`,
+  `valid accepted-candidate expected-artifact trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `required_supervised_prestart_gate_markers` exactly lists
@@ -1270,6 +1271,7 @@ contract; if any are missing, do not open the WING session.
   `valid accepted-candidate artifact-root trace`,
   `valid accepted-candidate request-sequence trace`,
   `valid accepted-candidate contact trace`,
+  `valid accepted-candidate expected-artifact trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `supervised_prestart_gate` exactly matches

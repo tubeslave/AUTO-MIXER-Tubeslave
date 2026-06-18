@@ -420,14 +420,15 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "supervised_prestart_gate" in text
     assert "expected_supervised_prestart_gate" in text
     assert "required_supervised_prestart_gate_markers" in text
-    assert "required_supervised_prestart_gate_marker_count: 8" in text
-    assert "expected_required_supervised_prestart_gate_marker_count: 8" in text
-    assert "supervised_prestart_gate_required_marker_count: 8" in text
-    assert "expected_supervised_prestart_gate_required_marker_count: 8" in text
+    assert "required_supervised_prestart_gate_marker_count: 9" in text
+    assert "expected_required_supervised_prestart_gate_marker_count: 9" in text
+    assert "supervised_prestart_gate_required_marker_count: 9" in text
+    assert "expected_supervised_prestart_gate_required_marker_count: 9" in text
     assert "supervised_prestart_gate.grants_live_authority: false" in text
     assert "supervised_prestart_gate.operator_sequence_step_index: 11" in text
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
     assert "valid accepted-candidate contact trace" in text
+    assert "valid accepted-candidate expected-artifact trace" in text
     assert (
         "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
         in text
@@ -1593,23 +1594,23 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF"
+        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `valid accepted-candidate expected-artifact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF"
         in current_command
     )
     assert (
-        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in current_command
     )
     assert (
-        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in current_command
     )
     assert (
-        'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in current_command
     )
     assert (
-        'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in current_command
     )
     assert (
@@ -1977,70 +1978,100 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert progress.current_first_command_missing_baseline_markers(current_command) == []
     assert progress.current_first_command_covers_baseline(current_command)
     missing_final_supervised_step_contact_marker_command = current_command.replace(
-        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF",
-        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF",
+        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `valid accepted-candidate expected-artifact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF",
+        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate expected-artifact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF",
     )
     assert not progress.current_first_command_covers_baseline(
         missing_final_supervised_step_contact_marker_command
     )
     assert (
-        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF"
+        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `valid accepted-candidate expected-artifact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF"
         in progress.current_first_command_missing_baseline_markers(
             missing_final_supervised_step_contact_marker_command
         )
     )
+    missing_final_supervised_step_expected_artifact_marker_command = (
+        current_command.replace(
+            "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `valid accepted-candidate expected-artifact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF",
+            "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF",
+        )
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_final_supervised_step_expected_artifact_marker_command
+    )
+    assert (
+        "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `valid accepted-candidate expected-artifact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF"
+        in progress.current_first_command_missing_baseline_markers(
+            missing_final_supervised_step_expected_artifact_marker_command
+        )
+    )
     missing_supervised_contact_gate_marker_command = current_command.replace(
-        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
-        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
     )
     assert not progress.current_first_command_covers_baseline(
         missing_supervised_contact_gate_marker_command
     )
     assert (
-        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in progress.current_first_command_missing_baseline_markers(
             missing_supervised_contact_gate_marker_command
         )
     )
+    missing_supervised_expected_artifact_gate_marker_command = (
+        current_command.replace(
+            'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+            'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+        )
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_supervised_expected_artifact_gate_marker_command
+    )
+    assert (
+        'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        in progress.current_first_command_missing_baseline_markers(
+            missing_supervised_expected_artifact_gate_marker_command
+        )
+    )
     missing_supervised_gate_required_contact_marker_command = current_command.replace(
-        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
-        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
     )
     assert not progress.current_first_command_covers_baseline(
         missing_supervised_gate_required_contact_marker_command
     )
     assert (
-        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in progress.current_first_command_missing_baseline_markers(
             missing_supervised_gate_required_contact_marker_command
         )
     )
     missing_expected_supervised_gate_required_contact_marker_command = (
         current_command.replace(
-            'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
-            'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+            'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+            'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
         )
     )
     assert not progress.current_first_command_covers_baseline(
         missing_expected_supervised_gate_required_contact_marker_command
     )
     assert (
-        'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'expected_supervised_prestart_gate_required_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in progress.current_first_command_missing_baseline_markers(
             missing_expected_supervised_gate_required_contact_marker_command
         )
     )
     missing_expected_required_supervised_contact_marker_command = (
         current_command.replace(
-            'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
-            'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+            'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
+            'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
         )
     )
     assert not progress.current_first_command_covers_baseline(
         missing_expected_required_supervised_contact_marker_command
     )
     assert (
-        'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
+        'expected_required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "valid accepted-candidate expected-artifact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]'
         in progress.current_first_command_missing_baseline_markers(
             missing_expected_required_supervised_contact_marker_command
         )

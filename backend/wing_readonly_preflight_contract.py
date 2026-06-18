@@ -253,6 +253,7 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_STEP = (
     "a valid accepted-candidate artifact-root trace, and "
     "a valid accepted-candidate request-sequence trace, a valid "
     "accepted-candidate contact trace, plus "
+    "a valid accepted-candidate expected-artifact trace, plus "
     "expected-artifact-bound accepted source id, move to "
     "WING_SUPERVISED_FADER_GAIN_PROOF."
 )
@@ -263,6 +264,7 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS = (
     "valid accepted-candidate artifact-root trace",
     "valid accepted-candidate request-sequence trace",
     "valid accepted-candidate contact trace",
+    "valid accepted-candidate expected-artifact trace",
     "expected-artifact-bound accepted source id",
     "WING_SUPERVISED_FADER_GAIN_PROOF",
 )
