@@ -136,6 +136,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         status="proposal_only",
         paths=(
             "backend/auto_soundcheck_engine.py",
+            "backend/agents/gain_agent.py",
             "backend/lufs_gain_staging.py",
             "backend/auto_fader.py",
             "backend/live_shared_mix.py",
@@ -143,11 +144,16 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "backend/processing_proposal_adapters.py",
             "backend/operator_recommendation_bridge.py",
         ),
-        entrypoints=("main_pipeline_preview", "run_operator_analysis", "import_soundcheck_recommendations"),
+        entrypoints=(
+            "main_pipeline_preview",
+            "run_operator_analysis",
+            "import_soundcheck_recommendations",
+            "GainAgent.act blocked trim evidence",
+        ),
         write_kinds=LIVE_ALLOWED_WRITE_KINDS,
         allowed_live=False,
         gate="Product Layer proposal queue; live apply requires product_layer_fader_gain_apply",
-        current_policy="May create bounded fader/gain recommendations only; no direct mixer mutation.",
+        current_policy="May create bounded fader/gain recommendations or blocked trim evidence only; no direct mixer mutation.",
         next_action="Continue feeding proposal evidence and rollback values into the queue.",
     ),
     WriteSurface(
