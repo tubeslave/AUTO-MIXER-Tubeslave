@@ -1525,6 +1525,43 @@ def test_plan_blocks_physical_proof_steps_when_unreviewed_candidate_source_ids_e
     assert plan["steps"] == []
 
 
+@pytest.mark.parametrize(
+    "rejected_source_ids",
+    [
+        [
+            "artifacts/wing_readonly_preflight/rejected/summary.json",
+            "artifacts/wing_readonly_preflight/rejected/summary.json",
+        ],
+        ["/tmp/wing_readonly_preflight/rejected/summary.json"],
+    ],
+)
+def test_plan_blocks_physical_proof_steps_when_rejected_source_ids_are_not_canonical(
+    rejected_source_ids,
+):
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"]["rejected_record_count"] = len(rejected_source_ids)
+    ledger["summary"]["rejected_source_ids"] = rejected_source_ids
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert plan["summary"]["readonly_preflight_review_decision_rejected_source_ids"] == (
+        rejected_source_ids
+    )
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
 def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart_contract():
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
