@@ -399,6 +399,36 @@ def test_context_aware_gate_chatter_guard_forces_expander_instead_of_hard_gate()
     assert recommendation.evidence["live_write"] is False
 
 
+def test_context_aware_gate_false_close_guard_forces_expander():
+    telemetry = BleedTelemetry(
+        channel_id=6,
+        channel_label="Snare Verb Mic",
+        expected_instrument="snare",
+        noise_floor_db=-70.0,
+        activity_ratio=0.32,
+        bleed_correlation_score=0.68,
+        spectral_outlier_score=0.44,
+        transient_density=0.7,
+        tail_risk=0.18,
+        chatter_risk=0.12,
+        false_open_risk=0.28,
+        false_close_risk=0.82,
+        current_state_cache_freshness=_freshness(),
+    )
+
+    recommendation = ContextAwareGateAgent().recommend(telemetry)
+
+    assert recommendation is not None
+    assert recommendation.action_type == "expander"
+    assert recommendation.suggested_params["mode"] == "expander"
+    guard = recommendation.evidence["chatter_guard"]
+    assert guard["hard_gate_allowed"] is False
+    assert guard["false_close_risk"] == 0.82
+    assert guard["max_false_close_risk_for_hard_gate"] == 0.45
+    assert recommendation.evidence["false_close_risk"] == 0.82
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
 def test_build_context_gate_proposals_filters_analysis_holds():
     fresh = BleedTelemetry(
         channel_id=4,

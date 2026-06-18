@@ -515,6 +515,7 @@ class ContextAwareGateConfig:
     max_musical_range_db: float = 8.0
     max_drum_range_db: float = 24.0
     max_chatter_risk_for_hard_gate: float = 0.35
+    max_false_close_risk_for_hard_gate: float = 0.45
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -688,10 +689,17 @@ class ContextAwareGateAgent:
     def _chatter_guard(self, telemetry: BleedTelemetry) -> Dict[str, Any]:
         max_chatter = _clip01(self.config.max_chatter_risk_for_hard_gate)
         chatter_risk = _clip01(telemetry.chatter_risk)
+        max_false_close = _clip01(self.config.max_false_close_risk_for_hard_gate)
+        false_close_risk = _clip01(telemetry.false_close_risk)
         return {
             "chatter_risk": _round(chatter_risk, 3),
             "max_chatter_risk_for_hard_gate": _round(max_chatter, 3),
-            "hard_gate_allowed": chatter_risk <= max_chatter,
+            "false_close_risk": _round(false_close_risk, 3),
+            "max_false_close_risk_for_hard_gate": _round(max_false_close, 3),
+            "hard_gate_allowed": (
+                chatter_risk <= max_chatter
+                and false_close_risk <= max_false_close
+            ),
         }
 
     def _risk_score(self, telemetry: BleedTelemetry) -> float:
