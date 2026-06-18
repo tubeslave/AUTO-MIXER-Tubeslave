@@ -3225,6 +3225,29 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["artifact_manifest_verifier_required_fields_missing"] == []
     assert result.detail["artifact_manifest_verifier_report_value_mismatches"] == []
     assert result.detail["artifact_manifest_verifier_check_mismatches"] == []
+    assert (
+        result.detail[
+            "artifact_manifest_verifier_source_authority_check_fields_optional"
+        ]
+        is True
+    )
+    assert (
+        result.detail[
+            "artifact_manifest_verifier_source_authority_check_emission_status"
+        ]
+        == "emitted"
+    )
+    assert result.detail[
+        "artifact_manifest_verifier_source_authority_check_fields_present"
+    ] == list(
+        release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+    )
+    assert (
+        result.detail[
+            "artifact_manifest_verifier_source_authority_check_fields_missing"
+        ]
+        == []
+    )
     for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
         assert result.detail[field] is True
     assert (
@@ -3399,6 +3422,23 @@ def test_no_wing_release_check_allows_wing_preflight_plan_without_unemitted_sour
     result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
 
     assert result.status == "passed"
+    assert (
+        result.detail[
+            "artifact_manifest_verifier_source_authority_check_emission_status"
+        ]
+        == "not_emitted"
+    )
+    assert (
+        result.detail[
+            "artifact_manifest_verifier_source_authority_check_fields_present"
+        ]
+        == []
+    )
+    assert result.detail[
+        "artifact_manifest_verifier_source_authority_check_fields_missing"
+    ] == list(
+        release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+    )
     for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
         assert result.detail[field] is None
 
@@ -15162,6 +15202,32 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["artifact_manifest_verifier_required_fields_missing"] == []
     assert artifact["artifact_manifest_verifier_report_value_mismatches"] == []
     assert artifact["artifact_manifest_verifier_check_mismatches"] == []
+    assert (
+        artifact["artifact_manifest_verifier_source_authority_check_fields_optional"]
+        is True
+    )
+    assert (
+        artifact["artifact_manifest_verifier_source_authority_check_emission_status"]
+        == "emitted"
+    )
+    assert artifact[
+        "artifact_manifest_verifier_source_authority_check_fields_present"
+    ] == list(
+        release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+    )
+    assert (
+        artifact["artifact_manifest_verifier_source_authority_check_fields_missing"]
+        == []
+    )
+    assert artifact[
+        "artifact_manifest_verifier_source_authority_check_field_count"
+    ] == len(
+        release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+    )
+    assert (
+        artifact["artifact_manifest_verifier_source_authority_check_missing_count"]
+        == 0
+    )
     for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
         assert artifact[field] is True
     assert artifact["artifact_manifest_verifier_failed_checks_have_check_entries"] is True
@@ -15246,6 +15312,18 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
         in markdown_summary
     )
     assert "artifact_manifest_verifier_check_mismatches: `[]`" in markdown_summary
+    assert (
+        "artifact_manifest_verifier_source_authority_check_fields_optional: `true`"
+        in markdown_summary
+    )
+    assert (
+        "artifact_manifest_verifier_source_authority_check_emission_status: `emitted`"
+        in markdown_summary
+    )
+    assert (
+        "artifact_manifest_verifier_source_authority_check_missing_count: `0`"
+        in markdown_summary
+    )
     for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
         assert f"{field}: `true`" in markdown_summary
     assert (

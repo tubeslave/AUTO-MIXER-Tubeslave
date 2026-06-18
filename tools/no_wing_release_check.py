@@ -346,6 +346,51 @@ NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS = (
         for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
     ),
 )
+
+
+def _source_authority_verifier_check_emission_status(
+    present_fields: Sequence[str],
+    missing_fields: Sequence[str],
+) -> str:
+    if not present_fields:
+        return "not_emitted"
+    if missing_fields:
+        return "partially_emitted"
+    return "emitted"
+
+
+def _source_authority_verifier_check_emission_summary(
+    payload: Mapping[str, Any],
+) -> dict[str, object]:
+    present_fields = [
+        field_name
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+        if field_name in payload
+    ]
+    missing_fields = [
+        field_name
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+        if field_name not in payload
+    ]
+    return {
+        "artifact_manifest_verifier_source_authority_check_fields_optional": True,
+        "artifact_manifest_verifier_source_authority_check_fields_present": present_fields,
+        "artifact_manifest_verifier_source_authority_check_fields_missing": missing_fields,
+        "artifact_manifest_verifier_source_authority_check_field_count": len(
+            present_fields
+        ),
+        "artifact_manifest_verifier_source_authority_check_missing_count": len(
+            missing_fields
+        ),
+        "artifact_manifest_verifier_source_authority_check_emission_status": (
+            _source_authority_verifier_check_emission_status(
+                present_fields,
+                missing_fields,
+            )
+        ),
+    }
+
+
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID,
     build_read_surface_physical_readback_capture_plan,
@@ -6556,6 +6601,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["artifact_manifest_verifier_check_mismatches"] = plan.get(
         "artifact_manifest_verifier_check_mismatches"
     )
+    detail.update(_source_authority_verifier_check_emission_summary(plan))
     for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
         detail[field_name] = plan.get(field_name)
     detail["artifact_manifest_verifier_failed_checks_have_check_entries"] = plan.get(
@@ -17632,6 +17678,34 @@ def wing_readonly_preflight_plan_artifact_summary(
         forbidden_request_types = detail.get("forbidden_request_types")
         fail_closed_conditions = detail.get("fail_closed_conditions")
         post_run_review_commands = detail.get("post_run_review_commands")
+        source_authority_check_fields_present = detail.get(
+            "artifact_manifest_verifier_source_authority_check_fields_present"
+        )
+        source_authority_check_fields_missing = detail.get(
+            "artifact_manifest_verifier_source_authority_check_fields_missing"
+        )
+        if not isinstance(source_authority_check_fields_present, list):
+            source_authority_check_fields_present = [
+                field_name
+                for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+                if isinstance(detail.get(field_name), bool)
+            ]
+        if not isinstance(source_authority_check_fields_missing, list):
+            source_authority_check_fields_missing = [
+                field_name
+                for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+                if field_name not in source_authority_check_fields_present
+            ]
+        source_authority_check_emission_status = detail.get(
+            "artifact_manifest_verifier_source_authority_check_emission_status"
+        )
+        if not isinstance(source_authority_check_emission_status, str):
+            source_authority_check_emission_status = (
+                _source_authority_verifier_check_emission_status(
+                    source_authority_check_fields_present,
+                    source_authority_check_fields_missing,
+                )
+            )
         return {
             "status": result.status,
             "read_only": detail.get("read_only") is True,
@@ -17787,6 +17861,22 @@ def wing_readonly_preflight_plan_artifact_summary(
                     list,
                 )
                 else []
+            ),
+            "artifact_manifest_verifier_source_authority_check_fields_optional": True,
+            "artifact_manifest_verifier_source_authority_check_fields_present": (
+                list(source_authority_check_fields_present)
+            ),
+            "artifact_manifest_verifier_source_authority_check_fields_missing": (
+                list(source_authority_check_fields_missing)
+            ),
+            "artifact_manifest_verifier_source_authority_check_field_count": len(
+                source_authority_check_fields_present
+            ),
+            "artifact_manifest_verifier_source_authority_check_missing_count": len(
+                source_authority_check_fields_missing
+            ),
+            "artifact_manifest_verifier_source_authority_check_emission_status": (
+                source_authority_check_emission_status
             ),
             **{
                 field_name: (
@@ -26368,6 +26458,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_value_mismatches'])}`",
                 "- artifact_manifest_verifier_check_mismatches: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_check_mismatches'])}`",
+                "- artifact_manifest_verifier_source_authority_check_fields_optional: "
+                f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_source_authority_check_fields_optional']).lower()}`",
+                "- artifact_manifest_verifier_source_authority_check_emission_status: "
+                f"`{wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_source_authority_check_emission_status']}`",
+                "- artifact_manifest_verifier_source_authority_check_field_count: "
+                f"`{wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_source_authority_check_field_count']}`",
+                "- artifact_manifest_verifier_source_authority_check_missing_count: "
+                f"`{wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_source_authority_check_missing_count']}`",
+                "- artifact_manifest_verifier_source_authority_check_fields_present: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_source_authority_check_fields_present'])}`",
+                "- artifact_manifest_verifier_source_authority_check_fields_missing: "
+                f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_source_authority_check_fields_missing'])}`",
                 *[
                     f"- {field_name}: "
                     f"`{str(wing_readonly_preflight_plan_artifact[field_name]).lower()}`"
