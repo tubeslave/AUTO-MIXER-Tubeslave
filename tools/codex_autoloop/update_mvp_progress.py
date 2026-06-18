@@ -308,7 +308,7 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: false",
     "operator_markdown_summary_required: true",
     "operator_markdown_summary_required_field_lines",
-    "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+    'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
     "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}",
     "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true",
     "operator_markdown_summary_required_field_lines_missing_members: []",

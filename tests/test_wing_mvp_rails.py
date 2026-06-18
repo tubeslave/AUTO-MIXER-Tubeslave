@@ -1431,7 +1431,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     for marker in (
-        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}",
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true",
     ):
@@ -1896,6 +1896,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true"
         in progress.current_first_command_missing_baseline_markers(
             failing_verifier_ws_proof_command
+        )
+    )
+    failing_verifier_ws_proof_source_command = current_command.replace(
+        'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
+        'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/stale_preflight/run/summary.json"]',
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_verifier_ws_proof_source_command
+    )
+    assert (
+        'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]'
+        in progress.current_first_command_missing_baseline_markers(
+            failing_verifier_ws_proof_source_command
         )
     )
     missing_contact_query_trace_command = current_command.replace(
@@ -2687,7 +2700,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
         in text
     )
     for marker in (
-        "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
+        'readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}",
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true",
     ):

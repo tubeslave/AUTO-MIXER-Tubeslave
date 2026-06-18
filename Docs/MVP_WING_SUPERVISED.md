@@ -160,7 +160,7 @@ Stop the current Codex work direction and return to the first open blocker if:
 - A supervised proof is planned while the no-WING operator Markdown does not
   show
   `operator_markdown_summary_required_field_lines` containing
-  `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids`,
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
   `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}`,
   `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`,
   `readonly_preflight_review_decision_candidate_request_sequence_contract_valid: true`,

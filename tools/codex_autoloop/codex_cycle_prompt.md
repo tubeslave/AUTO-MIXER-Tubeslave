@@ -416,7 +416,7 @@ blockers выше.
 87. verify the no-WING `next_wing_proof_plan` summary shows
    `operator_markdown_summary_required: true`,
    `operator_markdown_summary_required_field_lines`,
-   `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids`,
+   `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
    `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}`,
    `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`,
    `operator_markdown_summary_required_field_lines_missing_members: []`,
@@ -986,7 +986,7 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof, the no-WING `next_wing_proof_plan`
   summary must show `operator_markdown_summary_required: true`,
   `operator_markdown_summary_required_field_lines`,
-  `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids`,
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
   `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}`,
   `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`,
   `operator_markdown_summary_required_field_lines_missing_members: []`,

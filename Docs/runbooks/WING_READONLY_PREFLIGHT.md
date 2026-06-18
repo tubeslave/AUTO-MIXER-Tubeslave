@@ -392,7 +392,7 @@ and
 The operator Markdown surface must also prove those Project Director value-gate
 self-check lines were rendered:
 `operator_markdown_summary_required_field_lines` must include
-`readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids`,
+`readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
 `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}`,
 `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`,
 `readonly_preflight_review_decision_candidate_request_sequence_contract_valid: true`,
