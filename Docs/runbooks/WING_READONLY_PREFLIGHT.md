@@ -88,9 +88,11 @@ It does not approve live writes.
   real run must both use it with `--prestart-summary`; the runner records its
   SHA256 and fails closed before WebSocket if the file is missing, stale, or not
   a passed `backend_port_free` prestart result.
-- Before opening a backend/WING WebSocket, verify the detached
-  `artifact-manifest.json` in the same no-WING artifact directory as the passed
-  prestart `summary.json`:
+- Before opening a backend/WING WebSocket, run
+  `verify_no_wing_artifact_manifest` against the detached
+  `artifact-manifest.json` in the same no-WING artifact directory as the
+  passed prestart `summary.json`. It must be the same passed no-WING artifact directory.
+  This detached verifier must pass before any backend/WING WebSocket:
 
   ```bash
   PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py \
@@ -1256,14 +1258,18 @@ contract; if any are missing, do not open the WING session.
 - `operator_sequence_supervised_prestart_gate_step_index: 11`
 - `operator_sequence_supervised_prestart_gate_step` includes
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate verifier WebSocket proof`,
   `valid accepted-candidate artifact-root trace`,
   `valid accepted-candidate request-sequence trace`,
+  `valid accepted-candidate contact trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `required_supervised_prestart_gate_markers` exactly lists
   `accepted_decision_ready`, `valid accepted-candidate prestart trace`,
+  `valid accepted-candidate verifier WebSocket proof`,
   `valid accepted-candidate artifact-root trace`,
   `valid accepted-candidate request-sequence trace`,
+  `valid accepted-candidate contact trace`,
   `expected-artifact-bound accepted source id`, and
   `WING_SUPERVISED_FADER_GAIN_PROOF`
 - `supervised_prestart_gate` exactly matches

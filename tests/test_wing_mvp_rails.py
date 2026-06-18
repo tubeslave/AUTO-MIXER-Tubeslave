@@ -3,6 +3,7 @@ import re
 import sys
 from pathlib import Path
 
+from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import no_wing_release_check as release_check
 
 
@@ -1128,6 +1129,14 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "operator_sequence_supervised_prestart_gate_is_final" in readonly
     assert "supervised_prestart_gate" in readonly
     assert "expected_supervised_prestart_gate" in readonly
+    missing_supervised_prestart_gate_markers = [
+        marker
+        for marker in (
+            readonly_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
+        )
+        if marker not in readonly
+    ]
+    assert missing_supervised_prestart_gate_markers == []
     assert "artifact_operator_next_steps" in readonly
     assert "before opening a backend/WING WebSocket" in readonly
     assert "they do not approve live writes or close readiness rows" in readonly
@@ -1166,6 +1175,14 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         "manifest_artifact_manifest_verifier_report_required_fields_matches_expected: true"
         in readonly
     )
+    missing_artifact_manifest_verifier_operator_markers = [
+        marker
+        for marker in (
+            readonly_contract.WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS
+        )
+        if marker not in readonly
+    ]
+    assert missing_artifact_manifest_verifier_operator_markers == []
     for marker in (
         "summary_json_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_present: true",
         "summary_md_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_rendered: true",
