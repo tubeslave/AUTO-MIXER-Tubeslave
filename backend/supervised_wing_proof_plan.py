@@ -582,9 +582,13 @@ def _is_ws_backend_url(value: str | None) -> bool:
 def _is_artifacts_path(value: str | None) -> bool:
     if not value:
         return False
+    if value != value.strip():
+        return False
     normalized = value.replace("\\", "/")
     parts = normalized.split("/")
-    return parts[0] == "artifacts" and all(parts[1:]) and ".." not in parts[1:]
+    return parts[0] == "artifacts" and all(
+        part and part == part.strip() and part != ".." for part in parts[1:]
+    )
 
 
 def _duplicate_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -> Tuple[str, ...]:
