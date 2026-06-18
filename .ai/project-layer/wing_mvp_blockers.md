@@ -654,7 +654,7 @@ the no-WING handoff summary must also show
 `readonly_preflight_review_decision_candidate_artifact_roots`,
 `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`,
 `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and
-`readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`,
+`readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`,
 and `readonly_preflight_review_decision_invalid_records`;
 the operator-readable no-WING `summary.md` proof plan section must render those
 canonical helper fields;
@@ -835,8 +835,8 @@ in the proof plan blockers, and no-WING validation must fail with
 `next_wing_proof_plan_steps_with_candidate_artifact_root_violations` if
 physical proof steps are still present.
 The recomputed
-`readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`
-map must also stay `{}`; no-WING validation must fail with
+`readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`
+value must also stay true; no-WING validation must fail with
 `next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations`
 if that expected map is non-empty while physical proof steps are still present.
 The accepted-candidate prestart trace must also bind to a passed no-WING

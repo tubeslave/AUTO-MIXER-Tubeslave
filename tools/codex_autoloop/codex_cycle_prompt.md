@@ -404,12 +404,12 @@ blockers выше.
    `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`,
    `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
    `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
-   `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`,
+   `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
    `readonly_preflight_review_decision_candidate_artifact_roots`,
-   `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`,
+   `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`,
    `readonly_preflight_review_decision_expected_candidate_artifact_roots`,
    and
-   `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`,
+   `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`,
    and `readonly_preflight_review_decision_invalid_records`;
 86. verify the operator-readable no-WING `summary.md` proof plan section renders
    those canonical helper fields;
@@ -761,8 +761,8 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `next_wing_proof_plan_steps_with_candidate_artifact_root_violations` if proof
   steps are still present, and grants no live authority.
 - The recomputed
-  `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`
-  map must also stay `{}`. A non-empty expected map must trigger
+  `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`
+  value must also stay true. A non-empty expected map must trigger
   `next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations`
   if proof steps are still present.
 - Accepted review source ids must also expose an expected-artifact trace in the
@@ -975,11 +975,11 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`,
   `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
   `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
-  `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`,
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
   `readonly_preflight_review_decision_candidate_artifact_roots`,
-  `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`,
+  `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`,
   `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and
-  `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`,
+  `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`,
   and `readonly_preflight_review_decision_invalid_records`.
 - Before any supervised fader/gain proof, the operator-readable no-WING
   `summary.md` proof plan section must render those canonical helper fields.

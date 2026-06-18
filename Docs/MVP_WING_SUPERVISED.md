@@ -464,8 +464,8 @@ No-WING validation must also fail with
 proof plan carries a non-empty accepted-candidate artifact-root violations map
 while proof steps are present.
 The recomputed
-`readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`
-map must also stay `{}`; no-WING validation must fail with
+`readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`
+value must also stay true; no-WING validation must fail with
 `next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations`
 if that expected map is non-empty while proof steps are present.
 

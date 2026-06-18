@@ -1567,7 +1567,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}"
         in current_command
     )
     assert (
@@ -1831,6 +1831,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true"
         in progress.current_first_command_missing_baseline_markers(
             failing_candidate_artifact_root_command
+        )
+    )
+    failing_expected_artifact_root_command = current_command.replace(
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}",
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {'stale_source': ['missing artifact_root']}",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_expected_artifact_root_command
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}"
+        in progress.current_first_command_missing_baseline_markers(
+            failing_expected_artifact_root_command
         )
     )
     failing_verifier_ws_proof_command = current_command.replace(
