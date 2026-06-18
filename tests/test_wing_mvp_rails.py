@@ -1627,7 +1627,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_candidate_request_sequence_source_ids"
+        'readonly_preflight_review_decision_candidate_request_sequence_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]'
         in current_command
     )
     assert (
@@ -1635,7 +1635,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids"
+        'readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]'
         in current_command
     )
     assert (
@@ -1831,6 +1831,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_candidate_request_sequence_contract_valid: true"
         in progress.current_first_command_missing_baseline_markers(
             failing_candidate_request_sequence_command
+        )
+    )
+    failing_candidate_request_sequence_source_command = current_command.replace(
+        'readonly_preflight_review_decision_candidate_request_sequence_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
+        'readonly_preflight_review_decision_candidate_request_sequence_source_ids: ["artifacts/stale_preflight/run/summary.json"]',
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_candidate_request_sequence_source_command
+    )
+    assert (
+        'readonly_preflight_review_decision_candidate_request_sequence_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]'
+        in progress.current_first_command_missing_baseline_markers(
+            failing_candidate_request_sequence_source_command
         )
     )
     failing_candidate_artifact_root_command = current_command.replace(
