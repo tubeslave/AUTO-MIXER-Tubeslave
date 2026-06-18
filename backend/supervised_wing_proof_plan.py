@@ -537,6 +537,7 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and accepted_record_count > 0
         and bool(accepted_source_ids)
         and accepted_record_count == len(accepted_source_ids)
+        and len(set(accepted_source_ids)) == len(accepted_source_ids)
         and all(_is_artifacts_path(source_id) for source_id in accepted_source_ids)
         and _accepted_candidate_prestart_source_ids(summary) == accepted_source_ids
         and _accepted_candidate_request_sequence_source_ids(summary) == accepted_source_ids
