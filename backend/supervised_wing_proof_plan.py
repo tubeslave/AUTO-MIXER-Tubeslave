@@ -313,17 +313,17 @@ class WingReadonlyPreflightPlanStep:
     expected_artifacts: Tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if self.live_execution_required:
+        if self.live_execution_required is not False:
             raise ValueError("Read-only preflight step must not be a live write step")
-        if self.execution_allowed_by_plan:
+        if self.execution_allowed_by_plan is not False:
             raise ValueError("The proof plan must not authorize read-only preflight execution")
         if self.read_only is not True:
             raise ValueError("Read-only preflight step must be marked read-only")
-        if not self.operator_approval_required:
+        if self.operator_approval_required is not True:
             raise ValueError("Read-only WING preflight still requires operator presence")
-        if not self.expected_plan_required_for_real_run:
+        if self.expected_plan_required_for_real_run is not True:
             raise ValueError("Read-only preflight plan must require an expected plan")
-        if not self.prestart_summary_required:
+        if self.prestart_summary_required is not True:
             raise ValueError("Read-only preflight plan must require a prestart summary")
         command = tuple(self.command)
         readonly_flags = (

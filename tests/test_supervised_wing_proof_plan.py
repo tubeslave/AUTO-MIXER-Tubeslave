@@ -174,15 +174,24 @@ def readonly_preflight_command(*, runner="tools/wing_readonly_preflight_runner.p
     )
 
 
-def readonly_preflight_step(command, *, read_only=True):
+def readonly_preflight_step(
+    command,
+    *,
+    live_execution_required=False,
+    execution_allowed_by_plan=False,
+    operator_approval_required=True,
+    read_only=True,
+    expected_plan_required_for_real_run=True,
+    prestart_summary_required=True,
+):
     return WingReadonlyPreflightPlanStep(
         id="wing_readonly_preflight_required",
-        live_execution_required=False,
-        execution_allowed_by_plan=False,
-        operator_approval_required=True,
+        live_execution_required=live_execution_required,
+        execution_allowed_by_plan=execution_allowed_by_plan,
+        operator_approval_required=operator_approval_required,
         read_only=read_only,
-        expected_plan_required_for_real_run=True,
-        prestart_summary_required=True,
+        expected_plan_required_for_real_run=expected_plan_required_for_real_run,
+        prestart_summary_required=prestart_summary_required,
         expected_plan=READONLY_PREFLIGHT_EXPECTED_PLAN,
         prestart_summary=READONLY_PREFLIGHT_PRESTART_SUMMARY,
         command=command,
@@ -294,6 +303,39 @@ def test_readonly_preflight_step_rejects_non_read_only_flag():
         match="Read-only preflight step must be marked read-only",
     ):
         readonly_preflight_step(readonly_preflight_command(), read_only=False)
+
+
+@pytest.mark.parametrize(
+    ("override", "expected_error"),
+    [
+        (
+            {"live_execution_required": 0},
+            "Read-only preflight step must not be a live write step",
+        ),
+        (
+            {"execution_allowed_by_plan": 0},
+            "The proof plan must not authorize read-only preflight execution",
+        ),
+        (
+            {"operator_approval_required": 1},
+            "Read-only WING preflight still requires operator presence",
+        ),
+        (
+            {"expected_plan_required_for_real_run": 1},
+            "Read-only preflight plan must require an expected plan",
+        ),
+        (
+            {"prestart_summary_required": 1},
+            "Read-only preflight plan must require a prestart summary",
+        ),
+    ],
+)
+def test_readonly_preflight_step_rejects_non_bool_safety_fields(
+    override,
+    expected_error,
+):
+    with pytest.raises(ValueError, match=expected_error):
+        readonly_preflight_step(readonly_preflight_command(), **override)
 
 
 def test_readonly_preflight_step_rejects_non_canonical_runner():
