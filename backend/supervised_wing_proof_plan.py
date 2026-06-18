@@ -211,6 +211,17 @@ class WingProofPlanStep:
                 raise ValueError(
                     "Physical proof step command must include proof safety flags"
                 )
+        if command[:2] != (
+            "python3",
+            "tools/wing_operator_proposal_validation_runner.py",
+        ):
+            raise ValueError("Physical proof step command must use canonical proof runner")
+        if _command_value(command, "--rollback-delay-sec") != "0":
+            raise ValueError("Physical proof step command must bind zero rollback delay")
+        if not _command_value(command, "--artifact-root"):
+            raise ValueError("Physical proof step command must bind artifact root")
+        if _command_value(command, "--reason") != f"supervised_physical_{self.value_type}_proof":
+            raise ValueError("Physical proof step command must bind supervised proof reason")
         if tuple(self.expected_artifacts) != _expected_artifacts(self.value_type, channel):
             raise ValueError(
                 "Physical proof step expected artifacts must match value type and channel"
