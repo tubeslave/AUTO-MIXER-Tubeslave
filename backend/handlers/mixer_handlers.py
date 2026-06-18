@@ -99,25 +99,23 @@ def register_handlers(server):
         if server.mixer_client:
             server.mixer_client.set_channel_gain(channel, value)
 
-    async def handle_set_mute(websocket, data):
+    async def handle_set_mute(websocket, data, surface: str = "set_mute"):
         channel = data.get("channel")
         value = data.get("muted", data.get("value"))
         if server._is_wing_deployment_write_boundary_active():
-            result = await server._apply_manual_console_write(
+            blocked = await server._block_quarantined_wing_write_surface(
                 websocket,
-                channel=channel,
-                value=value,
-                value_type="mute",
-                source="websocket:set_mute",
-                reason=data.get("reason") or "websocket_set_mute",
-                approved=bool(data.get("approved", False)),
-                approval_id=data.get("approval_id"),
+                surface=surface,
+                result_type="manual_write_blocked",
+                request=data,
+                extra={
+                    "channel": channel,
+                    "value_type": "mute",
+                    "requested_value": value,
+                },
             )
-            result_type = "manual_write_applied" if result.get("status") == "applied" else "manual_write_blocked"
-            if result.get("status") == "error":
-                result_type = "manual_write_error"
-            await server.send_to_client(websocket, {"type": result_type, **result})
-            return
+            if blocked:
+                return
         if server.mixer_client:
             server.mixer_client.set_channel_mute(channel, value)
 
@@ -145,12 +143,12 @@ def register_handlers(server):
         payload = dict(data)
         if "muted" not in payload and "value" not in payload:
             payload["muted"] = True
-        await handle_set_mute(websocket, payload)
+        await handle_set_mute(websocket, payload, surface="mute_channel")
 
     async def handle_unmute_channel(websocket, data):
         payload = dict(data)
         payload["muted"] = False if payload.get("muted") is None else payload.get("muted")
-        await handle_set_mute(websocket, payload)
+        await handle_set_mute(websocket, payload, surface="unmute_channel")
 
     async def handle_set_eq(websocket, data):
         channel = data.get("channel")

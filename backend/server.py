@@ -717,7 +717,7 @@ class AutoMixerServer:
             "request": dict(command or {}),
             "message": (
                 "WING deployment path is limited to Product Layer proposals and "
-                "approved manual fader/gain/mute writes; direct voice-command writes "
+                "approved manual fader/gain/pan writes; direct voice-command writes "
                 "are quarantined."
             ),
             "manual_write_supervision": self.get_manual_write_supervision_status(),
@@ -791,13 +791,7 @@ class AutoMixerServer:
         operator_mode: Dict[str, Any],
     ) -> list[str]:
         operator_capabilities = operator_mode.get("capabilities", {})
-        allowed = list(operator_capabilities.get("allowed_live_write_kinds") or [])
-        if (
-            operator_mode.get("mode") == "supervised"
-            and "mute" not in allowed
-        ):
-            allowed.append("mute")
-        return allowed
+        return list(operator_capabilities.get("allowed_live_write_kinds") or [])
 
     @staticmethod
     def _manual_write_address(channel: int, value_type: str) -> str:
