@@ -485,10 +485,17 @@ def _readonly_preflight_overlay(
 
 
 def _readonly_preflight_candidate_available(overlay: Mapping[str, Any]) -> bool:
+    valid_candidate_count = _nonnegative_int_count(
+        overlay.get("valid_candidate_count")
+    )
+    invalid_candidate_count = _nonnegative_int_count(
+        overlay.get("invalid_candidate_count")
+    )
     return (
         overlay.get("readiness_update_candidate_available") is True
-        and int(overlay.get("valid_candidate_count") or 0) > 0
-        and int(overlay.get("invalid_candidate_count") or 0) == 0
+        and valid_candidate_count is not None
+        and valid_candidate_count > 0
+        and invalid_candidate_count == 0
         and overlay.get("readiness_closure_allowed_by_evidence") is not True
         and overlay.get("live_authority_granted") is not True
         and overlay.get("full_autonomous_ready") is not True
@@ -517,14 +524,22 @@ def _review_decision_summary(overlay: Mapping[str, Any]) -> Mapping[str, Any]:
 def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> bool:
     summary = _review_decision_summary(overlay)
     accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
+    accepted_record_count = _nonnegative_int_count(
+        summary.get("accepted_record_count")
+    )
+    invalid_record_count = _nonnegative_int_count(summary.get("invalid_record_count"))
+    unreviewed_candidate_count = _nonnegative_int_count(
+        summary.get("unreviewed_candidate_count")
+    )
     return (
         summary.get("manual_readiness_update_candidate_available") is True
-        and int(summary.get("accepted_record_count") or 0) > 0
+        and accepted_record_count is not None
+        and accepted_record_count > 0
         and bool(accepted_source_ids)
         and _accepted_candidate_prestart_source_ids(summary) == accepted_source_ids
         and _accepted_candidate_request_sequence_source_ids(summary) == accepted_source_ids
-        and int(summary.get("invalid_record_count") or 0) == 0
-        and int(summary.get("unreviewed_candidate_count") or 0) == 0
+        and invalid_record_count == 0
+        and unreviewed_candidate_count == 0
         and summary.get("readiness_matrix_update_allowed_by_decision") is not True
         and summary.get("readiness_closure_allowed_by_decision") is not True
         and summary.get("live_authority_granted") is not True
@@ -538,6 +553,18 @@ def _readonly_preflight_review_decision_status(overlay: Mapping[str, Any]) -> An
 
 def _string_list(value: Any) -> list[str]:
     return [str(item) for item in value if item] if isinstance(value, list) else []
+
+
+def _nonnegative_int_count(value: Any) -> int | None:
+    if value is None or value == "":
+        return 0
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.isdecimal():
+        return int(value)
+    return None
 
 
 def _invalid_review_decision_records(records: Any) -> list[dict[str, Any]]:
@@ -1572,8 +1599,8 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_blocked_by": _string_list(
                 review_summary.get("blocked_by")
             ),
-            "readonly_preflight_review_decision_accepted_record_count": int(
-                review_summary.get("accepted_record_count") or 0
+            "readonly_preflight_review_decision_accepted_record_count": (
+                _nonnegative_int_count(review_summary.get("accepted_record_count"))
             ),
             "readonly_preflight_review_decision_accepted_source_ids": _string_list(
                 review_summary.get("accepted_source_ids")
@@ -1638,8 +1665,8 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_rejected_source_ids": _string_list(
                 review_summary.get("rejected_source_ids")
             ),
-            "readonly_preflight_review_decision_invalid_record_count": int(
-                review_summary.get("invalid_record_count") or 0
+            "readonly_preflight_review_decision_invalid_record_count": (
+                _nonnegative_int_count(review_summary.get("invalid_record_count"))
             ),
             "readonly_preflight_review_decision_invalid_record_ids": _string_list(
                 review_summary.get("invalid_record_ids")
@@ -1651,8 +1678,10 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_conflicting_source_ids": _string_list(
                 review_summary.get("conflicting_source_ids")
             ),
-            "readonly_preflight_review_decision_unreviewed_candidate_count": int(
-                review_summary.get("unreviewed_candidate_count") or 0
+            "readonly_preflight_review_decision_unreviewed_candidate_count": (
+                _nonnegative_int_count(
+                    review_summary.get("unreviewed_candidate_count")
+                )
             ),
             "global_blockers": global_blockers,
         },

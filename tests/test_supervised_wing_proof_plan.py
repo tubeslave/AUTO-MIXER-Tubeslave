@@ -1161,6 +1161,70 @@ def test_plan_blocks_physical_proof_steps_until_review_decision_is_accepted():
     assert plan["steps"] == []
 
 
+def test_plan_blocks_readonly_preflight_when_candidate_counts_are_malformed():
+    readiness = preflight_ready_snapshot()
+    readiness["summary"]["wing_readonly_preflight_evidence"][
+        "valid_candidate_count"
+    ] = "many"
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "blocked_by_readonly_preflight"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_candidate_available"] is False
+    assert plan["summary"]["readonly_preflight_step_count"] == 1
+    assert (
+        "readonly_preflight_candidate_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+@pytest.mark.parametrize(
+    ("field", "summary_field"),
+    [
+        (
+            "accepted_record_count",
+            "readonly_preflight_review_decision_accepted_record_count",
+        ),
+        (
+            "invalid_record_count",
+            "readonly_preflight_review_decision_invalid_record_count",
+        ),
+        (
+            "unreviewed_candidate_count",
+            "readonly_preflight_review_decision_unreviewed_candidate_count",
+        ),
+    ],
+)
+def test_plan_blocks_physical_proof_steps_when_review_decision_counts_are_malformed(
+    field,
+    summary_field,
+):
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"][field] = "many"
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert plan["summary"][summary_field] is None
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
 def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart_contract():
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
