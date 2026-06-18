@@ -2,14 +2,14 @@
   "schema": "automixer.autopilot.state.v1",
   "program_status": "RUNNING",
   "active_milestone": "M001",
-  "active_checkpoint": "M001-CP04",
+  "active_checkpoint": "M001-CP05",
   "checkpoint_status": "pending",
   "last_verified_commit": "b27d789a",
-  "last_heartbeat_utc": "2026-06-18T20:45:37Z",
+  "last_heartbeat_utc": "2026-06-18T20:49:40Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": null,
-  "next_action": "Prepare the operator-facing real WING read-only handoff without contacting WING.",
+  "next_action": "Review M001 evidence and decide whether the milestone is READY_FOR_NEXT or WAITING_FOR_EXTERNAL_VALIDATION.",
   "last_validation_summary": {
     "status": "setup_validated",
     "hardware_evidence": false,
@@ -18,6 +18,13 @@
     "no_wing_quick": "PYTHONPATH=backend python tools/no_wing_release_check.py --quick: passed",
     "memory_lint": "python tools/memory/memory_lint.py --root .: PASS",
     "no_wing_artifact": "artifacts/no_wing_release_check/20260618T204503Z_no_wing_release_check",
+    "cp04_handoff_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md",
+    "cp04_expected_plan": "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json",
+    "cp04_validate_inputs": "ready_for_websocket; websocket_opened=false; write_request_sent=false",
+    "cp04_validate_input_artifacts": [
+      "artifacts/wing_readonly_preflight/20260618T204909Z_wing_readonly_preflight/summary.json",
+      "artifacts/wing_readonly_preflight/20260618T204929Z_wing_readonly_preflight/summary.json"
+    ],
     "authority": {
       "live_authority_granted": false,
       "readiness_closure_allowed": false,

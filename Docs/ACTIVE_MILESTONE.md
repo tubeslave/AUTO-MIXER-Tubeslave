@@ -65,8 +65,10 @@ be trusted.
   passed.
 - New no-WING artifact bundle:
   `artifacts/no_wing_release_check/20260618T204503Z_no_wing_release_check`.
-- The no-WING summary denied live authority and reported no WING/backend
-  contact, no console mutation and no live writes.
+- CP04 handoff report:
+  `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
+- Validate-only runner status for the fresh expected plan: `ready_for_websocket`
+  with `websocket_opened: false` and `write_request_sent: false`.
 
 ## Exact evidence
 
