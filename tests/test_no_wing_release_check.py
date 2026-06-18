@@ -4269,6 +4269,14 @@ def test_no_wing_release_check_validates_wing_preflight_handoff_packet_artifact(
         "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
         in result.detail["required_supervised_proof_plan_summary_fields"]
     )
+    assert (
+        "readonly_preflight_review_decision_source_authority_denied"
+        in result.detail["required_supervised_proof_plan_summary_fields"]
+    )
+    assert (
+        "readonly_preflight_review_decision_source_authority_flags"
+        in result.detail["required_supervised_proof_plan_summary_fields"]
+    )
     assert result.detail[
         "expected_required_supervised_proof_plan_summary_fields"
     ] == list(WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS)
@@ -10258,6 +10266,13 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "readonly_preflight_review_decision_accepted_source_ids": [
                     "artifacts/wing_readonly_preflight/run/summary.json"
                 ],
+                "readonly_preflight_review_decision_source_authority_denied": True,
+                "readonly_preflight_review_decision_source_authority_flags": {
+                    "readiness_matrix_update_allowed_by_decision": False,
+                    "readiness_closure_allowed_by_decision": False,
+                    "live_authority_granted": False,
+                    "full_autonomous_ready": False,
+                },
                 "readonly_preflight_review_decision_candidate_prestart_contract_valid": True,
                 "readonly_preflight_review_decision_candidate_prestart_source_ids": [
                     "artifacts/wing_readonly_preflight/run/summary.json"
@@ -10596,6 +10611,16 @@ def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
         == "operator_review_decision_records_available"
     )
     assert result.detail["readonly_preflight_review_decision_accepted_record_count"] == 1
+    assert (
+        result.detail["readonly_preflight_review_decision_source_authority_denied"]
+        is True
+    )
+    assert result.detail["readonly_preflight_review_decision_source_authority_flags"] == {
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert (
         result.detail[
             "readonly_preflight_review_decision_candidate_prestart_contract_valid"

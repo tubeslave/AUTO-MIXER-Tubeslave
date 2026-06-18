@@ -278,6 +278,8 @@ WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES = (
 )
 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS = (
     "allowed_supervised_live_value_types",
+    "readonly_preflight_review_decision_source_authority_denied",
+    "readonly_preflight_review_decision_source_authority_flags",
     "readonly_preflight_review_decision_candidate_prestart_contract_valid",
     "readonly_preflight_review_decision_candidate_prestart_source_ids",
     "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source",
