@@ -150,6 +150,8 @@ class WingProofPlanStep:
     required_evidence_components: Tuple[str, ...]
 
     def __post_init__(self) -> None:
+        if not self.live_execution_required:
+            raise ValueError("Physical proof steps must be marked as live execution")
         if self.execution_allowed_by_plan:
             raise ValueError("The proof plan must not authorize execution")
         if not self.operator_approval_required:
