@@ -406,6 +406,90 @@ def _record_next_wing_proof_plan_source_authority_checks(
         )
 
 
+def _expected_plan_artifact_source_authority_emission(
+    plan_artifact: Mapping[str, Any],
+) -> dict[str, object]:
+    source_authority_check_fields = (
+        no_wing_release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+    )
+    present_fields = [
+        field_name
+        for field_name in source_authority_check_fields
+        if isinstance(plan_artifact.get(field_name), bool)
+    ]
+    missing_fields = [
+        field_name
+        for field_name in source_authority_check_fields
+        if field_name not in present_fields
+    ]
+    return {
+        "artifact_manifest_verifier_source_authority_check_fields_optional": True,
+        "artifact_manifest_verifier_source_authority_check_fields_present": present_fields,
+        "artifact_manifest_verifier_source_authority_check_fields_missing": missing_fields,
+        "artifact_manifest_verifier_source_authority_check_field_count": len(
+            present_fields
+        ),
+        "artifact_manifest_verifier_source_authority_check_missing_count": len(
+            missing_fields
+        ),
+        "artifact_manifest_verifier_source_authority_check_emission_status": (
+            no_wing_release_check._source_authority_verifier_check_emission_status(
+                present_fields,
+                missing_fields,
+            )
+        ),
+    }
+
+
+def _record_plan_artifact_source_authority_emission_checks(
+    checks: dict[str, bool],
+    *,
+    summary_json: Mapping[str, Any],
+    summary_md_text: str,
+) -> None:
+    plan_artifact = summary_json.get("wing_readonly_preflight_plan_artifact")
+    summary_md_lines = set(summary_md_text.splitlines())
+    section_present = "## WING Read-Only Preflight Plan Artifact" in summary_md_lines
+    if not isinstance(plan_artifact, Mapping) and not section_present:
+        return
+    if not isinstance(plan_artifact, Mapping):
+        plan_artifact = {}
+
+    expected = _expected_plan_artifact_source_authority_emission(plan_artifact)
+    _record_check(
+        checks,
+        "summary_json_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_present",
+        all(field_name in plan_artifact for field_name in expected),
+    )
+    _record_check(
+        checks,
+        "summary_md_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_rendered",
+        all(
+            no_wing_release_check._format_markdown_summary_field_line(
+                field_name,
+                expected_value,
+            )
+            in summary_md_lines
+            for field_name, expected_value in expected.items()
+        ),
+    )
+    for field_name, expected_value in expected.items():
+        _record_check(
+            checks,
+            f"summary_json_wing_readonly_preflight_plan_artifact_{field_name}_matches_expected",
+            plan_artifact.get(field_name) == expected_value,
+        )
+        _record_check(
+            checks,
+            f"summary_md_wing_readonly_preflight_plan_artifact_{field_name}_matches_expected",
+            no_wing_release_check._format_markdown_summary_field_line(
+                field_name,
+                expected_value,
+            )
+            in summary_md_lines,
+        )
+
+
 def _record_summary_md_safety_checks(
     checks: dict[str, bool],
     *,
@@ -751,6 +835,11 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         summary_md_text=summary_md_text,
     )
     _record_next_wing_proof_plan_source_authority_checks(
+        checks,
+        summary_json=summary_json,
+        summary_md_text=summary_md_text,
+    )
+    _record_plan_artifact_source_authority_emission_checks(
         checks,
         summary_json=summary_json,
         summary_md_text=summary_md_text,

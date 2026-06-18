@@ -25346,6 +25346,95 @@ def test_verify_no_wing_artifact_manifest_checks_next_proof_plan_source_authorit
     )
 
 
+def test_verify_no_wing_artifact_manifest_checks_plan_source_authority_emission_surface(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+    write_summary(tmp_path, [result], generated_at="2026-06-15T00:00:00Z")
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    checks = report["checks"]
+    assert report["status"] == "passed"
+    assert report["failed_checks"] == []
+    assert (
+        checks[
+            "summary_json_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_present"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_md_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_rendered"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_emission_status_matches_expected"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_fields_present_matches_expected"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_md_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_missing_count_matches_expected"
+        ]
+        is True
+    )
+
+
+def test_verify_no_wing_artifact_manifest_fails_stale_plan_source_authority_emission_status(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+    write_summary(tmp_path, [result], generated_at="2026-06-15T00:00:00Z")
+    summary_json_path = tmp_path / "summary.json"
+    summary_json = json.loads(summary_json_path.read_text(encoding="utf-8"))
+    summary_json["wing_readonly_preflight_plan_artifact"][
+        "artifact_manifest_verifier_source_authority_check_emission_status"
+    ] = "stale"
+    summary_json_path.write_text(
+        json.dumps(summary_json, indent=2, ensure_ascii=False, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    _refresh_no_wing_manifest_artifact_sha(
+        tmp_path,
+        artifact_id="summary_json",
+        top_level_sha_field="artifact_manifest_summary_json_sha256",
+        artifact_path="summary.json",
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    failed_check = (
+        "summary_json_wing_readonly_preflight_plan_artifact_artifact_manifest_verifier_source_authority_check_emission_status_matches_expected"
+    )
+    assert report["status"] == "failed"
+    assert "summary_json_sha256_matches_actual" not in report["failed_checks"]
+    assert "summary_json_sha256_matches_manifest" not in report["failed_checks"]
+    assert failed_check in report["failed_checks"]
+    assert report["checks"][failed_check] is False
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_authority_granted"] is False
+
+
 def test_verify_no_wing_artifact_manifest_fails_next_proof_plan_source_authority_markdown_claim(
     tmp_path,
 ):
