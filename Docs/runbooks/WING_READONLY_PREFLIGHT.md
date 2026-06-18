@@ -1125,6 +1125,7 @@ The handoff validation must report:
 - `operator_sequence` lists the actual ordered handoff checklist
 - `expected_operator_sequence` lists the expected ordered handoff checklist
 - `wing_readonly_operator_sequence_list_summary_surface_self_check_required: true`
+- `wing_readonly_operator_sequence_list_summary_surface_required_fields`
 - `wing_readonly_operator_sequence_list_summary_surface_mismatches: []`
 - `wing_readonly_operator_sequence_list_summary_surface_match: true`
 - `wing_readonly_operator_sequence_list_summary_surface_readiness_closure_allowed: false`
