@@ -666,6 +666,31 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         summary_md_text=summary_md_text,
     )
 
+    self_consistency_match = self_consistency_check[
+        "artifact_manifest_self_consistency_match"
+    ]
+    cross_surface_match = cross_surface_check[
+        "artifact_manifest_contract_cross_surface_match"
+    ]
+    summary_surface_match = summary_surface_check[
+        "artifact_manifest_self_consistency_summary_surface_match"
+    ]
+    _record_check(
+        checks,
+        "verifier_report_artifact_manifest_self_consistency_match_matches_expected",
+        self_consistency_match is True,
+    )
+    _record_check(
+        checks,
+        "verifier_report_artifact_manifest_contract_cross_surface_match_matches_expected",
+        cross_surface_match is True,
+    )
+    _record_check(
+        checks,
+        "verifier_report_artifact_manifest_self_consistency_summary_surface_match_matches_expected",
+        summary_surface_match is True,
+    )
+
     report.update(
         {
             "summary_json_sha256": actual_sha256_by_id.get("summary_json"),
@@ -674,17 +699,9 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
             "readiness_closure_allowed": readiness_closure_allowed,
             "live_authority_granted": live_authority_granted,
             "artifact_manifest_contract_sha256": contract_sha256,
-            "artifact_manifest_self_consistency_match": self_consistency_check[
-                "artifact_manifest_self_consistency_match"
-            ],
-            "artifact_manifest_contract_cross_surface_match": cross_surface_check[
-                "artifact_manifest_contract_cross_surface_match"
-            ],
-            "artifact_manifest_self_consistency_summary_surface_match": (
-                summary_surface_check[
-                    "artifact_manifest_self_consistency_summary_surface_match"
-                ]
-            ),
+            "artifact_manifest_self_consistency_match": self_consistency_match,
+            "artifact_manifest_contract_cross_surface_match": cross_surface_match,
+            "artifact_manifest_self_consistency_summary_surface_match": summary_surface_match,
         }
     )
     return _finalize_verifier_report(report, checks)

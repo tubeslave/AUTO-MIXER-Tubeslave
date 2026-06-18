@@ -188,6 +188,17 @@ def test_runner_requires_manifest_verifier_report_readiness_matrix_check_before_
     )
 
 
+def test_runner_requires_all_manifest_verifier_report_safety_value_checks_before_websocket() -> None:
+    required_report_value_checks = {
+        f"verifier_report_{field_name}_matches_expected"
+        for field_name in runner.ARTIFACT_MANIFEST_VERIFIER_REPORT_EXPECTED_VALUES
+    }
+
+    assert required_report_value_checks <= set(
+        runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+    )
+
+
 def prestart_summary_path(tmp_path: Path) -> Path:
     return tmp_path / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
 
