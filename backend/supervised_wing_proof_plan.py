@@ -215,6 +215,10 @@ class WingProofPlanStep:
             raise ValueError(
                 "Physical proof step command must bind explicit proof flag values"
             )
+        if _unexpected_command_arguments(command, proof_flags, proof_value_flags):
+            raise ValueError(
+                "Physical proof step command must not include stray arguments"
+            )
         expected_delta = f"{self.delta_db:.2f}"
         if (
             _command_value(command, "--channel") != str(channel)
@@ -497,6 +501,25 @@ def _command_flags_with_flag_values(
         if index + 1 >= len(command) or command[index + 1].startswith("--"):
             malformed.append(flag)
     return tuple(malformed)
+
+
+def _unexpected_command_arguments(
+    command: Tuple[str, ...],
+    flags: Tuple[str, ...],
+    value_flags: Tuple[str, ...],
+) -> Tuple[str, ...]:
+    allowed_flags = set(flags)
+    flags_with_values = set(value_flags)
+    unexpected: list[str] = []
+    index = 2
+    while index < len(command):
+        token = command[index]
+        if token not in allowed_flags:
+            unexpected.append(token)
+            index += 1
+            continue
+        index += 2 if token in flags_with_values else 1
+    return tuple(unexpected)
 
 
 def _unsupported_supervised_value_types(mapping: Mapping[str, Any] | None) -> list[str]:
