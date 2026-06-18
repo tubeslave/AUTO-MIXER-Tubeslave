@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 from backend.agents.eq_agent import EQAgent
+from backend.agents.fader_agent import FaderAgent
 from backend.agents.gain_agent import GainAgent
 
 
@@ -25,6 +26,14 @@ class FakeGainMixer:
 
     def get_channel_trim(self, channel):
         return self.trim.get(channel, 0.0)
+
+    def send(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+
+
+class FakeFaderMixer:
+    def __init__(self):
+        self.calls = []
 
     def send(self, *args, **kwargs):
         self.calls.append((args, kwargs))
@@ -98,6 +107,41 @@ def test_gain_agent_records_blocked_evidence_without_live_write():
     }
 
 
+def test_fader_agent_records_blocked_evidence_without_live_write():
+    mixer = FakeFaderMixer()
+    agent = FaderAgent(mixer, target_lufs=-21.0)
+
+    asyncio.run(agent.act({"adjustments": {5: 1.5}, "faders": {5: 0.99}}))
+
+    assert mixer.calls == []
+    policy = agent.get_write_policy_state()
+    assert policy["live_write_allowed"] is False
+    assert policy["write_policy"] == "proposal_only_quarantined"
+    assert policy["last_write_attempted"] is True
+    assert policy["last_write_blocked"] is True
+    assert policy["last_write_count"] == 0
+    assert policy["last_blocked_calls"] == [
+        {
+            "cmd": "set_fader",
+            "path": "/ch/5/fdr",
+            "channel": 5,
+            "current_fader": 0.99,
+            "target_fader": 1.0,
+            "adjustment_db": 1.5,
+            "fader_delta": 0.015,
+            "bounded": True,
+            "target_lufs": -21.0,
+            "semantic": "legacy_fader_agent_level",
+        }
+    ]
+    assert agent.get_channel_states()[5] == {
+        "fader": 1.0,
+        "adjustment_db": 1.5,
+        "target_lufs": -21.0,
+        "blocked": True,
+    }
+
+
 def test_eq_agent_source_has_no_direct_mixer_send():
     source = Path("backend/agents/eq_agent.py").read_text()
 
@@ -110,3 +154,10 @@ def test_gain_agent_source_has_no_direct_mixer_send():
 
     assert "self._mixer.send(" not in source
     assert '"cmd": "set_channel_trim"' in source
+
+
+def test_fader_agent_source_has_no_direct_mixer_send():
+    source = Path("backend/agents/fader_agent.py").read_text()
+
+    assert "self._mixer.send(" not in source
+    assert '"cmd": "set_fader"' in source

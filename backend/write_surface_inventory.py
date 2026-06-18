@@ -136,6 +136,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         status="proposal_only",
         paths=(
             "backend/auto_soundcheck_engine.py",
+            "backend/agents/fader_agent.py",
             "backend/agents/gain_agent.py",
             "backend/lufs_gain_staging.py",
             "backend/auto_fader.py",
@@ -148,6 +149,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "main_pipeline_preview",
             "run_operator_analysis",
             "import_soundcheck_recommendations",
+            "FaderAgent.act blocked fader evidence",
             "GainAgent.act blocked trim evidence",
         ),
         write_kinds=LIVE_ALLOWED_WRITE_KINDS,
