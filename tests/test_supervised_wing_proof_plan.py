@@ -31,6 +31,9 @@ from backend.supervised_wing_proof_plan import (
     WingReadonlyPreflightPlanStep,
     build_supervised_wing_proof_plan,
 )
+from backend.wing_readonly_preflight_review_decision import (
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+)
 
 PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
@@ -665,6 +668,8 @@ def evidence_row(value_type: str, *, review_candidate: bool = False, blockers=No
 def accepted_review_decision_ledger() -> dict:
     return {
         "type": "wing_readonly_preflight_review_decision_ledger",
+        "method_id": WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+        "source_method_id": "wing_readonly_preflight_evidence",
         "status": "operator_review_decision_records_available",
         "safety": {
             "read_only": True,
@@ -1392,6 +1397,27 @@ def test_plan_blocks_physical_proof_steps_when_review_decision_status_is_not_rec
         plan["summary"]["readonly_preflight_review_decision_status"]
         == "operator_review_required"
     )
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+def test_plan_blocks_physical_proof_steps_when_review_decision_provenance_is_wrong():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["type"] = "manual_summary"
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
     assert (
         "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
         in plan["summary"]["global_blockers"]

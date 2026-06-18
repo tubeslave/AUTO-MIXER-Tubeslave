@@ -26,10 +26,12 @@ except ImportError:  # pragma: no cover - package import compatibility
 try:
     from wing_readonly_preflight_review_decision import (
         build_wing_readonly_preflight_review_decision_ledger,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_review_decision import (
         build_wing_readonly_preflight_review_decision_ledger,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
     )
 
 try:
@@ -533,7 +535,11 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         summary.get("unreviewed_candidate_count")
     )
     return (
-        _readonly_preflight_review_decision_status(overlay)
+        overlay.get("type") == "wing_readonly_preflight_review_decision_ledger"
+        and overlay.get("method_id")
+        == WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID
+        and overlay.get("source_method_id") == "wing_readonly_preflight_evidence"
+        and _readonly_preflight_review_decision_status(overlay)
         == "operator_review_decision_records_available"
         and summary.get("manual_readiness_update_candidate_available") is True
         and accepted_record_count is not None
