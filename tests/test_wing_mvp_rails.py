@@ -3,6 +3,8 @@ import re
 import sys
 from pathlib import Path
 
+from tools import no_wing_release_check as release_check
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MVP_DOC = PROJECT_ROOT / "Docs" / "MVP_WING_SUPERVISED.md"
@@ -1042,6 +1044,14 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
 def test_runbooks_keep_readonly_before_supervised_execute():
     readonly = READONLY_RUNBOOK.read_text(encoding="utf-8")
     supervised = SUPERVISED_RUNBOOK.read_text(encoding="utf-8")
+    missing_sidecar_markers = [
+        marker
+        for marker in (
+            release_check.PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS
+        )
+        if marker not in readonly
+    ]
+    assert missing_sidecar_markers == []
 
     assert "wing_readonly_preflight_runner.py" in readonly
     assert "review_wing_readonly_preflight_artifacts.py" in readonly
