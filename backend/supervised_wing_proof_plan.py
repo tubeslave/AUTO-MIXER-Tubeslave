@@ -575,8 +575,19 @@ def _command_value(command: Tuple[str, ...], flag: str) -> str | None:
 def _is_ws_backend_url(value: str | None) -> bool:
     if not value:
         return False
+    if value != value.strip():
+        return False
     parsed = urlparse(value)
-    return parsed.scheme in {"ws", "wss"} and bool(parsed.netloc)
+    return (
+        parsed.scheme in {"ws", "wss"}
+        and bool(parsed.hostname)
+        and not parsed.username
+        and not parsed.password
+        and not parsed.path
+        and not parsed.params
+        and not parsed.query
+        and not parsed.fragment
+    )
 
 
 def _is_artifacts_path(value: str | None) -> bool:

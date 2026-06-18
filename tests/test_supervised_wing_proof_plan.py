@@ -521,7 +521,19 @@ def test_readonly_preflight_step_requires_physical_readback_flag():
 
 @pytest.mark.parametrize(
     "backend_url",
-    ["", "http://localhost:8765", "localhost:8765", "ws://", "wss://"],
+    [
+        "",
+        " http://localhost:8765",
+        "http://localhost:8765",
+        "localhost:8765",
+        "ws://",
+        "wss://",
+        "ws://localhost:8765/",
+        "ws://localhost:8765/proof",
+        "ws://localhost:8765?token=unsafe",
+        "ws://localhost:8765#proof",
+        "ws://operator@localhost:8765",
+    ],
 )
 def test_readonly_preflight_step_rejects_non_websocket_backend_url(backend_url):
     with pytest.raises(
@@ -2484,7 +2496,19 @@ def test_proof_step_rejects_non_canonical_runner_command():
 
 @pytest.mark.parametrize(
     "backend_url",
-    ["", "http://localhost:8765", "localhost:8765", "ws://", "wss://"],
+    [
+        "",
+        " http://localhost:8765",
+        "http://localhost:8765",
+        "localhost:8765",
+        "ws://",
+        "wss://",
+        "ws://localhost:8765/",
+        "ws://localhost:8765/proof",
+        "ws://localhost:8765?token=unsafe",
+        "ws://localhost:8765#proof",
+        "ws://operator@localhost:8765",
+    ],
 )
 def test_proof_step_rejects_non_websocket_backend_url(backend_url):
     with pytest.raises(
