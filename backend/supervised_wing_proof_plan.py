@@ -180,24 +180,37 @@ class WingProofPlanStep:
         if abs(self.delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB:
             raise ValueError("Physical proof plan only supports deltas up to 0.5 dB")
         command = tuple(self.command)
-        if _duplicate_command_flags(
-            command,
-            (
-                "--channel",
-                "--operator-confirm-channel",
-                "--value-type",
-                "--operator-confirm-value-type",
-                "--delta-db",
-                "--operator-confirm-delta-db",
-                "--execute",
-                "--prove-blocked-apply",
-                "--prove-emergency-stop",
-                "--rollback-delay-sec",
-                "--artifact-root",
-                "--reason",
-            ),
-        ):
+        proof_flags = (
+            "--channel",
+            "--operator-confirm-channel",
+            "--value-type",
+            "--operator-confirm-value-type",
+            "--delta-db",
+            "--operator-confirm-delta-db",
+            "--execute",
+            "--prove-blocked-apply",
+            "--prove-emergency-stop",
+            "--rollback-delay-sec",
+            "--artifact-root",
+            "--reason",
+        )
+        if _duplicate_command_flags(command, proof_flags):
             raise ValueError("Physical proof step command must not repeat proof flags")
+        proof_value_flags = (
+            "--channel",
+            "--operator-confirm-channel",
+            "--value-type",
+            "--operator-confirm-value-type",
+            "--delta-db",
+            "--operator-confirm-delta-db",
+            "--rollback-delay-sec",
+            "--artifact-root",
+            "--reason",
+        )
+        if _command_flags_with_flag_values(command, proof_value_flags):
+            raise ValueError(
+                "Physical proof step command must bind explicit proof flag values"
+            )
         expected_delta = f"{self.delta_db:.2f}"
         if (
             _command_value(command, "--channel") != str(channel)
@@ -462,6 +475,19 @@ def _duplicate_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -
         if command.count(flag) > 1:
             duplicates.append(flag)
     return tuple(duplicates)
+
+
+def _command_flags_with_flag_values(
+    command: Tuple[str, ...], flags: Tuple[str, ...]
+) -> Tuple[str, ...]:
+    malformed: list[str] = []
+    for flag in flags:
+        if flag not in command:
+            continue
+        index = command.index(flag)
+        if index + 1 >= len(command) or command[index + 1].startswith("--"):
+            malformed.append(flag)
+    return tuple(malformed)
 
 
 def _unsupported_supervised_value_types(mapping: Mapping[str, Any] | None) -> list[str]:

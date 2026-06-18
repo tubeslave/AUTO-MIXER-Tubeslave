@@ -1960,6 +1960,37 @@ def test_proof_step_rejects_duplicate_command_flags():
         )
 
 
+def test_proof_step_rejects_command_flag_used_as_value():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step command must bind explicit proof flag values",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=proof_command(
+                tail=(
+                    "--rollback-delay-sec",
+                    "0",
+                    "--artifact-root",
+                    "--reason",
+                    "supervised_physical_gain_proof",
+                ),
+            ),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_proof_step_rejects_command_without_safety_flags():
     with pytest.raises(
         ValueError,
