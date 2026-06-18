@@ -528,6 +528,8 @@ def test_readonly_preflight_step_requires_physical_readback_flag():
         "localhost:8765",
         "ws://",
         "wss://",
+        "ws://localhost",
+        "ws://localhost:port",
         "ws://localhost:8765/",
         "ws://localhost:8765/proof",
         "ws://localhost:8765?token=unsafe",
@@ -905,7 +907,7 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
             evidence_row("fader", blockers=["physical_candidate_missing", "blocked_artifacts_for_value_type"]),
         ),
         autonomy_readiness_snapshot=preflight_ready_snapshot(),
-        backend_url="ws://proof-backend",
+        backend_url="ws://proof-backend:8765",
         artifact_root="artifacts/proof",
         channels_by_value_type={"gain": (3,), "fader": (2, 16)},
     )
@@ -1110,7 +1112,7 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert "--prove-blocked-apply" in gain_step["command"]
     assert "--prove-emergency-stop" in gain_step["command"]
     assert gain_step["required_evidence_components"] == GAIN_REQUIRED_EVIDENCE_COMPONENTS
-    assert "ws://proof-backend" in gain_step["command"]
+    assert "ws://proof-backend:8765" in gain_step["command"]
     assert (
         "A clean read-only WING preflight candidate exists and has been manually reviewed."
         in gain_step["prerequisites"]
@@ -2503,6 +2505,8 @@ def test_proof_step_rejects_non_canonical_runner_command():
         "localhost:8765",
         "ws://",
         "wss://",
+        "ws://localhost",
+        "ws://localhost:port",
         "ws://localhost:8765/",
         "ws://localhost:8765/proof",
         "ws://localhost:8765?token=unsafe",
