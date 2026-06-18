@@ -1520,6 +1520,14 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         in supervised
     )
     assert (
+        "accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof"
+        in supervised
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof"
+        in supervised
+    )
+    assert (
         "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
         in supervised
     )

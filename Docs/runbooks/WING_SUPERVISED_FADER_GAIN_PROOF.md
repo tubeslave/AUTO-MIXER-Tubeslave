@@ -55,6 +55,10 @@ Forbidden live writes:
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`.
 - The next supervised proof plan does not carry
+  `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`.
+- The next supervised proof plan does not carry
+  `accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof`.
+- The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof`.
 - The next supervised proof plan has
   `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`.
@@ -155,6 +159,10 @@ The artifact must show:
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`;
+- the proof plan carries
+  `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`;
+- the proof plan carries
+  `accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof`;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof`;
 - the proof plan does not show
