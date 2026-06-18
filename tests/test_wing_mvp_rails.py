@@ -1623,6 +1623,26 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
+        "readonly_preflight_review_decision_candidate_request_sequence_contract_valid: true"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_request_sequence_source_ids"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_request_sequence_contract_violations_by_source: {}"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_request_sequence_source_ids"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_expected_candidate_request_sequence_contract_violations_by_source: {}"
+        in current_command
+    )
+    assert (
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids"
         in current_command
     )
@@ -1785,6 +1805,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_candidate_prestart_contract_valid: true"
         in progress.current_first_command_missing_baseline_markers(
             failing_candidate_prestart_command
+        )
+    )
+    failing_candidate_request_sequence_command = current_command.replace(
+        "readonly_preflight_review_decision_candidate_request_sequence_contract_valid: true",
+        "readonly_preflight_review_decision_candidate_request_sequence_contract_valid: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_candidate_request_sequence_command
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_request_sequence_contract_valid: true"
+        in progress.current_first_command_missing_baseline_markers(
+            failing_candidate_request_sequence_command
         )
     )
     failing_candidate_artifact_root_command = current_command.replace(
