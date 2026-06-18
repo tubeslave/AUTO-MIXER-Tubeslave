@@ -1,11 +1,20 @@
 """Tests for auto_phase_gcc_phat module."""
 import sys
 import os
+from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 import numpy as np
 import pytest
 from auto_phase_gcc_phat import GCCPHATAnalyzer, DelayMeasurement, AutoPhaseAligner
+
+
+class FakePhaseDelayMixer:
+    def __init__(self):
+        self.calls = []
+
+    def set_channel_delay(self, *args, **kwargs):
+        self.calls.append(("set_channel_delay", args, kwargs))
 
 
 class TestGCCPHATAnalyzer:
@@ -109,3 +118,57 @@ class TestAutoPhaseAligner:
         logged_ref, logged_tgt = call_log[0]
         assert logged_ref is ref
         assert logged_tgt is tgt
+
+    def test_process_audio_blocks_legacy_delay_write_path(self):
+        mixer = FakePhaseDelayMixer()
+        aligner = AutoPhaseAligner(mixer_client=mixer)
+        aligner.add_channel(1)
+
+        class FixedDelayAnalyzer:
+            def add_frames(self, ref_frame, tgt_frame):
+                pass
+
+            def compute_delay(self):
+                return DelayMeasurement(
+                    delay_ms=1.23,
+                    delay_samples=59.04,
+                    correlation_peak=0.95,
+                    psr=12.0,
+                    snr_db=36.0,
+                    confidence=0.92,
+                    coherence=0.88,
+                )
+
+        aligner.channel_analyzers[1] = FixedDelayAnalyzer()
+        ref = np.array([1.0, 0.0, -1.0], dtype=np.float64)
+        tgt = np.array([0.0, 1.0, 0.0], dtype=np.float64)
+
+        aligner.process_audio(1, ref, tgt)
+
+        assert mixer.calls == []
+        status = aligner.get_status()
+        assert status["live_write_allowed"] is False
+        assert status["write_policy"] == "proposal_only_quarantined"
+        assert status["last_write_attempted"] is True
+        assert status["last_write_blocked"] is True
+        assert status["last_write_count"] == 0
+        assert status["last_blocked_calls"] == [
+            {
+                "cmd": "set_channel_delay",
+                "channel": 1,
+                "delay_ms": 1.24,
+                "mode": "MS",
+                "measured_delay_ms": 1.23,
+                "delay_samples": 59.04,
+                "confidence": 0.92,
+                "correlation_peak": 0.95,
+                "psr": 12.0,
+                "coherence": 0.88,
+            }
+        ]
+
+    def test_auto_phase_aligner_has_no_direct_delay_mixer_write(self):
+        source = Path("backend/auto_phase_gcc_phat.py").read_text()
+
+        assert "mixer_client.set_channel_delay(" not in source
+        assert '"cmd": "set_channel_delay"' in source

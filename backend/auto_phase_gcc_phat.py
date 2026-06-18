@@ -8,12 +8,12 @@ Method:
 1. Compute GCC-PHAT between reference and target channel
 2. Find delay from peak of inverse FFT
 3. Apply parabolic interpolation for sub-sample accuracy
-4. Send OSC delay command to mixer
+4. Build blocked delay-write evidence for operator review
 """
 
 import numpy as np
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from collections import deque
 from scipy.fft import fft, ifft
 from dataclasses import dataclass
@@ -247,7 +247,7 @@ class AutoPhaseAligner:
     """
     Automatic phase alignment controller.
     
-    Manages delay estimation and OSC command sending for multiple channels.
+    Manages delay estimation and blocked write evidence for multiple channels.
     """
     
     def __init__(self,
@@ -278,6 +278,12 @@ class AutoPhaseAligner:
         self.is_running = False
         self.measurements: Dict[int, DelayMeasurement] = {}
         self.last_update_time: Dict[int, float] = {}
+        self.live_write_allowed = False
+        self.write_policy = "proposal_only_quarantined"
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: List[Dict[str, Any]] = []
         
         # Settings
         self.min_update_interval_ms = 100  # Rate limiting
@@ -336,25 +342,64 @@ class AutoPhaseAligner:
         
         # Check if valid
         if measurement.is_valid(self.correlation_threshold, self.psr_threshold):
-            # Send OSC command if mixer client available
+            # Keep the legacy direct-write path fail-closed; evidence only.
             if self.mixer_client and abs(measurement.delay_ms) > 0.1:
                 self._send_delay_command(channel, measurement)
         
         self.last_update_time[channel] = current_time
     
-    def _send_delay_command(self, channel: int, measurement: DelayMeasurement):
-        """Send OSC delay command to mixer."""
-        try:
-            # Round to mixer precision (typically 0.02ms @ 48kHz)
-            delay_ms = round(measurement.delay_ms * 50) / 50  # 0.02ms resolution
-            
-            # Only apply if delay is positive (add delay to faster channel)
-            if delay_ms > 0:
-                self.mixer_client.set_channel_delay(channel, delay_ms)
-                logger.debug(f"Set delay for channel {channel}: {delay_ms:.2f}ms "
-                           f"(confidence: {measurement.confidence:.2f})")
-        except Exception as e:
-            logger.error(f"Failed to send delay command: {e}")
+    def _send_delay_command(self, channel: int, measurement: DelayMeasurement) -> Dict[str, Any]:
+        """Build blocked delay-write evidence without mutating the mixer."""
+        delay_ms = round(measurement.delay_ms * 50) / 50  # 0.02ms resolution
+        self.last_write_attempted = delay_ms > 0
+        self.last_write_blocked = delay_ms > 0
+        self.last_write_count = 0
+        self.last_blocked_calls = []
+
+        if delay_ms <= 0:
+            return {
+                "applied": False,
+                "blocked": False,
+                "reason": "no_positive_delay_correction",
+                "write_policy": self.write_policy,
+                "live_write_allowed": False,
+                "can_apply_live": False,
+                "mixer_client_present": self.mixer_client is not None,
+                "mutates_mixer": False,
+                "blocked_calls": [],
+                "blocked_call_count": 0,
+            }
+
+        blocked_call = {
+            "cmd": "set_channel_delay",
+            "channel": int(channel),
+            "delay_ms": delay_ms,
+            "mode": "MS",
+            "measured_delay_ms": measurement.delay_ms,
+            "delay_samples": measurement.delay_samples,
+            "confidence": measurement.confidence,
+            "correlation_peak": measurement.correlation_peak,
+            "psr": measurement.psr,
+            "coherence": measurement.coherence,
+        }
+        self.last_blocked_calls = [blocked_call]
+        logger.info(
+            "AutoPhaseAligner direct delay write blocked for channel %s: %.2fms",
+            channel,
+            delay_ms,
+        )
+        return {
+            "applied": False,
+            "blocked": True,
+            "reason": "auto_phase_delay_direct_apply_quarantined",
+            "write_policy": self.write_policy,
+            "live_write_allowed": False,
+            "can_apply_live": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+            "blocked_calls": [blocked_call],
+            "blocked_call_count": 1,
+        }
     
     def get_status(self) -> Dict:
         """Get current alignment status."""
@@ -369,7 +414,13 @@ class AutoPhaseAligner:
                     'valid': m.is_valid()
                 }
                 for ch, m in self.measurements.items()
-            }
+            },
+            'live_write_allowed': False,
+            'write_policy': self.write_policy,
+            'last_write_attempted': self.last_write_attempted,
+            'last_write_blocked': self.last_write_blocked,
+            'last_write_count': self.last_write_count,
+            'last_blocked_calls': list(self.last_blocked_calls),
         }
     
     def reset(self):
