@@ -4,6 +4,8 @@ import re
 import sys
 from pathlib import Path
 
+from tools import no_wing_release_check as release_check
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DIRECTOR_PATH = PROJECT_ROOT / "tools" / "codex_autoloop" / "project_director_agent.py"
@@ -415,6 +417,12 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
         "artifact_manifest_verifier_check_failed_checks_missing_check_entries_empty: true",
     ):
         assert marker in directive["selected_action"]
+    missing_sidecar_markers = [
+        marker
+        for marker in release_check.PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS
+        if marker not in directive["selected_action"]
+    ]
+    assert missing_sidecar_markers == []
     assert "full_autonomous_ready: false" in directive["selected_action"]
     assert (
         "next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json"
