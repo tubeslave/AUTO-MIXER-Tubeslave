@@ -354,6 +354,7 @@ def analyze_pan_need(
     blocker_list.extend(source_identity_trust.blockers)
 
     phase_safety_blockers = {
+        "mono_compatibility_risk_high",
         "mono_phase_check_missing",
         "pan_phase_correlation_unsafe",
         "pan_mono_sum_loss_high",
@@ -393,6 +394,7 @@ def analyze_pan_need(
             "status": mono_phase_status,
             "required_for_non_center_pan": non_center_pan_requires_phase,
             "phase_evidence_source": PAN_PHASE_REQUIRED_SOURCE,
+            "max_mono_compatibility_risk": HIGH_MONO_RISK,
             "min_safe_phase_correlation": MIN_SAFE_PHASE_CORRELATION,
             "min_mono_sum_delta_db": MIN_MONO_SUM_DELTA_DB,
         },

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from backend.pan_spatial_proposal import (
+    HIGH_MONO_RISK,
     PAN_READ_REQUIRED_SOURCE,
     PanAnalysisInput,
     analyze_pan_need,
@@ -126,20 +127,30 @@ def test_stereo_pair_side_can_create_spatial_pan_proposal():
 
 
 def test_high_mono_risk_blocks_non_center_pan_proposal():
-    recommendation = analyze_pan_need(
-        PanAnalysisInput(
-            channel_id=10,
-            source_role="keys",
-            current_pan_percent=0.0,
-            stage_position=0.8,
-            mono_compatibility_risk=0.9,
-            role_confidence=0.9,
-            persistence_cycles=3,
-        )
+    analysis = PanAnalysisInput(
+        channel_id=10,
+        source_role="keys",
+        current_pan_percent=0.0,
+        stage_position=0.8,
+        mono_compatibility_risk=0.9,
+        phase_correlation=0.82,
+        mono_sum_delta_db=-0.3,
+        mono_phase_check_freshness=_fresh(3),
+        current_state_cache_freshness=_fresh(),
+        role_confidence=0.9,
+        persistence_cycles=3,
     )
+    recommendation = analyze_pan_need(analysis)
 
     assert recommendation.status == "analysis_only"
     assert "mono_compatibility_risk_high" in recommendation.blockers
+    assert recommendation.evidence["mono_phase_safety"]["status"] == "blocked"
+    assert (
+        recommendation.evidence["mono_phase_safety"]["max_mono_compatibility_risk"]
+        == HIGH_MONO_RISK
+    )
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_pan_proposals([analysis]) == ()
 
 
 def test_non_center_pan_requires_fresh_mono_phase_evidence():
