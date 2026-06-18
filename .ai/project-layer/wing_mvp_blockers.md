@@ -646,9 +646,9 @@ the no-WING handoff summary must also show
 `required_supervised_proof_plan_summary_fields_include_invalid_records: true`;
 `required_supervised_proof_plan_summary_fields` must include
 `readonly_preflight_review_decision_candidate_prestart_contract_valid: true`,
-`readonly_preflight_review_decision_candidate_prestart_source_ids`,
+`readonly_preflight_review_decision_candidate_prestart_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
 `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`,
-`readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
+`readonly_preflight_review_decision_expected_candidate_prestart_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
 `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
 `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
 `readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]`,

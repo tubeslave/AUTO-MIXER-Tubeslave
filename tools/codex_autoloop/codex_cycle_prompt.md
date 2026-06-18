@@ -400,9 +400,9 @@ blockers выше.
    `required_supervised_proof_plan_summary_fields_include_invalid_records: true`;
 85. verify `required_supervised_proof_plan_summary_fields` includes
    `readonly_preflight_review_decision_candidate_prestart_contract_valid: true`,
-   `readonly_preflight_review_decision_candidate_prestart_source_ids`,
+   `readonly_preflight_review_decision_candidate_prestart_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
    `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`,
-   `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
+   `readonly_preflight_review_decision_expected_candidate_prestart_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
    `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
    `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
    `readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]`,
@@ -971,9 +971,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
 - Before any supervised fader/gain proof,
   `required_supervised_proof_plan_summary_fields` must include
   `readonly_preflight_review_decision_candidate_prestart_contract_valid: true`,
-  `readonly_preflight_review_decision_candidate_prestart_source_ids`,
+  `readonly_preflight_review_decision_candidate_prestart_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
   `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`,
-  `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
+  `readonly_preflight_review_decision_expected_candidate_prestart_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]`,
   `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
   `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
   `readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]`,
