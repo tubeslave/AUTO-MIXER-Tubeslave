@@ -1,0 +1,41 @@
+# Capability Matrix
+
+Status: evidence-based capability snapshot
+
+## Maturity model
+
+`NOT_STARTED` < `SPECIFIED` < `PROTOTYPE` < `UNIT_VERIFIED` <
+`INTEGRATION_VERIFIED` < `REPLAY_VERIFIED` < `SIMULATOR_VERIFIED` <
+`HARDWARE_READ_VERIFIED` < `ASSISTED_LIVE_VERIFIED` <
+`SUPERVISED_LIVE_VERIFIED` < `AUTONOMOUS_ELIGIBLE`
+
+Replay, mock and simulator evidence must not be labeled as hardware evidence.
+`UNKNOWN` is used when evidence is insufficient.
+
+## Rows
+
+| Capability | Current evidence level | Source files | Tests / commands | Known limitations | Safety class | Dependencies | Next validation gate | Hardware evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Analysis Mode | INTEGRATION_VERIFIED | `backend/operator_mode_policy.py`, `backend/project_goal_capability_matrix.py` | `PYTHONPATH=backend python -m pytest tests/test_project_goal_capability_matrix.py -q` | Must stay read-only | low | audio state | keep no-write regression green | none required |
+| Assisted Mixing Mode | INTEGRATION_VERIFIED | `backend/operator_proposal_queue.py`, proposal modules | standard pytest | Proposal freshness and source identity vary by family | medium | analysis mode | replay accepted/rejected proposals | none |
+| Supervised AutoMix Mode | SPECIFIED | `backend/operator_mode_policy.py`, `Docs/MVP_WING_SUPERVISED.md` | WING MVP tests and no-WING checks | WING live write scope is only `fader`/`gain`; real proof missing | critical | read-only WING proof | M001-M006 | none |
+| Full Autonomous Mixing Mode | NOT_STARTED | `backend/operator_mode_policy.py`, `Docs/PROJECT_COMPLETION_GATE.md` | none sufficient | Locked until all safety and hardware gates pass | critical | all mandatory capabilities | completion gate review | none |
+| Multichannel audio analysis | UNIT_VERIFIED | `backend/audio_capture.py`, `backend/autofoh_analysis.py` | standard pytest, offline validation | Hardware/Dante coverage not current in setup evidence | high | audio input | replay and simulator validation | UNKNOWN |
+| Source and instrument classification | UNIT_VERIFIED | `backend/ml/channel_classifier.py`, `backend/channel_recognizer.py` | `tests/test_ml/`, source identity tests | Model quality thresholds pending approval | medium | labeled data | replay calibration gate | none |
+| Arrangement-role detection | PROTOTYPE | `backend/arrangement_role_proposal.py` | `tests/test_arrangement_role_proposal.py` | Proposal-only, not apply authority | medium | source identity | replay accepted role decisions | none |
+| Gain staging | PROTOTYPE | `tools/offline_input_trim_autogain_mix.py`, `backend/operator_mode_policy.py` | gain/proposal tests | Live boost forbidden by default; WING gain proof missing | critical | headroom, bleed, readback | supervised gain-down proof | none |
+| Mix balance | PROTOTYPE | `backend/bus_group_balance_proposal.py`, `backend/auto_fader_v2/` | `tests/test_bus_group_balance_proposal.py` | Ayaic planes need group-sum validation | high | source/stem identity | replay bus/stem validation | none |
+| EQ | PROTOTYPE | `backend/auto_eq.py`, `backend/corrective_eq_proposal.py`, `backend/phase_aware_eq_guard.py` | EQ/proposal tests | Live EQ writes forbidden; protected-band logic must hold | critical | feedback, band identity | assisted replay gate | none |
+| Compression | PROTOTYPE | `backend/auto_compressor.py`, compressor proposal modules | compressor tests | Makeup cannot bypass headroom/feedback | critical | true peak, GR readback | replay and safety audit | none |
+| Gating | PROTOTYPE | `backend/gate_processor.py`, gate proposal modules | gate tests | Chatter/bleed risk in live mode | critical | source identity, hysteresis | replay and fault injection | none |
+| De-essing | SPECIFIED | `backend/deesser_*` proposal files when present, `.ai/briefs/deesser-*` | targeted tests UNKNOWN | Proposal/freshness evidence exists, maturity uncertain | high | vocal identity | unit and replay verification | none |
+| Panning | PROTOTYPE | `backend/pan_*`, `backend/operator_mode_policy.py` | pan proposal tests | Internal surface exists, WING live scope is not approved for pan | critical | mono/phase safety | assisted replay only | none |
+| Frequency separation | PROTOTYPE | `backend/frequency_separation_proposal.py` | `tests/test_frequency_separation_proposal.py` | Proposal-only | medium | spectral analysis | replay validation | none |
+| Cross-channel unmasking | PROTOTYPE | `backend/cross_adaptive_eq.py` | `tests/test_cross_adaptive_eq.py` | Must not become live EQ authority | high | arrangement role, EQ safety | replay/fault validation | none |
+| Phase analysis and correction | PROTOTYPE | `backend/phase_*`, `backend/phase_aware_eq_guard.py` | phase tests | Delay/polarity live writes forbidden until proof | critical | correlation, mono safety | simulator and supervised proof | none |
+| Effects and sends | PROTOTYPE | `backend/fx_send_proposal.py`, FX readback contracts | `tests/test_fx_send_proposal.py` | Live FX writes forbidden | high | routing/readback | assisted replay | none |
+| Master-bus processing | PROTOTYPE | `backend/master_bus_optimization_proposal.py` | `tests/test_master_bus_optimization_proposal.py` | Must not hide clipping or feedback risk | critical | full mix analysis | offline and listening gate | none |
+| Adaptive live mixing | SPECIFIED | `backend/performance_adaptation_proposal.py` | `tests/test_performance_adaptation_proposal.py` | No autonomous live authority | critical | mode gates, safety kernel | simulator and supervised staged proof | none |
+| Genre and task context | PROTOTYPE | `backend/autofoh_profiles.py`, `backend/mix_variant_profile_proposal.py` | profile/proposal tests | Context is advice, not authority | medium | source identity | replay validation | none |
+| Long-term memory and evaluation | PROTOTYPE | `.ai/memory/`, `tools/memory/`, `Docs/perceptual_evaluation.md` | `python3 tools/memory/memory_lint.py .`, pytest memory tests | Memory cannot mutate console directly | high | evidence provenance | lint plus replay promotion | none |
+

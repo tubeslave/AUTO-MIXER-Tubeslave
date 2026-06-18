@@ -7,6 +7,9 @@ Shared operating agreement for Codex.app, Codex CLI, Kimi CLI, and human contrib
 - Read this file before planning or editing.
 - Treat `CLAUDE.md` as the project canon for architecture, testing, and safety rules.
 - Pull extra context from `Docs/CONVENTIONS.md`, `Docs/ARCHITECTURE.md`, and `Docs/TOOLS.md` when the task touches those areas.
+- For autonomous project control, use `Docs/PROJECT_EXECUTION_CONTRACT.md`,
+  `Docs/ACTIVE_MILESTONE.md`, the active plan in `Docs/plans/`, and
+  `.agents/skills/automixer-autopilot/SKILL.md`.
 - This repository controls live-sound behavior. When unsure, choose the safer action: reduce risk, preserve headroom, and avoid destructive mixer operations.
 
 ## Shared Safety Rules

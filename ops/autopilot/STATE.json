@@ -1,0 +1,37 @@
+{
+  "schema": "automixer.autopilot.state.v1",
+  "program_status": "RUNNING",
+  "active_milestone": "M001",
+  "active_checkpoint": "M001-CP04",
+  "checkpoint_status": "pending",
+  "last_verified_commit": "b27d789a",
+  "last_heartbeat_utc": "2026-06-18T20:45:37Z",
+  "current_writer_lease": null,
+  "current_attempt_count": 0,
+  "current_blocker": null,
+  "next_action": "Prepare the operator-facing real WING read-only handoff without contacting WING.",
+  "last_validation_summary": {
+    "status": "setup_validated",
+    "hardware_evidence": false,
+    "product_runtime_changed": false,
+    "pytest": "PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q: 4027 passed, 1 skipped",
+    "no_wing_quick": "PYTHONPATH=backend python tools/no_wing_release_check.py --quick: passed",
+    "memory_lint": "python tools/memory/memory_lint.py --root .: PASS",
+    "no_wing_artifact": "artifacts/no_wing_release_check/20260618T204503Z_no_wing_release_check",
+    "authority": {
+      "live_authority_granted": false,
+      "readiness_closure_allowed": false,
+      "contacts_wing": false,
+      "contacts_backend": false,
+      "live_write": false
+    }
+  },
+  "external_validation_requirements": [
+    "Real WING Rack read-only artifact",
+    "Operator review of accepted read-only preflight candidate",
+    "Explicit operator approval before supervised fader/gain proof"
+  ],
+  "stop_file": "ops/autopilot/STOP",
+  "writer_lease_dir": "ops/autopilot/WRITER_LEASE",
+  "writer_lease_stale_after_minutes": 30
+}
