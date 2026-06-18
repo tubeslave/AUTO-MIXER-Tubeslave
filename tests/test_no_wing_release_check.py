@@ -21640,6 +21640,20 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             ),
             "readonly_preflight_review_decision_required": True,
             "readonly_preflight_review_decision_accepted": True,
+            "readonly_preflight_review_decision_source_authority_denied": True,
+            "readonly_preflight_review_decision_source_authority_flags": {
+                "readiness_matrix_update_allowed_by_decision": False,
+                "readiness_closure_allowed_by_decision": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+            "reported_readonly_preflight_review_decision_source_authority_denied": True,
+            "reported_readonly_preflight_review_decision_source_authority_flags": {
+                "readiness_matrix_update_allowed_by_decision": False,
+                "readiness_closure_allowed_by_decision": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
             "readonly_preflight_review_decision_status": "operator_review_decision_records_available",
             "readonly_preflight_review_decision_blocked_by": [
                 "readiness_matrix_update_still_requires_separate_manual_action"
@@ -22457,6 +22471,34 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         == []
     )
     assert json_summary["next_wing_proof_plan"]["planned_value_types"] == ["gain"]
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "readonly_preflight_review_decision_source_authority_denied"
+        ]
+        is True
+    )
+    assert json_summary["next_wing_proof_plan"][
+        "readonly_preflight_review_decision_source_authority_flags"
+    ] == {
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+    assert (
+        json_summary["next_wing_proof_plan"][
+            "reported_readonly_preflight_review_decision_source_authority_denied"
+        ]
+        is True
+    )
+    assert json_summary["next_wing_proof_plan"][
+        "reported_readonly_preflight_review_decision_source_authority_flags"
+    ] == {
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert json_summary["next_wing_proof_plan"][
         "required_supervised_proof_plan_summary_fields"
     ] == list(WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS)
@@ -22547,6 +22589,30 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert (
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "readonly_preflight_review_decision_source_authority_denied"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "readonly_preflight_review_decision_source_authority_flags"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "reported_readonly_preflight_review_decision_source_authority_denied"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "reported_readonly_preflight_review_decision_source_authority_flags"
         in json_summary["next_wing_proof_plan"][
             "operator_markdown_summary_required_field_lines"
         ]
@@ -23169,6 +23235,24 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert "operator_markdown_summary_values_match_contract: `true`" in markdown_summary
     assert "operator_markdown_summary_value_mismatches: `[]`" in markdown_summary
+    assert (
+        "readonly_preflight_review_decision_source_authority_denied: `true`"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_source_authority_flags: "
+        '`{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_decision": false, "readiness_matrix_update_allowed_by_decision": false}`'
+        in markdown_summary
+    )
+    assert (
+        "reported_readonly_preflight_review_decision_source_authority_denied: `true`"
+        in markdown_summary
+    )
+    assert (
+        "reported_readonly_preflight_review_decision_source_authority_flags: "
+        '`{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_decision": false, "readiness_matrix_update_allowed_by_decision": false}`'
+        in markdown_summary
+    )
     assert 'planned_value_types: `["gain"]`' in markdown_summary
     assert "readonly_preflight_candidate_available: `true`" in markdown_summary
     assert "readonly_preflight_prestart_check_required: `true`" in markdown_summary
@@ -23524,6 +23608,16 @@ def test_no_wing_release_check_fails_when_operator_markdown_live_value_types_are
             value = "true"
         elif field_name == "operator_markdown_summary_value_mismatches":
             value = "[]"
+        elif field_name in {
+            "readonly_preflight_review_decision_source_authority_denied",
+            "reported_readonly_preflight_review_decision_source_authority_denied",
+        }:
+            value = "false"
+        elif field_name in {
+            "readonly_preflight_review_decision_source_authority_flags",
+            "reported_readonly_preflight_review_decision_source_authority_flags",
+        }:
+            value = "{}"
         else:
             value = "placeholder"
         markdown_lines.append(f"- {field_name}: `{value}`")
@@ -23581,6 +23675,117 @@ def test_no_wing_release_check_post_check_markdown_sync_covers_live_value_types(
     assert live_value_type_fields.issubset(
         release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES
     )
+
+
+def test_no_wing_release_check_post_check_markdown_sync_covers_source_authority():
+    source_authority_fields = {
+        "readonly_preflight_review_decision_source_authority_denied",
+        "readonly_preflight_review_decision_source_authority_flags",
+        "reported_readonly_preflight_review_decision_source_authority_denied",
+        "reported_readonly_preflight_review_decision_source_authority_flags",
+    }
+
+    assert source_authority_fields.issubset(
+        release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_POST_CHECK_FIELD_LINES
+    )
+    assert source_authority_fields.issubset(
+        release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES
+    )
+
+
+def test_no_wing_release_check_fails_when_operator_markdown_source_authority_values_are_stale():
+    required_lines = list(
+        release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES
+    )
+    expected_value_types = json.dumps(
+        list(WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES)
+    )
+    expected_flags = {
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+    stale_flags_value = json.dumps({"live_authority_granted": True})
+    expected_flags_value = json.dumps(expected_flags, sort_keys=True)
+    markdown_lines = [
+        "# No-WING Release Check",
+        "",
+        "## Next WING Proof Plan",
+        "",
+        "- operator_markdown_summary_required_field_lines: "
+        f"`{json.dumps(required_lines)}`",
+    ]
+    for field_name in required_lines:
+        if field_name == "operator_markdown_summary_required_field_lines":
+            continue
+        if field_name == "allowed_supervised_live_value_types":
+            value = expected_value_types
+        elif (
+            field_name
+            == "operator_markdown_summary_allowed_supervised_live_value_types_expected_value"
+        ):
+            value = expected_value_types
+        elif (
+            field_name
+            == "operator_markdown_summary_allowed_supervised_live_value_types_actual_value"
+        ):
+            value = expected_value_types
+        elif (
+            field_name
+            == "operator_markdown_summary_allowed_supervised_live_value_types_match_contract"
+        ):
+            value = "true"
+        elif field_name == "operator_markdown_summary_values_match_contract":
+            value = "true"
+        elif field_name == "operator_markdown_summary_value_mismatches":
+            value = "[]"
+        elif field_name == "readonly_preflight_review_decision_source_authority_denied":
+            value = "true"
+        elif field_name == "readonly_preflight_review_decision_source_authority_flags":
+            value = stale_flags_value
+        elif (
+            field_name
+            == "reported_readonly_preflight_review_decision_source_authority_denied"
+        ):
+            value = "true"
+        elif (
+            field_name
+            == "reported_readonly_preflight_review_decision_source_authority_flags"
+        ):
+            value = expected_flags_value
+        else:
+            value = "placeholder"
+        markdown_lines.append(f"- {field_name}: `{value}`")
+    summary = {
+        "status": "passed",
+        "failed_checks": [],
+        "next_wing_proof_plan": {
+            "readonly_preflight_review_decision_source_authority_denied": True,
+            "readonly_preflight_review_decision_source_authority_flags": expected_flags,
+            "reported_readonly_preflight_review_decision_source_authority_denied": True,
+            "reported_readonly_preflight_review_decision_source_authority_flags": expected_flags,
+        },
+    }
+
+    release_check.apply_next_wing_proof_plan_operator_markdown_surface_check(
+        summary,
+        "\n".join(markdown_lines),
+    )
+
+    next_plan = summary["next_wing_proof_plan"]
+    assert summary["status"] == "failed"
+    assert (
+        release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SURFACE_CHECK_NAME
+        in summary["failed_checks"]
+    )
+    assert next_plan["operator_markdown_summary_missing_field_lines"] == []
+    assert next_plan["operator_markdown_summary_required_field_lines_match_contract"]
+    assert next_plan["operator_markdown_summary_values_match_contract"] is False
+    assert next_plan["operator_markdown_summary_value_mismatches"] == [
+        "readonly_preflight_review_decision_source_authority_flags",
+        "operator_markdown_summary_values_match_contract",
+    ]
 
 
 def test_no_wing_release_check_fails_summary_when_project_director_value_gate_markdown_surface_missing():

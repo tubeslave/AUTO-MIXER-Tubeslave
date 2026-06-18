@@ -401,6 +401,10 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
     "operator_markdown_summary_value_mismatches",
     "required_supervised_proof_plan_summary_fields",
     "missing_required_supervised_proof_plan_summary_fields",
+    "readonly_preflight_review_decision_source_authority_denied",
+    "readonly_preflight_review_decision_source_authority_flags",
+    "reported_readonly_preflight_review_decision_source_authority_denied",
+    "reported_readonly_preflight_review_decision_source_authority_flags",
     "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
     "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
     "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
@@ -457,6 +461,10 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_POST_CHECK_FIELD_LINES = (
     "operator_markdown_summary_allowed_supervised_live_value_types_match_contract",
     "operator_markdown_summary_values_match_contract",
     "operator_markdown_summary_value_mismatches",
+    "readonly_preflight_review_decision_source_authority_denied",
+    "readonly_preflight_review_decision_source_authority_flags",
+    "reported_readonly_preflight_review_decision_source_authority_denied",
+    "reported_readonly_preflight_review_decision_source_authority_flags",
     "operator_markdown_summary_required_field_lines_missing_members",
     "operator_markdown_summary_required_field_lines_match_contract",
     "operator_markdown_summary_missing_field_lines",
@@ -23842,6 +23850,46 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
             "readonly_preflight_review_decision_accepted": (
                 detail.get("readonly_preflight_review_decision_accepted") is True
             ),
+            "readonly_preflight_review_decision_source_authority_denied": (
+                detail.get(
+                    "readonly_preflight_review_decision_source_authority_denied"
+                )
+                is True
+            ),
+            "readonly_preflight_review_decision_source_authority_flags": (
+                dict(
+                    detail.get(
+                        "readonly_preflight_review_decision_source_authority_flags"
+                    )
+                )
+                if isinstance(
+                    detail.get(
+                        "readonly_preflight_review_decision_source_authority_flags"
+                    ),
+                    Mapping,
+                )
+                else {}
+            ),
+            "reported_readonly_preflight_review_decision_source_authority_denied": (
+                detail.get(
+                    "reported_readonly_preflight_review_decision_source_authority_denied"
+                )
+                is True
+            ),
+            "reported_readonly_preflight_review_decision_source_authority_flags": (
+                dict(
+                    detail.get(
+                        "reported_readonly_preflight_review_decision_source_authority_flags"
+                    )
+                )
+                if isinstance(
+                    detail.get(
+                        "reported_readonly_preflight_review_decision_source_authority_flags"
+                    ),
+                    Mapping,
+                )
+                else {}
+            ),
             "readonly_preflight_review_decision_status": detail.get(
                 "readonly_preflight_review_decision_status"
             ),
@@ -24295,8 +24343,62 @@ def apply_next_wing_proof_plan_operator_markdown_surface_check(
         markdown_text,
         "operator_markdown_summary_values_match_contract",
     )
+    source_authority_denied_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "readonly_preflight_review_decision_source_authority_denied",
+    )
+    source_authority_flags_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "readonly_preflight_review_decision_source_authority_flags",
+    )
+    reported_source_authority_denied_line_value = (
+        _extract_markdown_summary_field_value(
+            markdown_text,
+            "reported_readonly_preflight_review_decision_source_authority_denied",
+        )
+    )
+    reported_source_authority_flags_line_value = _extract_markdown_summary_field_value(
+        markdown_text,
+        "reported_readonly_preflight_review_decision_source_authority_flags",
+    )
     allowed_match_contract_text = (
         "true" if allowed_supervised_live_value_types_match_contract else "false"
+    )
+    source_authority_denied_text = (
+        "true"
+        if next_plan.get("readonly_preflight_review_decision_source_authority_denied")
+        is True
+        else "false"
+    )
+    source_authority_flags_text = json.dumps(
+        next_plan.get("readonly_preflight_review_decision_source_authority_flags")
+        if isinstance(
+            next_plan.get("readonly_preflight_review_decision_source_authority_flags"),
+            Mapping,
+        )
+        else {},
+        sort_keys=True,
+    )
+    reported_source_authority_denied_text = (
+        "true"
+        if next_plan.get(
+            "reported_readonly_preflight_review_decision_source_authority_denied"
+        )
+        is True
+        else "false"
+    )
+    reported_source_authority_flags_text = json.dumps(
+        next_plan.get(
+            "reported_readonly_preflight_review_decision_source_authority_flags"
+        )
+        if isinstance(
+            next_plan.get(
+                "reported_readonly_preflight_review_decision_source_authority_flags"
+            ),
+            Mapping,
+        )
+        else {},
+        sort_keys=True,
     )
     value_mismatches: list[str] = []
     if (
@@ -24326,6 +24428,36 @@ def apply_next_wing_proof_plan_operator_markdown_surface_check(
     ):
         value_mismatches.append(
             "operator_markdown_summary_allowed_supervised_live_value_types_match_contract"
+        )
+    if (
+        source_authority_denied_line_value is not None
+        and source_authority_denied_line_value != source_authority_denied_text
+    ):
+        value_mismatches.append(
+            "readonly_preflight_review_decision_source_authority_denied"
+        )
+    if (
+        source_authority_flags_line_value is not None
+        and source_authority_flags_line_value != source_authority_flags_text
+    ):
+        value_mismatches.append(
+            "readonly_preflight_review_decision_source_authority_flags"
+        )
+    if (
+        reported_source_authority_denied_line_value is not None
+        and reported_source_authority_denied_line_value
+        != reported_source_authority_denied_text
+    ):
+        value_mismatches.append(
+            "reported_readonly_preflight_review_decision_source_authority_denied"
+        )
+    if (
+        reported_source_authority_flags_line_value is not None
+        and reported_source_authority_flags_line_value
+        != reported_source_authority_flags_text
+    ):
+        value_mismatches.append(
+            "reported_readonly_preflight_review_decision_source_authority_flags"
         )
     values_match_contract_text = (
         "true"
@@ -24606,12 +24738,14 @@ def _replace_markdown_summary_field_line(
     lines: list[str],
     field_name: str,
     value: object,
+    *,
+    sort_keys: bool = False,
 ) -> None:
     prefix = f"- {field_name}: "
     if isinstance(value, bool):
         rendered_value = "true" if value else "false"
     elif isinstance(value, (dict, list)):
-        rendered_value = json.dumps(value)
+        rendered_value = json.dumps(value, sort_keys=sort_keys)
     else:
         rendered_value = str(value)
     for index, line in enumerate(lines):
@@ -28495,6 +28629,14 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(next_plan['operator_markdown_summary_values_match_contract']).lower()}`",
                 "- operator_markdown_summary_value_mismatches: "
                 f"`{json.dumps(next_plan['operator_markdown_summary_value_mismatches'])}`",
+                "- readonly_preflight_review_decision_source_authority_denied: "
+                f"`{str(next_plan['readonly_preflight_review_decision_source_authority_denied']).lower()}`",
+                "- readonly_preflight_review_decision_source_authority_flags: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_source_authority_flags'], sort_keys=True)}`",
+                "- reported_readonly_preflight_review_decision_source_authority_denied: "
+                f"`{str(next_plan['reported_readonly_preflight_review_decision_source_authority_denied']).lower()}`",
+                "- reported_readonly_preflight_review_decision_source_authority_flags: "
+                f"`{json.dumps(next_plan['reported_readonly_preflight_review_decision_source_authority_flags'], sort_keys=True)}`",
                 f"- step_count: `{next_plan['step_count']}`",
                 f"- planned_value_types: `{json.dumps(next_plan['planned_value_types'])}`",
                 f"- planned_channels: `{json.dumps(next_plan['planned_channels'])}`",
@@ -28841,10 +28983,15 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
     if isinstance(summary.get("next_wing_proof_plan"), dict):
         next_plan = summary["next_wing_proof_plan"]
         for field_name in NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_POST_CHECK_FIELD_LINES:
+            sort_keys = field_name in {
+                "readonly_preflight_review_decision_source_authority_flags",
+                "reported_readonly_preflight_review_decision_source_authority_flags",
+            }
             _replace_markdown_summary_field_line(
                 lines,
                 field_name,
                 next_plan[field_name],
+                sort_keys=sort_keys,
             )
     for field_name in (
         NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SELF_CONSISTENCY_SUMMARY_SURFACE_FIELDS
