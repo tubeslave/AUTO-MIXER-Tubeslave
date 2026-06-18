@@ -67,6 +67,11 @@ ARTIFACT_MANIFEST_VERIFIER_PASSED_BEFORE_WS_FIELD = (
 ARTIFACT_MANIFEST_VERIFIER_WS_OPENED_AFTER_PASS_FIELD = (
     ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS[2]
 )
+READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS = (
+    "readiness_closure_allowed_by_evidence",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
 MANUAL_REVIEW_CHECKLIST = (
     {
         "id": "confirm_artifact_paths",
@@ -112,6 +117,13 @@ def _string_list(value: Any) -> list[str]:
 
 def _non_bool_int(value: Any) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+
+def _readonly_preflight_source_authority_denied(summary: Mapping[str, Any]) -> bool:
+    return all(
+        summary.get(flag) is False
+        for flag in READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+    )
 
 
 def _int_list(value: Any) -> list[int]:
@@ -477,14 +489,13 @@ def build_review_report(
     artifact_operator_next_steps = _artifact_operator_next_steps(artifacts)
     valid_candidate_count = int(summary.get("valid_candidate_count") or 0)
     invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
+    source_authority_denied = _readonly_preflight_source_authority_denied(summary)
     candidate_available = (
         evidence.get("status") == "readonly_preflight_candidate_available"
         and valid_candidate_count > 0
         and invalid_candidate_count == 0
         and summary.get("readiness_matrix_update_allowed") is True
-        and summary.get("readiness_closure_allowed_by_evidence") is not True
-        and summary.get("live_authority_granted") is not True
-        and summary.get("full_autonomous_ready") is not True
+        and source_authority_denied
     )
     next_required_action = str(
         summary.get("next_global_step")
@@ -507,6 +518,11 @@ def build_review_report(
         "execution_allowed_by_review": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
+        "source_authority_denied": source_authority_denied,
+        "source_authority_flags": {
+            flag: summary.get(flag)
+            for flag in READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+        },
         "manual_review_required_before_readiness_update": True,
         "manual_review_decision_required": candidate_available,
         "request_id_policy": REQUEST_ID_POLICY,
@@ -570,6 +586,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- execution_allowed_by_review: `{str(report['execution_allowed_by_review']).lower()}`",
         f"- live_authority_granted: `{str(report['live_authority_granted']).lower()}`",
         f"- full_autonomous_ready: `{str(report['full_autonomous_ready']).lower()}`",
+        f"- source_authority_denied: `{str(report['source_authority_denied']).lower()}`",
+        f"- source_authority_flags: `{json.dumps(report['source_authority_flags'], sort_keys=True)}`",
         f"- manual_review_required_before_readiness_update: `{str(report['manual_review_required_before_readiness_update']).lower()}`",
         f"- manual_review_decision_required: `{str(report['manual_review_decision_required']).lower()}`",
         f"- request_id_policy: `{report['request_id_policy']}`",

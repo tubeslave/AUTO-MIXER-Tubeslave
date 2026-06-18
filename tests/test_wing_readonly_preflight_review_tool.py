@@ -486,6 +486,12 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert report["execution_allowed_by_review"] is False
     assert report["live_authority_granted"] is False
     assert report["full_autonomous_ready"] is False
+    assert report["source_authority_denied"] is True
+    assert report["source_authority_flags"] == {
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert report["manual_review_required_before_readiness_update"] is True
     assert report["manual_review_decision_required"] is True
     assert report["request_id_policy"] == "required_for_every_query_mixer_parameter_response"
@@ -666,6 +672,11 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
     assert "confirm_event_log_readonly_sequence" in markdown
     assert "confirm_event_log_run_id_binding" in markdown
     assert "manual_review_decision_required: `true`" in markdown
+    assert "source_authority_denied: `true`" in markdown
+    assert (
+        'source_authority_flags: `{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_evidence": false}`'
+        in markdown
+    )
     assert "request_id_policy: `required_for_every_query_mixer_parameter_response`" in markdown
     assert "request_id_correlation_required: `true`" in markdown
     assert "review_decision_template_available: `true`" in markdown
@@ -677,6 +688,61 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
         in markdown
     )
     assert "does not contact WING" in markdown
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("readiness_closure_allowed_by_evidence", None),
+        ("live_authority_granted", "false"),
+        ("full_autonomous_ready", 0),
+    ],
+)
+def test_review_report_blocks_candidate_when_source_authority_flag_is_not_false(
+    monkeypatch,
+    field: str,
+    value,
+):
+    summary = {
+        "artifact_count": 1,
+        "valid_candidate_count": 1,
+        "invalid_candidate_count": 0,
+        "readiness_matrix_update_allowed": True,
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "latest_valid_candidate_run_id": "20260606T120000Z_wing_readonly_preflight",
+        "blocked_by": [],
+        "violations": [],
+    }
+    summary[field] = value
+    evidence = {
+        "status": "readonly_preflight_candidate_available",
+        "summary": summary,
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        },
+        "artifacts": [],
+    }
+    monkeypatch.setattr(
+        review_tool,
+        "build_wing_readonly_preflight_evidence",
+        lambda **_: evidence,
+    )
+
+    report = review_tool.build_review_report()
+
+    assert report["status"] == "blocked"
+    assert report["readiness_update_candidate_available"] is False
+    assert report["manual_review_decision_required"] is False
+    assert report["review_decision_template_available"] is False
+    assert report["source_authority_denied"] is False
+    assert report["source_authority_flags"][field] == value
+    assert report["live_authority_granted"] is False
+    assert report["full_autonomous_ready"] is False
+    assert review_tool.exit_code_for_report(report) == 3
 
 
 def test_review_decision_template_links_clean_candidate_but_requires_operator_edit(tmp_path: Path):
