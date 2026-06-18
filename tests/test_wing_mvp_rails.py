@@ -2134,6 +2134,32 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
             closing_readiness_contact_value_gate_command
         )
     )
+    granting_contact_summary_surface_live_authority_command = current_command.replace(
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: false",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: true",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        granting_contact_summary_surface_live_authority_command
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: false"
+        in progress.current_first_command_missing_baseline_markers(
+            granting_contact_summary_surface_live_authority_command
+        )
+    )
+    closing_readiness_contact_summary_surface_command = current_command.replace(
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: false",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: true",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        closing_readiness_contact_summary_surface_command
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: false"
+        in progress.current_first_command_missing_baseline_markers(
+            closing_readiness_contact_summary_surface_command
+        )
+    )
     failing_request_sequence_value_gate_command = current_command.replace(
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed: true",
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed: false",
