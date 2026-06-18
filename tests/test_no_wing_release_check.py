@@ -7621,8 +7621,104 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     assert result.detail["readiness_closure_allowed_by_decision"] is False
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["source_authority_denied"] is True
+    assert result.detail["source_authority_flags"] == {
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert result.detail["candidate_reviews"] == []
     assert result.detail["violations"] == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("readiness_matrix_update_allowed_by_decision", None),
+        ("readiness_closure_allowed_by_decision", "false"),
+        ("live_authority_granted", 0),
+        ("full_autonomous_ready", "false"),
+    ],
+)
+def test_no_wing_release_check_rejects_non_false_wing_preflight_review_decision_authority(
+    monkeypatch,
+    field,
+    value,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    summary = {
+        "preflight_evidence_status": "review_candidates_available",
+        "decision_search_roots": [
+            WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
+        ],
+        "review_candidate_count": 1,
+        "decision_record_count": 1,
+        "accepted_record_count": 1,
+        "rejected_record_count": 0,
+        "invalid_record_count": 0,
+        "unreviewed_candidate_count": 0,
+        "accepted_source_ids": [source_id],
+        "accepted_candidate_prestart_contract_valid": True,
+        "accepted_candidate_prestart_source_ids": [source_id],
+        "accepted_candidate_prestart_contract_violations_by_source": {},
+        "accepted_candidate_artifact_root_contract_valid": True,
+        "accepted_candidate_artifact_roots": ["artifacts/wing_readonly_preflight"],
+        "accepted_candidate_artifact_root_contract_violations_by_source": {},
+        "operator_review_required": True,
+        "manual_readiness_update_candidate_available": True,
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "rejected_source_ids": [],
+        "invalid_record_ids": [],
+        "duplicate_source_ids": [],
+        "conflicting_source_ids": [],
+        "unreviewed_candidate_source_ids": [],
+        "candidate_reviews": [],
+        "blocked_by": [],
+    }
+    summary[field] = value
+
+    def fake_ledger():
+        return {
+            "type": "wing_readonly_preflight_review_decision_ledger",
+            "method_id": release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+            "status": "operator_review_decision_records_available",
+            "safety": {
+                "read_only": True,
+                "live_write": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "executes_tests": False,
+                "operator_required": True,
+                "execution_allowed_by_decision": False,
+                "readiness_matrix_update_allowed_by_decision": False,
+                "readiness_closure_allowed_by_decision": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+            "records": [{"review_id": "operator-review-1"}],
+            "summary": summary,
+        }
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        fake_ledger,
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert result.detail["source_authority_denied"] is False
+    assert result.detail["source_authority_flags"][field] == value
+    assert summary_payload["source_authority_denied"] is False
+    assert summary_payload["source_authority_flags"][field] == value
+    assert summary_payload["manual_readiness_update_candidate_available"] is False
 
 
 def test_no_wing_release_check_blocks_wing_preflight_review_decision_artifact_root_candidate(
@@ -11842,6 +11938,48 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_candidate_reques
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids"
     ] == [WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID]
     assert result.detail["violations"] == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("readiness_matrix_update_allowed_by_decision", None),
+        ("readiness_closure_allowed_by_decision", "false"),
+        ("live_authority_granted", 0),
+        ("full_autonomous_ready", "false"),
+    ],
+)
+def test_no_wing_release_check_next_wing_plan_requires_review_decision_source_authority_denied(
+    tmp_path,
+    field,
+    value,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["wing_readonly_preflight_review_decision_ledger"]["summary"][
+        field
+    ] = value
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_next_wing_plan(report_path)
+
+    assert result.status == "failed"
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_source_authority_denied"
+        ]
+        is False
+    )
+    assert (
+        result.detail["readonly_preflight_review_decision_source_authority_flags"][
+            field
+        ]
+        == value
+    )
+    assert (
+        "next_wing_proof_plan_review_decision_accepted_mismatch"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_allows_next_wing_plan_blocked_by_candidate_prestart_trace(
@@ -18616,6 +18754,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
             "readiness_closure_allowed_by_decision": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "source_authority_denied": True,
+            "source_authority_flags": {
+                "readiness_matrix_update_allowed_by_decision": False,
+                "readiness_closure_allowed_by_decision": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
             "accepted_source_ids": [],
             "accepted_candidate_prestart_contract_valid": False,
             "accepted_candidate_prestart_source_ids": [],
@@ -18710,8 +18855,20 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert decision["readiness_closure_allowed_by_decision"] is False
     assert decision["live_authority_granted"] is False
     assert decision["full_autonomous_ready"] is False
+    assert decision["source_authority_denied"] is True
+    assert decision["source_authority_flags"] == {
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert "## WING Read-Only Preflight Review Decision Ledger" in markdown_summary
     assert "readiness_matrix_update_allowed_by_decision: `false`" in markdown_summary
+    assert "source_authority_denied: `true`" in markdown_summary
+    assert (
+        'source_authority_flags: `{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_decision": false, "readiness_matrix_update_allowed_by_decision": false}`'
+        in markdown_summary
+    )
     assert "WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md" in markdown_summary
     assert "accepted_decision_ready" in markdown_summary
     assert "candidate_reviews:" in markdown_summary

@@ -314,6 +314,12 @@ WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS = (
+    "readiness_matrix_update_allowed_by_decision",
+    "readiness_closure_allowed_by_decision",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID,
     build_read_surface_physical_readback_capture_plan,
@@ -5221,6 +5227,15 @@ def _wing_readonly_preflight_source_authority_denied(
     )
 
 
+def _wing_readonly_preflight_review_decision_source_authority_denied(
+    summary: Mapping[str, object],
+) -> bool:
+    return all(
+        summary.get(flag) is False
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    )
+
+
 def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     started = datetime.now(timezone.utc)
     detail: dict[str, object] = {
@@ -9791,6 +9806,13 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     accepted_candidate_artifact_root_contract_valid = (
         summary.get("accepted_candidate_artifact_root_contract_valid") is True
     )
+    source_authority_flags = {
+        flag: summary.get(flag)
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    }
+    source_authority_denied = (
+        _wing_readonly_preflight_review_decision_source_authority_denied(summary)
+    )
     blocked_by = (
         list(summary.get("blocked_by"))
         if isinstance(summary.get("blocked_by"), list)
@@ -9873,6 +9895,8 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     )
     detail["live_authority_granted"] = summary.get("live_authority_granted")
     detail["full_autonomous_ready"] = summary.get("full_autonomous_ready")
+    detail["source_authority_denied"] = source_authority_denied
+    detail["source_authority_flags"] = source_authority_flags
     detail["accepted_source_ids"] = accepted_source_ids
     detail["accepted_candidate_prestart_contract_valid"] = (
         accepted_candidate_prestart_contract_valid
@@ -14536,6 +14560,8 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     readonly_preflight_command_prestart_summary = ""
     readonly_preflight_review_decision_required = False
     readonly_preflight_review_decision_accepted = False
+    readonly_preflight_review_decision_source_authority_denied = False
+    readonly_preflight_review_decision_source_authority_flags: dict[str, object] = {}
     readonly_preflight_review_decision_status: object = None
     readonly_preflight_review_decision_blocked_by: list[str] = []
     readonly_preflight_review_decision_accepted_record_count = 0
@@ -14614,6 +14640,15 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             review_decision.get("summary")
             if isinstance(review_decision.get("summary"), Mapping)
             else review_decision
+        )
+        readonly_preflight_review_decision_source_authority_flags = {
+            flag: review_summary.get(flag)
+            for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+        }
+        readonly_preflight_review_decision_source_authority_denied = (
+            _wing_readonly_preflight_review_decision_source_authority_denied(
+                review_summary
+            )
         )
         safety = plan.get("safety") if isinstance(plan.get("safety"), Mapping) else {}
         summary = plan.get("summary") if isinstance(plan.get("summary"), Mapping) else {}
@@ -15880,10 +15915,7 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
                 and expected_candidate_request_sequence_contract_valid
                 and int(review_summary.get("invalid_record_count") or 0) == 0
                 and int(review_summary.get("unreviewed_candidate_count") or 0) == 0
-                and review_summary.get("readiness_matrix_update_allowed_by_decision") is not True
-                and review_summary.get("readiness_closure_allowed_by_decision") is not True
-                and review_summary.get("live_authority_granted") is not True
-                and review_summary.get("full_autonomous_ready") is not True
+                and readonly_preflight_review_decision_source_authority_denied
             )
             if readonly_preflight_review_decision_accepted != expected_decision_accepted:
                 violations.append("next_wing_proof_plan_review_decision_accepted_mismatch")
@@ -16182,6 +16214,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
     )
     detail["readonly_preflight_review_decision_accepted"] = (
         readonly_preflight_review_decision_accepted
+    )
+    detail["readonly_preflight_review_decision_source_authority_denied"] = (
+        readonly_preflight_review_decision_source_authority_denied
+    )
+    detail["readonly_preflight_review_decision_source_authority_flags"] = (
+        readonly_preflight_review_decision_source_authority_flags
     )
     detail["readonly_preflight_review_decision_status"] = (
         readonly_preflight_review_decision_status
@@ -20942,6 +20980,21 @@ def wing_readonly_preflight_review_decision_summary(
         decision_search_roots = detail.get("decision_search_roots")
         review_command = detail.get("review_command")
         review_exit_codes = detail.get("review_exit_codes")
+        source_authority_flags = (
+            dict(detail.get("source_authority_flags"))
+            if isinstance(detail.get("source_authority_flags"), Mapping)
+            else {
+                flag: detail.get(flag)
+                for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+            }
+        )
+        source_authority_denied = (
+            detail.get("source_authority_denied") is True
+            or all(
+                source_authority_flags.get(flag) is False
+                for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+            )
+        )
         return {
             "status": result.status,
             "read_only": True,
@@ -20956,6 +21009,8 @@ def wing_readonly_preflight_review_decision_summary(
             "live_widening_allowed": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "source_authority_denied": source_authority_denied,
+            "source_authority_flags": source_authority_flags,
             "ledger_status": detail.get("ledger_status"),
             "review_tool_path": detail.get("review_tool_path"),
             "review_tool_available": detail.get("review_tool_available") is True,
@@ -20979,6 +21034,7 @@ def wing_readonly_preflight_review_decision_summary(
             "unreviewed_candidate_count": int(detail.get("unreviewed_candidate_count") or 0),
             "manual_readiness_update_candidate_available": (
                 detail.get("manual_readiness_update_candidate_available") is True
+                and source_authority_denied
             ),
             "operator_review_required": detail.get("operator_review_required") is True,
             "accepted_source_ids": (
@@ -26823,6 +26879,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_review_decision['live_authority_granted']).lower()}`",
                 "- full_autonomous_ready: "
                 f"`{str(wing_readonly_preflight_review_decision['full_autonomous_ready']).lower()}`",
+                "- source_authority_denied: "
+                f"`{str(wing_readonly_preflight_review_decision['source_authority_denied']).lower()}`",
+                "- source_authority_flags: "
+                f"`{json.dumps(wing_readonly_preflight_review_decision['source_authority_flags'], sort_keys=True)}`",
                 f"- ledger_status: `{wing_readonly_preflight_review_decision['ledger_status']}`",
                 f"- review_tool_path: `{wing_readonly_preflight_review_decision['review_tool_path']}`",
                 "- review_tool_available: "
