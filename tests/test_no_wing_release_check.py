@@ -1432,6 +1432,10 @@ def valid_wing_readonly_preflight_plan_payload(plan_path: Path) -> dict:
         "artifact_manifest_verifier_required_fields_missing": [],
         "artifact_manifest_verifier_report_value_mismatches": [],
         "artifact_manifest_verifier_check_mismatches": [],
+        **{
+            field: True
+            for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+        },
         "artifact_manifest_verifier_failed_checks_have_check_entries": True,
         "artifact_manifest_verifier_report_required_fields_present": True,
         "artifact_manifest_verifier_report_required_fields_match_contract": True,
@@ -3221,6 +3225,8 @@ def test_no_wing_release_check_validates_wing_preflight_plan_artifact(tmp_path):
     assert result.detail["artifact_manifest_verifier_required_fields_missing"] == []
     assert result.detail["artifact_manifest_verifier_report_value_mismatches"] == []
     assert result.detail["artifact_manifest_verifier_check_mismatches"] == []
+    for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
+        assert result.detail[field] is True
     assert (
         result.detail["artifact_manifest_verifier_failed_checks_have_check_entries"]
         is True
@@ -3357,6 +3363,44 @@ def test_no_wing_release_check_rejects_wing_preflight_plan_stale_manifest_verifi
         "wing_readonly_preflight_plan_artifact_manifest_verifier_live_authority_granted_not_false"
         in result.detail["violations"]
     )
+
+
+def test_no_wing_release_check_rejects_wing_preflight_plan_stale_source_authority_verifier_check(
+    tmp_path,
+):
+    plan_path = tmp_path / "stale-source-authority-verifier-plan.json"
+    payload = valid_wing_readonly_preflight_plan_payload(plan_path)
+    stale_field = (
+        release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS[
+            0
+        ]
+    )
+    payload[stale_field] = False
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+
+    assert result.status == "failed"
+    assert result.detail[stale_field] is False
+    assert f"wing_readonly_preflight_plan_{stale_field}_not_true" in result.detail[
+        "violations"
+    ]
+
+
+def test_no_wing_release_check_allows_wing_preflight_plan_without_unemitted_source_authority_verifier_checks(
+    tmp_path,
+):
+    plan_path = tmp_path / "plan-without-unemitted-source-authority-checks.json"
+    payload = valid_wing_readonly_preflight_plan_payload(plan_path)
+    for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
+        payload.pop(field)
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_plan_artifact_snapshot(plan_path)
+
+    assert result.status == "passed"
+    for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
+        assert result.detail[field] is None
 
 
 def test_no_wing_release_check_rejects_wing_preflight_plan_malformed_prestart_sha(
@@ -15043,6 +15087,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
             "artifact_manifest_verifier_required_fields_missing": [],
             "artifact_manifest_verifier_report_value_mismatches": [],
             "artifact_manifest_verifier_check_mismatches": [],
+            **{
+                field: True
+                for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+            },
             "artifact_manifest_verifier_failed_checks_have_check_entries": True,
             "artifact_manifest_verifier_report_required_fields_present": True,
             "artifact_manifest_verifier_report_required_fields_match_contract": True,
@@ -15114,6 +15162,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
     assert artifact["artifact_manifest_verifier_required_fields_missing"] == []
     assert artifact["artifact_manifest_verifier_report_value_mismatches"] == []
     assert artifact["artifact_manifest_verifier_check_mismatches"] == []
+    for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
+        assert artifact[field] is True
     assert artifact["artifact_manifest_verifier_failed_checks_have_check_entries"] is True
     assert artifact["artifact_manifest_verifier_report_required_fields_present"] is True
     assert (
@@ -15196,6 +15246,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_p
         in markdown_summary
     )
     assert "artifact_manifest_verifier_check_mismatches: `[]`" in markdown_summary
+    for field in release_check.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
+        assert f"{field}: `true`" in markdown_summary
     assert (
         "artifact_manifest_verifier_failed_checks_have_check_entries: `true`"
         in markdown_summary
@@ -15276,6 +15328,22 @@ def test_runner_optional_next_wing_checks_match_manifest_verifier_false_fields()
             manifest_verifier.NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
         )
     }
+    expected_optional_checks.update(
+        f"summary_json_next_wing_proof_plan_{field_name}_requires_denial"
+        for field_name in manifest_verifier.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+    )
+    expected_optional_checks.update(
+        f"summary_md_{field_name}_requires_denial"
+        for field_name in manifest_verifier.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+    )
+    expected_optional_checks.update(
+        f"summary_json_next_wing_proof_plan_{field_name}_denies_authority"
+        for field_name in manifest_verifier.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
+    )
+    expected_optional_checks.update(
+        f"summary_md_{field_name}_denies_authority"
+        for field_name in manifest_verifier.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
+    )
 
     assert expected_optional_checks == set(
         wing_readonly_preflight_runner.ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS

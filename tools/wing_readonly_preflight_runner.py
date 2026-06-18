@@ -57,6 +57,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 from tools.verify_no_wing_artifact_manifest import (  # noqa: E402
+    NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS,
+    NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS,
     NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
     SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
     VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS,
@@ -231,6 +233,22 @@ ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS = (
     *(
         f"summary_md_{field_name}_denies_authority"
         for field_name in NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
+    ),
+    *(
+        f"summary_json_next_wing_proof_plan_{field_name}_requires_denial"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+    ),
+    *(
+        f"summary_md_{field_name}_requires_denial"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+    ),
+    *(
+        f"summary_json_next_wing_proof_plan_{field_name}_denies_authority"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
+    ),
+    *(
+        f"summary_md_{field_name}_denies_authority"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
     ),
 )
 EXPECTED_PLAN_MATCH_KEYS = (

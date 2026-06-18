@@ -196,6 +196,22 @@ def test_runner_keeps_next_wing_manifest_checks_optional_until_section_exists() 
         "summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted_denies_authority",
         "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed_denies_authority",
         "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted_denies_authority",
+        *(
+            f"summary_json_next_wing_proof_plan_{field_name}_requires_denial"
+            for field_name in runner.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+        ),
+        *(
+            f"summary_md_{field_name}_requires_denial"
+            for field_name in runner.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+        ),
+        *(
+            f"summary_json_next_wing_proof_plan_{field_name}_denies_authority"
+            for field_name in runner.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
+        ),
+        *(
+            f"summary_md_{field_name}_denies_authority"
+            for field_name in runner.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
+        ),
     }
 
     assert required_optional_checks == set(

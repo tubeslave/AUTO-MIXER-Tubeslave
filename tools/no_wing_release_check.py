@@ -320,6 +320,32 @@ WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS = (
+    "readonly_preflight_review_decision_source_authority_denied",
+    "reported_readonly_preflight_review_decision_source_authority_denied",
+)
+NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS = (
+    "readonly_preflight_review_decision_source_authority_flags",
+    "reported_readonly_preflight_review_decision_source_authority_flags",
+)
+NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS = (
+    *(
+        f"artifact_manifest_verifier_check_summary_json_next_wing_proof_plan_{field_name}_requires_denial"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+    ),
+    *(
+        f"artifact_manifest_verifier_check_summary_md_{field_name}_requires_denial"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS
+    ),
+    *(
+        f"artifact_manifest_verifier_check_summary_json_next_wing_proof_plan_{field_name}_denies_authority"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
+    ),
+    *(
+        f"artifact_manifest_verifier_check_summary_md_{field_name}_denies_authority"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
+    ),
+)
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID,
     build_read_surface_physical_readback_capture_plan,
@@ -732,6 +758,10 @@ PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted_denies_authority: true",
     "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed_denies_authority: true",
     "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted_denies_authority: true",
+    *(
+        f"{field_name}: true"
+        for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+    ),
     "artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_fields_present: true",
     "artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_fields_present: true",
     "artifact_manifest_verifier_check_summary_md_artifact_manifest_verifier_fields_rendered: true",
@@ -6264,6 +6294,11 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
         violations.append(
             "wing_readonly_preflight_plan_artifact_manifest_verifier_check_mismatches_not_empty"
         )
+    for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
+        if field_name in plan and plan.get(field_name) is not True:
+            violations.append(
+                f"wing_readonly_preflight_plan_{field_name}_not_true"
+            )
     if plan.get("artifact_manifest_verifier_failed_checks_have_check_entries") is not True:
         violations.append(
             "wing_readonly_preflight_plan_artifact_manifest_verifier_failed_checks_have_check_entries_not_true"
@@ -6521,6 +6556,8 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     detail["artifact_manifest_verifier_check_mismatches"] = plan.get(
         "artifact_manifest_verifier_check_mismatches"
     )
+    for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS:
+        detail[field_name] = plan.get(field_name)
     detail["artifact_manifest_verifier_failed_checks_have_check_entries"] = plan.get(
         "artifact_manifest_verifier_failed_checks_have_check_entries"
     )
@@ -17751,6 +17788,14 @@ def wing_readonly_preflight_plan_artifact_summary(
                 )
                 else []
             ),
+            **{
+                field_name: (
+                    detail.get(field_name)
+                    if isinstance(detail.get(field_name), bool)
+                    else None
+                )
+                for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+            },
             "artifact_manifest_verifier_failed_checks_have_check_entries": (
                 detail.get("artifact_manifest_verifier_failed_checks_have_check_entries")
                 is True
@@ -26323,6 +26368,11 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_report_value_mismatches'])}`",
                 "- artifact_manifest_verifier_check_mismatches: "
                 f"`{json.dumps(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_check_mismatches'])}`",
+                *[
+                    f"- {field_name}: "
+                    f"`{str(wing_readonly_preflight_plan_artifact[field_name]).lower()}`"
+                    for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+                ],
                 "- artifact_manifest_verifier_failed_checks_have_check_entries: "
                 f"`{str(wing_readonly_preflight_plan_artifact['artifact_manifest_verifier_failed_checks_have_check_entries']).lower()}`",
                 "- artifact_manifest_verifier_report_required_fields_present: "
