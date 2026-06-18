@@ -603,6 +603,8 @@ def _is_artifacts_path(value: str | None) -> bool:
         return False
     if value != value.strip():
         return False
+    if any(char.isspace() for char in value):
+        return False
     normalized = value.replace("\\", "/")
     parts = normalized.split("/")
     return parts[0] == "artifacts" and len(parts) > 1 and all(
