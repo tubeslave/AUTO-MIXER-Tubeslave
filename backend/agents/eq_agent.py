@@ -1,7 +1,7 @@
 """
 EQ Agent - ODA agent for automatic equalization.
 
-Monitors spectral balance and applies EQ corrections
+Monitors spectral balance and builds proposal-only EQ correction evidence
 based on instrument profiles. Thread-safe shared state.
 """
 
@@ -13,13 +13,15 @@ from .base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 
+EQ_AGENT_WRITE_POLICY = "proposal_only_quarantined"
+
 
 class EQAgent(BaseAgent):
     """
     Automatic EQ adjustment agent.
 
     Observes spectral features, decides on EQ band adjustments,
-    and acts by sending OSC commands to the mixer.
+    and records blocked EQ write evidence for operator review.
     """
 
     def __init__(self, mixer_client, cycle_interval: float = 2.0):
@@ -29,6 +31,12 @@ class EQAgent(BaseAgent):
         self._channel_states: Dict[int, Dict[str, Any]] = {}
         self._channel_lock = threading.Lock()
         self._instrument_profiles: Dict[int, str] = {}
+        self.live_write_allowed = False
+        self.write_policy = EQ_AGENT_WRITE_POLICY
+        self.last_write_attempted = False
+        self.last_write_blocked = False
+        self.last_write_count = 0
+        self.last_blocked_calls: list[Dict[str, Any]] = []
 
     # ------ Configuration ------
 
@@ -39,6 +47,16 @@ class EQAgent(BaseAgent):
     def get_channel_states(self) -> Dict[int, Dict[str, Any]]:
         with self._channel_lock:
             return dict(self._channel_states)
+
+    def get_write_policy_state(self) -> Dict[str, Any]:
+        return {
+            "live_write_allowed": False,
+            "write_policy": self.write_policy,
+            "last_write_attempted": self.last_write_attempted,
+            "last_write_blocked": self.last_write_blocked,
+            "last_write_count": self.last_write_count,
+            "last_blocked_calls": list(self.last_blocked_calls),
+        }
 
     # ------ ODA cycle ------
 
@@ -86,8 +104,9 @@ class EQAgent(BaseAgent):
         return {}
 
     async def act(self, decision: Dict[str, Any]) -> None:
-        """Apply EQ corrections via OSC."""
+        """Record EQ corrections as blocked evidence without live writes."""
         corrections = decision.get("corrections", {})
+        blocked_calls = []
         for ch_id, bands in corrections.items():
             for band_id, adj_db in bands.items():
                 try:
@@ -95,11 +114,36 @@ class EQAgent(BaseAgent):
                     state = getattr(self._mixer, 'state', {})
                     current = state.get(f"ch/{ch_id}/eq/{band_id}/g", 0.0)
                     new_gain = max(-15.0, min(15.0, current + adj_db))
-                    self._mixer.send(gain_addr, new_gain)
+                    blocked_call = {
+                        "cmd": "set_eq_band_gain",
+                        "path": gain_addr,
+                        "channel": ch_id,
+                        "band": band_id,
+                        "current_gain_db": current,
+                        "target_gain_db": new_gain,
+                        "delta_gain_db": adj_db,
+                        "bounded": new_gain != current + adj_db,
+                        "semantic": "legacy_eq_agent_band_gain",
+                    }
+                    blocked_calls.append(blocked_call)
                     with self._channel_lock:
                         if ch_id not in self._channel_states:
                             self._channel_states[ch_id] = {"bands": {}, "corrections": {}}
-                        self._channel_states[ch_id]["corrections"][band_id] = adj_db
-                    logger.debug(f"EQAgent: Ch{ch_id} band{band_id} gain {current:.1f} -> {new_gain:.1f} dB")
+                        self._channel_states[ch_id]["corrections"][band_id] = {
+                            "delta_gain_db": adj_db,
+                            "target_gain_db": new_gain,
+                            "blocked": True,
+                        }
+                    logger.debug(
+                        "EQAgent: blocked Ch%s band%s gain %.1f -> %.1f dB",
+                        ch_id,
+                        band_id,
+                        current,
+                        new_gain,
+                    )
                 except Exception as e:
                     logger.error(f"EQAgent: Ch{ch_id} band{band_id} failed: {e}")
+        self.last_blocked_calls = blocked_calls
+        self.last_write_attempted = bool(blocked_calls)
+        self.last_write_blocked = bool(blocked_calls)
+        self.last_write_count = 0
