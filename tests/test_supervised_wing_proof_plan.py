@@ -1480,6 +1480,48 @@ def test_plan_blocks_physical_proof_steps_when_review_decision_safety_allows_liv
     assert plan["steps"] == []
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("readiness_matrix_update_allowed_by_decision", None),
+        ("readiness_closure_allowed_by_decision", "false"),
+        ("live_authority_granted", 0),
+        ("full_autonomous_ready", ""),
+    ],
+)
+def test_plan_blocks_physical_proof_steps_when_review_decision_summary_authority_flag_is_not_false(
+    field,
+    value,
+):
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"][field] = value
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert (
+        plan["summary"][
+            "readonly_preflight_review_decision_summary_authority_denied"
+        ]
+        is False
+    )
+    assert plan["summary"][
+        "readonly_preflight_review_decision_summary_authority_flags"
+    ][field] == value
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
 def test_plan_blocks_physical_proof_steps_when_rejected_record_count_mismatches_sources():
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
