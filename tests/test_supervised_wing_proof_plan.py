@@ -1499,6 +1499,47 @@ def test_plan_blocks_physical_proof_steps_when_invalid_record_ids_exist_with_zer
     assert plan["steps"] == []
 
 
+def test_plan_blocks_physical_proof_steps_when_invalid_records_exist_with_zero_count():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"]["invalid_record_count"] = 0
+    ledger["summary"]["invalid_record_ids"] = []
+    ledger["summary"]["invalid_records"] = [
+        {
+            "review_id": "review-invalid",
+            "artifact_source_id": "artifacts/wing_readonly_preflight/run/summary.json",
+            "decision": "accepted",
+            "valid": False,
+            "violations": ["review_decision_invalid_template_status"],
+        }
+    ]
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert plan["summary"]["readonly_preflight_review_decision_invalid_records"] == [
+        {
+            "review_id": "review-invalid",
+            "artifact_source_id": "artifacts/wing_readonly_preflight/run/summary.json",
+            "decision": "accepted",
+            "template_status": "",
+            "violations": ["review_decision_invalid_template_status"],
+            "unsafe_authority_flags": [],
+        }
+    ]
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
 def test_plan_blocks_physical_proof_steps_when_unreviewed_candidate_source_ids_exist_with_zero_count():
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
