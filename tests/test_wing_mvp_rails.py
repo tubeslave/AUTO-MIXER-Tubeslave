@@ -70,6 +70,14 @@ ARTIFACT_MANIFEST_SUMMARY_SURFACE_SIDECAR_MARKERS = (
     "artifact_manifest_contract_cross_surface_mismatches: []",
 )
 
+ARTIFACT_MANIFEST_VERIFIER_OPERATOR_RESULT_MARKERS = (
+    "status: passed",
+    "failed_checks: []",
+    "read_only: true",
+    "live_authority_granted: false",
+    "readiness_closure_allowed: false",
+)
+
 ARTIFACT_MANIFEST_VERIFIER_REPORT_MARKERS = (
     "PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py",
     "status: passed",
@@ -1150,6 +1158,8 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         in readonly
     )
     assert "artifact_manifest_verifier_required_markers" in readonly
+    for marker in ARTIFACT_MANIFEST_VERIFIER_OPERATOR_RESULT_MARKERS:
+        assert marker in readonly
     assert "artifact_manifest_verifier_operator_sequence_before_preview: true" in readonly
     assert "backend_port_prestart_check_operator_sequence_step_index: 0" in readonly
     assert "backend_port_prestart_check_operator_sequence_step" in readonly
