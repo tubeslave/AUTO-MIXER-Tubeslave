@@ -392,6 +392,14 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError(
                 "Read-only preflight step must require physical readback"
             )
+        artifact_root = _command_value(command, "--artifact-root")
+        if not artifact_root:
+            raise ValueError("Read-only preflight step must bind artifact root")
+        artifact_root_parts = artifact_root.replace("\\", "/").split("/")
+        if not artifact_root.startswith("artifacts/") or ".." in artifact_root_parts:
+            raise ValueError(
+                "Read-only preflight step artifact root must stay under artifacts"
+            )
         if _command_value(command, "--channels") != WING_READONLY_PREFLIGHT_RUNNER_CHANNELS:
             raise ValueError("Read-only preflight step must bind canonical --channels")
         if (

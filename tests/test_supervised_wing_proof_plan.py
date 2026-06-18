@@ -150,7 +150,12 @@ def proof_prerequisites(value_type="gain"):
     return prerequisites
 
 
-def readonly_preflight_command(*, runner="tools/wing_readonly_preflight_runner.py", tail=()):
+def readonly_preflight_command(
+    *,
+    runner="tools/wing_readonly_preflight_runner.py",
+    artifact_root="artifacts/wing_readonly_preflight",
+    tail=(),
+):
     return (
         "python3",
         runner,
@@ -165,7 +170,7 @@ def readonly_preflight_command(*, runner="tools/wing_readonly_preflight_runner.p
         READONLY_PREFLIGHT_VALUE_TYPES,
         "--require-physical-readback",
         "--artifact-root",
-        "artifacts/wing_readonly_preflight",
+        artifact_root,
         "--prestart-summary",
         READONLY_PREFLIGHT_PRESTART_SUMMARY,
         "--expected-plan",
@@ -451,6 +456,29 @@ def test_readonly_preflight_step_requires_physical_readback_flag():
         match="Read-only preflight step must require physical readback",
     ):
         readonly_preflight_step(command)
+
+
+@pytest.mark.parametrize(
+    "artifact_root",
+    [
+        "",
+        "/tmp/wing_readonly_preflight",
+        "artifacts/wing_readonly_preflight/..",
+        "reports/wing_readonly_preflight",
+    ],
+)
+def test_readonly_preflight_step_rejects_unsafe_artifact_root(artifact_root):
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Read-only preflight step must bind artifact root"
+            if not artifact_root
+            else "Read-only preflight step artifact root must stay under artifacts"
+        ),
+    ):
+        readonly_preflight_step(
+            readonly_preflight_command(artifact_root=artifact_root)
+        )
 
 
 @pytest.mark.parametrize(
