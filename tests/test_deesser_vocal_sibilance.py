@@ -81,9 +81,16 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
     assert 5500.0 <= recommendation.frequency_hz <= 10500.0
     assert -42.0 <= recommendation.threshold_db <= -12.0
     assert 1.5 <= recommendation.ratio <= 6.0
+    assert 1.0 <= recommendation.max_gain_reduction_db <= 8.0
     assert recommendation.confidence >= 0.45
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
+    assert recommendation.evidence["bounded_attenuation_only"] is True
+    assert recommendation.evidence["makeup_gain_db"] == 0.0
+    assert recommendation.evidence["boost_allowed"] is False
+    assert recommendation.evidence["max_gain_reduction_db"] == (
+        recommendation.max_gain_reduction_db
+    )
     assert recommendation.evidence["arrangement_role"] == "lead"
     assert recommendation.evidence["arrangement_deesser_profile"] == "lead_vocal"
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
@@ -98,7 +105,13 @@ def test_vocal_sibilance_creates_proposal_only_recommendation():
     assert proposal["can_apply_live"] is False
     assert "requested_change" not in proposal
     assert "unsupported_value_type:deesser" in proposal["blockers"]
+    assert proposal["proposed_action"]["max_gain_reduction_db"] == (
+        recommendation.max_gain_reduction_db
+    )
+    assert proposal["proposed_action"]["makeup_gain_db"] == 0.0
+    assert proposal["proposed_action"]["boost_allowed"] is False
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["bounded_attenuation_only"] is True
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["arrangement_context_cache_freshness_status"] == "fresh"
 
@@ -136,6 +149,7 @@ def test_backing_vocal_deesser_profile_is_less_aggressive_than_lead():
     assert tucked.evidence["arrangement_deesser_profile"] == "tucked_or_backing_vocal"
     assert tucked.ratio < lead.ratio
     assert tucked.threshold_db > lead.threshold_db
+    assert tucked.max_gain_reduction_db < lead.max_gain_reduction_db
     assert tucked.confidence < lead.confidence
 
 

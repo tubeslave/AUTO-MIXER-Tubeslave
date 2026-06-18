@@ -29,6 +29,9 @@ MIN_THRESHOLD_DB = -42.0
 MAX_THRESHOLD_DB = -12.0
 MIN_RATIO = 1.5
 MAX_RATIO = 6.0
+MIN_MAX_GAIN_REDUCTION_DB = 1.0
+MAX_MAX_GAIN_REDUCTION_DB = 8.0
+DEESSER_MAKEUP_GAIN_DB = 0.0
 
 
 def utc_now() -> str:
@@ -124,6 +127,7 @@ class DeesserRecommendation:
     frequency_hz: float
     threshold_db: float
     ratio: float
+    max_gain_reduction_db: float
     confidence: float
     severity: str
     reason: str
@@ -164,6 +168,9 @@ class DeesserRecommendation:
                 "frequency_hz": self.frequency_hz,
                 "threshold_db": self.threshold_db,
                 "ratio": self.ratio,
+                "max_gain_reduction_db": self.max_gain_reduction_db,
+                "makeup_gain_db": DEESSER_MAKEUP_GAIN_DB,
+                "boost_allowed": False,
             },
             "evidence": {
                 **self.evidence,
@@ -357,6 +364,11 @@ def analyze_deesser_need(
 
     frequency_hz = _clip(_frequency_from_bands(analysis.band_energy_db), MIN_CENTER_HZ, MAX_CENTER_HZ)
     ratio_value = _clip(MIN_RATIO + score * 4.0, MIN_RATIO, MAX_RATIO)
+    max_gain_reduction_db = _clip(
+        max(MIN_MAX_GAIN_REDUCTION_DB, excess_db * 0.75 + score * 2.0),
+        MIN_MAX_GAIN_REDUCTION_DB,
+        MAX_MAX_GAIN_REDUCTION_DB,
+    )
     threshold = _clip(
         _safe_float(analysis.peak_dbfs) - (8.0 + score * 8.0) + threshold_offset_db,
         MIN_THRESHOLD_DB,
@@ -371,6 +383,16 @@ def analyze_deesser_need(
     else:
         reason = f"{label} does not meet safe de-esser proposal criteria."
 
+    evidence.update(
+        {
+            "sibilance_band_hz": list(SIBILANCE_BAND),
+            "bounded_attenuation_only": True,
+            "max_gain_reduction_db": round(max_gain_reduction_db, 1),
+            "makeup_gain_db": DEESSER_MAKEUP_GAIN_DB,
+            "boost_allowed": False,
+        }
+    )
+
     return DeesserRecommendation(
         id=f"{DEESSER_METHOD_ID}:ch{int(analysis.channel_id)}",
         status=status,
@@ -381,6 +403,7 @@ def analyze_deesser_need(
         frequency_hz=round(frequency_hz, 1),
         threshold_db=round(threshold, 1),
         ratio=round(ratio_value, 2),
+        max_gain_reduction_db=round(max_gain_reduction_db, 1),
         confidence=round(confidence, 3),
         severity=_severity(blockers, score),
         reason=reason,
