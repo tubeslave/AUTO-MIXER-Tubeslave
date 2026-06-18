@@ -1079,7 +1079,7 @@ class TestWingDeploymentWriteBoundary:
         server.operator_mode = "supervised"
 
         status = server.get_manual_write_supervision_status()
-        assert status["approved_live_write_kinds"] == ["fader", "gain", "pan"]
+        assert status["approved_live_write_kinds"] == ["fader", "gain"]
 
         server.operator_mode = "auto"
         server._auto_mode_unlocked = True
@@ -1102,6 +1102,28 @@ class TestWingDeploymentWriteBoundary:
 
         status = server.get_manual_write_supervision_status()
         assert status["approved_live_write_kinds"] == ["fader", "gain", "pan"]
+
+    @pytest.mark.asyncio
+    async def test_wing_manual_gate_filters_pan_from_operator_mode_scope(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        result = await server._apply_manual_console_write(
+            websocket,
+            channel=1,
+            value=0.25,
+            value_type="pan",
+            source="unit:wing_pan_manual_gate",
+            approved=True,
+            approval_id="unit-wing-pan",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "live_write_kind_not_allowed_in_mode"
+        assert result["allowed_live_write_kinds"] == ["fader", "gain"]
+        server.mixer_client.set_channel_pan.assert_not_called()
 
     def test_supported_manual_write_kinds_remain_in_sync(self):
         assert AutoMixerServer._get_supported_manual_write_kinds() == tuple(

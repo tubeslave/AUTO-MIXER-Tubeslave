@@ -11,10 +11,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Tuple
-try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
-except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 
 
 WRITE_SURFACE_STATUSES = {
@@ -25,7 +21,7 @@ WRITE_SURFACE_STATUSES = {
     "blocked",
 }
 
-LIVE_ALLOWED_WRITE_KINDS = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+LIVE_ALLOWED_WRITE_KINDS = ("fader", "gain")
 
 
 @dataclass(frozen=True)

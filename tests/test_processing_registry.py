@@ -26,6 +26,7 @@ from backend.safety_coverage_matrix import (
     iter_safety_coverage_rows,
 )
 from backend.write_surface_inventory import (
+    LIVE_ALLOWED_WRITE_KINDS as WRITE_SURFACE_LIVE_ALLOWED_WRITE_KINDS,
     WRITE_SURFACE_STATUSES,
     build_write_surface_inventory_snapshot,
     get_write_surface,
@@ -904,7 +905,7 @@ def test_write_surface_inventory_is_fail_closed_by_default():
         assert surface.entrypoints
         if surface.allowed_live:
             assert surface.status == "canonical_supervised"
-            assert tuple(surface.write_kinds) == LIVE_ALLOWED_WRITE_KINDS
+            assert tuple(surface.write_kinds) == WRITE_SURFACE_LIVE_ALLOWED_WRITE_KINDS
             assert "apply_operator_proposal" in surface.gate
         else:
             assert surface.status in {"proposal_only", "lab_only", "quarantined", "blocked"}
@@ -948,7 +949,9 @@ def test_write_surface_snapshot_status_counts_and_blocked_surfaces():
 
     assert snapshot["type"] == "write_surface_inventory"
     assert snapshot["summary"]["live_apply_policy"] == "canonical_supervised_fader_gain_only"
-    assert snapshot["summary"]["allowed_live_write_kinds"] == list(LIVE_ALLOWED_WRITE_KINDS)
+    assert snapshot["summary"]["allowed_live_write_kinds"] == list(
+        WRITE_SURFACE_LIVE_ALLOWED_WRITE_KINDS
+    )
     assert snapshot["summary"]["allowed_live_surface_ids"] == ["product_layer_fader_gain_apply"]
     assert snapshot["summary"]["status_counts"]["blocked"] >= 3
     assert snapshot["summary"]["status_counts"]["quarantined"] >= 6

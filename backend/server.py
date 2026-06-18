@@ -791,7 +791,10 @@ class AutoMixerServer:
         operator_mode: Dict[str, Any],
     ) -> list[str]:
         operator_capabilities = operator_mode.get("capabilities", {})
-        return list(operator_capabilities.get("allowed_live_write_kinds") or [])
+        allowed = list(operator_capabilities.get("allowed_live_write_kinds") or [])
+        if self._is_wing_deployment_write_boundary_active():
+            allowed = [kind for kind in allowed if kind in {"fader", "gain"}]
+        return allowed
 
     @staticmethod
     def _manual_write_address(channel: int, value_type: str) -> str:
