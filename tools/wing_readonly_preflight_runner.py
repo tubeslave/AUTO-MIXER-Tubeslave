@@ -58,6 +58,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
 )
 from tools.verify_no_wing_artifact_manifest import (  # noqa: E402
     NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
+    SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
     VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS,
     VERIFIER_REPORT_STATIC_SAFETY_FIELDS,
     verify_no_wing_artifact_manifest,
@@ -167,20 +168,10 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     "summary_denies_readiness_closure",
     "summary_denies_readiness_matrix_update",
     "summary_denies_live_authority",
-    "summary_md_readiness_closure_allowed_by_packet_denies_authority",
-    "summary_md_live_authority_granted_denies_authority",
-    "summary_md_artifact_manifest_contract_cross_surface_readiness_closure_allowed_denies_authority",
-    "summary_md_artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed_denies_authority",
-    "summary_md_artifact_manifest_contract_cross_surface_live_authority_granted_denies_authority",
-    "summary_md_artifact_manifest_readiness_closure_allowed_denies_authority",
-    "summary_md_artifact_manifest_readiness_matrix_update_allowed_denies_authority",
-    "summary_md_artifact_manifest_live_authority_granted_denies_authority",
-    "summary_md_artifact_manifest_verifier_readiness_matrix_update_allowed_denies_authority",
-    "summary_md_artifact_manifest_verifier_readiness_closure_allowed_denies_authority",
-    "summary_md_artifact_manifest_verifier_live_authority_granted_denies_authority",
-    "summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed_denies_authority",
-    "summary_md_wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed_denies_authority",
-    "summary_md_wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted_denies_authority",
+    *(
+        f"summary_md_{field_name}_denies_authority"
+        for field_name in SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
+    ),
     "manifest_wing_readonly_handoff_plan_verifier_summary_surface_fields_present",
     "manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_matches_summary",
     "manifest_wing_readonly_handoff_plan_verifier_summary_surface_mismatches_matches_summary",
