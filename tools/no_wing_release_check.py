@@ -308,6 +308,12 @@ from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_STATUSES,
     build_wing_readonly_preflight_review_decision_ledger,
 )
+
+WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS = (
+    "readiness_closure_allowed_by_evidence",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
 from backend.read_surface_physical_readback_capture_plan import (  # noqa: E402
     READ_SURFACE_PHYSICAL_READBACK_CAPTURE_PLAN_METHOD_ID,
     build_read_surface_physical_readback_capture_plan,
@@ -5206,6 +5212,15 @@ def validate_read_surface_physical_readback_capture_template_artifact_snapshot(
     )
 
 
+def _wing_readonly_preflight_source_authority_denied(
+    summary: Mapping[str, object],
+) -> bool:
+    return all(
+        summary.get(flag) is False
+        for flag in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+    )
+
+
 def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     started = datetime.now(timezone.utc)
     detail: dict[str, object] = {
@@ -5692,6 +5707,13 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     accepted = summary.get("accepted_as_readonly_preflight_candidate") is True
     update_allowed = summary.get("readiness_matrix_update_allowed") is True
     candidate_expected = bool(valid_candidate_count) and invalid_candidate_count == 0
+    source_authority_flags = {
+        flag: summary.get(flag)
+        for flag in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+    }
+    source_authority_denied = _wing_readonly_preflight_source_authority_denied(
+        summary
+    )
     closure_allowed = summary.get("readiness_closure_allowed_by_evidence") is True
     live_authority = summary.get("live_authority_granted") is True
     full_auto = summary.get("full_autonomous_ready") is True
@@ -5702,6 +5724,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_candidate_summary_mismatch")
     if update_allowed != candidate_expected:
         violations.append("wing_readonly_preflight_readiness_update_allowed_mismatch")
+    for key in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS:
+        if summary.get(key) is not False:
+            violations.append(f"wing_readonly_preflight_summary_{key}_not_false")
     if closure_allowed:
         violations.append("wing_readonly_preflight_readiness_closure_allowed")
     if live_authority:
@@ -5736,6 +5761,8 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["readiness_closure_allowed_by_evidence"] = closure_allowed
     detail["live_authority_granted"] = live_authority
     detail["full_autonomous_ready"] = full_auto
+    detail["source_authority_denied"] = source_authority_denied
+    detail["source_authority_flags"] = source_authority_flags
     detail["mvp_blocker_candidate_count"] = int(summary.get("mvp_blocker_candidate_count") or 0)
     detail["mvp_blockers_closed_by_evidence"] = (
         list(summary.get("mvp_blockers_closed_by_evidence"))
@@ -17111,13 +17138,27 @@ def wing_readonly_preflight_evidence_summary(
         )
         valid_candidate_count = int(detail.get("valid_candidate_count") or 0)
         invalid_candidate_count = int(detail.get("invalid_candidate_count") or 0)
+        source_authority_flags = (
+            dict(detail.get("source_authority_flags"))
+            if isinstance(detail.get("source_authority_flags"), Mapping)
+            else {
+                flag: detail.get(flag)
+                for flag in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+            }
+        )
+        source_authority_denied = (
+            detail.get("source_authority_denied") is True
+            or all(
+                source_authority_flags.get(flag) is False
+                for flag in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+            )
+        )
         readiness_update_candidate_available = (
             result.status == "passed"
             and valid_candidate_count > 0
             and invalid_candidate_count == 0
             and detail.get("readiness_matrix_update_allowed") is True
-            and detail.get("readiness_closure_allowed_by_evidence") is not True
-            and detail.get("live_authority_granted") is not True
+            and source_authority_denied
         )
         return {
             "status": result.status,
@@ -17143,6 +17184,8 @@ def wing_readonly_preflight_evidence_summary(
                 detail.get("readiness_matrix_update_allowed") is True
             ),
             "readiness_update_candidate_available": readiness_update_candidate_available,
+            "source_authority_denied": source_authority_denied,
+            "source_authority_flags": source_authority_flags,
             "mvp_blocker_candidate_count": int(detail.get("mvp_blocker_candidate_count") or 0),
             "mvp_blockers_closed_by_evidence": (
                 list(closed_ids) if isinstance(closed_ids, list) else []
@@ -25781,6 +25824,9 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- readiness_closure_allowed_by_evidence: `{str(wing_readonly_preflight['readiness_closure_allowed_by_evidence']).lower()}`",
                 f"- live_authority_granted: `{str(wing_readonly_preflight['live_authority_granted']).lower()}`",
                 f"- full_autonomous_ready: `{str(wing_readonly_preflight['full_autonomous_ready']).lower()}`",
+                f"- source_authority_denied: `{str(wing_readonly_preflight['source_authority_denied']).lower()}`",
+                "- source_authority_flags: "
+                f"`{json.dumps(wing_readonly_preflight['source_authority_flags'], sort_keys=True)}`",
                 f"- evidence_status: `{wing_readonly_preflight['evidence_status']}`",
                 f"- artifact_count: `{wing_readonly_preflight['artifact_count']}`",
                 f"- valid_candidate_count: `{wing_readonly_preflight['valid_candidate_count']}`",

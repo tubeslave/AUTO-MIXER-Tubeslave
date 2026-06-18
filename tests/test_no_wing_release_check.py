@@ -1118,6 +1118,12 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["readiness_closure_allowed_by_evidence"] is False
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
+    assert result.detail["source_authority_denied"] is True
+    assert result.detail["source_authority_flags"] == {
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert result.detail["mvp_blocker_candidate_count"] == 0
     assert result.detail["mvp_blockers_closed_by_evidence"] == []
     assert result.detail["artifact_operator_next_steps"] == []
@@ -7442,6 +7448,12 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
     assert "wing_readonly_preflight_invalid_artifacts_present" in violations
     assert "wing_readonly_preflight_candidate_summary_mismatch" in violations
     assert "wing_readonly_preflight_readiness_update_allowed_mismatch" in violations
+    assert (
+        "wing_readonly_preflight_summary_readiness_closure_allowed_by_evidence_not_false"
+        in violations
+    )
+    assert "wing_readonly_preflight_summary_live_authority_granted_not_false" in violations
+    assert "wing_readonly_preflight_summary_full_autonomous_ready_not_false" in violations
     assert "wing_readonly_preflight_readiness_closure_allowed" in violations
     assert "wing_readonly_preflight_live_authority_granted" in violations
     assert "wing_readonly_preflight_full_autonomous_ready" in violations
@@ -7450,6 +7462,107 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
     assert "wing_readonly_preflight_matrix_row_closed_not_false" in violations
     assert "wing_readonly_preflight_matrix_manual_review_not_true" in violations
     assert "wing_readonly_preflight_matrix_live_authority_not_false" in violations
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("readiness_closure_allowed_by_evidence", None),
+        ("live_authority_granted", "false"),
+        ("full_autonomous_ready", 0),
+    ],
+)
+def test_no_wing_release_check_rejects_non_false_wing_preflight_summary_authority(
+    monkeypatch,
+    field,
+    value,
+):
+    summary = {
+        "artifact_count": 1,
+        "valid_candidate_count": 1,
+        "invalid_candidate_count": 0,
+        "accepted_as_readonly_preflight_candidate": True,
+        "readiness_matrix_update_allowed": True,
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "mvp_blocker_candidate_count": 4,
+        "mvp_blockers_closed_by_evidence": [],
+        "latest_valid_candidate_run_id": "20260606T120000Z_wing_readonly_preflight",
+        "blocked_by": [
+            "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+        ],
+    }
+    summary[field] = value
+    evidence = {
+        "type": "wing_readonly_preflight_evidence",
+        "method_id": "wing_readonly_preflight_evidence",
+        "status": "readonly_preflight_candidate_available",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_evidence": False,
+            "readiness_closure_allowed_by_evidence": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": summary,
+        "mvp_blocker_matrix": [
+            {
+                "id": "wing_readonly_connection_proof",
+                "status": "candidate_available",
+                "closed": False,
+                "manual_review_required": True,
+                "automatic_live_authority_allowed": False,
+            },
+            {
+                "id": "physical_console_readback_proof",
+                "status": "candidate_available",
+                "closed": False,
+                "manual_review_required": True,
+                "automatic_live_authority_allowed": False,
+            },
+            {
+                "id": "operator_visible_evidence_report",
+                "status": "candidate_available",
+                "closed": False,
+                "manual_review_required": True,
+                "automatic_live_authority_allowed": False,
+            },
+            {
+                "id": "readiness_matrix_update_based_on_real_proof",
+                "status": "candidate_available",
+                "closed": False,
+                "manual_review_required": True,
+                "automatic_live_authority_allowed": False,
+            },
+        ],
+        "artifacts": [],
+    }
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_evidence",
+        lambda: evidence,
+    )
+
+    result = validate_wing_readonly_preflight_evidence_snapshot()
+    summary_payload = wing_readonly_preflight_evidence_summary([result])
+
+    assert result.status == "failed"
+    assert result.detail["source_authority_denied"] is False
+    assert result.detail["source_authority_flags"][field] == value
+    assert (
+        f"wing_readonly_preflight_summary_{field}_not_false"
+        in result.detail["violations"]
+    )
+    assert summary_payload["readiness_update_candidate_available"] is False
+    assert summary_payload["source_authority_denied"] is False
+    assert summary_payload["source_authority_flags"][field] == value
 
 
 def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_snapshot():
@@ -13994,6 +14107,12 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "readiness_closure_allowed_by_evidence": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
+            "source_authority_denied": True,
+            "source_authority_flags": {
+                "readiness_closure_allowed_by_evidence": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
             "mvp_blocker_candidate_count": 0,
             "mvp_blockers_closed_by_evidence": [],
             "mvp_blocker_matrix_ids": [
@@ -14272,6 +14391,12 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False
+    assert preflight["source_authority_denied"] is True
+    assert preflight["source_authority_flags"] == {
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert preflight["readiness_update_candidate_available"] is False
     assert preflight["mvp_blocker_matrix_ids"] == [
         "wing_readonly_connection_proof",
@@ -14468,6 +14593,11 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "## WING Read-Only Preflight Evidence" in markdown_summary
     assert "readiness_closure_allowed_by_evidence: `false`" in markdown_summary
     assert "live_authority_granted: `false`" in markdown_summary
+    assert "source_authority_denied: `true`" in markdown_summary
+    assert (
+        'source_authority_flags: `{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_evidence": false}`'
+        in markdown_summary
+    )
     assert "readiness_update_candidate_available: `false`" in markdown_summary
     assert "artifact_operator_next_steps" in markdown_summary
     assert "Regenerate the offline expected plan" in markdown_summary
