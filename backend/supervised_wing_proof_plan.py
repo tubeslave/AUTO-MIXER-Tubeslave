@@ -180,6 +180,24 @@ class WingProofPlanStep:
         if abs(self.delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB:
             raise ValueError("Physical proof plan only supports deltas up to 0.5 dB")
         command = tuple(self.command)
+        if _duplicate_command_flags(
+            command,
+            (
+                "--channel",
+                "--operator-confirm-channel",
+                "--value-type",
+                "--operator-confirm-value-type",
+                "--delta-db",
+                "--operator-confirm-delta-db",
+                "--execute",
+                "--prove-blocked-apply",
+                "--prove-emergency-stop",
+                "--rollback-delay-sec",
+                "--artifact-root",
+                "--reason",
+            ),
+        ):
+            raise ValueError("Physical proof step command must not repeat proof flags")
         expected_delta = f"{self.delta_db:.2f}"
         if (
             _command_value(command, "--channel") != str(channel)
@@ -436,6 +454,14 @@ def _command_value(command: Tuple[str, ...], flag: str) -> str | None:
     if index + 1 >= len(command):
         return None
     return command[index + 1]
+
+
+def _duplicate_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -> Tuple[str, ...]:
+    duplicates: list[str] = []
+    for flag in flags:
+        if command.count(flag) > 1:
+            duplicates.append(flag)
+    return tuple(duplicates)
 
 
 def _unsupported_supervised_value_types(mapping: Mapping[str, Any] | None) -> list[str]:

@@ -1926,6 +1926,40 @@ def test_proof_step_rejects_mismatched_command_channel_confirmation():
         )
 
 
+def test_proof_step_rejects_duplicate_command_flags():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step command must not repeat proof flags",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=proof_command(
+                tail=(
+                    "--rollback-delay-sec",
+                    "0",
+                    "--artifact-root",
+                    "artifacts/proof",
+                    "--reason",
+                    "supervised_physical_gain_proof",
+                    "--channel",
+                    "4",
+                ),
+            ),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_proof_step_rejects_command_without_safety_flags():
     with pytest.raises(
         ValueError,
