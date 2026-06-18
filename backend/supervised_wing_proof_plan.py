@@ -181,6 +181,7 @@ class WingProofPlanStep:
             raise ValueError("Physical proof plan only supports deltas up to 0.5 dB")
         command = tuple(self.command)
         proof_flags = (
+            "--url",
             "--channel",
             "--operator-confirm-channel",
             "--value-type",
@@ -196,7 +197,10 @@ class WingProofPlanStep:
         )
         if _duplicate_command_flags(command, proof_flags):
             raise ValueError("Physical proof step command must not repeat proof flags")
+        if _unknown_command_flags(command, proof_flags):
+            raise ValueError("Physical proof step command must not include unknown flags")
         proof_value_flags = (
+            "--url",
             "--channel",
             "--operator-confirm-channel",
             "--value-type",
@@ -475,6 +479,11 @@ def _duplicate_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -
         if command.count(flag) > 1:
             duplicates.append(flag)
     return tuple(duplicates)
+
+
+def _unknown_command_flags(command: Tuple[str, ...], flags: Tuple[str, ...]) -> Tuple[str, ...]:
+    allowed = set(flags)
+    return tuple(token for token in command if token.startswith("--") and token not in allowed)
 
 
 def _command_flags_with_flag_values(
