@@ -1646,6 +1646,26 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete: true"
         in current_command
     )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_required: true"
+        in current_command
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations: []"
+        in current_command
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed: true"
+        in current_command
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed: false"
+        in current_command
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted: false"
+        in current_command
+    )
     assert "project_director_selected_action_anchor" in current_command
     assert "expected_project_director_selected_action_anchor" in current_command
     assert (
@@ -1738,6 +1758,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete: true"
         in progress.current_first_command_missing_baseline_markers(
             missing_contact_trace_command
+        )
+    )
+    failing_contact_value_gate_command = current_command.replace(
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed: true",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_contact_value_gate_command
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed: true"
+        in progress.current_first_command_missing_baseline_markers(
+            failing_contact_value_gate_command
         )
     )
     failing_request_sequence_value_gate_command = current_command.replace(
