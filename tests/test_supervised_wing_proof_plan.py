@@ -27,6 +27,7 @@ from backend.wing_readonly_preflight_contract import (
 )
 from backend.supervised_wing_proof_plan import (
     READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER,
+    WingProofPlanStep,
     build_supervised_wing_proof_plan,
 )
 
@@ -1555,6 +1556,59 @@ def test_plan_rejects_non_numeric_supervised_delta_override():
             ),
             autonomy_readiness_snapshot=preflight_ready_snapshot(),
             delta_db_by_value_type={"gain": "loud"},
+        )
+
+
+def test_plan_rejects_nan_supervised_delta_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof delta for gain: nan",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            delta_db_by_value_type={"gain": float("nan")},
+        )
+
+
+def test_plan_rejects_infinite_supervised_delta_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof delta for fader: -inf",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            delta_db_by_value_type={"fader": float("-inf")},
+        )
+
+
+def test_proof_step_rejects_non_finite_delta():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof plan only supports finite dB deltas",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=float("nan"),
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=("python3", "tools/wing_operator_proposal_validation_runner.py"),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
         )
 
 

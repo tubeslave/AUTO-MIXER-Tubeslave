@@ -7,6 +7,7 @@ clients and never runs those commands.
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Tuple
@@ -152,6 +153,8 @@ class WingProofPlanStep:
             raise ValueError("The proof plan must not authorize execution")
         if not self.operator_approval_required:
             raise ValueError("Physical proof steps require explicit operator approval")
+        if not math.isfinite(self.delta_db):
+            raise ValueError("Physical proof plan only supports finite dB deltas")
         if self.delta_db >= 0:
             raise ValueError("Physical proof plan only supports negative dB deltas")
         if abs(self.delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB:
@@ -421,7 +424,11 @@ def _normalize_delta_overrides(
             raise ValueError(
                 f"Invalid supervised WING proof delta for {value_type}: {raw_delta}"
             ) from None
-        if delta_db >= 0 or abs(delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB:
+        if (
+            not math.isfinite(delta_db)
+            or delta_db >= 0
+            or abs(delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB
+        ):
             raise ValueError(
                 f"Invalid supervised WING proof delta for {value_type}: {raw_delta}"
             )
