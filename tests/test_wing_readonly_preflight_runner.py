@@ -188,6 +188,24 @@ def test_runner_requires_manifest_verifier_report_readiness_matrix_check_before_
     )
 
 
+def test_runner_keeps_next_wing_manifest_checks_optional_until_section_exists() -> None:
+    required_optional_checks = {
+        "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed_denies_authority",
+        "summary_md_next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted_denies_authority",
+        "summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed_denies_authority",
+        "summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted_denies_authority",
+        "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed_denies_authority",
+        "summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted_denies_authority",
+    }
+
+    assert required_optional_checks == set(
+        runner.ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS
+    )
+    assert required_optional_checks.isdisjoint(
+        runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS
+    )
+
+
 def test_runner_requires_all_manifest_verifier_report_safety_value_checks_before_websocket() -> None:
     required_report_value_checks = {
         f"verifier_report_{field_name}_matches_expected"
