@@ -174,13 +174,13 @@ def readonly_preflight_command(*, runner="tools/wing_readonly_preflight_runner.p
     )
 
 
-def readonly_preflight_step(command):
+def readonly_preflight_step(command, *, read_only=True):
     return WingReadonlyPreflightPlanStep(
         id="wing_readonly_preflight_required",
         live_execution_required=False,
         execution_allowed_by_plan=False,
         operator_approval_required=True,
-        read_only=True,
+        read_only=read_only,
         expected_plan_required_for_real_run=True,
         prestart_summary_required=True,
         expected_plan=READONLY_PREFLIGHT_EXPECTED_PLAN,
@@ -286,6 +286,14 @@ def assert_readonly_preflight_command_bindings(step: dict) -> None:
     assert "--operator-confirm-session-ready" in command
     assert "--value-types" in command
     assert command[command.index("--value-types") + 1] == READONLY_PREFLIGHT_VALUE_TYPES
+
+
+def test_readonly_preflight_step_rejects_non_read_only_flag():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step must be marked read-only",
+    ):
+        readonly_preflight_step(readonly_preflight_command(), read_only=False)
 
 
 def test_readonly_preflight_step_rejects_non_canonical_runner():

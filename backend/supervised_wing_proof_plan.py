@@ -317,6 +317,8 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError("Read-only preflight step must not be a live write step")
         if self.execution_allowed_by_plan:
             raise ValueError("The proof plan must not authorize read-only preflight execution")
+        if self.read_only is not True:
+            raise ValueError("Read-only preflight step must be marked read-only")
         if not self.operator_approval_required:
             raise ValueError("Read-only WING preflight still requires operator presence")
         if not self.expected_plan_required_for_real_run:
