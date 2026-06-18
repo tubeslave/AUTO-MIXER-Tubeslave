@@ -206,6 +206,39 @@ def test_runner_keeps_next_wing_manifest_checks_optional_until_section_exists() 
     )
 
 
+def test_prestart_loader_records_present_next_wing_manifest_checks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prestart_path = ensure_prestart_summary(tmp_path)
+    verifier_report = dict(
+        runner.verify_no_wing_artifact_manifest(prestart_path.parent)
+    )
+    verifier_report["checks"] = {
+        **verifier_report["checks"],
+        **{
+            check_name: True
+            for check_name in (
+                runner.ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS
+            )
+        },
+    }
+    monkeypatch.setattr(
+        runner,
+        "verify_no_wing_artifact_manifest",
+        lambda _run_dir: verifier_report,
+    )
+
+    detail, violations = runner.load_backend_port_prestart_summary(str(prestart_path))
+
+    assert violations == []
+    assert detail["artifact_manifest_verifier_check_mismatches"] == []
+    for check_name in (
+        runner.ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS
+    ):
+        assert detail[f"artifact_manifest_verifier_check_{check_name}"] is True
+
+
 def test_runner_requires_all_manifest_verifier_report_safety_value_checks_before_websocket() -> None:
     required_report_value_checks = {
         f"verifier_report_{field_name}_matches_expected"
