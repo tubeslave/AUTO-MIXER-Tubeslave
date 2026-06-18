@@ -198,6 +198,12 @@ It does not approve live writes.
   `verifier_report_required_fields_match_contract`. The sidecar must preserve
   the same summary-surface value-gate verdict as `summary.json` and
   `summary.md`:
+  `artifact_manifest_summary_surface_required`,
+  `artifact_manifest_summary_surface_required_fields`,
+  `artifact_manifest_summary_surface_missing_fields`,
+  `artifact_manifest_summary_surface_required_field_lines`,
+  `artifact_manifest_summary_surface_missing_field_lines`,
+  `artifact_manifest_summary_surface_field_lines_rendered`,
   `artifact_manifest_self_consistency_summary_surface_match: true`,
   `artifact_manifest_self_consistency_summary_surface_json_mismatches: []`,
   `artifact_manifest_self_consistency_summary_surface_markdown_mismatches: []`,
