@@ -33,6 +33,7 @@ from backend.wing_readonly_preflight_contract import (
 from backend.wing_readonly_preflight_review_decision import (
     REQUIRED_REVIEW_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS,
     build_wing_readonly_preflight_review_decision_ledger,
 )
 
@@ -533,6 +534,11 @@ def test_review_decision_ledger_requires_preflight_candidate_first():
     assert ledger["summary"]["review_candidate_count"] == 0
     assert ledger["summary"]["decision_record_count"] == 0
     assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    assert ledger["summary"]["source_authority_denied"] is True
+    assert ledger["summary"]["source_authority_flags"] == {
+        flag: False
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    }
     assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["live_authority_granted"] is False
 
@@ -638,6 +644,11 @@ def test_review_decision_ledger_records_accepted_candidate_without_live_authorit
     assert ledger["summary"]["accepted_record_count"] == 1
     assert ledger["summary"]["rejected_record_count"] == 0
     assert ledger["summary"]["manual_readiness_update_candidate_available"] is True
+    assert ledger["summary"]["source_authority_denied"] is True
+    assert ledger["summary"]["source_authority_flags"] == {
+        flag: False
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    }
     assert ledger["summary"]["accepted_candidate_prestart_contract_valid"] is True
     assert ledger["summary"]["accepted_candidate_prestart_source_ids"] == [
         "inline_payload_0"

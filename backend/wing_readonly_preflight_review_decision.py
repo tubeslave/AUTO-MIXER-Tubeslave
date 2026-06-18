@@ -95,6 +95,12 @@ UNSAFE_DECISION_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS = (
+    "readiness_matrix_update_allowed_by_decision",
+    "readiness_closure_allowed_by_decision",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
 
 
 def _utc_now() -> str:
@@ -410,6 +416,13 @@ def _record_id(record: Mapping[str, Any], index: int) -> str:
 
 def _unsafe_flags(record: Mapping[str, Any]) -> Tuple[str, ...]:
     return tuple(flag for flag in UNSAFE_DECISION_FLAGS if record.get(flag) is True)
+
+
+def _source_authority_denied(summary: Mapping[str, Any]) -> bool:
+    return all(
+        summary.get(flag) is False
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    )
 
 
 def _duplicate_review_source_ids(
@@ -783,6 +796,11 @@ def build_wing_readonly_preflight_review_decision_ledger(
         and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
         and not accepted_candidate_artifact_root_violations_by_source
     )
+    source_authority_flags = {
+        flag: False
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    }
+    source_authority_denied = _source_authority_denied(source_authority_flags)
     manual_readiness_update_candidate_available = (
         bool(accepted_records)
         and not invalid_records
@@ -791,6 +809,7 @@ def build_wing_readonly_preflight_review_decision_ledger(
         and accepted_candidate_verifier_ws_proof_valid
         and accepted_candidate_artifact_root_contract_valid
         and accepted_candidate_request_sequence_contract_valid
+        and source_authority_denied
     )
 
     if invalid_records:
@@ -896,6 +915,8 @@ def build_wing_readonly_preflight_review_decision_ledger(
             ),
             "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
             "operator_review_required": True,
+            "source_authority_denied": source_authority_denied,
+            "source_authority_flags": source_authority_flags,
             "manual_readiness_update_candidate_available": (
                 manual_readiness_update_candidate_available
             ),

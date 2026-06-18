@@ -23,6 +23,7 @@ from backend.wing_readonly_preflight_evidence import (  # noqa: E402
 )
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS,
     build_wing_readonly_preflight_review_decision_ledger,
 )
 from backend.wing_readonly_preflight_contract import (  # noqa: E402
@@ -93,6 +94,16 @@ def _invalid_decision_records(records: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def _source_authority_denied(summary: Mapping[str, Any]) -> bool:
+    return (
+        summary.get("source_authority_denied") is True
+        and all(
+            summary.get(flag) is False
+            for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+        )
+    )
+
+
 def build_decision_review_report(
     *,
     artifact_roots: Iterable[str | Path] | None = None,
@@ -155,6 +166,11 @@ def build_decision_review_report(
     accepted_candidate_artifact_root_contract_valid = (
         summary.get("accepted_candidate_artifact_root_contract_valid") is True
     )
+    source_authority_flags = {
+        flag: summary.get(flag)
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    }
+    source_authority_denied = _source_authority_denied(summary)
     accepted_ready = (
         summary.get("manual_readiness_update_candidate_available") is True
         and int(summary.get("accepted_record_count") or 0) > 0
@@ -167,6 +183,7 @@ def build_decision_review_report(
         and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
         and int(summary.get("invalid_record_count") or 0) == 0
         and int(summary.get("unreviewed_candidate_count") or 0) == 0
+        and source_authority_denied
     )
     rejected_only = (
         int(summary.get("rejected_record_count") or 0) > 0
@@ -200,6 +217,8 @@ def build_decision_review_report(
         ),
         "live_authority_granted": safety.get("live_authority_granted") is True,
         "full_autonomous_ready": safety.get("full_autonomous_ready") is True,
+        "source_authority_denied": source_authority_denied,
+        "source_authority_flags": source_authority_flags,
         "preflight_evidence_status": summary.get("preflight_evidence_status"),
         "review_candidate_count": int(summary.get("review_candidate_count") or 0),
         "decision_record_count": int(summary.get("decision_record_count") or 0),
@@ -265,6 +284,11 @@ def build_decision_review_report(
                 "have a valid accepted-candidate artifact-root trace."
             )
             if accepted_source_ids and not accepted_candidate_artifact_root_contract_valid
+            else (
+                "Accepted review decision remains blocked until source authority "
+                "flags strictly deny readiness and live authority."
+            )
+            if accepted_source_ids and not source_authority_denied
             else "Operator rejected the candidate; capture or review a replacement artifact."
             if rejected_only
             else str(summary.get("next_global_step") or "Capture and review WING preflight evidence.")
@@ -337,6 +361,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"`{str(report['readiness_closure_allowed_by_decision']).lower()}`",
         f"- live_authority_granted: `{str(report['live_authority_granted']).lower()}`",
         f"- full_autonomous_ready: `{str(report['full_autonomous_ready']).lower()}`",
+        f"- source_authority_denied: `{str(report['source_authority_denied']).lower()}`",
+        f"- source_authority_flags: `{json.dumps(report['source_authority_flags'], sort_keys=True)}`",
         "",
         "## Decisions",
         "",
