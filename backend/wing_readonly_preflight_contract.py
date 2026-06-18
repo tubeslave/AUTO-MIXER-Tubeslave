@@ -213,11 +213,18 @@ WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_GATE_REQUIRED_MARKERS = (
 WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP_INDEX = 1
 WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_OPERATOR_STEP = (
     "Run verify_no_wing_artifact_manifest against the same passed no-WING "
-    "artifact directory before any backend/WING WebSocket."
+    "artifact directory and require status: passed, failed_checks: [], "
+    "read_only: true, live_authority_granted: false, and "
+    "readiness_closure_allowed: false before any backend/WING WebSocket."
 )
 WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS = (
     "verify_no_wing_artifact_manifest",
     "same passed no-WING artifact directory",
+    "status: passed",
+    "failed_checks: []",
+    "read_only: true",
+    "live_authority_granted: false",
+    "readiness_closure_allowed: false",
     "before any backend/WING WebSocket",
 )
 

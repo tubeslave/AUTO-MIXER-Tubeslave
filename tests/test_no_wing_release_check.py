@@ -6279,6 +6279,40 @@ def test_no_wing_release_check_rejects_handoff_packet_with_manifest_verifier_aft
     )
 
 
+def test_no_wing_release_check_requires_handoff_artifact_manifest_verifier_result_markers(
+    tmp_path,
+):
+    plan_path = tmp_path / "wing_readonly_preflight_plan.json"
+    packet_path = tmp_path / "handoff-with-verifier-result-markers.json"
+    plan_path.write_text(
+        json.dumps(valid_wing_readonly_preflight_plan_payload(plan_path)),
+        encoding="utf-8",
+    )
+    payload = valid_wing_readonly_preflight_handoff_packet_payload(plan_path)
+    packet_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_wing_readonly_preflight_handoff_packet_artifact_snapshot(
+        packet_path,
+        plan_path=plan_path,
+    )
+
+    required_result_markers = [
+        "status: passed",
+        "failed_checks: []",
+        "read_only: true",
+        "live_authority_granted: false",
+        "readiness_closure_allowed: false",
+    ]
+    assert result.status == "passed"
+    assert result.detail["artifact_manifest_verifier_required_markers"] == list(
+        WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_REQUIRED_MARKERS
+    )
+    for marker in required_result_markers:
+        assert marker in result.detail["artifact_manifest_verifier_required_markers"]
+        assert marker in result.detail["artifact_manifest_verifier_operator_sequence_step"]
+    assert result.detail["artifact_manifest_verifier_required_markers_present"] is True
+
+
 def test_no_wing_release_check_rejects_handoff_packet_without_structured_supervised_prestart_gate(
     tmp_path,
 ):
