@@ -24,7 +24,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 
 | ID | Title | Desired end state | Dependencies | Safety class | Target maturity transition | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| M001 | WING read-only preflight evidence gate | No-WING prestart is green, run inputs are validated, and the next real WING read-only artifact path is unambiguous | Existing WING preflight tooling | high, read-only | SPECIFIED to REPLAY_VERIFIED for gate tooling; hardware remains WAITING | ACTIVE |
+| M001 | WING read-only preflight evidence gate | No-WING prestart is green, run inputs are validated, and the next real WING read-only artifact path is unambiguous | Existing WING preflight tooling | high, read-only | SPECIFIED to REPLAY_VERIFIED for gate tooling; hardware remains WAITING | WAITING_FOR_EXTERNAL_VALIDATION |
 | M002 | Physical console readback intake | Real read-only WING artifact is reviewed and bound to accepted decision records | M001 plus WING hardware/operator | critical, read-only hardware | HARDWARE_READ_VERIFIED for readback rows | WAITING_FOR_EXTERNAL_VALIDATION |
 | M003 | Supervised fader proof | Exact bounded fader move is approved, applied, read back and rolled back | M002 | critical live write | SUPERVISED_LIVE_VERIFIED for fader only | BLOCKED_BY_M002 |
 | M004 | Supervised gain-down/trim proof | Exact bounded gain-down/trim move is approved, applied, read back and rolled back | M002 | critical live write | SUPERVISED_LIVE_VERIFIED for gain-down only | BLOCKED_BY_M002 |
@@ -37,6 +37,6 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 
 ## Active milestone
 
-Exactly one milestone is active: `M001`. See `Docs/ACTIVE_MILESTONE.md` and
+Exactly one milestone is active: `M001`, currently
+`WAITING_FOR_EXTERNAL_VALIDATION`. See `Docs/ACTIVE_MILESTONE.md` and
 `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`.
-

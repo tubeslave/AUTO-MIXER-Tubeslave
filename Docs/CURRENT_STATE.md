@@ -40,6 +40,9 @@ Generated: 2026-06-18T20:39:07Z
   by `WING_DEPLOYMENT_LIVE_WRITE_KINDS = ("fader", "gain")`.
 - Full Autonomous Mixing Mode is not ready.
 - No real hardware evidence was produced during this setup run.
+- M001 autonomous pre-hardware work is complete and waiting for external
+  WING/operator validation. The exact real-run handoff is
+  `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
 
 ## Unresolved unknowns
 
@@ -49,4 +52,3 @@ Generated: 2026-06-18T20:39:07Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect baseline tests.
-

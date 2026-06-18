@@ -17,10 +17,12 @@ Status: control-plane decision index
    automation support is available. If native Goal transition is unavailable in
    a wake-up, the automation must report the exact manual `/goal` command.
 6. No product runtime behavior is changed by control-plane setup.
+7. M001 is set to `WAITING_FOR_EXTERNAL_VALIDATION`, not `READY_FOR_NEXT`,
+   because autonomous evidence proves the pre-hardware gate while the next
+   proof requires real WING hardware and operator review.
 
 ## ADR relationship
 
 Accepted architecture decisions continue to live in `Docs/adr/`. This file is
 an operational index and does not replace ADRs required before production
 dependency changes, live write expansion or autonomous authority changes.
-

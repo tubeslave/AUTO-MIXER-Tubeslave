@@ -1,13 +1,13 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-18T20:49:40Z
+Last heartbeat UTC: 2026-06-18T20:54:55Z
 
-Status: RUNNING
+Status: WAITING_FOR_EXTERNAL_VALIDATION
 
 Active milestone: M001
 
-Active checkpoint: M001-CP05
+Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
 Writer lease: none
 
-Next action: review M001 evidence and decide whether the milestone is READY_FOR_NEXT or WAITING_FOR_EXTERNAL_VALIDATION.
+Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.

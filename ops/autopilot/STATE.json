@@ -1,17 +1,17 @@
 {
   "schema": "automixer.autopilot.state.v1",
-  "program_status": "RUNNING",
+  "program_status": "WAITING_FOR_EXTERNAL_VALIDATION",
   "active_milestone": "M001",
-  "active_checkpoint": "M001-CP05",
-  "checkpoint_status": "pending",
-  "last_verified_commit": "b27d789a",
-  "last_heartbeat_utc": "2026-06-18T20:49:40Z",
+  "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
+  "checkpoint_status": "waiting_for_external_validation",
+  "last_verified_commit": "95516acc",
+  "last_heartbeat_utc": "2026-06-18T20:54:55Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
-  "current_blocker": null,
-  "next_action": "Review M001 evidence and decide whether the milestone is READY_FOR_NEXT or WAITING_FOR_EXTERNAL_VALIDATION.",
+  "current_blocker": "Real WING Rack read-only artifact and operator review are required before the roadmap can advance to physical readback.",
+  "next_action": "Wait for operator-supervised WING read-only preflight using ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json.",
   "last_validation_summary": {
-    "status": "setup_validated",
+    "status": "cp05_validated_waiting_for_external_validation",
     "hardware_evidence": false,
     "product_runtime_changed": false,
     "pytest": "PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q: 4027 passed, 1 skipped",
@@ -22,9 +22,13 @@
     "cp04_expected_plan": "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json",
     "cp04_validate_inputs": "ready_for_websocket; websocket_opened=false; write_request_sent=false",
     "cp04_validate_input_artifacts": [
-      "artifacts/wing_readonly_preflight/20260618T204909Z_wing_readonly_preflight/summary.json",
-      "artifacts/wing_readonly_preflight/20260618T204929Z_wing_readonly_preflight/summary.json"
+      "ops/autopilot/evidence/M001_CP04_validate_inputs_expected_plan_mismatch/summary.json",
+      "ops/autopilot/evidence/M001_CP04_validate_inputs_ready_for_websocket/summary.json"
     ],
+    "cp05_milestone_review": "Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP05_MILESTONE_REVIEW_20260618.md",
+    "milestone_decision": "WAITING_FOR_EXTERNAL_VALIDATION",
+    "cp05_validation": "PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q: 4027 passed, 1 skipped",
+    "evidence_placement": "validate-only summaries are stored under ops/autopilot/evidence, not artifacts/wing_readonly_preflight",
     "authority": {
       "live_authority_granted": false,
       "readiness_closure_allowed": false,

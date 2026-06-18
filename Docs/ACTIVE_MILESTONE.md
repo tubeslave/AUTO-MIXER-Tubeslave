@@ -4,7 +4,7 @@ ID: M001
 
 Title: WING read-only preflight evidence gate
 
-Status: RUNNING
+Status: WAITING_FOR_EXTERNAL_VALIDATION
 
 ## Desired end state
 
@@ -69,6 +69,10 @@ be trusted.
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
 - Validate-only runner status for the fresh expected plan: `ready_for_websocket`
   with `websocket_opened: false` and `write_request_sent: false`.
+- CP05 milestone review:
+  `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP05_MILESTONE_REVIEW_20260618.md`.
+- M001 autonomous work is complete. The next required proof is external
+  hardware/operator validation.
 
 ## Exact evidence
 
@@ -88,4 +92,5 @@ or if no-WING evidence unexpectedly grants live authority.
 ## External blockers
 
 Real hardware proof requires WING Rack, intended backend session, operator
-presence and accepted review records.
+presence and accepted review records. Until that exists, the milestone remains
+`WAITING_FOR_EXTERNAL_VALIDATION`.

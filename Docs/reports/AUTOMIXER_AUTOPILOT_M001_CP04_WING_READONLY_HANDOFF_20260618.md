@@ -22,9 +22,9 @@ CP04 подготовлен без контакта с WING и без измен
 - Expected plan:
   `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 - First validate-only summary, expected mismatch safely blocked:
-  `artifacts/wing_readonly_preflight/20260618T204909Z_wing_readonly_preflight/summary.json`.
+  `ops/autopilot/evidence/M001_CP04_validate_inputs_expected_plan_mismatch/summary.json`.
 - Second validate-only summary, inputs ready for WebSocket:
-  `artifacts/wing_readonly_preflight/20260618T204929Z_wing_readonly_preflight/summary.json`.
+  `ops/autopilot/evidence/M001_CP04_validate_inputs_ready_for_websocket/summary.json`.
 - Validate-only status: `ready_for_websocket`.
 - Safety flags: `websocket_opened: false`, `write_request_sent: false`,
   `contacts_wing: false`, `contacts_backend: false`,
