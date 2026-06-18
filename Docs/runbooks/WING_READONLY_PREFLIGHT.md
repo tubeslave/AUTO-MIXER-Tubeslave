@@ -207,7 +207,34 @@ It does not approve live writes.
   `artifact_manifest_self_consistency_match: true`,
   `artifact_manifest_self_consistency_mismatches: []`,
   `artifact_manifest_contract_cross_surface_match: true`, and
-  `artifact_manifest_contract_cross_surface_mismatches: []`. Missing or failing
+  `artifact_manifest_contract_cross_surface_mismatches: []`. The Project
+  Director selected action value-gate self-check must also preserve the
+  no-authority summary values before any backend/WING session:
+  `backend_port_prestart_summary_read_only: true`,
+  `backend_port_prestart_summary_read_only_matches_plan: true`,
+  `backend_port_prestart_summary_contacts_wing: false`,
+  `backend_port_prestart_summary_contacts_wing_matches_plan: true`,
+  `backend_port_prestart_summary_mutates_console_state: false`,
+  `backend_port_prestart_summary_mutates_console_state_matches_plan: true`,
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required: true`,
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields`,
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches: []`,
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match: true`,
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed: false`,
+  `next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted: false`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required: true`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches: []`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match: true`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed: false`,
+  `next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted: false`,
+  `next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required: true`,
+  `next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields`,
+  `next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches: []`,
+  `next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match: true`,
+  `next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: false`, and
+  `next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: false`.
+  Missing or failing
   verifier/report/sidecar markers mean rerun the no-WING quick check and do not
   open the WING session. The verifier is diagnostic only and does not contact
   WING; its results do not close readiness, approve live writes, or grant live

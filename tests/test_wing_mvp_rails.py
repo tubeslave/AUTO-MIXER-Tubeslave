@@ -1052,6 +1052,14 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         if marker not in readonly
     ]
     assert missing_sidecar_markers == []
+    missing_value_gate_self_check_markers = [
+        marker
+        for marker in (
+            release_check.PROJECT_DIRECTOR_SELECTED_ACTION_VALUE_GATE_SELF_CHECK_REQUIRED_MARKERS
+        )
+        if marker not in readonly
+    ]
+    assert missing_value_gate_self_check_markers == []
 
     assert "wing_readonly_preflight_runner.py" in readonly
     assert "review_wing_readonly_preflight_artifacts.py" in readonly
