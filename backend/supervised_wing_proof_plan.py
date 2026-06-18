@@ -215,6 +215,11 @@ class WingProofPlanStep:
             )
         if tuple(self.abort_conditions) != _abort_conditions():
             raise ValueError("Physical proof step abort conditions must match safety contract")
+        if tuple(self.prerequisites) != _common_prerequisites(
+            self.value_type,
+            tuple(self.evidence_blockers_to_review),
+        ):
+            raise ValueError("Physical proof step prerequisites must match safety contract")
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)

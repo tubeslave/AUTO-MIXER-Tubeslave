@@ -1935,6 +1935,62 @@ def test_proof_step_rejects_mismatched_abort_conditions():
         )
 
 
+def test_proof_step_rejects_mismatched_prerequisites():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step prerequisites must match safety contract",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=(
+                "python3",
+                "tools/wing_operator_proposal_validation_runner.py",
+                "--channel",
+                "3",
+                "--operator-confirm-channel",
+                "3",
+                "--value-type",
+                "gain",
+                "--operator-confirm-value-type",
+                "gain",
+                "--delta-db",
+                "-0.25",
+                "--operator-confirm-delta-db",
+                "-0.25",
+                "--execute",
+                "--prove-blocked-apply",
+                "--prove-emergency-stop",
+            ),
+            rationale="unit regression",
+            prerequisites=(
+                "A clean read-only WING preflight candidate exists and has been manually reviewed.",
+            ),
+            abort_conditions=(
+                "Pre-read is unavailable or not from physical readback.",
+                "Requested delta is positive or exceeds 0.5 dB.",
+                "Apply readback is missing, mismatched, or not physically verified.",
+                "Rollback readback or rollback proof is missing.",
+                "Emergency stop does not block a follow-up proposal.",
+                "Any fader move would exceed 0 dBFS.",
+                "Feedback, clipping, or operator concern appears at any point.",
+            ),
+            expected_artifacts=(
+                "summary.json with value_type=gain and channel=3",
+                "events.jsonl with proposal/apply/rollback/emergency-stop sequence",
+                "proof report row with proof_mode=physical and status=supervised_candidate",
+                "promotion evidence row marked safety_review_candidate only after manual artifact review",
+            ),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_plan_is_manual_review_ready_when_all_value_types_have_candidates():
     plan = build_supervised_wing_proof_plan(
         evidence_snapshot(
