@@ -255,6 +255,11 @@ class WingProofPlanStep:
             "tools/wing_operator_proposal_validation_runner.py",
         ):
             raise ValueError("Physical proof step command must use canonical proof runner")
+        backend_url = _command_value(command, "--url")
+        if not backend_url or not backend_url.startswith(("ws://", "wss://")):
+            raise ValueError(
+                "Physical proof step command must bind a WebSocket backend URL"
+            )
         if _command_value(command, "--rollback-delay-sec") != "0":
             raise ValueError("Physical proof step command must bind zero rollback delay")
         if not _command_value(command, "--artifact-root"):

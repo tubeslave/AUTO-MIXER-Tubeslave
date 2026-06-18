@@ -72,6 +72,7 @@ def proof_command(
     channel=3,
     *,
     runner="tools/wing_operator_proposal_validation_runner.py",
+    backend_url="ws://localhost:8765",
     delta="-0.25",
     operator_channel=None,
     include_safety_flags=True,
@@ -82,6 +83,8 @@ def proof_command(
     command = (
         "python3",
         runner,
+        "--url",
+        backend_url,
         "--channel",
         str(channel),
         "--operator-confirm-channel",
@@ -2404,6 +2407,30 @@ def test_proof_step_rejects_non_canonical_runner_command():
             execution_allowed_by_plan=False,
             operator_approval_required=True,
             command=proof_command("fader", 2, runner="tools/other_runner.py"),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
+@pytest.mark.parametrize("backend_url", ["", "http://localhost:8765", "localhost:8765"])
+def test_proof_step_rejects_non_websocket_backend_url(backend_url):
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step command must bind a WebSocket backend URL",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=proof_command(backend_url=backend_url),
             rationale="unit regression",
             prerequisites=(),
             abort_conditions=(),
