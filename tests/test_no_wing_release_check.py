@@ -22130,6 +22130,18 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         "operator_markdown_summary_required_field_lines"
     ] == list(release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES)
     assert (
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed"
         in json_summary["next_wing_proof_plan"][
             "operator_markdown_summary_required_field_lines"
@@ -22178,6 +22190,18 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         ]
     )
     assert (
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed"
         in json_summary["next_wing_proof_plan"][
             "operator_markdown_summary_required_field_lines"
@@ -22185,6 +22209,18 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert (
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed"
+        in json_summary["next_wing_proof_plan"][
+            "operator_markdown_summary_required_field_lines"
+        ]
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted"
         in json_summary["next_wing_proof_plan"][
             "operator_markdown_summary_required_field_lines"
         ]
@@ -22983,10 +23019,16 @@ def test_no_wing_release_check_fails_when_operator_markdown_required_field_lines
         not in {
             "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed",
             "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted",
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed",
+            "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted",
             "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed",
             "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted",
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed",
+            "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted",
             "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed",
             "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted",
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed",
+            "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted",
             "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
             "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
             "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
@@ -23029,10 +23071,16 @@ def test_no_wing_release_check_fails_when_operator_markdown_required_field_lines
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed",
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted",
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed",
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed",
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted",
         "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed",
         "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed",
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted",
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed",
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_live_authority_granted",
     ]
