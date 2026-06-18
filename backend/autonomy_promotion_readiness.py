@@ -71,6 +71,12 @@ GAP_BUCKETS = (
     "other",
 )
 
+READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS = (
+    "readiness_closure_allowed_by_evidence",
+    "live_authority_granted",
+    "full_autonomous_ready",
+)
+
 @dataclass(frozen=True)
 class PromotionTarget:
     id: str
@@ -347,9 +353,7 @@ def _wing_readonly_preflight_readiness_overlay(
     valid_candidate_count = int(summary.get("valid_candidate_count") or 0)
     invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
     update_allowed = summary.get("readiness_matrix_update_allowed") is True
-    closure_allowed = summary.get("readiness_closure_allowed_by_evidence") is True
-    live_authority = summary.get("live_authority_granted") is True
-    full_auto = summary.get("full_autonomous_ready") is True
+    source_authority_denied = _readonly_preflight_source_authority_denied(summary)
     matrix_rows = [row for row in matrix if isinstance(row, dict)]
     artifacts = (
         evidence.get("artifacts") if isinstance(evidence.get("artifacts"), list) else []
@@ -384,9 +388,7 @@ def _wing_readonly_preflight_readiness_overlay(
         and invalid_candidate_count == 0
         and update_allowed
         and prestart_summary_contract_valid
-        and not closure_allowed
-        and not live_authority
-        and not full_auto
+        and source_authority_denied
     )
     next_actions = (
         [
@@ -408,6 +410,11 @@ def _wing_readonly_preflight_readiness_overlay(
         "readiness_closure_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
+        "source_authority_denied": source_authority_denied,
+        "source_authority_flags": {
+            flag: summary.get(flag)
+            for flag in READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+        },
         "evidence_status": evidence.get("status"),
         "artifact_count": int(summary.get("artifact_count") or 0),
         "valid_candidate_count": valid_candidate_count,
@@ -477,6 +484,13 @@ def _wing_readonly_preflight_readiness_overlay(
         "next_required_actions": next_actions,
         "claim": "read-only preflight evidence can inform manual readiness review only; it closes no blocker automatically",
     }
+
+
+def _readonly_preflight_source_authority_denied(summary: Dict[str, Any]) -> bool:
+    return all(
+        summary.get(flag) is False
+        for flag in READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+    )
 
 
 def _target_readiness(target: PromotionTarget, *, full_autonomous_blocked: bool) -> PromotionReadinessRow:

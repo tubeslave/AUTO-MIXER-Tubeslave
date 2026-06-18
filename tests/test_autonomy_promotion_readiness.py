@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from backend.autonomy_promotion_readiness import (
     build_autonomy_promotion_readiness_snapshot,
     iter_promotion_readiness_rows,
@@ -223,6 +225,12 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False
+    assert preflight["source_authority_denied"] is True
+    assert preflight["source_authority_flags"] == {
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
     assert preflight["evidence_status"] == "operator_preflight_required"
     assert preflight["readiness_update_candidate_available"] is False
     assert preflight["prestart_backend_port_check_required"] is True
@@ -562,6 +570,42 @@ def test_readiness_snapshot_accepts_artifact_bound_prestart_summary_contract():
     assert preflight["readiness_update_candidate_available"] is True
     assert preflight["prestart_backend_port_summary_contract_valid"] is True
     assert preflight["prestart_backend_port_summary_contract_violations"] == []
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
+    assert preflight["source_authority_denied"] is True
+    assert preflight["source_authority_flags"] == {
+        "readiness_closure_allowed_by_evidence": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("readiness_closure_allowed_by_evidence", None),
+        ("live_authority_granted", "false"),
+        ("full_autonomous_ready", 0),
+    ],
+)
+def test_readiness_snapshot_blocks_candidate_when_source_authority_flag_is_not_false(
+    field,
+    value,
+):
+    evidence = _readiness_evidence_snapshot_with_candidate(
+        _artifact_bound_preflight_candidate_row()
+    )
+    evidence["summary"][field] = value
+
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        wing_readonly_preflight_evidence_snapshot=evidence,
+    )
+    preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
+
+    assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["source_authority_denied"] is False
+    assert preflight["source_authority_flags"][field] == value
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False
