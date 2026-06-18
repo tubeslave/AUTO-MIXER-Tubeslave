@@ -209,6 +209,10 @@ class WingProofPlanStep:
                 raise ValueError(
                     "Physical proof step command must include proof safety flags"
                 )
+        if tuple(self.expected_artifacts) != _expected_artifacts(self.value_type, channel):
+            raise ValueError(
+                "Physical proof step expected artifacts must match value type and channel"
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
