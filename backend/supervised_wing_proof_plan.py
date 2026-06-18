@@ -392,6 +392,11 @@ class WingReadonlyPreflightPlanStep:
             raise ValueError(
                 "Read-only preflight step must require physical readback"
             )
+        backend_url = _command_value(command, "--url")
+        if not backend_url or not backend_url.startswith(("ws://", "wss://")):
+            raise ValueError(
+                "Read-only preflight step must bind a WebSocket backend URL"
+            )
         artifact_root = _command_value(command, "--artifact-root")
         if not artifact_root:
             raise ValueError("Read-only preflight step must bind artifact root")

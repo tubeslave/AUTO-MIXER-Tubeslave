@@ -153,6 +153,7 @@ def proof_prerequisites(value_type="gain"):
 def readonly_preflight_command(
     *,
     runner="tools/wing_readonly_preflight_runner.py",
+    backend_url="ws://localhost:8765",
     artifact_root="artifacts/wing_readonly_preflight",
     tail=(),
 ):
@@ -160,7 +161,7 @@ def readonly_preflight_command(
         "python3",
         runner,
         "--url",
-        "ws://localhost:8765",
+        backend_url,
         "--channels",
         READONLY_PREFLIGHT_CHANNELS,
         "--operator-confirm-channels",
@@ -456,6 +457,15 @@ def test_readonly_preflight_step_requires_physical_readback_flag():
         match="Read-only preflight step must require physical readback",
     ):
         readonly_preflight_step(command)
+
+
+@pytest.mark.parametrize("backend_url", ["", "http://localhost:8765", "localhost:8765"])
+def test_readonly_preflight_step_rejects_non_websocket_backend_url(backend_url):
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step must bind a WebSocket backend URL",
+    ):
+        readonly_preflight_step(readonly_preflight_command(backend_url=backend_url))
 
 
 @pytest.mark.parametrize(
