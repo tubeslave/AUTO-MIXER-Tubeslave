@@ -576,14 +576,7 @@ the final `operator_sequence_supervised_prestart_gate_step` must include
 `expected-artifact-bound accepted source id`, and
 `WING_SUPERVISED_FADER_GAIN_PROOF`;
 the no-WING handoff summary must also show
-`required_supervised_prestart_gate_markers` exactly listing
-`accepted_decision_ready`, `valid accepted-candidate prestart trace`,
-  `valid accepted-candidate verifier WebSocket proof`,
-  `valid accepted-candidate artifact-root trace`,
-`valid accepted-candidate request-sequence trace`,
-`valid accepted-candidate contact trace`,
-`expected-artifact-bound accepted source id`, and
-`WING_SUPERVISED_FADER_GAIN_PROOF`;
+`required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]`;
 the no-WING handoff summary must show `supervised_prestart_gate` exactly
 matching `expected_supervised_prestart_gate`;
 the no-WING handoff summary must also show
