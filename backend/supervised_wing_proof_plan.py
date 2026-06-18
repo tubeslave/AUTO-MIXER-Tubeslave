@@ -389,6 +389,8 @@ def _normalize_channel_overrides(
             )
         channels: list[int] = []
         invalid_channels: list[str] = []
+        duplicate_channels: list[str] = []
+        seen_channels: set[int] = set()
         for raw_channel in raw_channel_values:
             if isinstance(raw_channel, bool):
                 invalid_channels.append(str(raw_channel))
@@ -401,11 +403,20 @@ def _normalize_channel_overrides(
             if channel < 1 or raw_channel != channel:
                 invalid_channels.append(str(raw_channel))
                 continue
+            if channel in seen_channels:
+                duplicate_channels.append(str(channel))
+                continue
+            seen_channels.add(channel)
             channels.append(channel)
         if invalid_channels:
             raise ValueError(
                 f"Invalid supervised WING proof channels for {value_type}: "
                 + ", ".join(invalid_channels)
+            )
+        if duplicate_channels:
+            raise ValueError(
+                f"Duplicate supervised WING proof channels for {value_type}: "
+                + ", ".join(duplicate_channels)
             )
         normalized[str(value_type)] = tuple(channels)
     return normalized
