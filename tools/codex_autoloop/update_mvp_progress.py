@@ -190,6 +190,7 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "project_director_selected_action_value_gate_self_check_markdown_surface_live_authority_granted: false",
     "operator_sequence_has_supervised_prestart_gate: true",
     "operator_sequence_supervised_prestart_gate_is_final: true",
+    "the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `valid accepted-candidate verifier WebSocket proof`, `valid accepted-candidate artifact-root trace`, `valid accepted-candidate request-sequence trace`, `valid accepted-candidate contact trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF",
     'required_supervised_prestart_gate_markers: ["accepted_decision_ready", "valid accepted-candidate prestart trace", "valid accepted-candidate verifier WebSocket proof", "valid accepted-candidate artifact-root trace", "valid accepted-candidate request-sequence trace", "valid accepted-candidate contact trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]',
     "supervised_prestart_gate",
     "expected_supervised_prestart_gate",
