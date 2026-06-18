@@ -27,11 +27,13 @@ try:
     from wing_readonly_preflight_review_decision import (
         build_wing_readonly_preflight_review_decision_ledger,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS,
     )
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.wing_readonly_preflight_review_decision import (
         build_wing_readonly_preflight_review_decision_ledger,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS,
     )
 
 try:
@@ -117,6 +119,9 @@ READONLY_PREFLIGHT_REVIEW_DECISION_SUMMARY_AUTHORITY_FLAGS = (
     "readiness_closure_allowed_by_decision",
     "live_authority_granted",
     "full_autonomous_ready",
+)
+READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS = (
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
 )
 PLAN_STATUSES = {
     "operator_proof_required",
@@ -584,6 +589,16 @@ def _review_decision_summary_denies_authority(summary: Mapping[str, Any]) -> boo
     )
 
 
+def _review_decision_source_authority_denied(summary: Mapping[str, Any]) -> bool:
+    return (
+        summary.get("source_authority_denied") is True
+        and all(
+            summary.get(flag) is False
+            for flag in READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+        )
+    )
+
+
 def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> bool:
     summary = _review_decision_summary(overlay)
     accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
@@ -638,6 +653,7 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and not _string_list(summary.get("duplicate_source_ids"))
         and not _string_list(summary.get("conflicting_source_ids"))
         and _review_decision_summary_denies_authority(summary)
+        and _review_decision_source_authority_denied(summary)
     )
 
 
@@ -1715,6 +1731,13 @@ def build_supervised_wing_proof_plan(
             "readonly_preflight_review_decision_summary_authority_flags": {
                 flag: review_summary.get(flag)
                 for flag in READONLY_PREFLIGHT_REVIEW_DECISION_SUMMARY_AUTHORITY_FLAGS
+            },
+            "readonly_preflight_review_decision_source_authority_denied": (
+                _review_decision_source_authority_denied(review_summary)
+            ),
+            "readonly_preflight_review_decision_source_authority_flags": {
+                flag: review_summary.get(flag)
+                for flag in READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
             },
             "readonly_preflight_review_decision_candidate_prestart_contract_valid": (
                 candidate_prestart_contract_valid

@@ -33,6 +33,7 @@ from backend.supervised_wing_proof_plan import (
 )
 from backend.wing_readonly_preflight_review_decision import (
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS,
 )
 
 PRESTART_BACKEND_PORT_CHECK_COMMAND = list(
@@ -769,6 +770,11 @@ def accepted_review_decision_ledger() -> dict:
             "invalid_record_count": 0,
             "unreviewed_candidate_count": 0,
             "manual_readiness_update_candidate_available": True,
+            "source_authority_denied": True,
+            "source_authority_flags": {
+                flag: False
+                for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+            },
             "readiness_matrix_update_allowed_by_decision": False,
             "readiness_closure_allowed_by_decision": False,
             "live_authority_granted": False,
@@ -962,6 +968,14 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
         == "operator_review_decision_records_available"
     )
     assert plan["summary"]["readonly_preflight_review_decision_accepted_record_count"] == 1
+    assert (
+        plan["summary"]["readonly_preflight_review_decision_source_authority_denied"]
+        is True
+    )
+    assert plan["summary"]["readonly_preflight_review_decision_source_authority_flags"] == {
+        flag: False
+        for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    }
     assert plan["summary"]["readonly_preflight_review_decision_accepted_source_ids"] == [
         "artifacts/wing_readonly_preflight/run/summary.json"
     ]
@@ -1554,6 +1568,53 @@ def test_plan_blocks_physical_proof_steps_when_review_decision_summary_authority
     assert plan["summary"][
         "readonly_preflight_review_decision_summary_authority_flags"
     ][field] == value
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source_authority_denied", False),
+        ("source_authority_denied", None),
+        ("live_authority_granted", "false"),
+        ("readiness_matrix_update_allowed_by_decision", 0),
+    ],
+)
+def test_plan_blocks_physical_proof_steps_when_review_decision_source_authority_is_not_denied(
+    field,
+    value,
+):
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"][field] = value
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert (
+        plan["summary"]["readonly_preflight_review_decision_source_authority_denied"]
+        is False
+    )
+    source_authority_flags = plan["summary"][
+        "readonly_preflight_review_decision_source_authority_flags"
+    ]
+    if field == "source_authority_denied":
+        assert source_authority_flags == {
+            flag: False
+            for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+        }
+    else:
+        assert source_authority_flags[field] == value
     assert (
         "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
         in plan["summary"]["global_blockers"]
