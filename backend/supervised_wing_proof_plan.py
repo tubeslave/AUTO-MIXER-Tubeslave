@@ -117,6 +117,7 @@ DEFAULT_DELTA_DB_BY_VALUE_TYPE = {
     "gain": -0.25,
     "fader": -0.25,
 }
+MAX_SUPERVISED_PROOF_DELTA_DB = 0.5
 ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES = frozenset(
     WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
 )
@@ -153,6 +154,8 @@ class WingProofPlanStep:
             raise ValueError("Physical proof steps require explicit operator approval")
         if self.delta_db >= 0:
             raise ValueError("Physical proof plan only supports negative dB deltas")
+        if abs(self.delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB:
+            raise ValueError("Physical proof plan only supports deltas up to 0.5 dB")
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -398,6 +401,31 @@ def _normalize_channel_overrides(
                 + ", ".join(invalid_channels)
             )
         normalized[str(value_type)] = tuple(channels)
+    return normalized
+
+
+def _normalize_delta_overrides(
+    delta_db_by_value_type: Mapping[str, float] | None,
+) -> dict[str, float]:
+    if not delta_db_by_value_type:
+        return {}
+    normalized: dict[str, float] = {}
+    for value_type, raw_delta in delta_db_by_value_type.items():
+        if isinstance(raw_delta, bool):
+            raise ValueError(
+                f"Invalid supervised WING proof delta for {value_type}: {raw_delta}"
+            )
+        try:
+            delta_db = float(raw_delta)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"Invalid supervised WING proof delta for {value_type}: {raw_delta}"
+            ) from None
+        if delta_db >= 0 or abs(delta_db) > MAX_SUPERVISED_PROOF_DELTA_DB:
+            raise ValueError(
+                f"Invalid supervised WING proof delta for {value_type}: {raw_delta}"
+            )
+        normalized[str(value_type)] = delta_db
     return normalized
 
 
@@ -966,7 +994,7 @@ def build_supervised_wing_proof_plan(
         channels.update(_normalize_channel_overrides(channels_by_value_type))
     deltas = dict(DEFAULT_DELTA_DB_BY_VALUE_TYPE)
     if delta_db_by_value_type:
-        deltas.update({key: float(value) for key, value in delta_db_by_value_type.items()})
+        deltas.update(_normalize_delta_overrides(delta_db_by_value_type))
 
     invalid = _invalid_artifacts_present(promotion_evidence_snapshot)
     preflight = _readonly_preflight_overlay(autonomy_readiness_snapshot)

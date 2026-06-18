@@ -1513,6 +1513,51 @@ def test_plan_rejects_unsupported_delta_value_type_override():
         )
 
 
+def test_plan_rejects_positive_supervised_delta_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof delta for gain: 0.25",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            delta_db_by_value_type={"gain": 0.25},
+        )
+
+
+def test_plan_rejects_too_large_supervised_delta_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof delta for fader: -0.75",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            delta_db_by_value_type={"fader": -0.75},
+        )
+
+
+def test_plan_rejects_non_numeric_supervised_delta_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof delta for gain: loud",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            delta_db_by_value_type={"gain": "loud"},
+        )
+
+
 def test_plan_is_manual_review_ready_when_all_value_types_have_candidates():
     plan = build_supervised_wing_proof_plan(
         evidence_snapshot(
