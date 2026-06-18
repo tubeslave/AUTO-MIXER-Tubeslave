@@ -14906,7 +14906,14 @@ def test_project_director_sidecar_markers_cover_runner_verifier_checks():
         set(wing_readonly_preflight_runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS)
         - covered_checks
     )
+    missing_optional_next_wing_checks = sorted(
+        set(
+            wing_readonly_preflight_runner.ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS
+        )
+        - covered_checks
+    )
     assert missing_checks == []
+    assert missing_optional_next_wing_checks == []
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_artifact(
