@@ -429,6 +429,10 @@ def test_mvp_doc_declares_scope_and_stop_rules():
     assert "supervised_prestart_gate.operator_sequence_step_must_be_final: true" in text
     assert "valid accepted-candidate contact trace" in text
     assert (
+        "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
+        in text
+    )
+    assert (
         "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
         in text
     )
@@ -1044,6 +1048,10 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         in rows[0]["next action"]
     )
     assert (
+        "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
+        in rows[0]["next action"]
+    )
+    assert (
         "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
         in rows[0]["next action"]
     )
@@ -1491,6 +1499,7 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     assert "valid accepted-candidate artifact-root trace" in supervised
     assert "valid accepted-candidate request-sequence trace" in supervised
     assert "valid accepted-candidate contact trace" in supervised
+    assert "valid accepted-candidate expected-artifact trace" in supervised
     assert "expected-artifact-bound accepted source id" in supervised
     assert "supervised_prestart_gate" in supervised
     assert "expected_supervised_prestart_gate" in supervised
@@ -1525,6 +1534,10 @@ def test_runbooks_keep_readonly_before_supervised_execute():
     )
     assert (
         "accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof"
+        in supervised
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
         in supervised
     )
     assert (
@@ -3002,6 +3015,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     assert (
         "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
+        in report
+    )
+    assert (
+        "accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof"
         in report
     )
     assert "final handoff operator-sequence step" in report

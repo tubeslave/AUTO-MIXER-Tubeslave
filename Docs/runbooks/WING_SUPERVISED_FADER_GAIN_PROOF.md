@@ -4,6 +4,7 @@ Status: blocked until a clean read-only preflight candidate is manually reviewed
 and its accepted decision has a valid accepted-candidate prestart trace,
 valid accepted-candidate verifier WebSocket proof, valid accepted-candidate artifact-root trace,
 valid accepted-candidate request-sequence trace, valid accepted-candidate contact trace,
+valid accepted-candidate expected-artifact trace,
 and an expected-artifact-bound accepted source id.
 
 ## Goal
@@ -48,8 +49,9 @@ Forbidden live writes:
   valid accepted-candidate verifier WebSocket proof,
   valid accepted-candidate artifact-root trace,
   valid accepted-candidate request-sequence trace,
-  valid accepted-candidate contact trace, and expected-artifact-bound accepted
-  source ids from read-only preflight review.
+  valid accepted-candidate contact trace, valid accepted-candidate
+  expected-artifact trace, and expected-artifact-bound accepted source ids from
+  read-only preflight review.
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`.
 - The next supervised proof plan does not carry
@@ -58,6 +60,8 @@ Forbidden live writes:
   `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`.
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof`.
+- The next supervised proof plan does not carry
+  `accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof`.
 - The next supervised proof plan does not carry
   `accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof`.
 - The next supervised proof plan has
@@ -153,8 +157,8 @@ The artifact must show:
   valid accepted-candidate verifier WebSocket proof,
   valid accepted-candidate artifact-root trace,
   valid accepted-candidate request-sequence trace,
-  valid accepted-candidate contact trace, or expected-artifact-bound accepted
-  source id;
+  valid accepted-candidate contact trace, valid accepted-candidate
+  expected-artifact trace, or expected-artifact-bound accepted source id;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof`;
 - the proof plan carries
@@ -163,6 +167,8 @@ The artifact must show:
   `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof`;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_request_sequence_required_before_supervised_proof`;
+- the proof plan carries
+  `accepted_readonly_preflight_candidate_expected_artifact_trace_required_before_supervised_proof`;
 - the proof plan carries
   `accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof`;
 - the proof plan does not show
