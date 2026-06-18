@@ -65,6 +65,23 @@ NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS = (
     "readonly_preflight_review_decision_source_authority_flags",
     "reported_readonly_preflight_review_decision_source_authority_flags",
 )
+PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_FIELDS = (
+    "artifact_manifest_verifier_source_authority_check_fields_optional",
+    "artifact_manifest_verifier_source_authority_check_emission_status",
+    "artifact_manifest_verifier_source_authority_check_field_count",
+    "artifact_manifest_verifier_source_authority_check_missing_count",
+    "artifact_manifest_verifier_source_authority_check_fields_present",
+    "artifact_manifest_verifier_source_authority_check_fields_missing",
+)
+PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_CHECKS = (
+    "summary_json_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_present",
+    "summary_md_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_rendered",
+    *(
+        f"{surface}_wing_readonly_preflight_plan_artifact_{field_name}_matches_expected"
+        for surface in ("summary_json", "summary_md")
+        for field_name in PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_FIELDS
+    ),
+)
 
 
 def _sha256_file(path: Path) -> str:

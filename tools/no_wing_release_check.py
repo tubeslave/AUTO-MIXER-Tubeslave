@@ -346,6 +346,23 @@ NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS = (
         for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
     ),
 )
+PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_FIELDS = (
+    "artifact_manifest_verifier_source_authority_check_fields_optional",
+    "artifact_manifest_verifier_source_authority_check_emission_status",
+    "artifact_manifest_verifier_source_authority_check_field_count",
+    "artifact_manifest_verifier_source_authority_check_missing_count",
+    "artifact_manifest_verifier_source_authority_check_fields_present",
+    "artifact_manifest_verifier_source_authority_check_fields_missing",
+)
+PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_ARTIFACT_VERIFIER_CHECKS = (
+    "summary_json_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_present",
+    "summary_md_wing_readonly_preflight_plan_artifact_source_authority_emission_fields_rendered",
+    *(
+        f"{surface}_wing_readonly_preflight_plan_artifact_{field_name}_matches_expected"
+        for surface in ("summary_json", "summary_md")
+        for field_name in PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_FIELDS
+    ),
+)
 
 
 def _source_authority_verifier_check_emission_status(
@@ -806,6 +823,10 @@ PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     *(
         f"{field_name}: true"
         for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS
+    ),
+    *(
+        f"artifact_manifest_verifier_check_{field_name}: true"
+        for field_name in PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_ARTIFACT_VERIFIER_CHECKS
     ),
     "artifact_manifest_verifier_check_summary_json_artifact_manifest_verifier_fields_present: true",
     "artifact_manifest_verifier_check_manifest_artifact_manifest_verifier_fields_present: true",

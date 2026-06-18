@@ -46,6 +46,7 @@ from tools.no_wing_release_check import (
     write_no_wing_release_check_artifact_manifest,
     write_summary as write_no_wing_release_summary,
 )
+from tools import verify_no_wing_artifact_manifest as manifest_verifier
 
 
 RUNNER_PATH = Path(__file__).resolve().parents[1] / "tools" / "wing_readonly_preflight_runner.py"
@@ -212,6 +213,7 @@ def test_runner_keeps_next_wing_manifest_checks_optional_until_section_exists() 
             f"summary_md_{field_name}_denies_authority"
             for field_name in runner.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
         ),
+        *manifest_verifier.PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_CHECKS,
     }
 
     assert required_optional_checks == set(

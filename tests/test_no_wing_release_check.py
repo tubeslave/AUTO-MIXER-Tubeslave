@@ -15422,10 +15422,16 @@ def test_runner_optional_next_wing_checks_match_manifest_verifier_false_fields()
         f"summary_md_{field_name}_denies_authority"
         for field_name in manifest_verifier.NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS
     )
+    expected_optional_checks.update(
+        manifest_verifier.PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_CHECKS
+    )
 
     assert expected_optional_checks == set(
         wing_readonly_preflight_runner.ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS
     )
+    assert set(
+        release_check.PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_ARTIFACT_VERIFIER_CHECKS
+    ) == set(manifest_verifier.PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_CHECKS)
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_artifact(
