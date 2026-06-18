@@ -541,6 +541,8 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and _accepted_candidate_request_sequence_source_ids(summary) == accepted_source_ids
         and invalid_record_count == 0
         and unreviewed_candidate_count == 0
+        and not _string_list(summary.get("duplicate_source_ids"))
+        and not _string_list(summary.get("conflicting_source_ids"))
         and summary.get("readiness_matrix_update_allowed_by_decision") is not True
         and summary.get("readiness_closure_allowed_by_decision") is not True
         and summary.get("live_authority_granted") is not True

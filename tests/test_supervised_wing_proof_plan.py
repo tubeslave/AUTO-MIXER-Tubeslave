@@ -1256,6 +1256,43 @@ def test_plan_blocks_physical_proof_steps_when_review_decision_count_mismatches_
     assert plan["steps"] == []
 
 
+@pytest.mark.parametrize(
+    ("field", "summary_field"),
+    [
+        ("duplicate_source_ids", "readonly_preflight_review_decision_duplicate_source_ids"),
+        (
+            "conflicting_source_ids",
+            "readonly_preflight_review_decision_conflicting_source_ids",
+        ),
+    ],
+)
+def test_plan_blocks_physical_proof_steps_when_review_decision_has_duplicate_or_conflicting_sources(
+    field,
+    summary_field,
+):
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["summary"][field] = ["artifacts/wing_readonly_preflight/run/summary.json"]
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert plan["summary"][summary_field] == [
+        "artifacts/wing_readonly_preflight/run/summary.json"
+    ]
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
 def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_prestart_contract():
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
