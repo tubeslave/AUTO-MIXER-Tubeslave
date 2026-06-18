@@ -1,11 +1,16 @@
 """Fail-closed checks for legacy ODA agents."""
 
+import ast
 import asyncio
 from pathlib import Path
 
 from backend.agents.eq_agent import EQAgent
 from backend.agents.fader_agent import FaderAgent
 from backend.agents.gain_agent import GainAgent
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+AGENTS_ROOT = REPO_ROOT / "backend" / "agents"
 
 
 class FakeEQMixer:
@@ -161,3 +166,28 @@ def test_fader_agent_source_has_no_direct_mixer_send():
 
     assert "self._mixer.send(" not in source
     assert '"cmd": "set_fader"' in source
+
+
+def _dotted_name(node):
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        base = _dotted_name(node.value)
+        if base:
+            return f"{base}.{node.attr}"
+        return node.attr
+    return None
+
+
+def test_legacy_agents_have_no_direct_send_calls():
+    findings = []
+    for path in sorted(AGENTS_ROOT.glob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if node.func.attr == "send":
+                    rel_path = path.relative_to(REPO_ROOT).as_posix()
+                    receiver = _dotted_name(node.func.value) or "<dynamic>"
+                    findings.append(f"{rel_path}:{node.lineno}:{receiver}.send")
+
+    assert findings == []
