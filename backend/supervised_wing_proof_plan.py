@@ -548,10 +548,24 @@ def _readonly_preflight_review_decision_safety_allows_acceptance(
     )
 
 
+def _candidate_review_source_ids(summary: Mapping[str, Any]) -> list[str]:
+    rows = summary.get("candidate_reviews")
+    if not isinstance(rows, list):
+        return []
+    return [
+        str(row.get("source_id"))
+        for row in rows
+        if isinstance(row, Mapping)
+        and isinstance(row.get("source_id"), str)
+        and row.get("source_id")
+    ]
+
+
 def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> bool:
     summary = _review_decision_summary(overlay)
     accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
     rejected_source_ids = _string_list(summary.get("rejected_source_ids"))
+    candidate_review_source_ids = _candidate_review_source_ids(summary)
     accepted_record_count = _nonnegative_int_count(
         summary.get("accepted_record_count")
     )
@@ -587,6 +601,10 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and len(set(accepted_source_ids)) == len(accepted_source_ids)
         and not set(accepted_source_ids).intersection(rejected_source_ids)
         and all(_is_artifacts_path(source_id) for source_id in accepted_source_ids)
+        and all(
+            candidate_review_source_ids.count(source_id) == 1
+            for source_id in accepted_source_ids
+        )
         and _accepted_candidate_prestart_source_ids(summary) == accepted_source_ids
         and _accepted_candidate_request_sequence_source_ids(summary) == accepted_source_ids
         and invalid_record_count == 0
@@ -1660,6 +1678,9 @@ def build_supervised_wing_proof_plan(
             ),
             "readonly_preflight_review_decision_accepted_source_ids": _string_list(
                 review_summary.get("accepted_source_ids")
+            ),
+            "readonly_preflight_review_decision_candidate_review_source_ids": (
+                _candidate_review_source_ids(review_summary)
             ),
             "readonly_preflight_review_decision_candidate_prestart_contract_valid": (
                 candidate_prestart_contract_valid
