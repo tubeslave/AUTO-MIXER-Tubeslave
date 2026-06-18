@@ -5072,8 +5072,8 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         status="proposal_only",
         summary=(
             "Masking-aware mirror EQ proposal layer that emits linked cut/boost "
-            "candidates with freshness-gated masking context, source identity "
-            "downstream trust, and no live EQ writes."
+            "candidates with freshness-gated masking context, arrangement-role "
+            "priority evidence, source identity downstream trust, and no live EQ writes."
         ),
         module="backend/cross_adaptive_eq.py",
         can_analyze=True,
@@ -5081,17 +5081,18 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         pipeline_profiles=("lab_dsp", "offline_mix"),
         blocked_reason=(
             "eq_live_writes_need_fresh_masking_context_band_readback_sum_bus_check_"
-            "source_identity_trust_and_hardware_proof"
+            "arrangement_role_trust_source_identity_trust_and_hardware_proof"
         ),
         promotion_next=(
             "route fresh-context linked unmasking proposals to operator review "
-            "with trusted source identity and rollback EQ-band evidence; keep direct "
-            "EQ writes quarantined"
+            "with trusted arrangement/source identity and rollback EQ-band evidence; "
+            "keep direct EQ writes quarantined"
         ),
         notes=(
             "transport_free",
             "dry_run_true",
             "current_masking_context_freshness_gate",
+            "arrangement_role_priority_evidence",
             "source_identity_downstream_trust",
             "linked_mirror_eq_pair",
             "no_live_writes",
@@ -5290,28 +5291,40 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         label="FX Send Proposal Layer",
         domain="fx",
         status="proposal_only",
-        summary="Transport-free FX send analyzer that emits send/return proposals from fresh current-FX state and scoped Product Layer FX snapshot schema hints without live writes.",
+        summary="Transport-free FX send analyzer that emits send/return proposals from fresh current-FX state, monitor-safety evidence, return-level safety, and scoped Product Layer FX snapshot schema hints without live writes.",
         module="backend/fx_send_proposal.py",
         can_analyze=True,
         can_propose=True,
         pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
-        blocked_reason="fx_send_live_writes_need_fresh_send_return_readback_schema_hints_feedback_check_and_hardware_proof",
-        promotion_next="connect FX send proposals to operator review only after stale send/return cache states and unknown FX parameter schemas are blocked; keep FX writes out of the live executor",
-        notes=("transport_free", "proposal_only", "current_fx_freshness_gate", "fx_snapshot_freshness_gate", "fx_parameter_schema_gate", "fx_inserts_snapshot_schema_bridge", "batch_fx_snapshot_schema_bridge", "feedback_guard", "no_live_writes"),
+        blocked_reason="fx_send_live_writes_need_fresh_send_return_readback_monitor_safety_schema_hints_feedback_check_and_hardware_proof",
+        promotion_next="connect FX send proposals to operator review only after stale send/return cache states, monitor-safety risk, and unknown FX parameter schemas are blocked; keep FX writes out of the live executor",
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "current_fx_freshness_gate",
+            "fx_snapshot_freshness_gate",
+            "fx_parameter_schema_gate",
+            "fx_inserts_snapshot_schema_bridge",
+            "batch_fx_snapshot_schema_bridge",
+            "monitor_safety_guard",
+            "return_level_guard",
+            "feedback_guard",
+            "no_live_writes",
+        ),
     ),
     ProcessingMethod(
         id="master_bus_optimization_proposal",
         label="Master Bus Optimization Proposal Layer",
         domain="master_bus",
         status="proposal_only",
-        summary="Transport-free master bus analyzer that emits loudness, true-peak, tonal, and glue-compression proposals from fresh current main-bus state without live writes.",
+        summary="Transport-free master/output analyzer that emits loudness, true-peak, tonal, glue-compression, and PA-feed-safe proposals from fresh current main-bus state without live writes.",
         module="backend/master_bus_optimization_proposal.py",
         can_analyze=True,
         can_propose=True,
         pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
-        blocked_reason="master_bus_live_writes_need_fresh_main_bus_readback_limiter_dynamics_rollback_and_hardware_proof",
-        promotion_next="connect master-bus proposals to operator review only after stale main-bus processing cache states are blocked; keep main bus writes out of the live executor",
-        notes=("transport_free", "proposal_only", "current_main_bus_freshness_gate", "true_peak_guard", "no_live_writes"),
+        blocked_reason="master_bus_live_writes_need_fresh_main_bus_readback_pa_feed_safety_limiter_dynamics_rollback_and_hardware_proof",
+        promotion_next="connect master/output proposals to operator review only after stale main-bus and PA-feed cache states are blocked; keep main bus and output writes out of the live executor",
+        notes=("transport_free", "proposal_only", "current_main_bus_freshness_gate", "pa_feed_safety_gate", "reference_feed_exclusion", "true_peak_guard", "no_live_writes"),
     ),
     ProcessingMethod(
         id="mix_agent_conservative",
@@ -5535,6 +5548,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "long_term_memory_learning_proposal",
             "agentic_method_foundation",
             "context_aware_gate_agent",
+            "corrective_eq_proposal",
             "compressor_dynamics_proposal",
             "deesser_vocal_sibilance",
             "pan_spatial_proposal",
@@ -5699,6 +5713,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "autonomy_evidence_overlay",
             "autonomy_mode_transition_gate",
             "read_surface_remediation_plan",
+            "routing_group_read_map",
+            "scene_preset_read_inventory",
             "corrective_eq_proposal",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -5802,6 +5818,8 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "source_identity_proposal_ordering_preview",
             "source_identity_proposal_queue_ordering_plan",
             "source_identity_proposal_queue_importer",
+            "routing_group_read_map",
+            "scene_preset_read_inventory",
             "cross_adaptive_eq",
             "autoeq_audit_validation",
             "diff_deq_playbook_bridge",
@@ -6597,9 +6615,9 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "next_step": "Promote only bounded fader/gain outputs through existing proposal adapters; keep EQ/dynamics/gate/pan/FX proposal-only.",
     },
     "context_aware_gate_agent": {
-        "entrypoint": "context_aware_gate.extract_bleed_telemetry / ContextAwareGateAgent.recommend",
+        "entrypoint": "context_aware_gate.extract_bleed_telemetry / ContextAwareGateAgent.recommend / build_context_gate_proposals",
         "ui_surface": "Channel Intelligence, Decision Log evidence, future Gate/Bleed panel",
-        "next_step": "Feed real telemetry/offline bleed simulations; keep all gate/expander outputs dry-run/proposal-only.",
+        "next_step": "Feed real telemetry/offline bleed simulations; keep gate/expander proposals non-queueable until physical readback and rollback are proven.",
     },
     "compressor_dynamics_proposal": {
         "entrypoint": "compressor_dynamics_proposal.analyze_compressor_need / build_compressor_proposals",
@@ -6609,22 +6627,22 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
     "deesser_vocal_sibilance": {
         "entrypoint": "deesser_vocal_sibilance.analyze_deesser_need / build_deesser_proposals",
         "ui_surface": "Channel Intelligence, vocal processing proposals, future De-esser panel",
-        "next_step": "Keep de-esser output proposal-only until fresh dynamics/dynamic-EQ readback and rollback are proven.",
+        "next_step": "Keep de-esser output proposal-only until fresh arrangement context, dynamics/dynamic-EQ readback, and rollback are proven.",
     },
     "pan_spatial_proposal": {
         "entrypoint": "pan_spatial_proposal.analyze_pan_need / build_pan_proposals",
         "ui_surface": "Channel Intelligence, stereo-pair/stage pan proposals, future Panning panel",
-        "next_step": "Keep pan output proposal-only until fresh current-pan readback, mono checks, and rollback are proven.",
+        "next_step": "Keep pan output proposal-only until fresh current-pan readback, mono/phase checks, and rollback are proven.",
     },
     "fx_send_proposal": {
         "entrypoint": "fx_send_proposal.analyze_fx_send_need / build_fx_send_proposals",
         "ui_surface": "Channel Intelligence, FX send proposals, future FX panel",
-        "next_step": "Keep FX sends proposal-only until fresh send/return readback, feedback checks, and rollback are proven.",
+        "next_step": "Keep FX sends proposal-only until fresh send/return readback, monitor safety, feedback checks, and rollback are proven.",
     },
     "master_bus_optimization_proposal": {
         "entrypoint": "master_bus_optimization_proposal.analyze_master_bus_need / build_master_bus_proposals",
         "ui_surface": "Master bus evidence, Safety Monitor, future Master panel",
-        "next_step": "Keep master-bus output proposal-only until fresh main-bus readback, limiter/dynamics proof, and rollback are proven.",
+        "next_step": "Keep master/output proposals proposal-only until fresh main-bus readback, PA-feed safety, limiter/dynamics proof, reference-feed exclusion, and rollback are proven.",
     },
     "mix_agent_conservative": {
         "entrypoint": "python -m mix_agent analyze|suggest|apply",

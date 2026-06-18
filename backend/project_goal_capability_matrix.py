@@ -366,13 +366,14 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         method_ids=("cross_adaptive_eq", "live_shared_mix"),
         support_paths=(
             "backend/auto_fader_v2/controller.py",
+            "backend/arrangement_role_proposal.py",
             "backend/cross_adaptive_eq.py",
             "backend/source_identity_downstream_gate.py",
         ),
         blocker="Unmasking can recommend changes but cannot write EQ/fader relationships live; AutoFaderV2 masking EQ returns blocked evidence.",
         next_step=(
-            "Route fresh-context unmasking output with trusted source identity into "
-            "linked cut/boost proposals with EQ-band rollback evidence."
+            "Route fresh masking and arrangement context with trusted source identity "
+            "into linked cut/boost proposals with EQ-band rollback evidence."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -403,7 +404,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("fx",),
         blocker="FX rack/insert/reverb writes are broad state changes; AutoFX and AutoReverb direct apply are fail-closed and blocked from live runtime.",
-        next_step="Route AutoFX/AutoReverb plans and FX send/return proposals through read-only FX schema hints and operator review before any supervised FX-write proof.",
+        next_step="Route AutoFX/AutoReverb plans and monitor-safe FX send/return proposals through read-only FX schema hints and operator review before any supervised FX-write proof.",
     ),
     ProjectGoalCapabilityRow(
         id="effect_sends",
@@ -419,8 +420,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_downstream_gate.py",
         ),
         target_console_surfaces=("fx",),
-        blocker="Send level automation is fail-closed until feedback, intelligibility, and readback proof exist.",
-        next_step="Keep sends proposal-only until feedback risk, return headroom, readback, and rollback proof are complete.",
+        blocker="Send level automation is fail-closed until feedback, intelligibility, monitor safety, return-level, and readback proof exist.",
+        next_step="Keep sends proposal-only until feedback risk, monitor safety, return headroom, readback, and rollback proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="mix_balance",
@@ -504,8 +505,8 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/system_measurement.py",
         ),
         target_console_surfaces=("main_bus", "matrices", "eq", "compressor", "limiter"),
-        blocker="Master-bus writes can affect the entire PA and are not live-approved.",
-        next_step="Route master-bus recommendations to operator review; require main-bus readback, limiter/dynamics proof, and rollback before any write promotion.",
+        blocker="Master/output writes can affect the entire PA and must exclude reference feeds before any live approval.",
+        next_step="Route master/output recommendations to operator review only with fresh main-bus readback, true-peak headroom, PA-feed safety, reference-feed exclusion, limiter/dynamics proof, and rollback before any write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="realtime_corrections",
@@ -672,7 +673,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("pan",),
         blocker="No supervised pan write proof; AutoPanner, adaptive panner, and controller pan separation return blocked evidence only.",
-        next_step="Keep pan settings proposal-only until readback, mono compatibility, and rollback proof are complete.",
+        next_step="Keep pan settings proposal-only until readback, mono/phase compatibility, and rollback proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="console_eq_control",
@@ -786,7 +787,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("fx",),
         blocker="FX direct apply is blocked from the canonical live runtime; AutoFX and AutoReverb apply_to_mixer return blocked evidence only.",
-        next_step="Keep FX settings proposal-only until schema hints become verified model readback, feedback checks, and rollback proof are complete.",
+        next_step="Keep FX settings proposal-only until schema hints become verified model readback, monitor safety, feedback checks, and rollback proof are complete.",
     ),
     ProjectGoalCapabilityRow(
         id="console_scene_preset_control",
@@ -803,7 +804,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("scenes", "presets"),
         blocker="Scenes and presets can overwrite broad console state.",
-        next_step="Route read-only scoped scene/preset diffs to operator review with Product Layer snapshot freshness and read-only rollback evidence; require scope limits and hardware proof before any scene/preset write promotion.",
+        next_step="Route read-only scene/preset inventory and scoped diffs to operator review with Product Layer snapshot freshness and read-only rollback evidence; require scope limits and hardware proof before any scene/preset write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="decision_basis",
