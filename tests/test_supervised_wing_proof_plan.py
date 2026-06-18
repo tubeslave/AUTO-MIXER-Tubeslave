@@ -674,9 +674,14 @@ def accepted_review_decision_ledger() -> dict:
         "safety": {
             "read_only": True,
             "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
             "execution_allowed_by_decision": False,
             "readiness_matrix_update_allowed_by_decision": False,
             "readiness_closure_allowed_by_decision": False,
+            "live_widening_allowed": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
         },
@@ -1408,6 +1413,27 @@ def test_plan_blocks_physical_proof_steps_when_review_decision_provenance_is_wro
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
     ledger["type"] = "manual_summary"
+    readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
+
+    plan = build_supervised_wing_proof_plan(
+        evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
+        autonomy_readiness_snapshot=readiness,
+    )
+
+    assert plan["status"] == "manual_review_ready"
+    assert plan["summary"]["step_count"] == 0
+    assert plan["summary"]["readonly_preflight_review_decision_accepted"] is False
+    assert (
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in plan["summary"]["global_blockers"]
+    )
+    assert plan["steps"] == []
+
+
+def test_plan_blocks_physical_proof_steps_when_review_decision_safety_allows_live_authority():
+    readiness = preflight_ready_snapshot()
+    ledger = accepted_review_decision_ledger()
+    ledger["safety"]["live_authority_granted"] = True
     readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
 
     plan = build_supervised_wing_proof_plan(

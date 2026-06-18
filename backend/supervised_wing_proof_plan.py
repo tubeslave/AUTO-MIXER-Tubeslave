@@ -523,6 +523,31 @@ def _review_decision_summary(overlay: Mapping[str, Any]) -> Mapping[str, Any]:
     return summary if isinstance(summary, Mapping) else overlay
 
 
+def _readonly_preflight_review_decision_safety_allows_acceptance(
+    overlay: Mapping[str, Any],
+) -> bool:
+    safety = overlay.get("safety")
+    if not isinstance(safety, Mapping):
+        return False
+    required_false_flags = (
+        "live_write",
+        "mutates_console_state",
+        "queries_console",
+        "executes_tests",
+        "execution_allowed_by_decision",
+        "readiness_matrix_update_allowed_by_decision",
+        "readiness_closure_allowed_by_decision",
+        "live_widening_allowed",
+        "live_authority_granted",
+        "full_autonomous_ready",
+    )
+    return (
+        safety.get("read_only") is True
+        and safety.get("operator_required") is True
+        and all(safety.get(flag) is False for flag in required_false_flags)
+    )
+
+
 def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> bool:
     summary = _review_decision_summary(overlay)
     accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
@@ -539,6 +564,7 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and overlay.get("method_id")
         == WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID
         and overlay.get("source_method_id") == "wing_readonly_preflight_evidence"
+        and _readonly_preflight_review_decision_safety_allows_acceptance(overlay)
         and _readonly_preflight_review_decision_status(overlay)
         == "operator_review_decision_records_available"
         and summary.get("manual_readiness_update_candidate_available") is True
