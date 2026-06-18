@@ -107,6 +107,12 @@ fields, and the verifier report must show
 `verifier_report_required_fields_present: true`,
 `verifier_report_required_fields_missing: []`, and
 `verifier_report_required_fields_match_contract: true`, and
+`verifier_report_artifact_manifest_self_consistency_match_matches_expected: true`,
+and
+`verifier_report_artifact_manifest_contract_cross_surface_match_matches_expected: true`,
+and
+`verifier_report_artifact_manifest_self_consistency_summary_surface_match_matches_expected: true`,
+and
 `verifier_report_readiness_closure_allowed_matches_expected: true`, and
 `verifier_report_live_authority_granted_matches_expected: true`, and
 `verifier_report_wing_readonly_handoff_plan_verifier_summary_surface_required_is_boolean: true`, and
@@ -192,6 +198,9 @@ mirror those detached verifier checks before any WebSocket with
 `artifact_manifest_verifier_check_verifier_report_required_fields_present: true`,
 `artifact_manifest_verifier_check_verifier_report_required_fields_missing_empty: true`,
 `artifact_manifest_verifier_check_verifier_report_required_fields_match_contract: true`,
+`artifact_manifest_verifier_check_verifier_report_artifact_manifest_self_consistency_match_matches_expected: true`,
+`artifact_manifest_verifier_check_verifier_report_artifact_manifest_contract_cross_surface_match_matches_expected: true`,
+`artifact_manifest_verifier_check_verifier_report_artifact_manifest_self_consistency_summary_surface_match_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_read_only_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_live_write_matches_expected: true`,
 `artifact_manifest_verifier_check_verifier_report_contacts_wing_matches_expected: true`,
