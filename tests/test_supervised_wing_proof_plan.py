@@ -458,6 +458,7 @@ def test_readonly_preflight_step_rejects_swapped_plan_and_prestart_bindings():
     [
         "",
         "/tmp/wing_readonly_preflight_plan.json",
+        "artifacts",
         "artifacts/",
         "artifacts//wing_readonly_preflight_plan/latest_plan.json",
         "artifacts/wing_readonly_preflight_plan/latest_plan.json ",
@@ -483,6 +484,7 @@ def test_readonly_preflight_step_rejects_unsafe_expected_plan(expected_plan):
     [
         "",
         "/tmp/no_wing_release_check_summary.json",
+        "artifacts",
         "artifacts/",
         "artifacts//no_wing_release_check/summary.json",
         "artifacts/no_wing_release_check/summary.json ",
@@ -534,6 +536,7 @@ def test_readonly_preflight_step_rejects_non_websocket_backend_url(backend_url):
     [
         "",
         "/tmp/wing_readonly_preflight",
+        "artifacts",
         "artifacts/",
         "artifacts//wing_readonly_preflight",
         "artifacts/wing_readonly_preflight ",
@@ -2511,6 +2514,7 @@ def test_proof_step_rejects_non_websocket_backend_url(backend_url):
     [
         "",
         "/tmp/wing_physical_proof",
+        "artifacts",
         "artifacts/",
         "artifacts//proof",
         "artifacts/proof ",

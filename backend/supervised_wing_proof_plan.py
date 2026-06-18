@@ -586,7 +586,7 @@ def _is_artifacts_path(value: str | None) -> bool:
         return False
     normalized = value.replace("\\", "/")
     parts = normalized.split("/")
-    return parts[0] == "artifacts" and all(
+    return parts[0] == "artifacts" and len(parts) > 1 and all(
         part and part == part.strip() and part not in {".", ".."}
         for part in parts[1:]
     )
