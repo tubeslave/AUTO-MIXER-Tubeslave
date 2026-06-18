@@ -1546,6 +1546,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"
         in current_command
     )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+        in current_command
+    )
     assert "project_director_selected_action_anchor" in current_command
     assert "expected_project_director_selected_action_anchor" in current_command
     assert (
@@ -1612,6 +1616,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "required_supervised_proof_plan_summary_fields" in (
         progress.current_first_command_missing_baseline_markers(
             missing_proof_plan_fields_command
+        )
+    )
+    missing_contact_query_trace_command = current_command.replace(
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source",
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_missing",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_contact_query_trace_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+        in progress.current_first_command_missing_baseline_markers(
+            missing_contact_query_trace_command
         )
     )
     missing_markdown_summary_command = current_command.replace(
