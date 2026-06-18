@@ -645,8 +645,11 @@ the no-WING handoff summary must also show
 the no-WING handoff summary must also show
 `required_supervised_proof_plan_summary_fields_include_invalid_records: true`;
 `required_supervised_proof_plan_summary_fields` must include
+`readonly_preflight_review_decision_candidate_prestart_contract_valid: true`,
+`readonly_preflight_review_decision_candidate_prestart_source_ids`,
+`readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}`,
 `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
-`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`,
+`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
 `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
 `readonly_preflight_review_decision_candidate_artifact_roots`,
 `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`,
@@ -858,8 +861,8 @@ otherwise keep
 `accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof`
 in force.
 The recomputed
-`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`
-map must also stay `{}`; if it is non-empty while physical proof steps are
+`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`
+value must also stay true; if it is non-empty while physical proof steps are
 present, no-WING validation must fail with
 `next_wing_proof_plan_steps_with_expected_candidate_prestart_violations`.
 

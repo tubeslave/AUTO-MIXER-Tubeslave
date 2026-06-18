@@ -453,8 +453,8 @@ validation must fail with
 `next_wing_proof_plan_steps_with_candidate_prestart_violations` if the proof
 plan carries a non-empty map while proof steps are present.
 The recomputed
-`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`
-map must also stay `{}`; no-WING validation must fail with
+`readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`
+value must also stay true; no-WING validation must fail with
 `next_wing_proof_plan_steps_with_expected_candidate_prestart_violations` if
 that expected map is non-empty while proof steps are present.
 No-WING validation must also fail with

@@ -1531,11 +1531,23 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid: true"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_source_ids"
+        in current_command
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: {}"
+        in current_command
+    )
+    assert (
         "readonly_preflight_review_decision_expected_candidate_prestart_source_ids"
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}"
         in current_command
     )
     assert (
@@ -1760,6 +1772,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     assert "required_supervised_proof_plan_summary_fields" in (
         progress.current_first_command_missing_baseline_markers(
             missing_proof_plan_fields_command
+        )
+    )
+    failing_candidate_prestart_command = current_command.replace(
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid: true",
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_candidate_prestart_command
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_prestart_contract_valid: true"
+        in progress.current_first_command_missing_baseline_markers(
+            failing_candidate_prestart_command
         )
     )
     failing_candidate_artifact_root_command = current_command.replace(
@@ -2642,7 +2667,7 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     assert "declared_supervised_prestart_gate_matches_expected: true" in text
     assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in text
     assert (
-        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source"
+        "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}"
         in text
     )
 
