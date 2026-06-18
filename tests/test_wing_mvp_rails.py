@@ -1080,6 +1080,12 @@ def test_runbooks_keep_readonly_before_supervised_execute():
         if marker not in readonly
     ]
     assert missing_artifact_manifest_cross_surface_markers == []
+    missing_artifact_manifest_summary_surface_markers = [
+        marker
+        for marker in release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_SUMMARY_SURFACE_REQUIRED_FIELDS
+        if marker not in readonly
+    ]
+    assert missing_artifact_manifest_summary_surface_markers == []
 
     assert "wing_readonly_preflight_runner.py" in readonly
     assert "review_wing_readonly_preflight_artifacts.py" in readonly
