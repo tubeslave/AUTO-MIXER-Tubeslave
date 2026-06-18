@@ -1991,6 +1991,68 @@ def test_proof_step_rejects_mismatched_prerequisites():
         )
 
 
+def test_proof_step_rejects_mismatched_required_evidence_components():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof step evidence components must match safety coverage matrix",
+    ):
+        WingProofPlanStep(
+            id="gain_physical_proof_ch3",
+            value_type="gain",
+            channel=3,
+            delta_db=-0.25,
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=(
+                "python3",
+                "tools/wing_operator_proposal_validation_runner.py",
+                "--channel",
+                "3",
+                "--operator-confirm-channel",
+                "3",
+                "--value-type",
+                "gain",
+                "--operator-confirm-value-type",
+                "gain",
+                "--delta-db",
+                "-0.25",
+                "--operator-confirm-delta-db",
+                "-0.25",
+                "--execute",
+                "--prove-blocked-apply",
+                "--prove-emergency-stop",
+            ),
+            rationale="unit regression",
+            prerequisites=(
+                "A clean read-only WING preflight candidate exists and has been manually reviewed.",
+                "Operator is physically present and explicitly approves a bounded proof run.",
+                "Backend is connected to the intended WING Rack only.",
+                "A current scene/console backup exists and the operator can restore manually.",
+                "Monitor/PA risk is controlled before any supervised write.",
+                "Proof uses the Product Layer proposal path and rollback gate only.",
+                "Use gain-down proof only; gain-up remains out of scope for this plan.",
+            ),
+            abort_conditions=(
+                "Pre-read is unavailable or not from physical readback.",
+                "Requested delta is positive or exceeds 0.5 dB.",
+                "Apply readback is missing, mismatched, or not physically verified.",
+                "Rollback readback or rollback proof is missing.",
+                "Emergency stop does not block a follow-up proposal.",
+                "Any fader move would exceed 0 dBFS.",
+                "Feedback, clipping, or operator concern appears at any point.",
+            ),
+            expected_artifacts=(
+                "summary.json with value_type=gain and channel=3",
+                "events.jsonl with proposal/apply/rollback/emergency-stop sequence",
+                "proof report row with proof_mode=physical and status=supervised_candidate",
+                "promotion evidence row marked safety_review_candidate only after manual artifact review",
+            ),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
 def test_plan_is_manual_review_ready_when_all_value_types_have_candidates():
     plan = build_supervised_wing_proof_plan(
         evidence_snapshot(

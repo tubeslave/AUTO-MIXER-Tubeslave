@@ -220,6 +220,14 @@ class WingProofPlanStep:
             tuple(self.evidence_blockers_to_review),
         ):
             raise ValueError("Physical proof step prerequisites must match safety contract")
+        required_components = _required_evidence_components_by_value_type().get(
+            self.value_type,
+            (),
+        )
+        if tuple(self.required_evidence_components) != required_components:
+            raise ValueError(
+                "Physical proof step evidence components must match safety coverage matrix"
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
