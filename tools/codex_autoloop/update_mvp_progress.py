@@ -291,7 +291,7 @@ CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS = (
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed: false",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted: false",
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required: true",
-    "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids",
+    'readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
     "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source",
     "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source",
     "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids: []",

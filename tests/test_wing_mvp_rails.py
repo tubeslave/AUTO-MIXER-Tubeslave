@@ -1687,7 +1687,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
+        'readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]'
         in current_command
     )
     assert (
@@ -1935,6 +1935,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete: true"
         in progress.current_first_command_missing_baseline_markers(
             missing_contact_trace_command
+        )
+    )
+    failing_contact_trace_source_command = current_command.replace(
+        'readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]',
+        'readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids: ["artifacts/stale_preflight/run/summary.json"]',
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_contact_trace_source_command
+    )
+    assert (
+        'readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids: ["artifacts/wing_readonly_preflight/run/summary.json"]'
+        in progress.current_first_command_missing_baseline_markers(
+            failing_contact_trace_source_command
         )
     )
     missing_contact_source_trace_command = current_command.replace(
