@@ -555,6 +555,9 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
     accepted_record_count = _nonnegative_int_count(
         summary.get("accepted_record_count")
     )
+    rejected_record_count = _nonnegative_int_count(
+        summary.get("rejected_record_count")
+    )
     invalid_record_count = _nonnegative_int_count(summary.get("invalid_record_count"))
     unreviewed_candidate_count = _nonnegative_int_count(
         summary.get("unreviewed_candidate_count")
@@ -570,6 +573,8 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and summary.get("manual_readiness_update_candidate_available") is True
         and accepted_record_count is not None
         and accepted_record_count > 0
+        and rejected_record_count is not None
+        and rejected_record_count == len(rejected_source_ids)
         and bool(accepted_source_ids)
         and accepted_record_count == len(accepted_source_ids)
         and len(set(accepted_source_ids)) == len(accepted_source_ids)
