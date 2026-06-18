@@ -562,7 +562,7 @@ def _nonnegative_int_count(value: Any) -> int | None:
         return None
     if isinstance(value, int):
         return value if value >= 0 else None
-    if isinstance(value, str) and value.isdecimal():
+    if isinstance(value, str) and value.isascii() and value.isdecimal():
         return int(value)
     return None
 

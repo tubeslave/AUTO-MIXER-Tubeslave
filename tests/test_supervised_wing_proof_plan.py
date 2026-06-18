@@ -1161,11 +1161,14 @@ def test_plan_blocks_physical_proof_steps_until_review_decision_is_accepted():
     assert plan["steps"] == []
 
 
-def test_plan_blocks_readonly_preflight_when_candidate_counts_are_malformed():
+@pytest.mark.parametrize("malformed_count", ["many", "１"])
+def test_plan_blocks_readonly_preflight_when_candidate_counts_are_malformed(
+    malformed_count,
+):
     readiness = preflight_ready_snapshot()
     readiness["summary"]["wing_readonly_preflight_evidence"][
         "valid_candidate_count"
-    ] = "many"
+    ] = malformed_count
 
     plan = build_supervised_wing_proof_plan(
         evidence_snapshot(evidence_row("gain", blockers=["physical_candidate_missing"])),
@@ -1206,7 +1209,7 @@ def test_plan_blocks_physical_proof_steps_when_review_decision_counts_are_malfor
 ):
     readiness = preflight_ready_snapshot()
     ledger = accepted_review_decision_ledger()
-    ledger["summary"][field] = "many"
+    ledger["summary"][field] = "１"
     readiness["summary"]["wing_readonly_preflight_review_decision_ledger"] = ledger
 
     plan = build_supervised_wing_proof_plan(
