@@ -7,6 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
+- Latest heartbeat: 2026-06-18T21:26:06Z.
 
 ## Что сделано
 
@@ -40,11 +41,15 @@ now waiting for external WING/operator validation.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
+- Heartbeat reconciliation confirmed `251c1ddd` is the latest verified
+  control-plane commit and found no real WING read-only artifact under
+  `artifacts/wing_readonly_preflight/`.
 
 ## Оставшаяся работа
 
 Wait for the operator-supervised real WING read-only preflight. Do not contact
-WING from unattended automation.
+WING from unattended automation. There is no dependency-ready autonomous
+roadmap milestone until that external validation exists.
 
 ## Stop procedure
 

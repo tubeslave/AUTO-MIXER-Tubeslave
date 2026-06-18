@@ -4,8 +4,8 @@
   "active_milestone": "M001",
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
-  "last_verified_commit": "95516acc",
-  "last_heartbeat_utc": "2026-06-18T20:54:55Z",
+  "last_verified_commit": "251c1ddd",
+  "last_heartbeat_utc": "2026-06-18T21:26:06Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": "Real WING Rack read-only artifact and operator review are required before the roadmap can advance to physical readback.",
@@ -29,6 +29,7 @@
     "milestone_decision": "WAITING_FOR_EXTERNAL_VALIDATION",
     "cp05_validation": "PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q: 4027 passed, 1 skipped",
     "evidence_placement": "validate-only summaries are stored under ops/autopilot/evidence, not artifacts/wing_readonly_preflight",
+    "heartbeat_reconciliation": "2026-06-18T21:26:06Z confirmed CP05 commit 251c1ddd is the latest verified control-plane state; no real WING read-only artifact is present.",
     "authority": {
       "live_authority_granted": false,
       "readiness_closure_allowed": false,
