@@ -28,6 +28,7 @@ from backend.wing_readonly_preflight_contract import (
 from backend.supervised_wing_proof_plan import (
     READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER,
     WingProofPlanStep,
+    WingReadonlyPreflightPlanStep,
     build_supervised_wing_proof_plan,
 )
 
@@ -149,6 +150,49 @@ def proof_prerequisites(value_type="gain"):
     return prerequisites
 
 
+def readonly_preflight_command(*, runner="tools/wing_readonly_preflight_runner.py", tail=()):
+    return (
+        "python3",
+        runner,
+        "--url",
+        "ws://localhost:8765",
+        "--channels",
+        READONLY_PREFLIGHT_CHANNELS,
+        "--operator-confirm-channels",
+        READONLY_PREFLIGHT_CHANNELS,
+        "--operator-confirm-session-ready",
+        "--value-types",
+        READONLY_PREFLIGHT_VALUE_TYPES,
+        "--require-physical-readback",
+        "--artifact-root",
+        "artifacts/wing_readonly_preflight",
+        "--prestart-summary",
+        READONLY_PREFLIGHT_PRESTART_SUMMARY,
+        "--expected-plan",
+        READONLY_PREFLIGHT_EXPECTED_PLAN,
+        *tail,
+    )
+
+
+def readonly_preflight_step(command):
+    return WingReadonlyPreflightPlanStep(
+        id="wing_readonly_preflight_required",
+        live_execution_required=False,
+        execution_allowed_by_plan=False,
+        operator_approval_required=True,
+        read_only=True,
+        expected_plan_required_for_real_run=True,
+        prestart_summary_required=True,
+        expected_plan=READONLY_PREFLIGHT_EXPECTED_PLAN,
+        prestart_summary=READONLY_PREFLIGHT_PRESTART_SUMMARY,
+        command=command,
+        rationale="unit regression",
+        prerequisites=(),
+        abort_conditions=(),
+        expected_artifacts=(),
+    )
+
+
 READONLY_PREFLIGHT_REQUEST_SEQUENCE = [
     {"type": "get_operator_mode"},
     {"type": "get_state"},
@@ -242,6 +286,70 @@ def assert_readonly_preflight_command_bindings(step: dict) -> None:
     assert "--operator-confirm-session-ready" in command
     assert "--value-types" in command
     assert command[command.index("--value-types") + 1] == READONLY_PREFLIGHT_VALUE_TYPES
+
+
+def test_readonly_preflight_step_rejects_non_canonical_runner():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step must use canonical runner",
+    ):
+        readonly_preflight_step(
+            readonly_preflight_command(runner="tools/other_readonly_runner.py")
+        )
+
+
+def test_readonly_preflight_step_rejects_duplicate_command_flags():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step command must not repeat flags",
+    ):
+        readonly_preflight_step(
+            readonly_preflight_command(tail=("--channels", READONLY_PREFLIGHT_CHANNELS))
+        )
+
+
+def test_readonly_preflight_step_rejects_unknown_command_flags():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step command must not include unknown flags",
+    ):
+        readonly_preflight_step(readonly_preflight_command(tail=("--dry-run",)))
+
+
+def test_readonly_preflight_step_rejects_flag_used_as_value():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step command must bind explicit flag values",
+    ):
+        readonly_preflight_step(
+            (
+                "python3",
+                "tools/wing_readonly_preflight_runner.py",
+                "--url",
+                "ws://localhost:8765",
+                "--channels",
+                READONLY_PREFLIGHT_CHANNELS,
+                "--operator-confirm-channels",
+                READONLY_PREFLIGHT_CHANNELS,
+                "--operator-confirm-session-ready",
+                "--value-types",
+                READONLY_PREFLIGHT_VALUE_TYPES,
+                "--require-physical-readback",
+                "--artifact-root",
+                "artifacts/wing_readonly_preflight",
+                "--prestart-summary",
+                "--expected-plan",
+                READONLY_PREFLIGHT_EXPECTED_PLAN,
+            )
+        )
+
+
+def test_readonly_preflight_step_rejects_stray_command_arguments():
+    with pytest.raises(
+        ValueError,
+        match="Read-only preflight step command must not include stray arguments",
+    ):
+        readonly_preflight_step(readonly_preflight_command(tail=("operator-note",)))
 
 
 def evidence_snapshot(*rows):

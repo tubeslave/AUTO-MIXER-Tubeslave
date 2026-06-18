@@ -324,6 +324,40 @@ class WingReadonlyPreflightPlanStep:
         if not self.prestart_summary_required:
             raise ValueError("Read-only preflight plan must require a prestart summary")
         command = tuple(self.command)
+        readonly_flags = (
+            "--url",
+            "--channels",
+            "--operator-confirm-channels",
+            "--operator-confirm-session-ready",
+            "--value-types",
+            "--require-physical-readback",
+            "--artifact-root",
+            "--prestart-summary",
+            "--expected-plan",
+        )
+        if command[:2] != ("python3", "tools/wing_readonly_preflight_runner.py"):
+            raise ValueError("Read-only preflight step must use canonical runner")
+        if _duplicate_command_flags(command, readonly_flags):
+            raise ValueError("Read-only preflight step command must not repeat flags")
+        if _unknown_command_flags(command, readonly_flags):
+            raise ValueError("Read-only preflight step command must not include unknown flags")
+        readonly_value_flags = (
+            "--url",
+            "--channels",
+            "--operator-confirm-channels",
+            "--value-types",
+            "--artifact-root",
+            "--prestart-summary",
+            "--expected-plan",
+        )
+        if _command_flags_with_flag_values(command, readonly_value_flags):
+            raise ValueError(
+                "Read-only preflight step command must bind explicit flag values"
+            )
+        if _unexpected_command_arguments(command, readonly_flags, readonly_value_flags):
+            raise ValueError(
+                "Read-only preflight step command must not include stray arguments"
+            )
         if "--expected-plan" not in command or self.expected_plan not in command:
             raise ValueError("Read-only preflight step must bind --expected-plan")
         if "--prestart-summary" not in command or self.prestart_summary not in command:
