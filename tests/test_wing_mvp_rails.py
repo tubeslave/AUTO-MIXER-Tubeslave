@@ -13,6 +13,7 @@ READONLY_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_READONLY_PREFLIGHT
 SUPERVISED_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_SUPERVISED_FADER_GAIN_PROOF.md"
 DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
+RUNNER_TOOL = PROJECT_ROOT / "tools" / "wing_readonly_preflight_runner.py"
 PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
 
 DECLARED_OPERATOR_SEQUENCE_COUNT_MARKERS = (
@@ -188,6 +189,29 @@ def load_progress_module():
     return module
 
 
+def load_runner_module():
+    spec = importlib.util.spec_from_file_location(
+        "wing_readonly_preflight_runner_for_mvp_rails", RUNNER_TOOL
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def covered_verifier_checks(markers):
+    covered: set[str] = set()
+    for marker in markers:
+        if not marker.endswith(": true"):
+            continue
+        raw_marker = marker.removesuffix(": true")
+        covered.add(raw_marker)
+        if raw_marker.startswith("artifact_manifest_verifier_check_"):
+            covered.add(raw_marker.removeprefix("artifact_manifest_verifier_check_"))
+    return covered
+
+
 def current_wing_mvp_20260614_index_report_names():
     index_text = DOCS_INDEX.read_text(encoding="utf-8")
     report_paths = re.findall(
@@ -195,6 +219,16 @@ def current_wing_mvp_20260614_index_report_names():
         index_text,
     )
     return sorted({Path(path).name for path in report_paths})
+
+
+def test_progress_baseline_covers_runner_verifier_checks():
+    progress = load_progress_module()
+    runner = load_runner_module()
+    missing_checks = sorted(
+        set(runner.ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS)
+        - covered_verifier_checks(progress.CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS)
+    )
+    assert missing_checks == []
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
