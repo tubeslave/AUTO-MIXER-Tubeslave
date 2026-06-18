@@ -563,6 +563,9 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
     unreviewed_candidate_count = _nonnegative_int_count(
         summary.get("unreviewed_candidate_count")
     )
+    unreviewed_candidate_source_ids = _string_list(
+        summary.get("unreviewed_candidate_source_ids")
+    )
     return (
         overlay.get("type") == "wing_readonly_preflight_review_decision_ledger"
         and overlay.get("method_id")
@@ -586,6 +589,7 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and invalid_record_count == 0
         and not invalid_record_ids
         and unreviewed_candidate_count == 0
+        and not unreviewed_candidate_source_ids
         and not _string_list(summary.get("duplicate_source_ids"))
         and not _string_list(summary.get("conflicting_source_ids"))
         and summary.get("readiness_matrix_update_allowed_by_decision") is not True
@@ -1730,6 +1734,9 @@ def build_supervised_wing_proof_plan(
                 _nonnegative_int_count(
                     review_summary.get("unreviewed_candidate_count")
                 )
+            ),
+            "readonly_preflight_review_decision_unreviewed_candidate_source_ids": _string_list(
+                review_summary.get("unreviewed_candidate_source_ids")
             ),
             "global_blockers": global_blockers,
         },
