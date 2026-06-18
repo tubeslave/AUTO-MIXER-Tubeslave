@@ -1074,6 +1074,9 @@ def test_blocker_table_has_exact_nine_rows_and_no_closed_baseline():
         assert "valid accepted-candidate artifact-root trace" in row["next action"]
         assert "valid accepted-candidate request-sequence trace" in row["next action"]
         assert "valid accepted-candidate contact trace" in row["next action"]
+        assert (
+            "valid accepted-candidate expected-artifact trace" in row["next action"]
+        )
         assert "expected-artifact-bound accepted source id" in row["next action"]
         assert "supervised_prestart_gate" in row["next action"]
         assert "expected_supervised_prestart_gate" in row["next action"]
