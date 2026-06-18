@@ -559,6 +559,7 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         summary.get("rejected_record_count")
     )
     invalid_record_count = _nonnegative_int_count(summary.get("invalid_record_count"))
+    invalid_record_ids = _string_list(summary.get("invalid_record_ids"))
     unreviewed_candidate_count = _nonnegative_int_count(
         summary.get("unreviewed_candidate_count")
     )
@@ -583,6 +584,7 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         and _accepted_candidate_prestart_source_ids(summary) == accepted_source_ids
         and _accepted_candidate_request_sequence_source_ids(summary) == accepted_source_ids
         and invalid_record_count == 0
+        and not invalid_record_ids
         and unreviewed_candidate_count == 0
         and not _string_list(summary.get("duplicate_source_ids"))
         and not _string_list(summary.get("conflicting_source_ids"))
