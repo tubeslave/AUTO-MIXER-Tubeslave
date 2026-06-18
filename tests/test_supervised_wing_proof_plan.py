@@ -1453,6 +1453,51 @@ def test_plan_rejects_unsupported_channel_value_type_override():
         )
 
 
+def test_plan_rejects_non_positive_supervised_channel_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof channels for gain: 0, -1",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            channels_by_value_type={"gain": (0, -1)},
+        )
+
+
+def test_plan_rejects_fractional_supervised_channel_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof channels for fader: 3.5",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            channels_by_value_type={"fader": (3.5,)},
+        )
+
+
+def test_plan_rejects_scalar_supervised_channel_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof channels for gain: 3",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            channels_by_value_type={"gain": 3},
+        )
+
+
 def test_plan_rejects_unsupported_delta_value_type_override():
     with pytest.raises(
         ValueError,

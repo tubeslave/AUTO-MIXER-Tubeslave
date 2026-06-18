@@ -360,6 +360,47 @@ def _unsupported_supervised_value_types(mapping: Mapping[str, Any] | None) -> li
     )
 
 
+def _normalize_channel_overrides(
+    channels_by_value_type: Mapping[str, Tuple[int, ...]] | None,
+) -> dict[str, Tuple[int, ...]]:
+    if not channels_by_value_type:
+        return {}
+    normalized: dict[str, Tuple[int, ...]] = {}
+    for value_type, raw_channels in channels_by_value_type.items():
+        if isinstance(raw_channels, (str, bytes)):
+            raise ValueError(
+                f"Invalid supervised WING proof channels for {value_type}: {raw_channels}"
+            )
+        try:
+            raw_channel_values = tuple(raw_channels)
+        except TypeError:
+            raise ValueError(
+                f"Invalid supervised WING proof channels for {value_type}: {raw_channels}"
+            ) from None
+        channels: list[int] = []
+        invalid_channels: list[str] = []
+        for raw_channel in raw_channel_values:
+            if isinstance(raw_channel, bool):
+                invalid_channels.append(str(raw_channel))
+                continue
+            try:
+                channel = int(raw_channel)
+            except (TypeError, ValueError):
+                invalid_channels.append(str(raw_channel))
+                continue
+            if channel < 1 or raw_channel != channel:
+                invalid_channels.append(str(raw_channel))
+                continue
+            channels.append(channel)
+        if invalid_channels:
+            raise ValueError(
+                f"Invalid supervised WING proof channels for {value_type}: "
+                + ", ".join(invalid_channels)
+            )
+        normalized[str(value_type)] = tuple(channels)
+    return normalized
+
+
 def _accepted_candidate_prestart_source_ids(summary: Mapping[str, Any]) -> list[str]:
     accepted_source_ids = _string_list(summary.get("accepted_source_ids"))
     if not accepted_source_ids:
@@ -922,7 +963,7 @@ def build_supervised_wing_proof_plan(
 
     channels = dict(DEFAULT_CHANNELS_BY_VALUE_TYPE)
     if channels_by_value_type:
-        channels.update({key: tuple(int(item) for item in value) for key, value in channels_by_value_type.items()})
+        channels.update(_normalize_channel_overrides(channels_by_value_type))
     deltas = dict(DEFAULT_DELTA_DB_BY_VALUE_TYPE)
     if delta_db_by_value_type:
         deltas.update({key: float(value) for key, value in delta_db_by_value_type.items()})
