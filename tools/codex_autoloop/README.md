@@ -597,8 +597,8 @@ you want the background automation active.
   summary must show `operator_markdown_summary_required: true`,
   `operator_markdown_summary_required_field_lines`,
   `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids`,
-  `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source`,
-  `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete`,
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}`,
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`,
   `operator_markdown_summary_required_field_lines_missing_members: []`,
   `operator_markdown_summary_required_field_lines_match_contract: true`,
   `operator_markdown_summary_field_lines_rendered: true`, and

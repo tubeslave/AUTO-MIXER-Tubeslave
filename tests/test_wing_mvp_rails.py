@@ -1432,8 +1432,8 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
     )
     for marker in (
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
-        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
-        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true",
     ):
         assert marker in current_command
     assert "operator-readable no-WING `summary.md`" in current_command
@@ -1773,6 +1773,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true"
         in progress.current_first_command_missing_baseline_markers(
             failing_candidate_artifact_root_command
+        )
+    )
+    failing_verifier_ws_proof_command = current_command.replace(
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: false",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_verifier_ws_proof_command
+    )
+    assert (
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true"
+        in progress.current_first_command_missing_baseline_markers(
+            failing_verifier_ws_proof_command
         )
     )
     missing_contact_query_trace_command = current_command.replace(
@@ -2565,8 +2578,8 @@ def test_codex_prompt_requires_mvp_rails_before_new_work():
     )
     for marker in (
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids",
-        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source",
-        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}",
+        "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true",
     ):
         assert marker in text
     assert "operator-readable no-WING `summary.md`" in text

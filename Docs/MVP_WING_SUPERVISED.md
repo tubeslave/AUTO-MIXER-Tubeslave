@@ -161,8 +161,8 @@ Stop the current Codex work direction and return to the first open blocker if:
   show
   `operator_markdown_summary_required_field_lines` containing
   `readonly_preflight_review_decision_candidate_verifier_ws_proof_source_ids`,
-  `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source`,
-  `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete`,
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_violations_by_source: {}`,
+  `readonly_preflight_review_decision_candidate_verifier_ws_proof_complete: true`,
   `readonly_preflight_review_decision_candidate_request_sequence_contract_valid`,
   `readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source`,
   `readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete`,
