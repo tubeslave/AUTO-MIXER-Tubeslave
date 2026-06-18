@@ -533,7 +533,9 @@ def _readonly_preflight_review_decision_accepted(overlay: Mapping[str, Any]) -> 
         summary.get("unreviewed_candidate_count")
     )
     return (
-        summary.get("manual_readiness_update_candidate_available") is True
+        _readonly_preflight_review_decision_status(overlay)
+        == "operator_review_decision_records_available"
+        and summary.get("manual_readiness_update_candidate_available") is True
         and accepted_record_count is not None
         and accepted_record_count > 0
         and bool(accepted_source_ids)
