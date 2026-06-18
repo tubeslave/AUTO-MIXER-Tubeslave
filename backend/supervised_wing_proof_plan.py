@@ -119,6 +119,7 @@ DEFAULT_DELTA_DB_BY_VALUE_TYPE = {
     "fader": -0.25,
 }
 MAX_SUPERVISED_PROOF_DELTA_DB = 0.5
+MAX_SUPERVISED_PROOF_CHANNEL = 48
 ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES = frozenset(
     WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
 )
@@ -153,6 +154,17 @@ class WingProofPlanStep:
             raise ValueError("The proof plan must not authorize execution")
         if not self.operator_approval_required:
             raise ValueError("Physical proof steps require explicit operator approval")
+        try:
+            channel = int(self.channel)
+        except (TypeError, ValueError):
+            raise ValueError("Physical proof plan only supports WING channels 1..48") from None
+        if (
+            isinstance(self.channel, bool)
+            or channel < 1
+            or channel > MAX_SUPERVISED_PROOF_CHANNEL
+            or self.channel != channel
+        ):
+            raise ValueError("Physical proof plan only supports WING channels 1..48")
         if not math.isfinite(self.delta_db):
             raise ValueError("Physical proof plan only supports finite dB deltas")
         if self.delta_db >= 0:
@@ -400,7 +412,11 @@ def _normalize_channel_overrides(
             except (TypeError, ValueError):
                 invalid_channels.append(str(raw_channel))
                 continue
-            if channel < 1 or raw_channel != channel:
+            if (
+                channel < 1
+                or channel > MAX_SUPERVISED_PROOF_CHANNEL
+                or raw_channel != channel
+            ):
                 invalid_channels.append(str(raw_channel))
                 continue
             if channel in seen_channels:

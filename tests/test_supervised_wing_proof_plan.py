@@ -1469,6 +1469,21 @@ def test_plan_rejects_non_positive_supervised_channel_override():
         )
 
 
+def test_plan_rejects_out_of_range_supervised_channel_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof channels for fader: 49",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            channels_by_value_type={"fader": (49,)},
+        )
+
+
 def test_plan_rejects_fractional_supervised_channel_override():
     with pytest.raises(
         ValueError,
@@ -1629,6 +1644,29 @@ def test_proof_step_rejects_non_finite_delta():
             value_type="gain",
             channel=3,
             delta_db=float("nan"),
+            live_execution_required=True,
+            execution_allowed_by_plan=False,
+            operator_approval_required=True,
+            command=("python3", "tools/wing_operator_proposal_validation_runner.py"),
+            rationale="unit regression",
+            prerequisites=(),
+            abort_conditions=(),
+            expected_artifacts=(),
+            evidence_blockers_to_review=(),
+            required_evidence_components=(),
+        )
+
+
+def test_proof_step_rejects_out_of_range_channel():
+    with pytest.raises(
+        ValueError,
+        match="Physical proof plan only supports WING channels 1..48",
+    ):
+        WingProofPlanStep(
+            id="fader_physical_proof_ch49",
+            value_type="fader",
+            channel=49,
+            delta_db=-0.25,
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
