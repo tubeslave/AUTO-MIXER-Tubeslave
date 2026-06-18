@@ -1555,7 +1555,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_candidate_artifact_roots"
+        'readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]'
         in current_command
     )
     assert (
@@ -1563,7 +1563,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_expected_candidate_artifact_roots"
+        'readonly_preflight_review_decision_expected_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]'
         in current_command
     )
     assert (
@@ -1831,6 +1831,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true"
         in progress.current_first_command_missing_baseline_markers(
             failing_candidate_artifact_root_command
+        )
+    )
+    failing_candidate_artifact_roots_command = current_command.replace(
+        'readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]',
+        'readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/stale_preflight"]',
+    )
+    assert not progress.current_first_command_covers_baseline(
+        failing_candidate_artifact_roots_command
+    )
+    assert (
+        'readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]'
+        in progress.current_first_command_missing_baseline_markers(
+            failing_candidate_artifact_roots_command
         )
     )
     failing_expected_artifact_root_command = current_command.replace(

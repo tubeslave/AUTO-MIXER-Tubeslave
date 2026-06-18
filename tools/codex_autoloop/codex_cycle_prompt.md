@@ -405,9 +405,9 @@ blockers выше.
    `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
    `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
    `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
-   `readonly_preflight_review_decision_candidate_artifact_roots`,
+   `readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]`,
    `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`,
-   `readonly_preflight_review_decision_expected_candidate_artifact_roots`,
+   `readonly_preflight_review_decision_expected_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]`,
    and
    `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`,
    and `readonly_preflight_review_decision_invalid_records`;
@@ -976,9 +976,9 @@ python3 tools/codex_autoloop/project_director_agent.py \
   `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`,
   `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: {}`,
   `readonly_preflight_review_decision_candidate_artifact_root_contract_valid: true`,
-  `readonly_preflight_review_decision_candidate_artifact_roots`,
+  `readonly_preflight_review_decision_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]`,
   `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: {}`,
-  `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and
+  `readonly_preflight_review_decision_expected_candidate_artifact_roots: ["artifacts/wing_readonly_preflight"]`, and
   `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: {}`,
   and `readonly_preflight_review_decision_invalid_records`.
 - Before any supervised fader/gain proof, the operator-readable no-WING
