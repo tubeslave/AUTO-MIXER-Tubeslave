@@ -14916,6 +14916,19 @@ def test_project_director_sidecar_markers_cover_runner_verifier_checks():
     assert missing_optional_next_wing_checks == []
 
 
+def test_runner_optional_next_wing_checks_match_manifest_verifier_false_fields():
+    expected_optional_checks = {
+        f"summary_md_{field_name}_denies_authority"
+        for field_name in (
+            manifest_verifier.NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
+        )
+    }
+
+    assert expected_optional_checks == set(
+        wing_readonly_preflight_runner.ARTIFACT_MANIFEST_VERIFIER_OPTIONAL_NEXT_WING_PROOF_PLAN_CHECKS
+    )
+
+
 def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_artifact(
     tmp_path,
 ):
