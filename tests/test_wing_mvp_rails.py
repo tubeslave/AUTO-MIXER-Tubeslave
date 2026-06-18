@@ -1655,7 +1655,7 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
-        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids: []"
         in current_command
     )
     assert (
@@ -1774,6 +1774,19 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete: true"
         in progress.current_first_command_missing_baseline_markers(
             missing_contact_trace_command
+        )
+    )
+    missing_contact_source_trace_command = current_command.replace(
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids: []",
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids: ['stale_source']",
+    )
+    assert not progress.current_first_command_covers_baseline(
+        missing_contact_source_trace_command
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids: []"
+        in progress.current_first_command_missing_baseline_markers(
+            missing_contact_source_trace_command
         )
     )
     failing_contact_value_gate_command = current_command.replace(
