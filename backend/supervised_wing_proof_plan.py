@@ -383,6 +383,10 @@ def _normalize_channel_overrides(
             raise ValueError(
                 f"Invalid supervised WING proof channels for {value_type}: {raw_channels}"
             ) from None
+        if not raw_channel_values:
+            raise ValueError(
+                f"Invalid supervised WING proof channels for {value_type}: empty"
+            )
         channels: list[int] = []
         invalid_channels: list[str] = []
         for raw_channel in raw_channel_values:

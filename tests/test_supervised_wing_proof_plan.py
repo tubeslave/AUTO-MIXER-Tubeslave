@@ -1499,6 +1499,21 @@ def test_plan_rejects_scalar_supervised_channel_override():
         )
 
 
+def test_plan_rejects_empty_supervised_channel_override():
+    with pytest.raises(
+        ValueError,
+        match="Invalid supervised WING proof channels for gain: empty",
+    ):
+        build_supervised_wing_proof_plan(
+            evidence_snapshot(
+                evidence_row("gain", blockers=["physical_candidate_missing"]),
+                evidence_row("fader", blockers=["physical_candidate_missing"]),
+            ),
+            autonomy_readiness_snapshot=preflight_ready_snapshot(),
+            channels_by_value_type={"gain": ()},
+        )
+
+
 def test_plan_rejects_unsupported_delta_value_type_override():
     with pytest.raises(
         ValueError,
