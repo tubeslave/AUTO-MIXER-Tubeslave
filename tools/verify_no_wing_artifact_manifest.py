@@ -57,6 +57,14 @@ NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted",
 )
+NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS = (
+    "readonly_preflight_review_decision_source_authority_denied",
+    "reported_readonly_preflight_review_decision_source_authority_denied",
+)
+NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS = (
+    "readonly_preflight_review_decision_source_authority_flags",
+    "reported_readonly_preflight_review_decision_source_authority_flags",
+)
 
 
 def _sha256_file(path: Path) -> str:
@@ -95,6 +103,13 @@ def _compare_recomputed_fields(
             f"{prefix}_{field_name}_matches_recomputed",
             recorded.get(field_name) == expected_value,
         )
+
+
+def _expected_next_wing_proof_plan_source_authority_flags() -> dict[str, bool]:
+    return {
+        flag: False
+        for flag in no_wing_release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+    }
 
 
 def _expected_verifier_summary_surface() -> dict[str, object]:
@@ -341,6 +356,53 @@ def _record_manifest_handoff_plan_summary_surface_checks(
             checks,
             f"manifest_{field_name}_matches_expected",
             manifest.get(field_name) == expected_value,
+        )
+
+
+def _record_next_wing_proof_plan_source_authority_checks(
+    checks: dict[str, bool],
+    *,
+    summary_json: Mapping[str, Any],
+    summary_md_text: str,
+) -> None:
+    next_plan = summary_json.get("next_wing_proof_plan")
+    summary_md_lines = set(summary_md_text.splitlines())
+    section_present = (
+        no_wing_release_check.NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_SECTION
+        in summary_md_lines
+    )
+    if not isinstance(next_plan, Mapping) and not section_present:
+        return
+
+    expected_flags = _expected_next_wing_proof_plan_source_authority_flags()
+    expected_flags_text = json.dumps(expected_flags, sort_keys=True)
+    for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS:
+        json_check_name = f"summary_json_next_wing_proof_plan_{field_name}_requires_denial"
+        _record_check(
+            checks,
+            json_check_name,
+            isinstance(next_plan, Mapping) and next_plan.get(field_name) is True,
+        )
+        expected_line = no_wing_release_check._format_markdown_summary_field_line(
+            field_name,
+            True,
+        )
+        _record_check(
+            checks,
+            f"summary_md_{field_name}_requires_denial",
+            expected_line in summary_md_lines,
+        )
+    for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS:
+        _record_check(
+            checks,
+            f"summary_json_next_wing_proof_plan_{field_name}_denies_authority",
+            isinstance(next_plan, Mapping) and next_plan.get(field_name) == expected_flags,
+        )
+        expected_line = f"- {field_name}: `{expected_flags_text}`"
+        _record_check(
+            checks,
+            f"summary_md_{field_name}_denies_authority",
+            expected_line in summary_md_lines,
         )
 
 
@@ -686,6 +748,11 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
     )
     _record_summary_md_safety_checks(
         checks,
+        summary_md_text=summary_md_text,
+    )
+    _record_next_wing_proof_plan_source_authority_checks(
+        checks,
+        summary_json=summary_json,
         summary_md_text=summary_md_text,
     )
 

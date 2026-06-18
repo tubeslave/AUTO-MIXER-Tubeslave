@@ -25050,6 +25050,204 @@ def test_verify_no_wing_artifact_manifest_fails_stale_summary_md(tmp_path):
     assert report["live_authority_granted"] is False
 
 
+def _refresh_no_wing_manifest_artifact_sha(
+    run_dir: Path,
+    *,
+    artifact_id: str,
+    top_level_sha_field: str,
+    artifact_path: str,
+) -> None:
+    manifest_path = run_dir / release_check.NO_WING_RELEASE_CHECK_ARTIFACT_MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    fresh_sha = hashlib.sha256((run_dir / artifact_path).read_bytes()).hexdigest()
+    manifest[top_level_sha_field] = fresh_sha
+    for artifact in manifest["artifacts"]:
+        if artifact["artifact_id"] == artifact_id:
+            artifact["sha256"] = fresh_sha
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_no_wing_bundle_with_next_proof_plan_source_authority(
+    run_dir: Path,
+    *,
+    summary_json_flags: dict[str, bool] | None = None,
+    summary_md_denied: bool = True,
+) -> None:
+    write_summary(
+        run_dir,
+        [
+            CheckResult(
+                name="unit_check",
+                status="passed",
+                started_at="2026-06-15T00:00:00Z",
+                finished_at="2026-06-15T00:00:01Z",
+                duration_sec=1.0,
+                command="python -m pytest",
+                cwd=str(run_dir),
+                returncode=0,
+            )
+        ],
+        generated_at="2026-06-15T00:00:00Z",
+    )
+    expected_flags = (
+        manifest_verifier._expected_next_wing_proof_plan_source_authority_flags()
+    )
+    summary_flags = summary_json_flags or expected_flags
+    summary_path = run_dir / "summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["next_wing_proof_plan"] = {
+        "readonly_preflight_review_decision_source_authority_denied": True,
+        "readonly_preflight_review_decision_source_authority_flags": summary_flags,
+        "reported_readonly_preflight_review_decision_source_authority_denied": True,
+        "reported_readonly_preflight_review_decision_source_authority_flags": expected_flags,
+    }
+    summary_path.write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    summary_md_path = run_dir / "summary.md"
+    expected_flags_text = json.dumps(expected_flags, sort_keys=True)
+    denied_text = "true" if summary_md_denied else "false"
+    summary_md_text = "\n".join(
+        [
+            summary_md_path.read_text(encoding="utf-8").rstrip(),
+            "",
+            "## Next WING Proof Plan",
+            "",
+            *[
+                release_check._format_markdown_summary_field_line(field_name, False)
+                for field_name in manifest_verifier.NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
+            ],
+            (
+                "- readonly_preflight_review_decision_source_authority_denied: "
+                f"`{denied_text}`"
+            ),
+            (
+                "- readonly_preflight_review_decision_source_authority_flags: "
+                f"`{expected_flags_text}`"
+            ),
+            "- reported_readonly_preflight_review_decision_source_authority_denied: `true`",
+            (
+                "- reported_readonly_preflight_review_decision_source_authority_flags: "
+                f"`{expected_flags_text}`"
+            ),
+        ]
+    )
+    summary_md_path.write_text(summary_md_text + "\n", encoding="utf-8")
+    _refresh_no_wing_manifest_artifact_sha(
+        run_dir,
+        artifact_id="summary_json",
+        top_level_sha_field="artifact_manifest_summary_json_sha256",
+        artifact_path="summary.json",
+    )
+    _refresh_no_wing_manifest_artifact_sha(
+        run_dir,
+        artifact_id="summary_md",
+        top_level_sha_field="artifact_manifest_summary_md_sha256",
+        artifact_path="summary.md",
+    )
+
+
+def test_verify_no_wing_artifact_manifest_checks_next_proof_plan_source_authority(
+    tmp_path,
+):
+    _write_no_wing_bundle_with_next_proof_plan_source_authority(tmp_path)
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    checks = report["checks"]
+    assert report["status"] == "passed"
+    assert report["failed_checks"] == []
+    assert (
+        checks[
+            "summary_json_next_wing_proof_plan_readonly_preflight_review_decision_source_authority_denied_requires_denial"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_json_next_wing_proof_plan_readonly_preflight_review_decision_source_authority_flags_denies_authority"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_json_next_wing_proof_plan_reported_readonly_preflight_review_decision_source_authority_denied_requires_denial"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_json_next_wing_proof_plan_reported_readonly_preflight_review_decision_source_authority_flags_denies_authority"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_md_readonly_preflight_review_decision_source_authority_denied_requires_denial"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_md_readonly_preflight_review_decision_source_authority_flags_denies_authority"
+        ]
+        is True
+    )
+
+
+def test_verify_no_wing_artifact_manifest_fails_next_proof_plan_source_authority_markdown_claim(
+    tmp_path,
+):
+    _write_no_wing_bundle_with_next_proof_plan_source_authority(
+        tmp_path,
+        summary_md_denied=False,
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    failed_check = (
+        "summary_md_readonly_preflight_review_decision_source_authority_denied_requires_denial"
+    )
+    assert report["status"] == "failed"
+    assert "summary_md_sha256_matches_actual" not in report["failed_checks"]
+    assert "summary_md_sha256_matches_manifest" not in report["failed_checks"]
+    assert failed_check in report["failed_checks"]
+    assert report["checks"][failed_check] is False
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_authority_granted"] is False
+
+
+def test_verify_no_wing_artifact_manifest_fails_next_proof_plan_source_authority_json_claim(
+    tmp_path,
+):
+    stale_flags = (
+        manifest_verifier._expected_next_wing_proof_plan_source_authority_flags()
+    )
+    stale_flags["live_authority_granted"] = True
+    _write_no_wing_bundle_with_next_proof_plan_source_authority(
+        tmp_path,
+        summary_json_flags=stale_flags,
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    failed_check = (
+        "summary_json_next_wing_proof_plan_readonly_preflight_review_decision_source_authority_flags_denies_authority"
+    )
+    assert report["status"] == "failed"
+    assert "summary_json_sha256_matches_actual" not in report["failed_checks"]
+    assert "summary_json_sha256_matches_manifest" not in report["failed_checks"]
+    assert failed_check in report["failed_checks"]
+    assert report["checks"][failed_check] is False
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_authority_granted"] is False
+
+
 def test_verify_no_wing_artifact_manifest_fails_summary_md_authority_claim_even_with_fresh_sha(
     tmp_path,
 ):
