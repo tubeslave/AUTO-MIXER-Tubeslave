@@ -7728,6 +7728,48 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     )
     assert (
         result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids"
+        ]
+        == []
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids"
+        ]
+        == []
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
+        ]
+        is False
+    )
+    assert (
+        result.detail[
             "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
         ]
         is False
@@ -7774,6 +7816,20 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         "live_authority_granted": False,
         "full_autonomous_ready": False,
     }
+    assert summary_payload["accepted_candidate_request_sequence_trace_complete"] is False
+    assert summary_payload["accepted_candidate_request_sequence_trace_source_ids"] == []
+    assert summary_payload["accepted_candidate_request_sequence_by_source"] == {}
+    assert summary_payload["accepted_candidate_plan_request_sequence_by_source"] == {}
+    assert summary_payload["accepted_candidate_expected_request_sequence_by_source"] == {}
+    assert summary_payload[
+        "accepted_candidate_request_sequence_matches_plan_by_source"
+    ] == {}
+    assert (
+        summary_payload[
+            "accepted_candidate_request_sequence_trace_missing_source_ids"
+        ]
+        == []
+    )
     assert summary_payload["accepted_candidate_expected_contacts_backend_by_source"] == {}
     assert summary_payload["accepted_candidate_expected_queries_console_by_source"] == {}
     assert summary_payload["accepted_candidate_contacts_backend_by_source"] == {}
@@ -8456,6 +8512,12 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace
         == [source_id]
     )
     assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
+        ]
+        is True
+    )
+    assert (
         "wing_readonly_preflight_review_decision_contact_trace_blocker_missing"
         in result.detail["violations"]
     )
@@ -8473,6 +8535,25 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace
     )
     assert summary_payload["accepted_candidate_contact_trace_complete"] is False
     assert summary_payload["accepted_candidate_expected_artifact_trace_complete"] is False
+    assert summary_payload["accepted_candidate_request_sequence_trace_complete"] is True
+    assert summary_payload["accepted_candidate_request_sequence_trace_source_ids"] == [
+        source_id
+    ]
+    assert summary_payload["accepted_candidate_request_sequence_by_source"] == {
+        source_id: list(WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE)
+    }
+    assert summary_payload["accepted_candidate_plan_request_sequence_by_source"] == {
+        source_id: list(WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE)
+    }
+    assert summary_payload["accepted_candidate_expected_request_sequence_by_source"] == {
+        source_id: list(WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE)
+    }
+    assert summary_payload[
+        "accepted_candidate_request_sequence_matches_plan_by_source"
+    ] == {source_id: True}
+    assert summary_payload[
+        "accepted_candidate_request_sequence_trace_missing_source_ids"
+    ] == []
     assert summary_payload[
         "accepted_candidate_expected_contacts_backend_by_source"
     ] == {source_id: True}

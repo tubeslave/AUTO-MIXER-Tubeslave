@@ -21479,6 +21479,24 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_candidate_request_sequence_contract_violations_by_source = detail.get(
             "accepted_candidate_request_sequence_contract_violations_by_source"
         )
+        accepted_candidate_request_sequence_trace_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids"
+        )
+        accepted_candidate_request_sequence_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source"
+        )
+        accepted_candidate_plan_request_sequence_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+        )
+        accepted_candidate_expected_request_sequence_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
+        )
+        accepted_candidate_request_sequence_matches_plan_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
+        )
+        accepted_candidate_request_sequence_trace_missing_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids"
+        )
         accepted_candidate_contact_trace_source_ids = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
         )
@@ -21638,6 +21656,60 @@ def wing_readonly_preflight_review_decision_summary(
                     Mapping,
                 )
                 else {}
+            ),
+            "accepted_candidate_request_sequence_trace_complete": (
+                detail.get(
+                    "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
+                )
+                is True
+            ),
+            "accepted_candidate_request_sequence_trace_source_ids": (
+                list(accepted_candidate_request_sequence_trace_source_ids)
+                if isinstance(
+                    accepted_candidate_request_sequence_trace_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "accepted_candidate_request_sequence_by_source": (
+                dict(accepted_candidate_request_sequence_by_source)
+                if isinstance(
+                    accepted_candidate_request_sequence_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_plan_request_sequence_by_source": (
+                dict(accepted_candidate_plan_request_sequence_by_source)
+                if isinstance(
+                    accepted_candidate_plan_request_sequence_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_expected_request_sequence_by_source": (
+                dict(accepted_candidate_expected_request_sequence_by_source)
+                if isinstance(
+                    accepted_candidate_expected_request_sequence_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_request_sequence_matches_plan_by_source": (
+                dict(accepted_candidate_request_sequence_matches_plan_by_source)
+                if isinstance(
+                    accepted_candidate_request_sequence_matches_plan_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_request_sequence_trace_missing_source_ids": (
+                list(accepted_candidate_request_sequence_trace_missing_source_ids)
+                if isinstance(
+                    accepted_candidate_request_sequence_trace_missing_source_ids,
+                    list,
+                )
+                else []
             ),
             "accepted_candidate_contact_trace_complete": (
                 detail.get(
