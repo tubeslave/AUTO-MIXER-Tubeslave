@@ -38,6 +38,12 @@ from backend.recovery_policy_contract import (
     REQUIRED_RECOVERY_EVIDENCE as POLICY_REQUIRED_RECOVERY_EVIDENCE,
     evaluate_recovery_policy_contract,
 )
+from backend.safety_kernel_trace_contract import (
+    REQUIRED_AUDIT_FIELDS as SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_GUARD_CHECKS as SAFETY_KERNEL_REQUIRED_GUARD_CHECKS,
+    REQUIRED_TRACE_SCENARIOS as SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS,
+    evaluate_safety_kernel_trace_contract,
+)
 from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import no_wing_release_check as release_check
 
@@ -78,6 +84,8 @@ M018_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M018-integration-policy-contract.
 M018_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-policy-contract-20260619.md"
 M019_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M019-integration-policy-binding.md"
 M019_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-policy-binding-20260619.md"
+M020_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M020-safety-kernel-trace-contract.md"
+M020_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-kernel-trace-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -3206,6 +3214,181 @@ def test_m019_integration_policy_binding_requires_m018_manifest():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M019 integration policy binding is now covered" in current
     assert "M019 integration policy binding rail is now automated" in report
+
+
+def test_m020_safety_kernel_trace_contract_stays_offline_and_non_bypassable():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    safety = SAFETY_CONTRACT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M020_PLAN.read_text(encoding="utf-8")
+    adr = M020_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m020 = markdown_table_row(roadmap, "M020")
+    assert m020[1] == "Safety kernel trace contract"
+    assert m020[2] == (
+        "Deterministic safety-kernel traces are complete, audited and "
+        "non-bypassable before integration use"
+    )
+    assert m020[3] == "M013-M019"
+    assert m020[4] == "high offline"
+    assert (
+        m020[5]
+        == "SPECIFIED to UNIT_VERIFIED for safety-kernel trace gate; integration binding remains pending"
+    )
+    assert m020[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/safety_kernel_trace_contract.py`" in memory_eval[2]
+    assert "tests/test_safety_kernel_trace_contract.py" in memory_eval[3]
+    assert "deterministic safety-kernel trace evidence cannot grant live authority" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    def trace_record(scenario: str, **overrides) -> dict:
+        decision = (
+            "bounded_allow"
+            if scenario == "supervised_fader_gain_allowed"
+            else "reject"
+        )
+        record = {
+            "scenario": scenario,
+            "safety_decision": decision,
+            "guard_checks": {
+                key: True for key in SAFETY_KERNEL_REQUIRED_GUARD_CHECKS
+            },
+            "audit": {
+                "decision_id": f"{scenario}-decision",
+                "checked_at": "2026-06-19T18:39:18Z",
+                "candidate_action": f"{scenario}-candidate",
+                "safety_decision": decision,
+                "reason": f"{scenario} exercised deterministic safety kernel",
+                "policy_version": "safety-kernel-offline-v1",
+                "audit_reference": f"artifacts/safety-kernel/{scenario}.json",
+            },
+        }
+        record.update(overrides)
+        return record
+
+    def trace_manifest(**overrides) -> dict:
+        manifest = {
+            "trace_id": "safety-kernel-trace",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "trace_records": [
+                trace_record(scenario)
+                for scenario in SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS
+            ],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    incomplete_result = evaluate_safety_kernel_trace_contract(
+        trace_manifest(
+            trace_records=[
+                trace_record(
+                    "supervised_fader_gain_allowed",
+                    guard_checks={"mode_permission_checked": True},
+                )
+            ]
+        )
+    )
+    assert incomplete_result["ready_for_safety_kernel_trace_use"] is False
+    assert "missing_required_trace_scenario:unsupported_live_write_rejected" in (
+        incomplete_result["blockers"]
+    )
+    assert (
+        "supervised_fader_gain_allowed:missing_guard_check:"
+        "live_write_allowlist_checked"
+        in incomplete_result["blockers"]
+    )
+    assert incomplete_result["authority"]["live_authority_granted"] is False
+
+    complete_result = evaluate_safety_kernel_trace_contract(trace_manifest())
+    assert complete_result["ready_for_safety_kernel_trace_use"] is True
+    assert complete_result["hardware_evidence"] is False
+    assert complete_result["summary"]["missing_trace_scenarios"] == []
+    assert complete_result["authority"]["live_authority_granted"] is False
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+
+    blocked_result = evaluate_safety_kernel_trace_contract(
+        trace_manifest(
+            offline_only=False,
+            live_write=True,
+            contacts_wing=True,
+            contacts_backend=True,
+            hardware_evidence=True,
+            readiness_closure_allowed=True,
+            live_authority_granted=True,
+        )
+    )
+    assert blocked_result["ready_for_safety_kernel_trace_use"] is False
+    assert "offline_only_required" in blocked_result["blockers"]
+    assert "safety_kernel_trace_forbids_live_write" in blocked_result["blockers"]
+    assert "safety_kernel_trace_forbids_wing_contact" in blocked_result["blockers"]
+    assert "safety_kernel_trace_cannot_grant_live_authority" in blocked_result[
+        "blockers"
+    ]
+    assert blocked_result["authority"]["live_authority_granted"] is False
+
+    wrong_decision_result = evaluate_safety_kernel_trace_contract(
+        trace_manifest(
+            trace_records=[
+                trace_record(
+                    scenario,
+                    safety_decision="allow",
+                    audit={
+                        key: f"audit-{key}"
+                        for key in SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS
+                    }
+                    | {"safety_decision": "allow"},
+                )
+                if scenario == "unsupported_live_write_rejected"
+                else trace_record(scenario)
+                for scenario in SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS
+            ]
+        )
+    )
+    assert wrong_decision_result["ready_for_safety_kernel_trace_use"] is False
+    assert "unsupported_live_write_rejected:unexpected_safety_decision" in (
+        wrong_decision_result["blockers"]
+    )
+
+    assert "Safety-kernel trace candidates must be offline, complete and audited" in (
+        completion
+    )
+    assert "deterministic safety kernel is the non-bypassable authority" in safety
+    assert "M020-CP01" in plan
+    assert "M020-CP02" in plan
+    assert "Safety-kernel trace evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M020 safety kernel trace contract is now covered" in current
+    assert "M020 safety kernel trace contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

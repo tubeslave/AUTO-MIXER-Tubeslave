@@ -43,6 +43,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M017 | Fault recovery policy binding | Simulator fault-recovery promotion consumes the recovery policy contract instead of loose recovery_policy status fields | M012-M016 | high offline | UNIT_VERIFIED gate binding; simulator evidence remains pending | PENDING |
 | M018 | Integration policy contract | Candidate integration policies are complete, evidence-bound and owner-approved before offline integration promotion | M013-M017 | high offline | SPECIFIED to UNIT_VERIFIED for integration-policy gate; owner approval remains required | PENDING |
 | M019 | Integration policy binding | Offline integration promotion consumes the integration policy contract instead of loose integration_policy status fields | M013-M018 | high offline | UNIT_VERIFIED gate binding; integration evidence remains pending | PENDING |
+| M020 | Safety kernel trace contract | Deterministic safety-kernel traces are complete, audited and non-bypassable before integration use | M013-M019 | high offline | SPECIFIED to UNIT_VERIFIED for safety-kernel trace gate; integration binding remains pending | PENDING |
 
 ## Active milestone
 

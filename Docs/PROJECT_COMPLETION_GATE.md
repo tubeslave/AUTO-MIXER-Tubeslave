@@ -69,6 +69,11 @@ Integration bundle manifests must consume the integration policy contract result
 instead of loose integration_policy status fields before claiming offline
 integration promotion readiness.
 
+Safety-kernel trace candidates must be offline, complete and audited before
+they can be used for integration or completion-gate promotion. Complete
+candidate safety-kernel trace evidence alone cannot grant live authority, close
+readiness, bypass deterministic safety checks, or replace hardware validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

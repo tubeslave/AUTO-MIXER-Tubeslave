@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T18:30:55Z.
+- Latest heartbeat: 2026-06-19T18:43:43Z.
 
 ## Что сделано
 
@@ -417,6 +417,19 @@ requirements. Integration bundles surface the same failure through the
 `integration_policy:` child prefix. It still reports no hardware proof, no live
 write, no readiness closure and no live authority.
 
+The M020 safety kernel trace contract rail is now automated by
+`tests/test_safety_kernel_trace_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m020_safety_kernel_trace_contract_stays_offline_and_non_bypassable`.
+It adds `backend/safety_kernel_trace_contract.py` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M020-safety-kernel-trace-contract.md`,
+`Docs/adr/safety-kernel-trace-contract-20260619.md`, `Docs/CURRENT_STATE.md`
+and this report. The contract requires deterministic safety-kernel trace
+records for allow/reject scenarios, guard checks and audit fields before
+safety-kernel trace evidence can support integration use. It still reports no
+hardware proof, no live write, no readiness closure and no live authority.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -565,8 +578,12 @@ write, no readiness closure and no live authority.
   `6 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m019_integration_policy_binding_requires_m018_manifest -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_safety_kernel_trace_contract.py -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m020_safety_kernel_trace_contract_stays_offline_and_non_bypassable -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `32 passed`.
+  `33 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -578,7 +595,7 @@ write, no readiness closure and no live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4121 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4127 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING

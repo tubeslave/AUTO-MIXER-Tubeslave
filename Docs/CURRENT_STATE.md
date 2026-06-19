@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T18:30:55Z
+Generated: 2026-06-19T18:43:43Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T18:30:55Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `36442eaa Add integration policy contract gate`
+  `96240845 Bind integration policy to bundle gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -424,6 +424,19 @@ Generated: 2026-06-19T18:30:55Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so integration policy
   binding cannot become hardware proof or live readiness.
+- M020 safety kernel trace contract is now covered by
+  `tests/test_safety_kernel_trace_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m020_safety_kernel_trace_contract_stays_offline_and_non_bypassable`.
+  The new `backend/safety_kernel_trace_contract.py` module validates that
+  deterministic safety-kernel traces cover supervised fader/gain allow
+  evidence, unsupported live-write rejection, model/LLM bypass rejection,
+  stale-state rejection, missing readback/rollback rejection and
+  headroom/feedback-risk rejection. Each trace record must include guard
+  checks and audit fields before reporting safety-kernel trace use readiness.
+  It still keeps `live_authority_granted: false`,
+  `readiness_closure_allowed: false`, `live_write: false` and
+  `hardware_evidence: false`, so deterministic safety-kernel trace evidence
+  cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -434,4 +447,4 @@ Generated: 2026-06-19T18:30:55Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4121 passed, 1 skipped, 1 warning`.
+  `4127 passed, 1 skipped, 1 warning`.
