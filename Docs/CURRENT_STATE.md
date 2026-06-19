@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T08:54:33Z
+Generated: 2026-06-19T09:04:06Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `d84b4a63 Limit product state sequence policy scope`
+  `7a616805 Render gap rollup unexpected write kinds`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -48,7 +48,7 @@ Generated: 2026-06-19T08:54:33Z
   WING report/executor/monitor surfaces to the supervised deployment boundary:
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
   `bb5816d4`, `192d6bff`, `ce0d3d00`, `7796d28a`, `b0c9fc00`, and
-  `12ee8214`, `b0c71460`, and `d84b4a63`.
+  `12ee8214`, `b0c71460`, `d84b4a63`, and `7a616805`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -80,6 +80,10 @@ Generated: 2026-06-19T08:54:33Z
   memory-writer validators now use the active safety surface, so WING blocks
   `pan` sequence-policy evidence while non-WING/future surfaces can still keep
   the broader current-proven scope.
+- The no-WING release-check Markdown summary now renders
+  `unexpected_supervised_live_write_kinds` beside the policy and current WING
+  live-write kind fields, so operator-facing evidence does not hide a computed
+  kind-widening signal.
 
 ## Unresolved unknowns
 
@@ -89,5 +93,5 @@ Generated: 2026-06-19T08:54:33Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `d84b4a63` passed with
+  but the latest verified full-suite run for `7a616805` passed with
   `4044 passed, 1 skipped, 1 warning`.
