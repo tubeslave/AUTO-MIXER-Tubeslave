@@ -698,6 +698,87 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
     assert "until that external validation exists" in report
 
 
+def test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_approval():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    project_blockers = BLOCKERS_DOC.read_text(encoding="utf-8")
+    supervised_runbook = SUPERVISED_RUNBOOK.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+
+    m003 = markdown_table_row(roadmap, "M003")
+    m004 = markdown_table_row(roadmap, "M004")
+    m009 = markdown_table_row(roadmap, "M009")
+    assert m003[1] == "Supervised fader proof"
+    assert m003[2] == "Exact bounded fader move is approved, applied, read back and rolled back"
+    assert m003[3] == "M002"
+    assert m003[4] == "critical live write"
+    assert m003[5] == "SUPERVISED_LIVE_VERIFIED for fader only"
+    assert m003[-1] == "BLOCKED_BY_M002"
+    assert m004[1] == "Supervised gain-down/trim proof"
+    assert m004[2] == (
+        "Exact bounded gain-down/trim move is approved, applied, read back "
+        "and rolled back"
+    )
+    assert m004[3] == "M002"
+    assert m004[4] == "critical live write"
+    assert m004[5] == "SUPERVISED_LIVE_VERIFIED for gain-down only"
+    assert m004[-1] == "BLOCKED_BY_M002"
+    assert m009[1] == "Supervised non-fader/gain live expansion"
+    assert "separately approved ADR" in m009[2]
+    assert m009[-1] == "PENDING_APPROVAL"
+
+    fader = markdown_table_row(console, "Channel fader")
+    gain = markdown_table_row(console, "Preamp trim/gain-down")
+    pan = markdown_table_row(console, "Pan")
+    rollback = markdown_table_row(console, "Rollback")
+    assert fader[3] == "no live write"
+    assert fader[4] == "yes only after explicit approval"
+    assert fader[-2:] == ["supervised fader proof", "none"]
+    assert gain[3] == "no live write"
+    assert gain[4] == "yes only after explicit approval and gain-down bounds"
+    assert gain[-2:] == ["supervised gain-down proof", "none"]
+    assert pan[4] == "no for WING MVP"
+    assert "separate ADR and hardware proof" in pan[5]
+    assert rollback[4] == "required before closure"
+    assert rollback[-1] == "none"
+
+    fader_blocker = markdown_table_row(project_blockers, "Supervised fader write proof")
+    gain_blocker = markdown_table_row(project_blockers, "Supervised gain-down / trim proof")
+    rollback_blocker = markdown_table_row(project_blockers, "Rollback proof")
+    for row in (fader_blocker, gain_blocker, rollback_blocker):
+        assert row[1] == "blocked_by_readonly_preflight"
+    assert "run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for `--value-type fader`" in fader_blocker[3]
+    assert (
+        "run `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` for "
+        "`--value-type gain` with a negative delta only"
+    ) in gain_blocker[3]
+    assert "Preserve rollback request, rollback readback, and artifact review" in rollback_blocker[3]
+
+    assert "Status: blocked until a clean read-only preflight candidate" in supervised_runbook
+    assert "Allowed write kinds for this MVP:" in supervised_runbook
+    assert "- `fader`" in supervised_runbook
+    assert "- `gain` with a negative delta only" in supervised_runbook
+    for forbidden in ("EQ", "compressor", "gate", "routing", "mute/unmute", "FX", "scenes"):
+        assert f"- {forbidden}" in supervised_runbook
+    assert "The operator explicitly approves the exact channel, value type, and delta" in supervised_runbook
+    assert "The selected delta is small and negative" in supervised_runbook
+    assert "rollback went through `rollback_last_manual_write`" in supervised_runbook
+    assert "rollback readback status is `verified_from_physical_readback`" in supervised_runbook
+    assert "the delta is positive" in supervised_runbook
+    assert "the value type is not `fader` or `gain`" in supervised_runbook
+    assert "Do not claim full autonomous readiness" in supervised_runbook
+
+    assert "Supervised fader write proof with explicit operator approval" in goal
+    assert "Supervised gain-down / trim proof with explicit operator approval" in goal
+    assert "supervised `fader`/`gain` rail с явным approval, readback и rollback" in goal
+
+
 def test_mvp_doc_declares_scope_and_stop_rules():
     text = MVP_DOC.read_text(encoding="utf-8")
 

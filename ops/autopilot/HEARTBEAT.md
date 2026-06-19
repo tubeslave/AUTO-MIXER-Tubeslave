@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T15:20:54Z
+Last heartbeat UTC: 2026-06-19T15:28:42Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,16 +12,16 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M002 physical readback intake is now guarded by
-`tests/test_wing_mvp_rails.py::test_m002_physical_readback_waits_for_accepted_real_wing_review`,
-which compares `ops/autopilot/STATE.json`, `Docs/ROADMAP.md`,
-`Docs/ACTIVE_MILESTONE.md`, `.ai/project-layer/wing_mvp_blockers.md`,
-`ops/autopilot/BLOCKERS.md`, the M001 plan, `Docs/CURRENT_STATE.md` and
-`ops/autopilot/LAST_REPORT.md`. Physical readback remains waiting until a real
-WING read-only artifact is reviewed and bound to accepted decision records.
+Latest check: supervised fader/gain proof entry is now guarded by
+`tests/test_wing_mvp_rails.py::test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_approval`,
+which compares `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`, `.ai/project-layer/wing_mvp_blockers.md`
+and `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`. M003/M004 remain
+blocked by M002, WING live proof scope stays supervised `fader`/negative
+`gain`, and approval/readback/rollback remain required before closure.
 Targeted validation passed with `1 passed`; the full rail file passed with
-`16 passed`; the full suite passed with
-`4072 passed, 1 skipped, 1 warning`.
+`17 passed`; the full suite passed with
+`4073 passed, 1 skipped, 1 warning`.
 The fresh no-WING bundle remains
 `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`;
 the detached verifier passed with `failed_checks: []`, top-level coverage

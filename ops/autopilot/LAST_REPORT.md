@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T15:20:54Z.
+- Latest heartbeat: 2026-06-19T15:28:42Z.
 
 ## Что сделано
 
@@ -147,7 +147,7 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `6659c9fe`; this synchronization did not
+pre-checkpoint state/evidence commit `05a15d8a`; this synchronization did not
 change product runtime behavior.
 
 The current-state freshness rail is now automated by
@@ -210,6 +210,14 @@ It compares `ops/autopilot/STATE.json`, `Docs/ROADMAP.md`,
 `ops/autopilot/BLOCKERS.md`, the M001 plan, `Docs/CURRENT_STATE.md` and this
 report so physical readback remains waiting until a real WING read-only
 artifact is reviewed and bound to accepted decision records.
+
+The supervised fader/gain proof gate rail is now automated by
+`tests/test_wing_mvp_rails.py::test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_approval`.
+It compares `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`, `.ai/project-layer/wing_mvp_blockers.md`
+and `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` so M003/M004 remain
+blocked by M002, WING live proof scope stays supervised `fader`/negative
+`gain`, and explicit approval, physical readback and rollback remain required.
 
 ## Проверка
 
@@ -305,8 +313,10 @@ artifact is reviewed and bound to accepted decision records.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m002_physical_readback_waits_for_accepted_real_wing_review -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_approval -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `16 passed`.
+  `17 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -318,7 +328,7 @@ artifact is reviewed and bound to accepted decision records.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4072 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4073 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -349,9 +359,9 @@ artifact is reviewed and bound to accepted decision records.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T15:20:54Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T15:28:42Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `6659c9fe`, latest no-WING artifact
+  state/evidence commit `05a15d8a`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
@@ -380,6 +390,8 @@ artifact is reviewed and bound to accepted decision records.
 - The M002 physical readback intake rail confirmed physical readback still
   requires a real WING read-only artifact, operator review and accepted
   decision records.
+- The supervised fader/gain proof gate rail confirmed M003/M004 remain blocked
+  by M002 and still require explicit approval, physical readback and rollback.
 - Heartbeat reconciliation confirmed STOP, writer-lease, stale-run and
   recovery contract paths stay consistent across state, contract, skill, plan,
   operations, heartbeat, blockers and this report. It found no real WING

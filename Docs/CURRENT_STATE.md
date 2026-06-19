@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T15:20:54Z
+Generated: 2026-06-19T15:28:42Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T15:20:54Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `6659c9fe Guard validate-only artifact root`
+  `05a15d8a Guard M002 artifact review gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -253,6 +253,13 @@ Generated: 2026-06-19T15:20:54Z
   `ops/autopilot/BLOCKERS.md`, the M001 plan, `ops/autopilot/LAST_REPORT.md`
   and this file so physical readback remains waiting until a real WING
   read-only artifact is reviewed and bound to accepted decision records.
+- Supervised fader/gain proof entry is now covered by
+  `tests/test_wing_mvp_rails.py::test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_approval`.
+  The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/CONSOLE_CAPABILITY_MATRIX.md`, `.ai/project-layer/wing_mvp_blockers.md`
+  and `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` so M003/M004 remain
+  blocked by M002, WING live proof scope stays supervised `fader`/negative
+  `gain`, and approval/readback/rollback remain required before closure.
 
 ## Unresolved unknowns
 
@@ -263,4 +270,4 @@ Generated: 2026-06-19T15:20:54Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4072 passed, 1 skipped, 1 warning`.
+  `4073 passed, 1 skipped, 1 warning`.
