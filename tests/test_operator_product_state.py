@@ -3918,6 +3918,16 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
         "operator_required": True,
     }
     assert overlay["summary"]["autonomous_ready_target_ids"] == []
+    assert overlay["summary"]["target_count"] == 2
+    assert overlay["summary"]["status_counts"] == {
+        "dry_run_only": 1,
+        "manual_safety_review_candidate": 0,
+        "no_current_evidence": 1,
+        "remediation_required": 0,
+    }
+    assert overlay["summary"]["no_current_evidence_target_ids"] == [
+        "fader_supervised_promotion"
+    ]
     assert "overlay_does_not_modify_safety_rows" in overlay["summary"]["global_blockers"]
     rows = {row["value_type"]: row for row in overlay["rows"]}
     assert set(rows) == {"fader", "gain"}
@@ -3926,6 +3936,60 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert rows["gain"]["dry_run_ready_proof_ids"] == ["gain-proof-dry-run"]
     assert rows["fader"]["status"] == "no_current_evidence"
     assert "set_gain" not in set(_walk_keys(payload))
+
+
+def test_supervised_proof_evidence_filters_overlay_rows_to_wing_boundary(server, tmp_path):
+    latest_dir = tmp_path / "latest"
+    latest_dir.mkdir()
+    latest_report = latest_dir / "supervised_proof_artifact_report.json"
+    payload = proof_report_with_autonomy_overlay("ok")
+    overlay = payload["autonomy_evidence_overlay"]
+    overlay["summary"]["status_counts"]["no_current_evidence"] = 2
+    overlay["summary"]["no_current_evidence_target_ids"] = [
+        "fader_supervised_promotion",
+        "pan_phase_supervised_promotion",
+    ]
+    overlay["rows"].append(
+        {
+            "id": "pan_autonomy_evidence_overlay",
+            "target_id": "pan_phase_supervised_promotion",
+            "value_type": "pan",
+            "status": "no_current_evidence",
+            "safety_review_candidate": False,
+            "supervised_live_allowed_static": False,
+            "autonomous_ready": False,
+            "proof_artifact_count": 0,
+            "physical_candidate_count": 0,
+            "dry_run_ready_count": 0,
+            "blocked_artifact_count": 0,
+            "remediation_action_count": 0,
+            "physical_candidate_proof_ids": [],
+            "dry_run_ready_proof_ids": [],
+            "blocked_proof_ids": [],
+            "remediation_action_ids": [],
+            "blockers": ["proof_artifact_missing"],
+            "next_required_actions": ["Run one physical supervised pan proof."],
+        }
+    )
+    latest_report.write_text(json.dumps(payload), encoding="utf-8")
+    server.config["supervised_proof_evidence"] = {"report_path": str(latest_report)}
+
+    product_state = build_supervised_proof_evidence_snapshot(server)
+    normalized = product_state["autonomy_evidence_overlay"]
+
+    rows = {row["value_type"]: row for row in normalized["rows"]}
+    assert set(rows) == {"fader", "gain"}
+    assert normalized["summary"]["target_count"] == 2
+    assert normalized["summary"]["status_counts"] == {
+        "dry_run_only": 1,
+        "manual_safety_review_candidate": 0,
+        "no_current_evidence": 1,
+        "remediation_required": 0,
+    }
+    assert normalized["summary"]["no_current_evidence_target_ids"] == [
+        "fader_supervised_promotion"
+    ]
+    assert "pan_phase_supervised_promotion" not in str(normalized)
 
 
 def test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims(

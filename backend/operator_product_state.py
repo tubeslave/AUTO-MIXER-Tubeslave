@@ -55,11 +55,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_mode_policy import normalize_manual_live_write_kinds
 try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
-ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+ALLOWED_VALUE_TYPES = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 try:
     from operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan import (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan,
@@ -118,12 +118,13 @@ AUTONOMY_OVERLAY_STATUSES = {
     "dry_run_only",
     "no_current_evidence",
 }
-AUTONOMY_OVERLAY_ROW_STATUSES = {
+AUTONOMY_OVERLAY_ROW_STATUS_ORDER = (
     "manual_safety_review_candidate",
     "remediation_required",
     "dry_run_only",
     "no_current_evidence",
-}
+)
+AUTONOMY_OVERLAY_ROW_STATUSES = set(AUTONOMY_OVERLAY_ROW_STATUS_ORDER)
 TELEMETRY_ALERT_CONTEXT_ALLOWLIST = {
     "actor",
     "action_type",
@@ -6783,8 +6784,27 @@ def _normalize_autonomy_evidence_overlay(
         for row in fallback["rows"]:
             if row["value_type"] not in present_value_types:
                 rows.append(row)
-    status = str(overlay.get("status") or "no_current_evidence")
-    if status not in AUTONOMY_OVERLAY_STATUSES:
+    status_counts: Dict[str, int] = {
+        status: 0 for status in AUTONOMY_OVERLAY_ROW_STATUS_ORDER
+    }
+    target_ids_by_status: Dict[str, List[str]] = {
+        status: [] for status in AUTONOMY_OVERLAY_ROW_STATUS_ORDER
+    }
+    for row in rows:
+        row_status = str(row.get("status") or "no_current_evidence")
+        if row_status not in AUTONOMY_OVERLAY_ROW_STATUSES:
+            row_status = "no_current_evidence"
+        status_counts[row_status] += 1
+        target_id = str(row.get("target_id") or "")
+        if target_id:
+            target_ids_by_status[row_status].append(target_id)
+    if status_counts["remediation_required"]:
+        status = "manual_remediation_required"
+    elif status_counts["manual_safety_review_candidate"]:
+        status = "manual_review_ready"
+    elif status_counts["dry_run_only"]:
+        status = "dry_run_only"
+    else:
         status = "no_current_evidence"
     global_blockers = _string_list_value(summary.get("global_blockers"))
     for blocker in (
@@ -6811,13 +6831,13 @@ def _normalize_autonomy_evidence_overlay(
         },
         "summary": {
             "target_count": len(rows),
-            "status_counts": _int_mapping(summary.get("status_counts")),
-            "manual_safety_review_candidate_target_ids": _string_list_value(
-                summary.get("manual_safety_review_candidate_target_ids")
-            ),
-            "remediation_required_target_ids": _string_list_value(summary.get("remediation_required_target_ids")),
-            "dry_run_only_target_ids": _string_list_value(summary.get("dry_run_only_target_ids")),
-            "no_current_evidence_target_ids": _string_list_value(summary.get("no_current_evidence_target_ids")),
+            "status_counts": status_counts,
+            "manual_safety_review_candidate_target_ids": target_ids_by_status[
+                "manual_safety_review_candidate"
+            ],
+            "remediation_required_target_ids": target_ids_by_status["remediation_required"],
+            "dry_run_only_target_ids": target_ids_by_status["dry_run_only"],
+            "no_current_evidence_target_ids": target_ids_by_status["no_current_evidence"],
             "autonomous_ready_target_ids": [],
             "global_blockers": global_blockers,
         },
