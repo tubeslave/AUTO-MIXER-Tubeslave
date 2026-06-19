@@ -3755,6 +3755,7 @@ export function adaptDirectorRuntime(
   const integrationBundleGoal = integrationBundleBlockedReasons.length > 0
     ? 'Resolve the offline integration bundle blocker before promotion planning. Keep proposals review-only; no live authority, readiness closure or console apply is granted.'
     : '';
+  const integrationBundleBlocksPromotionPlanning = integrationBundleBlockedReasons.length > 0;
   const previewQueueMutation = Boolean(previewSummary.queue_mutation ?? previewExecutor.queue_mutation);
   const liveApplyPolicy = str(previewExecutor.live_apply_policy, str(processing.live_apply_policy, liveWritePolicy));
   const readyBlockedReasons = Array.isArray(readyForLive.blocked_reasons)
@@ -3783,8 +3784,12 @@ export function adaptDirectorRuntime(
     readyTone: emergencyStopped ? 'red' : ready ? 'green' : 'yellow',
     audioLabel: audioRunning ? 'Audio capture running' : 'Audio capture offline',
     audioTone: audioRunning ? 'green' : 'yellow',
-    proposalQueueLabel: proposalQueueAvailable ? 'Proposal queue online' : 'Proposal queue unavailable',
-    proposalQueueTone: proposalQueueAvailable ? 'green' : 'yellow',
+    proposalQueueLabel: integrationBundleBlocksPromotionPlanning
+      ? 'Promotion planning blocked'
+      : proposalQueueAvailable ? 'Proposal queue online' : 'Proposal queue unavailable',
+    proposalQueueTone: integrationBundleBlocksPromotionPlanning
+      ? 'red'
+      : proposalQueueAvailable ? 'green' : 'yellow',
     liveWritePolicy,
     manualGateLabel: emergencyStopped
       ? 'Reset required'

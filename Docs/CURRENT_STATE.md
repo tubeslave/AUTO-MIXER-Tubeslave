@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T21:33:52Z
+Generated: 2026-06-19T21:47:27Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T21:33:52Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `54d4d672 Render integration bundle blockers in director guard`
+  `f0e1de8a Surface integration bundle blocker in director goal`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -582,6 +582,17 @@ Generated: 2026-06-19T21:33:52Z
   apply, so goal-visible integration bundle status cannot queue proposals,
   grant live authority, close readiness, contact WING/backend, mark Full
   Autonomous ready, or replace real hardware/operator validation.
+- M033 Director queue integration bundle blocker badge is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m033_director_queue_badge_surfaces_integration_bundle_blocker`.
+  The updated `frontend/src/services/operatorAdapters.ts` module now changes
+  `DirectorRuntime.proposalQueueLabel` to `Promotion planning blocked` and
+  `proposalQueueTone` to `red` when `main_pipeline_preview.summary` reports a
+  blocked offline integration bundle. Backend queue availability still does
+  not become promotion readiness, review-only task rows remain inspectable,
+  and badge-visible integration bundle status cannot queue proposals, grant
+  live authority, close readiness, contact WING/backend, mark Full Autonomous
+  ready, apply to console, or replace real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -592,4 +603,4 @@ Generated: 2026-06-19T21:33:52Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4158 passed, 1 skipped, 1 warning`.
+  `4159 passed, 1 skipped, 1 warning`.

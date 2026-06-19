@@ -4720,6 +4720,8 @@ test('director runtime surfaces preview integration bundle readiness without liv
     runtime.currentGoal,
     'Resolve the offline integration bundle blocker before promotion planning. Keep proposals review-only; no live authority, readiness closure or console apply is granted.',
   );
+  assert.equal(runtime.proposalQueueLabel, 'Promotion planning blocked');
+  assert.equal(runtime.proposalQueueTone, 'red');
   assert.equal(runtime.manualGateLabel, 'Apply blocked');
 });
 

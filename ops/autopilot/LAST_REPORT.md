@@ -633,7 +633,35 @@ goal-visible integration bundle readiness cannot queue proposals, grant live
 authority, close readiness, contact WING/backend, mark Full Autonomous ready,
 or replace accepted real hardware/operator validation.
 
+The M033 Director queue integration bundle blocker badge rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m033_director_queue_badge_surfaces_integration_bundle_blocker`.
+It updates `frontend/src/services/operatorAdapters.ts` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M033-director-queue-integration-bundle-blocker-badge.md`,
+`Docs/adr/director-queue-integration-bundle-blocker-badge-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The Director runtime adapter now
+changes `DirectorRuntime.proposalQueueLabel` to `Promotion planning blocked`
+and `proposalQueueTone` to `red` when `main_pipeline_preview.summary` reports
+a blocked offline integration bundle. Backend queue availability stays
+separate from promotion readiness, review-only task rows remain inspectable,
+and badge-visible integration bundle readiness cannot queue proposals, grant
+live authority, close readiness, contact WING/backend, mark Full Autonomous
+ready, apply to console, or replace accepted real hardware/operator
+validation.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `50 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m033_director_queue_badge_surfaces_integration_bundle_blocker -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `46 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4159 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `50 passed`.

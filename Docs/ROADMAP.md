@@ -56,6 +56,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M030 | Director event integration bundle blocker summary | Director event rows render integration bundle blocker tags as operator-readable read-only events | M029 | high offline frontend | UNIT_VERIFIED read-only Director event surface; live authority remains blocked | PENDING |
 | M031 | Director guard integration bundle blocker banner | Runtime Guard blocker banner renders integration bundle blocker tags as operator-readable read-only messages | M030 | high offline frontend | UNIT_VERIFIED read-only Director guard banner; live authority remains blocked | PENDING |
 | M032 | Director goal integration bundle blocker summary | Director current goal names the offline integration bundle blocker before generic promotion-planning fallback | M031 | high offline frontend | UNIT_VERIFIED read-only Director goal; live authority remains blocked | PENDING |
+| M033 | Director queue integration bundle blocker badge | Director proposal queue badge shows blocked promotion planning when the offline integration bundle is blocked | M032 | high offline frontend | UNIT_VERIFIED read-only Director queue badge; live authority remains blocked | PENDING |
 
 ## Active milestone
 
