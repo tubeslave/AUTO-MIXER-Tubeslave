@@ -19,9 +19,15 @@ DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
 CURRENT_STATE_DOC = PROJECT_ROOT / "Docs" / "CURRENT_STATE.md"
 ROADMAP_DOC = PROJECT_ROOT / "Docs" / "ROADMAP.md"
 ACTIVE_MILESTONE_DOC = PROJECT_ROOT / "Docs" / "ACTIVE_MILESTONE.md"
+PROJECT_EXECUTION_CONTRACT = PROJECT_ROOT / "Docs" / "PROJECT_EXECUTION_CONTRACT.md"
 CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CAPABILITY_MATRIX.md"
 CONSOLE_CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CONSOLE_CAPABILITY_MATRIX.md"
+M001_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M001-wing-readonly-preflight-evidence-gate.md"
+AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
+AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
+AUTOPILOT_HEARTBEAT = PROJECT_ROOT / "ops" / "autopilot" / "HEARTBEAT.md"
+AUTOPILOT_LAST_REPORT = PROJECT_ROOT / "ops" / "autopilot" / "LAST_REPORT.md"
 AUTOPILOT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
 RUNNER_TOOL = PROJECT_ROOT / "tools" / "wing_readonly_preflight_runner.py"
@@ -339,6 +345,56 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
 
     assert "real WING Rack read-only artifact" in blockers
     assert "Control-plane docs/state can proceed without live hardware contact" in blockers
+
+
+def test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    contract = PROJECT_EXECUTION_CONTRACT.read_text(encoding="utf-8")
+    skill = AUTOPILOT_SKILL.read_text(encoding="utf-8")
+    plan = M001_PLAN.read_text(encoding="utf-8")
+    active = ACTIVE_MILESTONE_DOC.read_text(encoding="utf-8")
+    operations = AUTOPILOT_OPERATIONS.read_text(encoding="utf-8")
+    heartbeat = AUTOPILOT_HEARTBEAT.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    blockers = AUTOPILOT_BLOCKERS.read_text(encoding="utf-8")
+
+    assert state["stop_file"] == "ops/autopilot/STOP"
+    assert state["writer_lease_dir"] == "ops/autopilot/WRITER_LEASE"
+    assert state["writer_lease_stale_after_minutes"] == 30
+    assert state["current_writer_lease"] is None
+
+    stop_path = state["stop_file"]
+    lease_path = state["writer_lease_dir"]
+    owner_path = f"{lease_path}/owner.json"
+
+    for text in (contract, skill, operations):
+        assert stop_path in text
+        assert lease_path in text
+
+    assert owner_path in operations
+    assert ".codex_autoloop.lock" in contract
+    assert ".codex_autoloop.lock" in skill
+    assert "RUN_LEDGER.jsonl" in contract
+    assert "RUN_LEDGER.jsonl" in operations
+    assert "STOPPED" in contract
+    assert "STOPPED" in skill
+    assert "30 minutes" in operations
+    assert "30" in contract
+
+    assert "STOP, lock, stale-run and recovery behavior remain documented" in plan
+    assert "Stop if `ops/autopilot/STOP` exists" in active
+    assert "another writer owns a non-stale lease" in active
+    assert "Writer lease: none" in heartbeat
+    assert "`ops/autopilot/STOP` does not exist after setup" in blockers
+
+    assert "## Stop procedure" in report
+    assert "Create `ops/autopilot/STOP`" in report
+    assert re.search(r"release\s+lease", report)
+    assert "set status to `STOPPED`" in report
+    assert "## Recovery procedure" in report
+    for marker in ("STATE.json", "RUN_LEDGER.jsonl", "active plan", "git\ndiff"):
+        assert marker in report
+    assert "Resume from the first checkpoint whose required evidence is missing" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

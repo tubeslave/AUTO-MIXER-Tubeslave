@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T14:21:29Z
+Generated: 2026-06-19T14:34:16Z
 
 ## Repository snapshot
 
@@ -213,6 +213,15 @@ Generated: 2026-06-19T14:21:29Z
   `Docs/CONSOLE_CAPABILITY_MATRIX.md` and `ops/autopilot/BLOCKERS.md` so M001
   and M002 remain external-validation states, M003-M006 remain blocked by M002,
   and WING console live rows do not claim hardware evidence.
+- STOP, lease and recovery contract paths are now covered by
+  `tests/test_wing_mvp_rails.py::test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state`.
+  The rail checks `ops/autopilot/STATE.json`,
+  `Docs/PROJECT_EXECUTION_CONTRACT.md`, `.agents/skills/automixer-autopilot/SKILL.md`,
+  `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`,
+  `Docs/ACTIVE_MILESTONE.md`, `ops/autopilot/OPERATIONS.md`,
+  `ops/autopilot/HEARTBEAT.md`, `ops/autopilot/LAST_REPORT.md` and
+  `ops/autopilot/BLOCKERS.md` for consistent STOP, writer-lease, stale-run and
+  recovery wording.
 
 ## Unresolved unknowns
 
@@ -223,4 +232,4 @@ Generated: 2026-06-19T14:21:29Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4067 passed, 1 skipped, 1 warning`.
+  `4068 passed, 1 skipped, 1 warning`.

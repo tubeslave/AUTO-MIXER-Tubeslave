@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T14:21:29Z.
+- Latest heartbeat: 2026-06-19T14:34:16Z.
 
 ## Что сделано
 
@@ -166,6 +166,14 @@ It compares `ops/autopilot/STATE.json`, `Docs/ACTIVE_MILESTONE.md`,
 and M002 stay in external-validation states, M003-M006 stay blocked by M002,
 and WING console live rows do not claim hardware evidence.
 
+The STOP/lease/recovery contract rail is now automated by
+`tests/test_wing_mvp_rails.py::test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state`.
+It compares `ops/autopilot/STATE.json`, `Docs/PROJECT_EXECUTION_CONTRACT.md`,
+`.agents/skills/automixer-autopilot/SKILL.md`, the active M001 plan,
+`Docs/ACTIVE_MILESTONE.md`, `ops/autopilot/OPERATIONS.md`,
+`ops/autopilot/HEARTBEAT.md`, this report and `ops/autopilot/BLOCKERS.md` so
+STOP, writer-lease, stale-run and recovery paths stay consistent.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -250,8 +258,10 @@ and WING console live rows do not claim hardware evidence.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `11 passed`.
+  `12 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -263,7 +273,7 @@ and WING console live rows do not claim hardware evidence.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4067 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4068 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -294,7 +304,7 @@ and WING console live rows do not claim hardware evidence.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:21:29Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:34:16Z`, latest
   verified product/runtime commit `e8a38bc0`, latest state/evidence commit
   `74f063d1`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
@@ -319,10 +329,10 @@ and WING console live rows do not claim hardware evidence.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed active milestone, roadmap, capability
-  matrices and blockers keep M001/M002 waiting on real WING evidence and
-  M003-M006 blocked by M002. It found no real WING read-only artifact under
-  `artifacts/wing_readonly_preflight/`.
+- Heartbeat reconciliation confirmed STOP, writer-lease, stale-run and
+  recovery contract paths stay consistent across state, contract, skill, plan,
+  operations, heartbeat, blockers and this report. It found no real WING
+  read-only artifact under `artifacts/wing_readonly_preflight/`.
 
 ## Оставшаяся работа
 
