@@ -397,6 +397,57 @@ def test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state():
     assert "Resume from the first checkpoint whose required evidence is missing" in report
 
 
+def test_goal_transition_fallback_contract_stays_report_only_without_native_goal_tools():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    contract = PROJECT_EXECUTION_CONTRACT.read_text(encoding="utf-8")
+    skill = AUTOPILOT_SKILL.read_text(encoding="utf-8")
+    blockers = AUTOPILOT_BLOCKERS.read_text(encoding="utf-8")
+    heartbeat = AUTOPILOT_HEARTBEAT.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["active_milestone"] == "M001"
+    assert state["checkpoint_status"] == "waiting_for_external_validation"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["product_runtime_changed"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert "operator-supervised WING read-only preflight" in state["next_action"]
+
+    assert "## Goal transition" in contract
+    assert "Native thread Goal management" in contract
+    assert "goal tools" in contract
+    assert "native Goal update unavailable" in contract
+    assert "`LAST_REPORT.md`" in contract
+    assert "`/goal`" in contract
+    assert "state\nchecks" in contract
+    assert "Codex threads/goals" in contract
+    assert "Automixer product files" in contract
+    assert "hardware" in contract
+    assert "single-writer serialization" in contract
+
+    assert "active Goal" in contract
+    assert "RUN_LEDGER.jsonl" in contract
+    assert "Do not mark a checkpoint complete while required checks fail" in skill
+    assert re.search(
+        r"Always name exact files, commands, evidence paths, blockers and next\s+action",
+        skill,
+    )
+
+    assert "Future heartbeat wake-ups must verify native Goal transition tools before" in blockers
+    assert "replacing a thread Goal" in blockers
+    assert "Control-plane docs/state can proceed without live hardware contact" in blockers
+
+    assert "Writer lease: none" in heartbeat
+    assert "This heartbeat made no product/runtime\nchange" in heartbeat
+    assert "M001 still has no real WING read-only artifact" in heartbeat
+
+    assert "## First Goal" in report
+    assert "The next finite Goal should only be created after a real\nWING read-only artifact" in report
+    assert "another explicitly safe\nindependent roadmap item" in report
+    assert "Do not contact\nWING from unattended automation" in report
+    assert "There is no dependency-ready autonomous\nroadmap milestone" in report
+
+
 def test_mvp_doc_declares_scope_and_stop_rules():
     text = MVP_DOC.read_text(encoding="utf-8")
 

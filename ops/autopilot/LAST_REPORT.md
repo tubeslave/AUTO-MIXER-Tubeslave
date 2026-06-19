@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T14:34:16Z.
+- Latest heartbeat: 2026-06-19T14:45:06Z.
 
 ## Что сделано
 
@@ -147,8 +147,8 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-state/evidence commit `74f063d1`; this synchronization did not change product
-runtime behavior.
+pre-checkpoint state/evidence commit `75cd86c5`; this synchronization did not
+change product runtime behavior.
 
 The current-state freshness rail is now automated by
 `tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence`.
@@ -173,6 +173,16 @@ It compares `ops/autopilot/STATE.json`, `Docs/PROJECT_EXECUTION_CONTRACT.md`,
 `Docs/ACTIVE_MILESTONE.md`, `ops/autopilot/OPERATIONS.md`,
 `ops/autopilot/HEARTBEAT.md`, this report and `ops/autopilot/BLOCKERS.md` so
 STOP, writer-lease, stale-run and recovery paths stay consistent.
+
+The Goal transition fallback contract rail is now automated by
+`tests/test_wing_mvp_rails.py::test_goal_transition_fallback_contract_stays_report_only_without_native_goal_tools`.
+It compares `ops/autopilot/STATE.json`, `Docs/PROJECT_EXECUTION_CONTRACT.md`,
+`.agents/skills/automixer-autopilot/SKILL.md`, `ops/autopilot/BLOCKERS.md`,
+`ops/autopilot/HEARTBEAT.md` and this report so future heartbeat wake-ups
+verify native Goal tools before replacing a thread Goal. If native Goal update
+is unavailable, the fallback remains report-only: update repo state, print the
+manual `/goal` command in this report, and do not change Automixer product
+files or hardware.
 
 ## Проверка
 
@@ -260,8 +270,10 @@ STOP, writer-lease, stale-run and recovery paths stay consistent.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_goal_transition_fallback_contract_stays_report_only_without_native_goal_tools -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `12 passed`.
+  `13 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -273,7 +285,7 @@ STOP, writer-lease, stale-run and recovery paths stay consistent.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4068 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4069 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -304,9 +316,9 @@ STOP, writer-lease, stale-run and recovery paths stay consistent.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:34:16Z`, latest
-  verified product/runtime commit `e8a38bc0`, latest state/evidence commit
-  `74f063d1`, latest no-WING artifact
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:45:06Z`, latest
+  verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
+  state/evidence commit `75cd86c5`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:

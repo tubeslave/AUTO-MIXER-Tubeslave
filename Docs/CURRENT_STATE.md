@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T14:34:16Z
+Generated: 2026-06-19T14:45:06Z
 
 ## Repository snapshot
 
@@ -8,8 +8,8 @@ Generated: 2026-06-19T14:34:16Z
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
-- Latest verified autopilot state/evidence commit:
-  `74f063d1 Record no-WING manifest gate evidence`
+- Latest verified pre-checkpoint autopilot state/evidence commit:
+  `75cd86c5 Guard autopilot stop lease recovery`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -222,6 +222,14 @@ Generated: 2026-06-19T14:34:16Z
   `ops/autopilot/HEARTBEAT.md`, `ops/autopilot/LAST_REPORT.md` and
   `ops/autopilot/BLOCKERS.md` for consistent STOP, writer-lease, stale-run and
   recovery wording.
+- Goal transition fallback behavior is now covered by
+  `tests/test_wing_mvp_rails.py::test_goal_transition_fallback_contract_stays_report_only_without_native_goal_tools`.
+  The rail checks `Docs/PROJECT_EXECUTION_CONTRACT.md`,
+  `.agents/skills/automixer-autopilot/SKILL.md`, `ops/autopilot/BLOCKERS.md`,
+  `ops/autopilot/HEARTBEAT.md`, `ops/autopilot/LAST_REPORT.md` and
+  `ops/autopilot/STATE.json` so future heartbeat wake-ups verify native Goal
+  tools before replacing a thread Goal and fall back to report-only state
+  checks without changing Automixer product files or hardware.
 
 ## Unresolved unknowns
 
@@ -232,4 +240,4 @@ Generated: 2026-06-19T14:34:16Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4068 passed, 1 skipped, 1 warning`.
+  `4069 passed, 1 skipped, 1 warning`.
