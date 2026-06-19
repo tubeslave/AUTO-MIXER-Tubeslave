@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T07:48:53Z.
+- Latest heartbeat: 2026-06-19T07:57:23Z.
 
 ## Что сделано
 
@@ -29,6 +29,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 - `d20f7d46` - autonomy evidence overlay and the no-WING overlay schema gate
   now use the WING deployment boundary, so `pan` is not emitted or accepted as
   a current WING autonomy-overlay target.
+- `bb5816d4` - product-state normalization now filters and recomputes autonomy
+  overlay rows, status counts and target buckets against the WING deployment
+  boundary before exposing them to operator-facing state surfaces.
 
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
@@ -39,16 +42,20 @@ grant live authority.
   `27 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_autonomy_evidence_overlay.py tests/test_supervised_proof_artifact_report.py tests/test_no_wing_release_check.py::test_no_wing_release_check_validates_autonomy_evidence_overlay_schema tests/test_no_wing_release_check.py::test_no_wing_release_check_rejects_autonomy_overlay_outside_wing_boundary tests/test_no_wing_release_check.py::test_no_wing_release_check_rejects_autonomy_overlay_that_claims_authority tests/test_no_wing_release_check.py::test_no_wing_release_check_rejects_autonomy_overlay_summary_row_drift tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay -q`:
   `15 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_product_state.py::test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only tests/test_operator_product_state.py::test_supervised_proof_evidence_filters_overlay_rows_to_wing_boundary tests/test_operator_product_state.py::test_supervised_proof_evidence_normalizes_raw_mixer_contract_claims tests/test_operator_product_state.py::test_supervised_proof_evidence_snapshot_marks_stale_artifacts tests/test_operator_product_state.py::test_processing_pipeline_snapshot_includes_sanitized_autonomy_overlay -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_product_state.py -q`:
+  `155 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `430 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 tools/no_wing_release_check.py --quick`:
   passed.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4031 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4032 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
 - `python tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
-  `artifacts/no_wing_release_check/20260619T074627Z_no_wing_release_check`.
+  `artifacts/no_wing_release_check/20260619T075435Z_no_wing_release_check`.
 - Authority flags remained safe: no WING/backend contact, no live write, no
   readiness closure, no live authority.
 - CP04 handoff report:
@@ -67,7 +74,7 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `d20f7d46` is the latest verified
+- Heartbeat reconciliation confirmed `bb5816d4` is the latest verified
   product/runtime commit and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
