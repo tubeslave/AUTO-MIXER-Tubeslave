@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T11:46:05Z
+Generated: 2026-06-19T11:56:17Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `b239d6f5 Surface ledger request sequence maps`
+  `b595cf00 Surface ledger expected artifact maps`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -51,7 +51,7 @@ Generated: 2026-06-19T11:46:05Z
   `12ee8214`, `b0c71460`, `d84b4a63`, `7a616805`, `93e66009`, and
   `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, `ffddb646`, and
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
-  `14124ff6`, and `b239d6f5`.
+  `14124ff6`, `b239d6f5`, and `b595cf00`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -145,6 +145,11 @@ Generated: 2026-06-19T11:46:05Z
   request-sequence maps, per-source plan-match flags, missing source ids and
   trace completeness, so summary consumers can see the canonical request order
   proof instead of only contract validity and source ids.
+- The no-WING compact review-decision ledger summary now also exposes accepted
+  candidate expected-artifact trace maps, including expected artifacts,
+  expected summary/events artifact paths, per-source path-match flags, missing
+  source ids and trace completeness, so summary consumers can see stale or
+  forged artifact bindings without reading only the detailed proof plan.
 
 ## Unresolved unknowns
 
@@ -154,5 +159,5 @@ Generated: 2026-06-19T11:46:05Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `b239d6f5` passed with
+  but the latest verified full-suite run for `b595cf00` passed with
   `4061 passed, 1 skipped, 1 warning`.
