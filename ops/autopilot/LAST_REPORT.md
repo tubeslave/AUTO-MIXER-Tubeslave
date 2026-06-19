@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T10:26:30Z.
+- Latest heartbeat: 2026-06-19T10:40:30Z.
 
 ## Что сделано
 
@@ -86,6 +86,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 - `124c1115` - no-WING release-check ledger validation now also fails accepted
   review candidates whose expected-summary artifact trace points to a different
   summary path than the accepted source id.
+- `cb2301e8` - no-WING release-check ledger validation now also fails accepted
+  review candidates whose expected-events artifact trace points to a different
+  events path than the accepted summary source id.
 
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
@@ -146,6 +149,8 @@ grant live authority.
   `6 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_snapshot tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_expected_summary_artifact_mismatch tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace_candidates tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_request_sequence_source_mismatch tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_artifact_root_mismatch -q`:
   `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_snapshot tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_expected_summary_artifact_mismatch tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_expected_events_artifact_mismatch tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace_candidates tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_request_sequence_source_mismatch tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_artifact_root_mismatch -q`:
+  `6 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py -q`:
   `40 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision_tool.py -q`:
@@ -153,13 +158,13 @@ grant live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 tools/no_wing_release_check.py --quick --skip-frontend`:
   passed.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
-  `436 passed`.
+  `437 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4053 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4054 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
 - `python tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
-  `artifacts/no_wing_release_check/20260619T102434Z_no_wing_release_check`.
+  `artifacts/no_wing_release_check/20260619T104006Z_no_wing_release_check`.
 - Authority flags remained safe: no WING/backend contact, no live write, no
   readiness closure, no live authority.
 - CP04 handoff report:
@@ -178,7 +183,7 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `124c1115` is the latest verified
+- Heartbeat reconciliation confirmed `cb2301e8` is the latest verified
   product/runtime commit and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
