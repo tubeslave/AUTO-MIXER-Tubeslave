@@ -227,6 +227,18 @@ def register_handlers(server):
     def proposal_id_or_index(data):
         return data.get("proposal_id") or data.get("id"), data.get("index")
 
+    def allowed_live_write_kinds_for_safety_surface(operator_mode=None):
+        status = (
+            operator_mode
+            if isinstance(operator_mode, dict)
+            else server.get_operator_mode_status()
+        )
+        if status.get("wing_deployment"):
+            return list(
+                status.get("capabilities", {}).get("allowed_live_write_kinds") or []
+            )
+        return list(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+
     def coerce_float(value):
         try:
             if value is None:
@@ -381,7 +393,7 @@ def register_handlers(server):
             "proposed_value": proposed_value,
             "delta": delta,
             "safety_limits": {
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(),
                 "max_delta_db": APPLY_DELTA_LIMITS_DB.get(value_type),
                 "upward_auto_generated_moves_allowed": False,
             },
@@ -1886,7 +1898,7 @@ def register_handlers(server):
                     proposed_value=requested_change.get("value"),
                     delta=requested_change.get("delta_db"),
                     safety_limits={
-                        "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                        "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(),
                         "proposal_only_if_unsupported": True,
                     },
                     proof_status="pending",
@@ -2727,7 +2739,9 @@ def register_handlers(server):
                 "queries_console": False,
                 "live_widening_allowed": False,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(
+                    operator_mode
+                ),
             },
             "planned_apply_sequence": planned_steps,
             "blocked_results": blocked_results,
@@ -2966,7 +2980,7 @@ def register_handlers(server):
                 "queries_console": False,
                 "live_widening_allowed": False,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(),
             },
             "dry_run_results": results,
         }
@@ -3035,7 +3049,9 @@ def register_handlers(server):
                 "queries_console": False,
                 "live_widening_allowed": False,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(
+                    operator_mode
+                ),
             },
             "ready_for_executor": candidates,
             "blocked_results": blocked,
@@ -4112,7 +4128,9 @@ def register_handlers(server):
                 "requires_gate_ready": True,
                 "uses_existing_apply_operator_proposal": True,
                 "live_apply_entrypoint": "apply_operator_proposal",
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(
+                    operator_mode
+                ),
                 "live_write": live_write,
                 "direct_live_write": False,
                 "apply_attempted": delegated_apply_attempted,
@@ -4541,7 +4559,7 @@ def register_handlers(server):
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
                 "live_apply_entrypoint_required": "apply_operator_proposal",
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(),
                 "execution_allowed_by_audit": False,
                 "live_write": False,
                 "apply_attempted": False,
@@ -4816,7 +4834,7 @@ def register_handlers(server):
                 "audit_payload_required": True,
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(),
                 "execution_allowed_by_policy_gate": False,
                 "execution_allowed_by_audit": False,
                 "live_write": False,
@@ -5143,7 +5161,7 @@ def register_handlers(server):
                 "policy_gate_payload_required": True,
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(),
                 "append_only_memory_write_allowed_by_draft": False,
                 "requires_separate_memory_writer": True,
                 "execution_allowed_by_draft": False,
@@ -5506,7 +5524,7 @@ def register_handlers(server):
                 "target_memory_path": ".ai/memory/project.md",
                 "does_not_call_apply_operator_proposal": True,
                 "does_not_call_manual_console_write": True,
-                "allowed_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+                "allowed_live_write_kinds": allowed_live_write_kinds_for_safety_surface(),
                 "live_write": False,
                 "apply_attempted": False,
                 "queue_mutation": False,

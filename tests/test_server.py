@@ -1104,6 +1104,52 @@ class TestWingDeploymentWriteBoundary:
         assert status["approved_live_write_kinds"] == ["fader", "gain", "pan"]
 
     @pytest.mark.asyncio
+    async def test_wing_sequence_plan_safety_scope_uses_deployment_boundary(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["plan_operator_proposal_apply_sequence"](websocket, {})
+
+        payload = self._decode_last_message(websocket)
+        assert payload["operator_mode"]["wing_deployment"] is True
+        assert (
+            payload["operator_mode"]["capabilities"]["allowed_live_write_kinds"]
+            == ["fader", "gain"]
+        )
+        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
+        assert "pan" not in payload["safety"]["allowed_live_write_kinds"]
+
+    @pytest.mark.asyncio
+    async def test_offline_sequence_plan_safety_scope_retains_current_proven_kinds(
+        self,
+        minimal_server,
+    ):
+        server = minimal_server
+        server.connection_mode = "offline"
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["plan_operator_proposal_apply_sequence"](websocket, {})
+
+        payload = self._decode_last_message(websocket)
+        assert payload["operator_mode"]["wing_deployment"] is False
+        assert (
+            payload["operator_mode"]["capabilities"]["allowed_live_write_kinds"]
+            == ["fader", "gain", "pan"]
+        )
+        assert payload["safety"]["allowed_live_write_kinds"] == [
+            "fader",
+            "gain",
+            "pan",
+        ]
+
+    @pytest.mark.asyncio
     async def test_wing_manual_gate_filters_pan_from_operator_mode_scope(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
