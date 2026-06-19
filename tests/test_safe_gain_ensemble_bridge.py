@@ -1,9 +1,32 @@
-from operator_recommendation_bridge import build_safe_gain_operator_proposals
+import time
+
+from operator_recommendation_bridge import (
+    _cache_freshness_for_change,
+    build_safe_gain_operator_proposals,
+)
 
 
 class _MixerWithCachedTrim:
     def get_channel_gain(self, channel):
         return 0.0
+
+
+class _MixerWithCachedPan:
+    state = {"/ch/3/pan": 0.0}
+    state_timestamps = {"/ch/3/pan": time.time()}
+
+
+def test_recommendation_bridge_treats_pan_as_outside_current_wing_apply_scope():
+    freshness = _cache_freshness_for_change(
+        _MixerWithCachedPan(),
+        {"value_type": "pan", "channel": 3, "value": 0.0},
+    )
+
+    assert freshness["status"] == "unsupported"
+    assert freshness["value_type"] == "pan"
+    assert freshness["read_only"] is True
+    assert freshness["live_write"] is False
+    assert freshness["queries_console"] is False
 
 
 def test_safe_gain_proposal_omits_time_evidence_when_ensemble_time_coherence_disabled():
