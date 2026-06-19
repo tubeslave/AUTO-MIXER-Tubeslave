@@ -26261,6 +26261,23 @@ def test_verify_no_wing_artifact_manifest_passes_written_bundle(tmp_path):
     assert checks["summary_md_live_authority_granted_denies_authority"] is True
     for field_name in manifest_verifier.SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS:
         assert checks[f"summary_md_{field_name}_denies_authority"] is True
+    assert (
+        checks[
+            "summary_json_no_wing_summary_markdown_top_level_coverage_fields_present"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_md_no_wing_summary_markdown_top_level_coverage_fields_rendered"
+        ]
+        is True
+    )
+    for field_name in (
+        manifest_verifier.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_EXPECTED_VALUES
+    ):
+        assert checks[f"summary_json_{field_name}_matches_expected"] is True
+        assert checks[f"summary_md_{field_name}_matches_expected"] is True
     assert checks["verifier_report_read_only_matches_expected"] is True
     assert checks["verifier_report_live_write_matches_expected"] is True
     assert checks["verifier_report_contacts_wing_matches_expected"] is True
@@ -26517,6 +26534,157 @@ def _refresh_no_wing_manifest_artifact_sha(
         json.dumps(manifest, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def test_verify_no_wing_artifact_manifest_checks_top_level_coverage_field_lines(
+    tmp_path,
+):
+    write_summary(
+        tmp_path,
+        [
+            CheckResult(
+                name="unit_check",
+                status="passed",
+                started_at="2026-06-15T00:00:00Z",
+                finished_at="2026-06-15T00:00:01Z",
+                duration_sec=1.0,
+                command="python -m pytest",
+                cwd=str(tmp_path),
+                returncode=0,
+            )
+        ],
+        generated_at="2026-06-15T00:00:00Z",
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    checks = report["checks"]
+    assert report["status"] == "passed"
+    assert report["failed_checks"] == []
+    assert (
+        checks[
+            "summary_json_no_wing_summary_markdown_top_level_coverage_fields_present"
+        ]
+        is True
+    )
+    assert (
+        checks[
+            "summary_md_no_wing_summary_markdown_top_level_coverage_fields_rendered"
+        ]
+        is True
+    )
+    for field_name in (
+        manifest_verifier.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_EXPECTED_VALUES
+    ):
+        assert checks[f"summary_json_{field_name}_matches_expected"] is True
+        assert checks[f"summary_md_{field_name}_matches_expected"] is True
+    assert (
+        checks[
+            "summary_md_no_wing_summary_markdown_top_level_coverage_live_authority_granted_denies_authority"
+        ]
+        is True
+    )
+
+
+def test_verify_no_wing_artifact_manifest_fails_missing_top_level_coverage_markdown_line(
+    tmp_path,
+):
+    write_summary(
+        tmp_path,
+        [
+            CheckResult(
+                name="unit_check",
+                status="passed",
+                started_at="2026-06-15T00:00:00Z",
+                finished_at="2026-06-15T00:00:01Z",
+                duration_sec=1.0,
+                command="python -m pytest",
+                cwd=str(tmp_path),
+                returncode=0,
+            )
+        ],
+        generated_at="2026-06-15T00:00:00Z",
+    )
+    omitted_field = (
+        "no_wing_summary_markdown_top_level_coverage_live_authority_granted"
+    )
+    summary_md_path = tmp_path / "summary.md"
+    summary_md_text = "\n".join(
+        line
+        for line in summary_md_path.read_text(encoding="utf-8").splitlines()
+        if not line.startswith(f"- {omitted_field}: ")
+    )
+    summary_md_path.write_text(summary_md_text + "\n", encoding="utf-8")
+    _refresh_no_wing_manifest_artifact_sha(
+        tmp_path,
+        artifact_id="summary_md",
+        top_level_sha_field="artifact_manifest_summary_md_sha256",
+        artifact_path="summary.md",
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    failed_checks = report["failed_checks"]
+    assert report["status"] == "failed"
+    assert "summary_md_sha256_matches_actual" not in failed_checks
+    assert "summary_md_sha256_matches_manifest" not in failed_checks
+    assert (
+        "summary_md_no_wing_summary_markdown_top_level_coverage_fields_rendered"
+        in failed_checks
+    )
+    assert f"summary_md_{omitted_field}_matches_expected" in failed_checks
+    assert f"summary_md_{omitted_field}_denies_authority" in failed_checks
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_authority_granted"] is False
+
+
+def test_verify_no_wing_artifact_manifest_fails_top_level_coverage_json_drift(
+    tmp_path,
+):
+    write_summary(
+        tmp_path,
+        [
+            CheckResult(
+                name="unit_check",
+                status="passed",
+                started_at="2026-06-15T00:00:00Z",
+                finished_at="2026-06-15T00:00:01Z",
+                duration_sec=1.0,
+                command="python -m pytest",
+                cwd=str(tmp_path),
+                returncode=0,
+            )
+        ],
+        generated_at="2026-06-15T00:00:00Z",
+    )
+    drifted_field = (
+        "no_wing_summary_markdown_top_level_coverage_field_lines_rendered"
+    )
+    summary_json_path = tmp_path / "summary.json"
+    summary_json = json.loads(summary_json_path.read_text(encoding="utf-8"))
+    summary_json[drifted_field] = False
+    summary_json_path.write_text(
+        json.dumps(summary_json, indent=2, ensure_ascii=False, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    _refresh_no_wing_manifest_artifact_sha(
+        tmp_path,
+        artifact_id="summary_json",
+        top_level_sha_field="artifact_manifest_summary_json_sha256",
+        artifact_path="summary.json",
+    )
+
+    report = manifest_verifier.verify_no_wing_artifact_manifest(tmp_path)
+
+    failed_check = f"summary_json_{drifted_field}_matches_expected"
+    assert report["status"] == "failed"
+    assert "summary_json_sha256_matches_actual" not in report["failed_checks"]
+    assert "summary_json_sha256_matches_manifest" not in report["failed_checks"]
+    assert failed_check in report["failed_checks"]
+    assert report["checks"][failed_check] is False
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_authority_granted"] is False
 
 
 def _write_no_wing_bundle_with_next_proof_plan_source_authority(

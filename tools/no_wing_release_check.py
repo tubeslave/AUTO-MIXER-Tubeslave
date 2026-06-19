@@ -771,6 +771,16 @@ WING_READONLY_PREFLIGHT_VALIDATE_RUN_INPUTS_ONLY_EXPECTED_SAFETY_VALUES = {
     "validate_run_inputs_only_readiness_closure_allowed": False,
     "validate_run_inputs_only_grants_live_authority": False,
 }
+NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_VERIFIER_EXPECTED_FIELDS = (
+    "no_wing_summary_markdown_top_level_coverage_required",
+    "no_wing_summary_markdown_top_level_coverage_required_field_lines",
+    "no_wing_summary_markdown_top_level_unexpected_missing_keys_empty",
+    "no_wing_summary_markdown_top_level_interesting_missing_keys_empty",
+    "no_wing_summary_markdown_top_level_coverage_missing_field_lines",
+    "no_wing_summary_markdown_top_level_coverage_field_lines_rendered",
+    "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed",
+    "no_wing_summary_markdown_top_level_coverage_live_authority_granted",
+)
 PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "same no-WING artifact directory",
     "artifact_manifest_self_consistency_summary_surface_match: true",
@@ -842,6 +852,18 @@ PROJECT_DIRECTOR_SELECTED_ACTION_MANIFEST_SIDECAR_REQUIRED_MARKERS = (
     "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted_denies_authority: true",
     "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed_denies_authority: true",
     "artifact_manifest_verifier_check_summary_md_next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted_denies_authority: true",
+    "artifact_manifest_verifier_check_summary_md_no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed_denies_authority: true",
+    "artifact_manifest_verifier_check_summary_md_no_wing_summary_markdown_top_level_coverage_live_authority_granted_denies_authority: true",
+    "artifact_manifest_verifier_check_summary_json_no_wing_summary_markdown_top_level_coverage_fields_present: true",
+    "artifact_manifest_verifier_check_summary_md_no_wing_summary_markdown_top_level_coverage_fields_rendered: true",
+    *(
+        f"artifact_manifest_verifier_check_summary_json_{field_name}_matches_expected: true"
+        for field_name in NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_VERIFIER_EXPECTED_FIELDS
+    ),
+    *(
+        f"artifact_manifest_verifier_check_summary_md_{field_name}_matches_expected: true"
+        for field_name in NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_VERIFIER_EXPECTED_FIELDS
+    ),
     *(
         f"{field_name}: true"
         for field_name in NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_ARTIFACT_VERIFIER_CHECK_FIELDS

@@ -36,6 +36,8 @@ VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS = {
 SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS = (
     "readiness_closure_allowed_by_packet",
     "live_authority_granted",
+    "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed",
+    "no_wing_summary_markdown_top_level_coverage_live_authority_granted",
     "artifact_manifest_contract_cross_surface_readiness_closure_allowed",
     "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed",
     "artifact_manifest_contract_cross_surface_live_authority_granted",
@@ -82,6 +84,35 @@ PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_CHECKS = (
         for field_name in PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_FIELDS
     ),
 )
+NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_EXPECTED_VALUES = {
+    field_name: expected_value
+    for field_name, expected_value in (
+        (
+            "no_wing_summary_markdown_top_level_coverage_required",
+            True,
+        ),
+        (
+            "no_wing_summary_markdown_top_level_coverage_required_field_lines",
+            list(
+                no_wing_release_check.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_REQUIRED_FIELD_LINES
+            ),
+        ),
+        ("no_wing_summary_markdown_top_level_unexpected_missing_keys_empty", True),
+        ("no_wing_summary_markdown_top_level_interesting_missing_keys_empty", True),
+        ("no_wing_summary_markdown_top_level_coverage_missing_field_lines", []),
+        ("no_wing_summary_markdown_top_level_coverage_field_lines_rendered", True),
+        (
+            "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed",
+            False,
+        ),
+        (
+            "no_wing_summary_markdown_top_level_coverage_live_authority_granted",
+            False,
+        ),
+    )
+    if field_name
+    in no_wing_release_check.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_VERIFIER_EXPECTED_FIELDS
+}
 
 
 def _sha256_file(path: Path) -> str:
@@ -507,6 +538,48 @@ def _record_plan_artifact_source_authority_emission_checks(
         )
 
 
+def _record_no_wing_summary_markdown_top_level_coverage_checks(
+    checks: dict[str, bool],
+    *,
+    summary_json: Mapping[str, Any],
+    summary_md_text: str,
+) -> None:
+    summary_md_lines = set(summary_md_text.splitlines())
+    expected = NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_EXPECTED_VALUES
+    _record_check(
+        checks,
+        "summary_json_no_wing_summary_markdown_top_level_coverage_fields_present",
+        all(field_name in summary_json for field_name in expected),
+    )
+    _record_check(
+        checks,
+        "summary_md_no_wing_summary_markdown_top_level_coverage_fields_rendered",
+        all(
+            no_wing_release_check._format_markdown_summary_field_line(
+                field_name,
+                expected_value,
+            )
+            in summary_md_lines
+            for field_name, expected_value in expected.items()
+        ),
+    )
+    for field_name, expected_value in expected.items():
+        _record_check(
+            checks,
+            f"summary_json_{field_name}_matches_expected",
+            summary_json.get(field_name) == expected_value,
+        )
+        _record_check(
+            checks,
+            f"summary_md_{field_name}_matches_expected",
+            no_wing_release_check._format_markdown_summary_field_line(
+                field_name,
+                expected_value,
+            )
+            in summary_md_lines,
+        )
+
+
 def _record_summary_md_safety_checks(
     checks: dict[str, bool],
     *,
@@ -857,6 +930,11 @@ def verify_no_wing_artifact_manifest(run_dir: Path) -> dict[str, object]:
         summary_md_text=summary_md_text,
     )
     _record_plan_artifact_source_authority_emission_checks(
+        checks,
+        summary_json=summary_json,
+        summary_md_text=summary_md_text,
+    )
+    _record_no_wing_summary_markdown_top_level_coverage_checks(
         checks,
         summary_json=summary_json,
         summary_md_text=summary_md_text,

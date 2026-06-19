@@ -60,6 +60,7 @@ from tools.verify_no_wing_artifact_manifest import (  # noqa: E402
     NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_DENIED_FIELDS,
     NEXT_WING_PROOF_PLAN_SOURCE_AUTHORITY_FLAGS_FIELDS,
     NEXT_WING_PROOF_PLAN_SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
+    NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_EXPECTED_VALUES,
     PLAN_ARTIFACT_SOURCE_AUTHORITY_EMISSION_CHECKS,
     SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS,
     VERIFIER_REPORT_HANDOFF_PLAN_SUMMARY_SURFACE_EXPECTED_FIELDS,
@@ -179,6 +180,16 @@ ARTIFACT_MANIFEST_VERIFIER_REQUIRED_CHECKS = (
     *(
         f"summary_md_{field_name}_denies_authority"
         for field_name in SUMMARY_MD_REQUIRED_FALSE_SAFETY_FIELDS
+    ),
+    "summary_json_no_wing_summary_markdown_top_level_coverage_fields_present",
+    "summary_md_no_wing_summary_markdown_top_level_coverage_fields_rendered",
+    *(
+        f"summary_json_{field_name}_matches_expected"
+        for field_name in NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_EXPECTED_VALUES
+    ),
+    *(
+        f"summary_md_{field_name}_matches_expected"
+        for field_name in NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_EXPECTED_VALUES
     ),
     "manifest_wing_readonly_handoff_plan_verifier_summary_surface_fields_present",
     "manifest_wing_readonly_handoff_plan_verifier_summary_surface_required_matches_summary",
