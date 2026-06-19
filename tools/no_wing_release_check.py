@@ -3752,6 +3752,21 @@ def _accepted_candidate_artifact_root_contract(
     )
 
 
+def _expected_events_artifact_for_source(
+    source_id: str,
+    row: Mapping[str, Any],
+) -> str:
+    events_path = str(row.get("events_path") or "")
+    if events_path:
+        return events_path
+    summary_path = str(row.get("summary_path") or source_id or "")
+    summary_suffix = f"/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}"
+    if summary_path.endswith(summary_suffix):
+        run_dir = summary_path[: -len(summary_suffix)]
+        return f"{run_dir}/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}"
+    return ""
+
+
 def _accepted_candidate_expected_artifact_trace(
     accepted_source_ids: Sequence[str],
     candidate_reviews: Sequence[Mapping[str, Any]],
@@ -3778,6 +3793,10 @@ def _accepted_candidate_expected_artifact_trace(
         expected_artifacts = _string_list(row.get("expected_artifacts"))
         expected_summary_artifact = str(row.get("expected_summary_artifact") or "")
         expected_events_artifact = str(row.get("expected_events_artifact") or "")
+        expected_events_artifact_for_source = _expected_events_artifact_for_source(
+            source_id,
+            row,
+        )
         summary_path_matches = row.get("summary_path_matches_expected_artifact") is True
         events_path_matches = row.get("events_path_matches_expected_artifact") is True
         expected_artifacts_by_source[source_id] = expected_artifacts
@@ -3790,6 +3809,10 @@ def _accepted_candidate_expected_artifact_trace(
             or not expected_summary_artifact
             or expected_summary_artifact != source_id
             or not expected_events_artifact
+            or (
+                bool(expected_events_artifact_for_source)
+                and expected_events_artifact != expected_events_artifact_for_source
+            )
             or not summary_path_matches
             or not events_path_matches
         ):
