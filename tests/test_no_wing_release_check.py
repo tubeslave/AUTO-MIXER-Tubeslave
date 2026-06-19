@@ -19124,6 +19124,10 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     assert "selected_mvp_blocker_matches_plan: `true`" in markdown_summary
     assert "selected_mvp_blocker_status_matches_plan: `true`" in markdown_summary
     assert (
+        "project_director_selected_action_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
         "project_director_selected_action_source: "
         f"`{project_director_action_anchor['selected_action_source']}`"
         in markdown_summary
@@ -24446,6 +24450,18 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert (
+        "next_wing_proof_plan_candidate_contracts_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_candidate_contracts_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_candidate_contracts_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
+    assert (
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source"
         in markdown_summary
     )
@@ -24630,6 +24646,18 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert "readonly_preflight_review_decision_duplicate_source_ids: `[]`" in markdown_summary
     assert "required_supervised_proof_plan_summary_fields" in markdown_summary
     assert "missing_required_supervised_proof_plan_summary_fields: `[]`" in markdown_summary
+    assert (
+        "next_wing_proof_plan_required_fields_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_required_fields_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_required_fields_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
     assert "operator_markdown_summary_required: `true`" in markdown_summary
     assert "operator_markdown_summary_required_field_lines" in markdown_summary
     assert (
