@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T19:53:39Z
+Generated: 2026-06-19T20:08:21Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T19:53:39Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `112bf765 Add operator report contract`
+  `dbea76a6 Bind operator report into integration bundle`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -499,6 +499,20 @@ Generated: 2026-06-19T19:53:39Z
   `readiness_closure_allowed: false`, `live_write: false` and
   `hardware_evidence: false`, so operator-report binding cannot become
   hardware proof or live readiness.
+- M026 autonomy readiness integration-bundle overlay is now covered by
+  `tests/test_autonomy_promotion_readiness.py` and
+  `tests/test_wing_mvp_rails.py::test_m026_autonomy_readiness_consumes_integration_bundle_status`.
+  The updated `backend/autonomy_promotion_readiness.py` module now consumes an
+  optional `offline_integration_bundle_manifest` through
+  `backend/evaluation_integration_bundle_contract.py` before reporting offline
+  integration evidence usable for promotion planning. Missing or blocked
+  integration bundle evidence surfaces
+  `offline_integration_bundle_contract_not_ready`; passing offline integration
+  evidence only removes that planning blocker. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false`, `hardware_evidence: false` and
+  `full_autonomous_ready: false`, so autonomy readiness cannot become hardware
+  proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -509,4 +523,4 @@ Generated: 2026-06-19T19:53:39Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4147 passed, 1 skipped, 1 warning`.
+  `4151 passed, 1 skipped, 1 warning`.

@@ -109,6 +109,8 @@ M024_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M024-operator-report-contract.md"
 M024_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-report-contract-20260619.md"
 M025_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M025-operator-report-binding.md"
 M025_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-report-binding-20260619.md"
+M026_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M026-autonomy-readiness-integration-bundle-overlay.md"
+M026_ADR = PROJECT_ROOT / "Docs" / "adr" / "autonomy-readiness-integration-bundle-overlay-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -4200,6 +4202,86 @@ def test_m025_operator_report_binding_requires_m024_manifest():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M025 operator report binding is now covered" in current
     assert "M025 operator report binding rail is now automated" in report
+
+
+def test_m026_autonomy_readiness_consumes_integration_bundle_status():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M026_PLAN.read_text(encoding="utf-8")
+    adr = M026_ADR.read_text(encoding="utf-8")
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+    integration = snapshot["summary"]["offline_integration_bundle"]
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m026 = markdown_table_row(roadmap, "M026")
+    assert m026[1] == "Autonomy readiness integration bundle overlay"
+    assert m026[2] == (
+        "Autonomy promotion readiness consumes offline integration bundle "
+        "contract status before planning supervised or autonomous promotion"
+    )
+    assert m026[3] == "M007-M025"
+    assert m026[4] == "high offline"
+    assert m026[5] == "UNIT_VERIFIED readiness overlay; live authority remains blocked"
+    assert m026[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/autonomy_promotion_readiness.py`" in memory_eval[2]
+    assert "tests/test_autonomy_promotion_readiness.py" in memory_eval[3]
+    assert (
+        "autonomy promotion readiness now requires offline integration bundle contract status"
+        in memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert integration["read_only"] is True
+    assert integration["live_write"] is False
+    assert integration["hardware_evidence"] is False
+    assert integration["readiness_closure_allowed"] is False
+    assert integration["live_authority_granted"] is False
+    assert integration["ready_for_integration_promotion"] is False
+    assert "offline_only_required" in integration["blockers"]
+    assert "operator_report_contract_not_ready" in integration["blockers"]
+    assert "offline_integration_bundle_contract_not_ready" in (
+        snapshot["summary"]["global_blockers"]
+    )
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert snapshot["safety"]["full_autonomous_ready"] is False
+    assert "promotion planning only" in integration["claim"]
+
+    assert "Autonomy promotion readiness snapshots must consume the offline" in (
+        completion
+    )
+    assert "M026-CP01" in plan
+    assert "M026-CP02" in plan
+    assert "offline integration bundle evidence can inform promotion planning only" in (
+        plan
+    )
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M026 autonomy readiness integration-bundle overlay is now covered" in (
+        current
+    )
+    assert "M026 autonomy readiness integration-bundle overlay rail is now automated" in (
+        report
+    )
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -98,6 +98,12 @@ Integration bundle manifests must consume the operator-report contract result
 instead of loose operator_report_bound checks before claiming offline
 integration promotion readiness.
 
+Autonomy promotion readiness snapshots must consume the offline integration
+bundle contract result before treating offline integration evidence as
+promotion-planning input. Passing offline integration evidence alone cannot
+grant live authority, close readiness, mark Full Autonomous ready, or replace
+real hardware, listening, expert, owner, rollback or emergency-stop proof.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

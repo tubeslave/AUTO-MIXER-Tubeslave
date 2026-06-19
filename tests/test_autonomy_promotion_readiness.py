@@ -6,6 +6,47 @@ from backend.autonomy_promotion_readiness import (
     build_autonomy_promotion_readiness_snapshot,
     iter_promotion_readiness_rows,
 )
+from backend.evaluation_integration_bundle_contract import REQUIRED_INTEGRATION_CHECKS
+from backend.fault_injection_recovery_contract import (
+    REQUIRED_AUDIT_FIELDS as RECOVERY_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_EVALUATION_TYPES as RECOVERY_REQUIRED_EVALUATION_TYPES,
+    REQUIRED_FAULT_SCENARIOS,
+    REQUIRED_RECOVERY_OUTCOMES,
+)
+from backend.integration_policy_contract import (
+    REQUIRED_INTEGRATION_CONTROLS as POLICY_REQUIRED_INTEGRATION_CONTROLS,
+    REQUIRED_INTEGRATION_EVIDENCE as POLICY_REQUIRED_INTEGRATION_EVIDENCE,
+)
+from backend.no_live_transport_contract import (
+    REQUIRED_TRANSPORT_CONTROLS,
+    REQUIRED_TRANSPORT_EVIDENCE,
+    REQUIRED_ZERO_RUNTIME_OBSERVATIONS,
+)
+from backend.offline_replay_evaluation_contract import (
+    REQUIRED_EVALUATION_TYPES,
+    REQUIRED_QUALITY_AXES,
+    REQUIRED_SAFETY_CHECKS,
+    REQUIRED_SCENARIOS,
+)
+from backend.operator_report_contract import (
+    REQUIRED_AUDIT_FIELDS as OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_AUTHORITY_DENIAL_FLAGS as OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS,
+    REQUIRED_REPORT_BINDINGS,
+    REQUIRED_REPORT_SECTIONS,
+)
+from backend.quality_threshold_policy_contract import (
+    REQUIRED_POLICY_CHECKS as THRESHOLD_REQUIRED_POLICY_CHECKS,
+    REQUIRED_THRESHOLD_AXES,
+)
+from backend.recovery_policy_contract import (
+    REQUIRED_RECOVERY_CONTROLS,
+    REQUIRED_RECOVERY_EVIDENCE,
+)
+from backend.safety_kernel_trace_contract import (
+    REQUIRED_AUDIT_FIELDS as SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_GUARD_CHECKS as SAFETY_KERNEL_REQUIRED_GUARD_CHECKS,
+    REQUIRED_TRACE_SCENARIOS as SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS,
+)
 from backend.wing_readonly_preflight_evidence import (
     EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY,
     build_wing_readonly_preflight_evidence,
@@ -185,6 +226,272 @@ def _readiness_evidence_snapshot_with_candidate(candidate: dict) -> dict:
     }
 
 
+def _replay_scenario(name: str) -> dict:
+    return {
+        "scenario": name,
+        "evaluation_types": list(REQUIRED_EVALUATION_TYPES),
+        "safety_checks": {key: True for key in REQUIRED_SAFETY_CHECKS},
+        "quality_axes": {
+            key: {"status": "passed", "artifact": f"{name}/{key}.json"}
+            for key in REQUIRED_QUALITY_AXES
+        },
+    }
+
+
+def _threshold_axis(axis: str) -> dict:
+    return {
+        "axis": axis,
+        "metric_name": f"{axis}_score",
+        "direction": "min",
+        "candidate_value": 0.8,
+        "evidence_artifact": f"thresholds/{axis}.json",
+        "rationale": f"Replay promotion threshold for {axis}",
+        "rollback_policy": f"Revert {axis} threshold on regression",
+    }
+
+
+def _quality_threshold_policy_manifest(**overrides) -> dict:
+    manifest = {
+        "policy_id": "autonomy-readiness-threshold-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+        "threshold_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:offline-replay-thresholds",
+            "approved_at": "2026-06-19T17:32:45Z",
+        },
+        "thresholds": [_threshold_axis(axis) for axis in REQUIRED_THRESHOLD_AXES],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _offline_replay_manifest(**overrides) -> dict:
+    manifest = {
+        "manifest_id": "autonomy-readiness-offline-replay",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "quality_threshold_policy_manifest": _quality_threshold_policy_manifest(),
+        "scenarios": [_replay_scenario(name) for name in REQUIRED_SCENARIOS],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _fault_case(name: str) -> dict:
+    return {
+        "fault_scenario": name,
+        "evaluation_types": list(RECOVERY_REQUIRED_EVALUATION_TYPES),
+        "recovery_outcomes": {key: True for key in REQUIRED_RECOVERY_OUTCOMES},
+        "audit": {key: f"{name}/{key}" for key in RECOVERY_REQUIRED_AUDIT_FIELDS},
+    }
+
+
+def _recovery_policy_manifest(**overrides) -> dict:
+    manifest = {
+        "policy_id": "autonomy-readiness-recovery-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "recovery_controls": {key: True for key in REQUIRED_RECOVERY_CONTROLS},
+        "recovery_evidence": {key: True for key in REQUIRED_RECOVERY_EVIDENCE},
+        "recovery_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:fault-recovery-policy",
+            "approved_at": "2026-06-19T18:00:10Z",
+        },
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _fault_recovery_manifest(**overrides) -> dict:
+    manifest = {
+        "manifest_id": "autonomy-readiness-fault-recovery",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "recovery_policy_manifest": _recovery_policy_manifest(),
+        "fault_scenarios": [_fault_case(name) for name in REQUIRED_FAULT_SCENARIOS],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _integration_policy_manifest(**overrides) -> dict:
+    manifest = {
+        "policy_id": "autonomy-readiness-integration-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "integration_controls": {
+            key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+        },
+        "integration_evidence": {
+            key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+        },
+        "integration_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:integration-policy",
+            "approved_at": "2026-06-19T18:10:23Z",
+        },
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _safety_kernel_trace_record(scenario: str, **overrides) -> dict:
+    decision = "bounded_allow" if scenario == "supervised_fader_gain_allowed" else "reject"
+    record = {
+        "scenario": scenario,
+        "safety_decision": decision,
+        "guard_checks": {key: True for key in SAFETY_KERNEL_REQUIRED_GUARD_CHECKS},
+        "audit": {
+            key: f"{scenario}/{key}" for key in SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS
+        }
+        | {"safety_decision": decision},
+    }
+    record.update(overrides)
+    return record
+
+
+def _safety_kernel_trace_manifest(**overrides) -> dict:
+    manifest = {
+        "trace_id": "autonomy-readiness-safety-kernel-trace",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "trace_records": [
+            _safety_kernel_trace_record(scenario)
+            for scenario in SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS
+        ],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _transport_evidence_item(name: str) -> dict:
+    return {
+        "status": "passed",
+        "artifact": f"no-live-transport/{name}.json",
+        "sha256": f"{name}-sha256",
+    }
+
+
+def _no_live_transport_manifest(**overrides) -> dict:
+    manifest = {
+        "transport_id": "autonomy-readiness-no-live-transport",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "transport_controls": {key: True for key in REQUIRED_TRANSPORT_CONTROLS},
+        "transport_evidence": {
+            key: _transport_evidence_item(key) for key in REQUIRED_TRANSPORT_EVIDENCE
+        },
+        "runtime_observations": {
+            key: 0 for key in REQUIRED_ZERO_RUNTIME_OBSERVATIONS
+        },
+        "forbidden_transport_tokens": [],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _operator_report_binding(name: str) -> dict:
+    return {
+        "status": "passed",
+        "artifact": f"operator-report/{name}.json",
+        "sha256": f"{name}-sha256",
+    }
+
+
+def _operator_report_manifest(**overrides) -> dict:
+    manifest = {
+        "report_id": "autonomy-readiness-operator-report",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "report_sections": {key: True for key in REQUIRED_REPORT_SECTIONS},
+        "report_bindings": {
+            key: _operator_report_binding(key) for key in REQUIRED_REPORT_BINDINGS
+        },
+        "authority_denial": {
+            key: False for key in OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS
+        },
+        "visible_blockers": [
+            "M001 waits for real WING read-only artifact",
+            "operator review required",
+        ],
+        "next_operator_action": "Run WING read-only preflight with operator.",
+        "audit": {
+            key: f"operator-report/{key}"
+            for key in OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS
+        },
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _complete_integration_bundle(**overrides) -> dict:
+    manifest = {
+        "manifest_id": "autonomy-readiness-integration-bundle",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "integration_policy_manifest": _integration_policy_manifest(),
+        "safety_kernel_trace_manifest": _safety_kernel_trace_manifest(),
+        "no_live_transport_manifest": _no_live_transport_manifest(),
+        "operator_report_manifest": _operator_report_manifest(),
+        "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+        "offline_replay_manifest": _offline_replay_manifest(),
+        "fault_recovery_manifest": _fault_recovery_manifest(),
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def test_autonomy_promotion_readiness_module_is_read_only_and_transport_free():
     source = Path("backend/autonomy_promotion_readiness.py").read_text()
 
@@ -258,6 +565,101 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
     assert preflight["candidate_blocker_ids"] == []
     assert preflight["closed_blocker_ids"] == []
     assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
+
+
+def test_promotion_readiness_requires_offline_integration_bundle_contract():
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+    integration = snapshot["summary"]["offline_integration_bundle"]
+
+    assert "offline_integration_bundle_contract_not_ready" in (
+        snapshot["summary"]["global_blockers"]
+    )
+    assert integration["read_only"] is True
+    assert integration["offline_only"] is False
+    assert integration["live_write"] is False
+    assert integration["hardware_evidence"] is False
+    assert integration["readiness_closure_allowed"] is False
+    assert integration["live_authority_granted"] is False
+    assert integration["source_authority_denied"] is True
+    assert integration["ready_for_integration_promotion"] is False
+    assert integration["status"] == "blocked"
+    assert "offline_only_required" in integration["blockers"]
+    assert "operator_report_contract_not_ready" in integration["blockers"]
+    assert "offline_replay" in integration["child_contract_statuses"]
+    assert integration["child_contract_statuses"]["operator_report"] == "blocked"
+    assert "live authority or readiness closure" in integration["claim"]
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert snapshot["safety"]["full_autonomous_ready"] is False
+
+
+def test_promotion_readiness_accepts_ready_offline_bundle_without_authority():
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        offline_integration_bundle_manifest=_complete_integration_bundle()
+    )
+    integration = snapshot["summary"]["offline_integration_bundle"]
+
+    assert "offline_integration_bundle_contract_not_ready" not in (
+        snapshot["summary"]["global_blockers"]
+    )
+    assert integration["read_only"] is True
+    assert integration["offline_only"] is True
+    assert integration["live_write"] is False
+    assert integration["hardware_evidence"] is False
+    assert integration["readiness_closure_allowed"] is False
+    assert integration["live_authority_granted"] is False
+    assert integration["contacts_wing"] is False
+    assert integration["contacts_backend"] is False
+    assert integration["source_authority_denied"] is True
+    assert integration["ready_for_integration_promotion"] is True
+    assert integration["status"] == "ready_for_integration_evaluation_promotion"
+    assert integration["blockers"] == []
+    assert integration["missing_integration_checks"] == []
+    assert integration["child_contract_statuses"]["operator_report"] == (
+        "ready_for_operator_report_use"
+    )
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "full_autonomous_ready": False,
+        "supervised_only": True,
+    }
+
+
+def test_promotion_readiness_rejects_live_integration_bundle_claims():
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        offline_integration_bundle_manifest=_complete_integration_bundle(
+            live_write=True,
+            contacts_wing=True,
+            contacts_backend=True,
+            hardware_evidence=True,
+            readiness_closure_allowed=True,
+            live_authority_granted=True,
+        )
+    )
+    integration = snapshot["summary"]["offline_integration_bundle"]
+
+    assert "offline_integration_bundle_contract_not_ready" in (
+        snapshot["summary"]["global_blockers"]
+    )
+    assert integration["read_only"] is True
+    assert integration["live_write"] is False
+    assert integration["hardware_evidence"] is False
+    assert integration["readiness_closure_allowed"] is False
+    assert integration["live_authority_granted"] is False
+    assert integration["source_live_write_claimed"] is True
+    assert integration["source_hardware_evidence_claimed"] is True
+    assert integration["contacts_wing"] is True
+    assert integration["contacts_backend"] is True
+    assert integration["source_authority_denied"] is False
+    assert integration["ready_for_integration_promotion"] is False
+    assert "integration_bundle_forbids_live_write" in integration["blockers"]
+    assert "integration_bundle_evidence_cannot_grant_live_authority" in (
+        integration["blockers"]
+    )
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert snapshot["safety"]["full_autonomous_ready"] is False
 
 
 def test_fader_is_supervised_only_but_not_autonomous_ready():

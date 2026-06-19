@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T19:53:39Z.
+- Latest heartbeat: 2026-06-19T20:08:21Z.
 
 ## Что сделано
 
@@ -506,8 +506,33 @@ Integration bundles surface the same failure through the `operator_report:`
 child prefix. It still reports no hardware proof, no live write, no readiness
 closure and no live authority.
 
+The M026 autonomy readiness integration-bundle overlay rail is now automated by
+`tests/test_autonomy_promotion_readiness.py` and
+`tests/test_wing_mvp_rails.py::test_m026_autonomy_readiness_consumes_integration_bundle_status`.
+It updates `backend/autonomy_promotion_readiness.py` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M026-autonomy-readiness-integration-bundle-overlay.md`,
+`Docs/adr/autonomy-readiness-integration-bundle-overlay-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The autonomy readiness snapshot now
+consumes the M013-M025 offline integration bundle contract through optional
+`offline_integration_bundle_manifest` before treating integration evidence as
+promotion-planning input. Missing or blocked integration bundle evidence
+surfaces `offline_integration_bundle_contract_not_ready`; passing offline
+integration evidence removes only that planning blocker. It still reports no
+hardware proof, no live write, no readiness closure, no Full Autonomous
+readiness and no live authority.
+
 ## Проверка
 
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_autonomy_promotion_readiness.py -q`:
+  `18 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m026_autonomy_readiness_consumes_integration_bundle_status -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `39 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4151 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
   `11 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_report_contract.py -q`:

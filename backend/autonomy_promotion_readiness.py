@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Tuple
 
 try:
+    from evaluation_integration_bundle_contract import evaluate_integration_bundle_contract
     from project_goal_capability_matrix import get_project_goal_capability
     from read_surface_inventory import get_read_surface
     from safety_coverage_matrix import get_safety_coverage_row
@@ -27,6 +28,9 @@ try:
     from wing_readonly_preflight_evidence import build_wing_readonly_preflight_evidence
     from write_surface_inventory import get_write_surface
 except ImportError:  # pragma: no cover - package import compatibility
+    from backend.evaluation_integration_bundle_contract import (
+        evaluate_integration_bundle_contract,
+    )
     from backend.project_goal_capability_matrix import get_project_goal_capability
     from backend.read_surface_inventory import get_read_surface
     from backend.safety_coverage_matrix import get_safety_coverage_row
@@ -493,6 +497,65 @@ def _readonly_preflight_source_authority_denied(summary: Dict[str, Any]) -> bool
     )
 
 
+def _offline_integration_bundle_readiness_overlay(
+    integration_bundle_manifest: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    manifest = (
+        integration_bundle_manifest
+        if isinstance(integration_bundle_manifest, dict)
+        else {}
+    )
+    result = evaluate_integration_bundle_contract(manifest)
+    authority = result.get("authority") if isinstance(result.get("authority"), dict) else {}
+    summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+    child_results = (
+        result.get("child_results")
+        if isinstance(result.get("child_results"), dict)
+        else {}
+    )
+    ready = result.get("ready_for_integration_evaluation_promotion") is True
+
+    return {
+        "read_only": True,
+        "offline_only": result.get("offline_only") is True,
+        "live_write": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "contacts_wing": authority.get("contacts_wing") is True,
+        "contacts_backend": authority.get("contacts_backend") is True,
+        "source_live_write_claimed": result.get("live_write") is True,
+        "source_hardware_evidence_claimed": result.get("hardware_evidence") is True,
+        "ready_for_integration_promotion": ready,
+        "status": result.get("status"),
+        "manifest_id": result.get("manifest_id"),
+        "blockers": list(result.get("blockers") or []),
+        "required_integration_checks": list(
+            summary.get("required_integration_checks") or []
+        ),
+        "missing_integration_checks": list(
+            summary.get("missing_integration_checks") or []
+        ),
+        "child_contract_statuses": {
+            key: value.get("status")
+            for key, value in child_results.items()
+            if isinstance(value, dict)
+        },
+        "source_authority_denied": (
+            result.get("live_write") is not True
+            and result.get("hardware_evidence") is not True
+            and authority.get("live_authority_granted") is not True
+            and authority.get("readiness_closure_allowed") is not True
+            and authority.get("contacts_wing") is not True
+            and authority.get("contacts_backend") is not True
+        ),
+        "claim": (
+            "offline integration bundle evidence can inform promotion planning "
+            "only; it grants no live authority or readiness closure"
+        ),
+    }
+
+
 def _target_readiness(target: PromotionTarget, *, full_autonomous_blocked: bool) -> PromotionReadinessRow:
     capabilities = _capabilities(target.capability_ids)
     safety = get_safety_coverage_row(target.safety_row_id) if target.safety_row_id else None
@@ -612,10 +675,14 @@ def iter_promotion_readiness_rows() -> Iterable[PromotionReadinessRow]:
 def build_autonomy_promotion_readiness_snapshot(
     *,
     wing_readonly_preflight_evidence_snapshot: Dict[str, Any] | None = None,
+    offline_integration_bundle_manifest: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     rows = tuple(iter_promotion_readiness_rows())
     wing_preflight_overlay = _wing_readonly_preflight_readiness_overlay(
         wing_readonly_preflight_evidence_snapshot
+    )
+    offline_integration_overlay = _offline_integration_bundle_readiness_overlay(
+        offline_integration_bundle_manifest
     )
     status_counts: Dict[str, int] = {status: 0 for status in sorted(READINESS_STATUSES)}
     for row in rows:
@@ -623,6 +690,14 @@ def build_autonomy_promotion_readiness_snapshot(
     supervised_ids = [row.id for row in rows if row.supervised_live_allowed]
     autonomous_ids = [row.id for row in rows if row.autonomous_ready]
     blocked_ids = [row.id for row in rows if not row.autonomous_ready]
+    global_blockers = [
+        "mode_full_autonomous_blocked",
+        "only_supervised_fader_gain_executor_is_registered",
+        "read_coverage_is_partial_or_missing",
+        "real_wing_and_emergency_stop_proof_incomplete",
+    ]
+    if not offline_integration_overlay["ready_for_integration_promotion"]:
+        global_blockers.append("offline_integration_bundle_contract_not_ready")
 
     return {
         "type": "autonomy_promotion_readiness",
@@ -641,15 +716,11 @@ def build_autonomy_promotion_readiness_snapshot(
             "supervised_live_allowed_target_ids": supervised_ids,
             "autonomous_ready_target_ids": autonomous_ids,
             "blocked_target_ids": blocked_ids,
-            "global_blockers": [
-                "mode_full_autonomous_blocked",
-                "only_supervised_fader_gain_executor_is_registered",
-                "read_coverage_is_partial_or_missing",
-                "real_wing_and_emergency_stop_proof_incomplete",
-            ],
+            "global_blockers": global_blockers,
             "next_global_step": "Run proof gates per action family before widening supervised or autonomous live writes.",
             "promotion_gap_summary": _promotion_gap_summary(rows),
             "wing_readonly_preflight_evidence": wing_preflight_overlay,
+            "offline_integration_bundle": offline_integration_overlay,
         },
         "rows": [row.to_dict() for row in rows],
     }
