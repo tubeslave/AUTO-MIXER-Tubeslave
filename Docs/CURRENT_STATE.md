@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T12:19:29Z
+Generated: 2026-06-19T12:31:07Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `305bfac7 Surface prestart summary flags in no-WING markdown`
+  `ff8a70ff Surface WING summary flags in no-WING markdown`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -49,9 +49,10 @@ Generated: 2026-06-19T12:19:29Z
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
   `bb5816d4`, `192d6bff`, `ce0d3d00`, `7796d28a`, `b0c9fc00`, and
   `12ee8214`, `b0c71460`, `d84b4a63`, `7a616805`, `93e66009`, and
-  `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, `ffddb646`, and
+  `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, `ffddb646`,
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
-  `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, and `305bfac7`.
+  `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`, and
+  `ff8a70ff`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -159,6 +160,11 @@ Generated: 2026-06-19T12:19:29Z
   gate, prestart summary, failure-detail surface and authority-denial surface,
   so the operator-facing report exposes the same pre-backend safety gates as
   JSON.
+- The no-WING Markdown summary now also renders WING read-only handoff packet
+  summary-surface required/readiness/live-authority flags for packet safety,
+  expected artifacts, command binding, operator sequence, operator sequence
+  step gate and supervised proof-plan fields. The fresh no-WING bundle exposes
+  all `33` `wing_readonly_*summary_surface*` JSON keys in `summary.md`.
 
 ## Unresolved unknowns
 
@@ -168,5 +174,5 @@ Generated: 2026-06-19T12:19:29Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `305bfac7` passed with
+  but the latest verified full-suite run for `ff8a70ff` passed with
   `4061 passed, 1 skipped, 1 warning`.
