@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T15:38:32Z
+Generated: 2026-06-19T15:48:14Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T15:38:32Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `55167c34 Guard supervised fader gain proof gate`
+  `0bde10c1 Guard emergency timeout proof gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -269,6 +269,16 @@ Generated: 2026-06-19T15:38:32Z
   by M002, emergency-stop proof stays inside the explicit supervised proof
   run, timeout/connection-loss proof still requires a controlled real-run
   artifact, and simulator/no-WING evidence cannot close readiness.
+- MVP readiness/operator evidence update is now covered by
+  `tests/test_wing_mvp_rails.py::test_m006_readiness_update_stays_report_only_until_real_m002_m005_proof`.
+  The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/CAPABILITY_MATRIX.md`, `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+  `.ai/project-layer/wing_mvp_blockers.md`,
+  `backend/autonomy_promotion_readiness.py` and `ops/autopilot/LAST_REPORT.md`
+  so M006 remains blocked by M002-M005, operator-visible evidence stays
+  report-only, readiness rows do not close from missing/offline evidence, and
+  the backend readiness overlay continues to deny live authority and Full
+  Autonomous readiness.
 
 ## Unresolved unknowns
 
@@ -279,4 +289,4 @@ Generated: 2026-06-19T15:38:32Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4074 passed, 1 skipped, 1 warning`.
+  `4075 passed, 1 skipped, 1 warning`.

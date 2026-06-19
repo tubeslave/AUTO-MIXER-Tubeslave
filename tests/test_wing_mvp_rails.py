@@ -4,6 +4,7 @@ import re
 import sys
 from pathlib import Path
 
+from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
 from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import no_wing_release_check as release_check
 
@@ -873,6 +874,82 @@ def test_emergency_stop_timeout_proof_stays_blocked_until_m002_and_real_evidence
     assert "physical state is not\n  manually inspected" in supervised_runbook
     assert "any direct write path is used instead of `apply_operator_proposal`" in supervised_runbook
     assert "Do not claim full autonomous readiness." in supervised_runbook
+
+
+def test_m006_readiness_update_stays_report_only_until_real_m002_m005_proof():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    project_blockers = BLOCKERS_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+    preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+
+    m006 = markdown_table_row(roadmap, "M006")
+    assert m006[1] == "Operator evidence and readiness update"
+    assert m006[2] == "MVP readiness matrix updates only from accepted real proof"
+    assert m006[3] == "M002-M005"
+    assert m006[4] == "high audit"
+    assert m006[5] == "HARDWARE_READ_VERIFIED or SUPERVISED_LIVE_VERIFIED evidence surfaced"
+    assert m006[-1] == "BLOCKED_BY_M002"
+
+    operator_report = markdown_table_row(project_blockers, "Operator-visible evidence report")
+    readiness = markdown_table_row(project_blockers, "Readiness matrix update based on real proof")
+    assert operator_report[1] == "tooling_ready_waits_real_wing"
+    assert "Save preflight/proof artifacts" in operator_report[3]
+    assert "manual review" in operator_report[3]
+    assert readiness[1] == "blocked_by_real_artifact_review"
+    assert "Update readiness only after manual review of real WING artifacts" in readiness[3]
+    assert "do not close rows from offline evidence" in readiness[3]
+
+    supervised = markdown_table_row(capability, "Supervised AutoMix Mode")
+    full_auto = markdown_table_row(capability, "Full Autonomous Mixing Mode")
+    audit_logging = markdown_table_row(console, "Audit logging")
+    assert supervised[4] == "WING live write scope is only `fader`/`gain`; real proof missing"
+    assert supervised[7] == "M001-M006"
+    assert supervised[8] == "none"
+    assert full_auto[1] == "NOT_STARTED"
+    assert "Locked until all safety and hardware gates pass" in full_auto[4]
+    assert full_auto[8] == "none"
+    assert audit_logging[4] == "required"
+    assert audit_logging[-2:] == ["artifact review", "none"]
+
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "full_autonomous_ready": False,
+        "supervised_only": True,
+    }
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert "real_wing_and_emergency_stop_proof_incomplete" in snapshot["summary"]["global_blockers"]
+    assert preflight["read_only"] is True
+    assert preflight["live_write"] is False
+    assert preflight["live_widening_allowed"] is False
+    assert preflight["automatic_safety_update_allowed"] is False
+    assert preflight["readiness_closure_allowed_by_evidence"] is False
+    assert preflight["live_authority_granted"] is False
+    assert preflight["full_autonomous_ready"] is False
+    assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["closed_blocker_ids"] == []
+    assert "Do not update readiness rows from missing or invalid preflight evidence." in (
+        preflight["next_required_actions"]
+    )
+    assert "manual readiness review only" in preflight["claim"]
+
+    assert "Operator-visible evidence report." in goal
+    assert "Readiness matrix update based only on real proof." in goal
+    assert "Offline, shadow, replay, mock и simulator evidence не являются hardware proof." in goal
+    assert "MVP readiness/operator evidence update is now covered" in current
+    assert "readiness/operator evidence update gate rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
