@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T22:27:01Z.
+- Latest heartbeat: 2026-06-19T22:39:01Z.
 
 ## Что сделано
 
@@ -703,7 +703,33 @@ proposals, grant live authority, close readiness, contact WING/backend, mark
 Full Autonomous ready, apply to console, hide review-only evidence rows, bypass
 apply gates, or replace accepted real hardware/operator validation.
 
+The M037 Supervised Apply integration bundle blocker enforcement rail is now automated
+by `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m037_supervised_apply_blocker_enforcement_blocks_apply_confirm`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the enforcement through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M037-supervised-apply-integration-bundle-blocker-enforcement.md`,
+`Docs/adr/supervised-apply-integration-bundle-blocker-enforcement-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The Task Queue workspace now derives
+`integrationBundleApplyBlocked` from Director blocked-reason messages, removes
+task-row Apply actions while the blocker is visible, and disables the
+Supervised Apply confirm button unless the existing `canRequestBackendGate`
+path is true. This is local frontend enforcement only: no queue mutation,
+backend/WING contact, live transport, console apply, readiness closure, Full
+Autonomous readiness or live authority is introduced.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `53 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m037_supervised_apply_blocker_enforcement_blocks_apply_confirm -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `50 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4163 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `52 passed`.

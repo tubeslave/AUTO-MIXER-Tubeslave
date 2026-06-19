@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T22:27:01Z
+Last heartbeat UTC: 2026-06-19T22:39:01Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,17 +12,16 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M036 Supervised Apply integration bundle blocker notice now
-renders `Promotion planning blocked. Supervised apply remains blocked` inside
-the Supervised Apply modal when a modal task and Director blocked-reason
-messages are both visible. The updated
-`frontend/src/components/prototype/TaskQueuePanels.tsx` keeps existing apply
-gate labels governed by their current UI/backend status and does not add queue
-mutation, console apply, WING/backend contact or live authority.
+Latest check: M037 Supervised Apply integration bundle blocker enforcement now
+uses Director blocked-reason messages to remove task-row Apply actions and
+disable the Supervised Apply confirm button when promotion planning is blocked.
+The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` keeps this
+as local frontend enforcement and does not add queue mutation, console apply,
+WING/backend contact or live authority.
 
-Frontend adapter validation passed with `52 passed`; the frontend build
-passed; the M036 rail passed with `1 passed`; the full rail file passed with
-`49 passed`; and the full suite passed with `4162 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `53 passed`; the frontend build
+passed; the M037 rail passed with `1 passed`; the full rail file passed with
+`50 passed`; and the full suite passed with `4163 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

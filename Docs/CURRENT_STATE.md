@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T22:27:01Z
+Generated: 2026-06-19T22:39:01Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T22:27:01Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `ddf933f0 Show integration blocker in task queue`
+  `eb36f5b2 Show integration blocker in supervised apply`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -628,6 +628,17 @@ Generated: 2026-06-19T22:27:01Z
   grant live authority, close readiness, contact WING/backend, mark Full
   Autonomous ready, apply to console, hide review-only evidence rows, bypass
   apply gates, or replace real hardware/operator validation.
+- M037 Supervised Apply integration bundle blocker enforcement is now covered
+  by `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m037_supervised_apply_blocker_enforcement_blocks_apply_confirm`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives `integrationBundleApplyBlocked` from Director blocked-reason
+  messages, removes task-row Apply actions while the blocker is visible, and
+  disables the Supervised Apply confirm button unless `canRequestBackendGate`
+  is true. This is local frontend enforcement only: it creates no queue
+  mutation, no backend/WING contact, no live transport, no live authority,
+  no readiness closure, no Full Autonomous readiness and no replacement for
+  accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -638,4 +649,4 @@ Generated: 2026-06-19T22:27:01Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4162 passed, 1 skipped, 1 warning`.
+  `4163 passed, 1 skipped, 1 warning`.

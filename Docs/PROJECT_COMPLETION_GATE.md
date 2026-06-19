@@ -168,6 +168,13 @@ live authority, close readiness, contact WING/backend, mark Full Autonomous
 ready, apply to console, hide review-only evidence rows, bypass apply gates, or
 replace accepted real hardware/operator validation.
 
+Supervised Apply blockers must enforce the blocked state in frontend apply
+controls. When offline integration bundle blockers are visible, task-row apply
+actions and modal confirm controls must stay blocked. Frontend enforcement
+cannot grant live authority, close readiness, contact WING/backend, mark Full
+Autonomous ready, apply to console, replace backend safety gates, or replace
+accepted real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

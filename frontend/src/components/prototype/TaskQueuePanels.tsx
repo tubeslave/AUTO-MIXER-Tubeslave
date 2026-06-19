@@ -408,6 +408,7 @@ function SupervisedApplyModal({
   evidence,
   applyPlan,
   integrationBundleBlockerNotice,
+  integrationBundleApplyBlocked,
   onClose,
   onConfirm
 }: {
@@ -416,18 +417,29 @@ function SupervisedApplyModal({
   evidence: SafetyEvidenceItem[];
   applyPlan: ApplyPlanStep[];
   integrationBundleBlockerNotice: string;
+  integrationBundleApplyBlocked: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }) {
   const proposal = task.proposal;
-  const canRequestBackendGate = ui.mode === 'Supervised' && ui.backend.canApplyToConsole && Boolean(task.canApply ?? true) && !task.reviewOnly;
+  const canRequestBackendGate = ui.mode === 'Supervised'
+    && ui.backend.canApplyToConsole
+    && Boolean(task.canApply ?? true)
+    && !task.reviewOnly
+    && !integrationBundleApplyBlocked;
   const approvalLabel = ui.mode !== 'Supervised'
     ? 'Blocked by mode'
+    : integrationBundleApplyBlocked
+      ? 'Blocked by integration bundle'
     : canRequestBackendGate
       ? 'Backend supervised gate'
       : 'Local prototype approval only';
-  const approvalTone: Tone = ui.mode !== 'Supervised' ? 'red' : canRequestBackendGate ? 'yellow' : 'blue';
-  const applyRequest = canRequestBackendGate ? 'Ready to request' : ui.mode === 'Supervised' ? 'UI-only simulation' : 'Blocked';
+  const approvalTone: Tone = ui.mode !== 'Supervised' || integrationBundleApplyBlocked ? 'red' : canRequestBackendGate ? 'yellow' : 'blue';
+  const applyRequest = canRequestBackendGate
+    ? 'Ready to request'
+    : ui.mode === 'Supervised' && !integrationBundleApplyBlocked
+      ? 'UI-only simulation'
+      : 'Blocked';
   const backendResult = ui.backend.proposalApplyResult;
   const resultMatches = Boolean(
     backendResult
@@ -523,8 +535,13 @@ function SupervisedApplyModal({
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <button className="am-button" onClick={onClose} type="button">Cancel</button>
-          <button className="am-button border-warn/40 bg-warn/10 text-warn" onClick={onConfirm} type="button">
-            {task.reviewOnly ? 'Apply Blocked' : 'Request Supervised Apply'}
+          <button
+            className="am-button border-warn/40 bg-warn/10 text-warn disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!canRequestBackendGate}
+            onClick={onConfirm}
+            type="button"
+          >
+            {canRequestBackendGate ? 'Request Supervised Apply' : 'Apply Blocked'}
           </button>
         </div>
       </div>
@@ -565,6 +582,7 @@ export function TaskQueueWorkspace({
   const modalEvidence = modalTask ? safetyEvidenceForTask(modalTask, ui.mode) : evidence;
   const modalApplyPlan = modalTask ? applyPlanForTask(modalTask, ui.mode) : applyPlan;
   const blockedReasonMessages = directorBlockedReasonMessages(runtime.blockedReasons);
+  const integrationBundleApplyBlocked = blockedReasonMessages.length > 0;
   const taskQueueBlockerNotice = blockedReasonMessages.length > 0 && taskRows.length > 0
     ? `Promotion planning blocked. Task Queue evidence remains review-only: ${blockedReasonMessages[0]}`
     : '';
@@ -622,7 +640,7 @@ export function TaskQueueWorkspace({
             width: '90px',
             render: task => (
               <ActionCluster
-                actions={task.canApply === false || task.reviewOnly ? ['Detail', 'Reject'] : ['Detail', 'Apply', 'Reject']}
+                actions={integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly ? ['Detail', 'Reject'] : ['Detail', 'Apply', 'Reject']}
                 onAction={action => {
                   if (action === 'Apply') requestTaskApply(task, ui, actions);
                   else if (action === 'Reject') actions.setTaskStatus(task.id, 'Rejected');
@@ -649,6 +667,7 @@ export function TaskQueueWorkspace({
         <SupervisedApplyModal
           applyPlan={modalApplyPlan}
           evidence={modalEvidence}
+          integrationBundleApplyBlocked={integrationBundleApplyBlocked}
           integrationBundleBlockerNotice={supervisedApplyBlockerNotice}
           onClose={actions.closeSupervisedProposal}
           onConfirm={() => actions.confirmSupervisedApply(modalTask.id)}

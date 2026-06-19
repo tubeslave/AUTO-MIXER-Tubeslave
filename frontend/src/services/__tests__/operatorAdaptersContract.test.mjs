@@ -4369,6 +4369,21 @@ test('supervised apply modal renders integration bundle blocker before apply rev
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply modal blocks confirm when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /integrationBundleApplyBlocked/);
+  assert.match(source, /&& !integrationBundleApplyBlocked/);
+  assert.match(source, /Blocked by integration bundle/);
+  assert.match(source, /disabled=\{!canRequestBackendGate\}/);
+  assert.match(source, /integrationBundleApplyBlocked \|\| task\.canApply === false \|\| task\.reviewOnly/);
+  assert.match(source, /canRequestBackendGate \? 'Request Supervised Apply' : 'Apply Blocked'/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('dashboard mixer header uses the selected channel dynamically', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'),
