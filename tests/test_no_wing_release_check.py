@@ -18821,6 +18821,20 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         assert f"{field}_matches_plan: `true`" in markdown_summary
     assert "backend_port_prestart_check_command: " in markdown_summary
     assert "prestart_backend_port_check_command: " in markdown_summary
+    assert (
+        "backend_port_prestart_check_command_text: "
+        f"`{WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT}`"
+        in markdown_summary
+    )
+    assert (
+        "expected_backend_port_prestart_check_command_text: "
+        f"`{WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT}`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_check_command_text_matches_contract: `true`"
+        in markdown_summary
+    )
     assert "preview_command_prestart_summary_matches_plan: `true`" in markdown_summary
     assert "preview_command_artifact_root_matches_packet: `true`" in markdown_summary
     assert "preview_command_plan_output_matches_packet: `true`" in markdown_summary
@@ -18955,8 +18969,17 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "backend_port_prestart_gate" in markdown_summary
     assert "expected_backend_port_prestart_gate" in markdown_summary
+    assert "declared_expected_backend_port_prestart_gate" in markdown_summary
     assert "prestart_backend_port_check_command" in markdown_summary
     assert "backend_port_prestart_check_failure_detail_fields" in markdown_summary
+    assert (
+        "expected_backend_port_prestart_check_failure_detail_fields"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_check_failure_detail_fields_match_contract: `true`"
+        in markdown_summary
+    )
     assert "listener_processes" in markdown_summary
     assert "tools/no_wing_release_check.py" in markdown_summary
     assert "review_decision_template_output:" in markdown_summary
@@ -19151,6 +19174,31 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert (
         "project_director_selected_action_anchor_matches_current_directive: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_manifest_sidecar_required_markers: `["
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_manifest_sidecar_missing_markers: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_manifest_sidecar_checklist_present: `true`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_manifest_sidecar_denial_markers: `["
+        in markdown_summary
+    )
+    assert "do not open the WING session" in markdown_summary
+    assert (
+        "project_director_selected_action_manifest_sidecar_denial_missing_markers: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "project_director_selected_action_manifest_sidecar_denial_present: `true`"
         in markdown_summary
     )
     assert (

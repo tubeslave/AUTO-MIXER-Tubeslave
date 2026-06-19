@@ -27558,6 +27558,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['prestart_backend_port_check_command'])}`",
                 "- backend_port_prestart_check_command: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_command'])}`",
+                "- backend_port_prestart_check_command_text: "
+                f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_command_text']}`",
+                "- expected_backend_port_prestart_check_command_text: "
+                f"`{summary['expected_backend_port_prestart_check_command_text']}`",
+                "- backend_port_prestart_check_command_text_matches_contract: "
+                f"`{str(summary['backend_port_prestart_check_command_text_matches_contract']).lower()}`",
                 "- backend_port_prestart_check_operator_sequence_step_index: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_operator_sequence_step_index']}`",
                 "- backend_port_prestart_check_must_be_first_operator_step: "
@@ -27600,12 +27606,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_gate'])}`",
                 "- expected_backend_port_prestart_gate: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_backend_port_prestart_gate'])}`",
+                "- declared_expected_backend_port_prestart_gate: "
+                f"`{json.dumps(summary['declared_expected_backend_port_prestart_gate'])}`",
                 "- backend_port_prestart_gate_matches_expected: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_gate_matches_expected']).lower()}`",
                 "- declared_backend_port_prestart_gate_matches_expected: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['declared_backend_port_prestart_gate_matches_expected']).lower()}`",
                 "- backend_port_prestart_check_failure_detail_fields: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_failure_detail_fields'])}`",
+                "- expected_backend_port_prestart_check_failure_detail_fields: "
+                f"`{json.dumps(summary['expected_backend_port_prestart_check_failure_detail_fields'])}`",
+                "- backend_port_prestart_check_failure_detail_fields_match_contract: "
+                f"`{str(summary['backend_port_prestart_check_failure_detail_fields_match_contract']).lower()}`",
                 "- review_command_writes_decision_template: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['review_command_writes_decision_template']).lower()}`",
                 "- review_decision_template_output: "
@@ -27690,6 +27702,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_sha256_matches_current_directive']).lower()}`",
                 "- project_director_selected_action_anchor_matches_current_directive: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_selected_action_anchor_matches_current_directive']).lower()}`",
+                "- project_director_selected_action_manifest_sidecar_required_markers: "
+                f"`{json.dumps(summary['project_director_selected_action_manifest_sidecar_required_markers'])}`",
+                "- project_director_selected_action_manifest_sidecar_missing_markers: "
+                f"`{json.dumps(summary['project_director_selected_action_manifest_sidecar_missing_markers'])}`",
+                "- project_director_selected_action_manifest_sidecar_checklist_present: "
+                f"`{str(summary['project_director_selected_action_manifest_sidecar_checklist_present']).lower()}`",
+                "- project_director_selected_action_manifest_sidecar_denial_markers: "
+                f"`{json.dumps(summary['project_director_selected_action_manifest_sidecar_denial_markers'])}`",
+                "- project_director_selected_action_manifest_sidecar_denial_missing_markers: "
+                f"`{json.dumps(summary['project_director_selected_action_manifest_sidecar_denial_missing_markers'])}`",
+                "- project_director_selected_action_manifest_sidecar_denial_present: "
+                f"`{str(summary['project_director_selected_action_manifest_sidecar_denial_present']).lower()}`",
                 "- project_director_current_first_command_baseline_coverage_required: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['project_director_current_first_command_baseline_coverage_required']).lower()}`",
                 "- project_director_current_first_command_baseline_coverage_passed: "
