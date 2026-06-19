@@ -127,6 +127,8 @@ M033_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M033-director-queue-integration-b
 M033_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-queue-integration-bundle-blocker-badge-20260619.md"
 M034_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M034-director-suggestions-integration-bundle-blocker-notice.md"
 M034_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-suggestions-integration-bundle-blocker-notice-20260619.md"
+M035_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M035-task-queue-integration-bundle-blocker-notice.md"
+M035_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-integration-bundle-blocker-notice-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -151,6 +153,15 @@ FRONTEND_DIRECTOR_PANEL_MODEL = (
     / "directorPanelModel.ts"
 )
 FRONTEND_RIGHT_DIRECTOR_PANEL = PROJECT_ROOT / "frontend" / "src" / "views" / "DirectorPanel.tsx"
+FRONTEND_TASK_QUEUE_PANEL = (
+    PROJECT_ROOT
+    / "frontend"
+    / "src"
+    / "components"
+    / "prototype"
+    / "TaskQueuePanels.tsx"
+)
+FRONTEND_TASK_QUEUE_VIEW = PROJECT_ROOT / "frontend" / "src" / "views" / "TaskQueueView.tsx"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -4910,6 +4921,76 @@ def test_m034_director_suggestions_show_integration_bundle_blocker_notice():
         current
     )
     assert "M034 Director suggestions integration bundle blocker notice rail is now automated" in (
+        report
+    )
+
+
+def test_m035_task_queue_shows_integration_bundle_blocker_notice():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M035_PLAN.read_text(encoding="utf-8")
+    adr = M035_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    task_queue_view = FRONTEND_TASK_QUEUE_VIEW.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m035 = markdown_table_row(roadmap, "M035")
+    assert m035[1] == "Task Queue integration bundle blocker notice"
+    assert m035[2] == (
+        "Task Queue shows a read-only integration bundle blocker notice before "
+        "proposal actions when promotion planning is blocked"
+    )
+    assert m035[3] == "M034"
+    assert m035[4] == "high offline frontend"
+    assert m035[5] == "UNIT_VERIFIED read-only Task Queue notice; live authority remains blocked"
+    assert m035[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Queue now shows offline integration bundle blocker notices" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M035-CP01" in plan
+    assert "M035-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not queue proposals" in adr
+
+    assert "taskQueueBlockerNotice" in task_queue
+    assert "directorBlockedReasonMessages(runtime.blockedReasons)" in task_queue
+    assert "Promotion planning blocked. Task Queue evidence remains review-only" in (
+        task_queue
+    )
+    assert "runtime={data.directorRuntime}" in task_queue_view
+    assert "taskQueueBlockerNotice" in adapter_test
+    assert "Promotion planning blocked\\. Task Queue evidence remains review-only" in (
+        adapter_test
+    )
+    assert "Task Queue panels must render offline integration bundle" in completion
+    assert "M035 Task Queue integration bundle blocker notice is now covered" in (
+        current
+    )
+    assert "M035 Task Queue integration bundle blocker notice rail is now automated" in (
         report
     )
 

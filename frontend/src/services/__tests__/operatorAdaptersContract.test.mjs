@@ -4339,6 +4339,23 @@ test('dashboard director panel renders agent suggestions as review-only controls
   assert.equal(source.includes('Принять'), false);
 });
 
+test('task queue renders integration bundle blocker as review-only notice', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+  const viewSource = await fs.readFile(
+    path.join(srcRoot, 'views/TaskQueueView.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /taskQueueBlockerNotice/);
+  assert.match(source, /directorBlockedReasonMessages\(runtime\.blockedReasons\)/);
+  assert.match(source, /Promotion planning blocked\. Task Queue evidence remains review-only/);
+  assert.match(viewSource, /runtime=\{data\.directorRuntime\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('dashboard mixer header uses the selected channel dynamically', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'),

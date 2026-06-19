@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T21:58:26Z
+Generated: 2026-06-19T22:11:41Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T21:58:26Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `78bb644c Show integration blocker in director queue badge`
+  `cc9f32cc Show integration blocker in director suggestions`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -603,6 +603,19 @@ Generated: 2026-06-19T21:58:26Z
   and notice-visible integration bundle status cannot queue proposals, grant
   live authority, close readiness, contact WING/backend, mark Full Autonomous
   ready, apply to console, or replace real hardware/operator validation.
+- M035 Task Queue integration bundle blocker notice is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m035_task_queue_shows_integration_bundle_blocker_notice`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  renders a `Promotion planning blocked. Task Queue evidence remains
+  review-only` notice above proposal actions when task rows and Director
+  blocked-reason messages are both visible, and
+  `frontend/src/views/TaskQueueView.tsx` passes Director runtime into that
+  workspace. Queue rows stay inspectable, no queue mutation is introduced, and
+  queue-notice-visible integration bundle status cannot queue proposals, grant
+  live authority, close readiness, contact WING/backend, mark Full Autonomous
+  ready, apply to console, hide review-only evidence rows, or replace real
+  hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -613,4 +626,4 @@ Generated: 2026-06-19T21:58:26Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4160 passed, 1 skipped, 1 warning`.
+  `4161 passed, 1 skipped, 1 warning`.

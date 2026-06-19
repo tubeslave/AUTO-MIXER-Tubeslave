@@ -5,6 +5,7 @@ import {
   Panel,
   StatusBadge
 } from './AutomixerComponents';
+import { directorBlockedReasonMessages } from '../dashboard/directorPanelModel';
 import { applyPlanForTask, ensembleEvidenceForTask, safetyEvidenceForTask } from '../../mock/automixerData';
 import { getModeDisplayLabel, textClassForTone, toneForMode, toneForPriority, toneFromState } from '../../utils/prototypeTone';
 import type {
@@ -12,6 +13,7 @@ import type {
   ChannelIntelligenceRecord,
   DecisionTraceRecord,
   DecisionPolicy,
+  DirectorRuntime,
   Metric,
   GoalCapabilityObjectiveReadinessByGoalArea,
   ProposalPreview,
@@ -531,6 +533,7 @@ export function TaskQueueWorkspace({
   policy,
   evidence,
   applyPlan,
+  runtime,
   decisionTraces,
   safetyMonitor,
   replayRuns,
@@ -543,6 +546,7 @@ export function TaskQueueWorkspace({
   policy: DecisionPolicy;
   evidence: SafetyEvidenceItem[];
   applyPlan: ApplyPlanStep[];
+  runtime: DirectorRuntime;
   decisionTraces: DecisionTraceRecord[];
   safetyMonitor: SafetyMonitorState;
   replayRuns: ReplayRunRecord[];
@@ -553,11 +557,22 @@ export function TaskQueueWorkspace({
     : undefined;
   const modalEvidence = modalTask ? safetyEvidenceForTask(modalTask, ui.mode) : evidence;
   const modalApplyPlan = modalTask ? applyPlanForTask(modalTask, ui.mode) : applyPlan;
+  const blockedReasonMessages = directorBlockedReasonMessages(runtime.blockedReasons);
+  const taskQueueBlockerNotice = blockedReasonMessages.length > 0 && taskRows.length > 0
+    ? `Promotion planning blocked. Task Queue evidence remains review-only: ${blockedReasonMessages[0]}`
+    : '';
 
   return (
-    <div className="relative grid h-full grid-rows-[76px_1fr_118px] gap-2">
-      <div className="grid grid-cols-5 gap-2">
-        {taskQueueMetrics(taskRows).map(metric => <MetricCard metric={metric} key={metric.label} />)}
+    <div className="relative grid h-full grid-rows-[auto_1fr_118px] gap-2">
+      <div className="space-y-2">
+        <div className="grid grid-cols-5 gap-2">
+          {taskQueueMetrics(taskRows).map(metric => <MetricCard metric={metric} key={metric.label} />)}
+        </div>
+        {taskQueueBlockerNotice && (
+          <div className="rounded-[6px] border border-danger/35 bg-danger/10 px-2 py-1.5 text-[10px] leading-4 text-danger">
+            {taskQueueBlockerNotice}
+          </div>
+        )}
       </div>
       <DataTable
         rows={taskRows}

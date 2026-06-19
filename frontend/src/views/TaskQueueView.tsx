@@ -19,6 +19,7 @@ export function TaskQueue(ui: UiState, actions: UiActions, data: OperatorViewDat
       evidence={evidence}
       policy={policy}
       replayRuns={data.replayRuns}
+      runtime={data.directorRuntime}
       safetyMonitor={data.safetyMonitor}
       selectedTask={selectedTask}
       taskRows={taskRows}
