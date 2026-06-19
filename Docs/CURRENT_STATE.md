@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T16:56:13Z
+Generated: 2026-06-19T17:09:21Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T16:56:13Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `a53c4a65 Add offline replay evaluation gate`
+  `5d15478c Add fault recovery evaluation gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -339,6 +339,16 @@ Generated: 2026-06-19T16:56:13Z
   `readiness_closure_allowed: false`, `live_write: false` and
   `hardware_evidence: false`, so simulator fault evidence cannot become
   hardware proof or live readiness.
+- M013 integration evaluation bundle contract is now covered by
+  `tests/test_evaluation_integration_bundle_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gated`.
+  The new `backend/evaluation_integration_bundle_contract.py` module composes
+  the M011 replay contract and M012 fault-recovery contract, then requires
+  integration trace checks and an approved integration policy before reporting
+  offline integration-promotion readiness. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so integration bundle
+  evidence cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -349,4 +359,4 @@ Generated: 2026-06-19T16:56:13Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4091 passed, 1 skipped, 1 warning`.
+  `4097 passed, 1 skipped, 1 warning`.

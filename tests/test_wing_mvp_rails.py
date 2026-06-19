@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 
 from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
+from backend.evaluation_integration_bundle_contract import (
+    REQUIRED_INTEGRATION_CHECKS,
+    evaluate_integration_bundle_contract,
+)
 from backend.fault_injection_recovery_contract import (
     REQUIRED_AUDIT_FIELDS as RECOVERY_REQUIRED_AUDIT_FIELDS,
     REQUIRED_EVALUATION_TYPES as RECOVERY_REQUIRED_EVALUATION_TYPES,
@@ -45,6 +49,8 @@ M011_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M011-offline-replay-evaluation-co
 M011_ADR = PROJECT_ROOT / "Docs" / "adr" / "offline-replay-evaluation-contract-20260619.md"
 M012_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M012-fault-injection-recovery-contract.md"
 M012_ADR = PROJECT_ROOT / "Docs" / "adr" / "fault-injection-recovery-contract-20260619.md"
+M013_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M013-integration-evaluation-bundle-contract.md"
+M013_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-evaluation-bundle-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -1723,6 +1729,187 @@ def test_m012_fault_injection_recovery_contract_stays_simulator_only_and_audit_g
     assert "always returns `live_authority_granted: false`" in adr
     assert "M012 fault-injection recovery contract is now covered" in current
     assert "M012 fault-injection recovery contract rail is now automated" in report
+
+
+def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gated():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    safety = SAFETY_CONTRACT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M013_PLAN.read_text(encoding="utf-8")
+    adr = M013_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m013 = markdown_table_row(roadmap, "M013")
+    assert m013[1] == "Integration evaluation bundle contract"
+    assert m013[2] == (
+        "Replay and fault-recovery manifests are composed into an offline "
+        "integration bundle before promotion"
+    )
+    assert m013[3] == "M011-M012"
+    assert m013[4] == "high offline"
+    assert (
+        m013[5]
+        == "SPECIFIED to UNIT_VERIFIED for integration gate; integration evidence remains pending"
+    )
+    assert m013[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/evaluation_integration_bundle_contract.py`" in memory_eval[2]
+    assert "tests/test_evaluation_integration_bundle_contract.py" in memory_eval[3]
+    assert "integration bundle evidence cannot close live readiness" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    def complete_scenario(name: str) -> dict:
+        return {
+            "scenario": name,
+            "evaluation_types": list(REQUIRED_EVALUATION_TYPES),
+            "safety_checks": {key: True for key in REQUIRED_SAFETY_CHECKS},
+            "quality_axes": {
+                key: {"status": "passed", "artifact": f"{name}/{key}.json"}
+                for key in REQUIRED_QUALITY_AXES
+            },
+        }
+
+    def complete_replay_manifest(**overrides) -> dict:
+        manifest = {
+            "manifest_id": "complete-offline-replay",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:offline-replay-thresholds",
+            },
+            "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    def complete_fault(name: str) -> dict:
+        return {
+            "fault_scenario": name,
+            "evaluation_types": list(RECOVERY_REQUIRED_EVALUATION_TYPES),
+            "recovery_outcomes": {key: True for key in REQUIRED_RECOVERY_OUTCOMES},
+            "audit": {key: f"{name}/{key}" for key in RECOVERY_REQUIRED_AUDIT_FIELDS},
+        }
+
+    def complete_fault_manifest(**overrides) -> dict:
+        manifest = {
+            "manifest_id": "complete-fault-recovery",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "recovery_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:fault-recovery-policy",
+            },
+            "fault_scenarios": [
+                complete_fault(name) for name in RECOVERY_REQUIRED_FAULT_SCENARIOS
+            ],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    pending_result = evaluate_integration_bundle_contract(
+        {
+            "manifest_id": "pending-integration-bundle",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "integration_policy": {"status": "PENDING_APPROVAL"},
+            "integration_checks": {"analysis_trace_bound": True},
+            "offline_replay_manifest": complete_replay_manifest(
+                threshold_policy={"status": "PENDING_APPROVAL"},
+                scenarios=[complete_scenario("soundcheck")],
+            ),
+            "fault_recovery_manifest": complete_fault_manifest(
+                fault_scenarios=[complete_fault("transport_timeout")]
+            ),
+        }
+    )
+    assert pending_result["ready_for_integration_evaluation_promotion"] is False
+    assert pending_result["authority"]["live_authority_granted"] is False
+    assert pending_result["authority"]["readiness_closure_allowed"] is False
+    assert "approved_integration_policy_required" in pending_result["blockers"]
+    assert "offline_replay_contract_not_ready" in pending_result["blockers"]
+    assert "fault_recovery_contract_not_ready" in pending_result["blockers"]
+    assert "offline_replay:approved_quality_threshold_policy_required" in pending_result[
+        "blockers"
+    ]
+    assert "fault_recovery:missing_required_fault_scenario:connection_loss" in pending_result[
+        "blockers"
+    ]
+    assert "missing_integration_check:fault_recovery_result_bound" in pending_result[
+        "blockers"
+    ]
+
+    complete_result = evaluate_integration_bundle_contract(
+        {
+            "manifest_id": "complete-integration-bundle",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-evaluation-policy",
+            },
+            "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+            "offline_replay_manifest": complete_replay_manifest(),
+            "fault_recovery_manifest": complete_fault_manifest(),
+        }
+    )
+    assert complete_result["ready_for_integration_evaluation_promotion"] is True
+    assert complete_result["hardware_evidence"] is False
+    assert complete_result["authority"]["live_authority_granted"] is False
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+    assert complete_result["summary"]["offline_replay_ready"] is True
+    assert complete_result["summary"]["fault_recovery_ready"] is True
+    assert complete_result["summary"]["missing_integration_checks"] == []
+
+    assert "offline, replay,\n   simulator, fault-injection и integration evaluations" in completion
+    assert "Unvalidated candidates cannot alter live concert behavior" in safety
+    assert "M013-CP01" in plan
+    assert "M013-CP02" in plan
+    assert "Integration bundle evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M013 integration evaluation bundle contract is now covered" in current
+    assert "M013 integration evaluation bundle contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
