@@ -166,6 +166,20 @@ def build_decision_review_report(
     accepted_candidate_artifact_root_contract_valid = (
         summary.get("accepted_candidate_artifact_root_contract_valid") is True
     )
+    accepted_candidate_request_sequence_source_ids = _string_list(
+        summary.get("accepted_candidate_request_sequence_source_ids")
+    )
+    accepted_candidate_request_sequence_contract_violations_by_source = (
+        summary.get("accepted_candidate_request_sequence_contract_violations_by_source")
+        if isinstance(
+            summary.get("accepted_candidate_request_sequence_contract_violations_by_source"),
+            Mapping,
+        )
+        else {}
+    )
+    accepted_candidate_request_sequence_contract_valid = (
+        summary.get("accepted_candidate_request_sequence_contract_valid") is True
+    )
     source_authority_flags = {
         flag: summary.get(flag)
         for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
@@ -181,6 +195,8 @@ def build_decision_review_report(
         and accepted_candidate_verifier_ws_proof_source_ids == accepted_source_ids
         and accepted_candidate_artifact_root_contract_valid
         and len(accepted_candidate_artifact_roots) == len(accepted_source_ids)
+        and accepted_candidate_request_sequence_contract_valid
+        and accepted_candidate_request_sequence_source_ids == accepted_source_ids
         and int(summary.get("invalid_record_count") or 0) == 0
         and int(summary.get("unreviewed_candidate_count") or 0) == 0
         and source_authority_denied
@@ -250,6 +266,15 @@ def build_decision_review_report(
         "accepted_candidate_artifact_root_contract_violations_by_source": dict(
             accepted_candidate_artifact_root_contract_violations_by_source
         ),
+        "accepted_candidate_request_sequence_contract_valid": (
+            accepted_candidate_request_sequence_contract_valid
+        ),
+        "accepted_candidate_request_sequence_source_ids": (
+            accepted_candidate_request_sequence_source_ids
+        ),
+        "accepted_candidate_request_sequence_contract_violations_by_source": dict(
+            accepted_candidate_request_sequence_contract_violations_by_source
+        ),
         "rejected_source_ids": _string_list(summary.get("rejected_source_ids")),
         "invalid_record_ids": _string_list(summary.get("invalid_record_ids")),
         "invalid_records": invalid_records,
@@ -284,6 +309,11 @@ def build_decision_review_report(
                 "have a valid accepted-candidate artifact-root trace."
             )
             if accepted_source_ids and not accepted_candidate_artifact_root_contract_valid
+            else (
+                "Accepted review decision remains blocked until accepted source ids "
+                "have a valid accepted-candidate request-sequence trace."
+            )
+            if accepted_source_ids and not accepted_candidate_request_sequence_contract_valid
             else (
                 "Accepted review decision remains blocked until source authority "
                 "flags strictly deny readiness and live authority."
@@ -344,6 +374,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"`{json.dumps(report['accepted_candidate_artifact_roots'])}`",
         "- accepted_candidate_artifact_root_contract_violations_by_source: "
         f"`{json.dumps(report['accepted_candidate_artifact_root_contract_violations_by_source'], sort_keys=True)}`",
+        "- accepted_candidate_request_sequence_contract_valid: "
+        f"`{str(report['accepted_candidate_request_sequence_contract_valid']).lower()}`",
+        "- accepted_candidate_request_sequence_source_ids: "
+        f"`{json.dumps(report['accepted_candidate_request_sequence_source_ids'])}`",
+        "- accepted_candidate_request_sequence_contract_violations_by_source: "
+        f"`{json.dumps(report['accepted_candidate_request_sequence_contract_violations_by_source'], sort_keys=True)}`",
         "",
         "## Safety",
         "",

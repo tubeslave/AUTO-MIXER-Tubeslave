@@ -36,6 +36,7 @@ from backend.wing_readonly_preflight_review_decision import (
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS,
     build_wing_readonly_preflight_review_decision_ledger,
 )
+from tools import review_wing_readonly_preflight_decisions as decision_review_tool
 
 
 def test_review_decision_checklist_ids_match_shared_contract():
@@ -742,6 +743,59 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_request_sequen
     assert record["operator_accepted_readonly_preflight_candidate"] is True
     assert record["readiness_matrix_update_allowed_by_decision"] is False
     assert record["live_authority_granted"] is False
+
+
+def test_decision_review_report_surfaces_request_sequence_contract(monkeypatch):
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record()],
+    )
+    ledger["summary"]["manual_readiness_update_candidate_available"] = False
+    ledger["summary"]["accepted_candidate_request_sequence_contract_valid"] = False
+    ledger["summary"]["accepted_candidate_request_sequence_source_ids"] = []
+    ledger["summary"][
+        "accepted_candidate_request_sequence_contract_violations_by_source"
+    ] = {
+        "inline_payload_0": [
+            "plan_request_sequence_missing",
+            "request_sequence_matches_plan_not_true",
+        ]
+    }
+
+    monkeypatch.setattr(
+        decision_review_tool,
+        "build_wing_readonly_preflight_evidence",
+        lambda **kwargs: {"status": "readonly_preflight_candidate_available"},
+    )
+    monkeypatch.setattr(
+        decision_review_tool,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda **kwargs: ledger,
+    )
+
+    report = decision_review_tool.build_decision_review_report()
+    markdown = decision_review_tool.render_markdown(report)
+
+    assert report["status"] == "blocked"
+    assert report["manual_readiness_update_candidate_available"] is False
+    assert report["accepted_candidate_request_sequence_contract_valid"] is False
+    assert report["accepted_candidate_request_sequence_source_ids"] == []
+    assert report[
+        "accepted_candidate_request_sequence_contract_violations_by_source"
+    ] == {
+        "inline_payload_0": [
+            "plan_request_sequence_missing",
+            "request_sequence_matches_plan_not_true",
+        ]
+    }
+    assert "valid accepted-candidate request-sequence trace" in report[
+        "next_required_action"
+    ]
+    assert (
+        "accepted_candidate_request_sequence_contract_valid: `false`"
+        in markdown
+    )
+    assert "plan_request_sequence_missing" in markdown
 
 
 def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contract():
