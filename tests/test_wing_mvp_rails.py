@@ -31,6 +31,29 @@ AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
 AUTOPILOT_HEARTBEAT = PROJECT_ROOT / "ops" / "autopilot" / "HEARTBEAT.md"
 AUTOPILOT_LAST_REPORT = PROJECT_ROOT / "ops" / "autopilot" / "LAST_REPORT.md"
 AUTOPILOT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
+REAL_WING_ARTIFACT_ROOT = PROJECT_ROOT / "artifacts" / "wing_readonly_preflight"
+VALIDATE_INPUTS_READY_SUMMARY = (
+    PROJECT_ROOT
+    / "ops"
+    / "autopilot"
+    / "evidence"
+    / "M001_CP04_validate_inputs_ready_for_websocket"
+    / "summary.json"
+)
+VALIDATE_INPUTS_MISMATCH_SUMMARY = (
+    PROJECT_ROOT
+    / "ops"
+    / "autopilot"
+    / "evidence"
+    / "M001_CP04_validate_inputs_expected_plan_mismatch"
+    / "summary.json"
+)
+CP04_HANDOFF_REPORT = (
+    PROJECT_ROOT
+    / "Docs"
+    / "reports"
+    / "AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md"
+)
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
 RUNNER_TOOL = PROJECT_ROOT / "tools" / "wing_readonly_preflight_runner.py"
 PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
@@ -253,6 +276,12 @@ def markdown_table_row(text: str, first_cell: str) -> list[str]:
         if line.startswith(f"| {first_cell} |"):
             return [cell.strip() for cell in line.strip("|").split("|")]
     raise AssertionError(f"missing markdown table row for {first_cell!r}")
+
+
+def files_under(path: Path) -> list[Path]:
+    if not path.exists():
+        return []
+    return sorted(candidate for candidate in path.rglob("*") if candidate.is_file())
 
 
 def test_progress_baseline_covers_runner_verifier_checks():
@@ -528,6 +557,80 @@ def test_project_completion_gate_stays_closed_without_real_hardware_and_owner_ev
     assert "These commits do not create hardware proof" in report
     assert "grant live authority" in report
     assert "Do not contact\nWING from unattended automation" in report
+
+
+def test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    summary = state["last_validation_summary"]
+    authority = summary["authority"]
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    heartbeat = AUTOPILOT_HEARTBEAT.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    handoff = CP04_HANDOFF_REPORT.read_text(encoding="utf-8")
+    ready = json.loads(VALIDATE_INPUTS_READY_SUMMARY.read_text(encoding="utf-8"))
+    mismatch = json.loads(VALIDATE_INPUTS_MISMATCH_SUMMARY.read_text(encoding="utf-8"))
+
+    validate_only_artifacts = summary["cp04_validate_input_artifacts"]
+    expected_artifacts = [
+        "ops/autopilot/evidence/M001_CP04_validate_inputs_expected_plan_mismatch/summary.json",
+        "ops/autopilot/evidence/M001_CP04_validate_inputs_ready_for_websocket/summary.json",
+    ]
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert summary["hardware_evidence"] is False
+    assert summary["product_runtime_changed"] is False
+    assert summary["milestone_decision"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert authority["contacts_wing"] is False
+    assert authority["contacts_backend"] is False
+    assert authority["live_write"] is False
+    assert authority["live_authority_granted"] is False
+    assert authority["readiness_closure_allowed"] is False
+
+    assert summary["evidence_placement"] == (
+        "validate-only summaries are stored under ops/autopilot/evidence, "
+        "not artifacts/wing_readonly_preflight"
+    )
+    assert validate_only_artifacts == expected_artifacts
+    assert all(
+        not artifact.startswith("artifacts/wing_readonly_preflight")
+        for artifact in validate_only_artifacts
+    )
+    assert files_under(REAL_WING_ARTIFACT_ROOT) == []
+
+    for payload in (ready, mismatch):
+        assert payload["validation_only"] is True
+        assert payload["read_only"] is True
+        assert payload["websocket_opened"] is False
+        assert payload["write_request_sent"] is False
+        assert payload["contacts_wing"] is False
+        assert payload["contacts_backend"] is False
+        assert payload["live_write"] is False
+        assert payload["mutates_console_state"] is False
+        assert payload["queries_console"] is False
+        assert payload["readiness_closure_allowed"] is False
+        assert payload["readiness_matrix_update_allowed"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["artifact_root"] == "artifacts/wing_readonly_preflight"
+
+    assert ready["status"] == "ready_for_websocket"
+    assert ready["reason"] == "run_inputs_validated_no_websocket"
+    assert ready["expected_plan_match"] is True
+    assert ready["execution_allowed_by_validation"] is False
+    assert mismatch["status"] == "blocked"
+    assert mismatch["reason"] == "expected_plan_mismatch"
+    assert mismatch["expected_plan_match"] is False
+
+    for artifact in expected_artifacts:
+        assert artifact in report
+        assert artifact in handoff
+    assert "Validate-only summaries were moved to `ops/autopilot/evidence/`" in report
+    assert "not treated as real `artifacts/wing_readonly_preflight` candidates" in report
+    assert "M001 still has no real WING read-only artifact under\n" in heartbeat
+    assert "`artifacts/wing_readonly_preflight/`" in heartbeat
+    assert "No real hardware evidence was produced" in current
+    assert "`artifacts/wing_readonly_preflight` root" in current
+    assert "websocket_opened: false" in handoff
+    assert "write_request_sent: false" in handoff
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

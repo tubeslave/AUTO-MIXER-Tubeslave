@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T14:56:54Z
+Generated: 2026-06-19T15:11:45Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T14:56:54Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `685ec514 Guard goal transition fallback`
+  `31c1b5b3 Guard project completion gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -238,6 +238,14 @@ Generated: 2026-06-19T14:56:54Z
   `ops/autopilot/LAST_REPORT.md` so the project cannot be reported as
   `COMPLETE` or Full Autonomous ready from documentation, unit tests, mock,
   replay, simulator or no-WING artifacts alone.
+- Validate-only WING read-only preflight evidence placement is now covered by
+  `tests/test_wing_mvp_rails.py::test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root`.
+  The rail checks the CP04 validate-only summaries under
+  `ops/autopilot/evidence/`, `ops/autopilot/STATE.json`,
+  `ops/autopilot/HEARTBEAT.md`, `ops/autopilot/LAST_REPORT.md`, the CP04
+  handoff report and this file so validate-only summaries cannot be treated as
+  real `artifacts/wing_readonly_preflight` hardware evidence while
+  `hardware_evidence` remains false.
 
 ## Unresolved unknowns
 
@@ -248,4 +256,4 @@ Generated: 2026-06-19T14:56:54Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4070 passed, 1 skipped, 1 warning`.
+  `4071 passed, 1 skipped, 1 warning`.

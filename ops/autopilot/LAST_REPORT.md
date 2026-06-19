@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T14:56:54Z.
+- Latest heartbeat: 2026-06-19T15:11:45Z.
 
 ## Что сделано
 
@@ -147,7 +147,7 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `685ec514`; this synchronization did not
+pre-checkpoint state/evidence commit `31c1b5b3`; this synchronization did not
 change product runtime behavior.
 
 The current-state freshness rail is now automated by
@@ -192,6 +192,16 @@ It compares `ops/autopilot/STATE.json`, `Docs/PROJECT_COMPLETION_GATE.md`,
 `Docs/CURRENT_STATE.md` and this report so the project cannot be reported as
 `COMPLETE` or Full Autonomous ready from documentation, unit tests, mock,
 replay, simulator or no-WING artifacts alone.
+
+The validate-only WING read-only preflight evidence-placement rail is now
+automated by
+`tests/test_wing_mvp_rails.py::test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root`.
+It compares the CP04 validate-only summaries under `ops/autopilot/evidence/`,
+`ops/autopilot/STATE.json`, `Docs/CURRENT_STATE.md`,
+`ops/autopilot/HEARTBEAT.md`, this report and the CP04 handoff report so
+validate-only summaries cannot be treated as real
+`artifacts/wing_readonly_preflight` hardware evidence while
+`hardware_evidence` remains false.
 
 ## Проверка
 
@@ -283,8 +293,10 @@ replay, simulator or no-WING artifacts alone.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_project_completion_gate_stays_closed_without_real_hardware_and_owner_evidence -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `14 passed`.
+  `15 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -296,7 +308,7 @@ replay, simulator or no-WING artifacts alone.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4070 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4071 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -327,9 +339,9 @@ replay, simulator or no-WING artifacts alone.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:56:54Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T15:11:45Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `685ec514`, latest no-WING artifact
+  state/evidence commit `31c1b5b3`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
@@ -352,6 +364,9 @@ replay, simulator or no-WING artifacts alone.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
+- The validate-only artifact-root separation rail confirmed those summaries
+  stay out of the real `artifacts/wing_readonly_preflight` root while
+  `hardware_evidence` is false.
 - Heartbeat reconciliation confirmed STOP, writer-lease, stale-run and
   recovery contract paths stay consistent across state, contract, skill, plan,
   operations, heartbeat, blockers and this report. It found no real WING
