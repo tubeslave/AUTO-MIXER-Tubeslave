@@ -117,6 +117,8 @@ M028_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M028-main-pipeline-preview-integr
 M028_ADR = PROJECT_ROOT / "Docs" / "adr" / "main-pipeline-preview-integration-bundle-readiness-summary-20260619.md"
 M029_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M029-director-runtime-integration-bundle-readiness-summary.md"
 M029_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-runtime-integration-bundle-readiness-summary-20260619.md"
+M030_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M030-director-event-integration-bundle-blocker-summary.md"
+M030_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-event-integration-bundle-blocker-summary-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -131,6 +133,14 @@ FRONTEND_OPERATOR_ADAPTER_TEST = (
     / "services"
     / "__tests__"
     / "operatorAdaptersContract.test.mjs"
+)
+FRONTEND_DIRECTOR_PANEL_MODEL = (
+    PROJECT_ROOT
+    / "frontend"
+    / "src"
+    / "components"
+    / "dashboard"
+    / "directorPanelModel.ts"
 )
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
@@ -4538,6 +4548,82 @@ def test_m029_director_runtime_surfaces_integration_bundle_readiness_summary():
         current
     )
     assert "M029 Director runtime integration bundle readiness summary rail is now automated" in (
+        report
+    )
+
+
+def test_m030_director_events_render_integration_bundle_blocker_summary():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M030_PLAN.read_text(encoding="utf-8")
+    adr = M030_ADR.read_text(encoding="utf-8")
+    director_model = FRONTEND_DIRECTOR_PANEL_MODEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m030 = markdown_table_row(roadmap, "M030")
+    assert m030[1] == "Director event integration bundle blocker summary"
+    assert m030[2] == (
+        "Director event rows render integration bundle blocker tags as "
+        "operator-readable read-only events"
+    )
+    assert m030[3] == "M029"
+    assert m030[4] == "high offline frontend"
+    assert m030[5] == "UNIT_VERIFIED read-only Director event surface; live authority remains blocked"
+    assert m030[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`frontend/src/components/dashboard/directorPanelModel.ts`" in memory_eval[2]
+    assert "npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs" in (
+        memory_eval[3]
+    )
+    assert "Director event rows now render offline integration bundle blockers" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "directorEventRows" in plan
+    assert "M030-CP01" in plan
+    assert "M030-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not queue proposals" in adr
+
+    assert "integrationBundleEventMessage" in director_model
+    assert "Integration bundle" in director_model
+    assert "integration_bundle_missing_check:" in director_model
+    assert "integration_bundle_live_authority_granted:false" in director_model
+    assert "directorEventRows renders integration bundle blockers as operator-readable events" in (
+        adapter_test
+    )
+    assert "Integration bundle blocked; 1 blocker(s); missing: operator_report_bound" in (
+        adapter_test
+    )
+    assert "Director event rows must render offline integration bundle blocker" in (
+        completion
+    )
+    assert "M030 Director event integration bundle blocker summary is now covered" in (
+        current
+    )
+    assert "M030 Director event integration bundle blocker summary rail is now automated" in (
         report
     )
 

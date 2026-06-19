@@ -4121,6 +4121,51 @@ test('directorEventRows derives backend events from runtime state instead of moc
   assert.equal(rows[2].message, 'physical_pre_read_required');
 });
 
+test('directorEventRows renders integration bundle blockers as operator-readable events', async () => {
+  const { directorEventRows } = await importTypeScript('components/dashboard/directorPanelModel.ts');
+
+  const runtime = {
+    currentGoal: 'Keep writes supervised.',
+    readyLabel: 'Not live ready',
+    readyTone: 'red',
+    audioLabel: 'Read-only',
+    audioTone: 'yellow',
+    proposalQueueLabel: '2 pending',
+    proposalQueueTone: 'yellow',
+    liveWritePolicy: 'supervised_fader_gain_only',
+    manualGateLabel: 'Apply blocked',
+    manualGateTone: 'yellow',
+    resetRequired: false,
+    hardwareProofItems: [
+      { label: 'Readback', value: 'cache only', tone: 'yellow' },
+    ],
+    blockedReasons: [
+      'integration_bundle_status:blocked',
+      'integration_bundle_blocker:offline_integration_bundle_contract_not_ready',
+      'integration_bundle_missing_check:operator_report_bound',
+      'integration_bundle_source_authority_denied:true',
+      'integration_bundle_live_authority_granted:false',
+      'integration_bundle_readiness_closure_allowed:false',
+    ],
+    statusItems: [],
+    sourceLabel: 'Backend',
+  };
+
+  const rows = directorEventRows(runtime, []);
+  const integrationBundleRow = rows.find(row => row.source === 'Integration bundle');
+
+  assert.equal(integrationBundleRow?.tone, 'red');
+  assert.equal(
+    integrationBundleRow?.message,
+    'Integration bundle blocked; 1 blocker(s); missing: operator_report_bound; source authority denied, live authority denied, readiness closure denied.',
+  );
+  assert.equal(rows.some(row => row.source === 'Blockers'), false);
+  assert.equal(
+    rows.some(row => row.message.includes('integration_bundle_blocker:')),
+    false,
+  );
+});
+
 test('directorEventRows keeps static events only for mock source', async () => {
   const { directorEventRows } = await importTypeScript('components/dashboard/directorPanelModel.ts');
 

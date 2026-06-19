@@ -141,6 +141,41 @@ function appendRuntimeEvent(
   });
 }
 
+function integrationBundleEventMessage(blockedReasons: string[]): string {
+  const bundleReasons = blockedReasons.filter(reason => reason.startsWith('integration_bundle_'));
+  if (!bundleReasons.length) {
+    return '';
+  }
+
+  const status = bundleReasons
+    .find(reason => reason.startsWith('integration_bundle_status:'))
+    ?.split(':')
+    .slice(1)
+    .join(':') || 'blocked';
+  const blockerCount = bundleReasons.filter(reason => reason.startsWith('integration_bundle_blocker:')).length;
+  const missingChecks = bundleReasons
+    .filter(reason => reason.startsWith('integration_bundle_missing_check:'))
+    .map(reason => reason.split(':').slice(1).join(':'))
+    .filter(Boolean);
+  const sourceAuthorityDenied = bundleReasons.includes('integration_bundle_source_authority_denied:true');
+  const liveAuthorityDenied = bundleReasons.includes('integration_bundle_live_authority_granted:false');
+  const readinessClosureDenied = bundleReasons.includes('integration_bundle_readiness_closure_allowed:false');
+  const authorityDetails = [
+    sourceAuthorityDenied ? 'source authority denied' : '',
+    liveAuthorityDenied ? 'live authority denied' : '',
+    readinessClosureDenied ? 'readiness closure denied' : ''
+  ].filter(Boolean);
+  const detail = [
+    blockerCount ? `${blockerCount} blocker(s)` : '',
+    missingChecks.length ? `missing: ${missingChecks.slice(0, 2).join(', ')}` : '',
+    authorityDetails.join(', ')
+  ].filter(Boolean).join('; ');
+
+  return detail
+    ? `Integration bundle ${status}; ${detail}.`
+    : `Integration bundle ${status}.`;
+}
+
 export function directorEventRows(
   runtime: DirectorRuntime,
   fallbackRows: DirectorEventMock[]
@@ -172,11 +207,21 @@ export function directorEventRows(
     );
   }
 
-  if (runtime.blockedReasons.length) {
+  const integrationBundleMessage = integrationBundleEventMessage(runtime.blockedReasons);
+  if (integrationBundleMessage) {
+    appendRuntimeEvent(rows, 'Integration bundle', integrationBundleMessage, 'red');
+  }
+
+  const nonIntegrationBlockers = runtime.blockedReasons.filter(
+    reason => !reason.startsWith('integration_bundle_')
+  );
+  if (nonIntegrationBlockers.length || (runtime.blockedReasons.length && !integrationBundleMessage)) {
     appendRuntimeEvent(
       rows,
       'Blockers',
-      runtime.blockedReasons.slice(0, 2).join(', '),
+      (nonIntegrationBlockers.length ? nonIntegrationBlockers : runtime.blockedReasons)
+        .slice(0, 2)
+        .join(', '),
       'red'
     );
   } else if (runtime.hardwareProofItems.length) {

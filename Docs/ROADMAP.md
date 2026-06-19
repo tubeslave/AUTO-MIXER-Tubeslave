@@ -53,6 +53,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M027 | Operator adapter integration bundle readiness summary | Operator-facing module status rows surface offline integration bundle readiness, blockers and authority-denial status from autonomy promotion readiness | M026 | high offline frontend | UNIT_VERIFIED read-only operator surface; live authority remains blocked | PENDING |
 | M028 | Main pipeline preview integration bundle readiness summary | Main pipeline preview summary surfaces offline integration bundle readiness, blockers and authority-denial status from autonomy promotion readiness | M026-M027 | high offline preview | UNIT_VERIFIED read-only preview summary; live authority remains blocked | PENDING |
 | M029 | Director runtime integration bundle readiness summary | Director runtime surfaces main pipeline preview integration bundle readiness, blockers and authority-denial status for the runtime guard | M027-M028 | high offline frontend | UNIT_VERIFIED read-only Director surface; live authority remains blocked | PENDING |
+| M030 | Director event integration bundle blocker summary | Director event rows render integration bundle blocker tags as operator-readable read-only events | M029 | high offline frontend | UNIT_VERIFIED read-only Director event surface; live authority remains blocked | PENDING |
 
 ## Active milestone
 
