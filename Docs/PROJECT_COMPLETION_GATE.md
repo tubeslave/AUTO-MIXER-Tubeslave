@@ -84,6 +84,10 @@ Complete no-live-transport evidence alone cannot grant live authority, close
 readiness, contact WING/backend, send live writes, or replace hardware
 validation.
 
+Integration bundle manifests must consume the no-live-transport contract
+result instead of loose no_live_transport checks before claiming offline
+integration promotion readiness.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T18:43:43Z.
+- Latest heartbeat: 2026-06-19T19:22:15Z.
 
 ## Что сделано
 
@@ -147,7 +147,7 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `fbad044c`; this synchronization did not
+pre-checkpoint state/evidence commit `195e7ff6`; this synchronization did not
 change product runtime behavior.
 
 The current-state freshness rail is now automated by
@@ -460,8 +460,33 @@ token list before no-live-transport evidence can support integration use. It
 still reports no hardware proof, no live write, no readiness closure and no
 live authority.
 
+The M023 no-live-transport binding rail is now automated by
+`tests/test_evaluation_integration_bundle_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m023_no_live_transport_binding_requires_m022_manifest`.
+It updates `backend/evaluation_integration_bundle_contract.py` and binds the
+change through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M023-no-live-transport-binding.md`,
+`Docs/adr/no-live-transport-binding-20260619.md`, `Docs/CURRENT_STATE.md` and
+this report. Offline integration promotion now consumes the M022
+`no_live_transport_manifest`; loose `no_live_transport` integration checks
+remain context only and cannot satisfy no-live-transport requirements without
+the bound M022 contract manifest. Integration bundles surface the same failure
+through the `no_live_transport:` child prefix. It still reports no hardware
+proof, no live write, no readiness closure and no live authority.
+
 ## Проверка
 
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
+  `9 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_live_transport_contract.py -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m023_no_live_transport_binding_requires_m022_manifest -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `36 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4138 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_live_transport_contract.py -q`:
   `5 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m022_no_live_transport_contract_stays_offline_and_artifact_only -q`:

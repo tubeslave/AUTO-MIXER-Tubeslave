@@ -14,6 +14,11 @@ from backend.integration_policy_contract import (
     REQUIRED_INTEGRATION_CONTROLS as POLICY_REQUIRED_INTEGRATION_CONTROLS,
     REQUIRED_INTEGRATION_EVIDENCE as POLICY_REQUIRED_INTEGRATION_EVIDENCE,
 )
+from backend.no_live_transport_contract import (
+    REQUIRED_TRANSPORT_CONTROLS,
+    REQUIRED_TRANSPORT_EVIDENCE,
+    REQUIRED_ZERO_RUNTIME_OBSERVATIONS,
+)
 from backend.offline_replay_evaluation_contract import (
     REQUIRED_EVALUATION_TYPES,
     REQUIRED_QUALITY_AXES,
@@ -209,6 +214,37 @@ def _safety_kernel_trace_manifest(**overrides) -> dict:
     return manifest
 
 
+def _transport_evidence_item(name: str) -> dict:
+    return {
+        "status": "passed",
+        "artifact": f"no-live-transport/{name}.json",
+        "sha256": f"sha256:{name}",
+    }
+
+
+def _no_live_transport_manifest(**overrides) -> dict:
+    manifest = {
+        "transport_id": "no-live-transport-fixture",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "transport_controls": {key: True for key in REQUIRED_TRANSPORT_CONTROLS},
+        "transport_evidence": {
+            key: _transport_evidence_item(key) for key in REQUIRED_TRANSPORT_EVIDENCE
+        },
+        "runtime_observations": {
+            key: 0 for key in REQUIRED_ZERO_RUNTIME_OBSERVATIONS
+        },
+        "forbidden_transport_tokens": [],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def _complete_bundle(**overrides) -> dict:
     bundle = {
         "manifest_id": "integration-bundle-fixture",
@@ -221,6 +257,7 @@ def _complete_bundle(**overrides) -> dict:
         "live_authority_granted": False,
         "integration_policy_manifest": _integration_policy_manifest(),
         "safety_kernel_trace_manifest": _safety_kernel_trace_manifest(),
+        "no_live_transport_manifest": _no_live_transport_manifest(),
         "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
         "offline_replay_manifest": _offline_replay_manifest(),
         "fault_recovery_manifest": _fault_recovery_manifest(),
@@ -293,6 +330,7 @@ def test_integration_bundle_accepts_complete_offline_bundle_without_live_authori
     assert result["summary"]["offline_replay_ready"] is True
     assert result["summary"]["fault_recovery_ready"] is True
     assert result["summary"]["safety_kernel_trace_ready"] is True
+    assert result["summary"]["no_live_transport_ready"] is True
     assert result["summary"]["integration_policy_approved"] is True
     assert result["summary"]["integration_policy_contract_status"] == (
         "ready_for_integration_policy_use"
@@ -307,6 +345,10 @@ def test_integration_bundle_accepts_complete_offline_bundle_without_live_authori
         result["child_results"]["safety_kernel_trace"][
             "ready_for_safety_kernel_trace_use"
         ]
+        is True
+    )
+    assert (
+        result["child_results"]["no_live_transport"]["ready_for_no_live_transport_use"]
         is True
     )
     assert result["summary"]["missing_integration_checks"] == []
@@ -359,6 +401,70 @@ def test_integration_bundle_requires_bound_safety_kernel_trace_manifest():
     assert result["summary"]["safety_kernel_trace_ready"] is False
     assert result["summary"]["safety_kernel_trace_contract_status"] == "blocked"
     assert result["child_results"]["safety_kernel_trace"]["status"] == "blocked"
+    assert result["authority"]["live_authority_granted"] is False
+
+
+def test_integration_bundle_requires_bound_no_live_transport_manifest():
+    result = evaluate_integration_bundle_contract(
+        _complete_bundle(no_live_transport_manifest={})
+    )
+
+    assert result["status"] == "blocked"
+    assert result["ready_for_integration_evaluation_promotion"] is False
+    assert "no_live_transport_contract_not_ready" in result["blockers"]
+    assert "legacy_no_live_transport_without_contract_manifest" in result[
+        "blockers"
+    ]
+    assert "no_live_transport:offline_only_required" in result["blockers"]
+    assert (
+        "no_live_transport:missing_transport_control:offline_executor_only"
+        in result["blockers"]
+    )
+    assert (
+        "no_live_transport:missing_transport_evidence:source_audit_artifact"
+        in result["blockers"]
+    )
+    assert (
+        "no_live_transport:missing_runtime_observation:websocket_opened"
+        in result["blockers"]
+    )
+    assert result["summary"]["no_live_transport_ready"] is False
+    assert result["summary"]["no_live_transport_contract_status"] == "blocked"
+    assert result["child_results"]["no_live_transport"]["status"] == "blocked"
+    assert result["authority"]["live_authority_granted"] is False
+
+
+def test_integration_bundle_rejects_live_no_transport_manifest_claims():
+    result = evaluate_integration_bundle_contract(
+        _complete_bundle(
+            no_live_transport_manifest=_no_live_transport_manifest(
+                contacts_wing=True,
+                contacts_backend=True,
+                live_write=True,
+                runtime_observations={"websocket_opened": 1},
+                forbidden_transport_tokens=["WingClient"],
+            )
+        )
+    )
+
+    assert result["status"] == "blocked"
+    assert "no_live_transport_contract_not_ready" in result["blockers"]
+    assert "no_live_transport:no_live_transport_forbids_live_write" in result[
+        "blockers"
+    ]
+    assert "no_live_transport:no_live_transport_forbids_wing_contact" in result[
+        "blockers"
+    ]
+    assert "no_live_transport:no_live_transport_forbids_backend_contact" in result[
+        "blockers"
+    ]
+    assert "no_live_transport:live_transport_observed:websocket_opened" in result[
+        "blockers"
+    ]
+    assert "no_live_transport:forbidden_transport_token:WingClient" in result[
+        "blockers"
+    ]
+    assert result["summary"]["no_live_transport_ready"] is False
     assert result["authority"]["live_authority_granted"] is False
 
 

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T19:11:52Z
+Generated: 2026-06-19T19:22:15Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T19:11:52Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `d14fd77d Bind safety trace to integration bundle`
+  `195e7ff6 Add no live transport contract`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -461,6 +461,19 @@ Generated: 2026-06-19T19:11:52Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so no-live-transport
   evidence cannot become hardware proof or live readiness.
+- M023 no-live-transport binding is now covered by
+  `tests/test_evaluation_integration_bundle_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m023_no_live_transport_binding_requires_m022_manifest`.
+  The updated `backend/evaluation_integration_bundle_contract.py` module now
+  consumes `no_live_transport_manifest` from M022 before reporting offline
+  integration promotion readiness. Loose `no_live_transport` integration
+  checks remain visible as integration-check context, but cannot satisfy
+  no-live-transport requirements without the bound M022 contract manifest.
+  No-live-transport contract failures surface through the
+  `no_live_transport:` child prefix. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so no-live-transport
+  binding cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -471,4 +484,4 @@ Generated: 2026-06-19T19:11:52Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4135 passed, 1 skipped, 1 warning`.
+  `4138 passed, 1 skipped, 1 warning`.

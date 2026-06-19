@@ -96,6 +96,8 @@ M021_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M021-safety-kernel-trace-binding.
 M021_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-kernel-trace-binding-20260619.md"
 M022_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M022-no-live-transport-contract.md"
 M022_ADR = PROJECT_ROOT / "Docs" / "adr" / "no-live-transport-contract-20260619.md"
+M023_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M023-no-live-transport-binding.md"
+M023_ADR = PROJECT_ROOT / "Docs" / "adr" / "no-live-transport-binding-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -384,6 +386,38 @@ def safety_kernel_trace_manifest_fixture(**overrides) -> dict:
             safety_kernel_trace_record_fixture(scenario)
             for scenario in SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS
         ],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def no_live_transport_evidence_fixture(name: str) -> dict:
+    return {
+        "status": "passed",
+        "artifact": f"no-live-transport/{name}.json",
+        "sha256": f"{name}-sha256",
+    }
+
+
+def no_live_transport_manifest_fixture(**overrides) -> dict:
+    manifest = {
+        "transport_id": "no-live-transport-fixture",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "transport_controls": {key: True for key in REQUIRED_TRANSPORT_CONTROLS},
+        "transport_evidence": {
+            key: no_live_transport_evidence_fixture(key)
+            for key in REQUIRED_TRANSPORT_EVIDENCE
+        },
+        "runtime_observations": {
+            key: 0 for key in REQUIRED_ZERO_RUNTIME_OBSERVATIONS
+        },
+        "forbidden_transport_tokens": [],
     }
     manifest.update(overrides)
     return manifest
@@ -2116,6 +2150,7 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "live_authority_granted": False,
             "integration_policy_manifest": complete_integration_policy_manifest(),
             "safety_kernel_trace_manifest": safety_kernel_trace_manifest_fixture(),
+            "no_live_transport_manifest": no_live_transport_manifest_fixture(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": complete_replay_manifest(),
             "fault_recovery_manifest": complete_fault_manifest(),
@@ -3186,6 +3221,7 @@ def test_m019_integration_policy_binding_requires_m018_manifest():
             "live_authority_granted": False,
             "integration_policy_manifest": integration_policy_manifest(),
             "safety_kernel_trace_manifest": safety_kernel_trace_manifest_fixture(),
+            "no_live_transport_manifest": no_live_transport_manifest_fixture(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": replay_manifest(),
             "fault_recovery_manifest": fault_manifest(),
@@ -3717,6 +3753,113 @@ def test_m022_no_live_transport_contract_stays_offline_and_artifact_only():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M022 no-live-transport contract is now covered" in current
     assert "M022 no-live-transport contract rail is now automated" in report
+
+
+def test_m023_no_live_transport_binding_requires_m022_manifest():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M023_PLAN.read_text(encoding="utf-8")
+    adr = M023_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m023 = markdown_table_row(roadmap, "M023")
+    assert m023[1] == "No-live-transport binding"
+    assert m023[2] == (
+        "Offline integration promotion consumes the no-live-transport "
+        "contract instead of loose no_live_transport checks"
+    )
+    assert m023[3] == "M013-M022"
+    assert m023[4] == "high offline"
+    assert m023[5] == "UNIT_VERIFIED gate binding; integration evidence remains pending"
+    assert m023[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "tests/test_evaluation_integration_bundle_contract.py" in memory_eval[3]
+    assert "integration promotion now requires a bound no-live-transport manifest" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    def integration_bundle(**overrides) -> dict:
+        bundle = {
+            "manifest_id": "m023-integration-bundle",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+        }
+        bundle.update(overrides)
+        return bundle
+
+    legacy_result = evaluate_integration_bundle_contract(
+        integration_bundle(no_live_transport_manifest={})
+    )
+    assert legacy_result["ready_for_integration_evaluation_promotion"] is False
+    assert "no_live_transport_contract_not_ready" in legacy_result["blockers"]
+    assert "legacy_no_live_transport_without_contract_manifest" in legacy_result[
+        "blockers"
+    ]
+    assert "no_live_transport:offline_only_required" in legacy_result["blockers"]
+    assert (
+        "no_live_transport:missing_transport_control:offline_executor_only"
+        in legacy_result["blockers"]
+    )
+    assert legacy_result["summary"]["no_live_transport_ready"] is False
+    assert legacy_result["child_results"]["no_live_transport"]["status"] == "blocked"
+
+    bound_transport_result = evaluate_integration_bundle_contract(
+        integration_bundle(
+            no_live_transport_manifest=no_live_transport_manifest_fixture()
+        )
+    )
+    assert "no_live_transport_contract_not_ready" not in (
+        bound_transport_result["blockers"]
+    )
+    assert not any(
+        blocker.startswith("no_live_transport:")
+        for blocker in bound_transport_result["blockers"]
+    )
+    assert bound_transport_result["summary"]["no_live_transport_ready"] is True
+    assert (
+        bound_transport_result["child_results"]["no_live_transport"][
+            "ready_for_no_live_transport_use"
+        ]
+        is True
+    )
+    assert bound_transport_result["authority"]["live_authority_granted"] is False
+
+    assert "Integration bundle manifests must consume the no-live-transport contract" in (
+        completion
+    )
+    assert "M023-CP01" in plan
+    assert "M023-CP02" in plan
+    assert "loose `no_live_transport` integration checks" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M023 no-live-transport binding is now covered" in current
+    assert "M023 no-live-transport binding rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

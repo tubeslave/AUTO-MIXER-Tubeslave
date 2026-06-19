@@ -74,6 +74,12 @@ def _safety_kernel_trace_result(manifest: Mapping[str, Any]) -> Dict[str, Any]:
     return evaluate_safety_kernel_trace_contract(manifest)
 
 
+def _no_live_transport_result(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    from backend.no_live_transport_contract import evaluate_no_live_transport_contract
+
+    return evaluate_no_live_transport_contract(manifest)
+
+
 def _prefixed(prefix: str, blockers: Iterable[str]) -> List[str]:
     return [f"{prefix}:{blocker}" for blocker in blockers]
 
@@ -139,6 +145,8 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
     safety_kernel_trace_result = _safety_kernel_trace_result(
         safety_kernel_trace_manifest
     )
+    no_live_transport_manifest = _as_mapping(manifest.get("no_live_transport_manifest"))
+    no_live_transport_result = _no_live_transport_result(no_live_transport_manifest)
 
     integration_checks = _as_mapping(manifest.get("integration_checks"))
     missing_integration_checks = [
@@ -168,6 +176,15 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
             blockers.append(
                 "legacy_safety_kernel_trace_bound_without_contract_manifest"
             )
+    if no_live_transport_result["ready_for_no_live_transport_use"] is not True:
+        blockers.append("no_live_transport_contract_not_ready")
+        blockers.extend(
+            _prefixed("no_live_transport", no_live_transport_result["blockers"])
+        )
+        if _passed(integration_checks.get("no_live_transport")) and not (
+            no_live_transport_manifest
+        ):
+            blockers.append("legacy_no_live_transport_without_contract_manifest")
 
     blocker_list = _dedupe(blockers)
     ready_for_integration_promotion = not blocker_list
@@ -194,6 +211,9 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
             "safety_kernel_trace_ready": safety_kernel_trace_result[
                 "ready_for_safety_kernel_trace_use"
             ],
+            "no_live_transport_ready": no_live_transport_result[
+                "ready_for_no_live_transport_use"
+            ],
             "required_integration_checks": list(REQUIRED_INTEGRATION_CHECKS),
             "missing_integration_checks": missing_integration_checks,
             "integration_policy_status": str(integration_policy.get("status") or ""),
@@ -208,12 +228,14 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
             "safety_kernel_trace_contract_status": safety_kernel_trace_result[
                 "status"
             ],
+            "no_live_transport_contract_status": no_live_transport_result["status"],
         },
         "child_results": {
             "offline_replay": replay_result,
             "fault_recovery": fault_result,
             "integration_policy": integration_policy_result,
             "safety_kernel_trace": safety_kernel_trace_result,
+            "no_live_transport": no_live_transport_result,
         },
         "blockers": blocker_list,
     }

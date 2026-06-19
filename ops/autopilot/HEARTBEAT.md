@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T19:11:52Z
+Last heartbeat UTC: 2026-06-19T19:22:15Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,18 +12,18 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M022 no-live-transport contract is now guarded by
-`tests/test_no_live_transport_contract.py` and
-`tests/test_wing_mvp_rails.py::test_m022_no_live_transport_contract_stays_offline_and_artifact_only`.
-The new `backend/no_live_transport_contract.py` contract requires offline-only
-controls, evidence artifacts, zero live runtime observations and no forbidden
-transport tokens before no-live-transport evidence can support integration
-use. It keeps
+Latest check: M023 no-live-transport binding is now guarded by
+`tests/test_evaluation_integration_bundle_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m023_no_live_transport_binding_requires_m022_manifest`.
+The updated `backend/evaluation_integration_bundle_contract.py` contract now
+requires a bound M022 `no_live_transport_manifest` before offline integration
+promotion can use no-live-transport evidence. Loose `no_live_transport`
+integration checks remain context only. The binding keeps
 `live_authority_granted: false`, `readiness_closure_allowed: false`,
 `live_write: false` and `hardware_evidence: false`.
-Targeted validation passed with `5 passed` and `1 passed`; the full rail file
-passed with `35 passed`; the full suite passed with
-`4135 passed, 1 skipped, 1 warning`.
+Targeted validation passed with `9 passed`, `5 passed` and `1 passed`; the
+full rail file passed with `36 passed`; the full suite passed with
+`4138 passed, 1 skipped, 1 warning`.
 The fresh no-WING bundle remains
 `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`;
 the detached verifier passed with `failed_checks: []`, top-level coverage
