@@ -21,6 +21,12 @@ from backend.integration_policy_contract import (
     REQUIRED_INTEGRATION_EVIDENCE as POLICY_REQUIRED_INTEGRATION_EVIDENCE,
     evaluate_integration_policy_contract,
 )
+from backend.no_live_transport_contract import (
+    REQUIRED_TRANSPORT_CONTROLS,
+    REQUIRED_TRANSPORT_EVIDENCE,
+    REQUIRED_ZERO_RUNTIME_OBSERVATIONS,
+    evaluate_no_live_transport_contract,
+)
 from backend.offline_replay_evaluation_contract import (
     REQUIRED_EVALUATION_TYPES,
     REQUIRED_QUALITY_AXES,
@@ -88,6 +94,8 @@ M020_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M020-safety-kernel-trace-contract
 M020_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-kernel-trace-contract-20260619.md"
 M021_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M021-safety-kernel-trace-binding.md"
 M021_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-kernel-trace-binding-20260619.md"
+M022_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M022-no-live-transport-contract.md"
+M022_ADR = PROJECT_ROOT / "Docs" / "adr" / "no-live-transport-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -3567,6 +3575,148 @@ def test_m021_safety_kernel_trace_binding_requires_m020_manifest():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M021 safety kernel trace binding is now covered" in current
     assert "M021 safety kernel trace binding rail is now automated" in report
+
+
+def test_m022_no_live_transport_contract_stays_offline_and_artifact_only():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M022_PLAN.read_text(encoding="utf-8")
+    adr = M022_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m022 = markdown_table_row(roadmap, "M022")
+    assert m022[1] == "No-live-transport contract"
+    assert m022[2] == (
+        "Offline integration candidates prove no live transport, backend "
+        "contact, console contact or live write occurred"
+    )
+    assert m022[3] == "M013-M021"
+    assert m022[4] == "high offline"
+    assert (
+        m022[5]
+        == "SPECIFIED to UNIT_VERIFIED for no-live-transport gate; integration binding remains pending"
+    )
+    assert m022[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/no_live_transport_contract.py`" in memory_eval[2]
+    assert "tests/test_no_live_transport_contract.py" in memory_eval[3]
+    assert "no-live-transport evidence cannot grant live authority" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    def evidence(name: str) -> dict:
+        return {
+            "status": "passed",
+            "artifact": f"artifacts/no-live-transport/{name}.json",
+            "sha256": f"{name}-sha256",
+        }
+
+    def transport_manifest(**overrides) -> dict:
+        manifest = {
+            "transport_id": "m022-no-live-transport",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "transport_controls": {
+                key: True for key in REQUIRED_TRANSPORT_CONTROLS
+            },
+            "transport_evidence": {
+                key: evidence(key) for key in REQUIRED_TRANSPORT_EVIDENCE
+            },
+            "runtime_observations": {
+                key: False if key == "websocket_opened" else 0
+                for key in REQUIRED_ZERO_RUNTIME_OBSERVATIONS
+            },
+            "forbidden_transport_tokens": [],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    incomplete_result = evaluate_no_live_transport_contract(
+        transport_manifest(
+            transport_controls={"offline_executor_only": True},
+            transport_evidence={"source_audit_artifact": evidence("source")},
+            runtime_observations={"websocket_opened": False},
+        )
+    )
+    assert incomplete_result["ready_for_no_live_transport_use"] is False
+    assert "missing_transport_control:no_wing_client" in incomplete_result["blockers"]
+    assert "missing_transport_evidence:runtime_config_artifact" in (
+        incomplete_result["blockers"]
+    )
+    assert "missing_runtime_observation:osc_messages_sent" in (
+        incomplete_result["blockers"]
+    )
+    assert incomplete_result["authority"]["live_authority_granted"] is False
+
+    complete_result = evaluate_no_live_transport_contract(transport_manifest())
+    assert complete_result["ready_for_no_live_transport_use"] is True
+    assert complete_result["hardware_evidence"] is False
+    assert complete_result["summary"]["missing_transport_controls"] == []
+    assert complete_result["summary"]["missing_transport_evidence"] == []
+    assert complete_result["summary"]["nonzero_runtime_observations"] == []
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+
+    blocked_result = evaluate_no_live_transport_contract(
+        transport_manifest(
+            offline_only=False,
+            live_write=True,
+            contacts_wing=True,
+            contacts_backend=True,
+            hardware_evidence=True,
+            readiness_closure_allowed=True,
+            live_authority_granted=True,
+            runtime_observations={
+                "websocket_opened": True,
+                "osc_messages_sent": 1,
+                "live_write_requests_sent": 1,
+                "mixer_client_calls": 1,
+                "network_connections_opened": 1,
+            },
+            forbidden_transport_tokens=["WingClient"],
+        )
+    )
+    assert blocked_result["ready_for_no_live_transport_use"] is False
+    assert "offline_only_required" in blocked_result["blockers"]
+    assert "no_live_transport_forbids_live_write" in blocked_result["blockers"]
+    assert "no_live_transport_forbids_wing_contact" in blocked_result["blockers"]
+    assert "no_live_transport_cannot_grant_live_authority" in (
+        blocked_result["blockers"]
+    )
+    assert "live_transport_observed:websocket_opened" in blocked_result["blockers"]
+    assert "forbidden_transport_token:WingClient" in blocked_result["blockers"]
+    assert blocked_result["authority"]["live_authority_granted"] is False
+
+    assert "No-live-transport evidence candidates must be offline" in completion
+    assert "M022-CP01" in plan
+    assert "M022-CP02" in plan
+    assert "No-live-transport evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M022 no-live-transport contract is now covered" in current
+    assert "M022 no-live-transport contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

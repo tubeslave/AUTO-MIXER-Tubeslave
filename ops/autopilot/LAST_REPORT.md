@@ -446,8 +446,30 @@ Integration bundles surface the same failure through the `safety_kernel_trace:`
 child prefix. It still reports no hardware proof, no live write, no readiness
 closure and no live authority.
 
+The M022 no-live-transport contract rail is now automated by
+`tests/test_no_live_transport_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m022_no_live_transport_contract_stays_offline_and_artifact_only`.
+It adds `backend/no_live_transport_contract.py` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M022-no-live-transport-contract.md`,
+`Docs/adr/no-live-transport-contract-20260619.md`, `Docs/CURRENT_STATE.md`
+and this report. The contract requires offline-only controls, evidence
+artifacts, zero live runtime observations and an empty forbidden-transport
+token list before no-live-transport evidence can support integration use. It
+still reports no hardware proof, no live write, no readiness closure and no
+live authority.
+
 ## Проверка
 
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_live_transport_contract.py -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m022_no_live_transport_contract_stays_offline_and_artifact_only -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `35 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4135 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
   `7 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_safety_kernel_trace_contract.py -q`:

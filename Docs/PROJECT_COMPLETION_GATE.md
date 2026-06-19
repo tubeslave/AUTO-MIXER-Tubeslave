@@ -78,6 +78,12 @@ Integration bundle manifests must consume the safety-kernel trace contract
 result instead of loose safety_kernel_trace_bound checks before claiming offline
 integration promotion readiness.
 
+No-live-transport evidence candidates must be offline, artifact-only and
+audited before they can be used for integration or completion-gate promotion.
+Complete no-live-transport evidence alone cannot grant live authority, close
+readiness, contact WING/backend, send live writes, or replace hardware
+validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

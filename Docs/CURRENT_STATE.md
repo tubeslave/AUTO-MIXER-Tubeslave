@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T19:00:02Z
+Generated: 2026-06-19T19:11:52Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T19:00:02Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `4adb8a55 Add safety kernel trace contract`
+  `d14fd77d Bind safety trace to integration bundle`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -451,6 +451,16 @@ Generated: 2026-06-19T19:00:02Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so safety-kernel trace
   binding cannot become hardware proof or live readiness.
+- M022 no-live-transport contract is now covered by
+  `tests/test_no_live_transport_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m022_no_live_transport_contract_stays_offline_and_artifact_only`.
+  The new `backend/no_live_transport_contract.py` module validates that
+  offline integration candidates provide artifact-only controls, evidence
+  artifacts, zero live runtime observations and no forbidden transport tokens
+  before reporting no-live-transport evidence usable. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so no-live-transport
+  evidence cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -461,4 +471,4 @@ Generated: 2026-06-19T19:00:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4129 passed, 1 skipped, 1 warning`.
+  `4135 passed, 1 skipped, 1 warning`.
