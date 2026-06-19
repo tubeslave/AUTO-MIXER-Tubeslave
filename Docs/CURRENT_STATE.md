@@ -1,12 +1,12 @@
 # Current State
 
-Generated: 2026-06-18T20:39:07Z
+Generated: 2026-06-19T07:28:33Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
-- Branch at setup inspection: `offline-smarteq-eq-song-repa-20260602`
-- Recent HEAD: `b27d789a Report WING live scope as fader gain`
+- Branch at latest inspection: `codex/automixer-autopilot-control-plane`
+- Recent HEAD: `56329600 Filter safety monitor live scope`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -43,6 +43,9 @@ Generated: 2026-06-18T20:39:07Z
 - M001 autonomous pre-hardware work is complete and waiting for external
   WING/operator validation. The exact real-run handoff is
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
+- After M001-CP05, verified no-WING safety-scope hardening commits narrowed
+  WING report/executor/monitor surfaces to the supervised deployment boundary:
+  `2b25d91f`, `12f56180`, and `56329600`.
 
 ## Unresolved unknowns
 
@@ -51,4 +54,6 @@ Generated: 2026-06-18T20:39:07Z
 - Current WING Rack availability is UNKNOWN.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- Existing large uncommitted product changes may affect baseline tests.
+- Existing large uncommitted product changes may affect future focused work,
+  but the latest verified full-suite run at `56329600` passed with
+  `4030 passed, 1 skipped, 1 warning`.

@@ -7,18 +7,30 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-18T21:26:06Z.
+- Latest heartbeat: 2026-06-19T07:28:33Z.
 
 ## Что сделано
 
 Control plane initialized. M001-CP01 through M001-CP05 were verified with
-no-WING/read-only evidence. Product runtime behavior was not changed. M001 is
-now waiting for external WING/operator validation.
+no-WING/read-only evidence. M001 is now waiting for external WING/operator
+validation.
+
+After CP05, three verified no-WING safety-scope hardening commits were added:
+
+- `2b25d91f` - WING safety/product surfaces report the deployment boundary as
+  supervised `fader`/`gain`.
+- `12f56180` - processing live executor scope is filtered to the WING
+  deployment boundary.
+- `56329600` - safety monitor live scope filters manual payloads through the
+  active operator-mode capabilities.
+
+These commits do not create hardware proof, do not contact WING and do not
+grant live authority.
 
 ## Проверка
 
-- `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`: `4027 passed,
-  1 skipped`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
+  --tb=short -q`: `4030 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
 - `python tools/memory/memory_lint.py --root .`: PASS.
 - Evidence bundle:
@@ -41,8 +53,8 @@ now waiting for external WING/operator validation.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `251c1ddd` is the latest verified
-  control-plane commit and found no real WING read-only artifact under
+- Heartbeat reconciliation confirmed `56329600` is the latest verified HEAD and
+  found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
 ## Оставшаяся работа
