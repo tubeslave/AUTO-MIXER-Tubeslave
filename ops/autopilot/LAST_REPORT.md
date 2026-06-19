@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T11:35:54Z.
+- Latest heartbeat: 2026-06-19T11:46:05Z.
 
 ## Что сделано
 
@@ -102,6 +102,10 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 - `14124ff6` - no-WING compact review-decision ledger summary now exposes
   accepted-candidate expected/actual contact maps beside contact completeness,
   so summary consumers can see per-source backend/console contact evidence.
+- `b239d6f5` - no-WING compact review-decision ledger summary now exposes
+  accepted-candidate request-sequence trace source ids, actual/plan/expected
+  request-sequence maps, per-source plan-match flags, missing source ids and
+  trace completeness.
 
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
@@ -187,7 +191,7 @@ grant live authority.
 - `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
 - `python tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
-  `artifacts/no_wing_release_check/20260619T113502Z_no_wing_release_check`.
+  `artifacts/no_wing_release_check/20260619T114439Z_no_wing_release_check`.
 - Authority flags remained safe: no WING/backend contact, no live write, no
   readiness closure, no live authority.
 - CP04 handoff report:
@@ -206,7 +210,7 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `14124ff6` is the latest verified
+- Heartbeat reconciliation confirmed `b239d6f5` is the latest verified
   product/runtime commit and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
