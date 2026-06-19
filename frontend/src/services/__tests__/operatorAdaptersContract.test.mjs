@@ -4324,8 +4324,15 @@ test('dashboard director panel renders agent suggestions as review-only controls
     path.join(srcRoot, 'components/dashboard/DirectorPanel.tsx'),
     'utf8',
   );
+  const rightDirectorSource = await fs.readFile(
+    path.join(srcRoot, 'views/DirectorPanel.tsx'),
+    'utf8',
+  );
 
   assert.match(source, /directorProposalRows/);
+  assert.match(rightDirectorSource, /suggestionBlockerNotice/);
+  assert.match(rightDirectorSource, /Promotion planning blocked\. Suggestions remain review-only/);
+  assert.match(rightDirectorSource, /blockedReasonMessages\[0\]/);
   assert.match(source, /Просмотр/);
   assert.match(source, /No active backend proposals require review/);
   assert.match(source, /No OSC write sent/);

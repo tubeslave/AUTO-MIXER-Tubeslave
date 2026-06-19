@@ -58,6 +58,9 @@ export function RightDirectorPanel({
   const noSuggestionsMessage = isBackendSource
     ? 'No active backend proposals require review.'
     : 'No fallback suggestions are available.';
+  const suggestionBlockerNotice = blockedReasonMessages.length > 0 && suggestions.length > 0
+    ? `Promotion planning blocked. Suggestions remain review-only: ${blockedReasonMessages[0]}`
+    : '';
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -122,6 +125,11 @@ export function RightDirectorPanel({
       </Panel>
       <Panel title="Agent Suggestions">
         <div className="space-y-3 text-[10px]">
+          {suggestionBlockerNotice && (
+            <div className="rounded-[5px] border border-danger/35 bg-danger/10 px-2 py-1.5 leading-4 text-danger">
+              {suggestionBlockerNotice}
+            </div>
+          )}
           {suggestions.map(suggestion => (
             <div key={suggestion.id}>
               <div className="flex items-center justify-between gap-2">

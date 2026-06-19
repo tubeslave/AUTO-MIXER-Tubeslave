@@ -125,6 +125,8 @@ M032_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M032-director-goal-integration-bu
 M032_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-goal-integration-bundle-blocker-summary-20260619.md"
 M033_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M033-director-queue-integration-bundle-blocker-badge.md"
 M033_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-queue-integration-bundle-blocker-badge-20260619.md"
+M034_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M034-director-suggestions-integration-bundle-blocker-notice.md"
+M034_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-suggestions-integration-bundle-blocker-notice-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -4841,6 +4843,73 @@ def test_m033_director_queue_badge_surfaces_integration_bundle_blocker():
         current
     )
     assert "M033 Director queue integration bundle blocker badge rail is now automated" in (
+        report
+    )
+
+
+def test_m034_director_suggestions_show_integration_bundle_blocker_notice():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M034_PLAN.read_text(encoding="utf-8")
+    adr = M034_ADR.read_text(encoding="utf-8")
+    right_director = FRONTEND_RIGHT_DIRECTOR_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m034 = markdown_table_row(roadmap, "M034")
+    assert m034[1] == "Director suggestions integration bundle blocker notice"
+    assert m034[2] == (
+        "Agent Suggestions panel shows a read-only integration bundle blocker "
+        "notice while suggestions remain review-only"
+    )
+    assert m034[3] == "M033"
+    assert m034[4] == "high offline frontend"
+    assert m034[5] == "UNIT_VERIFIED read-only Director suggestions notice; live authority remains blocked"
+    assert m034[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Director Agent Suggestions now show offline integration bundle blocker notices" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M034-CP01" in plan
+    assert "M034-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not queue proposals" in adr
+
+    assert "suggestionBlockerNotice" in right_director
+    assert "Promotion planning blocked. Suggestions remain review-only" in right_director
+    assert "blockedReasonMessages[0]" in right_director
+    assert "suggestionBlockerNotice" in adapter_test
+    assert "Promotion planning blocked\\. Suggestions remain review-only" in adapter_test
+    assert "blockedReasonMessages\\[0\\]" in adapter_test
+    assert "Director Agent Suggestions panels must render offline integration bundle" in (
+        completion
+    )
+    assert "M034 Director suggestions integration bundle blocker notice is now covered" in (
+        current
+    )
+    assert "M034 Director suggestions integration bundle blocker notice rail is now automated" in (
         report
     )
 

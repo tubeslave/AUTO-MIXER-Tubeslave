@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T21:47:27Z
+Generated: 2026-06-19T21:58:26Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T21:47:27Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `f0e1de8a Surface integration bundle blocker in director goal`
+  `78bb644c Show integration blocker in director queue badge`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -593,6 +593,16 @@ Generated: 2026-06-19T21:47:27Z
   and badge-visible integration bundle status cannot queue proposals, grant
   live authority, close readiness, contact WING/backend, mark Full Autonomous
   ready, apply to console, or replace real hardware/operator validation.
+- M034 Director suggestions integration bundle blocker notice is now covered
+  by `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m034_director_suggestions_show_integration_bundle_blocker_notice`.
+  The updated `frontend/src/views/DirectorPanel.tsx` module now renders a
+  `Promotion planning blocked. Suggestions remain review-only` notice inside
+  Agent Suggestions when Director blocked-reason messages and suggestions are
+  both visible. Suggestions stay review-only, no queue mutation is introduced,
+  and notice-visible integration bundle status cannot queue proposals, grant
+  live authority, close readiness, contact WING/backend, mark Full Autonomous
+  ready, apply to console, or replace real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -603,4 +613,4 @@ Generated: 2026-06-19T21:47:27Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4159 passed, 1 skipped, 1 warning`.
+  `4160 passed, 1 skipped, 1 warning`.

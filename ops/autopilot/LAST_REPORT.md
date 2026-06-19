@@ -651,7 +651,34 @@ live authority, close readiness, contact WING/backend, mark Full Autonomous
 ready, apply to console, or replace accepted real hardware/operator
 validation.
 
+The M034 Director suggestions integration bundle blocker notice rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m034_director_suggestions_show_integration_bundle_blocker_notice`.
+It updates `frontend/src/views/DirectorPanel.tsx` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M034-director-suggestions-integration-bundle-blocker-notice.md`,
+`Docs/adr/director-suggestions-integration-bundle-blocker-notice-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The Director Agent Suggestions panel
+now renders `Promotion planning blocked. Suggestions remain review-only` when
+blocked-reason messages and suggestions are both visible. Suggestions remain
+review-only, no queue mutation is introduced, and notice-visible integration
+bundle status cannot queue proposals, grant live authority, close readiness,
+contact WING/backend, mark Full Autonomous ready, apply to console, hide
+review-only evidence rows, or replace accepted real hardware/operator
+validation.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `50 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m034_director_suggestions_show_integration_bundle_blocker_notice -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `47 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4160 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `50 passed`.

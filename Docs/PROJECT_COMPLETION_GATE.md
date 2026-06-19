@@ -147,6 +147,13 @@ authority, close readiness, contact WING/backend, mark Full Autonomous ready,
 apply to console, hide review-only evidence rows, or replace accepted real
 hardware/operator validation.
 
+Director Agent Suggestions panels must render offline integration bundle
+blocker notices as read-only operator explanation only. Notice-visible
+integration bundle status cannot queue proposals, grant live authority, close
+readiness, contact WING/backend, mark Full Autonomous ready, apply to console,
+hide review-only evidence rows, or replace accepted real hardware/operator
+validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
