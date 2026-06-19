@@ -14759,6 +14759,26 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     )
     assert 'unexpected_supervised_live_write_kinds: `[]`' in markdown_summary
     assert 'unexpected_supervised_live_write_surfaces: `[]`' in markdown_summary
+    assert (
+        "autonomy_gap_rollup"
+        in json_summary["no_wing_summary_markdown_top_level_allowed_missing_keys"]
+    )
+    assert (
+        json_summary["no_wing_summary_markdown_top_level_unexpected_missing_keys"]
+        == []
+    )
+    assert (
+        json_summary["no_wing_summary_markdown_top_level_interesting_missing_keys"]
+        == []
+    )
+    assert (
+        "no_wing_summary_markdown_top_level_interesting_missing_keys_empty: `true`"
+        in markdown_summary
+    )
+    assert (
+        "no_wing_summary_markdown_top_level_coverage_live_authority_granted: `false`"
+        in markdown_summary
+    )
 
 
 def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):
@@ -14787,6 +14807,22 @@ def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):
     assert json_summary["supervised_gain_dry_run"]["gain_dry_run_row_count"] == 1
     assert "## Supervised Gain Dry-Run Proof" in markdown_summary
     assert 'dry_run_ready_proof_ids: `["gain-proof-dry-run"]`' in markdown_summary
+    assert (
+        "supervised_gain_dry_run"
+        in json_summary["no_wing_summary_markdown_top_level_allowed_missing_keys"]
+    )
+    assert (
+        json_summary["no_wing_summary_markdown_top_level_unexpected_missing_keys"]
+        == []
+    )
+    assert (
+        "no_wing_summary_markdown_top_level_unexpected_missing_keys_empty: `true`"
+        in markdown_summary
+    )
+    assert (
+        "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
 
 
 def test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay(tmp_path):
