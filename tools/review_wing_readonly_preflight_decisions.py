@@ -32,6 +32,7 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
 )
@@ -57,6 +58,12 @@ ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
     f"artifact_manifest_verifier_must_pass_before_{WS_TOKEN}",
     f"artifact_manifest_verifier_passed_before_{WS_TOKEN}",
     f"artifact_manifest_verifier_{WS_TOKEN}_opened_after_pass",
+)
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER = (
+    "accepted_candidate_contact_trace_incomplete"
+)
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER = (
+    "accepted_candidate_expected_artifact_trace_incomplete"
 )
 
 
@@ -740,6 +747,34 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     ):
         rendered_blockers.append(
             WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
+        )
+    if (
+        report.get("accepted_source_ids")
+        and report.get("accepted_candidate_request_sequence_contract_valid") is not True
+        and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+        not in blocked_by
+    ):
+        rendered_blockers.append(
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+        )
+    if (
+        report.get("accepted_source_ids")
+        and report.get("accepted_candidate_contact_trace_complete") is not True
+        and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER
+        not in blocked_by
+    ):
+        rendered_blockers.append(
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER
+        )
+    if (
+        report.get("accepted_source_ids")
+        and report.get("accepted_candidate_expected_artifact_trace_complete")
+        is not True
+        and WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER
+        not in blocked_by
+    ):
+        rendered_blockers.append(
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER
         )
     lines.extend(f"- `{item}`" for item in rendered_blockers)
     if not rendered_blockers:

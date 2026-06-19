@@ -796,6 +796,10 @@ def test_decision_review_report_surfaces_request_sequence_contract(monkeypatch):
         in markdown
     )
     assert "plan_request_sequence_missing" in markdown
+    assert (
+        decision_review_tool.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER
+        in markdown
+    )
 
 
 def test_decision_review_report_blocks_without_contact_trace(monkeypatch):
@@ -841,6 +845,10 @@ def test_decision_review_report_blocks_without_contact_trace(monkeypatch):
     ]
     assert "accepted_candidate_contact_trace_complete: `false`" in markdown
     assert '"inline_payload_0": false' in markdown
+    assert (
+        decision_review_tool.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER
+        in markdown
+    )
 
 
 def test_decision_review_report_blocks_without_expected_artifact_trace(
@@ -897,6 +905,10 @@ def test_decision_review_report_blocks_without_expected_artifact_trace(
         in markdown
     )
     assert "expected-artifact-bound accepted source id" in markdown
+    assert (
+        decision_review_tool.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER
+        in markdown
+    )
 
 
 def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contract():
