@@ -10970,6 +10970,12 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids": [
                     WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID
                 ],
+                "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source": {
+                    WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: True
+                },
+                "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source": {
+                    WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: True
+                },
                 "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": {
                     WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: True
                 },
@@ -11101,6 +11107,12 @@ def set_empty_accepted_candidate_contact_trace(summary: dict) -> None:
     summary[
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
     ] = []
+    summary[
+        "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+    ] = {}
+    summary[
+        "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+    ] = {}
     summary[
         "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
     ] = {}
@@ -11407,6 +11419,12 @@ def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
     assert result.detail[
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
     ] == [WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID]
+    assert result.detail[
+        "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+    ] == {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: True}
+    assert result.detail[
+        "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+    ] == {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: True}
     assert result.detail[
         "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
     ] == {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: True}
@@ -12393,6 +12411,16 @@ def test_no_wing_release_check_rejects_next_wing_plan_request_sequence_trace_mis
             "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids",
             [],
             "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_mismatch",
+        ),
+        (
+            "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source",
+            {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: False},
+            "next_wing_proof_plan_accepted_candidate_expected_contacts_backend_mismatch",
+        ),
+        (
+            "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source",
+            {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: False},
+            "next_wing_proof_plan_accepted_candidate_expected_queries_console_mismatch",
         ),
         (
             "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source",
@@ -22484,6 +22512,23 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
             },
             "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids": [],
             "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete": True,
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids": [
+                "artifacts/wing_readonly_preflight/run/summary.json"
+            ],
+            "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source": {
+                "artifacts/wing_readonly_preflight/run/summary.json": True
+            },
+            "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source": {
+                "artifacts/wing_readonly_preflight/run/summary.json": True
+            },
+            "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": {
+                "artifacts/wing_readonly_preflight/run/summary.json": True
+            },
+            "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source": {
+                "artifacts/wing_readonly_preflight/run/summary.json": True
+            },
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids": [],
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete": True,
             "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids": [
                 "artifacts/wing_readonly_preflight/run/summary.json"
             ],
@@ -24144,6 +24189,34 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert (
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete: `true`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_violations: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed: `true`"
         in markdown_summary
     )
     assert (

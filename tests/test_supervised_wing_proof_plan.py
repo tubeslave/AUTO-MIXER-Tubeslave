@@ -1110,6 +1110,12 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
     ] == [accepted_source_id]
     assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+    ] == {accepted_source_id: True}
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+    ] == {accepted_source_id: True}
+    assert plan["summary"][
         "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
     ] == {accepted_source_id: True}
     assert plan["summary"][
@@ -1955,6 +1961,12 @@ def test_plan_blocks_physical_proof_steps_when_accepted_candidate_lacks_contact_
     assert plan["summary"][
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
     ] == [accepted_source_id]
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+    ] == {accepted_source_id: True}
+    assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+    ] == {accepted_source_id: True}
     assert plan["summary"][
         "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
     ] == {accepted_source_id: True}

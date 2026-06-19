@@ -1226,11 +1226,15 @@ def _accepted_candidate_contact_trace(
         for row in candidate_rows
         if isinstance(row.get("source_id"), str) and row.get("source_id")
     }
+    expected_contacts_backend_by_source: dict[str, bool] = {}
+    expected_queries_console_by_source: dict[str, bool] = {}
     contacts_backend_by_source: dict[str, bool] = {}
     queries_console_by_source: dict[str, bool] = {}
     missing_source_ids: list[str] = []
 
     for source_id in accepted_source_ids:
+        expected_contacts_backend_by_source[source_id] = True
+        expected_queries_console_by_source[source_id] = True
         row = rows_by_source.get(source_id)
         if row is None:
             missing_source_ids.append(source_id)
@@ -1245,6 +1249,12 @@ def _accepted_candidate_contact_trace(
     return {
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids": (
             accepted_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source": (
+            expected_contacts_backend_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source": (
+            expected_queries_console_by_source
         ),
         "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": (
             contacts_backend_by_source

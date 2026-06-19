@@ -518,6 +518,8 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted",
     "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids",
+    "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source",
     "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source",
     "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source",
     "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids",
@@ -613,6 +615,10 @@ NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_REQUEST_SEQUENCE_TRACE_VALUE_GATE_SUMMAR
 NEXT_WING_PROOF_PLAN_ACCEPTED_CANDIDATE_CONTACT_TRACE_VALUE_GATE_VIOLATIONS = (
     "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_missing",
     "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_mismatch",
+    "next_wing_proof_plan_accepted_candidate_expected_contacts_backend_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_contacts_backend_mismatch",
+    "next_wing_proof_plan_accepted_candidate_expected_queries_console_by_source_missing",
+    "next_wing_proof_plan_accepted_candidate_expected_queries_console_mismatch",
     "next_wing_proof_plan_accepted_candidate_contacts_backend_by_source_missing",
     "next_wing_proof_plan_accepted_candidate_contacts_backend_mismatch",
     "next_wing_proof_plan_accepted_candidate_queries_console_by_source_missing",
@@ -3940,11 +3946,15 @@ def _accepted_candidate_contact_trace(
             rows_by_source[source_id] = row
 
     trace_source_ids = [str(source_id) for source_id in accepted_source_ids if source_id]
+    expected_contacts_backend_by_source: dict[str, bool] = {}
+    expected_queries_console_by_source: dict[str, bool] = {}
     contacts_backend_by_source: dict[str, bool] = {}
     queries_console_by_source: dict[str, bool] = {}
     missing_source_ids: list[str] = []
 
     for source_id in trace_source_ids:
+        expected_contacts_backend_by_source[source_id] = True
+        expected_queries_console_by_source[source_id] = True
         row = rows_by_source.get(source_id)
         if row is None:
             missing_source_ids.append(source_id)
@@ -3959,6 +3969,12 @@ def _accepted_candidate_contact_trace(
     return {
         "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids": (
             trace_source_ids
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source": (
+            expected_contacts_backend_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source": (
+            expected_queries_console_by_source
         ),
         "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": (
             contacts_backend_by_source
@@ -15832,6 +15848,12 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             queries_console_by_source_key = (
                 "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
             )
+            expected_contacts_backend_by_source_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+            )
+            expected_queries_console_by_source_key = (
+                "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+            )
             contact_trace_missing_source_ids_key = (
                 "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
             )
@@ -15854,6 +15876,40 @@ def validate_supervised_proof_report_next_wing_plan(report_path: Path) -> CheckR
             ):
                 violations.append(
                     "next_wing_proof_plan_accepted_candidate_contact_trace_source_ids_mismatch"
+                )
+            (
+                reported_expected_contacts_backend_by_source,
+                reported_expected_contacts_backend_map_valid,
+            ) = _bool_value_map(summary.get(expected_contacts_backend_by_source_key))
+            if not reported_expected_contacts_backend_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_contacts_backend_by_source_missing"
+                )
+            if (
+                reported_expected_contacts_backend_by_source
+                != accepted_candidate_contact_trace[
+                    expected_contacts_backend_by_source_key
+                ]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_contacts_backend_mismatch"
+                )
+            (
+                reported_expected_queries_console_by_source,
+                reported_expected_queries_console_map_valid,
+            ) = _bool_value_map(summary.get(expected_queries_console_by_source_key))
+            if not reported_expected_queries_console_map_valid:
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_queries_console_by_source_missing"
+                )
+            if (
+                reported_expected_queries_console_by_source
+                != accepted_candidate_contact_trace[
+                    expected_queries_console_by_source_key
+                ]
+            ):
+                violations.append(
+                    "next_wing_proof_plan_accepted_candidate_expected_queries_console_mismatch"
                 )
             (
                 reported_contacts_backend_by_source,
@@ -24020,6 +24076,12 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         accepted_candidate_contact_trace_source_ids = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
         )
+        accepted_candidate_expected_contacts_backend_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+        )
+        accepted_candidate_expected_queries_console_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+        )
         accepted_candidate_contacts_backend_by_source = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
         )
@@ -24107,6 +24169,14 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
         ) = _bool_value_map(
             accepted_candidate_request_sequence_matches_plan_by_source
         )
+        (
+            normalized_accepted_candidate_expected_contacts_backend_by_source,
+            _,
+        ) = _bool_value_map(accepted_candidate_expected_contacts_backend_by_source)
+        (
+            normalized_accepted_candidate_expected_queries_console_by_source,
+            _,
+        ) = _bool_value_map(accepted_candidate_expected_queries_console_by_source)
         (
             normalized_accepted_candidate_contacts_backend_by_source,
             _,
@@ -24670,6 +24740,16 @@ def next_wing_proof_plan_summary(results: Sequence[CheckResult]) -> dict[str, ob
                     list,
                 )
                 else []
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source": (
+                dict(
+                    normalized_accepted_candidate_expected_contacts_backend_by_source
+                )
+            ),
+            "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source": (
+                dict(
+                    normalized_accepted_candidate_expected_queries_console_by_source
+                )
             ),
             "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source": (
                 dict(normalized_accepted_candidate_contacts_backend_by_source)
@@ -29282,6 +29362,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_live_authority_granted']).lower()}`",
                 "- readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids'])}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source'], sort_keys=True)}`",
+                "- readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source: "
+                f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source'], sort_keys=True)}`",
                 "- readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source'], sort_keys=True)}`",
                 "- readonly_preflight_review_decision_accepted_candidate_queries_console_by_source: "
