@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T07:57:23Z
+Generated: 2026-06-19T08:04:11Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `bb5816d4 Filter product state overlay to WING boundary`
+  `192d6bff Limit promotion evidence to WING boundary`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -47,13 +47,16 @@ Generated: 2026-06-19T07:57:23Z
 - After M001-CP05, verified no-WING safety-scope hardening commits narrowed
   WING report/executor/monitor surfaces to the supervised deployment boundary:
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
-  `bb5816d4`.
+  `bb5816d4`, and `192d6bff`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
 - Operator-facing product state now filters and recomputes autonomy-overlay
   rows, status counts and target buckets against the same WING deployment
   boundary before exposing supervised proof evidence to the UI.
+- Supervised promotion evidence now creates current review rows from the same
+  WING deployment boundary, so `pan` proof artifacts cannot become current WING
+  promotion-evidence rows without a separate hardware-backed expansion.
 
 ## Unresolved unknowns
 
@@ -63,5 +66,5 @@ Generated: 2026-06-19T07:57:23Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `bb5816d4` passed with
-  `4032 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `192d6bff` passed with
+  `4033 passed, 1 skipped, 1 warning`.
