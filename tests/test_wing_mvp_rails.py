@@ -139,6 +139,8 @@ M039_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M039-task-apply-request-helper-bl
 M039_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-apply-request-helper-blocker-guard-20260619.md"
 M040_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M040-task-details-apply-entrypoint-blocker-guard.md"
 M040_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-apply-entrypoint-blocker-guard-20260619.md"
+M041_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M041-task-queue-metrics-blocker-guard.md"
+M041_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-metrics-blocker-guard-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -5350,6 +5352,76 @@ def test_m040_task_details_apply_entrypoint_is_guarded_by_blocker():
         current
     )
     assert "M040 Task Details apply entrypoint blocker guard rail is now automated" in (
+        report
+    )
+
+
+def test_m041_task_queue_metrics_reflect_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M041_PLAN.read_text(encoding="utf-8")
+    adr = M041_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m041 = markdown_table_row(roadmap, "M041")
+    assert m041[1] == "Task Queue metrics blocker guard"
+    assert m041[2] == (
+        "Task Queue metrics show blocked apply capacity while promotion "
+        "planning is blocked"
+    )
+    assert m041[3] == "M040"
+    assert m041[4] == "high offline frontend"
+    assert m041[5] == "UNIT_VERIFIED blocked Task Queue metrics; live authority remains blocked"
+    assert m041[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Queue metrics now show blocked apply capacity when offline integration bundle blockers are visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M041-CP01" in plan
+    assert "M041-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not queue proposals" in adr
+
+    assert "function taskQueueMetrics(" in task_queue
+    assert "integrationBundleApplyBlocked = false" in task_queue
+    assert "const applyableCount = integrationBundleApplyBlocked" in task_queue
+    assert "? 0" in task_queue
+    assert "label: integrationBundleApplyBlocked ? 'Apply Blocked' : 'Applyable'" in (
+        task_queue
+    )
+    assert "sub: integrationBundleApplyBlocked ? 'integration bundle' : 'fader / gain only'" in (
+        task_queue
+    )
+    assert "tone: integrationBundleApplyBlocked ? 'red' : 'green'" in task_queue
+    assert "taskQueueMetrics(taskRows, integrationBundleApplyBlocked)" in task_queue
+    assert "task queue metrics show apply blocked" in adapter_test
+    assert "Task Queue apply metrics must fail closed" in completion
+    assert "M041 Task Queue metrics blocker guard is now covered" in current
+    assert "M041 Task Queue metrics blocker guard rail is now automated" in (
         report
     )
 

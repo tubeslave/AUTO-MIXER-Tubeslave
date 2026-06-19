@@ -64,6 +64,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M038 | Supervised Apply confirm callback blocker guard | Supervised Apply confirm callback returns before dispatch while promotion planning is blocked | M037 | high offline frontend | UNIT_VERIFIED guarded confirm callback; live authority remains blocked | PENDING |
 | M039 | Task apply request helper blocker guard | Task apply request helper returns before opening Supervised Apply while promotion planning is blocked | M038 | high offline frontend | UNIT_VERIFIED guarded task apply request; live authority remains blocked | PENDING |
 | M040 | Task Details apply entrypoint blocker guard | Task Details apply button stays blocked before opening Supervised Apply while promotion planning is blocked | M039 | high offline frontend | UNIT_VERIFIED guarded task details apply entrypoint; live authority remains blocked | PENDING |
+| M041 | Task Queue metrics blocker guard | Task Queue metrics show blocked apply capacity while promotion planning is blocked | M040 | high offline frontend | UNIT_VERIFIED blocked Task Queue metrics; live authority remains blocked | PENDING |
 
 ## Active milestone
 

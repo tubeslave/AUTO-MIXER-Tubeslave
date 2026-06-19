@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T23:10:36Z
+Last heartbeat UTC: 2026-06-19T23:21:30Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,16 +12,16 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M040 Task Details apply entrypoint blocker guard now computes
-`integrationBundleApplyBlocked` in `TaskQueueView` and passes it into
-`TaskDetailsPanel`, so the detail-panel apply button stays blocked before it
-can open Supervised Apply while integration-bundle blockers are visible. The
-updated frontend keeps this as local entrypoint hardening and does not add
-queue mutation, console apply, WING/backend contact or live authority.
+Latest check: M041 Task Queue metrics blocker guard now passes
+`integrationBundleApplyBlocked` into `taskQueueMetrics`, so the apply-capacity
+metric shows `Apply Blocked` with zero apply capacity while integration-bundle
+blockers are visible. The updated frontend keeps this as local presentation
+hardening and does not add queue mutation, console apply, WING/backend contact
+or live authority.
 
-Frontend adapter validation passed with `56 passed`; the frontend build
-passed; the M040 rail passed with `1 passed`; the full rail file passed with
-`53 passed`; and the full suite passed with `4166 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `57 passed`; the frontend build
+passed; the M041 rail passed with `1 passed`; the full rail file passed with
+`54 passed`; and the full suite passed with `4167 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

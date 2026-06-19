@@ -4428,6 +4428,23 @@ test('task details apply entrypoint is guarded by integration bundle blocker', a
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task queue metrics show apply blocked when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskQueueMetrics\(/);
+  assert.match(source, /integrationBundleApplyBlocked = false/);
+  assert.match(source, /const applyableCount = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 0/);
+  assert.match(source, /label: integrationBundleApplyBlocked \? 'Apply Blocked' : 'Applyable'/);
+  assert.match(source, /sub: integrationBundleApplyBlocked \? 'integration bundle' : 'fader \/ gain only'/);
+  assert.match(source, /tone: integrationBundleApplyBlocked \? 'red' : 'green'/);
+  assert.match(source, /taskQueueMetrics\(taskRows, integrationBundleApplyBlocked\)/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('dashboard mixer header uses the selected channel dynamically', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'),

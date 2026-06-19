@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T23:10:36Z
+Generated: 2026-06-19T23:21:30Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T23:10:36Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `54190c6a Guard task apply request helper`
+  `31f8fafe Guard task details apply entrypoint`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -671,6 +671,17 @@ Generated: 2026-06-19T23:10:36Z
   creates no queue mutation, no backend/WING contact, no live transport, no
   live authority, no readiness closure, no Full Autonomous readiness and no
   replacement for accepted real hardware/operator validation.
+- M041 Task Queue metrics blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m041_task_queue_metrics_reflect_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  passes `integrationBundleApplyBlocked` into `taskQueueMetrics`; while the
+  blocker is visible the apply-capacity metric shows `Apply Blocked`, reports
+  zero apply capacity and uses integration bundle context instead of the green
+  fader/gain metric. This is local frontend presentation hardening only: it
+  creates no queue mutation, no backend/WING contact, no live transport, no
+  live authority, no readiness closure, no Full Autonomous readiness and no
+  replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -681,4 +692,4 @@ Generated: 2026-06-19T23:10:36Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4166 passed, 1 skipped, 1 warning`.
+  `4167 passed, 1 skipped, 1 warning`.

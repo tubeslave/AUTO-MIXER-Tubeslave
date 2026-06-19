@@ -32,10 +32,22 @@ export type TaskRow = Task & {
   proposal: ProposalPreview;
 };
 
-function taskQueueMetrics(taskRows: TaskRow[]): Metric[] {
+function taskQueueMetrics(
+  taskRows: TaskRow[],
+  integrationBundleApplyBlocked = false,
+): Metric[] {
+  const applyableCount = integrationBundleApplyBlocked
+    ? 0
+    : taskRows.filter(task => task.canApply !== false).length;
+
   return [
     { label: 'Total Queue', value: String(taskRows.length), sub: 'operator proposals', tone: 'blue' },
-    { label: 'Applyable', value: String(taskRows.filter(task => task.canApply !== false).length), sub: 'fader / gain only', tone: 'green' },
+    {
+      label: integrationBundleApplyBlocked ? 'Apply Blocked' : 'Applyable',
+      value: String(applyableCount),
+      sub: integrationBundleApplyBlocked ? 'integration bundle' : 'fader / gain only',
+      tone: integrationBundleApplyBlocked ? 'red' : 'green'
+    },
     { label: 'Review Only', value: String(taskRows.filter(task => task.reviewOnly || task.canApply === false).length), sub: 'no live apply', tone: 'red' },
     { label: 'Pending', value: String(taskRows.filter(task => task.status === 'Pending').length), sub: 'operator wait', tone: 'yellow' },
     { label: 'Applied', value: String(taskRows.filter(task => task.status === 'Applied').length), sub: 'supervised history', tone: 'green' }
@@ -618,7 +630,7 @@ export function TaskQueueWorkspace({
     <div className="relative grid h-full grid-rows-[auto_1fr_118px] gap-2">
       <div className="space-y-2">
         <div className="grid grid-cols-5 gap-2">
-          {taskQueueMetrics(taskRows).map(metric => <MetricCard metric={metric} key={metric.label} />)}
+          {taskQueueMetrics(taskRows, integrationBundleApplyBlocked).map(metric => <MetricCard metric={metric} key={metric.label} />)}
         </div>
         {taskQueueBlockerNotice && (
           <div className="rounded-[6px] border border-danger/35 bg-danger/10 px-2 py-1.5 text-[10px] leading-4 text-danger">
