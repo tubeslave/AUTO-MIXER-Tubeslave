@@ -51,6 +51,11 @@ Replay manifests must consume the quality threshold policy contract result
 instead of loose threshold status fields before claiming replay-promotion
 readiness.
 
+Recovery policy candidates must be evidence-bound and owner-approved before
+they can be used for simulator fault-recovery promotion. Complete candidate
+recovery policy evidence alone cannot grant live authority, close readiness,
+replace emergency-stop or rollback proof, or replace hardware validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

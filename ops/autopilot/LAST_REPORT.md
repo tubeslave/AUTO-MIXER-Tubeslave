@@ -355,6 +355,21 @@ requirements. Integration bundles surface the same failure through the existing
 `offline_replay:` child prefix. It still reports no hardware proof, no live
 write, no readiness closure and no live authority.
 
+The M016 recovery policy contract rail is now automated by
+`tests/test_recovery_policy_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m016_recovery_policy_contract_stays_owner_approved_and_offline`.
+It adds `backend/recovery_policy_contract.py` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`, `Docs/SAFETY_CONTRACT.md`,
+`Docs/plans/M016-recovery-policy-contract.md`,
+`Docs/adr/recovery-policy-contract-20260619.md`, `Docs/CURRENT_STATE.md` and
+this report. The contract requires recovery controls, recovery evidence
+bindings and explicit owner approval before recovery policy use. Complete
+candidate evidence can become `ready_for_owner_review`, but it is not usable
+for simulator fault-recovery promotion until owner approval exists. It still
+reports no hardware proof, no live write, no readiness closure and no live
+authority.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -485,8 +500,12 @@ write, no readiness closure and no live authority.
   `5 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m015_replay_threshold_policy_binding_requires_m014_manifest -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_recovery_policy_contract.py -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m016_recovery_policy_contract_stays_owner_approved_and_offline -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `28 passed`.
+  `29 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -498,7 +517,7 @@ write, no readiness closure and no live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4105 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4111 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -529,9 +548,9 @@ write, no readiness closure and no live authority.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T17:38:18Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T17:51:02Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `70088ba9`, latest no-WING artifact
+  state/evidence commit `9e61ab0a`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:

@@ -37,9 +37,12 @@ logs and recordings -> data validation -> candidate policy/model/configuration
 
 Unvalidated candidates cannot alter live concert behavior.
 
+Recovery policy candidates remain offline artifacts until owner-approved and
+explicitly bound to the fault-recovery gate; they cannot alter live concert
+behavior.
+
 ## Safety kernel
 
 The deterministic safety kernel is the non-bypassable authority for console
 actions. Models, LLMs, classifiers, memory and proposal queues may recommend
 or rank actions, but they cannot bypass deterministic safety checks.
-

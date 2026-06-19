@@ -28,6 +28,11 @@ from backend.quality_threshold_policy_contract import (
     REQUIRED_THRESHOLD_AXES,
     evaluate_quality_threshold_policy_contract,
 )
+from backend.recovery_policy_contract import (
+    REQUIRED_RECOVERY_CONTROLS as POLICY_REQUIRED_RECOVERY_CONTROLS,
+    REQUIRED_RECOVERY_EVIDENCE as POLICY_REQUIRED_RECOVERY_EVIDENCE,
+    evaluate_recovery_policy_contract,
+)
 from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import no_wing_release_check as release_check
 
@@ -60,6 +65,8 @@ M014_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M014-quality-threshold-policy-con
 M014_ADR = PROJECT_ROOT / "Docs" / "adr" / "quality-threshold-policy-contract-20260619.md"
 M015_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M015-replay-threshold-policy-binding.md"
 M015_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-threshold-policy-binding-20260619.md"
+M016_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M016-recovery-policy-contract.md"
+M016_ADR = PROJECT_ROOT / "Docs" / "adr" / "recovery-policy-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -2321,6 +2328,138 @@ def test_m015_replay_threshold_policy_binding_requires_m014_manifest():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M015 replay threshold policy binding is now covered" in current
     assert "M015 replay threshold policy binding rail is now automated" in report
+
+
+def test_m016_recovery_policy_contract_stays_owner_approved_and_offline():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    safety = SAFETY_CONTRACT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M016_PLAN.read_text(encoding="utf-8")
+    adr = M016_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m016 = markdown_table_row(roadmap, "M016")
+    assert m016[1] == "Recovery policy contract"
+    assert m016[2] == (
+        "Candidate recovery policies are complete, evidence-bound and "
+        "owner-approved before simulator fault-recovery promotion"
+    )
+    assert m016[3] == "M012-M015"
+    assert m016[4] == "high offline"
+    assert (
+        m016[5]
+        == "SPECIFIED to UNIT_VERIFIED for recovery-policy gate; owner approval remains required"
+    )
+    assert m016[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/recovery_policy_contract.py`" in memory_eval[2]
+    assert "tests/test_recovery_policy_contract.py" in memory_eval[3]
+    assert "recovery policy evidence cannot grant live authority" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    candidate_result = evaluate_recovery_policy_contract(
+        {
+            "policy_id": "candidate-recovery-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "recovery_controls": {key: True for key in POLICY_REQUIRED_RECOVERY_CONTROLS},
+            "recovery_evidence": {key: True for key in POLICY_REQUIRED_RECOVERY_EVIDENCE},
+            "recovery_policy": {"status": "candidate"},
+        }
+    )
+    assert candidate_result["ready_for_owner_review"] is True
+    assert candidate_result["ready_for_recovery_policy_use"] is False
+    assert candidate_result["authority"]["live_authority_granted"] is False
+    assert candidate_result["authority"]["readiness_closure_allowed"] is False
+    assert candidate_result["review_blockers"] == []
+    assert candidate_result["blockers"] == [
+        "owner_approved_recovery_policy_required"
+    ]
+
+    approved_result = evaluate_recovery_policy_contract(
+        {
+            "policy_id": "approved-recovery-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "recovery_controls": {key: True for key in POLICY_REQUIRED_RECOVERY_CONTROLS},
+            "recovery_evidence": {key: True for key in POLICY_REQUIRED_RECOVERY_EVIDENCE},
+            "recovery_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:recovery-policy",
+                "approved_at": "2026-06-19T17:51:02Z",
+            },
+        }
+    )
+    assert approved_result["ready_for_recovery_policy_use"] is True
+    assert approved_result["recovery_policy_approved"] is True
+    assert approved_result["hardware_evidence"] is False
+    assert approved_result["authority"]["live_authority_granted"] is False
+    assert approved_result["authority"]["readiness_closure_allowed"] is False
+    assert approved_result["summary"]["missing_recovery_controls"] == []
+    assert approved_result["summary"]["missing_recovery_evidence"] == []
+
+    blocked_result = evaluate_recovery_policy_contract(
+        {
+            "policy_id": "blocked-recovery-policy",
+            "offline_only": True,
+            "live_write": True,
+            "contacts_wing": True,
+            "contacts_backend": True,
+            "hardware_evidence": True,
+            "readiness_closure_allowed": True,
+            "live_authority_granted": True,
+            "recovery_controls": {"fault_detection_policy": True},
+            "recovery_evidence": {"fault_scenario_matrix_bound": True},
+            "recovery_policy": {"status": "PENDING_APPROVAL"},
+        }
+    )
+    assert blocked_result["ready_for_owner_review"] is False
+    assert "recovery_policy_forbids_live_write" in blocked_result["blockers"]
+    assert "recovery_policy_forbids_wing_contact" in blocked_result["blockers"]
+    assert "recovery_policy_evidence_cannot_grant_live_authority" in blocked_result[
+        "blockers"
+    ]
+    assert "missing_recovery_control:fail_closed_policy" in blocked_result["blockers"]
+
+    assert "Recovery policy candidates must be evidence-bound and owner-approved" in completion
+    assert "Unvalidated candidates cannot alter live concert behavior" in safety
+    assert "M016-CP01" in plan
+    assert "M016-CP02" in plan
+    assert "Candidate recovery policy evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M016 recovery policy contract is now covered" in current
+    assert "M016 recovery policy contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
