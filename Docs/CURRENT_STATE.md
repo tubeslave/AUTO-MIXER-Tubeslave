@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T22:48:20Z
+Generated: 2026-06-19T22:59:06Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T22:48:20Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `c32e41e8 Enforce integration blocker in supervised apply`
+  `a278528b Guard supervised apply confirm callback`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -649,6 +649,16 @@ Generated: 2026-06-19T22:48:20Z
   hardening only: it creates no queue mutation, no backend/WING contact, no
   live transport, no live authority, no readiness closure, no Full Autonomous
   readiness and no replacement for accepted real hardware/operator validation.
+- M039 Task apply request helper blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m039_task_apply_request_helper_is_guarded_by_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  passes `integrationBundleApplyBlocked` into `requestTaskApply`, which returns
+  before `actions.openSupervisedProposal` while offline integration bundle
+  blockers are visible. This is local frontend request hardening only: it
+  creates no queue mutation, no backend/WING contact, no live transport, no
+  live authority, no readiness closure, no Full Autonomous readiness and no
+  replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -659,4 +669,4 @@ Generated: 2026-06-19T22:48:20Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4164 passed, 1 skipped, 1 warning`.
+  `4165 passed, 1 skipped, 1 warning`.

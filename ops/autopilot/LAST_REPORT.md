@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T22:48:20Z.
+- Latest heartbeat: 2026-06-19T22:59:06Z.
 
 ## Что сделано
 
@@ -734,7 +734,32 @@ This is local frontend dispatch hardening only: no queue mutation,
 backend/WING contact, live transport, console apply, readiness closure, Full
 Autonomous readiness or live authority is introduced.
 
+The M039 Task apply request helper blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m039_task_apply_request_helper_is_guarded_by_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the guarded helper through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M039-task-apply-request-helper-blocker-guard.md`,
+`Docs/adr/task-apply-request-helper-blocker-guard-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The task apply helper now receives
+`integrationBundleApplyBlocked`, records a local `Apply blocked` focus action
+and returns before `actions.openSupervisedProposal` while integration-bundle
+blockers are visible. This is local frontend request hardening only: no queue
+mutation, backend/WING contact, live transport, console apply, readiness
+closure, Full Autonomous readiness or live authority is introduced.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `55 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m039_task_apply_request_helper_is_guarded_by_blocker -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `52 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4165 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `54 passed`.

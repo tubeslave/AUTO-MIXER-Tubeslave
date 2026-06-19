@@ -106,7 +106,25 @@ function focusTaskDetail(actions: UiActions, task: TaskRow) {
   });
 }
 
-function requestTaskApply(task: TaskRow, ui: UiState, actions: UiActions) {
+function requestTaskApply(
+  task: TaskRow,
+  ui: UiState,
+  actions: UiActions,
+  integrationBundleApplyBlocked = false
+) {
+  if (integrationBundleApplyBlocked) {
+    actions.selectTask(task.id);
+    actions.focusAction({
+      action: 'Apply blocked',
+      target: task.title,
+      detail: 'Apply is blocked: offline integration bundle blockers are visible. Supervised apply remains review-only.',
+      tone: 'red',
+      timestamp: '10:24:15'
+    });
+    actions.pushToast(`${task.title} apply remains blocked by integration bundle evidence.`, 'red');
+    return;
+  }
+
   if (task.canApply === false || task.reviewOnly) {
     actions.selectTask(task.id);
     actions.focusAction({
@@ -646,7 +664,7 @@ export function TaskQueueWorkspace({
               <ActionCluster
                 actions={integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly ? ['Detail', 'Reject'] : ['Detail', 'Apply', 'Reject']}
                 onAction={action => {
-                  if (action === 'Apply') requestTaskApply(task, ui, actions);
+                  if (action === 'Apply') requestTaskApply(task, ui, actions, integrationBundleApplyBlocked);
                   else if (action === 'Reject') actions.setTaskStatus(task.id, 'Rejected');
                   else focusTaskDetail(actions, task);
                 }}

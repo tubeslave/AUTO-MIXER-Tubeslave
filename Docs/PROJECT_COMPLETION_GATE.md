@@ -182,6 +182,13 @@ readiness, contact WING/backend, mark Full Autonomous ready, apply to console,
 replace backend safety gates, or replace accepted real hardware/operator
 validation.
 
+Task apply request helpers must fail closed before opening Supervised Apply
+when offline integration bundle blockers are visible. Helper-visible
+enforcement cannot queue proposals, open supervised apply, dispatch supervised
+apply, grant live authority, close readiness, contact WING/backend, mark Full
+Autonomous ready, apply to console, replace backend safety gates, or replace
+accepted real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
