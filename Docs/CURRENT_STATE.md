@@ -1,12 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T07:28:33Z
+Generated: 2026-06-19T07:38:37Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
-- Recent HEAD: `56329600 Filter safety monitor live scope`
+- Latest verified product/runtime commit:
+  `2464f0d8 Align project goal live kinds with WING boundary`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -45,7 +46,7 @@ Generated: 2026-06-19T07:28:33Z
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
 - After M001-CP05, verified no-WING safety-scope hardening commits narrowed
   WING report/executor/monitor surfaces to the supervised deployment boundary:
-  `2b25d91f`, `12f56180`, and `56329600`.
+  `2b25d91f`, `12f56180`, `56329600`, and `2464f0d8`.
 
 ## Unresolved unknowns
 
@@ -55,5 +56,5 @@ Generated: 2026-06-19T07:28:33Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run at `56329600` passed with
+  but the latest verified full-suite run for `2464f0d8` passed with
   `4030 passed, 1 skipped, 1 warning`.
