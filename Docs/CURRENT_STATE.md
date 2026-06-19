@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T14:45:06Z
+Generated: 2026-06-19T14:56:54Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T14:45:06Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `75cd86c5 Guard autopilot stop lease recovery`
+  `685ec514 Guard goal transition fallback`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -230,6 +230,14 @@ Generated: 2026-06-19T14:45:06Z
   `ops/autopilot/STATE.json` so future heartbeat wake-ups verify native Goal
   tools before replacing a thread Goal and fall back to report-only state
   checks without changing Automixer product files or hardware.
+- Project Completion Gate closure is now covered by
+  `tests/test_wing_mvp_rails.py::test_project_completion_gate_stays_closed_without_real_hardware_and_owner_evidence`.
+  The rail checks `Docs/PROJECT_COMPLETION_GATE.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/CAPABILITY_MATRIX.md`, `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+  `Docs/ROADMAP.md`, `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json` and
+  `ops/autopilot/LAST_REPORT.md` so the project cannot be reported as
+  `COMPLETE` or Full Autonomous ready from documentation, unit tests, mock,
+  replay, simulator or no-WING artifacts alone.
 
 ## Unresolved unknowns
 
@@ -240,4 +248,4 @@ Generated: 2026-06-19T14:45:06Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4069 passed, 1 skipped, 1 warning`.
+  `4070 passed, 1 skipped, 1 warning`.

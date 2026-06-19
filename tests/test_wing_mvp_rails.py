@@ -20,6 +20,8 @@ CURRENT_STATE_DOC = PROJECT_ROOT / "Docs" / "CURRENT_STATE.md"
 ROADMAP_DOC = PROJECT_ROOT / "Docs" / "ROADMAP.md"
 ACTIVE_MILESTONE_DOC = PROJECT_ROOT / "Docs" / "ACTIVE_MILESTONE.md"
 PROJECT_EXECUTION_CONTRACT = PROJECT_ROOT / "Docs" / "PROJECT_EXECUTION_CONTRACT.md"
+PROJECT_GOAL = PROJECT_ROOT / "Docs" / "PROJECT_GOAL.md"
+PROJECT_COMPLETION_GATE = PROJECT_ROOT / "Docs" / "PROJECT_COMPLETION_GATE.md"
 CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CAPABILITY_MATRIX.md"
 CONSOLE_CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CONSOLE_CAPABILITY_MATRIX.md"
 M001_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M001-wing-readonly-preflight-evidence-gate.md"
@@ -446,6 +448,86 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
     assert "another explicitly safe\nindependent roadmap item" in report
     assert "Do not contact\nWING from unattended automation" in report
     assert "There is no dependency-ready autonomous\nroadmap milestone" in report
+
+
+def test_project_completion_gate_stays_closed_without_real_hardware_and_owner_evidence():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    summary = state["last_validation_summary"]
+    gate = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["checkpoint_status"] == "waiting_for_external_validation"
+    assert summary["hardware_evidence"] is False
+    assert summary["authority"]["live_authority_granted"] is False
+    assert summary["authority"]["readiness_closure_allowed"] is False
+    assert summary["authority"]["contacts_wing"] is False
+    assert summary["authority"]["contacts_backend"] is False
+
+    assert "Status: authoritative completion gate" in gate
+    assert "evidence-backed" in gate
+    assert "hardware, listening или owner validation" in gate
+    assert "WAITING_FOR_EXTERNAL_VALIDATION`, а не `COMPLETE`" in gate
+    assert "## Gate Conditions" in gate
+    assert "Full\n   Autonomous Mixing Mode" in gate
+    assert "staged real-hardware evidence" in gate
+    assert "High-risk console actions" in gate
+    assert "human supervision" in gate
+    assert "Threshold Policy" in gate
+    assert "PENDING_APPROVAL" in gate
+    assert "COMPLETE` запрещен" in gate
+    assert "UNKNOWN" in gate
+
+    assert "Full Autonomous Mixing Mode не может быть объявлен готовым" in goal
+    assert "зеленому unit test" in goal
+    assert "Offline, shadow, replay, mock и simulator evidence" in goal
+    assert "не являются hardware proof" in goal
+    assert "supervised `fader`/`gain` rail" in goal
+
+    full_auto = markdown_table_row(capability, "Full Autonomous Mixing Mode")
+    supervised = markdown_table_row(capability, "Supervised AutoMix Mode")
+    multichannel = markdown_table_row(capability, "Multichannel audio analysis")
+    assert full_auto[1] == "NOT_STARTED"
+    assert full_auto[-1] == "none"
+    assert "all safety and hardware gates pass" in full_auto[4]
+    assert full_auto[-2] == "completion gate review"
+    assert supervised[1] == "SPECIFIED"
+    assert "real proof missing" in supervised[4]
+    assert supervised[-1] == "none"
+    assert multichannel[-1] == "UNKNOWN"
+    assert "Replay, mock and simulator evidence must not be labeled as hardware evidence" in capability
+
+    assert markdown_table_row(roadmap, "M001")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert markdown_table_row(roadmap, "M002")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert markdown_table_row(roadmap, "M010")[-1] == "PENDING_APPROVAL"
+    assert "Full autonomous eligibility review" in markdown_table_row(roadmap, "M010")[1]
+    assert "M001-M009" in markdown_table_row(roadmap, "M010")[3]
+    assert "AUTONOMOUS_ELIGIBLE only if all gates pass" in markdown_table_row(
+        roadmap, "M010"
+    )[5]
+
+    for category in (
+        "Raw state/read-only connection",
+        "Physical readback",
+        "Channel fader",
+        "Preamp trim/gain-down",
+        "Rollback",
+        "Emergency stop",
+    ):
+        assert markdown_table_row(console, category)[-1] in {"none", "none in setup"}
+
+    assert "Full Autonomous Mixing Mode is not ready" in current
+    assert "No real hardware evidence was produced" in current
+    assert "Goal transition fallback behavior is now covered" in current
+    assert "Hardware input required now: yes" in report
+    assert "These commits do not create hardware proof" in report
+    assert "grant live authority" in report
+    assert "Do not contact\nWING from unattended automation" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

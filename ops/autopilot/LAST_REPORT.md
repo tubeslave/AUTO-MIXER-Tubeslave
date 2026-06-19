@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T14:45:06Z.
+- Latest heartbeat: 2026-06-19T14:56:54Z.
 
 ## Что сделано
 
@@ -147,7 +147,7 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `75cd86c5`; this synchronization did not
+pre-checkpoint state/evidence commit `685ec514`; this synchronization did not
 change product runtime behavior.
 
 The current-state freshness rail is now automated by
@@ -183,6 +183,15 @@ verify native Goal tools before replacing a thread Goal. If native Goal update
 is unavailable, the fallback remains report-only: update repo state, print the
 manual `/goal` command in this report, and do not change Automixer product
 files or hardware.
+
+The Project Completion Gate closure rail is now automated by
+`tests/test_wing_mvp_rails.py::test_project_completion_gate_stays_closed_without_real_hardware_and_owner_evidence`.
+It compares `ops/autopilot/STATE.json`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/PROJECT_GOAL.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`, `Docs/ROADMAP.md`,
+`Docs/CURRENT_STATE.md` and this report so the project cannot be reported as
+`COMPLETE` or Full Autonomous ready from documentation, unit tests, mock,
+replay, simulator or no-WING artifacts alone.
 
 ## Проверка
 
@@ -272,8 +281,10 @@ files or hardware.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_goal_transition_fallback_contract_stays_report_only_without_native_goal_tools -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_project_completion_gate_stays_closed_without_real_hardware_and_owner_evidence -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `13 passed`.
+  `14 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -285,7 +296,7 @@ files or hardware.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4069 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4070 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -316,9 +327,9 @@ files or hardware.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:45:06Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:56:54Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `75cd86c5`, latest no-WING artifact
+  state/evidence commit `685ec514`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
