@@ -513,6 +513,9 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_passed",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required",
+    "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_match",
     "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_readiness_closure_allowed",
@@ -528,6 +531,9 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_passed",
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed",
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required",
+    "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields",
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_mismatches",
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_match",
     "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed",
@@ -538,10 +544,16 @@ NEXT_WING_PROOF_PLAN_OPERATOR_MARKDOWN_REQUIRED_FIELD_LINES = (
     "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source",
     "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source",
     "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete",
+    "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_required",
+    "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_readiness_closure_allowed",
+    "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_live_authority_granted",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required",
+    "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_mismatches",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_match",
     "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_readiness_closure_allowed",
@@ -29514,6 +29526,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_readiness_closure_allowed']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted: "
                 f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_live_authority_granted']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required: "
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_self_check_required']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields: "
@@ -29552,6 +29566,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_readiness_closure_allowed']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted: "
                 f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_live_authority_granted']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required: "
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_self_check_required']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields: "
@@ -29564,6 +29580,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: "
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_required: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_required']).lower()}`",
                 "- readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids: "
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids'])}`",
                 "- readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source: "
@@ -29580,6 +29598,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids'])}`",
                 "- readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete: "
                 f"`{str(next_plan['readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_live_authority_granted: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_live_authority_granted']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required: "
                 f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_required']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violation_ids: "
@@ -29592,6 +29614,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_readiness_closure_allowed']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted: "
                 f"`{str(next_plan['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_live_authority_granted']).lower()}`",
+                "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required: "
+                f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required: "
                 f"`{str(summary['next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_self_check_required']).lower()}`",
                 "- next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields: "

@@ -24379,6 +24379,14 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert (
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_required_fields"
+        in markdown_summary
+    )
+    assert (
         "next_wing_proof_plan_accepted_candidate_request_sequence_trace_value_gate_summary_surface_mismatches: `[]`"
         in markdown_summary
     )
@@ -24423,6 +24431,26 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_required_fields"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_contact_trace_value_gate_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
         "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source"
         in markdown_summary
     )
@@ -24447,11 +24475,27 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
         in markdown_summary
     )
     assert (
+        "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_expected_artifacts_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
+    assert (
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_violations: `[]`"
         in markdown_summary
     )
     assert (
         "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_passed: `true`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_accepted_candidate_expected_artifact_trace_value_gate_summary_surface_required_fields"
         in markdown_summary
     )
     assert (
