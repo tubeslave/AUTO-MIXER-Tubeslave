@@ -10,9 +10,9 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional
 
 try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
 
 MAX_SHADOW_STEP_DB = 0.5
@@ -24,7 +24,7 @@ OSCILLATION_WINDOW = 4
 OSCILLATION_DIRECTION_CHANGES = 2
 
 
-ALLOWED_LIVE_WRITE_KINDS = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+SHADOW_PROMOTION_LIVE_WRITE_KINDS = tuple(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
 
 def _coerce_float(value: Any) -> Optional[float]:
@@ -194,7 +194,7 @@ def build_shadow_gain_ride_candidates(
                     "max_step_db": MAX_SHADOW_STEP_DB,
                     "live_promotion_allowed": False,
                     "requires_future_hardware_proof": True,
-                    "allowed_live_write_kinds": list(ALLOWED_LIVE_WRITE_KINDS),
+                    "allowed_live_write_kinds": list(SHADOW_PROMOTION_LIVE_WRITE_KINDS),
                 },
                 "safety_evidence": [
                     {"label": "Mode", "value": "shadow_only"},
