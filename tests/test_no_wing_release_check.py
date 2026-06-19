@@ -8207,6 +8207,67 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_request_seq
     ]
 
 
+def test_no_wing_release_check_blocks_wing_preflight_review_decision_expected_summary_artifact_mismatch(
+    monkeypatch,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    stale_summary_artifact = "artifacts/wing_readonly_preflight/stale/summary.json"
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            source_id,
+            candidate_updates={
+                "expected_artifacts": [
+                    stale_summary_artifact,
+                    "artifacts/wing_readonly_preflight/run/events.jsonl",
+                ],
+                "expected_summary_artifact": stale_summary_artifact,
+                "summary_path_matches_expected_artifact": True,
+            },
+        ),
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source"
+        ][source_id]
+        == stale_summary_artifact
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
+        ]
+        == [source_id]
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+        ]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_expected_artifact_trace_blocker_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_expected_artifact_trace"
+        in result.detail["violations"]
+    )
+    assert summary_payload["accepted_candidate_expected_artifact_trace_complete"] is False
+    assert (
+        summary_payload[
+            "accepted_candidate_expected_artifact_trace_missing_source_ids"
+        ]
+        == [source_id]
+    )
+
+
 def test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace_candidates(
     monkeypatch,
 ):

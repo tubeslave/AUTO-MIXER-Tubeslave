@@ -3788,6 +3788,7 @@ def _accepted_candidate_expected_artifact_trace(
         if (
             len(expected_artifacts) < 2
             or not expected_summary_artifact
+            or expected_summary_artifact != source_id
             or not expected_events_artifact
             or not summary_path_matches
             or not events_path_matches
