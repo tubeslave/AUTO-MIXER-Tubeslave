@@ -4458,6 +4458,19 @@ test('task queue review-only filter includes all rows when integration bundle is
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task queue row badge shows blocked state when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /\(integrationBundleApplyBlocked \|\| task\.reviewOnly\)/);
+  assert.match(source, /integrationBundleApplyBlocked \? 'Blocked' : 'Review'/);
+  assert.match(source, /predicate: task => integrationBundleApplyBlocked \|\| Boolean\(task\.reviewOnly \|\| task\.canApply === false\)/);
+  assert.match(source, /actions=\{integrationBundleApplyBlocked \|\| task\.canApply === false \|\| task\.reviewOnly \? \['Detail', 'Reject'\] : \['Detail', 'Apply', 'Reject'\]\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('dashboard mixer header uses the selected channel dynamically', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'),

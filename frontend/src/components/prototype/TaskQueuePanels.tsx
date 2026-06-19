@@ -662,7 +662,9 @@ export function TaskQueueWorkspace({
             render: task => (
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate">{task.title}</span>
-                {task.reviewOnly && <StatusBadge tone="red">Review</StatusBadge>}
+                {(integrationBundleApplyBlocked || task.reviewOnly) && (
+                  <StatusBadge tone="red">{integrationBundleApplyBlocked ? 'Blocked' : 'Review'}</StatusBadge>
+                )}
               </span>
             )
           },

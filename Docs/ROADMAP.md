@@ -66,6 +66,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M040 | Task Details apply entrypoint blocker guard | Task Details apply button stays blocked before opening Supervised Apply while promotion planning is blocked | M039 | high offline frontend | UNIT_VERIFIED guarded task details apply entrypoint; live authority remains blocked | PENDING |
 | M041 | Task Queue metrics blocker guard | Task Queue metrics show blocked apply capacity while promotion planning is blocked | M040 | high offline frontend | UNIT_VERIFIED blocked Task Queue metrics; live authority remains blocked | PENDING |
 | M042 | Task Queue review filter blocker guard | Task Queue Review only filter includes all rows while promotion planning is blocked | M041 | high offline frontend | UNIT_VERIFIED blocked Task Queue review filter; live authority remains blocked | PENDING |
+| M043 | Task Queue row badge blocker guard | Task Queue rows show blocked badges while promotion planning is blocked | M042 | high offline frontend | UNIT_VERIFIED blocked Task Queue row badges; live authority remains blocked | PENDING |
 
 ## Active milestone
 

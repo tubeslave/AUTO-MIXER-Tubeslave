@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T23:33:04Z.
+- Latest heartbeat: 2026-06-19T23:44:05Z.
 
 ## Что сделано
 
@@ -797,17 +797,33 @@ hardening only: no row hiding, queue mutation, backend/WING contact, live
 transport, console apply, readiness closure, Full Autonomous readiness or live
 authority is introduced.
 
+The M043 Task Queue row badge blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m043_task_queue_row_badge_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the row-badge guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M043-task-queue-row-badge-blocker-guard.md`,
+`Docs/adr/task-queue-row-badge-blocker-guard-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. Task Queue rows now render a red
+`Blocked` badge while `integrationBundleApplyBlocked` is true, and preserve
+the existing `Review` badge for per-task review-only rows when the global
+blocker is absent. This is local frontend presentation hardening only: no row
+data change, row hiding, queue mutation, backend/WING contact, live transport,
+console apply, readiness closure, Full Autonomous readiness or live authority
+is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `58 passed`.
+  `59 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m042_task_queue_review_filter_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m043_task_queue_row_badge_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `55 passed`.
+  `56 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4168 passed, 1 skipped, 1 warning`.
+  `4169 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.
@@ -1183,9 +1199,9 @@ authority is introduced.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T23:33:04Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T23:44:05Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `f5e60099`, latest no-WING artifact
+  state/evidence commit `a78319d6`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
