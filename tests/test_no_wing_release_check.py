@@ -18973,6 +18973,63 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "next_manual_artifact_required: "
         f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in markdown_summary
+    for field_name, expected_value in (
+        ("wing_readonly_packet_safety_boundary_summary_surface_required", "true"),
+        (
+            "wing_readonly_packet_safety_boundary_summary_surface_readiness_closure_allowed",
+            "false",
+        ),
+        (
+            "wing_readonly_packet_safety_boundary_summary_surface_live_authority_granted",
+            "false",
+        ),
+        ("wing_readonly_expected_artifacts_summary_surface_required", "true"),
+        (
+            "wing_readonly_expected_artifacts_summary_surface_readiness_closure_allowed",
+            "false",
+        ),
+        (
+            "wing_readonly_expected_artifacts_summary_surface_live_authority_granted",
+            "false",
+        ),
+        ("wing_readonly_command_binding_summary_surface_required", "true"),
+        (
+            "wing_readonly_command_binding_summary_surface_readiness_closure_allowed",
+            "false",
+        ),
+        (
+            "wing_readonly_command_binding_summary_surface_live_authority_granted",
+            "false",
+        ),
+        ("wing_readonly_operator_sequence_summary_surface_required", "true"),
+        (
+            "wing_readonly_operator_sequence_summary_surface_readiness_closure_allowed",
+            "false",
+        ),
+        (
+            "wing_readonly_operator_sequence_summary_surface_live_authority_granted",
+            "false",
+        ),
+        ("wing_readonly_operator_sequence_step_gate_summary_surface_required", "true"),
+        (
+            "wing_readonly_operator_sequence_step_gate_summary_surface_readiness_closure_allowed",
+            "false",
+        ),
+        (
+            "wing_readonly_operator_sequence_step_gate_summary_surface_live_authority_granted",
+            "false",
+        ),
+        ("wing_readonly_supervised_proof_plan_fields_summary_surface_required", "true"),
+        (
+            "wing_readonly_supervised_proof_plan_fields_summary_surface_readiness_closure_allowed",
+            "false",
+        ),
+        (
+            "wing_readonly_supervised_proof_plan_fields_summary_surface_live_authority_granted",
+            "false",
+        ),
+    ):
+        assert f"{field_name}: `{expected_value}`" in markdown_summary
     assert "plan_artifact_status: `passed`" in markdown_summary
     assert (
         "plan_artifact_manifest_verifier_report_value_mismatches: `[]`"
