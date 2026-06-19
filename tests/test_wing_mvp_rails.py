@@ -86,6 +86,8 @@ M019_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M019-integration-policy-binding.m
 M019_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-policy-binding-20260619.md"
 M020_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M020-safety-kernel-trace-contract.md"
 M020_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-kernel-trace-contract-20260619.md"
+M021_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M021-safety-kernel-trace-binding.md"
+M021_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-kernel-trace-binding-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -343,6 +345,40 @@ def files_under(path: Path) -> list[Path]:
     if not path.exists():
         return []
     return sorted(candidate for candidate in path.rglob("*") if candidate.is_file())
+
+
+def safety_kernel_trace_record_fixture(scenario: str, **overrides) -> dict:
+    decision = "bounded_allow" if scenario == "supervised_fader_gain_allowed" else "reject"
+    record = {
+        "scenario": scenario,
+        "safety_decision": decision,
+        "guard_checks": {key: True for key in SAFETY_KERNEL_REQUIRED_GUARD_CHECKS},
+        "audit": {
+            key: f"{scenario}/{key}" for key in SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS
+        }
+        | {"safety_decision": decision},
+    }
+    record.update(overrides)
+    return record
+
+
+def safety_kernel_trace_manifest_fixture(**overrides) -> dict:
+    manifest = {
+        "trace_id": "safety-kernel-trace-fixture",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "trace_records": [
+            safety_kernel_trace_record_fixture(scenario)
+            for scenario in SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS
+        ],
+    }
+    manifest.update(overrides)
+    return manifest
 
 
 def test_progress_baseline_covers_runner_verifier_checks():
@@ -2071,6 +2107,7 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
             "integration_policy_manifest": complete_integration_policy_manifest(),
+            "safety_kernel_trace_manifest": safety_kernel_trace_manifest_fixture(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": complete_replay_manifest(),
             "fault_recovery_manifest": complete_fault_manifest(),
@@ -3140,6 +3177,7 @@ def test_m019_integration_policy_binding_requires_m018_manifest():
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
             "integration_policy_manifest": integration_policy_manifest(),
+            "safety_kernel_trace_manifest": safety_kernel_trace_manifest_fixture(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": replay_manifest(),
             "fault_recovery_manifest": fault_manifest(),
@@ -3389,6 +3427,146 @@ def test_m020_safety_kernel_trace_contract_stays_offline_and_non_bypassable():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M020 safety kernel trace contract is now covered" in current
     assert "M020 safety kernel trace contract rail is now automated" in report
+
+
+def test_m021_safety_kernel_trace_binding_requires_m020_manifest():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M021_PLAN.read_text(encoding="utf-8")
+    adr = M021_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m021 = markdown_table_row(roadmap, "M021")
+    assert m021[1] == "Safety kernel trace binding"
+    assert m021[2] == (
+        "Offline integration promotion consumes the safety-kernel trace "
+        "contract instead of loose safety_kernel_trace_bound checks"
+    )
+    assert m021[3] == "M013-M020"
+    assert m021[4] == "high offline"
+    assert m021[5] == "UNIT_VERIFIED gate binding; integration evidence remains pending"
+    assert m021[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "tests/test_evaluation_integration_bundle_contract.py" in memory_eval[3]
+    assert "integration promotion now requires a bound safety-kernel trace manifest" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    def trace_record(scenario: str, **overrides) -> dict:
+        decision = (
+            "bounded_allow"
+            if scenario == "supervised_fader_gain_allowed"
+            else "reject"
+        )
+        record = {
+            "scenario": scenario,
+            "safety_decision": decision,
+            "guard_checks": {
+                key: True for key in SAFETY_KERNEL_REQUIRED_GUARD_CHECKS
+            },
+            "audit": {
+                key: f"{scenario}/{key}"
+                for key in SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS
+            }
+            | {"safety_decision": decision},
+        }
+        record.update(overrides)
+        return record
+
+    def trace_manifest(**overrides) -> dict:
+        manifest = {
+            "trace_id": "m021-safety-kernel-trace",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "trace_records": [
+                trace_record(scenario)
+                for scenario in SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS
+            ],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    def partial_integration_bundle(**overrides) -> dict:
+        bundle = {
+            "manifest_id": "m021-integration-bundle",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+        }
+        bundle.update(overrides)
+        return bundle
+
+    legacy_result = evaluate_integration_bundle_contract(
+        partial_integration_bundle(safety_kernel_trace_manifest={})
+    )
+    assert legacy_result["ready_for_integration_evaluation_promotion"] is False
+    assert "safety_kernel_trace_contract_not_ready" in legacy_result["blockers"]
+    assert "legacy_safety_kernel_trace_bound_without_contract_manifest" in (
+        legacy_result["blockers"]
+    )
+    assert "safety_kernel_trace:offline_only_required" in legacy_result["blockers"]
+    assert legacy_result["summary"]["safety_kernel_trace_ready"] is False
+    assert legacy_result["child_results"]["safety_kernel_trace"]["status"] == "blocked"
+
+    bound_trace_result = evaluate_integration_bundle_contract(
+        partial_integration_bundle(safety_kernel_trace_manifest=trace_manifest())
+    )
+    assert "safety_kernel_trace_contract_not_ready" not in (
+        bound_trace_result["blockers"]
+    )
+    assert not any(
+        blocker.startswith("safety_kernel_trace:")
+        for blocker in bound_trace_result["blockers"]
+    )
+    assert bound_trace_result["summary"]["safety_kernel_trace_ready"] is True
+    assert (
+        bound_trace_result["child_results"]["safety_kernel_trace"][
+            "ready_for_safety_kernel_trace_use"
+        ]
+        is True
+    )
+    assert bound_trace_result["authority"]["live_authority_granted"] is False
+
+    assert "Integration bundle manifests must consume the safety-kernel trace contract" in (
+        completion
+    )
+    assert "M021-CP01" in plan
+    assert "M021-CP02" in plan
+    assert "loose `safety_kernel_trace_bound` integration checks" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M021 safety kernel trace binding is now covered" in current
+    assert "M021 safety kernel trace binding rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

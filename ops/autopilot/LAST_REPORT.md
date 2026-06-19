@@ -430,8 +430,34 @@ records for allow/reject scenarios, guard checks and audit fields before
 safety-kernel trace evidence can support integration use. It still reports no
 hardware proof, no live write, no readiness closure and no live authority.
 
+The M021 safety kernel trace binding rail is now automated by
+`tests/test_evaluation_integration_bundle_contract.py`,
+`tests/test_safety_kernel_trace_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m021_safety_kernel_trace_binding_requires_m020_manifest`.
+It updates `backend/evaluation_integration_bundle_contract.py` and binds the
+change through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M021-safety-kernel-trace-binding.md`,
+`Docs/adr/safety-kernel-trace-binding-20260619.md`, `Docs/CURRENT_STATE.md`
+and this report. Offline integration promotion now consumes the M020
+`safety_kernel_trace_manifest`; loose `safety_kernel_trace_bound` integration
+checks remain context only and cannot satisfy safety-kernel trace requirements.
+Integration bundles surface the same failure through the `safety_kernel_trace:`
+child prefix. It still reports no hardware proof, no live write, no readiness
+closure and no live authority.
+
 ## Проверка
 
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
+  `7 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_safety_kernel_trace_contract.py -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m021_safety_kernel_trace_binding_requires_m020_manifest -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `34 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4129 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
   `27 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_autonomy_evidence_overlay.py tests/test_supervised_proof_artifact_report.py tests/test_no_wing_release_check.py::test_no_wing_release_check_validates_autonomy_evidence_overlay_schema tests/test_no_wing_release_check.py::test_no_wing_release_check_rejects_autonomy_overlay_outside_wing_boundary tests/test_no_wing_release_check.py::test_no_wing_release_check_rejects_autonomy_overlay_that_claims_authority tests/test_no_wing_release_check.py::test_no_wing_release_check_rejects_autonomy_overlay_summary_row_drift tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay -q`:

@@ -28,6 +28,11 @@ from backend.recovery_policy_contract import (
     REQUIRED_RECOVERY_CONTROLS,
     REQUIRED_RECOVERY_EVIDENCE,
 )
+from backend.safety_kernel_trace_contract import (
+    REQUIRED_AUDIT_FIELDS as SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_GUARD_CHECKS as SAFETY_KERNEL_REQUIRED_GUARD_CHECKS,
+    REQUIRED_TRACE_SCENARIOS as SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS,
+)
 
 
 def _scenario(name: str) -> dict:
@@ -170,6 +175,40 @@ def _integration_policy_manifest(**overrides) -> dict:
     return manifest
 
 
+def _safety_kernel_trace_record(scenario: str, **overrides) -> dict:
+    decision = "bounded_allow" if scenario == "supervised_fader_gain_allowed" else "reject"
+    record = {
+        "scenario": scenario,
+        "safety_decision": decision,
+        "guard_checks": {key: True for key in SAFETY_KERNEL_REQUIRED_GUARD_CHECKS},
+        "audit": {
+            key: f"{scenario}-{key}" for key in SAFETY_KERNEL_REQUIRED_AUDIT_FIELDS
+        }
+        | {"safety_decision": decision},
+    }
+    record.update(overrides)
+    return record
+
+
+def _safety_kernel_trace_manifest(**overrides) -> dict:
+    manifest = {
+        "trace_id": "safety-kernel-trace-fixture",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "trace_records": [
+            _safety_kernel_trace_record(scenario)
+            for scenario in SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS
+        ],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def _complete_bundle(**overrides) -> dict:
     bundle = {
         "manifest_id": "integration-bundle-fixture",
@@ -181,6 +220,7 @@ def _complete_bundle(**overrides) -> dict:
         "readiness_closure_allowed": False,
         "live_authority_granted": False,
         "integration_policy_manifest": _integration_policy_manifest(),
+        "safety_kernel_trace_manifest": _safety_kernel_trace_manifest(),
         "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
         "offline_replay_manifest": _offline_replay_manifest(),
         "fault_recovery_manifest": _fault_recovery_manifest(),
@@ -252,6 +292,7 @@ def test_integration_bundle_accepts_complete_offline_bundle_without_live_authori
     }
     assert result["summary"]["offline_replay_ready"] is True
     assert result["summary"]["fault_recovery_ready"] is True
+    assert result["summary"]["safety_kernel_trace_ready"] is True
     assert result["summary"]["integration_policy_approved"] is True
     assert result["summary"]["integration_policy_contract_status"] == (
         "ready_for_integration_policy_use"
@@ -259,6 +300,12 @@ def test_integration_bundle_accepts_complete_offline_bundle_without_live_authori
     assert (
         result["child_results"]["integration_policy"][
             "ready_for_integration_policy_use"
+        ]
+        is True
+    )
+    assert (
+        result["child_results"]["safety_kernel_trace"][
+            "ready_for_safety_kernel_trace_use"
         ]
         is True
     )
@@ -290,6 +337,28 @@ def test_integration_bundle_requires_bound_integration_policy_manifest():
     assert result["summary"]["integration_policy_status"] == ""
     assert result["summary"]["integration_policy_approved"] is False
     assert result["child_results"]["integration_policy"]["status"] == "blocked"
+    assert result["authority"]["live_authority_granted"] is False
+
+
+def test_integration_bundle_requires_bound_safety_kernel_trace_manifest():
+    result = evaluate_integration_bundle_contract(
+        _complete_bundle(safety_kernel_trace_manifest={})
+    )
+
+    assert result["status"] == "blocked"
+    assert result["ready_for_integration_evaluation_promotion"] is False
+    assert "safety_kernel_trace_contract_not_ready" in result["blockers"]
+    assert (
+        "legacy_safety_kernel_trace_bound_without_contract_manifest"
+        in result["blockers"]
+    )
+    assert "safety_kernel_trace:offline_only_required" in result["blockers"]
+    assert "safety_kernel_trace:missing_required_trace_scenario:stale_state_rejected" in (
+        result["blockers"]
+    )
+    assert result["summary"]["safety_kernel_trace_ready"] is False
+    assert result["summary"]["safety_kernel_trace_contract_status"] == "blocked"
+    assert result["child_results"]["safety_kernel_trace"]["status"] == "blocked"
     assert result["authority"]["live_authority_granted"] is False
 
 

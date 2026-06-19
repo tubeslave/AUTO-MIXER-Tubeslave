@@ -74,6 +74,10 @@ they can be used for integration or completion-gate promotion. Complete
 candidate safety-kernel trace evidence alone cannot grant live authority, close
 readiness, bypass deterministic safety checks, or replace hardware validation.
 
+Integration bundle manifests must consume the safety-kernel trace contract
+result instead of loose safety_kernel_trace_bound checks before claiming offline
+integration promotion readiness.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T18:43:43Z
+Generated: 2026-06-19T19:00:02Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T18:43:43Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `96240845 Bind integration policy to bundle gate`
+  `4adb8a55 Add safety kernel trace contract`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -437,6 +437,20 @@ Generated: 2026-06-19T18:43:43Z
   `readiness_closure_allowed: false`, `live_write: false` and
   `hardware_evidence: false`, so deterministic safety-kernel trace evidence
   cannot become hardware proof or live readiness.
+- M021 safety kernel trace binding is now covered by
+  `tests/test_evaluation_integration_bundle_contract.py`,
+  `tests/test_safety_kernel_trace_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m021_safety_kernel_trace_binding_requires_m020_manifest`.
+  The updated `backend/evaluation_integration_bundle_contract.py` module now
+  consumes `safety_kernel_trace_manifest` from M020 before reporting offline
+  integration promotion readiness. Loose `safety_kernel_trace_bound`
+  integration checks remain visible as integration-check context, but cannot
+  satisfy safety-kernel trace requirements without the bound M020 contract
+  manifest. Safety-kernel trace contract failures surface through the
+  `safety_kernel_trace:` child prefix. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so safety-kernel trace
+  binding cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -447,4 +461,4 @@ Generated: 2026-06-19T18:43:43Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4127 passed, 1 skipped, 1 warning`.
+  `4129 passed, 1 skipped, 1 warning`.

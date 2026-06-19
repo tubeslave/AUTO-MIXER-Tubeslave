@@ -66,6 +66,14 @@ def _integration_policy_result(manifest: Mapping[str, Any]) -> Dict[str, Any]:
     return evaluate_integration_policy_contract(manifest)
 
 
+def _safety_kernel_trace_result(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    from backend.safety_kernel_trace_contract import (
+        evaluate_safety_kernel_trace_contract,
+    )
+
+    return evaluate_safety_kernel_trace_contract(manifest)
+
+
 def _prefixed(prefix: str, blockers: Iterable[str]) -> List[str]:
     return [f"{prefix}:{blocker}" for blocker in blockers]
 
@@ -119,19 +127,27 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
         if legacy_integration_policy_approved and not integration_policy_manifest:
             blockers.append("legacy_integration_policy_without_contract_manifest")
 
-    integration_checks = _as_mapping(manifest.get("integration_checks"))
-    missing_integration_checks = [
-        item for item in REQUIRED_INTEGRATION_CHECKS if not _passed(integration_checks.get(item))
-    ]
-    blockers.extend(
-        f"missing_integration_check:{item}" for item in missing_integration_checks
-    )
-
     replay_result = evaluate_offline_replay_evaluation_contract(
         _as_mapping(manifest.get("offline_replay_manifest"))
     )
     fault_result = evaluate_fault_injection_recovery_contract(
         _as_mapping(manifest.get("fault_recovery_manifest"))
+    )
+    safety_kernel_trace_manifest = _as_mapping(
+        manifest.get("safety_kernel_trace_manifest")
+    )
+    safety_kernel_trace_result = _safety_kernel_trace_result(
+        safety_kernel_trace_manifest
+    )
+
+    integration_checks = _as_mapping(manifest.get("integration_checks"))
+    missing_integration_checks = [
+        item
+        for item in REQUIRED_INTEGRATION_CHECKS
+        if not _passed(integration_checks.get(item))
+    ]
+    blockers.extend(
+        f"missing_integration_check:{item}" for item in missing_integration_checks
     )
 
     if replay_result["ready_for_replay_promotion"] is not True:
@@ -140,6 +156,18 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
     if fault_result["ready_for_fault_recovery_promotion"] is not True:
         blockers.append("fault_recovery_contract_not_ready")
         blockers.extend(_prefixed("fault_recovery", fault_result["blockers"]))
+    if safety_kernel_trace_result["ready_for_safety_kernel_trace_use"] is not True:
+        blockers.append("safety_kernel_trace_contract_not_ready")
+        blockers.extend(
+            _prefixed("safety_kernel_trace", safety_kernel_trace_result["blockers"])
+        )
+        if (
+            _passed(integration_checks.get("safety_kernel_trace_bound"))
+            and not safety_kernel_trace_manifest
+        ):
+            blockers.append(
+                "legacy_safety_kernel_trace_bound_without_contract_manifest"
+            )
 
     blocker_list = _dedupe(blockers)
     ready_for_integration_promotion = not blocker_list
@@ -163,6 +191,9 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
         "summary": {
             "offline_replay_ready": replay_result["ready_for_replay_promotion"],
             "fault_recovery_ready": fault_result["ready_for_fault_recovery_promotion"],
+            "safety_kernel_trace_ready": safety_kernel_trace_result[
+                "ready_for_safety_kernel_trace_use"
+            ],
             "required_integration_checks": list(REQUIRED_INTEGRATION_CHECKS),
             "missing_integration_checks": missing_integration_checks,
             "integration_policy_status": str(integration_policy.get("status") or ""),
@@ -174,11 +205,15 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
             "integration_policy_ready_for_owner_review": integration_policy_result[
                 "ready_for_owner_review"
             ],
+            "safety_kernel_trace_contract_status": safety_kernel_trace_result[
+                "status"
+            ],
         },
         "child_results": {
             "offline_replay": replay_result,
             "fault_recovery": fault_result,
             "integration_policy": integration_policy_result,
+            "safety_kernel_trace": safety_kernel_trace_result,
         },
         "blockers": blocker_list,
     }
