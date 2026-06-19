@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T16:17:12Z.
+- Latest heartbeat: 2026-06-19T16:28:20Z.
 
 ## Что сделано
 
@@ -147,7 +147,7 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `edae1de5`; this synchronization did not
+pre-checkpoint state/evidence commit `350784a9`; this synchronization did not
 change product runtime behavior.
 
 The current-state freshness rail is now automated by
@@ -270,6 +270,17 @@ supervised-live allowed, non-fader/gain families require separate ADR, staged
 hardware proof, readback, rollback and emergency proof, and Full Autonomous
 remains locked.
 
+The M010 full autonomous eligibility rail is now automated by
+`tests/test_wing_mvp_rails.py::test_m010_full_autonomous_eligibility_stays_locked_until_completion_gates_pass`.
+It compares `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`, `ops/autopilot/STATE.json`, the backend
+autonomy promotion readiness overlay, `Docs/CURRENT_STATE.md` and this report
+so M010 remains `PENDING_APPROVAL`, Full Autonomous stays `NOT_STARTED`,
+completion cannot close from docs/unit/mock/replay/no-WING evidence, mandatory
+capabilities, hardware, listening and approved threshold evidence remain
+unproven, and no autonomous target is reported ready.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -376,8 +387,10 @@ remains locked.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_proof -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m010_full_autonomous_eligibility_stays_locked_until_completion_gates_pass -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `22 passed`.
+  `23 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -389,7 +402,7 @@ remains locked.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4078 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4079 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -420,9 +433,9 @@ remains locked.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T16:17:12Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T16:28:20Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `edae1de5`, latest no-WING artifact
+  state/evidence commit `350784a9`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:

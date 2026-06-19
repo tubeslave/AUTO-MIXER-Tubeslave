@@ -1326,6 +1326,133 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
     assert "M009 supervised non-fader/gain live expansion rail is now automated" in report
 
 
+def test_m010_full_autonomous_eligibility_stays_locked_until_completion_gates_pass():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["checkpoint_status"] == "waiting_for_external_validation"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"] == {
+        "contacts_backend": False,
+        "contacts_wing": False,
+        "live_authority_granted": False,
+        "live_write": False,
+        "readiness_closure_allowed": False,
+    }
+
+    m010 = markdown_table_row(roadmap, "M010")
+    assert m010[1] == "Full autonomous eligibility review"
+    assert m010[2] == "Full Autonomous Mixing Mode eligibility is reviewed against all completion gates"
+    assert m010[3] == "M001-M009"
+    assert m010[4] == "critical autonomous"
+    assert m010[5] == "AUTONOMOUS_ELIGIBLE only if all gates pass"
+    assert m010[-1] == "PENDING_APPROVAL"
+
+    full_auto = markdown_table_row(capability, "Full Autonomous Mixing Mode")
+    supervised = markdown_table_row(capability, "Supervised AutoMix Mode")
+    multichannel = markdown_table_row(capability, "Multichannel audio analysis")
+    assert full_auto == [
+        "Full Autonomous Mixing Mode",
+        "NOT_STARTED",
+        "`backend/operator_mode_policy.py`, `Docs/PROJECT_COMPLETION_GATE.md`",
+        "none sufficient",
+        "Locked until all safety and hardware gates pass",
+        "critical",
+        "all mandatory capabilities",
+        "completion gate review",
+        "none",
+    ]
+    assert supervised[1] == "SPECIFIED"
+    assert supervised[4] == "WING live write scope is only `fader`/`gain`; real proof missing"
+    assert supervised[7] == "M001-M006"
+    assert supervised[8] == "none"
+    assert multichannel[1] == "UNIT_VERIFIED"
+    assert multichannel[-1] == "UNKNOWN"
+
+    for capability_name in (
+        "Gain staging",
+        "Mix balance",
+        "EQ",
+        "Compression",
+        "Gating",
+        "Panning",
+        "Effects and sends",
+        "Master-bus processing",
+        "Long-term memory and evaluation",
+    ):
+        row = markdown_table_row(capability, capability_name)
+        assert row[1] != "AUTONOMOUS_ELIGIBLE"
+        assert row[-1] == "none"
+
+    assert "Replay, mock and simulator evidence must not be labeled as hardware evidence" in capability
+    assert "Все mandatory capabilities" in completion
+    assert "Analysis Mode, Assisted Mixing Mode, Supervised AutoMix Mode и Full" in completion
+    assert "Autonomous Mixing Mode" in completion
+    assert "WING Rack read/write protocol coverage" in completion
+    assert "deterministic Safety Kernel" in completion
+    assert "offline, replay,\n   simulator, fault-injection" in completion
+    assert "staged real-hardware testing" in completion
+    assert "PENDING_APPROVAL" in completion
+    assert "COMPLETE` запрещен" in completion
+
+    assert "Full Autonomous Mixing Mode не может быть объявлен готовым" in goal
+    assert "mock и simulator evidence не являются hardware proof" in goal
+    assert "Любая live WING запись до отдельного ADR и hardware proof" in goal
+
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "full_autonomous_ready": False,
+        "supervised_only": True,
+    }
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert snapshot["summary"]["supervised_live_allowed_target_ids"] == [
+        "fader_supervised_promotion"
+    ]
+    assert snapshot["summary"]["next_global_step"] == (
+        "Run proof gates per action family before widening supervised or "
+        "autonomous live writes."
+    )
+    assert set(snapshot["summary"]["global_blockers"]) >= {
+        "mode_full_autonomous_blocked",
+        "only_supervised_fader_gain_executor_is_registered",
+        "read_coverage_is_partial_or_missing",
+        "real_wing_and_emergency_stop_proof_incomplete",
+    }
+
+    for row in snapshot["rows"]:
+        assert row["autonomous_ready"] is False
+        assert "not_autonomous_ready" in row["blockers"]
+
+    for category in (
+        "EQ / HPF",
+        "Compressor / dynamics",
+        "Gate / expander",
+        "FX sends / returns",
+        "Routing / patch",
+        "Scenes / snapshots / presets",
+        "Matrices",
+    ):
+        row = markdown_table_row(console, category)
+        assert row[3] == "no"
+        assert row[4] == "no"
+        assert row[-1] == "none"
+
+    assert "Full autonomous eligibility review entry is now covered" in current
+    assert "completion gate cannot close from docs/unit/mock/replay/no-WING evidence" in current
+    assert "M010 full autonomous eligibility rail is now automated" in report
+    assert "no autonomous target is reported ready" in report
+
+
 def test_mvp_doc_declares_scope_and_stop_rules():
     text = MVP_DOC.read_text(encoding="utf-8")
 

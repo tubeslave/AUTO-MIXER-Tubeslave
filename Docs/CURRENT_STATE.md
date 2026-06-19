@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T16:17:12Z
+Generated: 2026-06-19T16:28:20Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T16:17:12Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `edae1de5 Guard assisted processing proof gate`
+  `350784a9 Guard live expansion proof gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -307,6 +307,16 @@ Generated: 2026-06-19T16:17:12Z
   candidate is reported as supervised-live allowed, non-fader/gain families
   require separate ADR, staged hardware proof, readback, rollback and emergency
   proof, and Full Autonomous remains locked.
+- Full autonomous eligibility review entry is now covered by
+  `tests/test_wing_mvp_rails.py::test_m010_full_autonomous_eligibility_stays_locked_until_completion_gates_pass`.
+  The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/PROJECT_COMPLETION_GATE.md`, `Docs/CAPABILITY_MATRIX.md`,
+  `Docs/CONSOLE_CAPABILITY_MATRIX.md`, `ops/autopilot/STATE.json`,
+  `backend/autonomy_promotion_readiness.py` and `ops/autopilot/LAST_REPORT.md`
+  so M010 remains `PENDING_APPROVAL`, Full Autonomous stays `NOT_STARTED`,
+  completion gate cannot close from docs/unit/mock/replay/no-WING evidence,
+  mandatory capabilities, hardware, listening and approved threshold evidence
+  remain unproven, and no autonomous target is reported ready.
 
 ## Unresolved unknowns
 
@@ -317,4 +327,4 @@ Generated: 2026-06-19T16:17:12Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4078 passed, 1 skipped, 1 warning`.
+  `4079 passed, 1 skipped, 1 warning`.
