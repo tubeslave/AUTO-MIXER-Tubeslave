@@ -7711,6 +7711,26 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         ]
         == {}
     )
+    assert result.detail["accepted_candidate_request_sequence_contract_valid"] is False
+    assert result.detail["accepted_candidate_request_sequence_source_ids"] == []
+    assert (
+        result.detail[
+            "accepted_candidate_request_sequence_contract_violations_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+        ]
+        is False
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+        ]
+        is False
+    )
     assert result.detail["operator_review_required"] is True
     assert result.detail["readiness_matrix_update_allowed_by_decision"] is False
     assert result.detail["readiness_closure_allowed_by_decision"] is False
@@ -7725,6 +7745,96 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     }
     assert result.detail["candidate_reviews"] == []
     assert result.detail["violations"] == []
+
+
+def _fake_review_decision_ledger_with_accepted_candidate(
+    source_id: str,
+    *,
+    summary_updates: dict | None = None,
+    candidate_updates: dict | None = None,
+) -> dict:
+    candidate = {
+        "source_id": source_id,
+        "contacts_backend": True,
+        "queries_console": True,
+        "expected_artifacts": [
+            "artifacts/wing_readonly_preflight/run/summary.json",
+            "artifacts/wing_readonly_preflight/run/events.jsonl",
+        ],
+        "expected_summary_artifact": (
+            "artifacts/wing_readonly_preflight/run/summary.json"
+        ),
+        "expected_events_artifact": (
+            "artifacts/wing_readonly_preflight/run/events.jsonl"
+        ),
+        "summary_path_matches_expected_artifact": True,
+        "events_path_matches_expected_artifact": True,
+        "request_sequence": list(WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE),
+        "plan_request_sequence": list(WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE),
+        "request_sequence_matches_plan": True,
+    }
+    if candidate_updates:
+        candidate.update(candidate_updates)
+
+    summary = {
+        "preflight_evidence_status": "review_candidates_available",
+        "decision_search_roots": [
+            WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT
+        ],
+        "review_candidate_count": 1,
+        "decision_record_count": 1,
+        "accepted_record_count": 1,
+        "rejected_record_count": 0,
+        "invalid_record_count": 0,
+        "unreviewed_candidate_count": 0,
+        "accepted_source_ids": [source_id],
+        "accepted_candidate_prestart_contract_valid": True,
+        "accepted_candidate_prestart_source_ids": [source_id],
+        "accepted_candidate_prestart_contract_violations_by_source": {},
+        "accepted_candidate_artifact_root_contract_valid": True,
+        "accepted_candidate_artifact_roots": ["artifacts/wing_readonly_preflight"],
+        "accepted_candidate_artifact_root_contract_violations_by_source": {},
+        "accepted_candidate_request_sequence_contract_valid": True,
+        "accepted_candidate_request_sequence_source_ids": [source_id],
+        "accepted_candidate_request_sequence_contract_violations_by_source": {},
+        "operator_review_required": True,
+        "manual_readiness_update_candidate_available": True,
+        "readiness_matrix_update_allowed_by_decision": False,
+        "readiness_closure_allowed_by_decision": False,
+        "live_authority_granted": False,
+        "full_autonomous_ready": False,
+        "rejected_source_ids": [],
+        "invalid_record_ids": [],
+        "duplicate_source_ids": [],
+        "conflicting_source_ids": [],
+        "unreviewed_candidate_source_ids": [],
+        "candidate_reviews": [candidate],
+        "blocked_by": [],
+    }
+    if summary_updates:
+        summary.update(summary_updates)
+
+    return {
+        "type": "wing_readonly_preflight_review_decision_ledger",
+        "method_id": release_check.WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID,
+        "status": "operator_review_decision_records_available",
+        "safety": {
+            "read_only": True,
+            "live_write": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "executes_tests": False,
+            "operator_required": True,
+            "execution_allowed_by_decision": False,
+            "readiness_matrix_update_allowed_by_decision": False,
+            "readiness_closure_allowed_by_decision": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "records": [{"review_id": "operator-review-1"}],
+        "summary": summary,
+    }
 
 
 @pytest.mark.parametrize(
@@ -7906,6 +8016,128 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_artifact_ro
     assert (
         "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_artifact_root"
         in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_blocks_wing_preflight_review_decision_request_sequence_candidate(
+    monkeypatch,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    request_sequence_violations_by_source = {
+        source_id: [
+            "plan_request_sequence_missing",
+            "request_sequence_matches_plan_not_true",
+        ]
+    }
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            source_id,
+            summary_updates={
+                "accepted_candidate_request_sequence_contract_valid": False,
+                "accepted_candidate_request_sequence_source_ids": [],
+                "accepted_candidate_request_sequence_contract_violations_by_source": (
+                    request_sequence_violations_by_source
+                ),
+            },
+        ),
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert result.detail["accepted_candidate_request_sequence_contract_valid"] is False
+    assert result.detail["accepted_candidate_request_sequence_source_ids"] == []
+    assert (
+        result.detail[
+            "accepted_candidate_request_sequence_contract_violations_by_source"
+        ]
+        == request_sequence_violations_by_source
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_request_sequence_blocker_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_request_sequence"
+        in result.detail["violations"]
+    )
+    assert summary_payload["accepted_candidate_request_sequence_contract_valid"] is False
+    assert (
+        summary_payload[
+            "accepted_candidate_request_sequence_contract_violations_by_source"
+        ]
+        == request_sequence_violations_by_source
+    )
+
+
+def test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace_candidates(
+    monkeypatch,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            source_id,
+            candidate_updates={
+                "contacts_backend": False,
+                "queries_console": False,
+                "expected_artifacts": [],
+                "expected_summary_artifact": "",
+                "expected_events_artifact": "",
+                "summary_path_matches_expected_artifact": False,
+                "events_path_matches_expected_artifact": False,
+            },
+        ),
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
+        ]
+        == [source_id]
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
+        ]
+        == [source_id]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_contact_trace_blocker_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_expected_artifact_trace_blocker_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_contact_trace"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_expected_artifact_trace"
+        in result.detail["violations"]
+    )
+    assert summary_payload["accepted_candidate_contact_trace_complete"] is False
+    assert summary_payload["accepted_candidate_expected_artifact_trace_complete"] is False
+    assert summary_payload["accepted_candidate_contact_trace_missing_source_ids"] == [
+        source_id
+    ]
+    assert (
+        summary_payload[
+            "accepted_candidate_expected_artifact_trace_missing_source_ids"
+        ]
+        == [source_id]
     )
 
 

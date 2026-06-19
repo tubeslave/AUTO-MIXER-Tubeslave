@@ -37,6 +37,12 @@ WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER = (
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER = (
     "accepted_readonly_preflight_candidate_verifier_ws_proof_required_before_supervised_proof"
 )
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER = (
+    "accepted_candidate_contact_trace_incomplete"
+)
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER = (
+    "accepted_candidate_expected_artifact_trace_incomplete"
+)
 WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_artifact_paths",
     "confirm_operator_channel_scope",

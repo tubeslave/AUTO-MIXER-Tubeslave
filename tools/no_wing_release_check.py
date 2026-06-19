@@ -1625,6 +1625,12 @@ WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER = (
 WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER = (
     preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
 )
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER = (
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER
+)
+WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER = (
+    preflight_contract.WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER
+)
 WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_SUPERVISED_PROOF_GATE_MARKERS = (
     preflight_contract.WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_MARKERS
 )
@@ -9919,6 +9925,55 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     accepted_candidate_artifact_root_contract_valid = (
         summary.get("accepted_candidate_artifact_root_contract_valid") is True
     )
+    accepted_candidate_request_sequence_source_ids = (
+        list(summary.get("accepted_candidate_request_sequence_source_ids"))
+        if isinstance(summary.get("accepted_candidate_request_sequence_source_ids"), list)
+        else []
+    )
+    accepted_candidate_request_sequence_contract_violations_by_source = (
+        dict(
+            summary.get(
+                "accepted_candidate_request_sequence_contract_violations_by_source"
+            )
+        )
+        if isinstance(
+            summary.get(
+                "accepted_candidate_request_sequence_contract_violations_by_source"
+            ),
+            Mapping,
+        )
+        else {}
+    )
+    accepted_candidate_request_sequence_contract_valid = (
+        summary.get("accepted_candidate_request_sequence_contract_valid") is True
+    )
+    candidate_reviews = (
+        list(summary.get("candidate_reviews"))
+        if isinstance(summary.get("candidate_reviews"), list)
+        else []
+    )
+    accepted_candidate_contact_trace = _accepted_candidate_contact_trace(
+        accepted_source_ids,
+        [item for item in candidate_reviews if isinstance(item, Mapping)],
+    )
+    accepted_candidate_expected_artifact_trace = (
+        _accepted_candidate_expected_artifact_trace(
+            accepted_source_ids,
+            [item for item in candidate_reviews if isinstance(item, Mapping)],
+        )
+    )
+    accepted_candidate_contact_trace_complete = (
+        accepted_candidate_contact_trace[
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+        ]
+        is True
+    )
+    accepted_candidate_expected_artifact_trace_complete = (
+        accepted_candidate_expected_artifact_trace[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+        ]
+        is True
+    )
     source_authority_flags = {
         flag: summary.get(flag)
         for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
@@ -9978,6 +10033,36 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
             violations.append(
                 "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_artifact_root"
             )
+    if accepted_source_ids and not accepted_candidate_request_sequence_contract_valid:
+        if WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER not in blocked_by:
+            violations.append(
+                "wing_readonly_preflight_review_decision_request_sequence_blocker_missing"
+            )
+        if summary.get("manual_readiness_update_candidate_available") is True:
+            violations.append(
+                "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_request_sequence"
+            )
+    if accepted_source_ids and not accepted_candidate_contact_trace_complete:
+        if WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER not in blocked_by:
+            violations.append(
+                "wing_readonly_preflight_review_decision_contact_trace_blocker_missing"
+            )
+        if summary.get("manual_readiness_update_candidate_available") is True:
+            violations.append(
+                "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_contact_trace"
+            )
+    if accepted_source_ids and not accepted_candidate_expected_artifact_trace_complete:
+        if (
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_EXPECTED_ARTIFACT_TRACE_BLOCKER
+            not in blocked_by
+        ):
+            violations.append(
+                "wing_readonly_preflight_review_decision_expected_artifact_trace_blocker_missing"
+            )
+        if summary.get("manual_readiness_update_candidate_available") is True:
+            violations.append(
+                "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_expected_artifact_trace"
+            )
 
     detail["ledger_status"] = ledger.get("status")
     detail["review_tool_path"] = WING_READONLY_PREFLIGHT_REVIEW_DECISION_TOOL
@@ -10027,6 +10112,17 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     detail["accepted_candidate_artifact_root_contract_violations_by_source"] = (
         accepted_candidate_artifact_root_contract_violations_by_source
     )
+    detail["accepted_candidate_request_sequence_contract_valid"] = (
+        accepted_candidate_request_sequence_contract_valid
+    )
+    detail["accepted_candidate_request_sequence_source_ids"] = (
+        accepted_candidate_request_sequence_source_ids
+    )
+    detail["accepted_candidate_request_sequence_contract_violations_by_source"] = (
+        accepted_candidate_request_sequence_contract_violations_by_source
+    )
+    detail.update(accepted_candidate_contact_trace)
+    detail.update(accepted_candidate_expected_artifact_trace)
     detail["rejected_source_ids"] = (
         list(summary.get("rejected_source_ids"))
         if isinstance(summary.get("rejected_source_ids"), list)
@@ -10053,11 +10149,7 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         if isinstance(summary.get("unreviewed_candidate_source_ids"), list)
         else []
     )
-    detail["candidate_reviews"] = (
-        list(summary.get("candidate_reviews"))
-        if isinstance(summary.get("candidate_reviews"), list)
-        else []
-    )
+    detail["candidate_reviews"] = candidate_reviews
     detail["blocked_by"] = blocked_by
     detail["violations"] = violations
     finished = datetime.now(timezone.utc)
@@ -21176,6 +21268,24 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_candidate_artifact_root_contract_violations_by_source = detail.get(
             "accepted_candidate_artifact_root_contract_violations_by_source"
         )
+        accepted_candidate_request_sequence_source_ids = detail.get(
+            "accepted_candidate_request_sequence_source_ids"
+        )
+        accepted_candidate_request_sequence_contract_violations_by_source = detail.get(
+            "accepted_candidate_request_sequence_contract_violations_by_source"
+        )
+        accepted_candidate_contact_trace_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
+        )
+        accepted_candidate_contact_trace_missing_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
+        )
+        accepted_candidate_expected_artifact_trace_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids"
+        )
+        accepted_candidate_expected_artifact_trace_missing_source_ids = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
+        )
         rejected_source_ids = detail.get("rejected_source_ids")
         invalid_record_ids = detail.get("invalid_record_ids")
         invalid_records = detail.get("invalid_records")
@@ -21279,6 +21389,60 @@ def wing_readonly_preflight_review_decision_summary(
                     Mapping,
                 )
                 else {}
+            ),
+            "accepted_candidate_request_sequence_contract_valid": (
+                detail.get("accepted_candidate_request_sequence_contract_valid") is True
+            ),
+            "accepted_candidate_request_sequence_source_ids": (
+                list(accepted_candidate_request_sequence_source_ids)
+                if isinstance(accepted_candidate_request_sequence_source_ids, list)
+                else []
+            ),
+            "accepted_candidate_request_sequence_contract_violations_by_source": (
+                dict(accepted_candidate_request_sequence_contract_violations_by_source)
+                if isinstance(
+                    accepted_candidate_request_sequence_contract_violations_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_contact_trace_complete": (
+                detail.get(
+                    "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+                )
+                is True
+            ),
+            "accepted_candidate_contact_trace_source_ids": (
+                list(accepted_candidate_contact_trace_source_ids)
+                if isinstance(accepted_candidate_contact_trace_source_ids, list)
+                else []
+            ),
+            "accepted_candidate_contact_trace_missing_source_ids": (
+                list(accepted_candidate_contact_trace_missing_source_ids)
+                if isinstance(accepted_candidate_contact_trace_missing_source_ids, list)
+                else []
+            ),
+            "accepted_candidate_expected_artifact_trace_complete": (
+                detail.get(
+                    "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
+                )
+                is True
+            ),
+            "accepted_candidate_expected_artifact_trace_source_ids": (
+                list(accepted_candidate_expected_artifact_trace_source_ids)
+                if isinstance(
+                    accepted_candidate_expected_artifact_trace_source_ids,
+                    list,
+                )
+                else []
+            ),
+            "accepted_candidate_expected_artifact_trace_missing_source_ids": (
+                list(accepted_candidate_expected_artifact_trace_missing_source_ids)
+                if isinstance(
+                    accepted_candidate_expected_artifact_trace_missing_source_ids,
+                    list,
+                )
+                else []
             ),
             "rejected_source_ids": (
                 list(rejected_source_ids)
