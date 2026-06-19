@@ -11,14 +11,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Mapping, Tuple
+
 try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
 
 SUPERVISED_PROOF_METHOD_ID = "supervised_proof_artifact_evaluator"
-SUPPORTED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+SUPPORTED_VALUE_TYPES = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 EVALUATION_STATUSES = {"dry_run_ready", "supervised_candidate", "blocked"}
 LEGACY_AMBIGUOUS_PROOF_MODE = "legacy_ambiguous"
 VERIFIED_READBACK_STATUSES = {

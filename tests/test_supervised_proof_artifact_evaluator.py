@@ -154,6 +154,16 @@ def test_unsupported_console_family_blocks():
     assert "unsupported_value_type" in result.blockers
 
 
+def test_pan_proof_is_outside_current_wing_deployment_boundary():
+    artifact = complete_artifact(value_type="pan")
+
+    result = evaluate_supervised_proof_artifact(artifact)
+
+    assert result.status == "blocked"
+    assert result.promotion_allowed is False
+    assert "unsupported_value_type" in result.blockers
+
+
 def test_gain_up_requires_operator_authored_reason():
     artifact = complete_artifact(
         old_value=0.0,
@@ -409,3 +419,4 @@ def test_snapshot_summarizes_promotion_candidates_without_autonomous_ready():
     assert snapshot["summary"]["status_counts"]["supervised_candidate"] == 1
     assert snapshot["summary"]["promotion_allowed_proof_ids"] == ["physical-fader-proof"]
     assert snapshot["summary"]["autonomous_ready_proof_ids"] == []
+    assert snapshot["summary"]["supported_value_types"] == ["fader", "gain"]
