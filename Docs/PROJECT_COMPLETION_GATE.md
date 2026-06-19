@@ -42,6 +42,11 @@ Automixer может перейти в `COMPLETE` только при evidence-b
 предлагать candidate thresholds, но они имеют статус `PENDING_APPROVAL`, пока
 product owner явно не утвердит их.
 
+Candidate threshold policies must be evidence-bound and owner-approved before
+they can be used for replay, integration or completion-gate promotion. Complete
+candidate threshold evidence alone cannot grant live authority, close readiness
+or replace listening, expert, hardware or owner validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
@@ -53,4 +58,3 @@ product owner явно не утвердит их.
 
 `COMPLETE` запрещен, если любая строка mandatory capability находится ниже
 approved target maturity или имеет `UNKNOWN` в required evidence.
-

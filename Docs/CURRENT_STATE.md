@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T17:09:21Z
+Generated: 2026-06-19T17:23:27Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T17:09:21Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `5d15478c Add fault recovery evaluation gate`
+  `37d79bb6 Add integration evaluation bundle gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -349,6 +349,17 @@ Generated: 2026-06-19T17:09:21Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so integration bundle
   evidence cannot become hardware proof or live readiness.
+- M014 quality threshold policy contract is now covered by
+  `tests/test_quality_threshold_policy_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m014_quality_threshold_policy_contract_stays_owner_approved_and_offline`.
+  The new `backend/quality_threshold_policy_contract.py` module validates that
+  candidate threshold policies cover every replay quality axis, bind baseline,
+  reference, replay, fault-recovery and integration evidence, and keep owner
+  approval separate from candidate-review readiness before reporting threshold
+  policy use readiness. It still keeps `live_authority_granted: false`,
+  `readiness_closure_allowed: false`, `live_write: false` and
+  `hardware_evidence: false`, so quality threshold policy evidence cannot
+  become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -359,4 +370,4 @@ Generated: 2026-06-19T17:09:21Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4097 passed, 1 skipped, 1 warning`.
+  `4103 passed, 1 skipped, 1 warning`.

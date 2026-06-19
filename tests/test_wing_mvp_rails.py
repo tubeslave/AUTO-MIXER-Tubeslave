@@ -23,6 +23,11 @@ from backend.offline_replay_evaluation_contract import (
     REQUIRED_SCENARIOS,
     evaluate_offline_replay_evaluation_contract,
 )
+from backend.quality_threshold_policy_contract import (
+    REQUIRED_POLICY_CHECKS as THRESHOLD_REQUIRED_POLICY_CHECKS,
+    REQUIRED_THRESHOLD_AXES,
+    evaluate_quality_threshold_policy_contract,
+)
 from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import no_wing_release_check as release_check
 
@@ -51,6 +56,8 @@ M012_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M012-fault-injection-recovery-con
 M012_ADR = PROJECT_ROOT / "Docs" / "adr" / "fault-injection-recovery-contract-20260619.md"
 M013_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M013-integration-evaluation-bundle-contract.md"
 M013_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-evaluation-bundle-contract-20260619.md"
+M014_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M014-quality-threshold-policy-contract.md"
+M014_ADR = PROJECT_ROOT / "Docs" / "adr" / "quality-threshold-policy-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -1910,6 +1917,153 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
     assert "always returns `live_authority_granted: false`" in adr
     assert "M013 integration evaluation bundle contract is now covered" in current
     assert "M013 integration evaluation bundle contract rail is now automated" in report
+
+
+def test_m014_quality_threshold_policy_contract_stays_owner_approved_and_offline():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    safety = SAFETY_CONTRACT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M014_PLAN.read_text(encoding="utf-8")
+    adr = M014_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m014 = markdown_table_row(roadmap, "M014")
+    assert m014[1] == "Quality threshold policy contract"
+    assert m014[2] == (
+        "Candidate quality thresholds are complete, evidence-bound and "
+        "owner-approved before replay or integration promotion"
+    )
+    assert m014[3] == "M011-M013"
+    assert m014[4] == "high offline"
+    assert (
+        m014[5]
+        == "SPECIFIED to UNIT_VERIFIED for threshold gate; owner approval remains required"
+    )
+    assert m014[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/quality_threshold_policy_contract.py`" in memory_eval[2]
+    assert "tests/test_quality_threshold_policy_contract.py" in memory_eval[3]
+    assert "quality threshold policy evidence cannot grant live authority" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    def complete_threshold(axis: str) -> dict:
+        return {
+            "axis": axis,
+            "metric_name": f"{axis}_score",
+            "direction": "min",
+            "candidate_value": 0.8,
+            "evidence_artifact": f"artifacts/evaluation/{axis}.json",
+            "rationale": f"Candidate threshold for {axis}",
+            "rollback_policy": f"Revert {axis} threshold if regression appears",
+        }
+
+    candidate_result = evaluate_quality_threshold_policy_contract(
+        {
+            "policy_id": "candidate-quality-thresholds",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+            "threshold_policy": {"status": "candidate"},
+            "thresholds": [complete_threshold(axis) for axis in REQUIRED_THRESHOLD_AXES],
+        }
+    )
+    assert candidate_result["ready_for_owner_review"] is True
+    assert candidate_result["ready_for_threshold_policy_use"] is False
+    assert candidate_result["authority"]["live_authority_granted"] is False
+    assert candidate_result["authority"]["readiness_closure_allowed"] is False
+    assert candidate_result["review_blockers"] == []
+    assert candidate_result["blockers"] == [
+        "owner_approved_quality_threshold_policy_required"
+    ]
+
+    approved_result = evaluate_quality_threshold_policy_contract(
+        {
+            "policy_id": "approved-quality-thresholds",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:quality-threshold-policy",
+                "approved_at": "2026-06-19T17:20:04Z",
+            },
+            "thresholds": [complete_threshold(axis) for axis in REQUIRED_THRESHOLD_AXES],
+        }
+    )
+    assert approved_result["ready_for_threshold_policy_use"] is True
+    assert approved_result["threshold_policy_approved"] is True
+    assert approved_result["hardware_evidence"] is False
+    assert approved_result["authority"]["live_authority_granted"] is False
+    assert approved_result["authority"]["readiness_closure_allowed"] is False
+    assert approved_result["summary"]["covered_threshold_axes"] == list(
+        REQUIRED_THRESHOLD_AXES
+    )
+
+    blocked_result = evaluate_quality_threshold_policy_contract(
+        {
+            "policy_id": "blocked-quality-thresholds",
+            "offline_only": True,
+            "live_write": True,
+            "contacts_wing": True,
+            "contacts_backend": True,
+            "hardware_evidence": True,
+            "readiness_closure_allowed": True,
+            "live_authority_granted": True,
+            "policy_checks": {"baseline_dataset_bound": True},
+            "threshold_policy": {"status": "PENDING_APPROVAL"},
+            "thresholds": [complete_threshold("objective_audio_metrics")],
+        }
+    )
+    assert blocked_result["ready_for_owner_review"] is False
+    assert "quality_threshold_policy_forbids_live_write" in blocked_result["blockers"]
+    assert "quality_threshold_policy_forbids_wing_contact" in blocked_result["blockers"]
+    assert "threshold_policy_evidence_cannot_grant_live_authority" in blocked_result[
+        "blockers"
+    ]
+    assert "missing_threshold_axis:reference_mix_comparison" in blocked_result[
+        "blockers"
+    ]
+
+    assert REQUIRED_THRESHOLD_AXES == REQUIRED_QUALITY_AXES
+    assert "Candidate threshold policies must be evidence-bound and owner-approved" in completion
+    assert "Unvalidated candidates cannot alter live concert behavior" in safety
+    assert "M014-CP01" in plan
+    assert "M014-CP02" in plan
+    assert "Candidate threshold policy evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M014 quality threshold policy contract is now covered" in current
+    assert "M014 quality threshold policy contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
