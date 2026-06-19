@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T08:43:47Z
+Generated: 2026-06-19T08:54:33Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `b0c71460 Limit sequence memory scope to WING boundary`
+  `d84b4a63 Limit product state sequence policy scope`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -48,7 +48,7 @@ Generated: 2026-06-19T08:43:47Z
   WING report/executor/monitor surfaces to the supervised deployment boundary:
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
   `bb5816d4`, `192d6bff`, `ce0d3d00`, `7796d28a`, `b0c9fc00`, and
-  `12ee8214`, and `b0c71460`.
+  `12ee8214`, `b0c71460`, and `d84b4a63`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -76,6 +76,10 @@ Generated: 2026-06-19T08:43:47Z
 - Supervised sequence policy memory index and trust-review validators now use
   the same WING deployment `fader`/`gain` boundary, so forged or append-only
   `pan` sequence memory cannot enter current fader/gain sequence review.
+- Operator-facing product-state sequence plan, dry-run, memory-draft and
+  memory-writer validators now use the active safety surface, so WING blocks
+  `pan` sequence-policy evidence while non-WING/future surfaces can still keep
+  the broader current-proven scope.
 
 ## Unresolved unknowns
 
@@ -85,5 +89,5 @@ Generated: 2026-06-19T08:43:47Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `b0c71460` passed with
-  `4042 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `d84b4a63` passed with
+  `4044 passed, 1 skipped, 1 warning`.
