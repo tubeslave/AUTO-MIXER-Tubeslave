@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import re
 import sys
 from pathlib import Path
@@ -15,6 +16,8 @@ CORRECTION_BACKLOG = PROJECT_ROOT / ".ai" / "project-layer" / "correction_method
 READONLY_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_READONLY_PREFLIGHT.md"
 SUPERVISED_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_SUPERVISED_FADER_GAIN_PROOF.md"
 DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
+CURRENT_STATE_DOC = PROJECT_ROOT / "Docs" / "CURRENT_STATE.md"
+AUTOPILOT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
 RUNNER_TOOL = PROJECT_ROOT / "tools" / "wing_readonly_preflight_runner.py"
 PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
@@ -240,6 +243,40 @@ def test_progress_baseline_covers_runner_verifier_checks():
         - covered_verifier_checks(progress.CURRENT_FIRST_COMMAND_BASELINE_COVERAGE_MARKERS)
     )
     assert missing_checks == []
+
+
+def test_current_state_doc_matches_autopilot_state_evidence():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    summary = state["last_validation_summary"]
+    authority = summary["authority"]
+    text = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+
+    latest_commit = re.search(
+        r"Latest verified product/runtime commit:\s*`([0-9a-f]+) ",
+        text,
+    )
+    assert latest_commit is not None
+    assert latest_commit.group(1) == state["last_verified_commit"]
+
+    latest_full_suite = re.search(
+        r"latest verified full-suite run for `([0-9a-f]+)` passed with\s*`([^`]+)`",
+        text,
+    )
+    assert latest_full_suite is not None
+    assert latest_full_suite.group(1) == state["last_verified_commit"]
+    assert summary["pytest"].rsplit(": ", 1)[-1] == latest_full_suite.group(2)
+
+    assert summary["no_wing_artifact"] in text
+    assert "tools/verify_no_wing_artifact_manifest.py" in text
+    assert "failed_checks: []" in text
+
+    for flag in ("live_authority_granted", "contacts_wing", "contacts_backend"):
+        expected = f"{flag}: {str(authority[flag]).lower()}"
+        assert expected in text
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert re.search(r"waiting for external\s+WING/operator validation", text)
+    assert "No real hardware evidence was produced" in text
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

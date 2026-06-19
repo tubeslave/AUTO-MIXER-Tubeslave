@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T14:00:59Z
+Generated: 2026-06-19T14:11:46Z
 
 ## Repository snapshot
 
@@ -200,6 +200,12 @@ Generated: 2026-06-19T14:00:59Z
   passed `tools/verify_no_wing_artifact_manifest.py` with `failed_checks: []`,
   `contacts_wing: false`, `contacts_backend: false` and
   `live_authority_granted: false`.
+- Current-state freshness is now covered by
+  `tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence`.
+  The rail checks `Docs/CURRENT_STATE.md` against `ops/autopilot/STATE.json`
+  for the latest verified product/runtime commit, full-suite result, no-WING
+  artifact path, artifact-manifest verifier failure list, authority-denial
+  flags and external-validation wait state.
 
 ## Unresolved unknowns
 
@@ -210,4 +216,4 @@ Generated: 2026-06-19T14:00:59Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4065 passed, 1 skipped, 1 warning`.
+  `4066 passed, 1 skipped, 1 warning`.
