@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T09:25:23Z.
+- Latest heartbeat: 2026-06-19T09:34:06Z.
 
 ## Что сделано
 
@@ -67,6 +67,10 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   `accepted_decision_ready` until accepted source ids also have complete
   contact trace and expected-artifact trace evidence, including
   expected-artifact-bound accepted source ids.
+- `367e67bb` - WING read-only preflight decision review Markdown now also
+  lists the computed request-sequence, contact-trace and expected-artifact-trace
+  blockers in the `Blockers` section whenever accepted readiness is closed by
+  those missing traces.
 
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
@@ -115,6 +119,8 @@ grant live authority.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py::test_decision_review_report_blocks_without_contact_trace tests/test_wing_readonly_preflight_review_decision.py::test_decision_review_report_blocks_without_expected_artifact_trace -q`:
   `2 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py::test_decision_review_report_surfaces_request_sequence_contract tests/test_wing_readonly_preflight_review_decision.py::test_decision_review_report_blocks_without_contact_trace tests/test_wing_readonly_preflight_review_decision.py::test_decision_review_report_blocks_without_expected_artifact_trace -q`:
+  `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py -q`:
   `40 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision_tool.py -q`:
@@ -126,7 +132,7 @@ grant live authority.
 - `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
 - `python tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
-  `artifacts/no_wing_release_check/20260619T092338Z_no_wing_release_check`.
+  `artifacts/no_wing_release_check/20260619T093222Z_no_wing_release_check`.
 - Authority flags remained safe: no WING/backend contact, no live write, no
   readiness closure, no live authority.
 - CP04 handoff report:
@@ -145,7 +151,7 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `c35947b0` is the latest verified
+- Heartbeat reconciliation confirmed `367e67bb` is the latest verified
   product/runtime commit and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 

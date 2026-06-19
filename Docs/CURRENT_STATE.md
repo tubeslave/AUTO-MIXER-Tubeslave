@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T09:25:23Z
+Generated: 2026-06-19T09:34:06Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `c35947b0 Gate decision readiness on final traces`
+  `367e67bb Surface computed decision blockers`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -49,7 +49,7 @@ Generated: 2026-06-19T09:25:23Z
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
   `bb5816d4`, `192d6bff`, `ce0d3d00`, `7796d28a`, `b0c9fc00`, and
   `12ee8214`, `b0c71460`, `d84b4a63`, `7a616805`, `93e66009`, and
-  `c35947b0`.
+  `c35947b0`, and `367e67bb`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -93,6 +93,10 @@ Generated: 2026-06-19T09:25:23Z
   until accepted source ids have complete contact trace and expected-artifact
   trace evidence, including expected-artifact-bound source ids visible in JSON
   and Markdown.
+- The decision review Markdown `Blockers` section now also surfaces the
+  computed request-sequence, contact-trace and expected-artifact-trace blockers
+  that already keep accepted readiness closed, so operator-facing Markdown no
+  longer hides those computed blockers.
 
 ## Unresolved unknowns
 
@@ -102,5 +106,5 @@ Generated: 2026-06-19T09:25:23Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `c35947b0` passed with
+  but the latest verified full-suite run for `367e67bb` passed with
   `4047 passed, 1 skipped, 1 warning`.
