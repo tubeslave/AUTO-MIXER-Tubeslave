@@ -8207,6 +8207,65 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_request_seq
     ]
 
 
+def test_no_wing_release_check_blocks_wing_preflight_review_decision_stale_request_sequence_trace(
+    monkeypatch,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    stale_request_sequence = [{"type": "get_state"}]
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            source_id,
+            candidate_updates={
+                "request_sequence": stale_request_sequence,
+                "plan_request_sequence": stale_request_sequence,
+                "request_sequence_matches_plan": True,
+            },
+        ),
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert result.detail["accepted_candidate_request_sequence_contract_valid"] is True
+    assert result.detail["accepted_candidate_request_sequence_source_ids"] == [
+        source_id
+    ]
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source"
+        ][source_id]
+        == stale_request_sequence
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids"
+        ]
+        == [source_id]
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
+        ]
+        is False
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_request_sequence_blocker_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_request_sequence"
+        in result.detail["violations"]
+    )
+    assert summary_payload["accepted_candidate_request_sequence_contract_valid"] is True
+    assert summary_payload["accepted_candidate_request_sequence_source_ids"] == [
+        source_id
+    ]
+
+
 def test_no_wing_release_check_blocks_wing_preflight_review_decision_expected_summary_artifact_mismatch(
     monkeypatch,
 ):

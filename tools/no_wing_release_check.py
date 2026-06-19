@@ -3726,6 +3726,20 @@ def _mapping_list(value: Any) -> list[dict[str, Any]]:
     return [dict(item) for item in value if isinstance(item, Mapping)]
 
 
+def _expected_wing_readonly_preflight_request_sequence() -> list[dict[str, Any]]:
+    expected_channels = _csv_ints(WING_READONLY_PREFLIGHT_RUNNER_CHANNELS)
+    expected_value_types = _csv_strings(WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES)
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            _expected_wing_read_request(channel, value_type)
+            for channel in expected_channels
+            for value_type in expected_value_types
+        ],
+    ]
+
+
 def _mapping_list_map_exact(value: Any) -> tuple[dict[str, list[dict[str, Any]]], bool]:
     if not isinstance(value, Mapping):
         return {}, False
@@ -3869,11 +3883,18 @@ def _accepted_candidate_request_sequence_trace(
             continue
         request_sequence = _mapping_list(row.get("request_sequence"))
         plan_request_sequence = _mapping_list(row.get("plan_request_sequence"))
+        expected_request_sequence = _expected_wing_readonly_preflight_request_sequence()
         matches_plan = row.get("request_sequence_matches_plan") is True
         request_sequence_by_source[source_id] = request_sequence
         plan_request_sequence_by_source[source_id] = plan_request_sequence
         matches_plan_by_source[source_id] = matches_plan
-        if not request_sequence or not plan_request_sequence or not matches_plan:
+        if (
+            not request_sequence
+            or request_sequence != expected_request_sequence
+            or not plan_request_sequence
+            or plan_request_sequence != expected_request_sequence
+            or not matches_plan
+        ):
             missing_source_ids.append(source_id)
 
     return {
@@ -6202,15 +6223,7 @@ def validate_wing_readonly_preflight_plan_artifact_snapshot(
     expected_value_types = _csv_strings(command_value_after_flag(plan_command, "--value-types"))
     expected_artifact_root = command_value_after_flag(plan_command, "--artifact-root")
     expected_plan_output = command_value_after_flag(plan_command, "--plan-output")
-    expected_requests = [
-        {"type": "get_operator_mode"},
-        {"type": "get_state"},
-        *[
-            _expected_wing_read_request(channel, value_type)
-            for channel in expected_channels
-            for value_type in expected_value_types
-        ],
-    ]
+    expected_requests = _expected_wing_readonly_preflight_request_sequence()
 
     if load_error:
         violations.append(f"wing_readonly_preflight_plan_artifact_{load_error}")
@@ -9996,6 +10009,12 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         accepted_source_ids,
         [item for item in candidate_reviews if isinstance(item, Mapping)],
     )
+    accepted_candidate_request_sequence_trace = (
+        _accepted_candidate_request_sequence_trace(
+            accepted_source_ids,
+            [item for item in candidate_reviews if isinstance(item, Mapping)],
+        )
+    )
     accepted_candidate_expected_artifact_trace = (
         _accepted_candidate_expected_artifact_trace(
             accepted_source_ids,
@@ -10005,6 +10024,12 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     accepted_candidate_contact_trace_complete = (
         accepted_candidate_contact_trace[
             "readonly_preflight_review_decision_accepted_candidate_contact_trace_complete"
+        ]
+        is True
+    )
+    accepted_candidate_request_sequence_trace_complete = (
+        accepted_candidate_request_sequence_trace[
+            "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete"
         ]
         is True
     )
@@ -10100,7 +10125,10 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
             violations.append(
                 "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_verifier_ws_proof"
             )
-    if accepted_source_ids and not accepted_candidate_request_sequence_contract_valid:
+    if accepted_source_ids and (
+        not accepted_candidate_request_sequence_contract_valid
+        or not accepted_candidate_request_sequence_trace_complete
+    ):
         if WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER not in blocked_by:
             violations.append(
                 "wing_readonly_preflight_review_decision_request_sequence_blocker_missing"
@@ -10203,6 +10231,7 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     detail["accepted_candidate_request_sequence_contract_violations_by_source"] = (
         accepted_candidate_request_sequence_contract_violations_by_source
     )
+    detail.update(accepted_candidate_request_sequence_trace)
     detail.update(accepted_candidate_contact_trace)
     detail.update(accepted_candidate_expected_artifact_trace)
     detail["rejected_source_ids"] = (
