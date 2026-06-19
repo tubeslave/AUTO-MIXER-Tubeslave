@@ -798,6 +798,107 @@ def test_decision_review_report_surfaces_request_sequence_contract(monkeypatch):
     assert "plan_request_sequence_missing" in markdown
 
 
+def test_decision_review_report_blocks_without_contact_trace(monkeypatch):
+    evidence = _evidence_with_candidate()
+    evidence["artifacts"][0]["contacts_backend"] = False
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=evidence,
+        decision_records=[_accepted_record()],
+    )
+
+    monkeypatch.setattr(
+        decision_review_tool,
+        "build_wing_readonly_preflight_evidence",
+        lambda **kwargs: {"status": "readonly_preflight_candidate_available"},
+    )
+    monkeypatch.setattr(
+        decision_review_tool,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda **kwargs: ledger,
+    )
+
+    report = decision_review_tool.build_decision_review_report()
+    markdown = decision_review_tool.render_markdown(report)
+
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is True
+    assert report["status"] == "blocked"
+    assert report["manual_readiness_update_candidate_available"] is False
+    assert report["accepted_candidate_contact_trace_complete"] is False
+    assert report["accepted_candidate_contact_trace_source_ids"] == [
+        "inline_payload_0"
+    ]
+    assert report["accepted_candidate_contacts_backend_by_source"] == {
+        "inline_payload_0": False
+    }
+    assert report["accepted_candidate_queries_console_by_source"] == {
+        "inline_payload_0": True
+    }
+    assert report["accepted_candidate_contact_trace_missing_source_ids"] == [
+        "inline_payload_0"
+    ]
+    assert "valid accepted-candidate contact trace" in report[
+        "next_required_action"
+    ]
+    assert "accepted_candidate_contact_trace_complete: `false`" in markdown
+    assert '"inline_payload_0": false' in markdown
+
+
+def test_decision_review_report_blocks_without_expected_artifact_trace(
+    monkeypatch,
+):
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[_accepted_record()],
+    )
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is True
+    candidate_review = ledger["summary"]["candidate_reviews"][0]
+    candidate_review["expected_artifacts"] = []
+    candidate_review["expected_summary_artifact"] = ""
+    candidate_review["summary_path_matches_expected_artifact"] = False
+
+    monkeypatch.setattr(
+        decision_review_tool,
+        "build_wing_readonly_preflight_evidence",
+        lambda **kwargs: {"status": "readonly_preflight_candidate_available"},
+    )
+    monkeypatch.setattr(
+        decision_review_tool,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda **kwargs: ledger,
+    )
+
+    report = decision_review_tool.build_decision_review_report()
+    markdown = decision_review_tool.render_markdown(report)
+
+    assert report["status"] == "blocked"
+    assert report["manual_readiness_update_candidate_available"] is False
+    assert report["accepted_candidate_contact_trace_complete"] is True
+    assert report["accepted_candidate_expected_artifact_trace_complete"] is False
+    assert report["accepted_candidate_expected_artifact_trace_source_ids"] == [
+        "inline_payload_0"
+    ]
+    assert report[
+        "accepted_candidate_expected_artifact_trace_missing_source_ids"
+    ] == ["inline_payload_0"]
+    assert report["accepted_candidate_expected_artifacts_by_source"] == {
+        "inline_payload_0": []
+    }
+    assert report[
+        "accepted_candidate_summary_path_matches_expected_artifact_by_source"
+    ] == {"inline_payload_0": False}
+    assert "valid accepted-candidate expected-artifact trace" in report[
+        "next_required_action"
+    ]
+    assert "expected-artifact-bound accepted source id" in report[
+        "next_required_action"
+    ]
+    assert (
+        "accepted_candidate_expected_artifact_trace_complete: `false`"
+        in markdown
+    )
+    assert "expected-artifact-bound accepted source id" in markdown
+
+
 def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contract():
     evidence = _evidence_with_candidate()
     evidence["artifacts"][0]["backend_port_prestart_check_required"] = False

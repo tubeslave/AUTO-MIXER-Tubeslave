@@ -531,6 +531,22 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
         str(summary_path.parent.parent)
     ]
     assert report["accepted_candidate_artifact_root_contract_violations_by_source"] == {}
+    assert report["accepted_candidate_contact_trace_complete"] is True
+    assert report["accepted_candidate_contact_trace_source_ids"] == [str(summary_path)]
+    assert report["accepted_candidate_contacts_backend_by_source"] == {
+        str(summary_path): True
+    }
+    assert report["accepted_candidate_queries_console_by_source"] == {
+        str(summary_path): True
+    }
+    assert report["accepted_candidate_contact_trace_missing_source_ids"] == []
+    assert report["accepted_candidate_expected_artifact_trace_complete"] is True
+    assert report["accepted_candidate_expected_artifact_trace_source_ids"] == [
+        str(summary_path)
+    ]
+    assert report[
+        "accepted_candidate_expected_artifact_trace_missing_source_ids"
+    ] == []
     summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
     candidate_review = report["candidate_reviews"][0]
     assert candidate_review["artifact_root"] == str(summary_path.parent.parent)
@@ -576,6 +592,8 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert "accepted_candidate_verifier_ws_proof_violations_by_source: `{}`" in markdown
     assert "accepted_candidate_artifact_root_contract_valid: `true`" in markdown
     assert "accepted_candidate_artifact_root_contract_violations_by_source: `{}`" in markdown
+    assert "accepted_candidate_contact_trace_complete: `true`" in markdown
+    assert "accepted_candidate_expected_artifact_trace_complete: `true`" in markdown
     assert "live_authority_granted: `false`" in markdown
     assert "source_authority_denied: `true`" in markdown
     assert (
@@ -668,7 +686,18 @@ def test_decision_review_report_requires_strict_source_authority_denial(monkeypa
                 "duplicate_source_ids": [],
                 "conflicting_source_ids": [],
                 "unreviewed_candidate_source_ids": [],
-                "candidate_reviews": [],
+                "candidate_reviews": [
+                    {
+                        "source_id": "source-a",
+                        "expected_artifacts": ["summary.json", "events.jsonl"],
+                        "expected_summary_artifact": "summary.json",
+                        "expected_events_artifact": "events.jsonl",
+                        "summary_path_matches_expected_artifact": True,
+                        "events_path_matches_expected_artifact": True,
+                        "contacts_backend": True,
+                        "queries_console": True,
+                    }
+                ],
                 "required_checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
                 "operator_review_required": True,
                 "source_authority_denied": True,
