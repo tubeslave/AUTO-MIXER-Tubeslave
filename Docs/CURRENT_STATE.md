@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T18:04:16Z
+Generated: 2026-06-19T18:14:26Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T18:04:16Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `e19382c2 Add recovery policy contract gate`
+  `9a83e5fe Bind fault recovery to policy contract`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -398,6 +398,18 @@ Generated: 2026-06-19T18:04:16Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so fault recovery policy
   binding cannot become hardware proof or live readiness.
+- M018 integration policy contract is now covered by
+  `tests/test_integration_policy_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m018_integration_policy_contract_stays_owner_approved_and_offline`.
+  The new `backend/integration_policy_contract.py` module validates that
+  candidate integration policies bind analysis trace, offline replay,
+  fault-recovery, safety-kernel, operator-report, reproducibility,
+  cross-scenario consistency and no-live-transport controls to integration
+  evidence, while keeping owner approval separate from candidate-review
+  readiness before reporting integration-policy use readiness. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so integration policy
+  evidence cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -408,4 +420,4 @@ Generated: 2026-06-19T18:04:16Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4113 passed, 1 skipped, 1 warning`.
+  `4119 passed, 1 skipped, 1 warning`.

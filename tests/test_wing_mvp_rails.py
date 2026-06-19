@@ -16,6 +16,11 @@ from backend.fault_injection_recovery_contract import (
     REQUIRED_RECOVERY_OUTCOMES,
     evaluate_fault_injection_recovery_contract,
 )
+from backend.integration_policy_contract import (
+    REQUIRED_INTEGRATION_CONTROLS as POLICY_REQUIRED_INTEGRATION_CONTROLS,
+    REQUIRED_INTEGRATION_EVIDENCE as POLICY_REQUIRED_INTEGRATION_EVIDENCE,
+    evaluate_integration_policy_contract,
+)
 from backend.offline_replay_evaluation_contract import (
     REQUIRED_EVALUATION_TYPES,
     REQUIRED_QUALITY_AXES,
@@ -69,6 +74,8 @@ M016_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M016-recovery-policy-contract.md"
 M016_ADR = PROJECT_ROOT / "Docs" / "adr" / "recovery-policy-contract-20260619.md"
 M017_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M017-fault-recovery-policy-binding.md"
 M017_ADR = PROJECT_ROOT / "Docs" / "adr" / "fault-recovery-policy-binding-20260619.md"
+M018_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M018-integration-policy-contract.md"
+M018_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-policy-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -2732,6 +2739,148 @@ def test_m017_fault_recovery_policy_binding_requires_m016_manifest():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M017 fault recovery policy binding is now covered" in current
     assert "M017 fault recovery policy binding rail is now automated" in report
+
+
+def test_m018_integration_policy_contract_stays_owner_approved_and_offline():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    safety = SAFETY_CONTRACT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M018_PLAN.read_text(encoding="utf-8")
+    adr = M018_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m018 = markdown_table_row(roadmap, "M018")
+    assert m018[1] == "Integration policy contract"
+    assert m018[2] == (
+        "Candidate integration policies are complete, evidence-bound and "
+        "owner-approved before offline integration promotion"
+    )
+    assert m018[3] == "M013-M017"
+    assert m018[4] == "high offline"
+    assert (
+        m018[5]
+        == "SPECIFIED to UNIT_VERIFIED for integration-policy gate; owner approval remains required"
+    )
+    assert m018[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/integration_policy_contract.py`" in memory_eval[2]
+    assert "tests/test_integration_policy_contract.py" in memory_eval[3]
+    assert "integration policy evidence cannot grant live authority" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    candidate_result = evaluate_integration_policy_contract(
+        {
+            "policy_id": "candidate-integration-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_controls": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+            },
+            "integration_evidence": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+            },
+            "integration_policy": {"status": "candidate"},
+        }
+    )
+    assert candidate_result["ready_for_owner_review"] is True
+    assert candidate_result["ready_for_integration_policy_use"] is False
+    assert candidate_result["authority"]["live_authority_granted"] is False
+    assert candidate_result["authority"]["readiness_closure_allowed"] is False
+    assert candidate_result["review_blockers"] == []
+    assert candidate_result["blockers"] == [
+        "owner_approved_integration_policy_required"
+    ]
+
+    approved_result = evaluate_integration_policy_contract(
+        {
+            "policy_id": "approved-integration-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_controls": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+            },
+            "integration_evidence": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+            },
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-policy",
+                "approved_at": "2026-06-19T18:10:23Z",
+            },
+        }
+    )
+    assert approved_result["ready_for_integration_policy_use"] is True
+    assert approved_result["integration_policy_approved"] is True
+    assert approved_result["hardware_evidence"] is False
+    assert approved_result["authority"]["live_authority_granted"] is False
+    assert approved_result["authority"]["readiness_closure_allowed"] is False
+    assert approved_result["summary"]["missing_integration_controls"] == []
+    assert approved_result["summary"]["missing_integration_evidence"] == []
+
+    blocked_result = evaluate_integration_policy_contract(
+        {
+            "policy_id": "blocked-integration-policy",
+            "offline_only": True,
+            "live_write": True,
+            "contacts_wing": True,
+            "contacts_backend": True,
+            "hardware_evidence": True,
+            "readiness_closure_allowed": True,
+            "live_authority_granted": True,
+            "integration_controls": {"analysis_trace_policy": True},
+            "integration_evidence": {"analysis_trace_bound": True},
+            "integration_policy": {"status": "PENDING_APPROVAL"},
+        }
+    )
+    assert blocked_result["ready_for_owner_review"] is False
+    assert "integration_policy_forbids_live_write" in blocked_result["blockers"]
+    assert "integration_policy_forbids_wing_contact" in blocked_result["blockers"]
+    assert "integration_policy_evidence_cannot_grant_live_authority" in blocked_result[
+        "blockers"
+    ]
+    assert "missing_integration_control:offline_replay_binding_policy" in blocked_result[
+        "blockers"
+    ]
+
+    assert "Integration policy candidates must be evidence-bound and owner-approved" in completion
+    assert "Unvalidated candidates cannot alter live concert behavior" in safety
+    assert "M018-CP01" in plan
+    assert "M018-CP02" in plan
+    assert "Candidate integration policy evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M018 integration policy contract is now covered" in current
+    assert "M018 integration policy contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -60,6 +60,11 @@ Fault-recovery manifests must consume the recovery policy contract result
 instead of loose recovery_policy status fields before claiming simulator
 fault-recovery promotion readiness.
 
+Integration policy candidates must be evidence-bound and owner-approved before
+they can be used for offline integration promotion. Complete candidate
+integration policy evidence alone cannot grant live authority, close readiness,
+replace child replay/fault-recovery evidence, or replace hardware validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
