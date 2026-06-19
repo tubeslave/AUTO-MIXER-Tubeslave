@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T15:48:14Z
+Generated: 2026-06-19T16:00:42Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T15:48:14Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `0bde10c1 Guard emergency timeout proof gate`
+  `1b1802ef Guard readiness update proof gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -279,6 +279,15 @@ Generated: 2026-06-19T15:48:14Z
   report-only, readiness rows do not close from missing/offline evidence, and
   the backend readiness overlay continues to deny live authority and Full
   Autonomous readiness.
+- Offline capability promotion framework entry is now covered by
+  `tests/test_wing_mvp_rails.py::test_m007_offline_promotion_framework_stays_replay_bound_before_live_expansion`.
+  The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/CAPABILITY_MATRIX.md`, `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+  `Docs/PROJECT_COMPLETION_GATE.md`, `backend/autonomy_promotion_readiness.py`
+  and `ops/autopilot/LAST_REPORT.md` so M007 remains pending behind M001-M006,
+  long-term processing families stay replay/fault/evaluation-bound before
+  live expansion, non-fader/gain live expansion still requires separate ADR
+  plus hardware, and Full Autonomous remains locked behind completion gates.
 
 ## Unresolved unknowns
 
@@ -289,4 +298,4 @@ Generated: 2026-06-19T15:48:14Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4075 passed, 1 skipped, 1 warning`.
+  `4076 passed, 1 skipped, 1 warning`.

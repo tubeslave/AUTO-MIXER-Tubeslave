@@ -952,6 +952,135 @@ def test_m006_readiness_update_stays_report_only_until_real_m002_m005_proof():
     assert "readiness/operator evidence update gate rail is now automated" in report
 
 
+def test_m007_offline_promotion_framework_stays_replay_bound_before_live_expansion():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+
+    m007 = markdown_table_row(roadmap, "M007")
+    m008 = markdown_table_row(roadmap, "M008")
+    m009 = markdown_table_row(roadmap, "M009")
+    m010 = markdown_table_row(roadmap, "M010")
+    assert m007[1] == "Offline capability promotion framework"
+    assert m007[2] == (
+        "Long-term processing families have replay/fault/evaluation gates before any live expansion"
+    )
+    assert m007[3] == "M001-M006"
+    assert m007[4] == "high offline"
+    assert m007[5] == "PROTOTYPE/UNIT_VERIFIED to REPLAY_VERIFIED"
+    assert m007[-1] == "PENDING"
+    assert m008[3] == "M007"
+    assert m008[-1] == "PENDING"
+    assert m009[2] == "A separately approved ADR widens supervised live writes one family at a time"
+    assert m009[3] == "M006-M008 plus hardware"
+    assert m009[4] == "critical live write"
+    assert m009[-1] == "PENDING_APPROVAL"
+    assert m010[5] == "AUTONOMOUS_ELIGIBLE only if all gates pass"
+    assert m010[-1] == "PENDING_APPROVAL"
+
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "full_autonomous_ready": False,
+        "supervised_only": True,
+    }
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert set(snapshot["summary"]["global_blockers"]) >= {
+        "mode_full_autonomous_blocked",
+        "only_supervised_fader_gain_executor_is_registered",
+        "read_coverage_is_partial_or_missing",
+        "real_wing_and_emergency_stop_proof_incomplete",
+    }
+    assert snapshot["summary"]["next_global_step"] == (
+        "Run proof gates per action family before widening supervised or autonomous live writes."
+    )
+
+    replay_bound_capabilities = {
+        "Assisted Mixing Mode": ("INTEGRATION_VERIFIED", "replay accepted/rejected proposals", "none"),
+        "Full Autonomous Mixing Mode": ("NOT_STARTED", "completion gate review", "none"),
+        "Multichannel audio analysis": (
+            "UNIT_VERIFIED",
+            "replay and simulator validation",
+            "UNKNOWN",
+        ),
+        "Source and instrument classification": ("UNIT_VERIFIED", "replay calibration gate", "none"),
+        "Arrangement-role detection": ("PROTOTYPE", "replay accepted role decisions", "none"),
+        "Mix balance": ("PROTOTYPE", "replay bus/stem validation", "none"),
+        "EQ": ("PROTOTYPE", "assisted replay gate", "none"),
+        "Compression": ("PROTOTYPE", "replay and safety audit", "none"),
+        "Gating": ("PROTOTYPE", "replay and fault injection", "none"),
+        "Panning": ("PROTOTYPE", "assisted replay only", "none"),
+        "Frequency separation": ("PROTOTYPE", "replay validation", "none"),
+        "Cross-channel unmasking": ("PROTOTYPE", "replay/fault validation", "none"),
+        "Effects and sends": ("PROTOTYPE", "assisted replay", "none"),
+        "Master-bus processing": ("PROTOTYPE", "offline and listening gate", "none"),
+        "Adaptive live mixing": ("SPECIFIED", "simulator and supervised staged proof", "none"),
+        "Long-term memory and evaluation": ("PROTOTYPE", "lint plus replay promotion", "none"),
+    }
+    for capability_name, (evidence_level, next_gate, hardware_evidence) in replay_bound_capabilities.items():
+        row = markdown_table_row(capability, capability_name)
+        assert row[1] == evidence_level
+        assert row[7] == next_gate
+        assert row[8] == hardware_evidence
+
+    assert "Replay, mock and simulator evidence must not be labeled as hardware evidence." in capability
+    assert "Proposal-only, not apply authority" in markdown_table_row(
+        capability, "Arrangement-role detection"
+    )[4]
+    assert "Live EQ writes forbidden" in markdown_table_row(capability, "EQ")[4]
+    assert "Live FX writes forbidden" in markdown_table_row(capability, "Effects and sends")[4]
+    assert "No autonomous live authority" in markdown_table_row(
+        capability, "Adaptive live mixing"
+    )[4]
+    assert "Memory cannot mutate console directly" in markdown_table_row(
+        capability, "Long-term memory and evaluation"
+    )[4]
+
+    live_forbidden_console_categories = {
+        "Pan": "no for WING MVP",
+        "EQ / HPF": "no",
+        "Compressor / dynamics": "no",
+        "Gate / expander": "no",
+        "FX sends / returns": "no",
+        "Routing / patch": "no",
+        "Scenes / snapshots / presets": "no",
+    }
+    for console_category, supervised_live_state in live_forbidden_console_categories.items():
+        row = markdown_table_row(console, console_category)
+        assert row[3] == "no"
+        assert row[4] == supervised_live_state
+        assert row[6] == "none"
+
+    assert markdown_table_row(console, "Rate limits / bounds / allowlists")[3] == "docs/tests only"
+    assert markdown_table_row(console, "Rate limits / bounds / allowlists")[4] == "required"
+    assert markdown_table_row(console, "Rate limits / bounds / allowlists")[5] == (
+        "fault-injection validation"
+    )
+
+    assert "offline, replay," in completion
+    assert "fault-injection и integration evaluations" in completion
+    assert "High-risk console actions прошли staged real-hardware testing" in completion
+    assert "PENDING_APPROVAL" in completion
+    assert "Offline, shadow, replay, mock и simulator evidence не являются hardware proof." in goal
+    assert "EQ, compressor, gate, routing, mute, FX, scenes, matrices, DCA" in goal
+    assert "Full Autonomous Mixing Mode не может быть объявлен готовым" in goal
+
+    assert "Offline capability promotion framework entry is now covered" in current
+    assert "M007 offline capability promotion framework rail is now automated" in report
+
+
 def test_mvp_doc_declares_scope_and_stop_rules():
     text = MVP_DOC.read_text(encoding="utf-8")
 
