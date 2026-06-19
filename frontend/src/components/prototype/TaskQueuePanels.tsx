@@ -407,6 +407,7 @@ function SupervisedApplyModal({
   ui,
   evidence,
   applyPlan,
+  integrationBundleBlockerNotice,
   onClose,
   onConfirm
 }: {
@@ -414,6 +415,7 @@ function SupervisedApplyModal({
   ui: UiState;
   evidence: SafetyEvidenceItem[];
   applyPlan: ApplyPlanStep[];
+  integrationBundleBlockerNotice: string;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -447,6 +449,11 @@ function SupervisedApplyModal({
           </div>
           <StatusBadge tone={approvalTone}>{approvalLabel}</StatusBadge>
         </div>
+        {integrationBundleBlockerNotice && (
+          <div className="mb-3 rounded-[7px] border border-danger/35 bg-danger/10 px-3 py-2 text-[10px] leading-4 text-danger">
+            {integrationBundleBlockerNotice}
+          </div>
+        )}
         <div className="grid grid-cols-[1.05fr_0.95fr] gap-3">
           <div className="space-y-3">
             <div className="rounded-[7px] border border-line bg-row p-3">
@@ -561,6 +568,9 @@ export function TaskQueueWorkspace({
   const taskQueueBlockerNotice = blockedReasonMessages.length > 0 && taskRows.length > 0
     ? `Promotion planning blocked. Task Queue evidence remains review-only: ${blockedReasonMessages[0]}`
     : '';
+  const supervisedApplyBlockerNotice = blockedReasonMessages.length > 0 && modalTask
+    ? `Promotion planning blocked. Supervised apply remains blocked: ${blockedReasonMessages[0]}`
+    : '';
 
   return (
     <div className="relative grid h-full grid-rows-[auto_1fr_118px] gap-2">
@@ -639,6 +649,7 @@ export function TaskQueueWorkspace({
         <SupervisedApplyModal
           applyPlan={modalApplyPlan}
           evidence={modalEvidence}
+          integrationBundleBlockerNotice={supervisedApplyBlockerNotice}
           onClose={actions.closeSupervisedProposal}
           onConfirm={() => actions.confirmSupervisedApply(modalTask.id)}
           task={modalTask}

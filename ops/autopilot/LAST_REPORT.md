@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T21:19:50Z.
+- Latest heartbeat: 2026-06-19T22:27:01Z.
 
 ## Что сделано
 
@@ -686,7 +686,34 @@ live authority, close readiness, contact WING/backend, mark Full Autonomous
 ready, apply to console, hide review-only evidence rows, or replace accepted
 real hardware/operator validation.
 
+The M036 Supervised Apply integration bundle blocker notice rail is now automated
+by `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m036_supervised_apply_modal_shows_integration_bundle_blocker_notice`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the modal notice through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M036-supervised-apply-integration-bundle-blocker-notice.md`,
+`Docs/adr/supervised-apply-integration-bundle-blocker-notice-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The Supervised Apply modal now renders
+`Promotion planning blocked. Supervised apply remains blocked` when a modal
+task and Director blocked-reason messages are both visible. Existing apply gate
+labels remain governed by their current UI/backend status, no queue mutation is
+introduced, and modal-notice-visible integration bundle status cannot queue
+proposals, grant live authority, close readiness, contact WING/backend, mark
+Full Autonomous ready, apply to console, hide review-only evidence rows, bypass
+apply gates, or replace accepted real hardware/operator validation.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `52 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m036_supervised_apply_modal_shows_integration_bundle_blocker_notice -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `49 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4162 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `51 passed`.

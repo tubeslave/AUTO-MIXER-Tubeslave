@@ -129,6 +129,8 @@ M034_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M034-director-suggestions-integra
 M034_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-suggestions-integration-bundle-blocker-notice-20260619.md"
 M035_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M035-task-queue-integration-bundle-blocker-notice.md"
 M035_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-integration-bundle-blocker-notice-20260619.md"
+M036_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M036-supervised-apply-integration-bundle-blocker-notice.md"
+M036_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-integration-bundle-blocker-notice-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -4991,6 +4993,75 @@ def test_m035_task_queue_shows_integration_bundle_blocker_notice():
         current
     )
     assert "M035 Task Queue integration bundle blocker notice rail is now automated" in (
+        report
+    )
+
+
+def test_m036_supervised_apply_modal_shows_integration_bundle_blocker_notice():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M036_PLAN.read_text(encoding="utf-8")
+    adr = M036_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m036 = markdown_table_row(roadmap, "M036")
+    assert m036[1] == "Supervised Apply integration bundle blocker notice"
+    assert m036[2] == (
+        "Supervised Apply modal shows a read-only integration bundle blocker "
+        "notice before supervised apply review"
+    )
+    assert m036[3] == "M035"
+    assert m036[4] == "high offline frontend"
+    assert m036[5] == "UNIT_VERIFIED read-only Supervised Apply notice; live authority remains blocked"
+    assert m036[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Supervised Apply modal now shows offline integration bundle blocker notices" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M036-CP01" in plan
+    assert "M036-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not queue proposals" in adr
+
+    assert "supervisedApplyBlockerNotice" in task_queue
+    assert "integrationBundleBlockerNotice" in task_queue
+    assert "Promotion planning blocked. Supervised apply remains blocked" in task_queue
+    assert "supervisedApplyBlockerNotice" in adapter_test
+    assert "integrationBundleBlockerNotice" in adapter_test
+    assert "Promotion planning blocked\\. Supervised apply remains blocked" in (
+        adapter_test
+    )
+    assert "Supervised Apply modals must render offline integration bundle" in (
+        completion
+    )
+    assert "M036 Supervised Apply integration bundle blocker notice is now covered" in (
+        current
+    )
+    assert "M036 Supervised Apply integration bundle blocker notice rail is now automated" in (
         report
     )
 

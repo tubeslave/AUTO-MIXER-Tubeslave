@@ -4356,6 +4356,19 @@ test('task queue renders integration bundle blocker as review-only notice', asyn
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply modal renders integration bundle blocker before apply review', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /supervisedApplyBlockerNotice/);
+  assert.match(source, /integrationBundleBlockerNotice/);
+  assert.match(source, /Promotion planning blocked\. Supervised apply remains blocked/);
+  assert.match(source, /directorBlockedReasonMessages\(runtime\.blockedReasons\)/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('dashboard mixer header uses the selected channel dynamically', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'),

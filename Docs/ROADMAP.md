@@ -59,6 +59,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M033 | Director queue integration bundle blocker badge | Director proposal queue badge shows blocked promotion planning when the offline integration bundle is blocked | M032 | high offline frontend | UNIT_VERIFIED read-only Director queue badge; live authority remains blocked | PENDING |
 | M034 | Director suggestions integration bundle blocker notice | Agent Suggestions panel shows a read-only integration bundle blocker notice while suggestions remain review-only | M033 | high offline frontend | UNIT_VERIFIED read-only Director suggestions notice; live authority remains blocked | PENDING |
 | M035 | Task Queue integration bundle blocker notice | Task Queue shows a read-only integration bundle blocker notice before proposal actions when promotion planning is blocked | M034 | high offline frontend | UNIT_VERIFIED read-only Task Queue notice; live authority remains blocked | PENDING |
+| M036 | Supervised Apply integration bundle blocker notice | Supervised Apply modal shows a read-only integration bundle blocker notice before supervised apply review | M035 | high offline frontend | UNIT_VERIFIED read-only Supervised Apply notice; live authority remains blocked | PENDING |
 
 ## Active milestone
 
