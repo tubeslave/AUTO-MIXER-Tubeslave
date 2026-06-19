@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T08:29:28Z.
+- Latest heartbeat: 2026-06-19T08:36:14Z.
 
 ## Что сделано
 
@@ -45,6 +45,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 - `b0c9fc00` - operator recommendation bridge cache-freshness gate now uses
   the WING deployment apply boundary, so future recommendation imports cannot
   treat `pan` as current WING apply scope.
+- `12ee8214` - shadow-only gain ride safety metadata now uses the WING
+  deployment apply boundary, so trace-only gain rides no longer advertise
+  `pan` as a current WING live-write kind.
 
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
@@ -73,16 +76,20 @@ grant live authority.
   `2 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_product_state.py -q -k "safe_gain_recommendation_bridge or soundcheck_recommendation_bridge"`:
   `4 passed, 151 deselected`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_shadow_gain_rides.py -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_product_state.py -q -k "shadow_gain_ride"`:
+  `3 passed, 152 deselected`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `430 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 tools/no_wing_release_check.py --quick`:
   passed.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4039 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4040 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
 - `python tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
-  `artifacts/no_wing_release_check/20260619T082730Z_no_wing_release_check`.
+  `artifacts/no_wing_release_check/20260619T083414Z_no_wing_release_check`.
 - Authority flags remained safe: no WING/backend contact, no live write, no
   readiness closure, no live authority.
 - CP04 handoff report:
@@ -101,7 +108,7 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `b0c9fc00` is the latest verified
+- Heartbeat reconciliation confirmed `12ee8214` is the latest verified
   product/runtime commit and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
