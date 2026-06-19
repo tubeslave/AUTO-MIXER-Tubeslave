@@ -24,11 +24,11 @@ except ImportError:  # pragma: no cover - package import compatibility
         build_operator_proposal_apply_sequence_policy_memory_index,
     )
 try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
-ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+SEQUENCE_MEMORY_REVIEW_VALUE_TYPES = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_REVIEW_METHOD_ID = (
@@ -237,7 +237,7 @@ def _index_record_violations(record: Mapping[str, Any]) -> Tuple[str, ...]:
         if not isinstance(record.get(field), str) or not record.get(field):
             violations.append(f"sequence_memory_trust_review_index_record_{field}_missing")
     value_type = str(record.get("value_type") or "").strip().lower()
-    if value_type not in ALLOWED_VALUE_TYPES:
+    if value_type not in SEQUENCE_MEMORY_REVIEW_VALUE_TYPES:
         violations.append("sequence_memory_trust_review_index_record_value_type_not_allowed")
     channel = record.get("channel")
     if isinstance(channel, bool) or not isinstance(channel, int) or channel < 1:

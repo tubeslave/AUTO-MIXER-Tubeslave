@@ -13,11 +13,11 @@ from pathlib import Path
 import re
 from typing import Any, Dict, List, Tuple
 try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
-ALLOWED_VALUE_TYPES = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+SEQUENCE_MEMORY_VALUE_TYPES = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
 
 OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_INDEX_METHOD_ID = (
@@ -139,7 +139,7 @@ def _parse_block(block: Tuple[str, ...], index: int) -> Tuple[Dict[str, Any], Tu
         violations.append("sequence_memory_index_record_draft_id_not_operator_sequence")
 
     value_type = fields.get("value_type", "").strip().lower()
-    if value_type not in ALLOWED_VALUE_TYPES:
+    if value_type not in SEQUENCE_MEMORY_VALUE_TYPES:
         violations.append("sequence_memory_index_record_value_type_not_allowed")
     channel = _coerce_int(fields.get("channel", ""))
     if channel is None or channel < 1:

@@ -12,7 +12,7 @@ from backend.processing_registry import (
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
-def _memory_text(*, effective_value: str = "-8.5") -> str:
+def _memory_text(*, effective_value: str = "-8.5", value_type: str = "fader") -> str:
     return "\n".join(
         [
             "# Project Memory",
@@ -28,7 +28,7 @@ def _memory_text(*, effective_value: str = "-8.5") -> str:
             ),
             "- Proposal ID: `memory-write-applied`",
             "- Learning scope: `supervised_fader_gain_sequence_execution`",
-            "- Value type: `fader`",
+            f"- Value type: `{value_type}`",
             "- Channel: `2`",
             f"- Effective value: `{effective_value}`",
             "- Idempotency key: `memory-write:memory-write-applied`",
@@ -134,6 +134,18 @@ def test_sequence_policy_memory_index_rejects_malformed_or_unsafe_memory_blocks(
     assert "sequence_memory_index_record_fader_ceiling_exceeded" in invalid
     assert "sequence_memory_index_record_runtime_authority_missing" in invalid
     assert "sequence_memory_index_record_runtime_authority_unsafe" in invalid
+
+
+def test_sequence_policy_memory_index_rejects_pan_outside_wing_sequence_boundary():
+    index = build_operator_proposal_apply_sequence_policy_memory_index(
+        memory_text=_memory_text(value_type="pan", effective_value="0.0"),
+    )
+
+    assert index["status"] == "sequence_memory_index_replacement_required"
+    assert index["summary"]["memory_record_count"] == 0
+    assert "sequence_memory_index_record_value_type_not_allowed" in index["summary"][
+        "invalid_record_ids"
+    ]
 
 
 def test_sequence_policy_memory_index_rejects_unapproved_target_path(tmp_path):
