@@ -27364,6 +27364,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['full_autonomous_ready']).lower()}`",
                 "- next_manual_artifact_required: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['next_manual_artifact_required']}`",
+                "- expected_next_manual_artifact_required: "
+                f"`{summary['expected_next_manual_artifact_required']}`",
+                "- next_manual_artifact_required_matches_contract: "
+                f"`{str(summary['next_manual_artifact_required_matches_contract']).lower()}`",
                 "- wing_readonly_packet_safety_boundary_summary_surface_required: "
                 f"`{str(summary['wing_readonly_packet_safety_boundary_summary_surface_required']).lower()}`",
                 "- wing_readonly_packet_safety_boundary_summary_surface_readiness_closure_allowed: "
@@ -27550,6 +27554,10 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(summary['wing_readonly_operator_sequence_list_markdown_surface_missing_field_lines'])}`",
                 "- wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered: "
                 f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_field_lines_rendered']).lower()}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_value_mismatches: "
+                f"`{json.dumps(summary['wing_readonly_operator_sequence_list_markdown_surface_value_mismatches'])}`",
+                "- wing_readonly_operator_sequence_list_markdown_surface_values_match_contract: "
+                f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_values_match_contract']).lower()}`",
                 "- wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed: "
                 f"`{str(summary['wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed']).lower()}`",
                 "- wing_readonly_operator_sequence_list_markdown_surface_live_authority_granted: "
@@ -27668,8 +27676,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_matches_current_first_open']).lower()}`",
                 "- mvp_blocker_anchor_sha256: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_sha256']}`",
+                "- actual_mvp_blocker_anchor_sha256: "
+                f"`{summary['actual_mvp_blocker_anchor_sha256']}`",
                 "- expected_mvp_blocker_anchor_sha256: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['expected_mvp_blocker_anchor_sha256']}`",
+                "- mvp_blocker_anchor_sha256_matches_anchor: "
+                f"`{str(summary['mvp_blocker_anchor_sha256_matches_anchor']).lower()}`",
                 "- mvp_blocker_anchor_sha256_matches_current_first_open: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['mvp_blocker_anchor_sha256_matches_current_first_open']).lower()}`",
                 "- mvp_blocker_anchor: "
@@ -27832,10 +27844,16 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields'])}`",
                 "- expected_required_supervised_proof_plan_summary_fields: "
                 f"`{json.dumps(wing_readonly_preflight_handoff_packet_artifact['expected_required_supervised_proof_plan_summary_fields'])}`",
+                "- declared_expected_required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(summary['declared_expected_required_supervised_proof_plan_summary_fields'])}`",
                 "- required_supervised_proof_plan_summary_fields_match_contract: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields_match_contract']).lower()}`",
                 "- required_supervised_proof_plan_summary_fields_include_invalid_records: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['required_supervised_proof_plan_summary_fields_include_invalid_records']).lower()}`",
+                "- declared_required_supervised_proof_plan_summary_fields_match_contract: "
+                f"`{str(summary['declared_required_supervised_proof_plan_summary_fields_match_contract']).lower()}`",
+                "- declared_required_supervised_proof_plan_summary_fields_include_invalid_records: "
+                f"`{str(summary['declared_required_supervised_proof_plan_summary_fields_include_invalid_records']).lower()}`",
                 "- wing_readonly_supervised_proof_plan_fields_summary_surface_required: "
                 f"`{str(summary['wing_readonly_supervised_proof_plan_fields_summary_surface_required']).lower()}`",
                 "- wing_readonly_supervised_proof_plan_fields_summary_surface_readiness_closure_allowed: "
@@ -29736,8 +29754,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{next_plan['readonly_preflight_review_decision_unreviewed_candidate_count']}`",
                 "- required_supervised_proof_plan_summary_fields: "
                 f"`{json.dumps(next_plan['required_supervised_proof_plan_summary_fields'])}`",
+                "- next_wing_proof_plan_required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(summary['next_wing_proof_plan_required_supervised_proof_plan_summary_fields'])}`",
+                "- expected_next_wing_proof_plan_required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(summary['expected_next_wing_proof_plan_required_supervised_proof_plan_summary_fields'])}`",
+                "- next_wing_proof_plan_required_supervised_proof_plan_summary_fields_match_contract: "
+                f"`{str(summary['next_wing_proof_plan_required_supervised_proof_plan_summary_fields_match_contract']).lower()}`",
                 "- missing_required_supervised_proof_plan_summary_fields: "
                 f"`{json.dumps(next_plan['missing_required_supervised_proof_plan_summary_fields'])}`",
+                "- next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields: "
+                f"`{json.dumps(summary['next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields'])}`",
+                "- next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields_empty: "
+                f"`{str(summary['next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields_empty']).lower()}`",
                 "- next_wing_proof_plan_required_fields_summary_surface_required: "
                 f"`{str(summary['next_wing_proof_plan_required_fields_summary_surface_required']).lower()}`",
                 "- next_wing_proof_plan_required_fields_summary_surface_readiness_closure_allowed: "

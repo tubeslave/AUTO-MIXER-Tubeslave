@@ -16950,8 +16950,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
             "expected_required_supervised_proof_plan_summary_fields": list(
                 WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
             ),
+            "declared_expected_required_supervised_proof_plan_summary_fields": list(
+                WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS
+            ),
             "required_supervised_proof_plan_summary_fields_match_contract": True,
             "required_supervised_proof_plan_summary_fields_include_invalid_records": True,
+            "declared_required_supervised_proof_plan_summary_fields_match_contract": True,
+            "declared_required_supervised_proof_plan_summary_fields_include_invalid_records": True,
             "violations": [],
         },
     )
@@ -18884,6 +18889,14 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         in markdown_summary
     )
     assert (
+        "wing_readonly_operator_sequence_list_markdown_surface_value_mismatches: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "wing_readonly_operator_sequence_list_markdown_surface_values_match_contract: `true`"
+        in markdown_summary
+    )
+    assert (
         "wing_readonly_operator_sequence_list_markdown_surface_readiness_closure_allowed: `false`"
         in markdown_summary
     )
@@ -18996,6 +19009,13 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "next_manual_artifact_required: "
         f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
     ) in markdown_summary
+    assert (
+        "expected_next_manual_artifact_required: "
+        f"`{WING_READONLY_PREFLIGHT_NEXT_MANUAL_ARTIFACT_REQUIRED}`"
+    ) in markdown_summary
+    assert "next_manual_artifact_required_matches_contract: `true`" in (
+        markdown_summary
+    )
     for field_name, expected_value in (
         ("wing_readonly_packet_safety_boundary_summary_surface_required", "true"),
         (
@@ -19140,6 +19160,8 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
         "mvp_blocker_anchor_matches_current_first_open: `true`"
         in markdown_summary
     )
+    assert "actual_mvp_blocker_anchor_sha256: `" in markdown_summary
+    assert "mvp_blocker_anchor_sha256_matches_anchor: `true`" in markdown_summary
     assert (
         "mvp_blocker_anchor_packet_does_not_close_blocker: `true`"
         in markdown_summary
@@ -19387,6 +19409,17 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert (
         "required_supervised_proof_plan_summary_fields_include_invalid_records: `true`"
+        in markdown_summary
+    )
+    assert "declared_expected_required_supervised_proof_plan_summary_fields" in (
+        markdown_summary
+    )
+    assert (
+        "declared_required_supervised_proof_plan_summary_fields_match_contract: `true`"
+        in markdown_summary
+    )
+    assert (
+        "declared_required_supervised_proof_plan_summary_fields_include_invalid_records: `true`"
         in markdown_summary
     )
     assert "readonly_preflight_review_decision_invalid_records" in markdown_summary
@@ -24693,7 +24726,27 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     assert "readonly_preflight_review_decision_invalid_records: `[]`" in markdown_summary
     assert "readonly_preflight_review_decision_duplicate_source_ids: `[]`" in markdown_summary
     assert "required_supervised_proof_plan_summary_fields" in markdown_summary
+    assert (
+        "next_wing_proof_plan_required_supervised_proof_plan_summary_fields"
+        in markdown_summary
+    )
+    assert (
+        "expected_next_wing_proof_plan_required_supervised_proof_plan_summary_fields"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_required_supervised_proof_plan_summary_fields_match_contract: `true`"
+        in markdown_summary
+    )
     assert "missing_required_supervised_proof_plan_summary_fields: `[]`" in markdown_summary
+    assert (
+        "next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields: `[]`"
+        in markdown_summary
+    )
+    assert (
+        "next_wing_proof_plan_missing_required_supervised_proof_plan_summary_fields_empty: `true`"
+        in markdown_summary
+    )
     assert (
         "next_wing_proof_plan_required_fields_summary_surface_required: `true`"
         in markdown_summary
