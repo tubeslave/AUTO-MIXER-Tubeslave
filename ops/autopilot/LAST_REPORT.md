@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T20:08:21Z.
+- Latest heartbeat: 2026-06-19T20:30:09Z.
 
 ## Что сделано
 
@@ -523,8 +523,36 @@ integration evidence removes only that planning blocker. It still reports no
 hardware proof, no live write, no readiness closure, no Full Autonomous
 readiness and no live authority.
 
+The M027 operator adapter integration bundle readiness summary rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m027_operator_adapter_surfaces_integration_bundle_readiness_summary`.
+It updates `frontend/src/services/operatorAdapters.ts` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M027-operator-adapter-integration-bundle-readiness-summary.md`,
+`Docs/adr/operator-adapter-integration-bundle-readiness-summary-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The operator-facing
+`autonomy_promotion_summary` row now consumes M026
+`summary.offline_integration_bundle` and renders `integration_bundle_ready:*`,
+`integration_bundle_status:*`,
+`integration_bundle_source_authority_denied:*`,
+`integration_bundle_blocker:*`, `integration_bundle_missing_check:*` and child
+contract status tags. The summary row stays read-only with
+`canWriteLive: false` and `liveWriteKinds: []`, so frontend-visible
+integration bundle readiness cannot grant live authority, close readiness,
+contact WING/backend, mark Full Autonomous ready, or replace accepted real
+hardware/operator validation.
+
 ## Проверка
 
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `47 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m027_operator_adapter_surfaces_integration_bundle_readiness_summary -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `40 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4152 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_autonomy_promotion_readiness.py -q`:
   `18 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m026_autonomy_readiness_consumes_integration_bundle_status -q`:
@@ -532,7 +560,7 @@ readiness and no live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
   `39 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4151 passed, 1 skipped, 1 warning`.
+  `4152 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
   `11 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_report_contract.py -q`:

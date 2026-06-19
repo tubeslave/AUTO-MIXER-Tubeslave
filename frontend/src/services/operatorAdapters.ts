@@ -806,9 +806,28 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
   const readiness = asRecord(data.autonomy_promotion_readiness);
   const readinessSummary = asRecord(readiness.summary);
   const gapSummary = asRecord(readinessSummary.promotion_gap_summary);
+  const offlineIntegrationBundle = asRecord(readinessSummary.offline_integration_bundle);
   const modeGate = asRecord(data.autonomy_mode_transition_gate);
   const autonomyPromotionFullAutonomousReady = Boolean(readinessSummary.autonomy_promotion_full_autonomous_ready);
   const autonomyModeTransitionFullAutonomousReady = Boolean(readinessSummary.autonomy_mode_transition_full_autonomous_ready);
+  const offlineIntegrationBundleReady = Boolean(
+    offlineIntegrationBundle.ready_for_integration_promotion,
+  );
+  const offlineIntegrationBundleStatus = str(offlineIntegrationBundle.status);
+  const offlineIntegrationBundleBlockers = stringList(offlineIntegrationBundle.blockers);
+  const offlineIntegrationBundleMissingChecks = stringList(
+    offlineIntegrationBundle.missing_integration_checks,
+  );
+  const offlineIntegrationBundleChildStatuses = Object.entries(
+    asRecord(offlineIntegrationBundle.child_contract_statuses),
+  )
+    .map(([contract, status]) => (
+      contract
+        ? `integration_bundle_child_status:${contract}:${str(status, 'unknown')}`
+        : ''
+    ))
+    .filter(Boolean);
+  const hasOfflineIntegrationBundleSignals = Object.keys(offlineIntegrationBundle).length > 0;
   const autonomyPromotionSupervisedLiveAllowedTargetCount = Math.trunc(
     num(readinessSummary.autonomy_promotion_supervised_live_allowed_target_count, 0),
   );
@@ -838,6 +857,12 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
     || autonomyModeTransitionGateLiveApplyAllowedModes.length > 0
     || autonomyModeTransitionGateSupervisedCurrentLiveWriteKinds.length > 0
     || autonomyModeTransitionGateSupervisedCurrentLiveWriteSurfaces.length > 0
+    || hasOfflineIntegrationBundleSignals
+  );
+  const autonomyReadinessSummaryReady = (
+    autonomyPromotionFullAutonomousReady
+    && autonomyModeTransitionFullAutonomousReady
+    && (!hasOfflineIntegrationBundleSignals || offlineIntegrationBundleReady)
   );
   const modeGateRows: ModuleStatusRecord[] = asArray(modeGate.rows).map(row => {
     const mode = str(row.mode, 'unknown_mode');
@@ -931,7 +956,7 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
       moduleId: 'autonomy_promotion_summary',
       label: 'Autonomy readiness summary',
       domain: 'autonomy_promotion_summary',
-      status: autonomyPromotionFullAutonomousReady && autonomyModeTransitionFullAutonomousReady
+      status: autonomyReadinessSummaryReady
         ? 'available'
         : 'blocked',
       entrypoint: 'main_pipeline_preview.summary',
@@ -952,16 +977,49 @@ export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[]
         ...autonomyModeTransitionGateSupervisedCurrentLiveWriteSurfaces.map(
           surface => `supervised_current_live_write_surface:${surface}`,
         ),
+        ...(
+          hasOfflineIntegrationBundleSignals
+            ? [
+              `integration_bundle_ready:${offlineIntegrationBundleReady}`,
+              `integration_bundle_status:${offlineIntegrationBundleStatus || 'unknown'}`,
+              `integration_bundle_source_authority_denied:${Boolean(
+                offlineIntegrationBundle.source_authority_denied,
+              )}`,
+            ]
+            : []
+        ),
+        ...offlineIntegrationBundleBlockers.map(
+          blocker => `integration_bundle_blocker:${blocker}`,
+        ),
+        ...offlineIntegrationBundleMissingChecks.map(
+          check => `integration_bundle_missing_check:${check}`,
+        ),
+        ...offlineIntegrationBundleChildStatuses,
       ],
-      blockedReason: autonomyPromotionFullAutonomousReady && autonomyModeTransitionFullAutonomousReady
+      blockedReason: autonomyReadinessSummaryReady
         ? 'No outstanding autonomy readiness blockers.'
-        : `Mode transition full autonomous ready: ${autonomyModeTransitionFullAutonomousReady}; Promotion full autonomous ready: ${autonomyPromotionFullAutonomousReady}`,
+        : [
+          `Mode transition full autonomous ready: ${autonomyModeTransitionFullAutonomousReady}`,
+          `Promotion full autonomous ready: ${autonomyPromotionFullAutonomousReady}`,
+          hasOfflineIntegrationBundleSignals
+            ? `Offline integration bundle ready: ${offlineIntegrationBundleReady}`
+            : '',
+          offlineIntegrationBundleBlockers.length
+            ? `Integration bundle blockers: ${offlineIntegrationBundleBlockers.join(', ')}`
+            : '',
+        ].filter(Boolean).join('; '),
       nextStep: [
         `supervised_live_allowed_target_count:${autonomyPromotionSupervisedLiveAllowedTargetCount}`,
         `blocked_target_count:${autonomyPromotionBlockedTargetCount}`,
         ...autonomyModeTransitionGateBlockedModes.map(mode => `blocked_transition_mode:${mode}`),
+        ...(hasOfflineIntegrationBundleSignals
+          ? [`integration_bundle_status:${offlineIntegrationBundleStatus || 'unknown'}`]
+          : []),
+        ...offlineIntegrationBundleBlockers.map(
+          blocker => `integration_bundle_blocker:${blocker}`,
+        ),
       ].join(' / '),
-      tone: autonomyPromotionFullAutonomousReady && autonomyModeTransitionFullAutonomousReady ? 'green' : 'red'
+      tone: autonomyReadinessSummaryReady ? 'green' : 'red'
     }]
     : [];
 

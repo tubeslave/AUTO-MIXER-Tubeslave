@@ -111,6 +111,17 @@ M025_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M025-operator-report-binding.md"
 M025_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-report-binding-20260619.md"
 M026_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M026-autonomy-readiness-integration-bundle-overlay.md"
 M026_ADR = PROJECT_ROOT / "Docs" / "adr" / "autonomy-readiness-integration-bundle-overlay-20260619.md"
+M027_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M027-operator-adapter-integration-bundle-readiness-summary.md"
+M027_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-adapter-integration-bundle-readiness-summary-20260619.md"
+FRONTEND_OPERATOR_ADAPTER = PROJECT_ROOT / "frontend" / "src" / "services" / "operatorAdapters.ts"
+FRONTEND_OPERATOR_ADAPTER_TEST = (
+    PROJECT_ROOT
+    / "frontend"
+    / "src"
+    / "services"
+    / "__tests__"
+    / "operatorAdaptersContract.test.mjs"
+)
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -4280,6 +4291,81 @@ def test_m026_autonomy_readiness_consumes_integration_bundle_status():
         current
     )
     assert "M026 autonomy readiness integration-bundle overlay rail is now automated" in (
+        report
+    )
+
+
+def test_m027_operator_adapter_surfaces_integration_bundle_readiness_summary():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M027_PLAN.read_text(encoding="utf-8")
+    adr = M027_ADR.read_text(encoding="utf-8")
+    adapter = FRONTEND_OPERATOR_ADAPTER.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m027 = markdown_table_row(roadmap, "M027")
+    assert m027[1] == "Operator adapter integration bundle readiness summary"
+    assert m027[2] == (
+        "Operator-facing module status rows surface offline integration bundle "
+        "readiness, blockers and authority-denial status from autonomy promotion readiness"
+    )
+    assert m027[3] == "M026"
+    assert m027[4] == "high offline frontend"
+    assert m027[5] == "UNIT_VERIFIED read-only operator surface; live authority remains blocked"
+    assert m027[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`frontend/src/services/operatorAdapters.ts`" in memory_eval[2]
+    assert "npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs" in (
+        memory_eval[3]
+    )
+    assert "operator-facing adapter summary now surfaces offline integration bundle readiness" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "summary.offline_integration_bundle" in plan
+    assert "M027-CP01" in plan
+    assert "M027-CP02" in plan
+    assert "cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "It keeps `canWriteLive: false` and `liveWriteKinds: []`." in adr
+
+    assert "offlineIntegrationBundle" in adapter
+    assert "integration_bundle_ready:" in adapter
+    assert "integration_bundle_status:" in adapter
+    assert "integration_bundle_source_authority_denied:" in adapter
+    assert "integration_bundle_blocker:" in adapter
+    assert "integration_bundle_missing_check:" in adapter
+    assert "integration_bundle_child_status:" in adapter
+    assert "offline_integration_bundle_contract_not_ready" in adapter_test
+    assert "integration_bundle_source_authority_denied:true" in adapter_test
+    assert "Operator-facing module status adapters must surface offline integration bundle" in (
+        completion
+    )
+    assert "M027 operator adapter integration bundle readiness summary is now covered" in (
+        current
+    )
+    assert "M027 operator adapter integration bundle readiness summary rail is now automated" in (
         report
     )
 

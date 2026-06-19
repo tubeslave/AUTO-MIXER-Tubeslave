@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T20:08:21Z
+Generated: 2026-06-19T20:30:09Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T20:08:21Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `dbea76a6 Bind operator report into integration bundle`
+  `19dce7dd Bind integration bundle to autonomy readiness`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -513,6 +513,19 @@ Generated: 2026-06-19T20:08:21Z
   `live_write: false`, `hardware_evidence: false` and
   `full_autonomous_ready: false`, so autonomy readiness cannot become hardware
   proof or live readiness.
+- M027 operator adapter integration bundle readiness summary is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m027_operator_adapter_surfaces_integration_bundle_readiness_summary`.
+  The updated `frontend/src/services/operatorAdapters.ts` module now surfaces
+  `summary.offline_integration_bundle` from autonomy promotion readiness in the
+  operator-facing `autonomy_promotion_summary` row as
+  `integration_bundle_ready:*`, `integration_bundle_status:*`,
+  `integration_bundle_source_authority_denied:*`,
+  `integration_bundle_blocker:*`, `integration_bundle_missing_check:*` and
+  child contract status tags. It keeps `canWriteLive: false` and
+  `liveWriteKinds: []`, so frontend-visible integration bundle status cannot
+  grant live authority, close readiness, contact WING/backend, mark Full
+  Autonomous ready, or replace real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -523,4 +536,4 @@ Generated: 2026-06-19T20:08:21Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4151 passed, 1 skipped, 1 warning`.
+  `4152 passed, 1 skipped, 1 warning`.

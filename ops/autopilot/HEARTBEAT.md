@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T20:08:21Z
+Last heartbeat UTC: 2026-06-19T20:30:09Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,25 +12,24 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M026 autonomy readiness integration-bundle overlay is now guarded
-by `tests/test_autonomy_promotion_readiness.py` and
-`tests/test_wing_mvp_rails.py::test_m026_autonomy_readiness_consumes_integration_bundle_status`.
-The updated `backend/autonomy_promotion_readiness.py` snapshot now consumes an
-optional `offline_integration_bundle_manifest` through the M013-M025
-integration bundle contract before treating offline integration evidence as
-promotion-planning input. Missing or blocked bundle evidence surfaces
-`offline_integration_bundle_contract_not_ready`; passing offline integration
-evidence removes only that planning blocker. The overlay keeps
-`live_authority_granted: false`, `readiness_closure_allowed: false`,
-`live_write: false`, `hardware_evidence: false` and
-`full_autonomous_ready: false`.
-Targeted validation passed with `18 passed` and `1 passed`; the full rail file
-passed with `39 passed`; the full suite passed with
-`4151 passed, 1 skipped, 1 warning`.
-The fresh no-WING bundle remains
-`artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`;
-the detached verifier passed with `failed_checks: []`, top-level coverage
-JSON/Markdown checks true, `contacts_wing: false`, `contacts_backend: false`
-and `live_authority_granted: false`. This heartbeat made no product/runtime
-change to live console authority. M001 still has no real WING read-only artifact under
+Latest check: M027 operator adapter integration bundle readiness summary now
+surfaces the M026 `summary.offline_integration_bundle` readiness overlay in
+the operator-facing `autonomy_promotion_summary` module status row.
+The updated `frontend/src/services/operatorAdapters.ts` adapter reports
+`integration_bundle_ready:*`, `integration_bundle_status:*`,
+`integration_bundle_source_authority_denied:*`,
+`integration_bundle_blocker:*`, `integration_bundle_missing_check:*` and child
+contract status tags while keeping `canWriteLive: false` and
+`liveWriteKinds: []`.
+
+Targeted frontend validation passed with `47 passed`; frontend build passed;
+the M027 rail passed with `1 passed`; the full rail file passed with
+`40 passed`; and the full suite passed with
+`4152 passed, 1 skipped, 1 warning`.
+
+This heartbeat made no product/runtime
+change to live console authority. No WING/backend contact was made. No
+OSC/websocket transport was opened. No live write, readiness closure, live
+authority grant, hardware evidence or Full Autonomous readiness was produced.
+M001 still has no real WING read-only artifact under
 `artifacts/wing_readonly_preflight/`.

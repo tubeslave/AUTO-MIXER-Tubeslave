@@ -104,6 +104,12 @@ promotion-planning input. Passing offline integration evidence alone cannot
 grant live authority, close readiness, mark Full Autonomous ready, or replace
 real hardware, listening, expert, owner, rollback or emergency-stop proof.
 
+Operator-facing module status adapters must surface offline integration bundle
+readiness, blockers and authority-denial status as read-only evidence only.
+Frontend-visible integration bundle readiness cannot grant live authority,
+close readiness, contact WING/backend, mark Full Autonomous ready, or replace
+accepted real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

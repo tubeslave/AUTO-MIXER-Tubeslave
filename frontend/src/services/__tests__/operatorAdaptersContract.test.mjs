@@ -470,6 +470,17 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
         autonomy_mode_transition_gate_live_apply_allowed_modes: ['supervised'],
         autonomy_mode_transition_gate_supervised_current_live_write_kinds: ['fader'],
         autonomy_mode_transition_gate_supervised_current_live_write_surfaces: ['preamp', 'trim', 'fader'],
+        offline_integration_bundle: {
+          ready_for_integration_promotion: false,
+          status: 'blocked',
+          source_authority_denied: true,
+          blockers: ['offline_integration_bundle_contract_not_ready'],
+          missing_integration_checks: ['operator_report_bound'],
+          child_contract_statuses: {
+            replay_evaluation: 'ready',
+            fault_recovery: 'blocked',
+          },
+        },
         promotion_gap_summary: {
           read_only: true,
           live_write: false,
@@ -1657,14 +1668,21 @@ test('adaptModuleStatusRecords appends read-only write surface inventory rows', 
     'supervised_current_live_write_surface:preamp',
     'supervised_current_live_write_surface:trim',
     'supervised_current_live_write_surface:fader',
+    'integration_bundle_ready:false',
+    'integration_bundle_status:blocked',
+    'integration_bundle_source_authority_denied:true',
+    'integration_bundle_blocker:offline_integration_bundle_contract_not_ready',
+    'integration_bundle_missing_check:operator_report_bound',
+    'integration_bundle_child_status:replay_evaluation:ready',
+    'integration_bundle_child_status:fault_recovery:blocked',
   ]);
   assert.equal(
     autonomySummary.blockedReason,
-    'Mode transition full autonomous ready: true; Promotion full autonomous ready: false',
+    'Mode transition full autonomous ready: true; Promotion full autonomous ready: false; Offline integration bundle ready: false; Integration bundle blockers: offline_integration_bundle_contract_not_ready',
   );
   assert.equal(
     autonomySummary.nextStep,
-    'supervised_live_allowed_target_count:2 / blocked_target_count:4 / blocked_transition_mode:analyze',
+    'supervised_live_allowed_target_count:2 / blocked_target_count:4 / blocked_transition_mode:analyze / integration_bundle_status:blocked / integration_bundle_blocker:offline_integration_bundle_contract_not_ready',
   );
 
   const proofEvidence = rows.find(row => row.moduleId === 'supervised_proof_evidence');
