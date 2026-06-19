@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T09:54:10Z
+Generated: 2026-06-19T10:07:31Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `e1e31ee0 Gate verifier proof review blockers`
+  `ffddb646 Gate request sequence source matches`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -49,7 +49,7 @@ Generated: 2026-06-19T09:54:10Z
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
   `bb5816d4`, `192d6bff`, `ce0d3d00`, `7796d28a`, `b0c9fc00`, and
   `12ee8214`, `b0c71460`, `d84b4a63`, `7a616805`, `93e66009`, and
-  `c35947b0`, `367e67bb`, `bd4e6ef0`, and `e1e31ee0`.
+  `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, and `ffddb646`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -103,6 +103,10 @@ Generated: 2026-06-19T09:54:10Z
 - The no-WING release gate now also independently checks that accepted review
   candidates missing artifact-manifest verifier WebSocket proof expose the
   matching blocker before any readiness candidate can proceed.
+- The no-WING release gate now also fails accepted review candidates whose
+  request-sequence contract claims validity for source ids that do not exactly
+  match the accepted source ids, blocking stale or cross-bound source traces
+  from supporting readiness.
 
 ## Unresolved unknowns
 
@@ -112,5 +116,5 @@ Generated: 2026-06-19T09:54:10Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `e1e31ee0` passed with
-  `4050 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `ffddb646` passed with
+  `4051 passed, 1 skipped, 1 warning`.
