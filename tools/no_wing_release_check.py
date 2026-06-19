@@ -10076,6 +10076,12 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
             violations.append(
                 "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_request_sequence"
             )
+    if accepted_candidate_request_sequence_contract_valid and (
+        accepted_candidate_request_sequence_source_ids != accepted_source_ids
+    ):
+        violations.append(
+            "wing_readonly_preflight_review_decision_request_sequence_sources_mismatch"
+        )
     if accepted_source_ids and not accepted_candidate_contact_trace_complete:
         if WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER not in blocked_by:
             violations.append(

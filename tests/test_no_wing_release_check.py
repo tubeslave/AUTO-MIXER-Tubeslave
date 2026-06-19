@@ -8131,6 +8131,44 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_request_seq
     )
 
 
+def test_no_wing_release_check_blocks_wing_preflight_review_decision_request_sequence_source_mismatch(
+    monkeypatch,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    stale_source_id = "artifacts/wing_readonly_preflight/stale/summary.json"
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            source_id,
+            summary_updates={
+                "accepted_candidate_request_sequence_contract_valid": True,
+                "accepted_candidate_request_sequence_source_ids": [stale_source_id],
+                "accepted_candidate_request_sequence_contract_violations_by_source": {},
+            },
+        ),
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert result.detail["accepted_source_ids"] == [source_id]
+    assert result.detail["accepted_candidate_request_sequence_contract_valid"] is True
+    assert result.detail["accepted_candidate_request_sequence_source_ids"] == [
+        stale_source_id
+    ]
+    assert (
+        "wing_readonly_preflight_review_decision_request_sequence_sources_mismatch"
+        in result.detail["violations"]
+    )
+    assert summary_payload["accepted_candidate_request_sequence_contract_valid"] is True
+    assert summary_payload["accepted_candidate_request_sequence_source_ids"] == [
+        stale_source_id
+    ]
+
+
 def test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace_candidates(
     monkeypatch,
 ):
