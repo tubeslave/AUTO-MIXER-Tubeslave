@@ -160,5 +160,24 @@ def test_current_artifact_shape_has_no_autonomous_or_automatic_update_path():
     assert set(snapshot["summary"]["blocked_evidence_row_ids"]) == {
         "fader_supervised_evidence",
         "gain_supervised_evidence",
-        "pan_supervised_evidence",
     }
+    assert [row["value_type"] for row in snapshot["rows"]] == ["fader", "gain"]
+
+
+def test_pan_artifacts_do_not_enter_current_wing_promotion_evidence():
+    snapshot = build_supervised_promotion_evidence_snapshot(
+        proof_report(
+            physical_candidate("physical-pan-proof", "pan"),
+            dry_run_ready("dry-gain-proof", "gain"),
+        )
+    )
+
+    rows = {row["value_type"]: row for row in snapshot["rows"]}
+    assert set(rows) == {"fader", "gain"}
+    assert snapshot["summary"]["row_count"] == 2
+    assert snapshot["summary"]["safety_row_review_candidate_ids"] == []
+    assert set(snapshot["summary"]["blocked_evidence_row_ids"]) == {
+        "fader_supervised_evidence",
+        "gain_supervised_evidence",
+    }
+    assert "pan_supervised_evidence" not in str(snapshot)
