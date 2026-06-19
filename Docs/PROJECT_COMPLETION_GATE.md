@@ -65,6 +65,10 @@ they can be used for offline integration promotion. Complete candidate
 integration policy evidence alone cannot grant live authority, close readiness,
 replace child replay/fault-recovery evidence, or replace hardware validation.
 
+Integration bundle manifests must consume the integration policy contract result
+instead of loose integration_policy status fields before claiming offline
+integration promotion readiness.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

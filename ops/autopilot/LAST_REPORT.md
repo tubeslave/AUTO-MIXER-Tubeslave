@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T16:41:18Z.
+- Latest heartbeat: 2026-06-19T18:30:55Z.
 
 ## Что сделано
 
@@ -401,6 +401,22 @@ usable for offline integration promotion until owner approval exists. It still
 reports no hardware proof, no live write, no readiness closure and no live
 authority.
 
+The M019 integration policy binding rail is now automated by
+`tests/test_evaluation_integration_bundle_contract.py`,
+`tests/test_integration_policy_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m019_integration_policy_binding_requires_m018_manifest`.
+It updates `backend/evaluation_integration_bundle_contract.py` and binds the
+change through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M019-integration-policy-binding.md`,
+`Docs/adr/integration-policy-binding-20260619.md`, `Docs/CURRENT_STATE.md`
+and this report. Offline integration promotion now consumes the M018
+`integration_policy_manifest`; loose legacy `integration_policy` status fields
+remain summary context only and cannot satisfy approved-integration-policy
+requirements. Integration bundles surface the same failure through the
+`integration_policy:` child prefix. It still reports no hardware proof, no live
+write, no readiness closure and no live authority.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -545,8 +561,12 @@ authority.
   `5 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m018_integration_policy_contract_stays_owner_approved_and_offline -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
+  `6 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m019_integration_policy_binding_requires_m018_manifest -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `31 passed`.
+  `32 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -558,7 +578,7 @@ authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4119 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4121 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING

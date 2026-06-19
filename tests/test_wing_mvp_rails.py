@@ -76,6 +76,8 @@ M017_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M017-fault-recovery-policy-bindin
 M017_ADR = PROJECT_ROOT / "Docs" / "adr" / "fault-recovery-policy-binding-20260619.md"
 M018_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M018-integration-policy-contract.md"
 M018_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-policy-contract-20260619.md"
+M019_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M019-integration-policy-binding.md"
+M019_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-policy-binding-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -1972,6 +1974,32 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
         manifest.update(overrides)
         return manifest
 
+    def complete_integration_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "complete-integration-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_controls": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+            },
+            "integration_evidence": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+            },
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-evaluation-policy",
+                "approved_at": "2026-06-19T18:10:23Z",
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
     pending_result = evaluate_integration_bundle_contract(
         {
             "manifest_id": "pending-integration-bundle",
@@ -1980,7 +2008,9 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "contacts_wing": False,
             "contacts_backend": False,
             "hardware_evidence": False,
-            "integration_policy": {"status": "PENDING_APPROVAL"},
+            "integration_policy_manifest": complete_integration_policy_manifest(
+                integration_policy={"status": "PENDING_APPROVAL"}
+            ),
             "integration_checks": {"analysis_trace_bound": True},
             "offline_replay_manifest": complete_replay_manifest(
                 quality_threshold_policy_manifest=complete_threshold_policy_manifest(
@@ -1997,6 +2027,11 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
     assert pending_result["authority"]["live_authority_granted"] is False
     assert pending_result["authority"]["readiness_closure_allowed"] is False
     assert "approved_integration_policy_required" in pending_result["blockers"]
+    assert "integration_policy_contract_not_ready" in pending_result["blockers"]
+    assert (
+        "integration_policy:owner_approved_integration_policy_required"
+        in pending_result["blockers"]
+    )
     assert "offline_replay_contract_not_ready" in pending_result["blockers"]
     assert "fault_recovery_contract_not_ready" in pending_result["blockers"]
     assert "offline_replay:approved_quality_threshold_policy_required" in pending_result[
@@ -2027,11 +2062,7 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "hardware_evidence": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
-            "integration_policy": {
-                "status": "approved",
-                "approved_by": "owner",
-                "approved_decision_id": "adr:integration-evaluation-policy",
-            },
+            "integration_policy_manifest": complete_integration_policy_manifest(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": complete_replay_manifest(),
             "fault_recovery_manifest": complete_fault_manifest(),
@@ -2290,6 +2321,32 @@ def test_m015_replay_threshold_policy_binding_requires_m014_manifest():
         manifest.update(overrides)
         return manifest
 
+    def integration_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "integration-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_controls": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+            },
+            "integration_evidence": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+            },
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-policy",
+                "approved_at": "2026-06-19T18:10:23Z",
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
     legacy_only_replay = {
         "manifest_id": "legacy-threshold-policy",
         "offline_only": True,
@@ -2346,11 +2403,7 @@ def test_m015_replay_threshold_policy_binding_requires_m014_manifest():
             "hardware_evidence": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
-            "integration_policy": {
-                "status": "approved",
-                "approved_by": "owner",
-                "approved_decision_id": "adr:integration-evaluation-policy",
-            },
+            "integration_policy_manifest": integration_policy_manifest(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": legacy_only_replay,
             "fault_recovery_manifest": {
@@ -2682,6 +2735,32 @@ def test_m017_fault_recovery_policy_binding_requires_m016_manifest():
         manifest.update(overrides)
         return manifest
 
+    def integration_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "integration-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_controls": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+            },
+            "integration_evidence": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+            },
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-policy",
+                "approved_at": "2026-06-19T18:10:23Z",
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
     integration_result = evaluate_integration_bundle_contract(
         {
             "manifest_id": "legacy-recovery-policy-integration-bundle",
@@ -2692,11 +2771,7 @@ def test_m017_fault_recovery_policy_binding_requires_m016_manifest():
             "hardware_evidence": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
-            "integration_policy": {
-                "status": "approved",
-                "approved_by": "owner",
-                "approved_decision_id": "adr:integration-evaluation-policy",
-            },
+            "integration_policy_manifest": integration_policy_manifest(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": {
                 "manifest_id": "bound-threshold-policy",
@@ -2881,6 +2956,256 @@ def test_m018_integration_policy_contract_stays_owner_approved_and_offline():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M018 integration policy contract is now covered" in current
     assert "M018 integration policy contract rail is now automated" in report
+
+
+def test_m019_integration_policy_binding_requires_m018_manifest():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M019_PLAN.read_text(encoding="utf-8")
+    adr = M019_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m019 = markdown_table_row(roadmap, "M019")
+    assert m019[1] == "Integration policy binding"
+    assert m019[2] == (
+        "Offline integration promotion consumes the integration policy contract "
+        "instead of loose integration_policy status fields"
+    )
+    assert m019[3] == "M013-M018"
+    assert m019[4] == "high offline"
+    assert m019[5] == "UNIT_VERIFIED gate binding; integration evidence remains pending"
+    assert m019[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "tests/test_evaluation_integration_bundle_contract.py" in memory_eval[3]
+    assert "integration promotion now requires a bound integration policy manifest" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    def complete_scenario(name: str) -> dict:
+        return {
+            "scenario": name,
+            "evaluation_types": list(REQUIRED_EVALUATION_TYPES),
+            "safety_checks": {key: True for key in REQUIRED_SAFETY_CHECKS},
+            "quality_axes": {
+                key: {"status": "passed", "artifact": f"{name}/{key}.json"}
+                for key in REQUIRED_QUALITY_AXES
+            },
+        }
+
+    def complete_threshold(axis: str) -> dict:
+        return {
+            "axis": axis,
+            "metric_name": f"{axis}_score",
+            "direction": "min",
+            "candidate_value": 0.8,
+            "evidence_artifact": f"thresholds/{axis}.json",
+            "rationale": f"Replay promotion threshold for {axis}",
+            "rollback_policy": f"Revert {axis} threshold on regression",
+        }
+
+    def threshold_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "offline-replay-threshold-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:offline-replay-thresholds",
+                "approved_at": "2026-06-19T17:32:45Z",
+            },
+            "thresholds": [complete_threshold(axis) for axis in REQUIRED_THRESHOLD_AXES],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    def replay_manifest() -> dict:
+        return {
+            "manifest_id": "bound-threshold-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "quality_threshold_policy_manifest": threshold_policy_manifest(),
+            "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
+        }
+
+    def complete_fault(name: str) -> dict:
+        return {
+            "fault_scenario": name,
+            "evaluation_types": list(RECOVERY_REQUIRED_EVALUATION_TYPES),
+            "recovery_outcomes": {key: True for key in REQUIRED_RECOVERY_OUTCOMES},
+            "audit": {key: f"{name}/{key}" for key in RECOVERY_REQUIRED_AUDIT_FIELDS},
+        }
+
+    def recovery_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "fault-recovery-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "recovery_controls": {key: True for key in POLICY_REQUIRED_RECOVERY_CONTROLS},
+            "recovery_evidence": {key: True for key in POLICY_REQUIRED_RECOVERY_EVIDENCE},
+            "recovery_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:fault-recovery-policy",
+                "approved_at": "2026-06-19T18:00:10Z",
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
+    def fault_manifest() -> dict:
+        return {
+            "manifest_id": "bound-recovery-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "recovery_policy_manifest": recovery_policy_manifest(),
+            "fault_scenarios": [
+                complete_fault(name) for name in RECOVERY_REQUIRED_FAULT_SCENARIOS
+            ],
+        }
+
+    def integration_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "integration-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_controls": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+            },
+            "integration_evidence": {
+                key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+            },
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-policy",
+                "approved_at": "2026-06-19T18:10:23Z",
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
+    def integration_bundle(**overrides) -> dict:
+        bundle = {
+            "manifest_id": "integration-policy-binding",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_policy_manifest": integration_policy_manifest(),
+            "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+            "offline_replay_manifest": replay_manifest(),
+            "fault_recovery_manifest": fault_manifest(),
+        }
+        bundle.update(overrides)
+        return bundle
+
+    legacy_result = evaluate_integration_bundle_contract(
+        integration_bundle(
+            integration_policy_manifest={},
+            integration_policy={
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:legacy-integration-policy",
+            },
+        )
+    )
+    assert legacy_result["ready_for_integration_evaluation_promotion"] is False
+    assert "approved_integration_policy_required" in legacy_result["blockers"]
+    assert "integration_policy_contract_not_ready" in legacy_result["blockers"]
+    assert "legacy_integration_policy_without_contract_manifest" in legacy_result[
+        "blockers"
+    ]
+    assert "integration_policy:offline_only_required" in legacy_result["blockers"]
+    assert legacy_result["summary"]["legacy_integration_policy_status"] == "approved"
+    assert legacy_result["summary"]["integration_policy_approved"] is False
+    assert legacy_result["authority"]["live_authority_granted"] is False
+
+    pending_manifest_result = evaluate_integration_bundle_contract(
+        integration_bundle(
+            integration_policy_manifest=integration_policy_manifest(
+                integration_policy={"status": "PENDING_APPROVAL"}
+            )
+        )
+    )
+    assert (
+        "integration_policy:owner_approved_integration_policy_required"
+        in pending_manifest_result["blockers"]
+    )
+    assert pending_manifest_result["child_results"]["integration_policy"][
+        "ready_for_owner_review"
+    ] is True
+    assert pending_manifest_result["child_results"]["integration_policy"][
+        "ready_for_integration_policy_use"
+    ] is False
+
+    bound_result = evaluate_integration_bundle_contract(integration_bundle())
+    assert bound_result["ready_for_integration_evaluation_promotion"] is True
+    assert bound_result["summary"]["integration_policy_contract_status"] == (
+        "ready_for_integration_policy_use"
+    )
+    assert bound_result["child_results"]["integration_policy"][
+        "ready_for_integration_policy_use"
+    ] is True
+    assert bound_result["authority"]["readiness_closure_allowed"] is False
+
+    assert "Integration bundle manifests must consume the integration policy contract result" in completion
+    assert "M019-CP01" in plan
+    assert "M019-CP02" in plan
+    assert "Legacy `integration_policy` fields without the M018 contract manifest" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M019 integration policy binding is now covered" in current
+    assert "M019 integration policy binding rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

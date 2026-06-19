@@ -10,6 +10,10 @@ from backend.fault_injection_recovery_contract import (
     REQUIRED_FAULT_SCENARIOS,
     REQUIRED_RECOVERY_OUTCOMES,
 )
+from backend.integration_policy_contract import (
+    REQUIRED_INTEGRATION_CONTROLS as POLICY_REQUIRED_INTEGRATION_CONTROLS,
+    REQUIRED_INTEGRATION_EVIDENCE as POLICY_REQUIRED_INTEGRATION_EVIDENCE,
+)
 from backend.offline_replay_evaluation_contract import (
     REQUIRED_EVALUATION_TYPES,
     REQUIRED_QUALITY_AXES,
@@ -139,6 +143,33 @@ def _fault_recovery_manifest(**overrides) -> dict:
     return manifest
 
 
+def _integration_policy_manifest(**overrides) -> dict:
+    manifest = {
+        "policy_id": "integration-policy-fixture",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "integration_controls": {
+            key: True for key in POLICY_REQUIRED_INTEGRATION_CONTROLS
+        },
+        "integration_evidence": {
+            key: True for key in POLICY_REQUIRED_INTEGRATION_EVIDENCE
+        },
+        "integration_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:integration-evaluation-policy",
+            "approved_at": "2026-06-19T18:10:23Z",
+        },
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def _complete_bundle(**overrides) -> dict:
     bundle = {
         "manifest_id": "integration-bundle-fixture",
@@ -149,11 +180,7 @@ def _complete_bundle(**overrides) -> dict:
         "hardware_evidence": False,
         "readiness_closure_allowed": False,
         "live_authority_granted": False,
-        "integration_policy": {
-            "status": "approved",
-            "approved_by": "owner",
-            "approved_decision_id": "adr:integration-evaluation-policy",
-        },
+        "integration_policy_manifest": _integration_policy_manifest(),
         "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
         "offline_replay_manifest": _offline_replay_manifest(),
         "fault_recovery_manifest": _fault_recovery_manifest(),
@@ -165,7 +192,9 @@ def _complete_bundle(**overrides) -> dict:
 def test_integration_bundle_blocks_incomplete_child_contracts_and_pending_policy():
     result = evaluate_integration_bundle_contract(
         _complete_bundle(
-            integration_policy={"status": "PENDING_APPROVAL"},
+            integration_policy_manifest=_integration_policy_manifest(
+                integration_policy={"status": "PENDING_APPROVAL"}
+            ),
             integration_checks={"analysis_trace_bound": True},
             offline_replay_manifest=_offline_replay_manifest(
                 quality_threshold_policy_manifest=_quality_threshold_policy_manifest(
@@ -184,6 +213,11 @@ def test_integration_bundle_blocks_incomplete_child_contracts_and_pending_policy
     assert result["authority"]["readiness_closure_allowed"] is False
     assert result["authority"]["live_authority_granted"] is False
     assert "approved_integration_policy_required" in result["blockers"]
+    assert "integration_policy_contract_not_ready" in result["blockers"]
+    assert (
+        "integration_policy:owner_approved_integration_policy_required"
+        in result["blockers"]
+    )
     assert "offline_replay_contract_not_ready" in result["blockers"]
     assert "fault_recovery_contract_not_ready" in result["blockers"]
     assert "offline_replay:approved_quality_threshold_policy_required" in result["blockers"]
@@ -219,8 +253,44 @@ def test_integration_bundle_accepts_complete_offline_bundle_without_live_authori
     assert result["summary"]["offline_replay_ready"] is True
     assert result["summary"]["fault_recovery_ready"] is True
     assert result["summary"]["integration_policy_approved"] is True
+    assert result["summary"]["integration_policy_contract_status"] == (
+        "ready_for_integration_policy_use"
+    )
+    assert (
+        result["child_results"]["integration_policy"][
+            "ready_for_integration_policy_use"
+        ]
+        is True
+    )
     assert result["summary"]["missing_integration_checks"] == []
     assert result["blockers"] == []
+
+
+def test_integration_bundle_requires_bound_integration_policy_manifest():
+    result = evaluate_integration_bundle_contract(
+        _complete_bundle(
+            integration_policy_manifest={},
+            integration_policy={
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:legacy-integration-policy",
+            },
+        )
+    )
+
+    assert result["status"] == "blocked"
+    assert result["ready_for_integration_evaluation_promotion"] is False
+    assert "approved_integration_policy_required" in result["blockers"]
+    assert "integration_policy_contract_not_ready" in result["blockers"]
+    assert "legacy_integration_policy_without_contract_manifest" in result[
+        "blockers"
+    ]
+    assert "integration_policy:offline_only_required" in result["blockers"]
+    assert result["summary"]["legacy_integration_policy_status"] == "approved"
+    assert result["summary"]["integration_policy_status"] == ""
+    assert result["summary"]["integration_policy_approved"] is False
+    assert result["child_results"]["integration_policy"]["status"] == "blocked"
+    assert result["authority"]["live_authority_granted"] is False
 
 
 def test_integration_bundle_rejects_live_or_hardware_claims():

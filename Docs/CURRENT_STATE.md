@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T18:14:26Z
+Generated: 2026-06-19T18:30:55Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T18:14:26Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `9a83e5fe Bind fault recovery to policy contract`
+  `36442eaa Add integration policy contract gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -410,6 +410,20 @@ Generated: 2026-06-19T18:14:26Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so integration policy
   evidence cannot become hardware proof or live readiness.
+- M019 integration policy binding is now covered by
+  `tests/test_evaluation_integration_bundle_contract.py`,
+  `tests/test_integration_policy_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m019_integration_policy_binding_requires_m018_manifest`.
+  The updated `backend/evaluation_integration_bundle_contract.py` module now
+  consumes `integration_policy_manifest` from M018 before reporting offline
+  integration promotion readiness. Legacy loose `integration_policy` status
+  fields remain visible as summary context, but cannot satisfy approved
+  integration-policy requirements without the bound M018 contract manifest.
+  Integration-policy contract failures surface through the
+  `integration_policy:` child prefix. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so integration policy
+  binding cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -420,4 +434,4 @@ Generated: 2026-06-19T18:14:26Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4119 passed, 1 skipped, 1 warning`.
+  `4121 passed, 1 skipped, 1 warning`.

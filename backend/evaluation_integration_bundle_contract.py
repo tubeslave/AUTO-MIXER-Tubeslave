@@ -60,6 +60,12 @@ def _policy_approved(policy: Mapping[str, Any]) -> bool:
     return status in {"approved", "owner_approved"} and bool(decision_id) and bool(owner)
 
 
+def _integration_policy_result(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    from backend.integration_policy_contract import evaluate_integration_policy_contract
+
+    return evaluate_integration_policy_contract(manifest)
+
+
 def _prefixed(prefix: str, blockers: Iterable[str]) -> List[str]:
     return [f"{prefix}:{blocker}" for blocker in blockers]
 
@@ -93,10 +99,25 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
     if claimed_live_authority:
         blockers.append("integration_bundle_evidence_cannot_grant_live_authority")
 
-    integration_policy = _as_mapping(manifest.get("integration_policy"))
-    integration_policy_approved = _policy_approved(integration_policy)
+    integration_policy_manifest = _as_mapping(manifest.get("integration_policy_manifest"))
+    integration_policy_result = _integration_policy_result(integration_policy_manifest)
+    integration_policy = _as_mapping(
+        integration_policy_manifest.get("integration_policy")
+    )
+    legacy_integration_policy = _as_mapping(manifest.get("integration_policy"))
+    legacy_integration_policy_approved = _policy_approved(legacy_integration_policy)
+    integration_policy_approved = integration_policy_result[
+        "ready_for_integration_policy_use"
+    ]
     if not integration_policy_approved:
         blockers.append("approved_integration_policy_required")
+        blockers.append("integration_policy_contract_not_ready")
+        blockers.extend(
+            f"integration_policy:{blocker}"
+            for blocker in integration_policy_result["blockers"]
+        )
+        if legacy_integration_policy_approved and not integration_policy_manifest:
+            blockers.append("legacy_integration_policy_without_contract_manifest")
 
     integration_checks = _as_mapping(manifest.get("integration_checks"))
     missing_integration_checks = [
@@ -145,11 +166,19 @@ def evaluate_integration_bundle_contract(manifest: Mapping[str, Any]) -> Dict[st
             "required_integration_checks": list(REQUIRED_INTEGRATION_CHECKS),
             "missing_integration_checks": missing_integration_checks,
             "integration_policy_status": str(integration_policy.get("status") or ""),
+            "legacy_integration_policy_status": str(
+                legacy_integration_policy.get("status") or ""
+            ),
             "integration_policy_approved": integration_policy_approved,
+            "integration_policy_contract_status": integration_policy_result["status"],
+            "integration_policy_ready_for_owner_review": integration_policy_result[
+                "ready_for_owner_review"
+            ],
         },
         "child_results": {
             "offline_replay": replay_result,
             "fault_recovery": fault_result,
+            "integration_policy": integration_policy_result,
         },
         "blockers": blocker_list,
     }
