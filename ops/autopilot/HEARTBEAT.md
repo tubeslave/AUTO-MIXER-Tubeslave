@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T12:40:32Z
+Last heartbeat UTC: 2026-06-19T12:50:36Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,9 +12,9 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: product/runtime commit `2f8bb432` is verified with post-M001
-no-WING proof-plan and Project Director summary-surface flag Markdown
-surfacing. The fresh no-WING bundle is
-`artifacts/no_wing_release_check/20260619T123953Z_no_wing_release_check`.
+Latest check: product/runtime commit `1ff17877` is verified with post-M001
+no-WING handoff sidecar and backend prestart contract Markdown surfacing. The
+fresh no-WING bundle is
+`artifacts/no_wing_release_check/20260619T124813Z_no_wing_release_check`.
 M001 still has no real WING read-only artifact under
 `artifacts/wing_readonly_preflight/`.
