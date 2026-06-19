@@ -16,6 +16,10 @@ from backend.offline_replay_evaluation_contract import (
     REQUIRED_SAFETY_CHECKS,
     REQUIRED_SCENARIOS,
 )
+from backend.quality_threshold_policy_contract import (
+    REQUIRED_POLICY_CHECKS as THRESHOLD_REQUIRED_POLICY_CHECKS,
+    REQUIRED_THRESHOLD_AXES,
+)
 
 
 def _scenario(name: str) -> dict:
@@ -30,6 +34,41 @@ def _scenario(name: str) -> dict:
     }
 
 
+def _threshold_axis(axis: str) -> dict:
+    return {
+        "axis": axis,
+        "metric_name": f"{axis}_score",
+        "direction": "min",
+        "candidate_value": 0.8,
+        "evidence_artifact": f"thresholds/{axis}.json",
+        "rationale": f"Replay promotion threshold for {axis}",
+        "rollback_policy": f"Revert {axis} threshold on regression",
+    }
+
+
+def _quality_threshold_policy_manifest(**overrides) -> dict:
+    manifest = {
+        "policy_id": "offline-replay-threshold-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+        "threshold_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:offline-replay-thresholds",
+            "approved_at": "2026-06-19T17:32:45Z",
+        },
+        "thresholds": [_threshold_axis(axis) for axis in REQUIRED_THRESHOLD_AXES],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def _offline_replay_manifest(**overrides) -> dict:
     manifest = {
         "manifest_id": "offline-replay-fixture",
@@ -40,11 +79,7 @@ def _offline_replay_manifest(**overrides) -> dict:
         "hardware_evidence": False,
         "readiness_closure_allowed": False,
         "live_authority_granted": False,
-        "threshold_policy": {
-            "status": "approved",
-            "approved_by": "owner",
-            "approved_decision_id": "adr:offline-replay-thresholds",
-        },
+        "quality_threshold_policy_manifest": _quality_threshold_policy_manifest(),
         "scenarios": [_scenario(name) for name in REQUIRED_SCENARIOS],
     }
     manifest.update(overrides)
@@ -110,7 +145,9 @@ def test_integration_bundle_blocks_incomplete_child_contracts_and_pending_policy
             integration_policy={"status": "PENDING_APPROVAL"},
             integration_checks={"analysis_trace_bound": True},
             offline_replay_manifest=_offline_replay_manifest(
-                threshold_policy={"status": "PENDING_APPROVAL"},
+                quality_threshold_policy_manifest=_quality_threshold_policy_manifest(
+                    threshold_policy={"status": "PENDING_APPROVAL"}
+                ),
                 scenarios=[_scenario("soundcheck")],
             ),
             fault_recovery_manifest=_fault_recovery_manifest(
@@ -127,6 +164,14 @@ def test_integration_bundle_blocks_incomplete_child_contracts_and_pending_policy
     assert "offline_replay_contract_not_ready" in result["blockers"]
     assert "fault_recovery_contract_not_ready" in result["blockers"]
     assert "offline_replay:approved_quality_threshold_policy_required" in result["blockers"]
+    assert "offline_replay:quality_threshold_policy_contract_not_ready" in result[
+        "blockers"
+    ]
+    assert (
+        "offline_replay:quality_threshold_policy:"
+        "owner_approved_quality_threshold_policy_required"
+        in result["blockers"]
+    )
     assert "offline_replay:missing_required_scenario:studio" in result["blockers"]
     assert "fault_recovery:missing_required_fault_scenario:connection_loss" in result[
         "blockers"

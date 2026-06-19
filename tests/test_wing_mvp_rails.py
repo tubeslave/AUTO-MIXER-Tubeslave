@@ -58,6 +58,8 @@ M013_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M013-integration-evaluation-bundl
 M013_ADR = PROJECT_ROOT / "Docs" / "adr" / "integration-evaluation-bundle-contract-20260619.md"
 M014_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M014-quality-threshold-policy-contract.md"
 M014_ADR = PROJECT_ROOT / "Docs" / "adr" / "quality-threshold-policy-contract-20260619.md"
+M015_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M015-replay-threshold-policy-binding.md"
+M015_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-threshold-policy-binding-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -1538,14 +1540,6 @@ def test_m011_offline_replay_evaluation_contract_stays_offline_and_threshold_gat
             }
         ],
     }
-    pending_result = evaluate_offline_replay_evaluation_contract(pending_manifest)
-    assert pending_result["ready_for_replay_promotion"] is False
-    assert pending_result["authority"]["live_authority_granted"] is False
-    assert pending_result["authority"]["readiness_closure_allowed"] is False
-    assert "approved_quality_threshold_policy_required" in pending_result["blockers"]
-    assert "missing_required_scenario:studio" in pending_result["blockers"]
-    assert "missing_required_scenario:concert" in pending_result["blockers"]
-
     def complete_scenario(name: str) -> dict:
         return {
             "scenario": name,
@@ -1557,6 +1551,57 @@ def test_m011_offline_replay_evaluation_contract_stays_offline_and_threshold_gat
             },
         }
 
+    def complete_threshold(axis: str) -> dict:
+        return {
+            "axis": axis,
+            "metric_name": f"{axis}_score",
+            "direction": "min",
+            "candidate_value": 0.8,
+            "evidence_artifact": f"thresholds/{axis}.json",
+            "rationale": f"Replay promotion threshold for {axis}",
+            "rollback_policy": f"Revert {axis} threshold on regression",
+        }
+
+    def complete_threshold_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "offline-replay-threshold-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:offline-replay-thresholds",
+                "approved_at": "2026-06-19T17:32:45Z",
+            },
+            "thresholds": [complete_threshold(axis) for axis in REQUIRED_THRESHOLD_AXES],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    pending_manifest["quality_threshold_policy_manifest"] = (
+        complete_threshold_policy_manifest(
+            threshold_policy={"status": "PENDING_APPROVAL"}
+        )
+    )
+    pending_result = evaluate_offline_replay_evaluation_contract(pending_manifest)
+    assert pending_result["ready_for_replay_promotion"] is False
+    assert pending_result["authority"]["live_authority_granted"] is False
+    assert pending_result["authority"]["readiness_closure_allowed"] is False
+    assert "approved_quality_threshold_policy_required" in pending_result["blockers"]
+    assert "quality_threshold_policy_contract_not_ready" in pending_result["blockers"]
+    assert (
+        "quality_threshold_policy:owner_approved_quality_threshold_policy_required"
+        in pending_result["blockers"]
+    )
+    assert "missing_required_scenario:studio" in pending_result["blockers"]
+    assert "missing_required_scenario:concert" in pending_result["blockers"]
+
     complete_result = evaluate_offline_replay_evaluation_contract(
         {
             "manifest_id": "complete-offline-replay",
@@ -1567,11 +1612,7 @@ def test_m011_offline_replay_evaluation_contract_stays_offline_and_threshold_gat
             "hardware_evidence": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
-            "threshold_policy": {
-                "status": "approved",
-                "approved_by": "owner",
-                "approved_decision_id": "adr:offline-replay-thresholds",
-            },
+            "quality_threshold_policy_manifest": complete_threshold_policy_manifest(),
             "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
         }
     )
@@ -1580,6 +1621,9 @@ def test_m011_offline_replay_evaluation_contract_stays_offline_and_threshold_gat
     assert complete_result["authority"]["live_authority_granted"] is False
     assert complete_result["authority"]["readiness_closure_allowed"] is False
     assert complete_result["summary"]["covered_scenarios"] == list(REQUIRED_SCENARIOS)
+    assert complete_result["summary"]["threshold_policy_contract_status"] == (
+        "ready_for_threshold_policy_use"
+    )
 
     assert "offline, replay,\n   simulator, fault-injection" in completion
     assert "approved thresholds" in completion
@@ -1785,6 +1829,39 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             },
         }
 
+    def complete_threshold(axis: str) -> dict:
+        return {
+            "axis": axis,
+            "metric_name": f"{axis}_score",
+            "direction": "min",
+            "candidate_value": 0.8,
+            "evidence_artifact": f"thresholds/{axis}.json",
+            "rationale": f"Replay promotion threshold for {axis}",
+            "rollback_policy": f"Revert {axis} threshold on regression",
+        }
+
+    def complete_threshold_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "offline-replay-threshold-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:offline-replay-thresholds",
+                "approved_at": "2026-06-19T17:32:45Z",
+            },
+            "thresholds": [complete_threshold(axis) for axis in REQUIRED_THRESHOLD_AXES],
+        }
+        manifest.update(overrides)
+        return manifest
+
     def complete_replay_manifest(**overrides) -> dict:
         manifest = {
             "manifest_id": "complete-offline-replay",
@@ -1795,11 +1872,7 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "hardware_evidence": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
-            "threshold_policy": {
-                "status": "approved",
-                "approved_by": "owner",
-                "approved_decision_id": "adr:offline-replay-thresholds",
-            },
+            "quality_threshold_policy_manifest": complete_threshold_policy_manifest(),
             "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
         }
         manifest.update(overrides)
@@ -1846,7 +1919,9 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "integration_policy": {"status": "PENDING_APPROVAL"},
             "integration_checks": {"analysis_trace_bound": True},
             "offline_replay_manifest": complete_replay_manifest(
-                threshold_policy={"status": "PENDING_APPROVAL"},
+                quality_threshold_policy_manifest=complete_threshold_policy_manifest(
+                    threshold_policy={"status": "PENDING_APPROVAL"}
+                ),
                 scenarios=[complete_scenario("soundcheck")],
             ),
             "fault_recovery_manifest": complete_fault_manifest(
@@ -1863,6 +1938,14 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
     assert "offline_replay:approved_quality_threshold_policy_required" in pending_result[
         "blockers"
     ]
+    assert "offline_replay:quality_threshold_policy_contract_not_ready" in pending_result[
+        "blockers"
+    ]
+    assert (
+        "offline_replay:quality_threshold_policy:"
+        "owner_approved_quality_threshold_policy_required"
+        in pending_result["blockers"]
+    )
     assert "fault_recovery:missing_required_fault_scenario:connection_loss" in pending_result[
         "blockers"
     ]
@@ -2064,6 +2147,180 @@ def test_m014_quality_threshold_policy_contract_stays_owner_approved_and_offline
     assert "always returns `live_authority_granted: false`" in adr
     assert "M014 quality threshold policy contract is now covered" in current
     assert "M014 quality threshold policy contract rail is now automated" in report
+
+
+def test_m015_replay_threshold_policy_binding_requires_m014_manifest():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M015_PLAN.read_text(encoding="utf-8")
+    adr = M015_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m015 = markdown_table_row(roadmap, "M015")
+    assert m015[1] == "Replay threshold policy binding"
+    assert m015[2] == (
+        "Offline replay promotion consumes the quality threshold policy contract "
+        "instead of loose threshold status fields"
+    )
+    assert m015[3] == "M011-M014"
+    assert m015[4] == "high offline"
+    assert m015[5] == "UNIT_VERIFIED gate binding; replay evidence remains pending"
+    assert m015[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/offline_replay_evaluation_contract.py`" in memory_eval[2]
+    assert "`backend/quality_threshold_policy_contract.py`" in memory_eval[2]
+    assert "tests/test_offline_replay_evaluation_contract.py" in memory_eval[3]
+    assert "replay promotion now requires a bound quality threshold policy manifest" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    def complete_scenario(name: str) -> dict:
+        return {
+            "scenario": name,
+            "evaluation_types": list(REQUIRED_EVALUATION_TYPES),
+            "safety_checks": {key: True for key in REQUIRED_SAFETY_CHECKS},
+            "quality_axes": {
+                key: {"status": "passed", "artifact": f"{name}/{key}.json"}
+                for key in REQUIRED_QUALITY_AXES
+            },
+        }
+
+    def complete_threshold(axis: str) -> dict:
+        return {
+            "axis": axis,
+            "metric_name": f"{axis}_score",
+            "direction": "min",
+            "candidate_value": 0.8,
+            "evidence_artifact": f"thresholds/{axis}.json",
+            "rationale": f"Replay promotion threshold for {axis}",
+            "rollback_policy": f"Revert {axis} threshold on regression",
+        }
+
+    def threshold_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "offline-replay-threshold-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:offline-replay-thresholds",
+                "approved_at": "2026-06-19T17:32:45Z",
+            },
+            "thresholds": [complete_threshold(axis) for axis in REQUIRED_THRESHOLD_AXES],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    legacy_only_replay = {
+        "manifest_id": "legacy-threshold-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "threshold_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:legacy-threshold-policy",
+        },
+        "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
+    }
+    legacy_result = evaluate_offline_replay_evaluation_contract(legacy_only_replay)
+    assert legacy_result["ready_for_replay_promotion"] is False
+    assert "approved_quality_threshold_policy_required" in legacy_result["blockers"]
+    assert "quality_threshold_policy_contract_not_ready" in legacy_result["blockers"]
+    assert "legacy_threshold_policy_without_contract_manifest" in legacy_result["blockers"]
+    assert "quality_threshold_policy:offline_only_required" in legacy_result["blockers"]
+    assert legacy_result["summary"]["legacy_threshold_policy_status"] == "approved"
+    assert legacy_result["summary"]["thresholds_approved"] is False
+    assert legacy_result["authority"]["live_authority_granted"] is False
+
+    complete_replay = {
+        "manifest_id": "bound-threshold-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "quality_threshold_policy_manifest": threshold_policy_manifest(),
+        "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
+    }
+    complete_result = evaluate_offline_replay_evaluation_contract(complete_replay)
+    assert complete_result["ready_for_replay_promotion"] is True
+    assert complete_result["summary"]["threshold_policy_contract_status"] == (
+        "ready_for_threshold_policy_use"
+    )
+    assert complete_result["threshold_policy_result"]["ready_for_threshold_policy_use"] is True
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+
+    integration_result = evaluate_integration_bundle_contract(
+        {
+            "manifest_id": "legacy-threshold-integration-bundle",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-evaluation-policy",
+            },
+            "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+            "offline_replay_manifest": legacy_only_replay,
+            "fault_recovery_manifest": {
+                "manifest_id": "missing-fault-recovery-for-prefix-check",
+                "offline_only": True,
+            },
+        }
+    )
+    assert integration_result["ready_for_integration_evaluation_promotion"] is False
+    assert "offline_replay:quality_threshold_policy_contract_not_ready" in integration_result[
+        "blockers"
+    ]
+    assert "offline_replay:legacy_threshold_policy_without_contract_manifest" in integration_result[
+        "blockers"
+    ]
+
+    assert "Replay manifests must consume the quality threshold policy contract result" in completion
+    assert "M015-CP01" in plan
+    assert "M015-CP02" in plan
+    assert "Legacy `threshold_policy` fields without the M014 contract manifest" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M015 replay threshold policy binding is now covered" in current
+    assert "M015 replay threshold policy binding rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

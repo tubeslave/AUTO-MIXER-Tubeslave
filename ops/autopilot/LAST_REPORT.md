@@ -339,6 +339,22 @@ before threshold policy use. Complete candidate evidence can become
 promotion until owner approval exists. It still reports no hardware proof, no
 live write, no readiness closure and no live authority.
 
+The M015 replay threshold policy binding rail is now automated by
+`tests/test_offline_replay_evaluation_contract.py`,
+`tests/test_evaluation_integration_bundle_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m015_replay_threshold_policy_binding_requires_m014_manifest`.
+It updates `backend/offline_replay_evaluation_contract.py` and binds it
+through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M015-replay-threshold-policy-binding.md`,
+`Docs/adr/replay-threshold-policy-binding-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. Replay promotion now consumes the M014
+`quality_threshold_policy_manifest`; loose legacy `threshold_policy` status
+fields remain summary context only and cannot satisfy approved-threshold
+requirements. Integration bundles surface the same failure through the existing
+`offline_replay:` child prefix. It still reports no hardware proof, no live
+write, no readiness closure and no live authority.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -463,8 +479,14 @@ live write, no readiness closure and no live authority.
   `5 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m014_quality_threshold_policy_contract_stays_owner_approved_and_offline -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_offline_replay_evaluation_contract.py -q`:
+  `6 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m015_replay_threshold_policy_binding_requires_m014_manifest -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `27 passed`.
+  `28 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -476,7 +498,7 @@ live write, no readiness closure and no live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4103 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4105 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -507,9 +529,9 @@ live write, no readiness closure and no live authority.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T17:23:27Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T17:38:18Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `37d79bb6`, latest no-WING artifact
+  state/evidence commit `70088ba9`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T17:23:27Z
+Generated: 2026-06-19T17:38:18Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T17:23:27Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `37d79bb6 Add integration evaluation bundle gate`
+  `70088ba9 Add quality threshold policy gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -360,6 +360,18 @@ Generated: 2026-06-19T17:23:27Z
   `readiness_closure_allowed: false`, `live_write: false` and
   `hardware_evidence: false`, so quality threshold policy evidence cannot
   become hardware proof or live readiness.
+- M015 replay threshold policy binding is now covered by
+  `tests/test_offline_replay_evaluation_contract.py`,
+  `tests/test_evaluation_integration_bundle_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m015_replay_threshold_policy_binding_requires_m014_manifest`.
+  The updated `backend/offline_replay_evaluation_contract.py` module now
+  consumes `quality_threshold_policy_manifest` from M014 before reporting
+  replay-promotion readiness. Legacy loose `threshold_policy` status fields
+  remain visible as summary context, but cannot satisfy approved-threshold
+  requirements without the bound M014 contract manifest. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so replay threshold
+  policy binding cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -370,4 +382,4 @@ Generated: 2026-06-19T17:23:27Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4103 passed, 1 skipped, 1 warning`.
+  `4105 passed, 1 skipped, 1 warning`.

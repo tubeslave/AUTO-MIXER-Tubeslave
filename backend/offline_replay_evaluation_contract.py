@@ -67,6 +67,14 @@ def _threshold_policy_approved(threshold_policy: Mapping[str, Any]) -> bool:
     return status in {"approved", "owner_approved"} and bool(decision_id) and bool(owner)
 
 
+def _quality_threshold_policy_result(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    from backend.quality_threshold_policy_contract import (
+        evaluate_quality_threshold_policy_contract,
+    )
+
+    return evaluate_quality_threshold_policy_contract(manifest)
+
+
 def _scenario_result(record: Mapping[str, Any]) -> Dict[str, Any]:
     scenario = str(record.get("scenario") or record.get("name") or "").strip().lower()
     evaluation_types = {
@@ -148,10 +156,27 @@ def evaluate_offline_replay_evaluation_contract(
     if claimed_live_authority:
         blockers.append("offline_replay_evidence_cannot_grant_live_authority")
 
-    threshold_policy = _as_mapping(manifest.get("threshold_policy"))
-    thresholds_approved = _threshold_policy_approved(threshold_policy)
+    quality_threshold_policy_manifest = _as_mapping(
+        manifest.get("quality_threshold_policy_manifest")
+    )
+    threshold_policy_result = _quality_threshold_policy_result(
+        quality_threshold_policy_manifest
+    )
+    threshold_policy = _as_mapping(
+        quality_threshold_policy_manifest.get("threshold_policy")
+    )
+    legacy_threshold_policy = _as_mapping(manifest.get("threshold_policy"))
+    legacy_thresholds_approved = _threshold_policy_approved(legacy_threshold_policy)
+    thresholds_approved = threshold_policy_result["ready_for_threshold_policy_use"]
     if not thresholds_approved:
         blockers.append("approved_quality_threshold_policy_required")
+        blockers.append("quality_threshold_policy_contract_not_ready")
+        blockers.extend(
+            f"quality_threshold_policy:{blocker}"
+            for blocker in threshold_policy_result["blockers"]
+        )
+        if legacy_thresholds_approved and not quality_threshold_policy_manifest:
+            blockers.append("legacy_threshold_policy_without_contract_manifest")
 
     scenario_records = _as_list(manifest.get("scenarios"))
     scenario_results = [_scenario_result(_as_mapping(record)) for record in scenario_records]
@@ -200,8 +225,16 @@ def evaluate_offline_replay_evaluation_contract(
             "required_safety_checks": list(REQUIRED_SAFETY_CHECKS),
             "required_quality_axes": list(REQUIRED_QUALITY_AXES),
             "threshold_policy_status": str(threshold_policy.get("status") or ""),
+            "legacy_threshold_policy_status": str(
+                legacy_threshold_policy.get("status") or ""
+            ),
             "thresholds_approved": thresholds_approved,
+            "threshold_policy_contract_status": threshold_policy_result["status"],
+            "threshold_policy_ready_for_owner_review": threshold_policy_result[
+                "ready_for_owner_review"
+            ],
         },
+        "threshold_policy_result": threshold_policy_result,
         "scenario_results": scenario_results,
         "blockers": blocker_list,
     }

@@ -38,6 +38,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M012 | Fault-injection recovery contract | Simulator fault bundles fail closed until required failure modes, recovery outcomes and audit evidence exist | M011 | high offline | SPECIFIED to UNIT_VERIFIED for recovery gate; simulator evidence remains pending | PENDING |
 | M013 | Integration evaluation bundle contract | Replay and fault-recovery manifests are composed into an offline integration bundle before promotion | M011-M012 | high offline | SPECIFIED to UNIT_VERIFIED for integration gate; integration evidence remains pending | PENDING |
 | M014 | Quality threshold policy contract | Candidate quality thresholds are complete, evidence-bound and owner-approved before replay or integration promotion | M011-M013 | high offline | SPECIFIED to UNIT_VERIFIED for threshold gate; owner approval remains required | PENDING |
+| M015 | Replay threshold policy binding | Offline replay promotion consumes the quality threshold policy contract instead of loose threshold status fields | M011-M014 | high offline | UNIT_VERIFIED gate binding; replay evidence remains pending | PENDING |
 
 ## Active milestone
 

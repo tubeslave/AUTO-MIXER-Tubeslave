@@ -47,6 +47,10 @@ they can be used for replay, integration or completion-gate promotion. Complete
 candidate threshold evidence alone cannot grant live authority, close readiness
 or replace listening, expert, hardware or owner validation.
 
+Replay manifests must consume the quality threshold policy contract result
+instead of loose threshold status fields before claiming replay-promotion
+readiness.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
