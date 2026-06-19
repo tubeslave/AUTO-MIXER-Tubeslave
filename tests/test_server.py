@@ -1075,6 +1075,111 @@ class TestWingDeploymentWriteBoundary:
         raw = websocket.send.await_args_list[-1].args[0]
         return json.loads(raw)
 
+    @staticmethod
+    def _sequence_execution_payload(value_type, allowed_live_write_kinds=None):
+        allowed_live_write_kinds = allowed_live_write_kinds or ["fader", "gain", "pan"]
+        return {
+            "type": "operator_proposal_apply_sequence_execution_result",
+            "status": "applied",
+            "summary": {
+                "uses_existing_apply_operator_proposal": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "direct_live_write": False,
+                "direct_manual_console_write_called": False,
+                "manual_console_write_called_by_sequence_executor": False,
+                "idempotency_reserved_by_executor_directly": False,
+                "live_widening_allowed": False,
+                "queries_console": False,
+            },
+            "safety": {
+                "uses_existing_apply_operator_proposal": True,
+                "live_apply_entrypoint": "apply_operator_proposal",
+                "does_not_call_manual_console_write_directly": True,
+                "allowed_live_write_kinds": allowed_live_write_kinds,
+                "direct_live_write": False,
+                "direct_manual_console_write_called": False,
+                "manual_console_write_called_by_sequence_executor": False,
+                "idempotency_reserved_by_executor_directly": False,
+                "live_widening_allowed": False,
+                "queries_console": False,
+            },
+            "execution_results": [
+                {
+                    "proposal_id": "unit-sequence-pan",
+                    "status": "applied",
+                    "apply_attempted": True,
+                    "apply_request": {
+                        "type": "apply_operator_proposal",
+                        "proposal_id": "unit-sequence-pan",
+                        "approved": True,
+                        "idempotency_key": "unit-sequence-pan-key",
+                    },
+                    "apply_result": {
+                        "status": "applied",
+                        "channel": 1,
+                        "value_type": value_type,
+                        "effective_value": 0.0,
+                        "readback_status": "verified_from_cache",
+                        "proof_status": "verified",
+                        "rollback_available": True,
+                    },
+                }
+            ],
+        }
+
+    @staticmethod
+    def _sequence_execution_audit_payload(value_type, allowed_live_write_kinds=None):
+        allowed_live_write_kinds = allowed_live_write_kinds or ["fader", "gain", "pan"]
+        return {
+            "type": "operator_proposal_apply_sequence_execution_audit",
+            "status": "passed",
+            "summary": {
+                "audit_only": True,
+                "execution_allowed_by_audit": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+            },
+            "safety": {
+                "audit_only": True,
+                "does_not_call_apply_operator_proposal": True,
+                "does_not_call_manual_console_write": True,
+                "allowed_live_write_kinds": allowed_live_write_kinds,
+                "execution_allowed_by_audit": False,
+                "live_write": False,
+                "apply_attempted": False,
+                "queue_mutation": False,
+                "proposal_status_mutation": False,
+                "idempotency_reserved": False,
+                "manual_console_write_called": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+            },
+            "audit_rows": [
+                {
+                    "proposal_id": "unit-sequence-pan",
+                    "status": "passed",
+                    "value_type": value_type,
+                    "channel": 1,
+                    "effective_value": 0.0,
+                    "idempotency_key": "unit-sequence-pan-key",
+                    "readback_status": "verified_from_cache",
+                    "proof_status": "verified",
+                    "rollback_available": True,
+                }
+            ],
+            "blocked_results": [],
+        }
+
     def test_manual_write_supervision_reports_mode_limited_live_kinds(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
@@ -1176,6 +1281,114 @@ class TestWingDeploymentWriteBoundary:
             "gain",
             "pan",
         ]
+
+    @pytest.mark.asyncio
+    async def test_wing_sequence_execution_audit_rejects_pan_scope(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+            websocket,
+            {
+                "execution_result_payload": self._sequence_execution_payload(
+                    "pan",
+                    allowed_live_write_kinds=["fader", "gain", "pan"],
+                )
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        reasons = {item["reason"] for item in payload["blocked_results"]}
+        assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
+        assert payload["status"] == "blocked"
+        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
+        assert "safety_allowed_live_write_kinds_widened" in reasons
+        assert "execution_row_value_type_not_live_allowed" in reasons
+        assert payload["audit_rows"] == []
+
+    @pytest.mark.asyncio
+    async def test_offline_sequence_execution_audit_retains_current_proven_pan_scope(
+        self,
+        minimal_server,
+    ):
+        server = minimal_server
+        server.connection_mode = "offline"
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
+            websocket,
+            {
+                "execution_result_payload": self._sequence_execution_payload(
+                    "pan",
+                    allowed_live_write_kinds=["fader", "gain", "pan"],
+                )
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
+        assert payload["status"] == "passed"
+        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
+        assert payload["audit_rows"][0]["value_type"] == "pan"
+        assert payload["blocked_results"] == []
+
+    @pytest.mark.asyncio
+    async def test_wing_sequence_audit_policy_gate_rejects_pan_scope(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+            websocket,
+            {
+                "execution_audit_payload": self._sequence_execution_audit_payload(
+                    "pan",
+                    allowed_live_write_kinds=["fader", "gain", "pan"],
+                )
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        reasons = {item["reason"] for item in payload["blocked_results"]}
+        assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
+        assert payload["status"] == "blocked"
+        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
+        assert "safety_allowed_live_write_kinds_widened" in reasons
+        assert "audit_row_value_type_not_policy_allowed" in reasons
+        assert payload["policy_evidence"] == []
+
+    @pytest.mark.asyncio
+    async def test_offline_sequence_audit_policy_gate_retains_current_proven_pan_scope(
+        self,
+        minimal_server,
+    ):
+        server = minimal_server
+        server.connection_mode = "offline"
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
+            websocket,
+            {
+                "execution_audit_payload": self._sequence_execution_audit_payload(
+                    "pan",
+                    allowed_live_write_kinds=["fader", "gain", "pan"],
+                )
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
+        assert payload["status"] == "ready"
+        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
+        assert payload["policy_evidence"][0]["value_type"] == "pan"
+        assert payload["blocked_results"] == []
 
     @pytest.mark.asyncio
     async def test_wing_manual_gate_filters_pan_from_operator_mode_scope(self, dummy_wing_server):

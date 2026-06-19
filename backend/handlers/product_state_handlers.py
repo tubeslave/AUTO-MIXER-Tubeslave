@@ -239,6 +239,9 @@ def register_handlers(server):
             )
         return list(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 
+    def live_write_kind_set_for_safety_surface(operator_mode=None):
+        return set(allowed_live_write_kinds_for_safety_surface(operator_mode))
+
     def coerce_float(value):
         try:
             if value is None:
@@ -4384,7 +4387,8 @@ def register_handlers(server):
                 )
             )
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
+        active_allowed = live_write_kind_set_for_safety_surface()
+        if not allowed or allowed - active_allowed:
             blockers.append(
                 sequence_execution_audit_blocker(
                     "safety_allowed_live_write_kinds_widened"
@@ -4467,7 +4471,7 @@ def register_handlers(server):
                 )
             )
         value_type = str(apply_result.get("value_type") or "").strip().lower()
-        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
+        if value_type not in live_write_kind_set_for_safety_surface():
             blockers.append(
                 sequence_execution_audit_blocker(
                     "execution_row_value_type_not_live_allowed",
@@ -4693,7 +4697,8 @@ def register_handlers(server):
             if safety.get(field) not in (False, None):
                 blockers.append(audit_policy_gate_blocker(f"safety_{field}_true"))
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
+        active_allowed = live_write_kind_set_for_safety_surface()
+        if not allowed or allowed - active_allowed:
             blockers.append(
                 audit_policy_gate_blocker("safety_allowed_live_write_kinds_widened")
             )
@@ -4714,7 +4719,7 @@ def register_handlers(server):
                 )
             )
         value_type = str(row.get("value_type") or "").strip().lower()
-        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
+        if value_type not in live_write_kind_set_for_safety_surface():
             blockers.append(
                 audit_policy_gate_blocker(
                     "audit_row_value_type_not_policy_allowed",
