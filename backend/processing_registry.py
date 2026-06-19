@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from operator_mode_policy import (
+    WING_DEPLOYMENT_LIVE_WRITE_KINDS,
     normalize_manual_live_write_kinds,
-    CURRENT_PROVEN_LIVE_WRITE_KINDS,
 )
 
 try:
@@ -700,7 +700,7 @@ PROCESSING_DOMAINS = {
     "offline_render",
 }
 
-LIVE_ALLOWED_WRITE_KINDS = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+LIVE_ALLOWED_WRITE_KINDS = tuple(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
 
 @dataclass(frozen=True)
@@ -7154,23 +7154,26 @@ def build_processing_registry_snapshot(
     }
 
 
-def build_pipeline_runtime_summary(operator_mode: Dict[str, Any], manual_write_supervision: Dict[str, Any]) -> Dict[str, Any]:
+def _pipeline_live_write_kinds(raw_kinds: Any) -> List[str]:
+    normalized = set(normalize_manual_live_write_kinds(raw_kinds))
+    return [kind for kind in LIVE_ALLOWED_WRITE_KINDS if kind in normalized]
+
+
+def build_pipeline_runtime_summary(
+    operator_mode: Dict[str, Any],
+    manual_write_supervision: Dict[str, Any],
+) -> Dict[str, Any]:
     manual = manual_write_supervision if isinstance(manual_write_supervision, dict) else {}
     approved_live_write_kinds = manual.get("approved_live_write_kinds")
     if not approved_live_write_kinds:
-        allowed = list(
+        approved_live_write_kinds = list(
             operator_mode.get("capabilities", {}).get("allowed_live_write_kinds") or []
         )
-        if (
-            operator_mode.get("mode") == "supervised"
-            and "mute" not in allowed
-        ):
-            allowed.append("mute")
-        approved_live_write_kinds = allowed
     else:
         approved_live_write_kinds = normalize_manual_live_write_kinds(
             approved_live_write_kinds
         )
+    approved_live_write_kinds = _pipeline_live_write_kinds(approved_live_write_kinds)
     main = get_pipeline_profile("main_live_assist")
     return {
         "main_pipeline_id": "main_live_assist",

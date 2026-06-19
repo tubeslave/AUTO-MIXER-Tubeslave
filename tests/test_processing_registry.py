@@ -66,6 +66,7 @@ def test_processing_methods_have_valid_statuses_domains_and_unique_ids():
 def test_live_capable_methods_require_supervision_and_only_fader_gain():
     live_methods = [method for method in iter_processing_methods() if method.can_write_live]
 
+    assert LIVE_ALLOWED_WRITE_KINDS == ("fader", "gain")
     assert [method.id for method in live_methods] == ["supervised_manual_fader_gain"]
     for method in live_methods:
         assert method.requires_supervision is True
@@ -189,7 +190,7 @@ def test_main_live_pipeline_executor_is_only_supervised_fader_gain():
     assert "context_aware_gate_agent" in main.proposal_method_ids
 
 
-def test_pipeline_runtime_summary_prefers_manual_approved_live_write_kinds():
+def test_pipeline_runtime_summary_filters_manual_scope_to_canonical_live_kinds():
     operator_mode = {
         "mode": "supervised",
         "capabilities": {
@@ -219,19 +220,21 @@ def test_pipeline_runtime_summary_prefers_manual_approved_live_write_kinds():
     assert runtime["allowed_live_write_kinds"] == [
         "fader",
         "gain",
-        "mute",
     ]
 
 
-def test_pipeline_runtime_summary_falls_back_to_supervised_mode_live_write_kinds():
+def test_pipeline_runtime_summary_filters_supervised_fallback_to_canonical_live_kinds():
     operator_mode = {
         "mode": "supervised",
-        "capabilities": {"allowed_live_write_kinds": ["fader", "gain", "pan"], "can_apply_to_console": True},
+        "capabilities": {
+            "allowed_live_write_kinds": ["fader", "gain", "pan"],
+            "can_apply_to_console": True,
+        },
     }
 
     runtime = build_pipeline_runtime_summary(operator_mode, {})
 
-    assert runtime["allowed_live_write_kinds"] == ["fader", "gain", "pan", "mute"]
+    assert runtime["allowed_live_write_kinds"] == ["fader", "gain"]
 
 
 def test_pipeline_runtime_summary_shows_no_live_write_kinds_in_assisted_mode_without_manual_override():

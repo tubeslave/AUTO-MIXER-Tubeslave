@@ -1943,7 +1943,7 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert payload["type"] == "processing_pipeline_snapshot"
     assert payload["runtime"]["main_pipeline_id"] == "main_live_assist"
     assert payload["summary"]["live_executor_method_ids"] == ["supervised_manual_fader_gain"]
-    assert payload["summary"]["live_allowed_write_kinds"] == ["fader", "gain", "pan"]
+    assert payload["summary"]["live_allowed_write_kinds"] == ["fader", "gain"]
     goal_matrix = payload["project_goal_capability_matrix"]
     assert goal_matrix["type"] == "project_goal_capability_matrix"
     assert goal_matrix["safety"]["live_write"] is False
@@ -2052,7 +2052,6 @@ def test_processing_pipeline_snapshot_exposes_method_selection_without_writes(se
     assert module_map["supervised_manual_fader_gain"]["live_write_kinds"] == [
         "fader",
         "gain",
-        "pan",
     ]
     assert module_map["auto_eq"]["can_write_live"] is False
     assert module_map["auto_eq"]["next_step"].startswith("proposal_adapter") or "ADR" in module_map["auto_eq"]["next_step"]
@@ -5426,7 +5425,6 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     assert payload["executor_policy"]["allowed_requested_change_value_types"] == [
         "fader",
         "gain",
-        "pan",
     ]
     assert payload["summary"]["proposal_count"] == 2
     goal_progress = payload["registry"][
@@ -5745,7 +5743,6 @@ def test_main_pipeline_preview_exposes_non_fader_gain_proposal_contracts(server)
         assert contract["proposal_contract"]["allowed_live_write_kinds"] == [
             "fader",
             "gain",
-            "pan",
         ]
         assert f"unsupported_value_type:{value_type}" in contract["blockers"]
         assert "requested_change" not in contract
