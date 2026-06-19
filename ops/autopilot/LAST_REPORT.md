@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T20:30:09Z.
+- Latest heartbeat: 2026-06-19T20:44:55Z.
 
 ## Что сделано
 
@@ -543,8 +543,35 @@ integration bundle readiness cannot grant live authority, close readiness,
 contact WING/backend, mark Full Autonomous ready, or replace accepted real
 hardware/operator validation.
 
+The M028 main pipeline preview integration bundle readiness summary rail is now automated by
+`tests/test_processing_pipeline_preview_integration_bundle_summary.py` and
+`tests/test_wing_mvp_rails.py::test_m028_main_pipeline_preview_surfaces_integration_bundle_readiness_summary`.
+It updates `backend/processing_pipeline_preview.py` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M028-main-pipeline-preview-integration-bundle-readiness-summary.md`,
+`Docs/adr/main-pipeline-preview-integration-bundle-readiness-summary-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The top-level
+`main_pipeline_preview.summary` now consumes M026
+`registry.autonomy_promotion_readiness.summary.offline_integration_bundle` and
+renders integration bundle readiness, status, blockers, missing checks, source
+authority denial, live authority, readiness closure, live write and hardware
+evidence fields. The preview remains read-only with
+`executor_policy.preview_only: true` and `queue_mutation: false`, so
+preview-visible integration bundle readiness cannot queue proposals, grant live
+authority, close readiness, contact WING/backend, mark Full Autonomous ready,
+or replace accepted real hardware/operator validation.
+
 ## Проверка
 
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_processing_pipeline_preview_integration_bundle_summary.py -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m028_main_pipeline_preview_surfaces_integration_bundle_readiness_summary -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `41 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4154 passed, 1 skipped, 1 warning`.
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `47 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m027_operator_adapter_surfaces_integration_bundle_readiness_summary -q`:

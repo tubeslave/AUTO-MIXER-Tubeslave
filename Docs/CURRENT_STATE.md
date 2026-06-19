@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T20:30:09Z
+Generated: 2026-06-19T20:44:55Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T20:30:09Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `19dce7dd Bind integration bundle to autonomy readiness`
+  `bb33f2ac Surface integration bundle readiness in operator adapter`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -526,6 +526,18 @@ Generated: 2026-06-19T20:30:09Z
   `liveWriteKinds: []`, so frontend-visible integration bundle status cannot
   grant live authority, close readiness, contact WING/backend, mark Full
   Autonomous ready, or replace real hardware/operator validation.
+- M028 main pipeline preview integration bundle readiness summary is now covered by
+  `tests/test_processing_pipeline_preview_integration_bundle_summary.py` and
+  `tests/test_wing_mvp_rails.py::test_m028_main_pipeline_preview_surfaces_integration_bundle_readiness_summary`.
+  The updated `backend/processing_pipeline_preview.py` module now surfaces
+  `registry.autonomy_promotion_readiness.summary.offline_integration_bundle`
+  in top-level `main_pipeline_preview.summary` fields for readiness, status,
+  blockers, missing integration checks, source authority denial, live
+  authority, readiness closure, live write and hardware evidence. The preview
+  still keeps `executor_policy.preview_only: true` and `queue_mutation: false`,
+  so preview-visible integration bundle status cannot queue proposals, grant
+  live authority, close readiness, contact WING/backend, mark Full Autonomous
+  ready, or replace real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -536,4 +548,4 @@ Generated: 2026-06-19T20:30:09Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4152 passed, 1 skipped, 1 warning`.
+  `4154 passed, 1 skipped, 1 warning`.

@@ -113,6 +113,14 @@ M026_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M026-autonomy-readiness-integrati
 M026_ADR = PROJECT_ROOT / "Docs" / "adr" / "autonomy-readiness-integration-bundle-overlay-20260619.md"
 M027_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M027-operator-adapter-integration-bundle-readiness-summary.md"
 M027_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-adapter-integration-bundle-readiness-summary-20260619.md"
+M028_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M028-main-pipeline-preview-integration-bundle-readiness-summary.md"
+M028_ADR = PROJECT_ROOT / "Docs" / "adr" / "main-pipeline-preview-integration-bundle-readiness-summary-20260619.md"
+PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
+PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
+    PROJECT_ROOT
+    / "tests"
+    / "test_processing_pipeline_preview_integration_bundle_summary.py"
+)
 FRONTEND_OPERATOR_ADAPTER = PROJECT_ROOT / "frontend" / "src" / "services" / "operatorAdapters.ts"
 FRONTEND_OPERATOR_ADAPTER_TEST = (
     PROJECT_ROOT
@@ -4366,6 +4374,89 @@ def test_m027_operator_adapter_surfaces_integration_bundle_readiness_summary():
         current
     )
     assert "M027 operator adapter integration bundle readiness summary rail is now automated" in (
+        report
+    )
+
+
+def test_m028_main_pipeline_preview_surfaces_integration_bundle_readiness_summary():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M028_PLAN.read_text(encoding="utf-8")
+    adr = M028_ADR.read_text(encoding="utf-8")
+    preview = PROCESSING_PIPELINE_PREVIEW.read_text(encoding="utf-8")
+    preview_test = PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST.read_text(
+        encoding="utf-8"
+    )
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m028 = markdown_table_row(roadmap, "M028")
+    assert m028[1] == "Main pipeline preview integration bundle readiness summary"
+    assert m028[2] == (
+        "Main pipeline preview summary surfaces offline integration bundle "
+        "readiness, blockers and authority-denial status from autonomy promotion readiness"
+    )
+    assert m028[3] == "M026-M027"
+    assert m028[4] == "high offline preview"
+    assert m028[5] == "UNIT_VERIFIED read-only preview summary; live authority remains blocked"
+    assert m028[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/processing_pipeline_preview.py`" in memory_eval[2]
+    assert (
+        "tests/test_processing_pipeline_preview_integration_bundle_summary.py"
+        in memory_eval[3]
+    )
+    assert "main pipeline preview summary now surfaces offline integration bundle readiness" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "main_pipeline_preview.summary" in plan
+    assert "M028-CP01" in plan
+    assert "M028-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "They do not queue work" in adr
+
+    for field in (
+        "autonomy_promotion_offline_integration_bundle_ready",
+        "autonomy_promotion_offline_integration_bundle_status",
+        "autonomy_promotion_offline_integration_bundle_blockers",
+        "autonomy_promotion_offline_integration_bundle_missing_checks",
+        "autonomy_promotion_offline_integration_bundle_source_authority_denied",
+        "autonomy_promotion_offline_integration_bundle_live_authority_granted",
+        "autonomy_promotion_offline_integration_bundle_readiness_closure_allowed",
+        "autonomy_promotion_offline_integration_bundle_live_write",
+        "autonomy_promotion_offline_integration_bundle_hardware_evidence",
+    ):
+        assert field in preview
+        assert field in preview_test
+    assert "payload[\"summary\"][\"queue_mutation\"] is False" in preview_test
+    assert "Main pipeline preview summaries must surface offline integration bundle" in (
+        completion
+    )
+    assert "M028 main pipeline preview integration bundle readiness summary is now covered" in (
+        current
+    )
+    assert "M028 main pipeline preview integration bundle readiness summary rail is now automated" in (
         report
     )
 

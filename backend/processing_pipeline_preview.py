@@ -1246,6 +1246,12 @@ def build_main_pipeline_preview(
     )
     autonomy_promotion_summary = autonomy_promotion_readiness.get("summary", {})
     autonomy_promotion_safety = autonomy_promotion_readiness.get("safety", {})
+    offline_integration_bundle = autonomy_promotion_summary.get(
+        "offline_integration_bundle",
+        {},
+    )
+    if not isinstance(offline_integration_bundle, dict):
+        offline_integration_bundle = {}
     autonomy_mode_transition_safety = autonomy_mode_transition_gate.get("safety", {})
 
     analysis_status = str(analysis_report.get("status") or "unknown")
@@ -1413,6 +1419,33 @@ def build_main_pipeline_preview(
             ),
             "autonomy_promotion_blocked_target_count": int(
                 len(autonomy_promotion_summary.get("blocked_target_ids", ()))
+            ),
+            "autonomy_promotion_offline_integration_bundle_ready": bool(
+                offline_integration_bundle.get("ready_for_integration_promotion", False)
+            ),
+            "autonomy_promotion_offline_integration_bundle_status": (
+                offline_integration_bundle.get("status") or "unknown"
+            ),
+            "autonomy_promotion_offline_integration_bundle_blockers": list(
+                offline_integration_bundle.get("blockers", ()) or ()
+            ),
+            "autonomy_promotion_offline_integration_bundle_missing_checks": list(
+                offline_integration_bundle.get("missing_integration_checks", ()) or ()
+            ),
+            "autonomy_promotion_offline_integration_bundle_source_authority_denied": bool(
+                offline_integration_bundle.get("source_authority_denied", False)
+            ),
+            "autonomy_promotion_offline_integration_bundle_live_authority_granted": bool(
+                offline_integration_bundle.get("live_authority_granted", False)
+            ),
+            "autonomy_promotion_offline_integration_bundle_readiness_closure_allowed": bool(
+                offline_integration_bundle.get("readiness_closure_allowed", False)
+            ),
+            "autonomy_promotion_offline_integration_bundle_live_write": bool(
+                offline_integration_bundle.get("live_write", False)
+            ),
+            "autonomy_promotion_offline_integration_bundle_hardware_evidence": bool(
+                offline_integration_bundle.get("hardware_evidence", False)
             ),
             "autonomy_mode_transition_gate_blocked_modes": list(
                 autonomy_mode_transition_gate_summary.get("blocked_modes", ())

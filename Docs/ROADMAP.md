@@ -51,6 +51,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M025 | Operator report binding | Offline integration promotion consumes the operator-report contract instead of loose operator_report_bound checks | M013-M024 | high offline | UNIT_VERIFIED gate binding; integration evidence remains pending | PENDING |
 | M026 | Autonomy readiness integration bundle overlay | Autonomy promotion readiness consumes offline integration bundle contract status before planning supervised or autonomous promotion | M007-M025 | high offline | UNIT_VERIFIED readiness overlay; live authority remains blocked | PENDING |
 | M027 | Operator adapter integration bundle readiness summary | Operator-facing module status rows surface offline integration bundle readiness, blockers and authority-denial status from autonomy promotion readiness | M026 | high offline frontend | UNIT_VERIFIED read-only operator surface; live authority remains blocked | PENDING |
+| M028 | Main pipeline preview integration bundle readiness summary | Main pipeline preview summary surfaces offline integration bundle readiness, blockers and authority-denial status from autonomy promotion readiness | M026-M027 | high offline preview | UNIT_VERIFIED read-only preview summary; live authority remains blocked | PENDING |
 
 ## Active milestone
 
