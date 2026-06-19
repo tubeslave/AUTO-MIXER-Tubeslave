@@ -22,7 +22,6 @@ Status: WING/live authority snapshot
 | Scenes / snapshots / presets | SPECIFIED | snapshot handlers and contracts | no | no | destructive-action ADR and proof | none |
 | Rollback | SPECIFIED | WING proof runbooks | no live action unattended | required before closure | supervised rollback proof | none |
 | Emergency stop | SPECIFIED | WING MVP docs | no live action unattended | required before closure | emergency-stop proof | none |
-| Rate limits / bounds / allowlists | PROTOTYPE | `backend/autofoh_safety.py`, `backend/wing_client.py` | docs/tests only | required | fault-injection validation | none |
+| Rate limits / bounds / allowlists | PROTOTYPE | `backend/autofoh_safety.py`, `backend/wing_client.py`, `backend/fault_injection_recovery_contract.py` | docs/tests only | required | fault-injection validation | none |
 | Stale state / disconnect fail-closed | PROTOTYPE | preflight and runtime safety modules | no hardware unattended | required | timeout/fail-closed proof | none |
 | Audit logging | PROTOTYPE | WING runbooks, reports, ledger patterns | yes for local state | required | artifact review | none |
-

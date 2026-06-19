@@ -35,6 +35,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M009 | Supervised non-fader/gain live expansion | A separately approved ADR widens supervised live writes one family at a time | M006-M008 plus hardware | critical live write | SUPERVISED_LIVE_VERIFIED per family | PENDING_APPROVAL |
 | M010 | Full autonomous eligibility review | Full Autonomous Mixing Mode eligibility is reviewed against all completion gates | M001-M009 | critical autonomous | AUTONOMOUS_ELIGIBLE only if all gates pass | PENDING_APPROVAL |
 | M011 | Offline replay evaluation contract | Soundcheck, studio and concert replay manifests fail closed until approved thresholds and complete scenario evidence exist | M007-M010 | high offline | SPECIFIED to UNIT_VERIFIED for gate contract; replay evidence remains pending | PENDING |
+| M012 | Fault-injection recovery contract | Simulator fault bundles fail closed until required failure modes, recovery outcomes and audit evidence exist | M011 | high offline | SPECIFIED to UNIT_VERIFIED for recovery gate; simulator evidence remains pending | PENDING |
 
 ## Active milestone
 

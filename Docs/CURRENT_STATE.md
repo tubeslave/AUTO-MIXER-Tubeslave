@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T16:41:18Z
+Generated: 2026-06-19T16:56:13Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T16:41:18Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `fbad044c Guard autonomous eligibility proof gate`
+  `a53c4a65 Add offline replay evaluation gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -327,6 +327,18 @@ Generated: 2026-06-19T16:41:18Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so offline replay
   evidence cannot become hardware proof or live readiness.
+- M012 fault-injection recovery contract is now covered by
+  `tests/test_fault_injection_recovery_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m012_fault_injection_recovery_contract_stays_simulator_only_and_audit_gated`.
+  The new `backend/fault_injection_recovery_contract.py` module validates
+  transport-timeout, connection-loss, stale-state, emergency-stop,
+  safety-kernel-reject and rollback-required fault scenarios, simulator /
+  fault-injection / recovery evidence, recovery outcomes, audit fields and an
+  approved recovery policy before reporting simulator fault-recovery promotion
+  readiness. It still keeps `live_authority_granted: false`,
+  `readiness_closure_allowed: false`, `live_write: false` and
+  `hardware_evidence: false`, so simulator fault evidence cannot become
+  hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -337,4 +349,4 @@ Generated: 2026-06-19T16:41:18Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4085 passed, 1 skipped, 1 warning`.
+  `4091 passed, 1 skipped, 1 warning`.

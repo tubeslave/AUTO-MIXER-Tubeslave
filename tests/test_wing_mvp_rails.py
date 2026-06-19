@@ -5,6 +5,13 @@ import sys
 from pathlib import Path
 
 from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
+from backend.fault_injection_recovery_contract import (
+    REQUIRED_AUDIT_FIELDS as RECOVERY_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_EVALUATION_TYPES as RECOVERY_REQUIRED_EVALUATION_TYPES,
+    REQUIRED_FAULT_SCENARIOS as RECOVERY_REQUIRED_FAULT_SCENARIOS,
+    REQUIRED_RECOVERY_OUTCOMES,
+    evaluate_fault_injection_recovery_contract,
+)
 from backend.offline_replay_evaluation_contract import (
     REQUIRED_EVALUATION_TYPES,
     REQUIRED_QUALITY_AXES,
@@ -36,6 +43,8 @@ CONSOLE_CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CONSOLE_CAPABILITY_MATRIX.m
 M001_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M001-wing-readonly-preflight-evidence-gate.md"
 M011_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M011-offline-replay-evaluation-contract.md"
 M011_ADR = PROJECT_ROOT / "Docs" / "adr" / "offline-replay-evaluation-contract-20260619.md"
+M012_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M012-fault-injection-recovery-contract.md"
+M012_ADR = PROJECT_ROOT / "Docs" / "adr" / "fault-injection-recovery-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -1578,6 +1587,142 @@ def test_m011_offline_replay_evaluation_contract_stays_offline_and_threshold_gat
     assert "always returns `live_authority_granted: false`" in adr
     assert "M011 offline replay evaluation contract is now covered" in current
     assert "M011 offline replay evaluation contract rail is now automated" in report
+
+
+def test_m012_fault_injection_recovery_contract_stays_simulator_only_and_audit_gated():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M012_PLAN.read_text(encoding="utf-8")
+    adr = M012_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m012 = markdown_table_row(roadmap, "M012")
+    assert m012[1] == "Fault-injection recovery contract"
+    assert m012[2] == (
+        "Simulator fault bundles fail closed until required failure modes, "
+        "recovery outcomes and audit evidence exist"
+    )
+    assert m012[3] == "M011"
+    assert m012[4] == "high offline"
+    assert (
+        m012[5]
+        == "SPECIFIED to UNIT_VERIFIED for recovery gate; simulator evidence remains pending"
+    )
+    assert m012[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/fault_injection_recovery_contract.py`" in memory_eval[2]
+    assert "tests/test_fault_injection_recovery_contract.py" in memory_eval[3]
+    assert "fault-recovery simulator evidence cannot close live readiness" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    rate_limits = markdown_table_row(console, "Rate limits / bounds / allowlists")
+    stale_state = markdown_table_row(console, "Stale state / disconnect fail-closed")
+    audit_logging = markdown_table_row(console, "Audit logging")
+    assert "`backend/fault_injection_recovery_contract.py`" in rate_limits[2]
+    assert rate_limits[3] == "docs/tests only"
+    assert rate_limits[4] == "required"
+    assert rate_limits[5] == "fault-injection validation"
+    assert stale_state[5] == "timeout/fail-closed proof"
+    assert audit_logging[5] == "artifact review"
+    assert rate_limits[6] == "none"
+    assert stale_state[6] == "none"
+    assert audit_logging[6] == "none"
+
+    pending_manifest = {
+        "manifest_id": "pending-recovery-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "recovery_policy": {"status": "PENDING_APPROVAL"},
+        "fault_scenarios": [
+            {
+                "fault_scenario": "transport_timeout",
+                "evaluation_types": list(RECOVERY_REQUIRED_EVALUATION_TYPES),
+                "recovery_outcomes": {
+                    key: True for key in REQUIRED_RECOVERY_OUTCOMES
+                },
+                "audit": {
+                    key: f"transport-timeout-{key}"
+                    for key in RECOVERY_REQUIRED_AUDIT_FIELDS
+                },
+            }
+        ],
+    }
+    pending_result = evaluate_fault_injection_recovery_contract(pending_manifest)
+    assert pending_result["ready_for_fault_recovery_promotion"] is False
+    assert pending_result["authority"]["live_authority_granted"] is False
+    assert pending_result["authority"]["readiness_closure_allowed"] is False
+    assert "approved_recovery_policy_required" in pending_result["blockers"]
+    assert "missing_required_fault_scenario:connection_loss" in pending_result["blockers"]
+    assert "missing_required_fault_scenario:emergency_stop" in pending_result["blockers"]
+
+    def complete_fault(name: str) -> dict:
+        return {
+            "fault_scenario": name,
+            "evaluation_types": list(RECOVERY_REQUIRED_EVALUATION_TYPES),
+            "recovery_outcomes": {key: True for key in REQUIRED_RECOVERY_OUTCOMES},
+            "audit": {key: f"{name}/{key}" for key in RECOVERY_REQUIRED_AUDIT_FIELDS},
+        }
+
+    complete_result = evaluate_fault_injection_recovery_contract(
+        {
+            "manifest_id": "complete-fault-recovery",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "recovery_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:fault-recovery-policy",
+            },
+            "fault_scenarios": [
+                complete_fault(name) for name in RECOVERY_REQUIRED_FAULT_SCENARIOS
+            ],
+        }
+    )
+    assert complete_result["ready_for_fault_recovery_promotion"] is True
+    assert complete_result["hardware_evidence"] is False
+    assert complete_result["authority"]["live_authority_granted"] is False
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+    assert complete_result["summary"]["covered_fault_scenarios"] == list(
+        RECOVERY_REQUIRED_FAULT_SCENARIOS
+    )
+
+    assert "Recovery, rollback, emergency-stop and audit behavior verified" in completion
+    assert "fault-injection и integration evaluations" in completion
+    assert "M012-CP01" in plan
+    assert "M012-CP02" in plan
+    assert "Simulator fault evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M012 fault-injection recovery contract is now covered" in current
+    assert "M012 fault-injection recovery contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
