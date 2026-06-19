@@ -19,6 +19,12 @@ from backend.no_live_transport_contract import (
     REQUIRED_TRANSPORT_EVIDENCE,
     REQUIRED_ZERO_RUNTIME_OBSERVATIONS,
 )
+from backend.operator_report_contract import (
+    REQUIRED_AUDIT_FIELDS as OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_AUTHORITY_DENIAL_FLAGS as OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS,
+    REQUIRED_REPORT_BINDINGS,
+    REQUIRED_REPORT_SECTIONS,
+)
 from backend.offline_replay_evaluation_contract import (
     REQUIRED_EVALUATION_TYPES,
     REQUIRED_QUALITY_AXES,
@@ -245,6 +251,45 @@ def _no_live_transport_manifest(**overrides) -> dict:
     return manifest
 
 
+def _operator_report_binding(name: str) -> dict:
+    return {
+        "status": "passed",
+        "artifact": f"operator-report/{name}.json",
+        "sha256": f"sha256:{name}",
+    }
+
+
+def _operator_report_manifest(**overrides) -> dict:
+    manifest = {
+        "report_id": "operator-report-fixture",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "report_sections": {key: True for key in REQUIRED_REPORT_SECTIONS},
+        "report_bindings": {
+            key: _operator_report_binding(key) for key in REQUIRED_REPORT_BINDINGS
+        },
+        "authority_denial": {
+            key: False for key in OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS
+        },
+        "visible_blockers": [
+            "M001 waits for real WING read-only artifact",
+            "operator review required",
+        ],
+        "next_operator_action": "Run WING read-only preflight with operator.",
+        "audit": {
+            key: f"operator-report/{key}"
+            for key in OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS
+        },
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def _complete_bundle(**overrides) -> dict:
     bundle = {
         "manifest_id": "integration-bundle-fixture",
@@ -258,6 +303,7 @@ def _complete_bundle(**overrides) -> dict:
         "integration_policy_manifest": _integration_policy_manifest(),
         "safety_kernel_trace_manifest": _safety_kernel_trace_manifest(),
         "no_live_transport_manifest": _no_live_transport_manifest(),
+        "operator_report_manifest": _operator_report_manifest(),
         "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
         "offline_replay_manifest": _offline_replay_manifest(),
         "fault_recovery_manifest": _fault_recovery_manifest(),
@@ -331,6 +377,7 @@ def test_integration_bundle_accepts_complete_offline_bundle_without_live_authori
     assert result["summary"]["fault_recovery_ready"] is True
     assert result["summary"]["safety_kernel_trace_ready"] is True
     assert result["summary"]["no_live_transport_ready"] is True
+    assert result["summary"]["operator_report_ready"] is True
     assert result["summary"]["integration_policy_approved"] is True
     assert result["summary"]["integration_policy_contract_status"] == (
         "ready_for_integration_policy_use"
@@ -349,6 +396,10 @@ def test_integration_bundle_accepts_complete_offline_bundle_without_live_authori
     )
     assert (
         result["child_results"]["no_live_transport"]["ready_for_no_live_transport_use"]
+        is True
+    )
+    assert (
+        result["child_results"]["operator_report"]["ready_for_operator_report_use"]
         is True
     )
     assert result["summary"]["missing_integration_checks"] == []
@@ -431,6 +482,64 @@ def test_integration_bundle_requires_bound_no_live_transport_manifest():
     assert result["summary"]["no_live_transport_ready"] is False
     assert result["summary"]["no_live_transport_contract_status"] == "blocked"
     assert result["child_results"]["no_live_transport"]["status"] == "blocked"
+    assert result["authority"]["live_authority_granted"] is False
+
+
+def test_integration_bundle_requires_bound_operator_report_manifest():
+    result = evaluate_integration_bundle_contract(
+        _complete_bundle(operator_report_manifest={})
+    )
+
+    assert result["status"] == "blocked"
+    assert result["ready_for_integration_evaluation_promotion"] is False
+    assert "operator_report_contract_not_ready" in result["blockers"]
+    assert "legacy_operator_report_bound_without_contract_manifest" in result[
+        "blockers"
+    ]
+    assert "operator_report:offline_only_required" in result["blockers"]
+    assert "operator_report:missing_report_section:current_status" in result[
+        "blockers"
+    ]
+    assert "operator_report:missing_report_binding:integration_bundle_artifact" in (
+        result["blockers"]
+    )
+    assert result["summary"]["operator_report_ready"] is False
+    assert result["summary"]["operator_report_contract_status"] == "blocked"
+    assert result["child_results"]["operator_report"]["status"] == "blocked"
+    assert result["authority"]["live_authority_granted"] is False
+
+
+def test_integration_bundle_rejects_live_operator_report_manifest_claims():
+    result = evaluate_integration_bundle_contract(
+        _complete_bundle(
+            operator_report_manifest=_operator_report_manifest(
+                contacts_wing=True,
+                contacts_backend=True,
+                live_write=True,
+                authority_denial={
+                    key: False
+                    for key in OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS
+                }
+                | {"live_authority_granted": True},
+            )
+        )
+    )
+
+    assert result["status"] == "blocked"
+    assert "operator_report_contract_not_ready" in result["blockers"]
+    assert "operator_report:operator_report_forbids_live_write" in result[
+        "blockers"
+    ]
+    assert "operator_report:operator_report_forbids_wing_contact" in result[
+        "blockers"
+    ]
+    assert "operator_report:operator_report_forbids_backend_contact" in result[
+        "blockers"
+    ]
+    assert "operator_report:authority_not_denied:live_authority_granted" in result[
+        "blockers"
+    ]
+    assert result["summary"]["operator_report_ready"] is False
     assert result["authority"]["live_authority_granted"] is False
 
 

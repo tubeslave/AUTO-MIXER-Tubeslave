@@ -48,6 +48,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M022 | No-live-transport contract | Offline integration candidates prove no live transport, backend contact, console contact or live write occurred | M013-M021 | high offline | SPECIFIED to UNIT_VERIFIED for no-live-transport gate; integration binding remains pending | PENDING |
 | M023 | No-live-transport binding | Offline integration promotion consumes the no-live-transport contract instead of loose no_live_transport checks | M013-M022 | high offline | UNIT_VERIFIED gate binding; integration evidence remains pending | PENDING |
 | M024 | Operator report contract | Offline integration reports prove operator-visible status, blockers, authority denial, child evidence and next action before review use | M013-M023 | high offline | SPECIFIED to UNIT_VERIFIED for operator-report gate; integration binding remains pending | PENDING |
+| M025 | Operator report binding | Offline integration promotion consumes the operator-report contract instead of loose operator_report_bound checks | M013-M024 | high offline | UNIT_VERIFIED gate binding; integration evidence remains pending | PENDING |
 
 ## Active milestone
 

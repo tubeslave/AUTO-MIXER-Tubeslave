@@ -107,6 +107,8 @@ M023_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M023-no-live-transport-binding.md
 M023_ADR = PROJECT_ROOT / "Docs" / "adr" / "no-live-transport-binding-20260619.md"
 M024_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M024-operator-report-contract.md"
 M024_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-report-contract-20260619.md"
+M025_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M025-operator-report-binding.md"
+M025_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-report-binding-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -427,6 +429,46 @@ def no_live_transport_manifest_fixture(**overrides) -> dict:
             key: 0 for key in REQUIRED_ZERO_RUNTIME_OBSERVATIONS
         },
         "forbidden_transport_tokens": [],
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def operator_report_binding_fixture(name: str) -> dict:
+    return {
+        "status": "passed",
+        "artifact": f"operator-report/{name}.json",
+        "sha256": f"{name}-sha256",
+    }
+
+
+def operator_report_manifest_fixture(**overrides) -> dict:
+    manifest = {
+        "report_id": "operator-report-fixture",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "report_sections": {key: True for key in REQUIRED_REPORT_SECTIONS},
+        "report_bindings": {
+            key: operator_report_binding_fixture(key)
+            for key in REQUIRED_REPORT_BINDINGS
+        },
+        "authority_denial": {
+            key: False for key in OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS
+        },
+        "visible_blockers": [
+            "M001 waits for real WING read-only artifact",
+            "operator review required",
+        ],
+        "next_operator_action": "Run WING read-only preflight with operator.",
+        "audit": {
+            key: f"operator-report/{key}"
+            for key in OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS
+        },
     }
     manifest.update(overrides)
     return manifest
@@ -2160,6 +2202,7 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "integration_policy_manifest": complete_integration_policy_manifest(),
             "safety_kernel_trace_manifest": safety_kernel_trace_manifest_fixture(),
             "no_live_transport_manifest": no_live_transport_manifest_fixture(),
+            "operator_report_manifest": operator_report_manifest_fixture(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": complete_replay_manifest(),
             "fault_recovery_manifest": complete_fault_manifest(),
@@ -3231,6 +3274,7 @@ def test_m019_integration_policy_binding_requires_m018_manifest():
             "integration_policy_manifest": integration_policy_manifest(),
             "safety_kernel_trace_manifest": safety_kernel_trace_manifest_fixture(),
             "no_live_transport_manifest": no_live_transport_manifest_fixture(),
+            "operator_report_manifest": operator_report_manifest_fixture(),
             "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
             "offline_replay_manifest": replay_manifest(),
             "fault_recovery_manifest": fault_manifest(),
@@ -4019,6 +4063,143 @@ def test_m024_operator_report_contract_stays_offline_and_review_bound():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M024 operator report contract is now covered" in current
     assert "M024 operator report contract rail is now automated" in report
+
+
+def test_m025_operator_report_binding_requires_m024_manifest():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M025_PLAN.read_text(encoding="utf-8")
+    adr = M025_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m025 = markdown_table_row(roadmap, "M025")
+    assert m025[1] == "Operator report binding"
+    assert m025[2] == (
+        "Offline integration promotion consumes the operator-report contract "
+        "instead of loose operator_report_bound checks"
+    )
+    assert m025[3] == "M013-M024"
+    assert m025[4] == "high offline"
+    assert m025[5] == "UNIT_VERIFIED gate binding; integration evidence remains pending"
+    assert m025[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "tests/test_evaluation_integration_bundle_contract.py" in memory_eval[3]
+    assert "integration promotion now requires a bound operator-report manifest" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    def binding(name: str) -> dict:
+        return {
+            "status": "passed",
+            "artifact": f"operator-report/{name}.json",
+            "sha256": f"{name}-sha256",
+        }
+
+    def operator_report_manifest(**overrides) -> dict:
+        manifest = {
+            "report_id": "m025-operator-report",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "report_sections": {key: True for key in REQUIRED_REPORT_SECTIONS},
+            "report_bindings": {key: binding(key) for key in REQUIRED_REPORT_BINDINGS},
+            "authority_denial": {
+                key: False for key in OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS
+            },
+            "visible_blockers": [
+                "M001 waits for real WING read-only artifact",
+                "operator review required",
+            ],
+            "next_operator_action": "Run WING read-only preflight with operator.",
+            "audit": {
+                key: f"operator-report/{key}"
+                for key in OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
+    def integration_bundle(**overrides) -> dict:
+        bundle = {
+            "manifest_id": "m025-integration-bundle",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+        }
+        bundle.update(overrides)
+        return bundle
+
+    legacy_result = evaluate_integration_bundle_contract(
+        integration_bundle(operator_report_manifest={})
+    )
+    assert legacy_result["ready_for_integration_evaluation_promotion"] is False
+    assert "operator_report_contract_not_ready" in legacy_result["blockers"]
+    assert "legacy_operator_report_bound_without_contract_manifest" in legacy_result[
+        "blockers"
+    ]
+    assert "operator_report:offline_only_required" in legacy_result["blockers"]
+    assert "operator_report:missing_report_section:current_status" in legacy_result[
+        "blockers"
+    ]
+    assert legacy_result["summary"]["operator_report_ready"] is False
+    assert legacy_result["child_results"]["operator_report"]["status"] == "blocked"
+
+    bound_report_result = evaluate_integration_bundle_contract(
+        integration_bundle(operator_report_manifest=operator_report_manifest())
+    )
+    assert "operator_report_contract_not_ready" not in bound_report_result["blockers"]
+    assert not any(
+        blocker.startswith("operator_report:")
+        for blocker in bound_report_result["blockers"]
+    )
+    assert bound_report_result["summary"]["operator_report_ready"] is True
+    assert (
+        bound_report_result["child_results"]["operator_report"][
+            "ready_for_operator_report_use"
+        ]
+        is True
+    )
+    assert bound_report_result["authority"]["live_authority_granted"] is False
+
+    assert "Integration bundle manifests must consume the operator-report contract" in (
+        completion
+    )
+    assert "M025-CP01" in plan
+    assert "M025-CP02" in plan
+    assert "loose `operator_report_bound` integration checks" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M025 operator report binding is now covered" in current
+    assert "M025 operator report binding rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

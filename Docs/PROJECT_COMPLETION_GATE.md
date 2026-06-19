@@ -94,6 +94,10 @@ promotion. Complete operator-report evidence alone cannot grant live authority,
 close readiness, contact WING/backend, replace accepted real proof, or replace
 operator/hardware validation.
 
+Integration bundle manifests must consume the operator-report contract result
+instead of loose operator_report_bound checks before claiming offline
+integration promotion readiness.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

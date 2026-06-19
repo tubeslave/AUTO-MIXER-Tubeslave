@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T19:32:51Z.
+- Latest heartbeat: 2026-06-19T19:53:39Z.
 
 ## Что сделано
 
@@ -490,8 +490,34 @@ and explicit authority-denial flags before operator-report evidence can support
 offline review use. It still reports no hardware proof, no live write, no
 readiness closure and no live authority.
 
+The M025 operator report binding rail is now automated by
+`tests/test_evaluation_integration_bundle_contract.py` and
+`tests/test_wing_mvp_rails.py::test_m025_operator_report_binding_requires_m024_manifest`.
+It updates `backend/evaluation_integration_bundle_contract.py` and binds it
+through `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M025-operator-report-binding.md`,
+`Docs/adr/operator-report-binding-20260619.md`, `Docs/CURRENT_STATE.md` and
+this report. Offline integration promotion now consumes the M024
+operator-report contract through `operator_report_manifest`; loose
+`operator_report_bound` integration checks remain context only and cannot
+satisfy operator-report requirements without the bound M024 contract manifest.
+Integration bundles surface the same failure through the `operator_report:`
+child prefix. It still reports no hardware proof, no live write, no readiness
+closure and no live authority.
+
 ## Проверка
 
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_evaluation_integration_bundle_contract.py -q`:
+  `11 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_report_contract.py -q`:
+  `5 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m025_operator_report_binding_requires_m024_manifest -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `38 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4147 passed, 1 skipped, 1 warning`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_operator_report_contract.py -q`:
   `5 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m024_operator_report_contract_stays_offline_and_review_bound -q`:

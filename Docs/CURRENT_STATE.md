@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T19:32:51Z
+Generated: 2026-06-19T19:53:39Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T19:32:51Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `8931def6 Bind no live transport into integration bundle`
+  `112bf765 Add operator report contract`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -486,6 +486,19 @@ Generated: 2026-06-19T19:32:51Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so operator-report
   evidence cannot become hardware proof or live readiness.
+- M025 operator report binding is now covered by
+  `tests/test_evaluation_integration_bundle_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m025_operator_report_binding_requires_m024_manifest`.
+  The updated `backend/evaluation_integration_bundle_contract.py` module now
+  consumes `operator_report_manifest` from M024 before reporting offline
+  integration promotion readiness. Loose `operator_report_bound` integration
+  checks remain visible as integration-check context, but cannot satisfy
+  operator-report requirements without the bound M024 contract manifest.
+  Operator-report contract failures surface through the `operator_report:`
+  child prefix. It still keeps `live_authority_granted: false`,
+  `readiness_closure_allowed: false`, `live_write: false` and
+  `hardware_evidence: false`, so operator-report binding cannot become
+  hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -496,4 +509,4 @@ Generated: 2026-06-19T19:32:51Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4144 passed, 1 skipped, 1 warning`.
+  `4147 passed, 1 skipped, 1 warning`.
