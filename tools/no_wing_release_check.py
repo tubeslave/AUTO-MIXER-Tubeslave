@@ -10037,6 +10037,15 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
         violations.append(
             "wing_readonly_preflight_review_decision_artifact_roots_count_mismatch"
         )
+    if accepted_candidate_artifact_root_contract_valid:
+        expected_artifact_roots = [
+            WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+            for _source_id in accepted_source_ids
+        ]
+        if accepted_candidate_artifact_roots != expected_artifact_roots:
+            violations.append(
+                "wing_readonly_preflight_review_decision_artifact_roots_mismatch"
+            )
     if accepted_source_ids and not accepted_candidate_artifact_root_contract_valid:
         if (
             WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER

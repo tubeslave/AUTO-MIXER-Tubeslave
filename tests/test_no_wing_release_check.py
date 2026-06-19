@@ -8028,6 +8028,44 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_artifact_ro
     )
 
 
+def test_no_wing_release_check_blocks_wing_preflight_review_decision_artifact_root_mismatch(
+    monkeypatch,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    stale_artifact_root = "artifacts/wing_readonly_preflight_stale"
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            source_id,
+            summary_updates={
+                "accepted_candidate_artifact_root_contract_valid": True,
+                "accepted_candidate_artifact_roots": [stale_artifact_root],
+                "accepted_candidate_artifact_root_contract_violations_by_source": {},
+            },
+        ),
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert result.detail["accepted_source_ids"] == [source_id]
+    assert result.detail["accepted_candidate_artifact_root_contract_valid"] is True
+    assert result.detail["accepted_candidate_artifact_roots"] == [
+        stale_artifact_root
+    ]
+    assert (
+        "wing_readonly_preflight_review_decision_artifact_roots_mismatch"
+        in result.detail["violations"]
+    )
+    assert summary_payload["accepted_candidate_artifact_root_contract_valid"] is True
+    assert summary_payload["accepted_candidate_artifact_roots"] == [
+        stale_artifact_root
+    ]
+
+
 def test_no_wing_release_check_blocks_wing_preflight_review_decision_verifier_ws_candidate(
     monkeypatch,
 ):
