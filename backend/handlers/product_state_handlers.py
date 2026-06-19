@@ -2642,11 +2642,14 @@ def register_handlers(server):
 
     def plan_change_from_preflight(result, change, change_index):
         safety = result.get("safety") if isinstance(result.get("safety"), dict) else {}
+        current_allowed = live_write_kind_set_for_safety_surface()
         allowed = set(safety.get("allowed_live_write_kinds") or [])
         if not allowed:
-            allowed = PROVEN_LIVE_WRITE_KIND_SET
+            allowed = set(current_allowed)
+        else:
+            allowed &= current_allowed
         value_type = str(change.get("value_type") or "").strip().lower()
-        if value_type not in PROVEN_LIVE_WRITE_KIND_SET or value_type not in allowed:
+        if value_type not in current_allowed or value_type not in allowed:
             return None, "preflight_change_value_type_not_plan_eligible"
         channel = change.get("channel")
         if channel is None:
@@ -2910,7 +2913,7 @@ def register_handlers(server):
         if not isinstance(change, dict):
             return None, "invalid_planned_change"
         value_type = str(change.get("value_type") or "").strip().lower()
-        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
+        if value_type not in live_write_kind_set_for_safety_surface():
             return None, "planned_change_value_type_not_dry_run_eligible"
         channel = change.get("channel")
         if channel is None:
@@ -4977,7 +4980,7 @@ def register_handlers(server):
             if safety.get(field) not in (False, None):
                 blockers.append(policy_memory_draft_blocker(f"safety_{field}_true"))
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
+        if not allowed or allowed - live_write_kind_set_for_safety_surface():
             blockers.append(
                 policy_memory_draft_blocker("safety_allowed_live_write_kinds_widened")
             )
@@ -5020,7 +5023,7 @@ def register_handlers(server):
                     )
                 )
         value_type = str(row.get("value_type") or "").strip().lower()
-        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
+        if value_type not in live_write_kind_set_for_safety_surface():
             blockers.append(
                 policy_memory_draft_blocker(
                     "policy_evidence_value_type_not_memory_allowed",
@@ -5313,7 +5316,7 @@ def register_handlers(server):
             if safety.get(field) not in (False, None):
                 blockers.append(policy_memory_writer_blocker(f"safety_{field}_true"))
         allowed = set(safety.get("allowed_live_write_kinds") or [])
-        if not allowed or allowed - PROVEN_LIVE_WRITE_KIND_SET:
+        if not allowed or allowed - live_write_kind_set_for_safety_surface():
             blockers.append(
                 policy_memory_writer_blocker("safety_allowed_live_write_kinds_widened")
             )
@@ -5378,7 +5381,7 @@ def register_handlers(server):
                 )
         evidence = record.get("evidence") if isinstance(record.get("evidence"), dict) else {}
         value_type = str(evidence.get("value_type") or "").strip().lower()
-        if value_type not in PROVEN_LIVE_WRITE_KIND_SET:
+        if value_type not in live_write_kind_set_for_safety_surface():
             blockers.append(
                 policy_memory_writer_blocker(
                     "memory_draft_record_value_type_not_allowed",
