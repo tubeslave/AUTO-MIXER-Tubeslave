@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T13:52:42Z.
+- Latest heartbeat: 2026-06-19T14:00:59Z.
 
 ## Что сделано
 
@@ -146,6 +146,10 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
+The current state document is also synchronized with `e8a38bc0` and the latest
+state/evidence commit `74f063d1`; this synchronization did not change product
+runtime behavior.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -268,6 +272,10 @@ grant live authority.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:00:59Z`, latest
+  verified product/runtime commit `e8a38bc0`, latest state/evidence commit
+  `74f063d1`, latest no-WING artifact
+  `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
@@ -289,8 +297,8 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `e8a38bc0` is the latest verified
-  product/runtime commit and found no real WING read-only artifact under
+- Heartbeat reconciliation confirmed `Docs/CURRENT_STATE.md` is synchronized
+  with `e8a38bc0`/`74f063d1` and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
 ## Оставшаяся работа

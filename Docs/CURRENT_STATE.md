@@ -1,13 +1,15 @@
 # Current State
 
-Generated: 2026-06-19T13:29:26Z
+Generated: 2026-06-19T14:00:59Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `80e625a4 Check no-WING coverage field lines`
+  `e8a38bc0 Verify no-WING coverage in manifest gate`
+- Latest verified autopilot state/evidence commit:
+  `74f063d1 Record no-WING manifest gate evidence`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -52,8 +54,8 @@ Generated: 2026-06-19T13:29:26Z
   `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, `ffddb646`,
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
   `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`,
-  `ff8a70ff`, `2f8bb432`, `1ff17877`, `41a60af6`, `7de7bfe1`, and
-  `80e625a4`.
+  `ff8a70ff`, `2f8bb432`, `1ff17877`, `41a60af6`, `7de7bfe1`,
+  `80e625a4`, and `e8a38bc0`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -187,11 +189,17 @@ Generated: 2026-06-19T13:29:26Z
   `0` unexpected or interesting missing safety/evidence keys.
 - The no-WING top-level Markdown coverage section now also self-checks its own
   required field lines. The fresh no-WING bundle
-  `artifacts/no_wing_release_check/20260619T132625Z_no_wing_release_check`
+  `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`
   reports `no_wing_summary_markdown_top_level_coverage_missing_field_lines: []`,
   `no_wing_summary_markdown_top_level_coverage_field_lines_rendered: true`,
   `live_authority_granted: false`, `readiness_closure_allowed_by_packet: false`
   and `0` overall `summary.json` keys missing from `summary.md`.
+- The detached no-WING artifact-manifest verifier and the WING read-only
+  preflight runner now require those top-level coverage field-line checks from
+  both JSON and Markdown before any backend/WING session. The same fresh bundle
+  passed `tools/verify_no_wing_artifact_manifest.py` with `failed_checks: []`,
+  `contacts_wing: false`, `contacts_backend: false` and
+  `live_authority_granted: false`.
 
 ## Unresolved unknowns
 
@@ -201,5 +209,5 @@ Generated: 2026-06-19T13:29:26Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `80e625a4` passed with
-  `4062 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `e8a38bc0` passed with
+  `4065 passed, 1 skipped, 1 warning`.
