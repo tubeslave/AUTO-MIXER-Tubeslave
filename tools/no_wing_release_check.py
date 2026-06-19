@@ -9925,6 +9925,22 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     accepted_candidate_artifact_root_contract_valid = (
         summary.get("accepted_candidate_artifact_root_contract_valid") is True
     )
+    accepted_candidate_verifier_ws_proof_source_ids = (
+        list(summary.get("accepted_candidate_verifier_ws_proof_source_ids"))
+        if isinstance(summary.get("accepted_candidate_verifier_ws_proof_source_ids"), list)
+        else []
+    )
+    accepted_candidate_verifier_ws_proof_violations_by_source = (
+        dict(summary.get("accepted_candidate_verifier_ws_proof_violations_by_source"))
+        if isinstance(
+            summary.get("accepted_candidate_verifier_ws_proof_violations_by_source"),
+            Mapping,
+        )
+        else {}
+    )
+    accepted_candidate_verifier_ws_proof_valid = (
+        summary.get("accepted_candidate_verifier_ws_proof_valid") is True
+    )
     accepted_candidate_request_sequence_source_ids = (
         list(summary.get("accepted_candidate_request_sequence_source_ids"))
         if isinstance(summary.get("accepted_candidate_request_sequence_source_ids"), list)
@@ -10033,6 +10049,24 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
             violations.append(
                 "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_artifact_root"
             )
+    if accepted_candidate_verifier_ws_proof_valid and (
+        accepted_candidate_verifier_ws_proof_source_ids != accepted_source_ids
+    ):
+        violations.append(
+            "wing_readonly_preflight_review_decision_verifier_ws_proof_sources_mismatch"
+        )
+    if accepted_source_ids and not accepted_candidate_verifier_ws_proof_valid:
+        if (
+            WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER
+            not in blocked_by
+        ):
+            violations.append(
+                "wing_readonly_preflight_review_decision_verifier_ws_proof_blocker_missing"
+            )
+        if summary.get("manual_readiness_update_candidate_available") is True:
+            violations.append(
+                "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_verifier_ws_proof"
+            )
     if accepted_source_ids and not accepted_candidate_request_sequence_contract_valid:
         if WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER not in blocked_by:
             violations.append(
@@ -10111,6 +10145,15 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     detail["accepted_candidate_artifact_roots"] = accepted_candidate_artifact_roots
     detail["accepted_candidate_artifact_root_contract_violations_by_source"] = (
         accepted_candidate_artifact_root_contract_violations_by_source
+    )
+    detail["accepted_candidate_verifier_ws_proof_valid"] = (
+        accepted_candidate_verifier_ws_proof_valid
+    )
+    detail["accepted_candidate_verifier_ws_proof_source_ids"] = (
+        accepted_candidate_verifier_ws_proof_source_ids
+    )
+    detail["accepted_candidate_verifier_ws_proof_violations_by_source"] = (
+        accepted_candidate_verifier_ws_proof_violations_by_source
     )
     detail["accepted_candidate_request_sequence_contract_valid"] = (
         accepted_candidate_request_sequence_contract_valid
@@ -21268,6 +21311,12 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_candidate_artifact_root_contract_violations_by_source = detail.get(
             "accepted_candidate_artifact_root_contract_violations_by_source"
         )
+        accepted_candidate_verifier_ws_proof_source_ids = detail.get(
+            "accepted_candidate_verifier_ws_proof_source_ids"
+        )
+        accepted_candidate_verifier_ws_proof_violations_by_source = detail.get(
+            "accepted_candidate_verifier_ws_proof_violations_by_source"
+        )
         accepted_candidate_request_sequence_source_ids = detail.get(
             "accepted_candidate_request_sequence_source_ids"
         )
@@ -21386,6 +21435,22 @@ def wing_readonly_preflight_review_decision_summary(
                 dict(accepted_candidate_artifact_root_contract_violations_by_source)
                 if isinstance(
                     accepted_candidate_artifact_root_contract_violations_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_verifier_ws_proof_valid": (
+                detail.get("accepted_candidate_verifier_ws_proof_valid") is True
+            ),
+            "accepted_candidate_verifier_ws_proof_source_ids": (
+                list(accepted_candidate_verifier_ws_proof_source_ids)
+                if isinstance(accepted_candidate_verifier_ws_proof_source_ids, list)
+                else []
+            ),
+            "accepted_candidate_verifier_ws_proof_violations_by_source": (
+                dict(accepted_candidate_verifier_ws_proof_violations_by_source)
+                if isinstance(
+                    accepted_candidate_verifier_ws_proof_violations_by_source,
                     Mapping,
                 )
                 else {}

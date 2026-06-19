@@ -7711,6 +7711,12 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         ]
         == {}
     )
+    assert result.detail["accepted_candidate_verifier_ws_proof_valid"] is False
+    assert result.detail["accepted_candidate_verifier_ws_proof_source_ids"] == []
+    assert (
+        result.detail["accepted_candidate_verifier_ws_proof_violations_by_source"]
+        == {}
+    )
     assert result.detail["accepted_candidate_request_sequence_contract_valid"] is False
     assert result.detail["accepted_candidate_request_sequence_source_ids"] == []
     assert (
@@ -7794,6 +7800,9 @@ def _fake_review_decision_ledger_with_accepted_candidate(
         "accepted_candidate_artifact_root_contract_valid": True,
         "accepted_candidate_artifact_roots": ["artifacts/wing_readonly_preflight"],
         "accepted_candidate_artifact_root_contract_violations_by_source": {},
+        "accepted_candidate_verifier_ws_proof_valid": True,
+        "accepted_candidate_verifier_ws_proof_source_ids": [source_id],
+        "accepted_candidate_verifier_ws_proof_violations_by_source": {},
         "accepted_candidate_request_sequence_contract_valid": True,
         "accepted_candidate_request_sequence_source_ids": [source_id],
         "accepted_candidate_request_sequence_contract_violations_by_source": {},
@@ -8016,6 +8025,54 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_artifact_ro
     assert (
         "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_artifact_root"
         in result.detail["violations"]
+    )
+
+
+def test_no_wing_release_check_blocks_wing_preflight_review_decision_verifier_ws_candidate(
+    monkeypatch,
+):
+    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    verifier_ws_violations_by_source = {
+        source_id: ["artifact_manifest_verifier_websocket_opened_after_pass_not_true"]
+    }
+
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            source_id,
+            summary_updates={
+                "accepted_candidate_verifier_ws_proof_valid": False,
+                "accepted_candidate_verifier_ws_proof_source_ids": [],
+                "accepted_candidate_verifier_ws_proof_violations_by_source": (
+                    verifier_ws_violations_by_source
+                ),
+            },
+        ),
+    )
+
+    result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
+
+    assert result.status == "failed"
+    assert result.detail["accepted_candidate_verifier_ws_proof_valid"] is False
+    assert result.detail["accepted_candidate_verifier_ws_proof_source_ids"] == []
+    assert (
+        result.detail["accepted_candidate_verifier_ws_proof_violations_by_source"]
+        == verifier_ws_violations_by_source
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_verifier_ws_proof_blocker_missing"
+        in result.detail["violations"]
+    )
+    assert (
+        "wing_readonly_preflight_review_decision_manual_candidate_not_blocked_by_verifier_ws_proof"
+        in result.detail["violations"]
+    )
+    assert summary_payload["accepted_candidate_verifier_ws_proof_valid"] is False
+    assert (
+        summary_payload["accepted_candidate_verifier_ws_proof_violations_by_source"]
+        == verifier_ws_violations_by_source
     )
 
 
