@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T12:50:36Z
+Generated: 2026-06-19T13:03:53Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `1ff17877 Surface handoff sidecar markdown fields`
+  `41a60af6 Surface remaining handoff markdown fields`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -52,7 +52,7 @@ Generated: 2026-06-19T12:50:36Z
   `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, `ffddb646`,
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
   `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`,
-  `ff8a70ff`, `2f8bb432`, and `1ff17877`.
+  `ff8a70ff`, `2f8bb432`, `1ff17877`, and `41a60af6`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -175,6 +175,10 @@ Generated: 2026-06-19T12:50:36Z
   backend prestart gate, and Project Director selected-action sidecar denial
   markers. The fresh no-WING bundle exposes all selected handoff sidecar and
   prestart contract Markdown keys checked for this slice.
+- The no-WING Markdown summary now also renders the remaining selected handoff
+  sidecar, supervised proof-plan, manual-artifact, blocker-anchor and next
+  proof-plan contract fields. The fresh no-WING bundle exposes all selected
+  `14` remaining safety/evidence JSON keys in `summary.md`.
 
 ## Unresolved unknowns
 
@@ -184,5 +188,5 @@ Generated: 2026-06-19T12:50:36Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `1ff17877` passed with
+  but the latest verified full-suite run for `41a60af6` passed with
   `4061 passed, 1 skipped, 1 warning`.
