@@ -329,6 +329,10 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     assert report["autonomy_evidence_overlay"]["summary"]["remediation_required_target_ids"] == [
         "gain_trim_supervised_promotion"
     ]
+    assert report["autonomy_evidence_overlay"]["summary"]["no_current_evidence_target_ids"] == []
+    assert [
+        row["value_type"] for row in report["autonomy_evidence_overlay"]["rows"]
+    ] == ["fader", "gain"]
     assert report["autonomy_mode_transition_gate"]["safety"]["automatic_mode_change_allowed"] is False
     assert report["autonomy_mode_transition_gate"]["summary"]["autonomous_apply_allowed_modes"] == []
     assert report["autonomy_mode_transition_gate"]["summary"]["full_auto_readiness_gap_bucket_counts"]["read_surface"] > 0

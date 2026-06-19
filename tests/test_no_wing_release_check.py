@@ -10054,11 +10054,11 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "operator_required": True,
             },
             "summary": {
-                "target_count": 3,
+                "target_count": 2,
                 "status_counts": {
                     "dry_run_only": 1,
                     "manual_safety_review_candidate": 0,
-                    "no_current_evidence": 2,
+                    "no_current_evidence": 1,
                     "remediation_required": 0,
                 },
                 "manual_safety_review_candidate_target_ids": [],
@@ -10066,7 +10066,6 @@ def valid_proof_report_with_gap_rollup() -> dict:
                 "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
                 "no_current_evidence_target_ids": [
                     "fader_supervised_promotion",
-                    "pan_phase_supervised_promotion",
                 ],
                 "autonomous_ready_target_ids": [],
                 "global_blockers": [
@@ -10115,26 +10114,6 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "remediation_action_ids": [],
                     "blockers": ["physical_proof_required_for_promotion"],
                     "next_required_actions": ["Run one small supervised gain proof on WING."],
-                },
-                {
-                    "id": "pan_autonomy_evidence_overlay",
-                    "target_id": "pan_phase_supervised_promotion",
-                    "value_type": "pan",
-                    "status": "no_current_evidence",
-                    "safety_review_candidate": False,
-                    "supervised_live_allowed_static": False,
-                    "autonomous_ready": False,
-                    "proof_artifact_count": 0,
-                    "physical_candidate_count": 0,
-                    "dry_run_ready_count": 0,
-                    "blocked_artifact_count": 0,
-                    "remediation_action_count": 0,
-                    "physical_candidate_proof_ids": [],
-                    "dry_run_ready_proof_ids": [],
-                    "blocked_proof_ids": [],
-                    "remediation_action_ids": [],
-                    "blockers": ["proof_artifact_missing"],
-                    "next_required_actions": ["Run one physical supervised pan proof."],
                 },
             ],
         },
@@ -10663,13 +10642,55 @@ def test_no_wing_release_check_validates_autonomy_evidence_overlay_schema(tmp_pa
 
     assert result.status == "passed"
     assert result.detail["overlay_status"] == "dry_run_only"
-    assert result.detail["row_count"] == 3
+    assert result.detail["row_count"] == 2
+    assert result.detail["expected_value_types"] == ["fader", "gain"]
     assert result.detail["dry_run_only_target_ids"] == ["gain_trim_supervised_promotion"]
     assert result.detail["no_current_evidence_target_ids"] == [
         "fader_supervised_promotion",
-        "pan_phase_supervised_promotion",
     ]
     assert result.detail["violations"] == []
+
+
+def test_no_wing_release_check_rejects_autonomy_overlay_outside_wing_boundary(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    overlay = payload["autonomy_evidence_overlay"]
+    overlay["summary"]["target_count"] = 3
+    overlay["summary"]["status_counts"]["no_current_evidence"] = 2
+    overlay["summary"]["no_current_evidence_target_ids"] = [
+        "fader_supervised_promotion",
+        "pan_phase_supervised_promotion",
+    ]
+    overlay["rows"].append(
+        {
+            "id": "pan_autonomy_evidence_overlay",
+            "target_id": "pan_phase_supervised_promotion",
+            "value_type": "pan",
+            "status": "no_current_evidence",
+            "safety_review_candidate": False,
+            "supervised_live_allowed_static": False,
+            "autonomous_ready": False,
+            "proof_artifact_count": 0,
+            "physical_candidate_count": 0,
+            "dry_run_ready_count": 0,
+            "blocked_artifact_count": 0,
+            "remediation_action_count": 0,
+            "physical_candidate_proof_ids": [],
+            "dry_run_ready_proof_ids": [],
+            "blocked_proof_ids": [],
+            "remediation_action_ids": [],
+            "blockers": ["proof_artifact_missing"],
+            "next_required_actions": ["Run one physical supervised pan proof."],
+        }
+    )
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_autonomy_overlay(report_path)
+
+    assert result.status == "failed"
+    assert result.detail["expected_value_types"] == ["fader", "gain"]
+    assert "autonomy_overlay_row_2_unexpected_value_type" in result.detail["violations"]
+    assert "autonomy_overlay_fader_gain_rows_missing" in result.detail["violations"]
 
 
 def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
@@ -13963,11 +13984,12 @@ def test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay(tmp_path
         duration_sec=1.0,
         detail={
             "overlay_status": "dry_run_only",
-            "row_count": 3,
+            "row_count": 2,
+            "expected_value_types": ["fader", "gain"],
             "status_counts": {
                 "dry_run_only": 1,
                 "manual_safety_review_candidate": 0,
-                "no_current_evidence": 2,
+                "no_current_evidence": 1,
                 "remediation_required": 0,
             },
             "manual_safety_review_candidate_target_ids": [],
@@ -13975,7 +13997,6 @@ def test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay(tmp_path
             "dry_run_only_target_ids": ["gain_trim_supervised_promotion"],
             "no_current_evidence_target_ids": [
                 "fader_supervised_promotion",
-                "pan_phase_supervised_promotion",
             ],
             "global_blockers": [
                 "overlay_does_not_modify_safety_rows",

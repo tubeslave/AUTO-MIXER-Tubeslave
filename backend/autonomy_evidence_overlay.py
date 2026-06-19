@@ -11,9 +11,9 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Tuple
 try:
-    from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 except ImportError:  # pragma: no cover - package import compatibility
-    from backend.operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+    from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
 try:
     from autonomy_promotion_readiness import iter_promotion_readiness_rows
@@ -37,7 +37,7 @@ TARGET_BY_VALUE_TYPE = {
     "gain": "gain_trim_supervised_promotion",
     "pan": "pan_phase_supervised_promotion",
 }
-PROMOTION_VALUE_TYPES = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+PROMOTION_VALUE_TYPES = tuple(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
 
 @dataclass(frozen=True)

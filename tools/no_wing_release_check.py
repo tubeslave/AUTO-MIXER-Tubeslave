@@ -32,6 +32,7 @@ if str(REPO_ROOT) not in sys.path:
 from backend.operator_mode_policy import (
     CURRENT_PROVEN_LIVE_WRITE_KINDS,
     MODE_SUPERVISED,
+    WING_DEPLOYMENT_LIVE_WRITE_KINDS,
     build_operator_mode_status,
 )  # noqa: E402
 from backend.bus_group_main_dca_physical_readback_contract import (  # noqa: E402
@@ -16741,6 +16742,7 @@ def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> Chec
     remediation_ids: list[str] = []
     dry_run_ids: list[str] = []
     no_evidence_ids: list[str] = []
+    expected_value_types = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
     if load_error is not None:
         violations.append(load_error)
@@ -16799,7 +16801,6 @@ def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> Chec
 
         row_count = len(rows)
         row_value_types: set[str] = set()
-        expected_value_types = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
         expected_row_statuses = {
             "manual_safety_review_candidate",
             "remediation_required",
@@ -16856,6 +16857,7 @@ def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> Chec
 
     detail["overlay_status"] = overlay_status
     detail["row_count"] = row_count
+    detail["expected_value_types"] = sorted(expected_value_types)
     detail["status_counts"] = dict(status_counts)
     detail["manual_safety_review_candidate_target_ids"] = manual_review_ids
     detail["remediation_required_target_ids"] = remediation_ids

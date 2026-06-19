@@ -100,9 +100,8 @@ def test_overlay_maps_physical_fader_candidate_and_legacy_gain_remediation_to_ta
     assert overlay["summary"]["remediation_required_target_ids"] == [
         "gain_trim_supervised_promotion"
     ]
-    assert "pan_phase_supervised_promotion" in overlay["summary"][
-        "no_current_evidence_target_ids"
-    ]
+    assert overlay["summary"]["no_current_evidence_target_ids"] == []
+    assert "pan" not in rows
 
     fader = rows["fader"]
     assert fader["status"] == "manual_safety_review_candidate"
@@ -130,11 +129,9 @@ def test_overlay_reports_dry_run_only_and_no_current_evidence_without_promotion(
     assert overlay["summary"]["dry_run_only_target_ids"] == ["gain_trim_supervised_promotion"]
     assert overlay["summary"]["no_current_evidence_target_ids"] == [
         "fader_supervised_promotion",
-        "pan_phase_supervised_promotion",
     ]
     assert rows["gain"]["status"] == "dry_run_only"
     assert rows["gain"]["dry_run_ready_proof_ids"] == ["dry-gain-proof"]
     assert rows["fader"]["status"] == "no_current_evidence"
     assert "proof_artifact_missing" in rows["fader"]["blockers"]
-    assert rows["pan"]["status"] == "no_current_evidence"
-    assert "proof_artifact_missing" in rows["pan"]["blockers"]
+    assert "pan" not in rows
