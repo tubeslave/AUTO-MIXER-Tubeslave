@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T12:31:07Z
+Generated: 2026-06-19T12:40:32Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `ff8a70ff Surface WING summary flags in no-WING markdown`
+  `2f8bb432 Surface proof plan summary flags in no-WING markdown`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -51,8 +51,8 @@ Generated: 2026-06-19T12:31:07Z
   `12ee8214`, `b0c71460`, `d84b4a63`, `7a616805`, `93e66009`, and
   `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, `ffddb646`,
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
-  `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`, and
-  `ff8a70ff`.
+  `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`,
+  `ff8a70ff`, and `2f8bb432`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -165,6 +165,11 @@ Generated: 2026-06-19T12:31:07Z
   expected artifacts, command binding, operator sequence, operator sequence
   step gate and supervised proof-plan fields. The fresh no-WING bundle exposes
   all `33` `wing_readonly_*summary_surface*` JSON keys in `summary.md`.
+- The no-WING Markdown summary now also renders next WING proof-plan
+  candidate-contract and required-fields summary-surface required/readiness/live
+  authority flags, plus the Project Director selected-action summary-surface
+  required flag. The fresh no-WING bundle exposes all `90` `summary_surface`
+  JSON keys in `summary.md`.
 
 ## Unresolved unknowns
 
@@ -174,5 +179,5 @@ Generated: 2026-06-19T12:31:07Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `ff8a70ff` passed with
+  but the latest verified full-suite run for `2f8bb432` passed with
   `4061 passed, 1 skipped, 1 warning`.

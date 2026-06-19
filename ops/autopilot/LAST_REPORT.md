@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T12:31:07Z.
+- Latest heartbeat: 2026-06-19T12:40:32Z.
 
 ## Что сделано
 
@@ -120,6 +120,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   packet summary-surface required/readiness/live-authority flags for packet
   safety, expected artifacts, command binding, operator sequence, operator
   sequence step gate and supervised proof-plan fields.
+- `2f8bb432` - no-WING Markdown summary now renders next WING proof-plan
+  candidate-contract and required-fields summary-surface denial flags, plus the
+  Project Director selected-action summary-surface required flag.
 
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
@@ -209,10 +212,13 @@ grant live authority.
 - WING read-only summary Markdown coverage check against the fresh no-WING
   bundle: `33` JSON `wing_readonly_*summary_surface*` keys, `0` missing from
   `summary.md`.
+- Summary-surface Markdown coverage check against the fresh no-WING bundle:
+  `90` JSON `summary_surface` keys, `0` missing from `summary.md`; next WING
+  proof-plan coverage: `30` keys, `0` missing.
 - `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
 - `python tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
-  `artifacts/no_wing_release_check/20260619T123039Z_no_wing_release_check`.
+  `artifacts/no_wing_release_check/20260619T123953Z_no_wing_release_check`.
 - Authority flags remained safe: no WING/backend contact, no live write, no
   readiness closure, no live authority.
 - CP04 handoff report:
@@ -231,7 +237,7 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `ff8a70ff` is the latest verified
+- Heartbeat reconciliation confirmed `2f8bb432` is the latest verified
   product/runtime commit and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
