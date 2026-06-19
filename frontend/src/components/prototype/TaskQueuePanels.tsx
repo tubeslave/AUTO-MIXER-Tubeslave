@@ -589,6 +589,10 @@ export function TaskQueueWorkspace({
   const supervisedApplyBlockerNotice = blockedReasonMessages.length > 0 && modalTask
     ? `Promotion planning blocked. Supervised apply remains blocked: ${blockedReasonMessages[0]}`
     : '';
+  const guardedConfirmSupervisedApply = (taskId: string) => {
+    if (integrationBundleApplyBlocked) return;
+    actions.confirmSupervisedApply(taskId);
+  };
 
   return (
     <div className="relative grid h-full grid-rows-[auto_1fr_118px] gap-2">
@@ -670,7 +674,7 @@ export function TaskQueueWorkspace({
           integrationBundleApplyBlocked={integrationBundleApplyBlocked}
           integrationBundleBlockerNotice={supervisedApplyBlockerNotice}
           onClose={actions.closeSupervisedProposal}
-          onConfirm={() => actions.confirmSupervisedApply(modalTask.id)}
+          onConfirm={() => guardedConfirmSupervisedApply(modalTask.id)}
           task={modalTask}
           ui={ui}
         />

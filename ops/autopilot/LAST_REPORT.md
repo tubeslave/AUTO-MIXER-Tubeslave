@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T22:39:01Z.
+- Latest heartbeat: 2026-06-19T22:48:20Z.
 
 ## Что сделано
 
@@ -719,7 +719,32 @@ path is true. This is local frontend enforcement only: no queue mutation,
 backend/WING contact, live transport, console apply, readiness closure, Full
 Autonomous readiness or live authority is introduced.
 
+The M038 Supervised Apply confirm callback blocker guard rail is now automated
+by `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m038_supervised_apply_confirm_callback_is_guarded_by_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the guarded callback through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M038-supervised-apply-confirm-callback-blocker-guard.md`,
+`Docs/adr/supervised-apply-confirm-callback-blocker-guard-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The modal confirm callback now calls
+`guardedConfirmSupervisedApply`, which returns before dispatching
+`actions.confirmSupervisedApply` while integration-bundle blockers are visible.
+This is local frontend dispatch hardening only: no queue mutation,
+backend/WING contact, live transport, console apply, readiness closure, Full
+Autonomous readiness or live authority is introduced.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `54 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m038_supervised_apply_confirm_callback_is_guarded_by_blocker -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `51 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4164 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `53 passed`.

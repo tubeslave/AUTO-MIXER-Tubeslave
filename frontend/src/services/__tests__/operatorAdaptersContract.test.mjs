@@ -4384,6 +4384,19 @@ test('supervised apply modal blocks confirm when integration bundle is blocked',
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply confirm callback is guarded by integration bundle blocker', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /guardedConfirmSupervisedApply/);
+  assert.match(source, /if \(integrationBundleApplyBlocked\) return/);
+  assert.match(source, /actions\.confirmSupervisedApply\(taskId\)/);
+  assert.match(source, /onConfirm=\{\(\) => guardedConfirmSupervisedApply\(modalTask\.id\)\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('dashboard mixer header uses the selected channel dynamically', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'),

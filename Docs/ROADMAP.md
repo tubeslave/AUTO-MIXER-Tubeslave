@@ -61,6 +61,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M035 | Task Queue integration bundle blocker notice | Task Queue shows a read-only integration bundle blocker notice before proposal actions when promotion planning is blocked | M034 | high offline frontend | UNIT_VERIFIED read-only Task Queue notice; live authority remains blocked | PENDING |
 | M036 | Supervised Apply integration bundle blocker notice | Supervised Apply modal shows a read-only integration bundle blocker notice before supervised apply review | M035 | high offline frontend | UNIT_VERIFIED read-only Supervised Apply notice; live authority remains blocked | PENDING |
 | M037 | Supervised Apply integration bundle blocker enforcement | Supervised Apply modal and task actions block apply confirm when promotion planning is blocked | M036 | high offline frontend | UNIT_VERIFIED read-only Supervised Apply enforcement; live authority remains blocked | PENDING |
+| M038 | Supervised Apply confirm callback blocker guard | Supervised Apply confirm callback returns before dispatch while promotion planning is blocked | M037 | high offline frontend | UNIT_VERIFIED guarded confirm callback; live authority remains blocked | PENDING |
 
 ## Active milestone
 
