@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T19:22:15Z
+Generated: 2026-06-19T19:32:51Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T19:22:15Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `195e7ff6 Add no live transport contract`
+  `8931def6 Bind no live transport into integration bundle`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -474,6 +474,18 @@ Generated: 2026-06-19T19:22:15Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so no-live-transport
   binding cannot become hardware proof or live readiness.
+- M024 operator report contract is now covered by
+  `tests/test_operator_report_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m024_operator_report_contract_stays_offline_and_review_bound`.
+  The new `backend/operator_report_contract.py` module validates that
+  operator-facing integration reports include current status, authority denial,
+  evidence summaries, child contract results, visible blockers, next operator
+  action, rollback and audit trail sections, plus bound child-result artifacts
+  and explicit authority-denial flags before reporting operator-report evidence
+  usable for offline review. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so operator-report
+  evidence cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -484,4 +496,4 @@ Generated: 2026-06-19T19:22:15Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4138 passed, 1 skipped, 1 warning`.
+  `4144 passed, 1 skipped, 1 warning`.

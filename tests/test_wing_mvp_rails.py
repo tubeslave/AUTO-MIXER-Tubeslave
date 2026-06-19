@@ -34,6 +34,13 @@ from backend.offline_replay_evaluation_contract import (
     REQUIRED_SCENARIOS,
     evaluate_offline_replay_evaluation_contract,
 )
+from backend.operator_report_contract import (
+    REQUIRED_AUDIT_FIELDS as OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS,
+    REQUIRED_AUTHORITY_DENIAL_FLAGS as OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS,
+    REQUIRED_REPORT_BINDINGS,
+    REQUIRED_REPORT_SECTIONS,
+    evaluate_operator_report_contract,
+)
 from backend.quality_threshold_policy_contract import (
     REQUIRED_POLICY_CHECKS as THRESHOLD_REQUIRED_POLICY_CHECKS,
     REQUIRED_THRESHOLD_AXES,
@@ -98,6 +105,8 @@ M022_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M022-no-live-transport-contract.m
 M022_ADR = PROJECT_ROOT / "Docs" / "adr" / "no-live-transport-contract-20260619.md"
 M023_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M023-no-live-transport-binding.md"
 M023_ADR = PROJECT_ROOT / "Docs" / "adr" / "no-live-transport-binding-20260619.md"
+M024_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M024-operator-report-contract.md"
+M024_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-report-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -3860,6 +3869,156 @@ def test_m023_no_live_transport_binding_requires_m022_manifest():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M023 no-live-transport binding is now covered" in current
     assert "M023 no-live-transport binding rail is now automated" in report
+
+
+def test_m024_operator_report_contract_stays_offline_and_review_bound():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M024_PLAN.read_text(encoding="utf-8")
+    adr = M024_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m024 = markdown_table_row(roadmap, "M024")
+    assert m024[1] == "Operator report contract"
+    assert m024[2] == (
+        "Offline integration reports prove operator-visible status, blockers, "
+        "authority denial, child evidence and next action before review use"
+    )
+    assert m024[3] == "M013-M023"
+    assert m024[4] == "high offline"
+    assert (
+        m024[5]
+        == "SPECIFIED to UNIT_VERIFIED for operator-report gate; integration binding remains pending"
+    )
+    assert m024[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/operator_report_contract.py`" in memory_eval[2]
+    assert "tests/test_operator_report_contract.py" in memory_eval[3]
+    assert "operator-report evidence cannot grant live authority" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    def binding(name: str) -> dict:
+        return {
+            "status": "passed",
+            "artifact": f"operator-report/{name}.json",
+            "sha256": f"{name}-sha256",
+        }
+
+    def operator_report(**overrides) -> dict:
+        manifest = {
+            "report_id": "m024-operator-report",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "report_sections": {
+                key: True for key in REQUIRED_REPORT_SECTIONS
+            },
+            "report_bindings": {
+                key: binding(key) for key in REQUIRED_REPORT_BINDINGS
+            },
+            "authority_denial": {
+                key: False for key in OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS
+            },
+            "visible_blockers": [
+                "M001 waits for real WING read-only artifact",
+                "operator review required",
+            ],
+            "next_operator_action": "Run WING read-only preflight with operator.",
+            "audit": {
+                key: f"operator-report/{key}"
+                for key in OPERATOR_REPORT_REQUIRED_AUDIT_FIELDS
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
+    incomplete_result = evaluate_operator_report_contract(
+        operator_report(
+            report_sections={"current_status": True},
+            report_bindings={"integration_bundle_artifact": binding("bundle")},
+            authority_denial={"live_authority_granted": False},
+            visible_blockers=[],
+            next_operator_action="",
+            audit={"report_id": "m024-operator-report"},
+        )
+    )
+    assert incomplete_result["ready_for_operator_report_use"] is False
+    assert "missing_report_section:authority_denial" in incomplete_result["blockers"]
+    assert "missing_report_binding:offline_replay_result" in (
+        incomplete_result["blockers"]
+    )
+    assert "missing_authority_denial_flag:readiness_closure_allowed" in (
+        incomplete_result["blockers"]
+    )
+    assert "visible_blockers_required" in incomplete_result["blockers"]
+    assert "next_operator_action_required" in incomplete_result["blockers"]
+    assert incomplete_result["authority"]["live_authority_granted"] is False
+
+    complete_result = evaluate_operator_report_contract(operator_report())
+    assert complete_result["ready_for_operator_report_use"] is True
+    assert complete_result["hardware_evidence"] is False
+    assert complete_result["summary"]["missing_report_sections"] == []
+    assert complete_result["summary"]["missing_report_bindings"] == []
+    assert complete_result["summary"]["non_denied_authority_flags"] == []
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+    assert complete_result["authority"]["live_authority_granted"] is False
+
+    blocked_result = evaluate_operator_report_contract(
+        operator_report(
+            offline_only=False,
+            live_write=True,
+            contacts_wing=True,
+            contacts_backend=True,
+            hardware_evidence=True,
+            readiness_closure_allowed=True,
+            live_authority_granted=True,
+            authority_denial={
+                key: False for key in OPERATOR_REPORT_REQUIRED_AUTHORITY_DENIAL_FLAGS
+            }
+            | {"live_authority_granted": True},
+        )
+    )
+    assert blocked_result["ready_for_operator_report_use"] is False
+    assert "operator_report_forbids_live_write" in blocked_result["blockers"]
+    assert "operator_report_forbids_wing_contact" in blocked_result["blockers"]
+    assert "operator_report_cannot_grant_live_authority" in blocked_result[
+        "blockers"
+    ]
+    assert "authority_not_denied:live_authority_granted" in blocked_result[
+        "blockers"
+    ]
+
+    assert "Operator report candidates must be offline" in completion
+    assert "M024-CP01" in plan
+    assert "M024-CP02" in plan
+    assert "Operator-report evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M024 operator report contract is now covered" in current
+    assert "M024 operator report contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

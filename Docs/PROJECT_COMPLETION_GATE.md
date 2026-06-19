@@ -88,6 +88,12 @@ Integration bundle manifests must consume the no-live-transport contract
 result instead of loose no_live_transport checks before claiming offline
 integration promotion readiness.
 
+Operator report candidates must be offline, evidence-bound and
+operator-visible before they can be used for integration or completion-gate
+promotion. Complete operator-report evidence alone cannot grant live authority,
+close readiness, contact WING/backend, replace accepted real proof, or replace
+operator/hardware validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
