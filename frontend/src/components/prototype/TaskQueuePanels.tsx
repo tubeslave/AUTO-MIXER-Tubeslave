@@ -150,15 +150,17 @@ export function TaskDetailsPanel({
   task,
   ui,
   actions,
+  integrationBundleApplyBlocked = false,
   policy
 }: {
   task: TaskRow;
   ui: UiState;
   actions: UiActions;
+  integrationBundleApplyBlocked?: boolean;
   policy: DecisionPolicy;
 }) {
   const proposal = task.proposal;
-  const applyBlocked = task.canApply === false || task.reviewOnly;
+  const applyBlocked = integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly;
   const blockers = task.applyBlockers ?? [];
   const ensembleEvidence = ensembleEvidenceForTask(task);
 
@@ -240,7 +242,7 @@ export function TaskDetailsPanel({
         {applyBlocked ? (
           <button className="am-button text-audio" onClick={() => focusTaskDetail(actions, task)} type="button">Inspect</button>
         ) : (
-          <button className="am-button text-online" onClick={() => requestTaskApply(task, ui, actions)} type="button">{policy.actionLabel}</button>
+          <button className="am-button text-online" onClick={() => requestTaskApply(task, ui, actions, integrationBundleApplyBlocked)} type="button">{policy.actionLabel}</button>
         )}
         <button className="am-button text-danger" onClick={() => actions.setTaskStatus(task.id, 'Rejected')} type="button">Reject</button>
       </div>

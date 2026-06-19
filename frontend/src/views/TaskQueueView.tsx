@@ -1,4 +1,5 @@
 import { TaskDetailsPanel, TaskQueueWorkspace, type TaskRow } from '../components/prototype/TaskQueuePanels';
+import { directorBlockedReasonMessages } from '../components/dashboard/directorPanelModel';
 import { applyPlanForTask, decisionPolicyForMode, proposalPreviewForTask, safetyEvidenceForTask } from '../mock/automixerData';
 import type { OperatorViewData } from '../services/useOperatorBackend';
 import type { UiActions, UiState } from '../types';
@@ -10,6 +11,7 @@ export function TaskQueue(ui: UiState, actions: UiActions, data: OperatorViewDat
   const policy = decisionPolicyForMode(ui.mode);
   const evidence = safetyEvidenceForTask(selectedTask, ui.mode);
   const applyPlan = applyPlanForTask(selectedTask, ui.mode);
+  const integrationBundleApplyBlocked = directorBlockedReasonMessages(data.directorRuntime.blockedReasons).length > 0;
   return tableView('4. Task Queue', 'Prioritized proposals and operator decisions', (
     <TaskQueueWorkspace
       actions={actions}
@@ -25,5 +27,13 @@ export function TaskQueue(ui: UiState, actions: UiActions, data: OperatorViewDat
       taskRows={taskRows}
       ui={ui}
     />
-  ), <TaskDetailsPanel actions={actions} policy={policy} task={selectedTask} ui={ui} />);
+  ), (
+    <TaskDetailsPanel
+      actions={actions}
+      integrationBundleApplyBlocked={integrationBundleApplyBlocked}
+      policy={policy}
+      task={selectedTask}
+      ui={ui}
+    />
+  ));
 }

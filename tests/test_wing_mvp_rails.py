@@ -137,6 +137,8 @@ M038_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M038-supervised-apply-confirm-cal
 M038_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-confirm-callback-blocker-guard-20260619.md"
 M039_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M039-task-apply-request-helper-blocker-guard.md"
 M039_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-apply-request-helper-blocker-guard-20260619.md"
+M040_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M040-task-details-apply-entrypoint-blocker-guard.md"
+M040_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-apply-entrypoint-blocker-guard-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -5274,6 +5276,80 @@ def test_m039_task_apply_request_helper_is_guarded_by_blocker():
         current
     )
     assert "M039 Task apply request helper blocker guard rail is now automated" in (
+        report
+    )
+
+
+def test_m040_task_details_apply_entrypoint_is_guarded_by_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M040_PLAN.read_text(encoding="utf-8")
+    adr = M040_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    task_queue_view = FRONTEND_TASK_QUEUE_VIEW.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m040 = markdown_table_row(roadmap, "M040")
+    assert m040[1] == "Task Details apply entrypoint blocker guard"
+    assert m040[2] == (
+        "Task Details apply button stays blocked before opening Supervised "
+        "Apply while promotion planning is blocked"
+    )
+    assert m040[3] == "M039"
+    assert m040[4] == "high offline frontend"
+    assert m040[5] == "UNIT_VERIFIED guarded task details apply entrypoint; live authority remains blocked"
+    assert m040[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Details apply entrypoint now stays blocked before opening Supervised Apply when offline integration bundle blockers are visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M040-CP01" in plan
+    assert "M040-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not open Supervised Apply" in adr
+
+    assert "integrationBundleApplyBlocked?: boolean" in task_queue
+    assert "const applyBlocked = integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly" in (
+        task_queue
+    )
+    assert "requestTaskApply(task, ui, actions, integrationBundleApplyBlocked)" in (
+        task_queue
+    )
+    assert "directorBlockedReasonMessages(data.directorRuntime.blockedReasons).length > 0" in (
+        task_queue_view
+    )
+    assert "integrationBundleApplyBlocked={integrationBundleApplyBlocked}" in (
+        task_queue_view
+    )
+    assert "task details apply entrypoint is guarded" in adapter_test
+    assert "Task Details apply entrypoints must fail closed" in completion
+    assert "M040 Task Details apply entrypoint blocker guard is now covered" in (
+        current
+    )
+    assert "M040 Task Details apply entrypoint blocker guard rail is now automated" in (
         report
     )
 
