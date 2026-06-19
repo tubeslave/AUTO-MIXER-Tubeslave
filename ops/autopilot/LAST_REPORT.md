@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T20:44:55Z.
+- Latest heartbeat: 2026-06-19T20:57:47Z.
 
 ## Что сделано
 
@@ -562,7 +562,35 @@ preview-visible integration bundle readiness cannot queue proposals, grant live
 authority, close readiness, contact WING/backend, mark Full Autonomous ready,
 or replace accepted real hardware/operator validation.
 
+The M029 Director runtime integration bundle readiness summary rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m029_director_runtime_surfaces_integration_bundle_readiness_summary`.
+It updates `frontend/src/services/operatorAdapters.ts` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M029-director-runtime-integration-bundle-readiness-summary.md`,
+`Docs/adr/director-runtime-integration-bundle-readiness-summary-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The Director runtime guard now
+consumes M028 `main_pipeline_preview.summary`
+`autonomy_promotion_offline_integration_bundle_*` fields and renders an
+`Integration bundle` status row plus blocked-reason tags for status, blockers,
+missing checks, source authority denial, live authority denial and readiness
+closure denial. The runtime guard remains read-only, so Director-visible
+integration bundle readiness cannot queue proposals, grant live authority,
+close readiness, contact WING/backend, mark Full Autonomous ready, or replace
+accepted real hardware/operator validation.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `48 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m029_director_runtime_surfaces_integration_bundle_readiness_summary -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `42 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4155 passed, 1 skipped, 1 warning`.
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_processing_pipeline_preview_integration_bundle_summary.py -q`:
   `1 passed`.

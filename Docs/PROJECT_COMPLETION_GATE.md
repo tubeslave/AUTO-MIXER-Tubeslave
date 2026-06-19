@@ -116,6 +116,12 @@ Preview-visible integration bundle readiness cannot queue proposals, grant live
 authority, close readiness, contact WING/backend, mark Full Autonomous ready,
 or replace accepted real hardware/operator validation.
 
+Director runtime guards must surface offline integration bundle readiness,
+blockers and authority-denial status as read-only evidence only. Director-visible
+integration bundle readiness cannot queue proposals, grant live authority, close
+readiness, contact WING/backend, mark Full Autonomous ready, or replace
+accepted real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

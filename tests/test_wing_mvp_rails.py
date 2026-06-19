@@ -115,6 +115,8 @@ M027_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M027-operator-adapter-integration
 M027_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-adapter-integration-bundle-readiness-summary-20260619.md"
 M028_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M028-main-pipeline-preview-integration-bundle-readiness-summary.md"
 M028_ADR = PROJECT_ROOT / "Docs" / "adr" / "main-pipeline-preview-integration-bundle-readiness-summary-20260619.md"
+M029_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M029-director-runtime-integration-bundle-readiness-summary.md"
+M029_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-runtime-integration-bundle-readiness-summary-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -4457,6 +4459,85 @@ def test_m028_main_pipeline_preview_surfaces_integration_bundle_readiness_summar
         current
     )
     assert "M028 main pipeline preview integration bundle readiness summary rail is now automated" in (
+        report
+    )
+
+
+def test_m029_director_runtime_surfaces_integration_bundle_readiness_summary():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M029_PLAN.read_text(encoding="utf-8")
+    adr = M029_ADR.read_text(encoding="utf-8")
+    adapter = FRONTEND_OPERATOR_ADAPTER.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m029 = markdown_table_row(roadmap, "M029")
+    assert m029[1] == "Director runtime integration bundle readiness summary"
+    assert m029[2] == (
+        "Director runtime surfaces main pipeline preview integration bundle "
+        "readiness, blockers and authority-denial status for the runtime guard"
+    )
+    assert m029[3] == "M027-M028"
+    assert m029[4] == "high offline frontend"
+    assert m029[5] == "UNIT_VERIFIED read-only Director surface; live authority remains blocked"
+    assert m029[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`frontend/src/services/operatorAdapters.ts`" in memory_eval[2]
+    assert "npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs" in (
+        memory_eval[3]
+    )
+    assert "Director runtime guard now surfaces offline integration bundle readiness" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "DirectorRuntime" in plan
+    assert "M029-CP01" in plan
+    assert "M029-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "does not add a live apply path" in adr
+
+    for field in (
+        "autonomy_promotion_offline_integration_bundle_ready",
+        "autonomy_promotion_offline_integration_bundle_status",
+        "autonomy_promotion_offline_integration_bundle_blockers",
+        "autonomy_promotion_offline_integration_bundle_missing_checks",
+        "autonomy_promotion_offline_integration_bundle_source_authority_denied",
+        "autonomy_promotion_offline_integration_bundle_live_authority_granted",
+        "autonomy_promotion_offline_integration_bundle_readiness_closure_allowed",
+    ):
+        assert field in adapter
+        assert field in adapter_test
+    assert "Integration bundle" in adapter
+    assert "integration_bundle_live_authority_granted:false" in adapter_test
+    assert "Director runtime guards must surface offline integration bundle" in (
+        completion
+    )
+    assert "M029 Director runtime integration bundle readiness summary is now covered" in (
+        current
+    )
+    assert "M029 Director runtime integration bundle readiness summary rail is now automated" in (
         report
     )
 

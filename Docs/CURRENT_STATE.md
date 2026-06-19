@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T20:44:55Z
+Generated: 2026-06-19T20:57:47Z
 
 ## Repository snapshot
 
@@ -538,6 +538,17 @@ Generated: 2026-06-19T20:44:55Z
   so preview-visible integration bundle status cannot queue proposals, grant
   live authority, close readiness, contact WING/backend, mark Full Autonomous
   ready, or replace real hardware/operator validation.
+- M029 Director runtime integration bundle readiness summary is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m029_director_runtime_surfaces_integration_bundle_readiness_summary`.
+  The updated `frontend/src/services/operatorAdapters.ts` module now surfaces
+  `main_pipeline_preview.summary` integration bundle fields in
+  `DirectorRuntime.statusItems` and `DirectorRuntime.blockedReasons`.
+  Runtime guard rows include integration bundle readiness, status, blockers,
+  missing checks and authority-denial tags while keeping the frontend surface
+  read-only, so Director-visible integration bundle status cannot queue
+  proposals, grant live authority, close readiness, contact WING/backend, mark
+  Full Autonomous ready, or replace real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -548,4 +559,4 @@ Generated: 2026-06-19T20:44:55Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4154 passed, 1 skipped, 1 warning`.
+  `4155 passed, 1 skipped, 1 warning`.

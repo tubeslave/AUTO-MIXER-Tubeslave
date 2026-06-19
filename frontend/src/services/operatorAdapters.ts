@@ -3715,6 +3715,43 @@ export function adaptDirectorRuntime(
   const previewStatus = str(preview.status, 'not requested');
   const previewProposalCount = Math.trunc(metricNum(previewSummary.proposal_count, 0));
   const previewBlockerCount = Math.trunc(metricNum(previewSummary.blocker_count, 0));
+  const integrationBundleStatus = str(previewSummary.autonomy_promotion_offline_integration_bundle_status);
+  const integrationBundleBlockers = stringList(
+    previewSummary.autonomy_promotion_offline_integration_bundle_blockers,
+  );
+  const integrationBundleMissingChecks = stringList(
+    previewSummary.autonomy_promotion_offline_integration_bundle_missing_checks,
+  );
+  const integrationBundleReady = boolish(
+    previewSummary.autonomy_promotion_offline_integration_bundle_ready,
+  );
+  const integrationBundleSourceAuthorityDenied = boolish(
+    previewSummary.autonomy_promotion_offline_integration_bundle_source_authority_denied,
+  );
+  const integrationBundleLiveAuthorityGranted = boolish(
+    previewSummary.autonomy_promotion_offline_integration_bundle_live_authority_granted,
+  );
+  const integrationBundleReadinessClosureAllowed = boolish(
+    previewSummary.autonomy_promotion_offline_integration_bundle_readiness_closure_allowed,
+  );
+  const hasIntegrationBundleSummary = integrationBundleReady !== undefined
+    || integrationBundleStatus !== ''
+    || integrationBundleBlockers.length > 0
+    || integrationBundleMissingChecks.length > 0
+    || integrationBundleSourceAuthorityDenied !== undefined
+    || integrationBundleLiveAuthorityGranted !== undefined
+    || integrationBundleReadinessClosureAllowed !== undefined;
+  const integrationBundleStatusLabel = integrationBundleStatus || (integrationBundleReady ? 'ready' : 'unknown');
+  const integrationBundleBlockedReasons = hasIntegrationBundleSummary && integrationBundleReady !== true
+    ? [
+      `integration_bundle_status:${integrationBundleStatusLabel}`,
+      ...integrationBundleBlockers.map(blocker => `integration_bundle_blocker:${blocker}`),
+      ...integrationBundleMissingChecks.map(check => `integration_bundle_missing_check:${check}`),
+      integrationBundleSourceAuthorityDenied ? 'integration_bundle_source_authority_denied:true' : '',
+      integrationBundleLiveAuthorityGranted === false ? 'integration_bundle_live_authority_granted:false' : '',
+      integrationBundleReadinessClosureAllowed === false ? 'integration_bundle_readiness_closure_allowed:false' : '',
+    ].filter(Boolean)
+    : [];
   const previewQueueMutation = Boolean(previewSummary.queue_mutation ?? previewExecutor.queue_mutation);
   const liveApplyPolicy = str(previewExecutor.live_apply_policy, str(processing.live_apply_policy, liveWritePolicy));
   const readyBlockedReasons = Array.isArray(readyForLive.blocked_reasons)
@@ -3723,7 +3760,11 @@ export function adaptDirectorRuntime(
   const policyBlockedReasons = Array.isArray(safety.blocked_reasons)
     ? safety.blocked_reasons.map(item => String(item)).filter(Boolean)
     : [];
-  const blockedReasons = Array.from(new Set([...policyBlockedReasons, ...readyBlockedReasons]));
+  const blockedReasons = Array.from(new Set([
+    ...policyBlockedReasons,
+    ...readyBlockedReasons,
+    ...integrationBundleBlockedReasons
+  ]));
   const resetRequired = Boolean(manual.reset_required ?? emergencyStopped);
   const automationUnfrozen = readyChecks.automation_unfrozen !== false;
 
@@ -3819,6 +3860,13 @@ export function adaptDirectorRuntime(
         value: previewQueueMutation ? 'Enabled' : 'Disabled',
         tone: previewQueueMutation ? 'red' : 'green'
       },
+      ...(hasIntegrationBundleSummary
+        ? [{
+          label: 'Integration bundle',
+          value: `${integrationBundleStatusLabel} / ready:${integrationBundleReady === true}`,
+          tone: integrationBundleReady ? 'green' as Tone : 'red' as Tone
+        }]
+        : []),
       {
         label: 'Apply policy',
         value: liveApplyPolicy,

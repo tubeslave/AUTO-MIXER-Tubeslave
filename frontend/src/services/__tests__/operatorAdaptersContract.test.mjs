@@ -4566,6 +4566,89 @@ test('read-only DTO adapters preserve explicit empty backend snapshots', async (
   assert.deepEqual(adaptDevices(undefined, fallbackDevice), fallbackDevice);
 });
 
+test('director runtime surfaces preview integration bundle readiness without live authority', async () => {
+  const { adaptDirectorRuntime } = await importTypeScript('services/operatorAdapters.ts');
+
+  const runtime = adaptDirectorRuntime(
+    {
+      safety: {
+        live_write_policy: 'supervised_fader_gain_only',
+        ready_for_live: {
+          ready: false,
+          checks: {
+            mixer_connected: true,
+            gain_staging_available: true,
+            auto_fader_available: true,
+            no_clipping: true,
+            automation_unfrozen: true,
+          },
+        },
+        manual_write_supervision: {
+          emergency_stopped: false,
+          reset_required: false,
+        },
+      },
+      audio_capture: { running: true },
+      runtime: {
+        proposal_queue_available: true,
+        processing: {
+          main_pipeline_id: 'main_live_assist',
+          main_pipeline_status: 'canonical',
+          live_apply_policy: 'supervised_fader_gain_only',
+        },
+      },
+    },
+    {
+      summary: {
+        can_live_execute: false,
+        proposal_queue_available: true,
+      },
+    },
+    {
+      status: 'ok',
+      pipeline_id: 'main_live_assist',
+      pipeline_status: 'canonical',
+      summary: {
+        proposal_count: 2,
+        blocker_count: 1,
+        queue_mutation: false,
+        autonomy_promotion_offline_integration_bundle_ready: false,
+        autonomy_promotion_offline_integration_bundle_status: 'blocked',
+        autonomy_promotion_offline_integration_bundle_blockers: [
+          'offline_integration_bundle_contract_not_ready',
+        ],
+        autonomy_promotion_offline_integration_bundle_missing_checks: [
+          'operator_report_bound',
+        ],
+        autonomy_promotion_offline_integration_bundle_source_authority_denied: true,
+        autonomy_promotion_offline_integration_bundle_live_authority_granted: false,
+        autonomy_promotion_offline_integration_bundle_readiness_closure_allowed: false,
+      },
+      executor_policy: {
+        live_apply_policy: 'supervised_fader_gain_only',
+        queue_mutation: false,
+      },
+    },
+  );
+
+  const integrationBundle = runtime.statusItems.find(item => item.label === 'Integration bundle');
+  assert.deepEqual(integrationBundle, {
+    label: 'Integration bundle',
+    value: 'blocked / ready:false',
+    tone: 'red',
+  });
+  assert.equal(runtime.blockedReasons.includes('integration_bundle_status:blocked'), true);
+  assert.equal(
+    runtime.blockedReasons.includes('integration_bundle_blocker:offline_integration_bundle_contract_not_ready'),
+    true,
+  );
+  assert.equal(runtime.blockedReasons.includes('integration_bundle_missing_check:operator_report_bound'), true);
+  assert.equal(runtime.blockedReasons.includes('integration_bundle_source_authority_denied:true'), true);
+  assert.equal(runtime.blockedReasons.includes('integration_bundle_live_authority_granted:false'), true);
+  assert.equal(runtime.blockedReasons.includes('integration_bundle_readiness_closure_allowed:false'), true);
+  assert.equal(runtime.manualGateLabel, 'Apply blocked');
+});
+
 test('cockpit marks visual placeholder metrics instead of presenting them as live telemetry', async () => {
   const dashboardSource = await fs.readFile(path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'), 'utf8');
   const performanceSource = await fs.readFile(path.join(srcRoot, 'views/PerformanceView.tsx'), 'utf8');
