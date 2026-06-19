@@ -1194,6 +1194,138 @@ def test_m008_assisted_processing_expansion_stays_proposal_only_with_identity_ga
     assert "M008 assisted processing family expansion rail is now automated" in report
 
 
+def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_proof():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m009 = markdown_table_row(roadmap, "M009")
+    m010 = markdown_table_row(roadmap, "M010")
+    assert m009[1] == "Supervised non-fader/gain live expansion"
+    assert m009[2] == "A separately approved ADR widens supervised live writes one family at a time"
+    assert m009[3] == "M006-M008 plus hardware"
+    assert m009[4] == "critical live write"
+    assert m009[5] == "SUPERVISED_LIVE_VERIFIED per family"
+    assert m009[-1] == "PENDING_APPROVAL"
+    assert m010[3] == "M001-M009"
+    assert m010[-1] == "PENDING_APPROVAL"
+
+    supervised = markdown_table_row(capability, "Supervised AutoMix Mode")
+    full_auto = markdown_table_row(capability, "Full Autonomous Mixing Mode")
+    assert supervised[1] == "SPECIFIED"
+    assert supervised[4] == "WING live write scope is only `fader`/`gain`; real proof missing"
+    assert supervised[7] == "M001-M006"
+    assert supervised[8] == "none"
+    assert full_auto[1] == "NOT_STARTED"
+    assert "Locked until all safety and hardware gates pass" in full_auto[4]
+    assert full_auto[8] == "none"
+
+    assert snapshot["safety"] == {
+        "read_only": True,
+        "live_write": False,
+        "live_widening_allowed": False,
+        "full_autonomous_ready": False,
+        "supervised_only": True,
+    }
+    assert snapshot["summary"]["supervised_live_allowed_target_ids"] == [
+        "fader_supervised_promotion"
+    ]
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert set(snapshot["summary"]["global_blockers"]) >= {
+        "mode_full_autonomous_blocked",
+        "only_supervised_fader_gain_executor_is_registered",
+        "read_coverage_is_partial_or_missing",
+        "real_wing_and_emergency_stop_proof_incomplete",
+    }
+
+    rows_by_id = {row["id"]: row for row in snapshot["rows"]}
+    non_fader_gain_rows = {
+        "eq_supervised_promotion": "eq",
+        "dynamics_supervised_promotion": "compressor",
+        "gate_supervised_promotion": "gate",
+        "pan_phase_supervised_promotion": "pan_phase_delay",
+        "fx_supervised_promotion": "fx_send_insert",
+        "bus_group_matrix_supervised_promotion": "bus_group_matrix",
+        "mute_supervised_promotion": "mute",
+        "routing_supervised_promotion": "routing",
+        "scene_preset_supervised_promotion": "scene_preset",
+    }
+    for row_id, action_family in non_fader_gain_rows.items():
+        row = rows_by_id[row_id]
+        assert row["action_family"] == action_family
+        assert row["supervised_live_allowed"] is False
+        assert row["autonomous_ready"] is False
+        assert "canonical_supervised" not in row["write_surface_statuses"]
+        assert set(row["write_surface_statuses"]) <= {"proposal_only", "quarantined"}
+        assert "no_allowed_live_write_surface" in row["blockers"]
+        assert "safety_live_not_allowed" in row["blockers"]
+        assert any(
+            blocker in row["blockers"]
+            for blocker in ("real_wing_proof_missing", "real_wing_proof_not_allowed")
+        )
+        assert "rollback_readback_missing" in row["blockers"]
+        assert "emergency_stop_proof_missing" in row["blockers"]
+
+    allowed_fader = rows_by_id["fader_supervised_promotion"]
+    gain_trim = rows_by_id["gain_trim_supervised_promotion"]
+    assert allowed_fader["action_family"] == "fader"
+    assert allowed_fader["supervised_live_allowed"] is True
+    assert gain_trim["action_family"] == "gain"
+    assert gain_trim["supervised_live_allowed"] is False
+    assert "real_wing_proof_missing" in gain_trim["blockers"]
+    assert "apply_readback_missing" in gain_trim["blockers"]
+
+    console_live_expansion_rows = {
+        "Pan": ("no", "no for WING MVP", "separate ADR and hardware proof"),
+        "Mute/unmute": ("no", "no", "separate ADR and proof"),
+        "EQ / HPF": ("no", "no", "protected-band, feedback, readback, rollback proof"),
+        "Compressor / dynamics": ("no", "no", "headroom, GR and readback proof"),
+        "Gate / expander": ("no", "no", "chatter/bleed replay plus hardware proof"),
+        "De-esser": ("no", "no", "unit/replay first"),
+        "FX sends / returns": ("no", "no", "readback and rollback proof"),
+        "Routing / patch": ("no", "no", "read-only physical readback first"),
+        "Bus/group/main/DCA faders": (
+            "no",
+            "no except later approved supervised proof",
+            "physical readback",
+        ),
+        "Matrices": ("no", "no", "physical readback"),
+        "Scenes / snapshots / presets": ("no", "no", "destructive-action ADR and proof"),
+    }
+    for category, (unattended, supervised_live, next_gate) in console_live_expansion_rows.items():
+        row = markdown_table_row(console, category)
+        assert row[3] == unattended
+        assert row[4] == supervised_live
+        assert row[5] == next_gate
+        assert row[6] == "none"
+
+    fader = markdown_table_row(console, "Channel fader")
+    gain = markdown_table_row(console, "Preamp trim/gain-down")
+    assert fader[4] == "yes only after explicit approval"
+    assert fader[5:] == ["supervised fader proof", "none"]
+    assert gain[4] == "yes only after explicit approval and gain-down bounds"
+    assert gain[5:] == ["supervised gain-down proof", "none"]
+
+    assert "High-risk console actions прошли staged real-hardware testing" in completion
+    assert "Recovery, rollback, emergency-stop and audit behavior verified" in completion
+    assert "Любая live WING запись до отдельного ADR и hardware proof ограничена только" in goal
+    assert "EQ, compressor, gate, routing, mute, FX, scenes, matrices, DCA" in goal
+    assert "Supervised non-fader/gain live expansion entry is now covered" in current
+    assert "M009 supervised non-fader/gain live expansion rail is now automated" in report
+
+
 def test_mvp_doc_declares_scope_and_stop_rules():
     text = MVP_DOC.read_text(encoding="utf-8")
 

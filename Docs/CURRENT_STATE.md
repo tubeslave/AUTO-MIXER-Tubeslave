@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T16:09:07Z
+Generated: 2026-06-19T16:17:12Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T16:09:07Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `3662360d Guard offline promotion proof gate`
+  `edae1de5 Guard assisted processing proof gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -297,6 +297,16 @@ Generated: 2026-06-19T16:09:07Z
   identity and safety gates stay explicit, direct apply surfaces remain
   blocked or quarantined, and M009 live expansion still requires a separate ADR
   plus hardware.
+- Supervised non-fader/gain live expansion entry is now covered by
+  `tests/test_wing_mvp_rails.py::test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_proof`.
+  The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/PROJECT_COMPLETION_GATE.md`, `Docs/CAPABILITY_MATRIX.md`,
+  `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+  `backend/autonomy_promotion_readiness.py` and `ops/autopilot/LAST_REPORT.md`
+  so M009 remains `PENDING_APPROVAL`, only the existing fader supervised
+  candidate is reported as supervised-live allowed, non-fader/gain families
+  require separate ADR, staged hardware proof, readback, rollback and emergency
+  proof, and Full Autonomous remains locked.
 
 ## Unresolved unknowns
 
@@ -307,4 +317,4 @@ Generated: 2026-06-19T16:09:07Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4077 passed, 1 skipped, 1 warning`.
+  `4078 passed, 1 skipped, 1 warning`.
