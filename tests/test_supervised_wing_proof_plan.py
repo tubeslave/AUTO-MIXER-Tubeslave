@@ -1092,6 +1092,9 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
         "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
     ] == {accepted_source_id: READONLY_PREFLIGHT_REQUEST_SEQUENCE}
     assert plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
+    ] == {accepted_source_id: READONLY_PREFLIGHT_REQUEST_SEQUENCE}
+    assert plan["summary"][
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
     ] == {accepted_source_id: True}
     assert plan["summary"][

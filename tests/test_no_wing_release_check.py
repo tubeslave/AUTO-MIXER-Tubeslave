@@ -10957,6 +10957,11 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE
                     )
                 },
+                "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source": {
+                    WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: list(
+                        WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE
+                    )
+                },
                 "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source": {
                     WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: True
                 },
@@ -11077,6 +11082,9 @@ def set_empty_accepted_candidate_request_sequence_trace(summary: dict) -> None:
     ] = {}
     summary[
         "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+    ] = {}
+    summary[
+        "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
     ] = {}
     summary[
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
@@ -11372,6 +11380,13 @@ def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
     }
     assert result.detail[
         "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+    ] == {
+        WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: list(
+            WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE
+        )
+    }
+    assert result.detail[
+        "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
     ] == {
         WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: list(
             WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE
@@ -12272,6 +12287,15 @@ def test_no_wing_release_check_rejects_next_wing_plan_expected_artifact_trace_mi
             "next_wing_proof_plan_accepted_candidate_plan_request_sequence_mismatch",
         ),
         (
+            "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source",
+            {
+                WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: [
+                    {"type": "get_state"}
+                ]
+            },
+            "next_wing_proof_plan_accepted_candidate_expected_request_sequence_mismatch",
+        ),
+        (
             "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source",
             {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: False},
             "next_wing_proof_plan_accepted_candidate_request_sequence_match_flags_mismatch",
@@ -12578,6 +12602,13 @@ def test_no_wing_release_check_allows_next_wing_plan_blocked_by_candidate_reques
     plan["summary"][
         "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
     ] = {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: []}
+    plan["summary"][
+        "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
+    ] = {
+        WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: list(
+            WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE
+        )
+    }
     plan["summary"][
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source"
     ] = {WING_READONLY_PREFLIGHT_ACCEPTED_SOURCE_ID: False}
@@ -22443,6 +22474,11 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
                     WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE
                 )
             },
+            "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source": {
+                "artifacts/wing_readonly_preflight/run/summary.json": list(
+                    WING_READONLY_PREFLIGHT_REQUEST_SEQUENCE
+                )
+            },
             "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source": {
                 "artifacts/wing_readonly_preflight/run/summary.json": True
             },
@@ -24068,6 +24104,10 @@ def test_no_wing_release_check_summary_embeds_next_wing_proof_plan(tmp_path):
     )
     assert (
         "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source"
+        in markdown_summary
+    )
+    assert (
+        "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
         in markdown_summary
     )
     assert (

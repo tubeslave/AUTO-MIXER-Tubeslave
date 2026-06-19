@@ -1842,6 +1842,10 @@ def test_progress_tool_generates_latest_report_from_blocker_table(tmp_path):
         in current_command
     )
     assert (
+        "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source"
+        in current_command
+    )
+    assert (
         'readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source: {"artifacts/wing_readonly_preflight/run/summary.json": true}'
         in current_command
     )

@@ -317,6 +317,7 @@ WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_REQUIRED_PROOF_PLAN_SUMMARY_FIELDS =
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_source_ids",
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_by_source",
     "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source",
+    "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source",
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source",
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_missing_source_ids",
     "readonly_preflight_review_decision_accepted_candidate_request_sequence_trace_complete",

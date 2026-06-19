@@ -1099,6 +1099,54 @@ def _mapping_list(value: Any) -> list[dict[str, Any]]:
     return [dict(item) for item in value if isinstance(item, Mapping)]
 
 
+def _csv_strings(value: str | None) -> list[str]:
+    if not isinstance(value, str):
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _csv_ints(value: str | None) -> list[int]:
+    parsed: list[int] = []
+    for item in _csv_strings(value):
+        try:
+            parsed.append(int(item))
+        except ValueError:
+            return []
+    return parsed
+
+
+def _expected_wing_read_request(channel: int, value_type: str) -> dict[str, Any]:
+    if value_type == "fader":
+        address = f"/ch/{channel}/fdr"
+    elif value_type == "gain":
+        address = f"/ch/{channel}/in/set/trim"
+    elif value_type == "pan":
+        address = f"/ch/{channel}/pan"
+    else:
+        address = ""
+    return {
+        "type": "query_mixer_parameter",
+        "request_id": f"wing-readonly-preflight:ch{channel}:{value_type}",
+        "channel": channel,
+        "value_type": value_type,
+        "address": address,
+    }
+
+
+def _expected_wing_readonly_preflight_request_sequence() -> list[dict[str, Any]]:
+    expected_channels = _csv_ints(WING_READONLY_PREFLIGHT_RUNNER_CHANNELS)
+    expected_value_types = _csv_strings(WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES)
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            _expected_wing_read_request(channel, value_type)
+            for channel in expected_channels
+            for value_type in expected_value_types
+        ],
+    ]
+
+
 def _accepted_candidate_request_sequence_trace(
     summary: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -1116,10 +1164,15 @@ def _accepted_candidate_request_sequence_trace(
     }
     request_sequence_by_source: dict[str, list[dict[str, Any]]] = {}
     plan_request_sequence_by_source: dict[str, list[dict[str, Any]]] = {}
+    expected_request_sequence_by_source: dict[str, list[dict[str, Any]]] = {}
     matches_plan_by_source: dict[str, bool] = {}
     missing_source_ids: list[str] = []
+    expected_request_sequence = _expected_wing_readonly_preflight_request_sequence()
 
     for source_id in accepted_source_ids:
+        expected_request_sequence_by_source[source_id] = [
+            dict(item) for item in expected_request_sequence
+        ]
         row = rows_by_source.get(source_id)
         if row is None:
             missing_source_ids.append(source_id)
@@ -1142,6 +1195,9 @@ def _accepted_candidate_request_sequence_trace(
         ),
         "readonly_preflight_review_decision_accepted_candidate_plan_request_sequence_by_source": (
             plan_request_sequence_by_source
+        ),
+        "readonly_preflight_review_decision_accepted_candidate_expected_request_sequence_by_source": (
+            expected_request_sequence_by_source
         ),
         "readonly_preflight_review_decision_accepted_candidate_request_sequence_matches_plan_by_source": (
             matches_plan_by_source
