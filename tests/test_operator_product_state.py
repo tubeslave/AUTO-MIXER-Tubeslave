@@ -11326,7 +11326,6 @@ def test_build_safety_monitor_falls_back_to_allowed_live_write_kinds_when_manual
         "fader",
         "gain",
         "pan",
-        "mute",
     ]
 
 
@@ -11383,7 +11382,6 @@ def test_build_safety_monitor_prefers_manual_approved_live_write_kinds_and_filte
     assert monitor["live_write_policy"]["approved_live_write_kinds"] == [
         "fader",
         "gain",
-        "mute",
     ]
 
 

@@ -7105,6 +7105,20 @@ def build_decision_traces(server: Any, limit: int = 50) -> Dict[str, Any]:
     }
 
 
+def _monitor_approved_live_write_kinds(
+    operator_mode: Mapping[str, Any],
+    raw_approved_kinds: Any,
+) -> List[str]:
+    allowed = list(
+        (operator_mode.get("capabilities") or {}).get("allowed_live_write_kinds")
+        or []
+    )
+    if not raw_approved_kinds:
+        return allowed
+    approved = set(normalize_manual_live_write_kinds(raw_approved_kinds))
+    return [kind for kind in allowed if kind in approved]
+
+
 def build_safety_monitor(server: Any) -> Dict[str, Any]:
     operator_mode = server.get_operator_mode_status()
     dashboard = build_dashboard_snapshot(server)
@@ -7150,20 +7164,10 @@ def build_safety_monitor(server: Any) -> Dict[str, Any]:
         else {}
     )
     approved_live_write_kinds = manual.get("approved_live_write_kinds")
-    if not approved_live_write_kinds:
-        allowed = list(
-            operator_mode.get("capabilities", {}).get("allowed_live_write_kinds") or []
-        )
-        if (
-            operator_mode.get("mode") == "supervised"
-            and "mute" not in allowed
-        ):
-            allowed.append("mute")
-        approved_live_write_kinds = allowed
-    else:
-        approved_live_write_kinds = normalize_manual_live_write_kinds(
-            approved_live_write_kinds
-        )
+    approved_live_write_kinds = _monitor_approved_live_write_kinds(
+        operator_mode,
+        approved_live_write_kinds,
+    )
     traces = build_decision_traces(server, limit=12)
     last_trace = traces["traces"][-1] if traces["traces"] else None
     quarantined_surfaces = [

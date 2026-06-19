@@ -15,6 +15,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from handlers import automation_handlers, fx_handlers, mixer_handlers, routing_handlers, snapshot_handlers
 from backend.operator_mode_policy import SUPPORTED_MANUAL_LIVE_WRITE_KINDS
+from operator_product_state import build_safety_monitor
 
 try:
     from server import convert_numpy_types, AutoMixerServer
@@ -1085,6 +1086,33 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         status = server.get_manual_write_supervision_status()
         assert status["approved_live_write_kinds"] == []
+
+    def test_wing_safety_monitor_filters_manual_scope_to_operator_mode(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server.get_manual_write_supervision_status = lambda: {
+            "approved_live_write_kinds": [
+                "fader",
+                "gain",
+                "pan",
+                "mute",
+                "trim",
+            ]
+        }
+
+        monitor = build_safety_monitor(server)
+
+        assert (
+            monitor["operator_mode"]["capabilities"]["allowed_live_write_kinds"]
+            == ["fader", "gain"]
+        )
+        assert monitor["live_write_policy"]["approved_live_write_kinds"] == [
+            "fader",
+            "gain",
+        ]
 
     @pytest.mark.asyncio
     @patch.object(AutoMixerServer, "_load_config", return_value={})
