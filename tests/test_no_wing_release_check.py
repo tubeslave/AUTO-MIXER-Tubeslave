@@ -18656,6 +18656,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "backend_port_prestart_check_required: `true`" in markdown_summary
     assert "backend_port_prestart_check_must_pass_before_starting_backend: `true`" in markdown_summary
+    assert "backend_port_prestart_gate_summary_surface_required: `true`" in markdown_summary
+    assert (
+        "backend_port_prestart_gate_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_gate_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
     assert "backend_port_prestart_check_operator_sequence_step_index: `0`" in (
         markdown_summary
     )
@@ -18686,6 +18695,15 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "backend_port_prestart_summary_sha256_matches_plan: `true`" in (
         markdown_summary
+    )
+    assert "backend_port_prestart_summary_surface_required: `true`" in markdown_summary
+    assert (
+        "backend_port_prestart_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
     )
     assert "backend_port_prestart_summary_sha256_available: `true`" in (
         markdown_summary
@@ -18772,6 +18790,30 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_arti
     )
     assert "backend_port_prestart_check_status_matches_plan: `true`" in (
         markdown_summary
+    )
+    assert (
+        "backend_port_prestart_failure_detail_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_failure_detail_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_failure_detail_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_gate_authority_denial_summary_surface_required: `true`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_gate_authority_denial_summary_surface_readiness_closure_allowed: `false`"
+        in markdown_summary
+    )
+    assert (
+        "backend_port_prestart_gate_authority_denial_summary_surface_live_authority_granted: `false`"
+        in markdown_summary
     )
     for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
         assert f"{field}: `false`" in markdown_summary

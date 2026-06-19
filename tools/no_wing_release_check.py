@@ -27212,8 +27212,20 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_required']).lower()}`",
                 "- backend_port_prestart_check_must_pass_before_starting_backend: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_must_pass_before_starting_backend']).lower()}`",
+                "- backend_port_prestart_gate_summary_surface_required: "
+                f"`{str(summary['backend_port_prestart_gate_summary_surface_required']).lower()}`",
+                "- backend_port_prestart_gate_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['backend_port_prestart_gate_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- backend_port_prestart_gate_summary_surface_live_authority_granted: "
+                f"`{str(summary['backend_port_prestart_gate_summary_surface_live_authority_granted']).lower()}`",
                 "- backend_port_prestart_summary_required: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_required']).lower()}`",
+                "- backend_port_prestart_summary_surface_required: "
+                f"`{str(summary['backend_port_prestart_summary_surface_required']).lower()}`",
+                "- backend_port_prestart_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['backend_port_prestart_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- backend_port_prestart_summary_surface_live_authority_granted: "
+                f"`{str(summary['backend_port_prestart_summary_surface_live_authority_granted']).lower()}`",
                 "- backend_port_prestart_summary_path_placeholder: "
                 f"`{wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_summary_path_placeholder']}`",
                 "- plan_backend_port_prestart_summary_path: "
@@ -27294,6 +27306,18 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{wing_readonly_preflight_handoff_packet_artifact['plan_backend_port_prestart_check_status']}`",
                 "- backend_port_prestart_check_status_matches_plan: "
                 f"`{str(wing_readonly_preflight_handoff_packet_artifact['backend_port_prestart_check_status_matches_plan']).lower()}`",
+                "- backend_port_prestart_failure_detail_summary_surface_required: "
+                f"`{str(summary['backend_port_prestart_failure_detail_summary_surface_required']).lower()}`",
+                "- backend_port_prestart_failure_detail_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['backend_port_prestart_failure_detail_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- backend_port_prestart_failure_detail_summary_surface_live_authority_granted: "
+                f"`{str(summary['backend_port_prestart_failure_detail_summary_surface_live_authority_granted']).lower()}`",
+                "- backend_port_prestart_gate_authority_denial_summary_surface_required: "
+                f"`{str(summary['backend_port_prestart_gate_authority_denial_summary_surface_required']).lower()}`",
+                "- backend_port_prestart_gate_authority_denial_summary_surface_readiness_closure_allowed: "
+                f"`{str(summary['backend_port_prestart_gate_authority_denial_summary_surface_readiness_closure_allowed']).lower()}`",
+                "- backend_port_prestart_gate_authority_denial_summary_surface_live_authority_granted: "
+                f"`{str(summary['backend_port_prestart_gate_authority_denial_summary_surface_live_authority_granted']).lower()}`",
                 *[
                     f"- {field}: "
                     f"`{str(wing_readonly_preflight_handoff_packet_artifact[field]).lower()}`"
