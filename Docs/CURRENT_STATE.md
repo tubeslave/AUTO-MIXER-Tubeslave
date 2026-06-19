@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T08:21:25Z
+Generated: 2026-06-19T08:29:28Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `7796d28a Limit sequence audit scope to WING boundary`
+  `b0c9fc00 Limit recommendation bridge apply scope to WING boundary`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -47,7 +47,7 @@ Generated: 2026-06-19T08:21:25Z
 - After M001-CP05, verified no-WING safety-scope hardening commits narrowed
   WING report/executor/monitor surfaces to the supervised deployment boundary:
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
-  `bb5816d4`, `192d6bff`, `ce0d3d00`, and `7796d28a`.
+  `bb5816d4`, `192d6bff`, `ce0d3d00`, `7796d28a`, and `b0c9fc00`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -66,6 +66,9 @@ Generated: 2026-06-19T08:21:25Z
   deployment this blocks `pan` audit rows and forged `fader/gain/pan` safety
   envelopes; offline/non-WING audits still retain the broader current-proven
   scope.
+- Operator recommendation bridge cache-freshness gating now uses the same WING
+  deployment apply boundary, so future recommendation imports treat `pan` as
+  unsupported for current WING apply scope even when read-only pan cache exists.
 
 ## Unresolved unknowns
 
@@ -75,5 +78,5 @@ Generated: 2026-06-19T08:21:25Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `7796d28a` passed with
-  `4038 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `b0c9fc00` passed with
+  `4039 passed, 1 skipped, 1 warning`.
