@@ -5,6 +5,7 @@ from backend.project_goal_capability_matrix import (
     AUTONOMY_MODE_CEILINGS,
     CURRENT_PROVEN_LIVE_WRITE_KINDS,
     GOAL_CAPABILITY_STATUSES,
+    PROJECT_GOAL_LIVE_WRITE_KINDS,
     build_project_goal_objective_alignment_snapshot,
     build_project_goal_capability_matrix_snapshot,
     build_project_goal_capability_progress_snapshot,
@@ -207,8 +208,8 @@ def test_runtime_mode_capability_rows_match_operator_mode_policy():
 
         policy = build_operator_mode_status(
             mode=operator_mode,
-            connection_mode="offline_fixture",
-            wing_boundary_active=False,
+            connection_mode="wing",
+            wing_boundary_active=True,
         )
 
         assert row.autonomy_mode_ceiling == expected_ceiling
@@ -230,7 +231,7 @@ def test_project_goal_rows_are_valid_and_reference_registered_methods():
         assert row.autonomy_mode_ceiling in AUTONOMY_MODE_CEILINGS
         assert set(row.method_ids) <= method_ids
         for kind in row.current_live_write_kinds:
-            assert kind in CURRENT_PROVEN_LIVE_WRITE_KINDS
+            assert kind in PROJECT_GOAL_LIVE_WRITE_KINDS
 
 
 def test_full_autonomous_and_broad_console_writes_remain_blocked():
@@ -252,7 +253,9 @@ def test_supervised_automix_goal_requires_wing_candidate_prestart_trace():
 
     assert row is not None
     assert row.autonomy_mode_ceiling == "supervised_narrow"
-    assert row.current_live_write_kinds == CURRENT_PROVEN_LIVE_WRITE_KINDS
+    assert row.current_live_write_kinds == PROJECT_GOAL_LIVE_WRITE_KINDS
+    assert row.current_live_write_kinds == ("fader", "gain")
+    assert "pan" not in row.current_live_write_kinds
     assert "accepted-candidate prestart trace" in row.next_step
     assert "read-only preflight review" in row.next_step
     assert "supervised_prestart_gate" in row.next_step
@@ -891,6 +894,8 @@ def test_snapshot_is_read_only_and_fail_closed_for_live_widening():
         "live_write": False,
         "live_widening_allowed": False,
         "current_proven_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+        "wing_deployment_live_write_kinds": list(PROJECT_GOAL_LIVE_WRITE_KINDS),
+        "project_goal_live_write_kinds": list(PROJECT_GOAL_LIVE_WRITE_KINDS),
     }
     assert "deessing" not in snapshot["summary"]["missing_capability_ids"]
     assert "mode_full_autonomous" in snapshot["summary"]["blocked_live_capability_ids"]

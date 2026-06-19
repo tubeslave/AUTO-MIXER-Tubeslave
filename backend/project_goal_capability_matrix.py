@@ -11,7 +11,13 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Tuple
 
-from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+from operator_mode_policy import (
+    CURRENT_PROVEN_LIVE_WRITE_KINDS,
+    WING_DEPLOYMENT_LIVE_WRITE_KINDS,
+)
+
+
+PROJECT_GOAL_LIVE_WRITE_KINDS = WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
 
 GOAL_CAPABILITY_STATUSES = {
@@ -57,7 +63,7 @@ class ProjectGoalCapabilityRow:
         if self.autonomy_mode_ceiling not in AUTONOMY_MODE_CEILINGS:
             raise ValueError(f"{self.id} has unknown autonomy mode ceiling")
         for kind in self.current_live_write_kinds:
-            if kind not in CURRENT_PROVEN_LIVE_WRITE_KINDS:
+            if kind not in PROJECT_GOAL_LIVE_WRITE_KINDS:
                 raise ValueError(f"{self.id} widens current live write kind: {kind}")
         if self.current_live_write_kinds and self.autonomy_mode_ceiling != "supervised_narrow":
             raise ValueError(f"{self.id} declares live writes outside supervised_narrow")
@@ -108,7 +114,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         autonomy_mode_ceiling="supervised_narrow",
         method_ids=("supervised_manual_fader_gain",),
         support_paths=("backend/operator_mode_policy.py", "backend/autofoh_safety.py"),
-        current_live_write_kinds=CURRENT_PROVEN_LIVE_WRITE_KINDS,
+        current_live_write_kinds=PROJECT_GOAL_LIVE_WRITE_KINDS,
         blocker="Only narrow fader/gain surfaces are allowed; broad processing families need proof.",
         next_step=(
             "Add fake-mixer and physical proof one action family at a time "
@@ -227,7 +233,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         method_ids=("lufs_gain_staging", "supervised_manual_fader_gain"),
         support_paths=("tools/offline_input_trim_autogain_mix.py",),
         target_console_surfaces=("preamp", "trim", "fader"),
-        current_live_write_kinds=CURRENT_PROVEN_LIVE_WRITE_KINDS,
+        current_live_write_kinds=PROJECT_GOAL_LIVE_WRITE_KINDS,
         blocker="Gain-up and broad trim behavior still need headroom, bleed, and physical proof.",
         next_step="Complete supervised gain-down proof and keep gain-up opt-in.",
     ),
@@ -1365,6 +1371,8 @@ def build_project_goal_capability_matrix_snapshot() -> Dict[str, Any]:
             "live_write": False,
             "live_widening_allowed": False,
             "current_proven_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+            "wing_deployment_live_write_kinds": list(WING_DEPLOYMENT_LIVE_WRITE_KINDS),
+            "project_goal_live_write_kinds": list(PROJECT_GOAL_LIVE_WRITE_KINDS),
         },
         "summary": {
             "row_count": len(PROJECT_GOAL_CAPABILITIES),
@@ -1541,6 +1549,8 @@ def build_project_goal_capability_progress_snapshot() -> Dict[str, Any]:
             "live_write": False,
             "live_widening_allowed": False,
             "current_proven_live_write_kinds": list(CURRENT_PROVEN_LIVE_WRITE_KINDS),
+            "wing_deployment_live_write_kinds": list(WING_DEPLOYMENT_LIVE_WRITE_KINDS),
+            "project_goal_live_write_kinds": list(PROJECT_GOAL_LIVE_WRITE_KINDS),
         },
         "summary": {
             "row_count": len(rows),
