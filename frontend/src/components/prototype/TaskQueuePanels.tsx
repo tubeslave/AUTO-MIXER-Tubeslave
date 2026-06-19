@@ -648,7 +648,7 @@ export function TaskQueueWorkspace({
         filters={[
           { label: 'All', predicate: () => true },
           { label: 'High', predicate: task => task.priority === 'High' },
-          { label: 'Review only', predicate: task => Boolean(task.reviewOnly || task.canApply === false) },
+          { label: 'Review only', predicate: task => integrationBundleApplyBlocked || Boolean(task.reviewOnly || task.canApply === false) },
           { label: 'Pending', predicate: task => task.status === 'Pending' },
           { label: 'Applied', predicate: task => task.status === 'Applied' }
         ]}

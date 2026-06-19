@@ -141,6 +141,8 @@ M040_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M040-task-details-apply-entrypoin
 M040_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-apply-entrypoint-blocker-guard-20260619.md"
 M041_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M041-task-queue-metrics-blocker-guard.md"
 M041_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-metrics-blocker-guard-20260619.md"
+M042_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M042-task-queue-review-filter-blocker-guard.md"
+M042_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-review-filter-blocker-guard-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -5422,6 +5424,71 @@ def test_m041_task_queue_metrics_reflect_integration_bundle_blocker():
     assert "Task Queue apply metrics must fail closed" in completion
     assert "M041 Task Queue metrics blocker guard is now covered" in current
     assert "M041 Task Queue metrics blocker guard rail is now automated" in (
+        report
+    )
+
+
+def test_m042_task_queue_review_filter_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M042_PLAN.read_text(encoding="utf-8")
+    adr = M042_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m042 = markdown_table_row(roadmap, "M042")
+    assert m042[1] == "Task Queue review filter blocker guard"
+    assert m042[2] == (
+        "Task Queue Review only filter includes all rows while promotion "
+        "planning is blocked"
+    )
+    assert m042[3] == "M041"
+    assert m042[4] == "high offline frontend"
+    assert m042[5] == "UNIT_VERIFIED blocked Task Queue review filter; live authority remains blocked"
+    assert m042[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Queue Review only filter now includes all rows when offline integration bundle blockers are visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M042-CP01" in plan
+    assert "M042-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not hide rows" in adr
+
+    assert "label: 'Review only'" in task_queue
+    assert "predicate: task => integrationBundleApplyBlocked || Boolean(task.reviewOnly || task.canApply === false)" in (
+        task_queue
+    )
+    assert "integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly" in (
+        task_queue
+    )
+    assert "task queue review-only filter includes all rows" in adapter_test
+    assert "Task Queue review filters must fail closed" in completion
+    assert "M042 Task Queue review filter blocker guard is now covered" in current
+    assert "M042 Task Queue review filter blocker guard rail is now automated" in (
         report
     )
 
