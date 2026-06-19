@@ -13942,9 +13942,15 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
         in markdown_summary
     )
     assert (
+        'policy_supervised_live_write_kinds: `["fader", "gain"]`'
+        in markdown_summary
+    )
+    assert (
         'policy_supervised_live_write_surfaces: `["preamp", "trim", "fader"]`'
         in markdown_summary
     )
+    assert 'unexpected_supervised_live_write_kinds: `[]`' in markdown_summary
+    assert 'unexpected_supervised_live_write_surfaces: `[]`' in markdown_summary
 
 
 def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):

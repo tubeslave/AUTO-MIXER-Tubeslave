@@ -25950,6 +25950,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(gap_rollup['policy_supervised_live_write_kinds'])}`",
                 "- policy_supervised_live_write_surfaces: "
                 f"`{json.dumps(gap_rollup['policy_supervised_live_write_surfaces'])}`",
+                "- unexpected_supervised_live_write_kinds: "
+                f"`{json.dumps(gap_rollup['unexpected_supervised_live_write_kinds'])}`",
                 "- unexpected_supervised_live_write_surfaces: "
                 f"`{json.dumps(gap_rollup['unexpected_supervised_live_write_surfaces'])}`",
                 f"- violations: `{json.dumps(gap_rollup['violations'])}`",
