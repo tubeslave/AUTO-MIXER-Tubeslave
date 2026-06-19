@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T15:28:42Z
+Generated: 2026-06-19T15:38:32Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T15:28:42Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `05a15d8a Guard M002 artifact review gate`
+  `55167c34 Guard supervised fader gain proof gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -260,6 +260,15 @@ Generated: 2026-06-19T15:28:42Z
   and `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` so M003/M004 remain
   blocked by M002, WING live proof scope stays supervised `fader`/negative
   `gain`, and approval/readback/rollback remain required before closure.
+- Emergency stop and timeout/fail-closed proof entry is now covered by
+  `tests/test_wing_mvp_rails.py::test_emergency_stop_timeout_proof_stays_blocked_until_m002_and_real_evidence`.
+  The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/SAFETY_CONTRACT.md`, `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+  `.ai/project-layer/wing_mvp_blockers.md` and
+  `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` so M005 remains blocked
+  by M002, emergency-stop proof stays inside the explicit supervised proof
+  run, timeout/connection-loss proof still requires a controlled real-run
+  artifact, and simulator/no-WING evidence cannot close readiness.
 
 ## Unresolved unknowns
 
@@ -270,4 +279,4 @@ Generated: 2026-06-19T15:28:42Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4073 passed, 1 skipped, 1 warning`.
+  `4074 passed, 1 skipped, 1 warning`.

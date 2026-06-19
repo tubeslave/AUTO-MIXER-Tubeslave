@@ -22,6 +22,7 @@ ACTIVE_MILESTONE_DOC = PROJECT_ROOT / "Docs" / "ACTIVE_MILESTONE.md"
 PROJECT_EXECUTION_CONTRACT = PROJECT_ROOT / "Docs" / "PROJECT_EXECUTION_CONTRACT.md"
 PROJECT_GOAL = PROJECT_ROOT / "Docs" / "PROJECT_GOAL.md"
 PROJECT_COMPLETION_GATE = PROJECT_ROOT / "Docs" / "PROJECT_COMPLETION_GATE.md"
+SAFETY_CONTRACT = PROJECT_ROOT / "Docs" / "SAFETY_CONTRACT.md"
 CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CAPABILITY_MATRIX.md"
 CONSOLE_CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CONSOLE_CAPABILITY_MATRIX.md"
 M001_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M001-wing-readonly-preflight-evidence-gate.md"
@@ -777,6 +778,101 @@ def test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_appro
     assert "Supervised fader write proof with explicit operator approval" in goal
     assert "Supervised gain-down / trim proof with explicit operator approval" in goal
     assert "supervised `fader`/`gain` rail с явным approval, readback и rollback" in goal
+
+
+def test_emergency_stop_timeout_proof_stays_blocked_until_m002_and_real_evidence():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    safety = SAFETY_CONTRACT.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    project_blockers = BLOCKERS_DOC.read_text(encoding="utf-8")
+    supervised_runbook = SUPERVISED_RUNBOOK.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    authority = state["last_validation_summary"]["authority"]
+    for key in (
+        "live_authority_granted",
+        "readiness_closure_allowed",
+        "contacts_wing",
+        "contacts_backend",
+        "live_write",
+    ):
+        assert authority[key] is False
+
+    m005 = markdown_table_row(roadmap, "M005")
+    m006 = markdown_table_row(roadmap, "M006")
+    assert m005[1] == "Emergency stop and timeout proof"
+    assert m005[2] == (
+        "Emergency stop, disconnect, timeout and stale-state protections "
+        "are verified"
+    )
+    assert m005[3] == "M002"
+    assert m005[4] == "critical safety"
+    assert m005[5] == "SIMULATOR_VERIFIED plus supervised hardware evidence"
+    assert m005[-1] == "BLOCKED_BY_M002"
+    assert m006[1] == "Operator evidence and readiness update"
+    assert m006[3] == "M002-M005"
+    assert "accepted real proof" in m006[2]
+    assert m006[-1] == "BLOCKED_BY_M002"
+
+    rollback = markdown_table_row(console, "Rollback")
+    emergency = markdown_table_row(console, "Emergency stop")
+    stale_disconnect = markdown_table_row(console, "Stale state / disconnect fail-closed")
+    assert rollback[3] == "no live action unattended"
+    assert rollback[4] == "required before closure"
+    assert rollback[-2:] == ["supervised rollback proof", "none"]
+    assert emergency[3] == "no live action unattended"
+    assert emergency[4] == "required before closure"
+    assert emergency[-2:] == ["emergency-stop proof", "none"]
+    assert stale_disconnect[3] == "no hardware unattended"
+    assert stale_disconnect[4] == "required"
+    assert stale_disconnect[-2:] == ["timeout/fail-closed proof", "none"]
+
+    rollback_blocker = markdown_table_row(project_blockers, "Rollback proof")
+    emergency_blocker = markdown_table_row(project_blockers, "Emergency-stop proof")
+    timeout_blocker = markdown_table_row(
+        project_blockers, "Connection-loss / timeout fail-closed proof"
+    )
+    assert rollback_blocker[1] == "blocked_by_readonly_preflight"
+    assert emergency_blocker[1] == "blocked_by_readonly_preflight"
+    assert timeout_blocker[1] == "tooling_ready_waits_real_wing"
+    assert "rollback through `rollback_last_manual_write`" in rollback_blocker[2]
+    assert "runner supports `--prove-emergency-stop`" in emergency_blocker[2]
+    assert "blocks later apply with `emergency_stop_active`" in emergency_blocker[2]
+    assert (
+        "Use `--prove-emergency-stop` only inside the explicit supervised proof run."
+        in emergency_blocker[3]
+    )
+    assert "controlled real-run timeout/connection-loss artifact" in timeout_blocker[3]
+    assert "verify fail-closed semantics" in timeout_blocker[3]
+
+    assert "Rollback proof." in goal
+    assert "Emergency stop proof." in goal
+    assert "Connection-loss / timeout fail-closed proof." in goal
+    assert "Offline, shadow, replay, mock и simulator evidence не являются hardware proof." in goal
+    assert "Full Autonomous Mixing Mode не может быть объявлен готовым" in goal
+
+    assert "Unknown and insufficient evidence are valid safe outcomes." in safety
+    assert "send live OSC writes;" in safety
+    assert "control a real console;" in safety
+    assert "modify the user's WING scene;" in safety
+    assert "stale-state protection" in safety
+    assert "readback, rollback or audit logging" in safety
+    assert "describe simulated validation as real hardware validation;" in safety
+    assert "weaken safety tests to pass a change." in safety
+
+    assert supervised_runbook.count("--prove-emergency-stop") == 2
+    assert "rollback went through `rollback_last_manual_write`" in supervised_runbook
+    assert "rollback readback status is `verified_from_physical_readback`" in supervised_runbook
+    assert "emergency stop was applied" in supervised_runbook
+    assert "later apply was blocked with `emergency_stop_active`" in supervised_runbook
+    assert "emergency stop does not block a later apply" in supervised_runbook
+    assert "timeout happens after `apply_operator_proposal`" in supervised_runbook
+    assert "physical state is not\n  manually inspected" in supervised_runbook
+    assert "any direct write path is used instead of `apply_operator_proposal`" in supervised_runbook
+    assert "Do not claim full autonomous readiness." in supervised_runbook
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
