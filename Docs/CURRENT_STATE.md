@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-19T13:16:15Z
+Generated: 2026-06-19T13:29:26Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `7de7bfe1 Check no-WING markdown top-level coverage`
+  `80e625a4 Check no-WING coverage field lines`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -52,7 +52,8 @@ Generated: 2026-06-19T13:16:15Z
   `c35947b0`, `367e67bb`, `bd4e6ef0`, `e1e31ee0`, `ffddb646`,
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
   `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`,
-  `ff8a70ff`, `2f8bb432`, `1ff17877`, `41a60af6`, and `7de7bfe1`.
+  `ff8a70ff`, `2f8bb432`, `1ff17877`, `41a60af6`, `7de7bfe1`, and
+  `80e625a4`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -184,6 +185,13 @@ Generated: 2026-06-19T13:16:15Z
   aggregate-only blobs (`autonomy_gap_rollup`, `results`,
   `supervised_gain_dry_run`) as whole-object Markdown omissions, and reported
   `0` unexpected or interesting missing safety/evidence keys.
+- The no-WING top-level Markdown coverage section now also self-checks its own
+  required field lines. The fresh no-WING bundle
+  `artifacts/no_wing_release_check/20260619T132625Z_no_wing_release_check`
+  reports `no_wing_summary_markdown_top_level_coverage_missing_field_lines: []`,
+  `no_wing_summary_markdown_top_level_coverage_field_lines_rendered: true`,
+  `live_authority_granted: false`, `readiness_closure_allowed_by_packet: false`
+  and `0` overall `summary.json` keys missing from `summary.md`.
 
 ## Unresolved unknowns
 
@@ -193,5 +201,5 @@ Generated: 2026-06-19T13:16:15Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `7de7bfe1` passed with
-  `4061 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `80e625a4` passed with
+  `4062 passed, 1 skipped, 1 warning`.

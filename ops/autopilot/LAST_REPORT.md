@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T13:16:15Z.
+- Latest heartbeat: 2026-06-19T13:29:26Z.
 
 ## Что сделано
 
@@ -134,6 +134,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 - `7de7bfe1` - no-WING summary now emits a top-level Markdown coverage
   self-check, including missing/allowed/unexpected/interesting key lists and
   explicit readiness/live-authority denial for that coverage gate.
+- `80e625a4` - no-WING top-level Markdown coverage now also self-checks its
+  own required field lines, reports missing coverage-section lines, and fails
+  closed if a required coverage line disappears from `summary.md`.
 
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
@@ -179,7 +182,7 @@ grant live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_snapshot tests/test_no_wing_release_check.py::test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace_candidates -q`:
   `2 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
-  `444 passed`.
+  `445 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py::test_decision_review_report_surfaces_request_sequence_contract -q`:
@@ -218,10 +221,10 @@ grant live authority.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_wing_preflight_handoff_packet_artifact tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_next_wing_proof_plan -q`:
   `2 passed`.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof -q`:
-  `2 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
+  `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4061 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4062 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -242,10 +245,18 @@ grant live authority.
   `542` top-level summary keys checked; allowed missing whole-object aggregate
   keys were `autonomy_gap_rollup`, `results` and `supervised_gain_dry_run`;
   unexpected missing keys: `0`; interesting safety/evidence missing keys: `0`.
-- `PYTHONPATH=backend python tools/no_wing_release_check.py --quick`: passed.
-- `python tools/memory/memory_lint.py --root .`: PASS.
+- Top-level coverage field-line self-check against the fresh no-WING bundle:
+  `no_wing_summary_markdown_top_level_coverage_missing_field_lines: []`,
+  `no_wing_summary_markdown_top_level_coverage_field_lines_rendered: true`,
+  and `0` overall `summary.json` keys missing from `summary.md`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 tools/no_wing_release_check.py --quick`:
+  passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 tools/verify_no_wing_artifact_manifest.py artifacts/no_wing_release_check/20260619T132625Z_no_wing_release_check`:
+  passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
+  `contacts_backend: false` and `live_authority_granted: false`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
-  `artifacts/no_wing_release_check/20260619T131418Z_no_wing_release_check`.
+  `artifacts/no_wing_release_check/20260619T132625Z_no_wing_release_check`.
 - Authority flags remained safe: no WING/backend contact, no live write, no
   readiness closure, no live authority.
 - CP04 handoff report:
@@ -264,7 +275,7 @@ grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `7de7bfe1` is the latest verified
+- Heartbeat reconciliation confirmed `80e625a4` is the latest verified
   product/runtime commit and found no real WING read-only artifact under
   `artifacts/wing_readonly_preflight/`.
 
