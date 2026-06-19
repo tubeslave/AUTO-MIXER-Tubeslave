@@ -56,6 +56,10 @@ they can be used for simulator fault-recovery promotion. Complete candidate
 recovery policy evidence alone cannot grant live authority, close readiness,
 replace emergency-stop or rollback proof, or replace hardware validation.
 
+Fault-recovery manifests must consume the recovery policy contract result
+instead of loose recovery_policy status fields before claiming simulator
+fault-recovery promotion readiness.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

@@ -67,6 +67,8 @@ M015_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M015-replay-threshold-policy-bind
 M015_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-threshold-policy-binding-20260619.md"
 M016_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M016-recovery-policy-contract.md"
 M016_ADR = PROJECT_ROOT / "Docs" / "adr" / "recovery-policy-contract-20260619.md"
+M017_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M017-fault-recovery-policy-binding.md"
+M017_ADR = PROJECT_ROOT / "Docs" / "adr" / "fault-recovery-policy-binding-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -1709,7 +1711,21 @@ def test_m012_fault_injection_recovery_contract_stays_simulator_only_and_audit_g
         "contacts_wing": False,
         "contacts_backend": False,
         "hardware_evidence": False,
-        "recovery_policy": {"status": "PENDING_APPROVAL"},
+        "recovery_policy_manifest": {
+            "policy_id": "pending-recovery-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "recovery_controls": {
+                key: True for key in POLICY_REQUIRED_RECOVERY_CONTROLS
+            },
+            "recovery_evidence": {
+                key: True for key in POLICY_REQUIRED_RECOVERY_EVIDENCE
+            },
+            "recovery_policy": {"status": "PENDING_APPROVAL"},
+        },
         "fault_scenarios": [
             {
                 "fault_scenario": "transport_timeout",
@@ -1750,10 +1766,27 @@ def test_m012_fault_injection_recovery_contract_stays_simulator_only_and_audit_g
             "hardware_evidence": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
-            "recovery_policy": {
-                "status": "approved",
-                "approved_by": "owner",
-                "approved_decision_id": "adr:fault-recovery-policy",
+            "recovery_policy_manifest": {
+                "policy_id": "approved-recovery-policy",
+                "offline_only": True,
+                "live_write": False,
+                "contacts_wing": False,
+                "contacts_backend": False,
+                "hardware_evidence": False,
+                "readiness_closure_allowed": False,
+                "live_authority_granted": False,
+                "recovery_controls": {
+                    key: True for key in POLICY_REQUIRED_RECOVERY_CONTROLS
+                },
+                "recovery_evidence": {
+                    key: True for key in POLICY_REQUIRED_RECOVERY_EVIDENCE
+                },
+                "recovery_policy": {
+                    "status": "approved",
+                    "approved_by": "owner",
+                    "approved_decision_id": "adr:fault-recovery-policy",
+                    "approved_at": "2026-06-19T18:00:10Z",
+                },
             },
             "fault_scenarios": [
                 complete_fault(name) for name in RECOVERY_REQUIRED_FAULT_SCENARIOS
@@ -1903,10 +1936,27 @@ def test_m013_integration_evaluation_bundle_contract_stays_offline_and_child_gat
             "hardware_evidence": False,
             "readiness_closure_allowed": False,
             "live_authority_granted": False,
-            "recovery_policy": {
-                "status": "approved",
-                "approved_by": "owner",
-                "approved_decision_id": "adr:fault-recovery-policy",
+            "recovery_policy_manifest": {
+                "policy_id": "approved-recovery-policy",
+                "offline_only": True,
+                "live_write": False,
+                "contacts_wing": False,
+                "contacts_backend": False,
+                "hardware_evidence": False,
+                "readiness_closure_allowed": False,
+                "live_authority_granted": False,
+                "recovery_controls": {
+                    key: True for key in POLICY_REQUIRED_RECOVERY_CONTROLS
+                },
+                "recovery_evidence": {
+                    key: True for key in POLICY_REQUIRED_RECOVERY_EVIDENCE
+                },
+                "recovery_policy": {
+                    "status": "approved",
+                    "approved_by": "owner",
+                    "approved_decision_id": "adr:fault-recovery-policy",
+                    "approved_at": "2026-06-19T18:00:10Z",
+                },
             },
             "fault_scenarios": [
                 complete_fault(name) for name in RECOVERY_REQUIRED_FAULT_SCENARIOS
@@ -2460,6 +2510,228 @@ def test_m016_recovery_policy_contract_stays_owner_approved_and_offline():
     assert "always returns `live_authority_granted: false`" in adr
     assert "M016 recovery policy contract is now covered" in current
     assert "M016 recovery policy contract rail is now automated" in report
+
+
+def test_m017_fault_recovery_policy_binding_requires_m016_manifest():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M017_PLAN.read_text(encoding="utf-8")
+    adr = M017_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m017 = markdown_table_row(roadmap, "M017")
+    assert m017[1] == "Fault recovery policy binding"
+    assert m017[2] == (
+        "Simulator fault-recovery promotion consumes the recovery policy "
+        "contract instead of loose recovery_policy status fields"
+    )
+    assert m017[3] == "M012-M016"
+    assert m017[4] == "high offline"
+    assert m017[5] == "UNIT_VERIFIED gate binding; simulator evidence remains pending"
+    assert m017[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`backend/fault_injection_recovery_contract.py`" in memory_eval[2]
+    assert "`backend/recovery_policy_contract.py`" in memory_eval[2]
+    assert "tests/test_fault_injection_recovery_contract.py" in memory_eval[3]
+    assert "fault-recovery promotion now requires a bound recovery policy manifest" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    def complete_fault(name: str) -> dict:
+        return {
+            "fault_scenario": name,
+            "evaluation_types": list(RECOVERY_REQUIRED_EVALUATION_TYPES),
+            "recovery_outcomes": {key: True for key in REQUIRED_RECOVERY_OUTCOMES},
+            "audit": {key: f"{name}/{key}" for key in RECOVERY_REQUIRED_AUDIT_FIELDS},
+        }
+
+    def recovery_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "approved-recovery-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "recovery_controls": {
+                key: True for key in POLICY_REQUIRED_RECOVERY_CONTROLS
+            },
+            "recovery_evidence": {
+                key: True for key in POLICY_REQUIRED_RECOVERY_EVIDENCE
+            },
+            "recovery_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:fault-recovery-policy",
+                "approved_at": "2026-06-19T18:00:10Z",
+            },
+        }
+        manifest.update(overrides)
+        return manifest
+
+    legacy_only_fault_recovery = {
+        "manifest_id": "legacy-recovery-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "recovery_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:legacy-recovery-policy",
+        },
+        "fault_scenarios": [
+            complete_fault(name) for name in RECOVERY_REQUIRED_FAULT_SCENARIOS
+        ],
+    }
+    legacy_result = evaluate_fault_injection_recovery_contract(legacy_only_fault_recovery)
+    assert legacy_result["ready_for_fault_recovery_promotion"] is False
+    assert "approved_recovery_policy_required" in legacy_result["blockers"]
+    assert "recovery_policy_contract_not_ready" in legacy_result["blockers"]
+    assert "legacy_recovery_policy_without_contract_manifest" in legacy_result[
+        "blockers"
+    ]
+    assert "recovery_policy:offline_only_required" in legacy_result["blockers"]
+    assert legacy_result["summary"]["legacy_recovery_policy_status"] == "approved"
+    assert legacy_result["summary"]["recovery_policy_approved"] is False
+    assert legacy_result["authority"]["live_authority_granted"] is False
+
+    complete_fault_recovery = {
+        "manifest_id": "bound-recovery-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "recovery_policy_manifest": recovery_policy_manifest(),
+        "fault_scenarios": [
+            complete_fault(name) for name in RECOVERY_REQUIRED_FAULT_SCENARIOS
+        ],
+    }
+    complete_result = evaluate_fault_injection_recovery_contract(complete_fault_recovery)
+    assert complete_result["ready_for_fault_recovery_promotion"] is True
+    assert complete_result["summary"]["recovery_policy_contract_status"] == (
+        "ready_for_recovery_policy_use"
+    )
+    assert complete_result["recovery_policy_result"]["ready_for_recovery_policy_use"] is True
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+
+    def complete_scenario(name: str) -> dict:
+        return {
+            "scenario": name,
+            "evaluation_types": list(REQUIRED_EVALUATION_TYPES),
+            "safety_checks": {key: True for key in REQUIRED_SAFETY_CHECKS},
+            "quality_axes": {
+                key: {"status": "passed", "artifact": f"{name}/{key}.json"}
+                for key in REQUIRED_QUALITY_AXES
+            },
+        }
+
+    def complete_threshold(axis: str) -> dict:
+        return {
+            "axis": axis,
+            "metric_name": f"{axis}_score",
+            "direction": "min",
+            "candidate_value": 0.8,
+            "evidence_artifact": f"thresholds/{axis}.json",
+            "rationale": f"Replay promotion threshold for {axis}",
+            "rollback_policy": f"Revert {axis} threshold on regression",
+        }
+
+    def threshold_policy_manifest(**overrides) -> dict:
+        manifest = {
+            "policy_id": "offline-replay-threshold-policy",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "policy_checks": {key: True for key in THRESHOLD_REQUIRED_POLICY_CHECKS},
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:offline-replay-thresholds",
+                "approved_at": "2026-06-19T17:32:45Z",
+            },
+            "thresholds": [complete_threshold(axis) for axis in REQUIRED_THRESHOLD_AXES],
+        }
+        manifest.update(overrides)
+        return manifest
+
+    integration_result = evaluate_integration_bundle_contract(
+        {
+            "manifest_id": "legacy-recovery-policy-integration-bundle",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "integration_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:integration-evaluation-policy",
+            },
+            "integration_checks": {key: True for key in REQUIRED_INTEGRATION_CHECKS},
+            "offline_replay_manifest": {
+                "manifest_id": "bound-threshold-policy",
+                "offline_only": True,
+                "live_write": False,
+                "contacts_wing": False,
+                "contacts_backend": False,
+                "hardware_evidence": False,
+                "readiness_closure_allowed": False,
+                "live_authority_granted": False,
+                "quality_threshold_policy_manifest": threshold_policy_manifest(),
+                "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
+            },
+            "fault_recovery_manifest": legacy_only_fault_recovery,
+        }
+    )
+    assert integration_result["ready_for_integration_evaluation_promotion"] is False
+    assert "fault_recovery:recovery_policy_contract_not_ready" in integration_result[
+        "blockers"
+    ]
+    assert "fault_recovery:legacy_recovery_policy_without_contract_manifest" in integration_result[
+        "blockers"
+    ]
+
+    assert "Fault-recovery manifests must consume the recovery policy contract result" in completion
+    assert "M017-CP01" in plan
+    assert "M017-CP02" in plan
+    assert "Legacy `recovery_policy` fields without the M016 contract manifest" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M017 fault recovery policy binding is now covered" in current
+    assert "M017 fault recovery policy binding rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -7,6 +7,10 @@ from backend.fault_injection_recovery_contract import (
     REQUIRED_RECOVERY_OUTCOMES,
     evaluate_fault_injection_recovery_contract,
 )
+from backend.recovery_policy_contract import (
+    REQUIRED_RECOVERY_CONTROLS,
+    REQUIRED_RECOVERY_EVIDENCE,
+)
 
 
 def _fault_case(name: str) -> dict:
@@ -16,6 +20,29 @@ def _fault_case(name: str) -> dict:
         "recovery_outcomes": {key: True for key in REQUIRED_RECOVERY_OUTCOMES},
         "audit": {key: f"{name}-{key}" for key in REQUIRED_AUDIT_FIELDS},
     }
+
+
+def _recovery_policy_manifest(**overrides) -> dict:
+    manifest = {
+        "policy_id": "approved-recovery-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "recovery_controls": {key: True for key in REQUIRED_RECOVERY_CONTROLS},
+        "recovery_evidence": {key: True for key in REQUIRED_RECOVERY_EVIDENCE},
+        "recovery_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:fault-recovery-policy",
+            "approved_at": "2026-06-19T18:00:10Z",
+        },
+    }
+    manifest.update(overrides)
+    return manifest
 
 
 def _complete_manifest(**overrides) -> dict:
@@ -28,11 +55,7 @@ def _complete_manifest(**overrides) -> dict:
         "hardware_evidence": False,
         "readiness_closure_allowed": False,
         "live_authority_granted": False,
-        "recovery_policy": {
-            "status": "approved",
-            "approved_by": "owner",
-            "approved_decision_id": "adr:fault-recovery-policy",
-        },
+        "recovery_policy_manifest": _recovery_policy_manifest(),
         "fault_scenarios": [_fault_case(name) for name in REQUIRED_FAULT_SCENARIOS],
     }
     manifest.update(overrides)
@@ -42,7 +65,9 @@ def _complete_manifest(**overrides) -> dict:
 def test_fault_recovery_contract_blocks_incomplete_or_pending_policy_evidence():
     result = evaluate_fault_injection_recovery_contract(
         _complete_manifest(
-            recovery_policy={"status": "PENDING_APPROVAL"},
+            recovery_policy_manifest=_recovery_policy_manifest(
+                recovery_policy={"status": "PENDING_APPROVAL"}
+            ),
             fault_scenarios=[_fault_case("transport_timeout")],
         )
     )
@@ -72,7 +97,33 @@ def test_fault_recovery_contract_accepts_complete_simulator_bundle_without_live_
     }
     assert result["summary"]["covered_fault_scenarios"] == list(REQUIRED_FAULT_SCENARIOS)
     assert result["summary"]["recovery_policy_approved"] is True
+    assert result["summary"]["recovery_policy_contract_status"] == (
+        "ready_for_recovery_policy_use"
+    )
     assert result["blockers"] == []
+
+
+def test_fault_recovery_contract_requires_bound_recovery_policy_manifest():
+    result = evaluate_fault_injection_recovery_contract(
+        _complete_manifest(
+            recovery_policy_manifest={},
+            recovery_policy={
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:legacy-recovery-policy",
+            },
+        )
+    )
+
+    assert result["status"] == "blocked"
+    assert result["ready_for_fault_recovery_promotion"] is False
+    assert "approved_recovery_policy_required" in result["blockers"]
+    assert "recovery_policy_contract_not_ready" in result["blockers"]
+    assert "legacy_recovery_policy_without_contract_manifest" in result["blockers"]
+    assert "recovery_policy:offline_only_required" in result["blockers"]
+    assert result["summary"]["legacy_recovery_policy_status"] == "approved"
+    assert result["summary"]["recovery_policy_approved"] is False
+    assert result["authority"]["live_authority_granted"] is False
 
 
 def test_fault_recovery_contract_rejects_live_or_hardware_claims():

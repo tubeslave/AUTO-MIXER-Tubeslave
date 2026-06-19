@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T17:51:02Z
+Generated: 2026-06-19T18:04:16Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T17:51:02Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `9e61ab0a Bind replay thresholds to policy gate`
+  `e19382c2 Add recovery policy contract gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -384,6 +384,20 @@ Generated: 2026-06-19T17:51:02Z
   `live_authority_granted: false`, `readiness_closure_allowed: false`,
   `live_write: false` and `hardware_evidence: false`, so recovery policy
   evidence cannot become hardware proof or live readiness.
+- M017 fault recovery policy binding is now covered by
+  `tests/test_fault_injection_recovery_contract.py`,
+  `tests/test_evaluation_integration_bundle_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m017_fault_recovery_policy_binding_requires_m016_manifest`.
+  The updated `backend/fault_injection_recovery_contract.py` module now
+  consumes `recovery_policy_manifest` from M016 before reporting simulator
+  fault-recovery promotion readiness. Legacy loose `recovery_policy` status
+  fields remain visible as summary context, but cannot satisfy approved
+  recovery-policy requirements without the bound M016 contract manifest.
+  Integration bundles surface the same failure through the existing
+  `fault_recovery:` child prefix. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so fault recovery policy
+  binding cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -394,4 +408,4 @@ Generated: 2026-06-19T17:51:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4111 passed, 1 skipped, 1 warning`.
+  `4113 passed, 1 skipped, 1 warning`.

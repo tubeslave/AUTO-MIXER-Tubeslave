@@ -59,11 +59,17 @@ def _dedupe(items: Iterable[str]) -> List[str]:
     return sorted(dict.fromkeys(items))
 
 
-def _policy_approved(policy: Mapping[str, Any]) -> bool:
+def _recovery_policy_approved(policy: Mapping[str, Any]) -> bool:
     status = str(policy.get("status") or "").strip().lower()
     decision_id = str(policy.get("approved_decision_id") or "").strip()
     owner = str(policy.get("approved_by") or "").strip()
     return status in {"approved", "owner_approved"} and bool(decision_id) and bool(owner)
+
+
+def _recovery_policy_result(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    from backend.recovery_policy_contract import evaluate_recovery_policy_contract
+
+    return evaluate_recovery_policy_contract(manifest)
 
 
 def _fault_result(record: Mapping[str, Any]) -> Dict[str, Any]:
@@ -143,10 +149,21 @@ def evaluate_fault_injection_recovery_contract(
     if claimed_live_authority:
         blockers.append("simulator_fault_evidence_cannot_grant_live_authority")
 
-    recovery_policy = _as_mapping(manifest.get("recovery_policy"))
-    recovery_policy_approved = _policy_approved(recovery_policy)
+    recovery_policy_manifest = _as_mapping(manifest.get("recovery_policy_manifest"))
+    recovery_policy_result = _recovery_policy_result(recovery_policy_manifest)
+    recovery_policy = _as_mapping(recovery_policy_manifest.get("recovery_policy"))
+    legacy_recovery_policy = _as_mapping(manifest.get("recovery_policy"))
+    legacy_recovery_policy_approved = _recovery_policy_approved(legacy_recovery_policy)
+    recovery_policy_approved = recovery_policy_result["ready_for_recovery_policy_use"]
     if not recovery_policy_approved:
         blockers.append("approved_recovery_policy_required")
+        blockers.append("recovery_policy_contract_not_ready")
+        blockers.extend(
+            f"recovery_policy:{blocker}"
+            for blocker in recovery_policy_result["blockers"]
+        )
+        if legacy_recovery_policy_approved and not recovery_policy_manifest:
+            blockers.append("legacy_recovery_policy_without_contract_manifest")
 
     fault_records = _as_list(manifest.get("fault_scenarios"))
     fault_results = [_fault_result(_as_mapping(record)) for record in fault_records]
@@ -199,8 +216,16 @@ def evaluate_fault_injection_recovery_contract(
             "required_recovery_outcomes": list(REQUIRED_RECOVERY_OUTCOMES),
             "required_audit_fields": list(REQUIRED_AUDIT_FIELDS),
             "recovery_policy_status": str(recovery_policy.get("status") or ""),
+            "legacy_recovery_policy_status": str(
+                legacy_recovery_policy.get("status") or ""
+            ),
             "recovery_policy_approved": recovery_policy_approved,
+            "recovery_policy_contract_status": recovery_policy_result["status"],
+            "recovery_policy_ready_for_owner_review": recovery_policy_result[
+                "ready_for_owner_review"
+            ],
         },
+        "recovery_policy_result": recovery_policy_result,
         "fault_results": fault_results,
         "blockers": blocker_list,
     }

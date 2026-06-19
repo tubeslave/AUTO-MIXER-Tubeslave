@@ -20,6 +20,10 @@ from backend.quality_threshold_policy_contract import (
     REQUIRED_POLICY_CHECKS as THRESHOLD_REQUIRED_POLICY_CHECKS,
     REQUIRED_THRESHOLD_AXES,
 )
+from backend.recovery_policy_contract import (
+    REQUIRED_RECOVERY_CONTROLS,
+    REQUIRED_RECOVERY_EVIDENCE,
+)
 
 
 def _scenario(name: str) -> dict:
@@ -95,6 +99,29 @@ def _fault_case(name: str) -> dict:
     }
 
 
+def _recovery_policy_manifest(**overrides) -> dict:
+    manifest = {
+        "policy_id": "fault-recovery-policy",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "readiness_closure_allowed": False,
+        "live_authority_granted": False,
+        "recovery_controls": {key: True for key in REQUIRED_RECOVERY_CONTROLS},
+        "recovery_evidence": {key: True for key in REQUIRED_RECOVERY_EVIDENCE},
+        "recovery_policy": {
+            "status": "approved",
+            "approved_by": "owner",
+            "approved_decision_id": "adr:fault-recovery-policy",
+            "approved_at": "2026-06-19T18:00:10Z",
+        },
+    }
+    manifest.update(overrides)
+    return manifest
+
+
 def _fault_recovery_manifest(**overrides) -> dict:
     manifest = {
         "manifest_id": "fault-recovery-fixture",
@@ -105,11 +132,7 @@ def _fault_recovery_manifest(**overrides) -> dict:
         "hardware_evidence": False,
         "readiness_closure_allowed": False,
         "live_authority_granted": False,
-        "recovery_policy": {
-            "status": "approved",
-            "approved_by": "owner",
-            "approved_decision_id": "adr:fault-recovery-policy",
-        },
+        "recovery_policy_manifest": _recovery_policy_manifest(),
         "fault_scenarios": [_fault_case(name) for name in REQUIRED_FAULT_SCENARIOS],
     }
     manifest.update(overrides)
