@@ -4716,6 +4716,10 @@ test('director runtime surfaces preview integration bundle readiness without liv
   assert.equal(runtime.blockedReasons.includes('integration_bundle_source_authority_denied:true'), true);
   assert.equal(runtime.blockedReasons.includes('integration_bundle_live_authority_granted:false'), true);
   assert.equal(runtime.blockedReasons.includes('integration_bundle_readiness_closure_allowed:false'), true);
+  assert.equal(
+    runtime.currentGoal,
+    'Resolve the offline integration bundle blocker before promotion planning. Keep proposals review-only; no live authority, readiness closure or console apply is granted.',
+  );
   assert.equal(runtime.manualGateLabel, 'Apply blocked');
 });
 

@@ -616,7 +616,34 @@ bundle readiness cannot queue proposals, grant live authority, close readiness,
 contact WING/backend, mark Full Autonomous ready, or replace accepted real
 hardware/operator validation.
 
+The M032 Director goal integration bundle blocker summary rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m032_director_goal_surfaces_integration_bundle_blocker_summary`.
+It updates `frontend/src/services/operatorAdapters.ts` and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M032-director-goal-integration-bundle-blocker-summary.md`,
+`Docs/adr/director-goal-integration-bundle-blocker-summary-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The Director runtime adapter now
+sets `DirectorRuntime.currentGoal` to a blocker-focused offline integration
+bundle message when `main_pipeline_preview.summary` reports the bundle is not
+ready. Emergency stop remains higher priority. The goal text keeps proposals
+review-only with no live authority, readiness closure or console apply, so
+goal-visible integration bundle readiness cannot queue proposals, grant live
+authority, close readiness, contact WING/backend, mark Full Autonomous ready,
+or replace accepted real hardware/operator validation.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `50 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m032_director_goal_surfaces_integration_bundle_blocker_summary -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `45 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4158 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `50 passed`.

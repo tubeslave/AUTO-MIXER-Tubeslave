@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T21:19:50Z
+Last heartbeat UTC: 2026-06-19T21:33:52Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,16 +12,16 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M031 Director guard integration bundle blocker banner now renders
-M029 `DirectorRuntime.blockedReasons` `integration_bundle_*` tags as
-operator-readable Runtime Guard banner messages. The updated
-`frontend/src/views/DirectorPanel.tsx` uses the shared read-only
-`directorBlockedReasonMessages` formatter from
-`frontend/src/components/dashboard/directorPanelModel.ts`.
+Latest check: M032 Director goal integration bundle blocker summary now sets
+`DirectorRuntime.currentGoal` to a blocker-focused offline integration bundle
+message when `main_pipeline_preview.summary` reports the bundle is not ready.
+Emergency stop remains higher priority. The updated
+`frontend/src/services/operatorAdapters.ts` keeps the goal text review-only and
+states that no live authority, readiness closure or console apply is granted.
 
 Frontend adapter validation passed with `50 passed`; the frontend build
-passed; the M031 rail passed with `1 passed`; the full rail file passed with
-`44 passed`; and the full suite passed with `4157 passed, 1 skipped, 1 warning`.
+passed; the M032 rail passed with `1 passed`; the full rail file passed with
+`45 passed`; and the full suite passed with `4158 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

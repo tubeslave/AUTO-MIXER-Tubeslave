@@ -121,6 +121,8 @@ M030_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M030-director-event-integration-b
 M030_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-event-integration-bundle-blocker-summary-20260619.md"
 M031_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M031-director-guard-integration-bundle-blocker-banner.md"
 M031_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-guard-integration-bundle-blocker-banner-20260619.md"
+M032_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M032-director-goal-integration-bundle-blocker-summary.md"
+M032_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-goal-integration-bundle-blocker-summary-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -4696,6 +4698,80 @@ def test_m031_director_guard_banner_renders_integration_bundle_blocker_summary()
         current
     )
     assert "M031 Director guard integration bundle blocker banner rail is now automated" in (
+        report
+    )
+
+
+def test_m032_director_goal_surfaces_integration_bundle_blocker_summary():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M032_PLAN.read_text(encoding="utf-8")
+    adr = M032_ADR.read_text(encoding="utf-8")
+    adapter = FRONTEND_OPERATOR_ADAPTER.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m032 = markdown_table_row(roadmap, "M032")
+    assert m032[1] == "Director goal integration bundle blocker summary"
+    assert m032[2] == (
+        "Director current goal names the offline integration bundle blocker "
+        "before generic promotion-planning fallback"
+    )
+    assert m032[3] == "M031"
+    assert m032[4] == "high offline frontend"
+    assert m032[5] == "UNIT_VERIFIED read-only Director goal; live authority remains blocked"
+    assert m032[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`frontend/src/services/operatorAdapters.ts`" in memory_eval[2]
+    assert "Director current goal now names offline integration bundle blockers" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M032-CP01" in plan
+    assert "M032-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not queue proposals" in adr
+
+    goal_text = (
+        "Resolve the offline integration bundle blocker before promotion planning. "
+        "Keep proposals review-only; no live authority, readiness closure or "
+        "console apply is granted."
+    )
+    assert "integrationBundleGoal" in adapter
+    assert goal_text in adapter
+    assert "currentGoal: emergencyStopped" in adapter
+    assert goal_text in adapter_test
+    assert "director runtime surfaces preview integration bundle readiness without live authority" in (
+        adapter_test
+    )
+    assert "Director current-goal text must render offline integration bundle" in (
+        completion
+    )
+    assert "M032 Director goal integration bundle blocker summary is now covered" in (
+        current
+    )
+    assert "M032 Director goal integration bundle blocker summary rail is now automated" in (
         report
     )
 

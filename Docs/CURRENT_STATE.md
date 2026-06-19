@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T21:19:50Z
+Generated: 2026-06-19T21:33:52Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T21:19:50Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `bb33f2ac Surface integration bundle readiness in operator adapter`
+  `54d4d672 Render integration bundle blockers in director guard`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -571,6 +571,17 @@ Generated: 2026-06-19T21:19:50Z
   integration bundle status cannot queue proposals, grant live authority, close
   readiness, contact WING/backend, mark Full Autonomous ready, or replace real
   hardware/operator validation.
+- M032 Director goal integration bundle blocker summary is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m032_director_goal_surfaces_integration_bundle_blocker_summary`.
+  The updated `frontend/src/services/operatorAdapters.ts` module now sets
+  `DirectorRuntime.currentGoal` to a blocker-focused offline integration
+  bundle message when `main_pipeline_preview.summary` reports the bundle is
+  not ready. Emergency stop remains higher priority, and the goal text keeps
+  proposals review-only with no live authority, readiness closure or console
+  apply, so goal-visible integration bundle status cannot queue proposals,
+  grant live authority, close readiness, contact WING/backend, mark Full
+  Autonomous ready, or replace real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -581,4 +592,4 @@ Generated: 2026-06-19T21:19:50Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4157 passed, 1 skipped, 1 warning`.
+  `4158 passed, 1 skipped, 1 warning`.

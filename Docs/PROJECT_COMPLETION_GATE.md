@@ -134,6 +134,12 @@ status cannot queue proposals, grant live authority, close readiness, contact
 WING/backend, mark Full Autonomous ready, or replace accepted real
 hardware/operator validation.
 
+Director current-goal text must render offline integration bundle blocker
+status as read-only operator explanation only. Goal-visible integration bundle
+status cannot queue proposals, grant live authority, close readiness, contact
+WING/backend, mark Full Autonomous ready, apply to console, or replace accepted
+real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

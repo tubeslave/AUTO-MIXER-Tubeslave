@@ -3752,6 +3752,9 @@ export function adaptDirectorRuntime(
       integrationBundleReadinessClosureAllowed === false ? 'integration_bundle_readiness_closure_allowed:false' : '',
     ].filter(Boolean)
     : [];
+  const integrationBundleGoal = integrationBundleBlockedReasons.length > 0
+    ? 'Resolve the offline integration bundle blocker before promotion planning. Keep proposals review-only; no live authority, readiness closure or console apply is granted.'
+    : '';
   const previewQueueMutation = Boolean(previewSummary.queue_mutation ?? previewExecutor.queue_mutation);
   const liveApplyPolicy = str(previewExecutor.live_apply_policy, str(processing.live_apply_policy, liveWritePolicy));
   const readyBlockedReasons = Array.isArray(readyForLive.blocked_reasons)
@@ -3771,6 +3774,8 @@ export function adaptDirectorRuntime(
   return {
     currentGoal: emergencyStopped
       ? 'Emergency stop is active. Live apply remains blocked until the operator resets the latch and reviews frozen automation.'
+      : integrationBundleGoal
+      ? integrationBundleGoal
       : canLiveExecute
       ? 'Supervised gate is available for approved fader/gain proposals. The UI still avoids direct console writes.'
       : 'Collect runtime evidence, keep proposals review-only, and wait for the supervised gate before any console apply.',
