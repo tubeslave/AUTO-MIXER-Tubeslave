@@ -21482,6 +21482,18 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_candidate_contact_trace_source_ids = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_contact_trace_source_ids"
         )
+        accepted_candidate_expected_contacts_backend_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+        )
+        accepted_candidate_expected_queries_console_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+        )
+        accepted_candidate_contacts_backend_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
+        )
+        accepted_candidate_queries_console_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+        )
         accepted_candidate_contact_trace_missing_source_ids = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_contact_trace_missing_source_ids"
         )
@@ -21637,6 +21649,32 @@ def wing_readonly_preflight_review_decision_summary(
                 list(accepted_candidate_contact_trace_source_ids)
                 if isinstance(accepted_candidate_contact_trace_source_ids, list)
                 else []
+            ),
+            "accepted_candidate_expected_contacts_backend_by_source": (
+                dict(accepted_candidate_expected_contacts_backend_by_source)
+                if isinstance(
+                    accepted_candidate_expected_contacts_backend_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_expected_queries_console_by_source": (
+                dict(accepted_candidate_expected_queries_console_by_source)
+                if isinstance(
+                    accepted_candidate_expected_queries_console_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_contacts_backend_by_source": (
+                dict(accepted_candidate_contacts_backend_by_source)
+                if isinstance(accepted_candidate_contacts_backend_by_source, Mapping)
+                else {}
+            ),
+            "accepted_candidate_queries_console_by_source": (
+                dict(accepted_candidate_queries_console_by_source)
+                if isinstance(accepted_candidate_queries_console_by_source, Mapping)
+                else {}
             ),
             "accepted_candidate_contact_trace_missing_source_ids": (
                 list(accepted_candidate_contact_trace_missing_source_ids)

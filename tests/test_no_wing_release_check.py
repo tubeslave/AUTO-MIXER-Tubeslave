@@ -7662,6 +7662,7 @@ def test_no_wing_release_check_rejects_non_false_wing_preflight_summary_authorit
 
 def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_snapshot():
     result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
+    summary_payload = wing_readonly_preflight_review_decision_summary([result])
 
     assert result.status == "passed"
     assert (
@@ -7733,6 +7734,30 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     )
     assert (
         result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_contacts_backend_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_queries_console_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_contacts_backend_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_queries_console_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
             "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_complete"
         ]
         is False
@@ -7749,6 +7774,10 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         "live_authority_granted": False,
         "full_autonomous_ready": False,
     }
+    assert summary_payload["accepted_candidate_expected_contacts_backend_by_source"] == {}
+    assert summary_payload["accepted_candidate_expected_queries_console_by_source"] == {}
+    assert summary_payload["accepted_candidate_contacts_backend_by_source"] == {}
+    assert summary_payload["accepted_candidate_queries_console_by_source"] == {}
     assert result.detail["candidate_reviews"] == []
     assert result.detail["violations"] == []
 
@@ -8444,6 +8473,18 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace
     )
     assert summary_payload["accepted_candidate_contact_trace_complete"] is False
     assert summary_payload["accepted_candidate_expected_artifact_trace_complete"] is False
+    assert summary_payload[
+        "accepted_candidate_expected_contacts_backend_by_source"
+    ] == {source_id: True}
+    assert summary_payload[
+        "accepted_candidate_expected_queries_console_by_source"
+    ] == {source_id: True}
+    assert summary_payload["accepted_candidate_contacts_backend_by_source"] == {
+        source_id: False
+    }
+    assert summary_payload["accepted_candidate_queries_console_by_source"] == {
+        source_id: False
+    }
     assert summary_payload["accepted_candidate_contact_trace_missing_source_ids"] == [
         source_id
     ]
