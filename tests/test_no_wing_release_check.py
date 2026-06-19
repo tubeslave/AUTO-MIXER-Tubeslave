@@ -7804,6 +7804,48 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
         ]
         is False
     )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids"
+        ]
+        == []
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source"
+        ]
+        == {}
+    )
+    assert (
+        result.detail[
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
+        ]
+        == []
+    )
     assert result.detail["operator_review_required"] is True
     assert result.detail["readiness_matrix_update_allowed_by_decision"] is False
     assert result.detail["readiness_closure_allowed_by_decision"] is False
@@ -7834,6 +7876,27 @@ def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_s
     assert summary_payload["accepted_candidate_expected_queries_console_by_source"] == {}
     assert summary_payload["accepted_candidate_contacts_backend_by_source"] == {}
     assert summary_payload["accepted_candidate_queries_console_by_source"] == {}
+    assert summary_payload["accepted_candidate_expected_artifact_trace_complete"] is False
+    assert summary_payload["accepted_candidate_expected_artifact_trace_source_ids"] == []
+    assert summary_payload["accepted_candidate_expected_artifacts_by_source"] == {}
+    assert summary_payload[
+        "accepted_candidate_expected_summary_artifact_by_source"
+    ] == {}
+    assert summary_payload[
+        "accepted_candidate_expected_events_artifact_by_source"
+    ] == {}
+    assert summary_payload[
+        "accepted_candidate_summary_path_matches_expected_artifact_by_source"
+    ] == {}
+    assert summary_payload[
+        "accepted_candidate_events_path_matches_expected_artifact_by_source"
+    ] == {}
+    assert (
+        summary_payload[
+            "accepted_candidate_expected_artifact_trace_missing_source_ids"
+        ]
+        == []
+    )
     assert result.detail["candidate_reviews"] == []
     assert result.detail["violations"] == []
 
@@ -8569,6 +8632,24 @@ def test_no_wing_release_check_blocks_wing_preflight_review_decision_final_trace
     assert summary_payload["accepted_candidate_contact_trace_missing_source_ids"] == [
         source_id
     ]
+    assert summary_payload["accepted_candidate_expected_artifact_trace_source_ids"] == [
+        source_id
+    ]
+    assert summary_payload["accepted_candidate_expected_artifacts_by_source"] == {
+        source_id: []
+    }
+    assert summary_payload[
+        "accepted_candidate_expected_summary_artifact_by_source"
+    ] == {source_id: ""}
+    assert summary_payload[
+        "accepted_candidate_expected_events_artifact_by_source"
+    ] == {source_id: ""}
+    assert summary_payload[
+        "accepted_candidate_summary_path_matches_expected_artifact_by_source"
+    ] == {source_id: False}
+    assert summary_payload[
+        "accepted_candidate_events_path_matches_expected_artifact_by_source"
+    ] == {source_id: False}
     assert (
         summary_payload[
             "accepted_candidate_expected_artifact_trace_missing_source_ids"

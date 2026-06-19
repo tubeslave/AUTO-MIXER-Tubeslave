@@ -21518,6 +21518,25 @@ def wing_readonly_preflight_review_decision_summary(
         accepted_candidate_expected_artifact_trace_source_ids = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_source_ids"
         )
+        accepted_candidate_expected_artifacts_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_artifacts_by_source"
+        )
+        accepted_candidate_expected_summary_artifact_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_summary_artifact_by_source"
+        )
+        accepted_candidate_expected_events_artifact_by_source = detail.get(
+            "readonly_preflight_review_decision_accepted_candidate_expected_events_artifact_by_source"
+        )
+        accepted_candidate_summary_path_matches_expected_artifact_by_source = (
+            detail.get(
+                "readonly_preflight_review_decision_accepted_candidate_summary_path_matches_expected_artifact_by_source"
+            )
+        )
+        accepted_candidate_events_path_matches_expected_artifact_by_source = (
+            detail.get(
+                "readonly_preflight_review_decision_accepted_candidate_events_path_matches_expected_artifact_by_source"
+            )
+        )
         accepted_candidate_expected_artifact_trace_missing_source_ids = detail.get(
             "readonly_preflight_review_decision_accepted_candidate_expected_artifact_trace_missing_source_ids"
         )
@@ -21766,6 +21785,43 @@ def wing_readonly_preflight_review_decision_summary(
                     list,
                 )
                 else []
+            ),
+            "accepted_candidate_expected_artifacts_by_source": (
+                dict(accepted_candidate_expected_artifacts_by_source)
+                if isinstance(accepted_candidate_expected_artifacts_by_source, Mapping)
+                else {}
+            ),
+            "accepted_candidate_expected_summary_artifact_by_source": (
+                dict(accepted_candidate_expected_summary_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_expected_summary_artifact_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_expected_events_artifact_by_source": (
+                dict(accepted_candidate_expected_events_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_expected_events_artifact_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_summary_path_matches_expected_artifact_by_source": (
+                dict(accepted_candidate_summary_path_matches_expected_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_summary_path_matches_expected_artifact_by_source,
+                    Mapping,
+                )
+                else {}
+            ),
+            "accepted_candidate_events_path_matches_expected_artifact_by_source": (
+                dict(accepted_candidate_events_path_matches_expected_artifact_by_source)
+                if isinstance(
+                    accepted_candidate_events_path_matches_expected_artifact_by_source,
+                    Mapping,
+                )
+                else {}
             ),
             "accepted_candidate_expected_artifact_trace_missing_source_ids": (
                 list(accepted_candidate_expected_artifact_trace_missing_source_ids)
