@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T15:11:45Z.
+- Latest heartbeat: 2026-06-19T15:20:54Z.
 
 ## Что сделано
 
@@ -147,7 +147,7 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `31c1b5b3`; this synchronization did not
+pre-checkpoint state/evidence commit `6659c9fe`; this synchronization did not
 change product runtime behavior.
 
 The current-state freshness rail is now automated by
@@ -202,6 +202,14 @@ It compares the CP04 validate-only summaries under `ops/autopilot/evidence/`,
 validate-only summaries cannot be treated as real
 `artifacts/wing_readonly_preflight` hardware evidence while
 `hardware_evidence` remains false.
+
+The M002 physical readback intake rail is now automated by
+`tests/test_wing_mvp_rails.py::test_m002_physical_readback_waits_for_accepted_real_wing_review`.
+It compares `ops/autopilot/STATE.json`, `Docs/ROADMAP.md`,
+`Docs/ACTIVE_MILESTONE.md`, `.ai/project-layer/wing_mvp_blockers.md`,
+`ops/autopilot/BLOCKERS.md`, the M001 plan, `Docs/CURRENT_STATE.md` and this
+report so physical readback remains waiting until a real WING read-only
+artifact is reviewed and bound to accepted decision records.
 
 ## Проверка
 
@@ -295,8 +303,10 @@ validate-only summaries cannot be treated as real
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m002_physical_readback_waits_for_accepted_real_wing_review -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `15 passed`.
+  `16 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -308,7 +318,7 @@ validate-only summaries cannot be treated as real
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4071 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4072 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -339,9 +349,9 @@ validate-only summaries cannot be treated as real
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T15:11:45Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T15:20:54Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `31c1b5b3`, latest no-WING artifact
+  state/evidence commit `6659c9fe`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
@@ -367,6 +377,9 @@ validate-only summaries cannot be treated as real
 - The validate-only artifact-root separation rail confirmed those summaries
   stay out of the real `artifacts/wing_readonly_preflight` root while
   `hardware_evidence` is false.
+- The M002 physical readback intake rail confirmed physical readback still
+  requires a real WING read-only artifact, operator review and accepted
+  decision records.
 - Heartbeat reconciliation confirmed STOP, writer-lease, stale-run and
   recovery contract paths stay consistent across state, contract, skill, plan,
   operations, heartbeat, blockers and this report. It found no real WING

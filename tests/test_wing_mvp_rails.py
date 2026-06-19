@@ -633,6 +633,71 @@ def test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root()
     assert "write_request_sent: false" in handoff
 
 
+def test_m002_physical_readback_waits_for_accepted_real_wing_review():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    active = ACTIVE_MILESTONE_DOC.read_text(encoding="utf-8")
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    autopilot_blockers = AUTOPILOT_BLOCKERS.read_text(encoding="utf-8")
+    project_blockers = BLOCKERS_DOC.read_text(encoding="utf-8")
+    plan = M001_PLAN.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["active_checkpoint"] == "M001-EXTERNAL-WING-READONLY-ARTIFACT"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["next_action"] == (
+        "Wait for operator-supervised WING read-only preflight using "
+        "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json."
+    )
+    assert state["external_validation_requirements"] == [
+        "Real WING Rack read-only artifact",
+        "Operator review of accepted read-only preflight candidate",
+        "Explicit operator approval before supervised fader/gain proof",
+    ]
+
+    m002 = markdown_table_row(roadmap, "M002")
+    m003 = markdown_table_row(roadmap, "M003")
+    m004 = markdown_table_row(roadmap, "M004")
+    m005 = markdown_table_row(roadmap, "M005")
+    m006 = markdown_table_row(roadmap, "M006")
+    assert m002[1] == "Physical console readback intake"
+    assert m002[2] == (
+        "Real read-only WING artifact is reviewed and bound to accepted "
+        "decision records"
+    )
+    assert m002[3] == "M001 plus WING hardware/operator"
+    assert m002[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    for row in (m003, m004, m005, m006):
+        assert row[-1] == "BLOCKED_BY_M002"
+    assert m006[2] == "MVP readiness matrix updates only from accepted real proof"
+
+    readonly = markdown_table_row(project_blockers, "WING read-only connection proof")
+    physical_readback = markdown_table_row(project_blockers, "Physical console readback proof")
+    readiness = markdown_table_row(project_blockers, "Readiness matrix update based on real proof")
+    assert readonly[1] == "tooling_ready_waits_real_wing"
+    assert physical_readback[1] == "tooling_ready_waits_real_wing"
+    assert "Run read-only preflight with `--require-physical-readback`" in physical_readback[3]
+    assert readiness[1] == "blocked_by_real_artifact_review"
+    assert "Update readiness only after manual review of real WING artifacts" in readiness[3]
+    assert "do not close rows from offline evidence" in readiness[3]
+
+    assert (
+        "real WING Rack read-only artifact\n  and operator review are required "
+        "before physical readback intake can begin"
+    ) in autopilot_blockers
+    assert "presence and accepted review records" in active
+    assert "operator captures and reviews a real WING read-only artifact" in plan
+    assert "M001 autonomous pre-hardware work is complete and waiting for external" in current
+    assert "WING/operator validation" in current
+    assert "Hardware input required now: yes" in report
+    assert "intended backend/WING session and operator review" in report
+    assert "Wait for the operator-supervised real WING read-only preflight" in report
+    assert "There is no dependency-ready autonomous\nroadmap milestone" in report
+    assert "until that external validation exists" in report
+
+
 def test_mvp_doc_declares_scope_and_stop_rules():
     text = MVP_DOC.read_text(encoding="utf-8")
 

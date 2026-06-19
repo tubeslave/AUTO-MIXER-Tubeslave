@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T15:11:45Z
+Generated: 2026-06-19T15:20:54Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T15:11:45Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `31c1b5b3 Guard project completion gate`
+  `6659c9fe Guard validate-only artifact root`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -246,6 +246,13 @@ Generated: 2026-06-19T15:11:45Z
   handoff report and this file so validate-only summaries cannot be treated as
   real `artifacts/wing_readonly_preflight` hardware evidence while
   `hardware_evidence` remains false.
+- M002 physical readback intake is now covered by
+  `tests/test_wing_mvp_rails.py::test_m002_physical_readback_waits_for_accepted_real_wing_review`.
+  The rail checks `ops/autopilot/STATE.json`, `Docs/ROADMAP.md`,
+  `Docs/ACTIVE_MILESTONE.md`, `.ai/project-layer/wing_mvp_blockers.md`,
+  `ops/autopilot/BLOCKERS.md`, the M001 plan, `ops/autopilot/LAST_REPORT.md`
+  and this file so physical readback remains waiting until a real WING
+  read-only artifact is reviewed and bound to accepted decision records.
 
 ## Unresolved unknowns
 
@@ -256,4 +263,4 @@ Generated: 2026-06-19T15:11:45Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4071 passed, 1 skipped, 1 warning`.
+  `4072 passed, 1 skipped, 1 warning`.
