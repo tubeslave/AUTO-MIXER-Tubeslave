@@ -17,6 +17,11 @@ READONLY_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_READONLY_PREFLIGHT
 SUPERVISED_RUNBOOK = PROJECT_ROOT / "Docs" / "runbooks" / "WING_SUPERVISED_FADER_GAIN_PROOF.md"
 DOCS_INDEX = PROJECT_ROOT / "Docs" / "INDEX.md"
 CURRENT_STATE_DOC = PROJECT_ROOT / "Docs" / "CURRENT_STATE.md"
+ROADMAP_DOC = PROJECT_ROOT / "Docs" / "ROADMAP.md"
+ACTIVE_MILESTONE_DOC = PROJECT_ROOT / "Docs" / "ACTIVE_MILESTONE.md"
+CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CAPABILITY_MATRIX.md"
+CONSOLE_CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CONSOLE_CAPABILITY_MATRIX.md"
+AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
 RUNNER_TOOL = PROJECT_ROOT / "tools" / "wing_readonly_preflight_runner.py"
@@ -235,6 +240,13 @@ def current_wing_mvp_20260614_index_report_names():
     return sorted({Path(path).name for path in report_paths})
 
 
+def markdown_table_row(text: str, first_cell: str) -> list[str]:
+    for line in text.splitlines():
+        if line.startswith(f"| {first_cell} |"):
+            return [cell.strip() for cell in line.strip("|").split("|")]
+    raise AssertionError(f"missing markdown table row for {first_cell!r}")
+
+
 def test_progress_baseline_covers_runner_verifier_checks():
     progress = load_progress_module()
     runner = load_runner_module()
@@ -277,6 +289,56 @@ def test_current_state_doc_matches_autopilot_state_evidence():
     assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
     assert re.search(r"waiting for external\s+WING/operator validation", text)
     assert "No real hardware evidence was produced" in text
+
+
+def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    active = ACTIVE_MILESTONE_DOC.read_text(encoding="utf-8")
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    blockers = AUTOPILOT_BLOCKERS.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["active_milestone"] == "M001"
+    assert state["checkpoint_status"] == "waiting_for_external_validation"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+
+    assert "ID: M001" in active
+    assert "Status: WAITING_FOR_EXTERNAL_VALIDATION" in active
+    assert "A real hardware run remains external validation" in active
+    assert "M001 autonomous work is complete" in active
+    assert "Real hardware proof requires WING Rack" in active
+
+    assert "Exactly one milestone is active: `M001`" in roadmap
+    assert "`WAITING_FOR_EXTERNAL_VALIDATION`" in roadmap
+    assert markdown_table_row(roadmap, "M001")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert markdown_table_row(roadmap, "M002")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    for milestone in ("M003", "M004", "M005", "M006"):
+        assert markdown_table_row(roadmap, milestone)[-1] == "BLOCKED_BY_M002"
+    assert "Real read-only WING artifact is reviewed" in markdown_table_row(
+        roadmap, "M002"
+    )[2]
+
+    assert "Full Autonomous Mixing Mode | NOT_STARTED" in capability
+    assert "Locked until all safety and hardware gates pass" in capability
+    assert "Supervised AutoMix Mode | SPECIFIED" in capability
+    assert "WING live write scope is only `fader`/`gain`; real proof missing" in capability
+
+    raw_read = markdown_table_row(console, "Raw state/read-only connection")
+    physical = markdown_table_row(console, "Physical readback")
+    fader = markdown_table_row(console, "Channel fader")
+    gain = markdown_table_row(console, "Preamp trim/gain-down")
+    assert raw_read[-2:] == ["M001/M002 real artifact", "none in setup"]
+    assert physical[-2:] == ["accepted real artifact review", "none"]
+    assert fader[-2:] == ["supervised fader proof", "none"]
+    assert gain[-2:] == ["supervised gain-down proof", "none"]
+    assert fader[3] == "no live write"
+    assert gain[3] == "no live write"
+
+    assert "real WING Rack read-only artifact" in blockers
+    assert "Control-plane docs/state can proceed without live hardware contact" in blockers
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

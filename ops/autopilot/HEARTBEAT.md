@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-19T14:11:46Z
+Last heartbeat UTC: 2026-06-19T14:21:29Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,12 +12,14 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: `Docs/CURRENT_STATE.md` is now guarded by
-`tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence`,
-which compares it against `ops/autopilot/STATE.json`. Targeted validation
-passed with `1 passed`; the full rail file passed with `10 passed`; the full
-suite passed with `4066 passed, 1 skipped, 1 warning`. The fresh no-WING bundle
-remains
+Latest check: M001/M002 waiting state is now guarded by
+`tests/test_wing_mvp_rails.py::test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence`,
+which compares `ops/autopilot/STATE.json`, `Docs/ACTIVE_MILESTONE.md`,
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md` and `ops/autopilot/BLOCKERS.md`.
+Targeted validation passed with `1 passed`; the full rail file passed with
+`11 passed`; the full suite passed with `4067 passed, 1 skipped, 1 warning`.
+The fresh no-WING bundle remains
 `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`;
 the detached verifier passed with `failed_checks: []`, top-level coverage
 JSON/Markdown checks true, `contacts_wing: false`, `contacts_backend: false`

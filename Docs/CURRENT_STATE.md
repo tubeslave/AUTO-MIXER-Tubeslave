@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T14:11:46Z
+Generated: 2026-06-19T14:21:29Z
 
 ## Repository snapshot
 
@@ -206,6 +206,13 @@ Generated: 2026-06-19T14:11:46Z
   for the latest verified product/runtime commit, full-suite result, no-WING
   artifact path, artifact-manifest verifier failure list, authority-denial
   flags and external-validation wait state.
+- Milestone and roadmap waiting state is now covered by
+  `tests/test_wing_mvp_rails.py::test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence`.
+  The rail checks `ops/autopilot/STATE.json`, `Docs/ACTIVE_MILESTONE.md`,
+  `Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+  `Docs/CONSOLE_CAPABILITY_MATRIX.md` and `ops/autopilot/BLOCKERS.md` so M001
+  and M002 remain external-validation states, M003-M006 remain blocked by M002,
+  and WING console live rows do not claim hardware evidence.
 
 ## Unresolved unknowns
 
@@ -216,4 +223,4 @@ Generated: 2026-06-19T14:11:46Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4066 passed, 1 skipped, 1 warning`.
+  `4067 passed, 1 skipped, 1 warning`.

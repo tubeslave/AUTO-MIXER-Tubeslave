@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T14:11:46Z.
+- Latest heartbeat: 2026-06-19T14:21:29Z.
 
 ## Что сделано
 
@@ -158,6 +158,14 @@ verifier failure list, authority-denial flags and external-validation wait
 state. This is a test/control-plane change only; it does not contact WING and
 does not grant live authority.
 
+The milestone/roadmap waiting-state rail is now automated by
+`tests/test_wing_mvp_rails.py::test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence`.
+It compares `ops/autopilot/STATE.json`, `Docs/ACTIVE_MILESTONE.md`,
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md` and `ops/autopilot/BLOCKERS.md` so M001
+and M002 stay in external-validation states, M003-M006 stay blocked by M002,
+and WING console live rows do not claim hardware evidence.
+
 ## Проверка
 
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py -q`:
@@ -240,8 +248,10 @@ does not grant live authority.
   `192 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `10 passed`.
+  `11 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -253,7 +263,7 @@ does not grant live authority.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4066 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4067 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -284,7 +294,7 @@ does not grant live authority.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:11:46Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T14:21:29Z`, latest
   verified product/runtime commit `e8a38bc0`, latest state/evidence commit
   `74f063d1`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
@@ -309,9 +319,10 @@ does not grant live authority.
   --tb=short -q` passed with `4027 passed, 1 skipped`.
 - Validate-only summaries were moved to `ops/autopilot/evidence/` so they are
   not treated as real `artifacts/wing_readonly_preflight` candidates.
-- Heartbeat reconciliation confirmed `Docs/CURRENT_STATE.md` is synchronized
-  with `ops/autopilot/STATE.json` through the current-state freshness rail and
-  found no real WING read-only artifact under `artifacts/wing_readonly_preflight/`.
+- Heartbeat reconciliation confirmed active milestone, roadmap, capability
+  matrices and blockers keep M001/M002 waiting on real WING evidence and
+  M003-M006 blocked by M002. It found no real WING read-only artifact under
+  `artifacts/wing_readonly_preflight/`.
 
 ## Оставшаяся работа
 
