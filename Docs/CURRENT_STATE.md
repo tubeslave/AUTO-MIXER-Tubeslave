@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T21:10:09Z
+Generated: 2026-06-19T21:19:50Z
 
 ## Repository snapshot
 
@@ -560,6 +560,17 @@ Generated: 2026-06-19T21:10:09Z
   as the only blocker event, so event-visible integration bundle status cannot
   queue proposals, grant live authority, close readiness, contact WING/backend,
   mark Full Autonomous ready, or replace real hardware/operator validation.
+- M031 Director guard integration bundle blocker banner is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m031_director_guard_banner_renders_integration_bundle_blocker_summary`.
+  The updated `frontend/src/components/dashboard/directorPanelModel.ts` module
+  now exports `directorBlockedReasonMessages`, and
+  `frontend/src/views/DirectorPanel.tsx` uses it for the Runtime Guard blocker
+  banner. Integration bundle blocked-reason tags render as one readable banner
+  message while non-integration blockers remain visible, so banner-visible
+  integration bundle status cannot queue proposals, grant live authority, close
+  readiness, contact WING/backend, mark Full Autonomous ready, or replace real
+  hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -570,4 +581,4 @@ Generated: 2026-06-19T21:10:09Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4156 passed, 1 skipped, 1 warning`.
+  `4157 passed, 1 skipped, 1 warning`.

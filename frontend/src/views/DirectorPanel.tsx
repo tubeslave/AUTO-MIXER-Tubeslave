@@ -1,5 +1,6 @@
 import { DirectorAvatar, Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
 import {
+  directorBlockedReasonMessages,
   directorDecisionRows,
   directorProposalRows,
   type DirectorProposalRow
@@ -49,6 +50,7 @@ export function RightDirectorPanel({
 }) {
   const decisions = directorDecisionRows(taskRows, []);
   const suggestions = directorProposalRows(taskRows, fallbackSuggestionRows, runtime.sourceLabel);
+  const blockedReasonMessages = directorBlockedReasonMessages(runtime.blockedReasons);
   const isBackendSource = runtime.sourceLabel.toLowerCase().includes('backend');
   const noDecisionsMessage = isBackendSource
     ? 'Backend queue has no recent decisions.'
@@ -88,9 +90,9 @@ export function RightDirectorPanel({
           { label: 'Live write policy', value: runtime.liveWritePolicy, tone: runtime.manualGateTone },
           ...runtime.statusItems
         ]} />
-        {runtime.blockedReasons.length > 0 && (
+        {blockedReasonMessages.length > 0 && (
           <div className="mt-2 rounded-[5px] border border-warn/35 bg-warn/10 px-2 py-1.5 text-[10px] text-warn">
-            {runtime.blockedReasons.slice(0, 2).join(' · ')}
+            {blockedReasonMessages.slice(0, 2).join(' · ')}
           </div>
         )}
       </Panel>

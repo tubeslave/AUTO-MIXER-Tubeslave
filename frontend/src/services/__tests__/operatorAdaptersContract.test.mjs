@@ -4166,6 +4166,31 @@ test('directorEventRows renders integration bundle blockers as operator-readable
   );
 });
 
+test('director runtime guard banner uses readable integration bundle blocker messages', async () => {
+  const { directorBlockedReasonMessages } = await importTypeScript('components/dashboard/directorPanelModel.ts');
+  const directorPanelSource = await fs.readFile(path.join(srcRoot, 'views/DirectorPanel.tsx'), 'utf8');
+
+  const messages = directorBlockedReasonMessages([
+    'integration_bundle_status:blocked',
+    'integration_bundle_blocker:offline_integration_bundle_contract_not_ready',
+    'integration_bundle_missing_check:operator_report_bound',
+    'integration_bundle_source_authority_denied:true',
+    'integration_bundle_live_authority_granted:false',
+    'integration_bundle_readiness_closure_allowed:false',
+    'physical_pre_read_required',
+  ]);
+
+  assert.deepEqual(messages, [
+    'Integration bundle blocked; 1 blocker(s); missing: operator_report_bound; source authority denied, live authority denied, readiness closure denied.',
+    'physical_pre_read_required',
+  ]);
+  assert.match(directorPanelSource, /directorBlockedReasonMessages\(runtime\.blockedReasons\)/);
+  assert.equal(
+    directorPanelSource.includes("runtime.blockedReasons.slice(0, 2).join(' · ')"),
+    false,
+  );
+});
+
 test('directorEventRows keeps static events only for mock source', async () => {
   const { directorEventRows } = await importTypeScript('components/dashboard/directorPanelModel.ts');
 

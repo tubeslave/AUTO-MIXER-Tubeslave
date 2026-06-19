@@ -141,8 +141,12 @@ function appendRuntimeEvent(
   });
 }
 
-function integrationBundleEventMessage(blockedReasons: string[]): string {
-  const bundleReasons = blockedReasons.filter(reason => reason.startsWith('integration_bundle_'));
+function isIntegrationBundleBlockedReason(reason: string): boolean {
+  return reason.startsWith('integration_bundle_');
+}
+
+export function integrationBundleBlockedReasonMessage(blockedReasons: string[]): string {
+  const bundleReasons = blockedReasons.filter(isIntegrationBundleBlockedReason);
   if (!bundleReasons.length) {
     return '';
   }
@@ -176,6 +180,15 @@ function integrationBundleEventMessage(blockedReasons: string[]): string {
     : `Integration bundle ${status}.`;
 }
 
+export function directorBlockedReasonMessages(blockedReasons: string[]): string[] {
+  const integrationBundleMessage = integrationBundleBlockedReasonMessage(blockedReasons);
+  const nonIntegrationBlockers = blockedReasons.filter(reason => !isIntegrationBundleBlockedReason(reason));
+  return [
+    integrationBundleMessage,
+    ...nonIntegrationBlockers
+  ].filter(Boolean);
+}
+
 export function directorEventRows(
   runtime: DirectorRuntime,
   fallbackRows: DirectorEventMock[]
@@ -207,13 +220,13 @@ export function directorEventRows(
     );
   }
 
-  const integrationBundleMessage = integrationBundleEventMessage(runtime.blockedReasons);
+  const integrationBundleMessage = integrationBundleBlockedReasonMessage(runtime.blockedReasons);
   if (integrationBundleMessage) {
     appendRuntimeEvent(rows, 'Integration bundle', integrationBundleMessage, 'red');
   }
 
   const nonIntegrationBlockers = runtime.blockedReasons.filter(
-    reason => !reason.startsWith('integration_bundle_')
+    reason => !isIntegrationBundleBlockedReason(reason)
   );
   if (nonIntegrationBlockers.length || (runtime.blockedReasons.length && !integrationBundleMessage)) {
     appendRuntimeEvent(

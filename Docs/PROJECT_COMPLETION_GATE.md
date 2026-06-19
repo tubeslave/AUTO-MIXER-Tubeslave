@@ -128,6 +128,12 @@ cannot queue proposals, grant live authority, close readiness, contact
 WING/backend, mark Full Autonomous ready, or replace accepted real
 hardware/operator validation.
 
+Director Runtime Guard banners must render offline integration bundle blocker
+status as read-only operator explanation only. Banner-visible integration bundle
+status cannot queue proposals, grant live authority, close readiness, contact
+WING/backend, mark Full Autonomous ready, or replace accepted real
+hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

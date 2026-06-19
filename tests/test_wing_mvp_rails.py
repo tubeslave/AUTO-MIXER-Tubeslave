@@ -119,6 +119,8 @@ M029_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M029-director-runtime-integration
 M029_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-runtime-integration-bundle-readiness-summary-20260619.md"
 M030_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M030-director-event-integration-bundle-blocker-summary.md"
 M030_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-event-integration-bundle-blocker-summary-20260619.md"
+M031_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M031-director-guard-integration-bundle-blocker-banner.md"
+M031_ADR = PROJECT_ROOT / "Docs" / "adr" / "director-guard-integration-bundle-blocker-banner-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -142,6 +144,7 @@ FRONTEND_DIRECTOR_PANEL_MODEL = (
     / "dashboard"
     / "directorPanelModel.ts"
 )
+FRONTEND_RIGHT_DIRECTOR_PANEL = PROJECT_ROOT / "frontend" / "src" / "views" / "DirectorPanel.tsx"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -4607,7 +4610,7 @@ def test_m030_director_events_render_integration_bundle_blocker_summary():
         assert heading in adr
     assert "This does not queue proposals" in adr
 
-    assert "integrationBundleEventMessage" in director_model
+    assert "integrationBundleBlockedReasonMessage" in director_model
     assert "Integration bundle" in director_model
     assert "integration_bundle_missing_check:" in director_model
     assert "integration_bundle_live_authority_granted:false" in director_model
@@ -4624,6 +4627,75 @@ def test_m030_director_events_render_integration_bundle_blocker_summary():
         current
     )
     assert "M030 Director event integration bundle blocker summary rail is now automated" in (
+        report
+    )
+
+
+def test_m031_director_guard_banner_renders_integration_bundle_blocker_summary():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M031_PLAN.read_text(encoding="utf-8")
+    adr = M031_ADR.read_text(encoding="utf-8")
+    director_model = FRONTEND_DIRECTOR_PANEL_MODEL.read_text(encoding="utf-8")
+    right_panel = FRONTEND_RIGHT_DIRECTOR_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m031 = markdown_table_row(roadmap, "M031")
+    assert m031[1] == "Director guard integration bundle blocker banner"
+    assert m031[2] == (
+        "Runtime Guard blocker banner renders integration bundle blocker tags "
+        "as operator-readable read-only messages"
+    )
+    assert m031[3] == "M030"
+    assert m031[4] == "high offline frontend"
+    assert m031[5] == "UNIT_VERIFIED read-only Director guard banner; live authority remains blocked"
+    assert m031[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "`frontend/src/components/dashboard/directorPanelModel.ts`" in memory_eval[2]
+    assert "Director Runtime Guard blocker banners now render offline integration bundle blockers" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M031-CP01" in plan
+    assert "M031-CP02" in plan
+    assert "No queue mutation" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not queue proposals" in adr
+
+    assert "directorBlockedReasonMessages" in director_model
+    assert "directorBlockedReasonMessages(runtime.blockedReasons)" in right_panel
+    assert "runtime.blockedReasons.slice(0, 2).join(' · ')" not in right_panel
+    assert "director runtime guard banner uses readable integration bundle blocker messages" in (
+        adapter_test
+    )
+    assert "Director Runtime Guard banners must render offline integration bundle" in (
+        completion
+    )
+    assert "M031 Director guard integration bundle blocker banner is now covered" in (
+        current
+    )
+    assert "M031 Director guard integration bundle blocker banner rail is now automated" in (
         report
     )
 

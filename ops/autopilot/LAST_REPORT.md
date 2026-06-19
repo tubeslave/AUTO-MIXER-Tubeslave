@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T21:10:09Z.
+- Latest heartbeat: 2026-06-19T21:19:50Z.
 
 ## Что сделано
 
@@ -599,7 +599,34 @@ cannot queue proposals, grant live authority, close readiness, contact
 WING/backend, mark Full Autonomous ready, or replace accepted real
 hardware/operator validation.
 
+The M031 Director guard integration bundle blocker banner rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m031_director_guard_banner_renders_integration_bundle_blocker_summary`.
+It updates `frontend/src/components/dashboard/directorPanelModel.ts` and
+`frontend/src/views/DirectorPanel.tsx`, and binds it through
+`Docs/ROADMAP.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M031-director-guard-integration-bundle-blocker-banner.md`,
+`Docs/adr/director-guard-integration-bundle-blocker-banner-20260619.md`,
+`Docs/CURRENT_STATE.md` and this report. The Runtime Guard blocker banner now
+uses `directorBlockedReasonMessages(...)` so integration bundle tags render as
+one operator-readable banner message while non-integration blockers remain
+visible. The banner surface remains read-only, so banner-visible integration
+bundle readiness cannot queue proposals, grant live authority, close readiness,
+contact WING/backend, mark Full Autonomous ready, or replace accepted real
+hardware/operator validation.
+
 ## Проверка
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `50 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m031_director_guard_banner_renders_integration_bundle_blocker_summary -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `44 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4157 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `49 passed`.
