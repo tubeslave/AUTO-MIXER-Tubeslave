@@ -14775,6 +14775,27 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
         "no_wing_summary_markdown_top_level_interesting_missing_keys_empty: `true`"
         in markdown_summary
     )
+    assert json_summary[
+        "no_wing_summary_markdown_top_level_coverage_required_field_lines"
+    ] == list(
+        release_check.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_REQUIRED_FIELD_LINES
+    )
+    assert (
+        json_summary[
+            "no_wing_summary_markdown_top_level_coverage_missing_field_lines"
+        ]
+        == []
+    )
+    assert (
+        json_summary[
+            "no_wing_summary_markdown_top_level_coverage_field_lines_rendered"
+        ]
+        is True
+    )
+    assert (
+        "no_wing_summary_markdown_top_level_coverage_field_lines_rendered: `true`"
+        in markdown_summary
+    )
     assert (
         "no_wing_summary_markdown_top_level_coverage_live_authority_granted: `false`"
         in markdown_summary
@@ -14820,9 +14841,77 @@ def test_no_wing_release_check_summary_embeds_gain_dry_run_proof(tmp_path):
         in markdown_summary
     )
     assert (
+        json_summary[
+            "no_wing_summary_markdown_top_level_coverage_field_lines_rendered"
+        ]
+        is True
+    )
+    assert (
+        json_summary[
+            "no_wing_summary_markdown_top_level_coverage_missing_field_lines"
+        ]
+        == []
+    )
+    assert (
         "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed: `false`"
         in markdown_summary
     )
+
+
+def test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line():
+    summary = {"status": "passed", "failed_checks": []}
+    omitted_field = (
+        "no_wing_summary_markdown_top_level_coverage_live_authority_granted"
+    )
+    markdown_text = "\n".join(
+        f"- {field_name}: `value`"
+        for field_name in (
+            release_check.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_REQUIRED_FIELD_LINES
+        )
+        if field_name != omitted_field
+    )
+
+    release_check.apply_no_wing_summary_markdown_top_level_coverage_markdown_surface_check(
+        summary,
+        markdown_text,
+    )
+
+    assert summary["status"] == "failed"
+    assert release_check.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_CHECK_NAME in (
+        summary["failed_checks"]
+    )
+    assert summary[
+        "no_wing_summary_markdown_top_level_coverage_missing_field_lines"
+    ] == [omitted_field]
+    assert (
+        summary[
+            "no_wing_summary_markdown_top_level_coverage_field_lines_rendered"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed"
+        ]
+        is False
+    )
+    assert (
+        summary["no_wing_summary_markdown_top_level_coverage_live_authority_granted"]
+        is False
+    )
+
+    summary = {
+        "status": "passed",
+        "failed_checks": [
+            release_check.NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_CHECK_NAME
+        ],
+    }
+    release_check.apply_no_wing_summary_markdown_top_level_coverage_markdown_surface_check(
+        summary,
+        markdown_text,
+    )
+
+    assert summary["status"] == "failed"
 
 
 def test_no_wing_release_check_summary_embeds_autonomy_evidence_overlay(tmp_path):

@@ -1168,6 +1168,21 @@ NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_INTERESTING_KEY_PATTERNS = (
     "wing_",
     "write",
 )
+NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_REQUIRED_FIELD_LINES = (
+    "no_wing_summary_markdown_top_level_coverage_required",
+    "no_wing_summary_markdown_top_level_coverage_required_field_lines",
+    "no_wing_summary_markdown_top_level_checked_key_count",
+    "no_wing_summary_markdown_top_level_missing_keys",
+    "no_wing_summary_markdown_top_level_allowed_missing_keys",
+    "no_wing_summary_markdown_top_level_unexpected_missing_keys",
+    "no_wing_summary_markdown_top_level_unexpected_missing_keys_empty",
+    "no_wing_summary_markdown_top_level_interesting_missing_keys",
+    "no_wing_summary_markdown_top_level_interesting_missing_keys_empty",
+    "no_wing_summary_markdown_top_level_coverage_missing_field_lines",
+    "no_wing_summary_markdown_top_level_coverage_field_lines_rendered",
+    "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed",
+    "no_wing_summary_markdown_top_level_coverage_live_authority_granted",
+)
 
 
 def build_no_wing_artifact_manifest_contract_payload() -> dict[str, object]:
@@ -25592,6 +25607,9 @@ def build_no_wing_summary_markdown_top_level_coverage_check(
     ]
     return {
         "no_wing_summary_markdown_top_level_coverage_required": True,
+        "no_wing_summary_markdown_top_level_coverage_required_field_lines": list(
+            NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_REQUIRED_FIELD_LINES
+        ),
         "no_wing_summary_markdown_top_level_checked_key_count": len(checked_keys),
         "no_wing_summary_markdown_top_level_missing_keys": missing_keys,
         "no_wing_summary_markdown_top_level_allowed_missing_keys": allowed_missing_keys,
@@ -25607,6 +25625,8 @@ def build_no_wing_summary_markdown_top_level_coverage_check(
         "no_wing_summary_markdown_top_level_interesting_missing_keys_empty": (
             not interesting_missing_keys
         ),
+        "no_wing_summary_markdown_top_level_coverage_missing_field_lines": [],
+        "no_wing_summary_markdown_top_level_coverage_field_lines_rendered": True,
         "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed": (
             False
         ),
@@ -25625,6 +25645,38 @@ def mark_no_wing_summary_markdown_top_level_coverage_failed(
     ):
         failed_checks.append(NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_CHECK_NAME)
     summary["status"] = "failed"
+
+
+def apply_no_wing_summary_markdown_top_level_coverage_markdown_surface_check(
+    summary: dict[str, object],
+    markdown_text: str,
+) -> None:
+    required_field_lines = list(
+        NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_REQUIRED_FIELD_LINES
+    )
+    missing_field_lines = [
+        field_name
+        for field_name in required_field_lines
+        if _extract_markdown_summary_field_value(markdown_text, field_name) is None
+    ]
+
+    summary["no_wing_summary_markdown_top_level_coverage_required_field_lines"] = (
+        required_field_lines
+    )
+    summary["no_wing_summary_markdown_top_level_coverage_missing_field_lines"] = (
+        missing_field_lines
+    )
+    summary["no_wing_summary_markdown_top_level_coverage_field_lines_rendered"] = (
+        not missing_field_lines
+    )
+    summary[
+        "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed"
+    ] = False
+    summary["no_wing_summary_markdown_top_level_coverage_live_authority_granted"] = (
+        False
+    )
+    if missing_field_lines:
+        mark_no_wing_summary_markdown_top_level_coverage_failed(summary)
 
 
 def apply_no_wing_artifact_manifest_summary_json_surface_check(
@@ -30072,20 +30124,24 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
             *[
                 _format_markdown_summary_field_line(field_name, summary[field_name])
                 for field_name in (
-                    "no_wing_summary_markdown_top_level_coverage_required",
-                    "no_wing_summary_markdown_top_level_checked_key_count",
-                    "no_wing_summary_markdown_top_level_missing_keys",
-                    "no_wing_summary_markdown_top_level_allowed_missing_keys",
-                    "no_wing_summary_markdown_top_level_unexpected_missing_keys",
-                    "no_wing_summary_markdown_top_level_unexpected_missing_keys_empty",
-                    "no_wing_summary_markdown_top_level_interesting_missing_keys",
-                    "no_wing_summary_markdown_top_level_interesting_missing_keys_empty",
-                    "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed",
-                    "no_wing_summary_markdown_top_level_coverage_live_authority_granted",
+                    NO_WING_SUMMARY_MARKDOWN_TOP_LEVEL_COVERAGE_REQUIRED_FIELD_LINES
                 )
             ],
         ]
     )
+    markdown_text = "\n".join(lines) + "\n"
+    apply_no_wing_summary_markdown_top_level_coverage_markdown_surface_check(
+        summary,
+        markdown_text,
+    )
+    lines[3] = f"- status: `{summary['status']}`"
+    for field_name in (
+        "no_wing_summary_markdown_top_level_coverage_missing_field_lines",
+        "no_wing_summary_markdown_top_level_coverage_field_lines_rendered",
+        "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed",
+        "no_wing_summary_markdown_top_level_coverage_live_authority_granted",
+    ):
+        _replace_markdown_summary_field_line(lines, field_name, summary[field_name])
     markdown_text = "\n".join(lines) + "\n"
     bind_next_wing_proof_plan_operator_markdown_artifact(summary, markdown_text)
     apply_next_wing_proof_plan_operator_markdown_artifact_integrity_check(
