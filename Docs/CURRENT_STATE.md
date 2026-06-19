@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T16:00:42Z
+Generated: 2026-06-19T16:09:07Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-19T16:00:42Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `1b1802ef Guard readiness update proof gate`
+  `3662360d Guard offline promotion proof gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 13160.
@@ -288,6 +288,15 @@ Generated: 2026-06-19T16:00:42Z
   long-term processing families stay replay/fault/evaluation-bound before
   live expansion, non-fader/gain live expansion still requires separate ADR
   plus hardware, and Full Autonomous remains locked behind completion gates.
+- Assisted processing family expansion entry is now covered by
+  `tests/test_wing_mvp_rails.py::test_m008_assisted_processing_expansion_stays_proposal_only_with_identity_gates`.
+  The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+  `Docs/CAPABILITY_MATRIX.md`, `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+  `backend/autonomy_promotion_readiness.py` and `ops/autopilot/LAST_REPORT.md`
+  so M008 remains proposal-only for EQ, dynamics, pan, FX and balance, source
+  identity and safety gates stay explicit, direct apply surfaces remain
+  blocked or quarantined, and M009 live expansion still requires a separate ADR
+  plus hardware.
 
 ## Unresolved unknowns
 
@@ -298,4 +307,4 @@ Generated: 2026-06-19T16:00:42Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4076 passed, 1 skipped, 1 warning`.
+  `4077 passed, 1 skipped, 1 warning`.

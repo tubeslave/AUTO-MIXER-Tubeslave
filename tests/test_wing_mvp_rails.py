@@ -1081,6 +1081,119 @@ def test_m007_offline_promotion_framework_stays_replay_bound_before_live_expansi
     assert "M007 offline capability promotion framework rail is now automated" in report
 
 
+def test_m008_assisted_processing_expansion_stays_proposal_only_with_identity_gates():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    goal = PROJECT_GOAL.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    snapshot = build_autonomy_promotion_readiness_snapshot()
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m008 = markdown_table_row(roadmap, "M008")
+    m009 = markdown_table_row(roadmap, "M009")
+    assert m008[1] == "Assisted processing family expansion"
+    assert m008[2] == (
+        "EQ, dynamics, pan, FX and balance stay proposal-only with source identity and safety gates"
+    )
+    assert m008[3] == "M007"
+    assert m008[4] == "high assisted"
+    assert m008[5] == "UNIT_VERIFIED to INTEGRATION_VERIFIED"
+    assert m008[-1] == "PENDING"
+    assert m009[2] == "A separately approved ADR widens supervised live writes one family at a time"
+    assert m009[-1] == "PENDING_APPROVAL"
+
+    assisted = markdown_table_row(capability, "Assisted Mixing Mode")
+    source_identity = markdown_table_row(capability, "Source and instrument classification")
+    arrangement_role = markdown_table_row(capability, "Arrangement-role detection")
+    assert assisted[1] == "INTEGRATION_VERIFIED"
+    assert assisted[4] == "Proposal freshness and source identity vary by family"
+    assert assisted[7] == "replay accepted/rejected proposals"
+    assert assisted[8] == "none"
+    assert source_identity[7] == "replay calibration gate"
+    assert arrangement_role[4] == "Proposal-only, not apply authority"
+    assert arrangement_role[7] == "replay accepted role decisions"
+
+    assisted_family_rows = {
+        "Mix balance": ("PROTOTYPE", "source/stem identity", "replay bus/stem validation"),
+        "EQ": ("PROTOTYPE", "feedback, band identity", "assisted replay gate"),
+        "Compression": ("PROTOTYPE", "true peak, GR readback", "replay and safety audit"),
+        "Gating": ("PROTOTYPE", "source identity, hysteresis", "replay and fault injection"),
+        "Panning": ("PROTOTYPE", "mono/phase safety", "assisted replay only"),
+        "Effects and sends": ("PROTOTYPE", "routing/readback", "assisted replay"),
+        "Cross-channel unmasking": ("PROTOTYPE", "arrangement role, EQ safety", "replay/fault validation"),
+    }
+    for capability_name, (evidence_level, dependency, next_gate) in assisted_family_rows.items():
+        row = markdown_table_row(capability, capability_name)
+        assert row[1] == evidence_level
+        assert row[6] == dependency
+        assert row[7] == next_gate
+        assert row[8] == "none"
+
+    assert "Live EQ writes forbidden" in markdown_table_row(capability, "EQ")[4]
+    assert "Makeup cannot bypass headroom/feedback" in markdown_table_row(
+        capability, "Compression"
+    )[4]
+    assert "Chatter/bleed risk in live mode" in markdown_table_row(capability, "Gating")[4]
+    assert "WING live scope is not approved for pan" in markdown_table_row(
+        capability, "Panning"
+    )[4]
+    assert "Live FX writes forbidden" in markdown_table_row(capability, "Effects and sends")[4]
+
+    assisted_snapshot_rows = {
+        "eq_supervised_promotion": "read_coverage_blocked",
+        "dynamics_supervised_promotion": "read_coverage_blocked",
+        "gate_supervised_promotion": "read_coverage_blocked",
+        "pan_phase_supervised_promotion": "manual_only_blocked",
+        "fx_supervised_promotion": "manual_only_blocked",
+        "bus_group_matrix_supervised_promotion": "manual_only_blocked",
+    }
+    rows_by_id = {row["id"]: row for row in snapshot["rows"]}
+    for row_id, expected_status in assisted_snapshot_rows.items():
+        row = rows_by_id[row_id]
+        assert row["status"] == expected_status
+        assert row["supervised_live_allowed"] is False
+        assert row["autonomous_ready"] is False
+        assert set(row["capability_statuses"]) == {"proposal_only"}
+        assert "canonical_supervised" not in row["write_surface_statuses"]
+        assert set(row["write_surface_statuses"]) <= {"proposal_only", "quarantined"}
+        assert "safety_live_not_allowed" in row["blockers"]
+        assert "not_autonomous_ready" in row["blockers"]
+
+    console_assisted_boundaries = {
+        "EQ / HPF": ("no", "no", "protected-band, feedback, readback, rollback proof"),
+        "Compressor / dynamics": ("no", "no", "headroom, GR and readback proof"),
+        "Gate / expander": ("no", "no", "chatter/bleed replay plus hardware proof"),
+        "Pan": ("no", "no for WING MVP", "separate ADR and hardware proof"),
+        "FX sends / returns": ("no", "no", "readback and rollback proof"),
+        "Bus/group/main/DCA faders": (
+            "no",
+            "no except later approved supervised proof",
+            "physical readback",
+        ),
+    }
+    for category, (unattended, supervised, next_gate) in console_assisted_boundaries.items():
+        row = markdown_table_row(console, category)
+        assert row[3] == unattended
+        assert row[4] == supervised
+        assert row[5] == next_gate
+        assert row[6] == "none"
+
+    assert "EQ, compressor, gate, routing, mute, FX, scenes, matrices, DCA" in goal
+    assert "Offline, shadow, replay, mock и simulator evidence не являются hardware proof." in goal
+    assert snapshot["summary"]["autonomous_ready_target_ids"] == []
+    assert snapshot["safety"]["live_write"] is False
+    assert snapshot["safety"]["live_widening_allowed"] is False
+    assert "Assisted processing family expansion entry is now covered" in current
+    assert "M008 assisted processing family expansion rail is now automated" in report
+
+
 def test_mvp_doc_declares_scope_and_stop_rules():
     text = MVP_DOC.read_text(encoding="utf-8")
 

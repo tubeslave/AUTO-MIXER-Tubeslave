@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-19T16:00:42Z.
+- Latest heartbeat: 2026-06-19T16:09:07Z.
 
 ## Что сделано
 
@@ -147,7 +147,7 @@ These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
 The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `1b1802ef`; this synchronization did not
+pre-checkpoint state/evidence commit `3662360d`; this synchronization did not
 change product runtime behavior.
 
 The current-state freshness rail is now automated by
@@ -248,6 +248,16 @@ overlay, `Docs/CURRENT_STATE.md` and this report so M007 remains pending behind
 M001-M006, long-term processing families stay replay/fault/evaluation-bound
 before live expansion, non-fader/gain live expansion still requires separate
 ADR plus hardware, and Full Autonomous remains locked behind completion gates.
+
+The M008 assisted processing family expansion rail is now automated by
+`tests/test_wing_mvp_rails.py::test_m008_assisted_processing_expansion_stays_proposal_only_with_identity_gates`.
+It compares `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/CONSOLE_CAPABILITY_MATRIX.md`, the backend
+autonomy promotion readiness overlay, `Docs/CURRENT_STATE.md` and this report
+so EQ, dynamics, pan, FX and balance remain proposal-only in assisted flows,
+source identity and safety gates stay explicit, direct apply surfaces remain
+blocked or quarantined, and M009 live expansion still requires separate ADR
+plus hardware.
 
 ## Проверка
 
@@ -351,8 +361,10 @@ ADR plus hardware, and Full Autonomous remains locked behind completion gates.
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m007_offline_promotion_framework_stays_replay_bound_before_live_expansion -q`:
   `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m008_assisted_processing_expansion_stays_proposal_only_with_identity_gates -q`:
+  `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `20 passed`.
+  `21 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q`:
   `444 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_handoff_packet.py -q`:
@@ -364,7 +376,7 @@ ADR plus hardware, and Full Autonomous remains locked behind completion gates.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_autonomy_gap_rollup tests/test_no_wing_release_check.py::test_no_wing_release_check_summary_embeds_gain_dry_run_proof tests/test_no_wing_release_check.py::test_no_wing_summary_markdown_top_level_coverage_check_detects_missing_field_line -q`:
   `3 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x
-  --tb=short -q`: `4076 passed, 1 skipped, 1 warning`.
+  --tb=short -q`: `4077 passed, 1 skipped, 1 warning`.
 - Accepted-candidate summary Markdown coverage check against the fresh
   no-WING bundle: `51` JSON trace keys, `0` missing from `summary.md`.
 - Backend-prestart summary Markdown coverage check against the fresh no-WING
@@ -395,9 +407,9 @@ ADR plus hardware, and Full Autonomous remains locked behind completion gates.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T16:00:42Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-19T16:09:07Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `1b1802ef`, latest no-WING artifact
+  state/evidence commit `3662360d`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
