@@ -5,6 +5,13 @@ import sys
 from pathlib import Path
 
 from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
+from backend.offline_replay_evaluation_contract import (
+    REQUIRED_EVALUATION_TYPES,
+    REQUIRED_QUALITY_AXES,
+    REQUIRED_SAFETY_CHECKS,
+    REQUIRED_SCENARIOS,
+    evaluate_offline_replay_evaluation_contract,
+)
 from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import no_wing_release_check as release_check
 
@@ -27,6 +34,8 @@ SAFETY_CONTRACT = PROJECT_ROOT / "Docs" / "SAFETY_CONTRACT.md"
 CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CAPABILITY_MATRIX.md"
 CONSOLE_CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CONSOLE_CAPABILITY_MATRIX.md"
 M001_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M001-wing-readonly-preflight-evidence-gate.md"
+M011_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M011-offline-replay-evaluation-contract.md"
+M011_ADR = PROJECT_ROOT / "Docs" / "adr" / "offline-replay-evaluation-contract-20260619.md"
 AUTOPILOT_SKILL = PROJECT_ROOT / ".agents" / "skills" / "automixer-autopilot" / "SKILL.md"
 AUTOPILOT_BLOCKERS = PROJECT_ROOT / "ops" / "autopilot" / "BLOCKERS.md"
 AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
@@ -1451,6 +1460,124 @@ def test_m010_full_autonomous_eligibility_stays_locked_until_completion_gates_pa
     assert "completion gate cannot close from docs/unit/mock/replay/no-WING evidence" in current
     assert "M010 full autonomous eligibility rail is now automated" in report
     assert "no autonomous target is reported ready" in report
+
+
+def test_m011_offline_replay_evaluation_contract_stays_offline_and_threshold_gated():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M011_PLAN.read_text(encoding="utf-8")
+    adr = M011_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+
+    m011 = markdown_table_row(roadmap, "M011")
+    assert m011[1] == "Offline replay evaluation contract"
+    assert m011[2] == (
+        "Soundcheck, studio and concert replay manifests fail closed until "
+        "approved thresholds and complete scenario evidence exist"
+    )
+    assert m011[3] == "M007-M010"
+    assert m011[4] == "high offline"
+    assert (
+        m011[5]
+        == "SPECIFIED to UNIT_VERIFIED for gate contract; replay evidence remains pending"
+    )
+    assert m011[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert memory_eval[1] == "PROTOTYPE"
+    assert "`backend/offline_replay_evaluation_contract.py`" in memory_eval[2]
+    assert "tests/test_offline_replay_evaluation_contract.py" in memory_eval[3]
+    assert "approved thresholds are still required" in memory_eval[4]
+    assert memory_eval[-1] == "none"
+
+    pending_manifest = {
+        "manifest_id": "pending-thresholds",
+        "offline_only": True,
+        "live_write": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "hardware_evidence": False,
+        "threshold_policy": {"status": "PENDING_APPROVAL"},
+        "scenarios": [
+            {
+                "scenario": "soundcheck",
+                "evaluation_types": list(REQUIRED_EVALUATION_TYPES),
+                "safety_checks": {key: True for key in REQUIRED_SAFETY_CHECKS},
+                "quality_axes": {
+                    key: {"status": "passed"} for key in REQUIRED_QUALITY_AXES
+                },
+            }
+        ],
+    }
+    pending_result = evaluate_offline_replay_evaluation_contract(pending_manifest)
+    assert pending_result["ready_for_replay_promotion"] is False
+    assert pending_result["authority"]["live_authority_granted"] is False
+    assert pending_result["authority"]["readiness_closure_allowed"] is False
+    assert "approved_quality_threshold_policy_required" in pending_result["blockers"]
+    assert "missing_required_scenario:studio" in pending_result["blockers"]
+    assert "missing_required_scenario:concert" in pending_result["blockers"]
+
+    def complete_scenario(name: str) -> dict:
+        return {
+            "scenario": name,
+            "evaluation_types": list(REQUIRED_EVALUATION_TYPES),
+            "safety_checks": {key: True for key in REQUIRED_SAFETY_CHECKS},
+            "quality_axes": {
+                key: {"status": "passed", "artifact": f"{name}/{key}.json"}
+                for key in REQUIRED_QUALITY_AXES
+            },
+        }
+
+    complete_result = evaluate_offline_replay_evaluation_contract(
+        {
+            "manifest_id": "complete-offline-replay",
+            "offline_only": True,
+            "live_write": False,
+            "contacts_wing": False,
+            "contacts_backend": False,
+            "hardware_evidence": False,
+            "readiness_closure_allowed": False,
+            "live_authority_granted": False,
+            "threshold_policy": {
+                "status": "approved",
+                "approved_by": "owner",
+                "approved_decision_id": "adr:offline-replay-thresholds",
+            },
+            "scenarios": [complete_scenario(name) for name in REQUIRED_SCENARIOS],
+        }
+    )
+    assert complete_result["ready_for_replay_promotion"] is True
+    assert complete_result["hardware_evidence"] is False
+    assert complete_result["authority"]["live_authority_granted"] is False
+    assert complete_result["authority"]["readiness_closure_allowed"] is False
+    assert complete_result["summary"]["covered_scenarios"] == list(REQUIRED_SCENARIOS)
+
+    assert "offline, replay,\n   simulator, fault-injection" in completion
+    assert "approved thresholds" in completion
+    assert "M011-CP01" in plan
+    assert "M011-CP02" in plan
+    assert "Offline replay evidence cannot grant live authority" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "always returns `live_authority_granted: false`" in adr
+    assert "M011 offline replay evaluation contract is now covered" in current
+    assert "M011 offline replay evaluation contract rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

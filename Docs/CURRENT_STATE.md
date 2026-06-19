@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-19T16:28:20Z
+Generated: 2026-06-19T16:41:18Z
 
 ## Repository snapshot
 
@@ -9,10 +9,10 @@ Generated: 2026-06-19T16:28:20Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `350784a9 Guard live expansion proof gate`
+  `fbad044c Guard autonomous eligibility proof gate`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
-- Complete tracked file count from `rg --files`: 13160.
+- Complete tracked file count from `rg --files`: 14140.
 - Existing root agent file: only `./AGENTS.md`.
 - Canonical docs tree: `Docs/`. On this macOS checkout `docs` resolves to the
   same tree, but new durable files are written as `Docs/...`.
@@ -317,6 +317,16 @@ Generated: 2026-06-19T16:28:20Z
   completion gate cannot close from docs/unit/mock/replay/no-WING evidence,
   mandatory capabilities, hardware, listening and approved threshold evidence
   remain unproven, and no autonomous target is reported ready.
+- M011 offline replay evaluation contract is now covered by
+  `tests/test_offline_replay_evaluation_contract.py` and
+  `tests/test_wing_mvp_rails.py::test_m011_offline_replay_evaluation_contract_stays_offline_and_threshold_gated`.
+  The new `backend/offline_replay_evaluation_contract.py` module validates
+  soundcheck, studio and concert scenario coverage, offline/replay/fault
+  injection evidence, safety checks, required quality axes and approved
+  threshold policy before reporting replay-promotion readiness. It still keeps
+  `live_authority_granted: false`, `readiness_closure_allowed: false`,
+  `live_write: false` and `hardware_evidence: false`, so offline replay
+  evidence cannot become hardware proof or live readiness.
 
 ## Unresolved unknowns
 
@@ -327,4 +337,4 @@ Generated: 2026-06-19T16:28:20Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4079 passed, 1 skipped, 1 warning`.
+  `4085 passed, 1 skipped, 1 warning`.
