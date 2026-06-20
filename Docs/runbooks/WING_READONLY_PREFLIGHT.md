@@ -834,6 +834,15 @@ marker in an accepted decision; the decision ledger treats that marker as an
 unedited pending template and fails closed. Keep `artifact_source_id`, `run_id`,
 `artifact_captured_at`, `artifact_root`, `summary_path`, `events_path`, and
 `checklist_ids` aligned with the template.
+Also keep every field listed by the handoff packet as
+`decision_template_required_fields`, especially every
+`decision_template_prestart_proof_fields` entry. Those proof fields bind the
+operator decision to the passed backend-port prestart summary and the
+artifact-manifest verifier ordering proof, including
+`backend_port_prestart_summary_path`, `backend_port_prestart_summary_sha256`,
+backend prestart authority-denial fields, and
+`artifact_manifest_verifier_websocket_opened_after_pass`. Removing or editing
+those generated proof fields makes the accepted decision stale or invalid.
 
 After editing the decision JSON, run the focused decision review:
 

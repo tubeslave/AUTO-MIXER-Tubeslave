@@ -58,6 +58,7 @@ from backend.safety_kernel_trace_contract import (
     evaluate_safety_kernel_trace_contract,
 )
 from backend import wing_readonly_preflight_contract as readonly_contract
+from tools import build_wing_readonly_preflight_handoff_packet as handoff_packet
 from tools import no_wing_release_check as release_check
 
 
@@ -221,6 +222,8 @@ M080_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M080-replay-evidence-report-row-b
 M080_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-report-row-blocker-visibility-guard-20260620.md"
 M081_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M081-wing-review-decision-prestart-proof-binding.md"
 M081_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-review-decision-prestart-proof-binding-20260620.md"
+M082_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M082-wing-handoff-decision-template-proof-fields.md"
+M082_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-handoff-decision-template-proof-fields-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8152,6 +8155,113 @@ def test_m081_wing_review_decision_binds_prestart_proof():
     assert "WING review decision proof binding must remain offline" in completion
     assert "M081 WING review decision prestart proof binding is now covered" in current
     assert "M081 WING review decision prestart proof binding rail is now automated" in report
+
+
+def test_m082_wing_handoff_surfaces_decision_template_proof_fields():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    runbook = READONLY_RUNBOOK.read_text(encoding="utf-8")
+    plan = M082_PLAN.read_text(encoding="utf-8")
+    adr = M082_ADR.read_text(encoding="utf-8")
+    handoff_tool = (
+        PROJECT_ROOT / "tools" / "build_wing_readonly_preflight_handoff_packet.py"
+    ).read_text(encoding="utf-8")
+    packet = handoff_packet.build_handoff_packet(generated_at="2026-06-20T00:00:00Z")
+    rendered = handoff_packet.render_markdown(packet)
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m082 = markdown_table_row(roadmap, "M082")
+    assert m082[1] == "WING handoff decision template proof fields"
+    assert m082[2] == (
+        "Operator handoff packets surface the review-decision template "
+        "required fields and prestart/verifier proof-field subset"
+    )
+    assert m082[3] == "M002"
+    assert m082[4] == "critical read-only hardware handoff"
+    assert m082[5] == (
+        "UNIT_VERIFIED handoff proof-field contract; hardware remains waiting"
+    )
+    assert m082[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    assert "M082-CP01" in plan
+    assert "M082-CP02" in plan
+    assert "M082-CP03" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert "REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS" in handoff_tool
+    assert "REVIEW_DECISION_PRESTART_PROOF_FIELDS" in handoff_tool
+    assert packet["decision_template_required_fields"] == list(
+        readonly_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert packet["expected_decision_template_required_fields"] == packet[
+        "decision_template_required_fields"
+    ]
+    assert packet["decision_template_required_fields_match_contract"] is True
+    assert packet["decision_template_prestart_proof_fields"] == list(
+        readonly_contract.WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+    )
+    assert packet["expected_decision_template_prestart_proof_fields"] == packet[
+        "decision_template_prestart_proof_fields"
+    ]
+    assert packet["decision_template_prestart_proof_fields_match_contract"] is True
+    assert packet["decision_template_prestart_proof_fields_required"] is True
+    assert packet[
+        "decision_template_required_fields_include_prestart_proof_fields"
+    ] is True
+    assert (
+        packet["decision_template_preserve_prestart_proof_fields_before_operator_edit"]
+        is True
+    )
+    assert packet["readiness_closure_allowed_by_packet"] is False
+    assert packet["live_authority_granted"] is False
+
+    for field_name in (
+        "backend_port_prestart_summary_path",
+        "backend_port_prestart_summary_sha256",
+        "backend_port_prestart_summary_status",
+        "backend_port_prestart_summary_read_only",
+        "backend_port_prestart_summary_live_write",
+        "backend_port_prestart_summary_contacts_backend",
+        "backend_port_prestart_summary_contacts_wing",
+        "artifact_manifest_verifier_must_pass_before_websocket",
+        "artifact_manifest_verifier_passed_before_websocket",
+        "artifact_manifest_verifier_websocket_opened_after_pass",
+    ):
+        assert field_name in packet["decision_template_prestart_proof_fields"]
+        assert field_name in rendered
+
+    assert "decision_template_required_fields" in rendered
+    assert "decision_template_prestart_proof_fields" in rendered
+    assert "decision_template_prestart_proof_fields_required: `true`" in rendered
+    assert (
+        "decision_template_preserve_prestart_proof_fields_before_operator_edit: `true`"
+        in rendered
+    )
+    assert "decision_template_prestart_proof_fields" in runbook
+    assert "Removing or editing" in runbook
+    assert "those generated proof fields makes the accepted decision stale or invalid" in runbook
+    assert "M082 WING handoff decision template proof fields is now covered" in current
+    assert "M082 WING handoff decision template proof fields rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

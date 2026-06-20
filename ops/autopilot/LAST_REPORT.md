@@ -24,6 +24,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   hardening only; it creates no WING/backend contact, live write, readiness
   closure, hardware evidence or live authority.
 
+- M082 WING handoff decision template proof fields rail is now automated:
+  operator handoff packets now surface the full review-decision template
+  required field list and the prestart/verifier proof-field subset that must
+  survive manual decision-template edits. The runbook points the operator at
+  those fields before M002 decision review. This is offline handoff hardening
+  only; it creates no WING/backend contact, live write, readiness closure,
+  hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING

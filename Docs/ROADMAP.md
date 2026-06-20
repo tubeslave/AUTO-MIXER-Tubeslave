@@ -105,6 +105,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M079 | Replay Evidence channel identity blocker guard | Replay Evidence channel identity shows no-channel-proof status while promotion planning is blocked | M078 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence channel identity; live authority remains blocked | PENDING |
 | M080 | Replay Evidence report row blocker visibility guard | Replay Evidence report row remains visible with blocker status while promotion planning is blocked | M079 | high offline frontend | UNIT_VERIFIED visible blocked Replay Evidence report row; live authority remains blocked | PENDING |
 | M081 | WING review decision prestart proof binding | Review decision templates and ledgers bind accepted WING candidates to backend prestart and manifest-verifier proof fields | M002 | critical read-only hardware review | UNIT_VERIFIED stricter WING review decision proof binding; hardware remains waiting | WAITING_FOR_EXTERNAL_VALIDATION |
+| M082 | WING handoff decision template proof fields | Operator handoff packets surface the review-decision template required fields and prestart/verifier proof-field subset | M002 | critical read-only hardware handoff | UNIT_VERIFIED handoff proof-field contract; hardware remains waiting | WAITING_FOR_EXTERNAL_VALIDATION |
 
 ## Active milestone
 

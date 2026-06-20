@@ -1238,6 +1238,19 @@ Generated: 2026-06-20T06:31:25Z
   WING/backend transport, opens no WebSocket/OSC write path, applies no
   proposal, grants no live authority, closes no readiness row, creates no
   hardware evidence and does not replace real WING/operator validation.
+- M082 WING handoff decision template proof fields is now covered by
+  `tests/test_wing_readonly_preflight_handoff_packet.py` and
+  `tests/test_wing_mvp_rails.py::test_m082_wing_handoff_surfaces_decision_template_proof_fields`.
+  The offline WING handoff packet now surfaces both the full
+  `decision_template_required_fields` contract and the
+  `decision_template_prestart_proof_fields` subset that operator edits must
+  preserve before the decision ledger can accept a real read-only WING
+  artifact. The runbook now points the operator at those fields during manual
+  review. This is offline handoff hardening for the physical readback path
+  only: it contacts no WING/backend transport, opens no WebSocket/OSC write
+  path, applies no proposal, grants no live authority, closes no readiness row,
+  creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1248,4 +1261,4 @@ Generated: 2026-06-20T06:31:25Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4209 passed, 1 skipped, 1 warning`.
+  `4210 passed, 1 skipped, 1 warning`.

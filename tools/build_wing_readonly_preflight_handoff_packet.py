@@ -60,6 +60,8 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -147,6 +149,12 @@ REQUIRED_REVIEW_CHECKLIST_IDS = list(
 )
 NOT_CLOSED_BLOCKERS = list(
     WING_READONLY_PREFLIGHT_HANDOFF_REQUIRED_NOT_CLOSED_BLOCKERS
+)
+REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = list(
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+)
+REVIEW_DECISION_PRESTART_PROOF_FIELDS = list(
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
 )
 
 
@@ -658,6 +666,13 @@ def build_handoff_packet(
         "readonly_preflight_review_decision_invalid_records"
         in required_supervised_proof_plan_summary_fields
     )
+    decision_template_required_fields = list(REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS)
+    decision_template_prestart_proof_fields = list(
+        REVIEW_DECISION_PRESTART_PROOF_FIELDS
+    )
+    decision_template_required_fields_include_prestart_proof_fields = set(
+        decision_template_prestart_proof_fields
+    ).issubset(set(decision_template_required_fields))
     backend_port_prestart_gate = dict(expected_prestart_gate)
     expected_backend_port_prestart_gate_dict = dict(expected_prestart_gate)
     supervised_prestart_gate = dict(expected_supervised_gate)
@@ -801,6 +816,41 @@ def build_handoff_packet(
             decision_template_output
             == WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
         ),
+        "decision_template_required_fields": decision_template_required_fields,
+        "expected_decision_template_required_fields": list(
+            WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+        ),
+        "decision_template_required_fields_count": len(
+            decision_template_required_fields
+        ),
+        "expected_decision_template_required_fields_count": len(
+            WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+        ),
+        "decision_template_required_fields_match_contract": (
+            decision_template_required_fields
+            == list(WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS)
+        ),
+        "decision_template_prestart_proof_fields": (
+            decision_template_prestart_proof_fields
+        ),
+        "expected_decision_template_prestart_proof_fields": list(
+            WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+        ),
+        "decision_template_prestart_proof_fields_count": len(
+            decision_template_prestart_proof_fields
+        ),
+        "expected_decision_template_prestart_proof_fields_count": len(
+            WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+        ),
+        "decision_template_prestart_proof_fields_match_contract": (
+            decision_template_prestart_proof_fields
+            == list(WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS)
+        ),
+        "decision_template_prestart_proof_fields_required": True,
+        "decision_template_required_fields_include_prestart_proof_fields": (
+            decision_template_required_fields_include_prestart_proof_fields
+        ),
+        "decision_template_preserve_prestart_proof_fields_before_operator_edit": True,
         "review_output": review_output,
         "review_output_matches_contract": (
             review_output == WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT
@@ -1310,6 +1360,24 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
             f"- pending decision template: `{packet['decision_template_output']}`",
             "- pending decision template matches contract: "
             f"`{str(packet['decision_template_output_matches_contract']).lower()}`",
+            "- decision_template_required_fields: "
+            f"`{json.dumps(packet.get('decision_template_required_fields') or [])}`",
+            "- expected_decision_template_required_fields: "
+            f"`{json.dumps(packet.get('expected_decision_template_required_fields') or [])}`",
+            "- decision_template_required_fields_match_contract: "
+            f"`{str(packet.get('decision_template_required_fields_match_contract')).lower()}`",
+            "- decision_template_prestart_proof_fields: "
+            f"`{json.dumps(packet.get('decision_template_prestart_proof_fields') or [])}`",
+            "- expected_decision_template_prestart_proof_fields: "
+            f"`{json.dumps(packet.get('expected_decision_template_prestart_proof_fields') or [])}`",
+            "- decision_template_prestart_proof_fields_match_contract: "
+            f"`{str(packet.get('decision_template_prestart_proof_fields_match_contract')).lower()}`",
+            "- decision_template_prestart_proof_fields_required: "
+            f"`{str(packet.get('decision_template_prestart_proof_fields_required')).lower()}`",
+            "- decision_template_required_fields_include_prestart_proof_fields: "
+            f"`{str(packet.get('decision_template_required_fields_include_prestart_proof_fields')).lower()}`",
+            "- decision_template_preserve_prestart_proof_fields_before_operator_edit: "
+            f"`{str(packet.get('decision_template_preserve_prestart_proof_fields_before_operator_edit')).lower()}`",
             f"- artifact review report: `{packet['review_output']}`",
             "- artifact review report matches contract: "
             f"`{str(packet['review_output_matches_contract']).lower()}`",

@@ -42,7 +42,9 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_REPORT_OUTPUT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_REVIEW_REPORT_OUTPUT,
     WING_READONLY_PREFLIGHT_SELECTED_MVP_BLOCKER,
@@ -693,6 +695,24 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         "readonly_preflight_review_decision_candidate_verifier_ws_proof_complete",
     ):
         assert field_name in rendered
+    assert "decision_template_required_fields" in rendered
+    assert "decision_template_prestart_proof_fields" in rendered
+    assert "decision_template_required_fields_match_contract: `true`" in rendered
+    assert (
+        "decision_template_prestart_proof_fields_match_contract: `true`" in rendered
+    )
+    assert "decision_template_prestart_proof_fields_required: `true`" in rendered
+    assert (
+        "decision_template_required_fields_include_prestart_proof_fields: `true`"
+        in rendered
+    )
+    assert (
+        "decision_template_preserve_prestart_proof_fields_before_operator_edit: `true`"
+        in rendered
+    )
+    assert "backend_port_prestart_summary_path" in rendered
+    assert "backend_port_prestart_summary_sha256" in rendered
+    assert "artifact_manifest_verifier_websocket_opened_after_pass" in rendered
     assert "readonly_preflight_review_decision_expected_candidate_prestart_source_ids" in rendered
     assert "readonly_preflight_review_decision_invalid_records" in rendered
     assert (
@@ -706,6 +726,41 @@ def test_handoff_packet_builds_readonly_operator_sequence():
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
     )
     assert packet["decision_template_output_matches_contract"] is True
+    assert packet["decision_template_required_fields"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert packet["expected_decision_template_required_fields"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert packet["decision_template_required_fields_count"] == len(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert packet["expected_decision_template_required_fields_count"] == len(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+    )
+    assert packet["decision_template_required_fields_match_contract"] is True
+    assert packet["decision_template_prestart_proof_fields"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+    )
+    assert packet["expected_decision_template_prestart_proof_fields"] == list(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+    )
+    assert packet["decision_template_prestart_proof_fields_count"] == len(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+    )
+    assert packet["expected_decision_template_prestart_proof_fields_count"] == len(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+    )
+    assert packet["decision_template_prestart_proof_fields_match_contract"] is True
+    assert packet["decision_template_prestart_proof_fields_required"] is True
+    assert (
+        packet["decision_template_required_fields_include_prestart_proof_fields"]
+        is True
+    )
+    assert (
+        packet["decision_template_preserve_prestart_proof_fields_before_operator_edit"]
+        is True
+    )
     assert WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT in packet[
         "commands"
     ]["review_artifact_and_write_pending_decision_template"]
