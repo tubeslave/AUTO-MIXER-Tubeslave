@@ -203,6 +203,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   no WING/backend contact, proposal apply, queue import, live write, readiness
   closure, hardware evidence or live authority.
 
+- M101 WING read-only artifact root whitespace intake guard rail is now
+  automated: candidate WING read-only summaries whose `artifact_root` has
+  surrounding whitespace fail artifact intake before they can become accepted
+  real WING read-only candidates. This blocks whitespace-mutated artifact roots
+  from passing trimmed canonical-root checks while still pointing to a
+  different filesystem path. The concrete intake violation is
+  `artifact_root_has_surrounding_whitespace`. This creates no WING/backend
+  contact, proposal apply, queue import, live write, readiness closure,
+  hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING

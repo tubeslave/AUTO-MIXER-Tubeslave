@@ -1504,6 +1504,18 @@ Generated: 2026-06-20T15:44:02Z
   queue, applies no proposal, grants no live authority, closes no readiness
   row, creates no hardware evidence and does not replace real WING/operator
   validation.
+- M101 WING read-only artifact root whitespace intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m101_wing_readonly_artifact_root_whitespace_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when
+  `artifact_root` has surrounding whitespace. This blocks whitespace-mutated
+  artifact roots from passing trimmed canonical-root checks while still
+  pointing to a different filesystem path. The concrete intake violation is
+  `artifact_root_has_surrounding_whitespace`. It contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness
+  row, creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1514,4 +1526,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4031 passed, 1 skipped, 1 warning`.
+  `4033 passed, 1 skipped, 1 warning`.

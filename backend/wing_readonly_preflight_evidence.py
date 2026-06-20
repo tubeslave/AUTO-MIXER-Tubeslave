@@ -699,6 +699,13 @@ def _path_contains_parent_traversal(value: Any) -> bool:
     return ".." in normalized.split("/")
 
 
+def _path_has_surrounding_whitespace(value: Any) -> bool:
+    if not isinstance(value, (str, Path)):
+        return False
+    normalized = Path(value).as_posix()
+    return normalized != normalized.strip()
+
+
 def _run_id_is_single_safe_path_segment(value: str) -> bool:
     return value not in {".", ".."} and "/" not in value and "\\" not in value
 
@@ -718,6 +725,8 @@ def _validate_candidate_artifact_intake_paths(
     if _path_is_under_reserved_non_wing_evidence_root(artifact_root):
         violations.append("artifact_root_reserved_for_non_wing_evidence")
     elif isinstance(artifact_root, str) and artifact_root:
+        if _path_has_surrounding_whitespace(artifact_root):
+            violations.append("artifact_root_has_surrounding_whitespace")
         if _path_contains_parent_traversal(artifact_root):
             violations.append("artifact_root_contains_parent_traversal")
         if not _path_matches_wing_readonly_capture_root(artifact_root):

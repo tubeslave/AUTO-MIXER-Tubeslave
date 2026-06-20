@@ -1005,6 +1005,49 @@ def test_file_preflight_evidence_rejects_artifact_root_parent_traversal(tmp_path
     assert "artifact_root_contains_parent_traversal" in evidence["summary"]["violations"]
 
 
+def test_file_preflight_evidence_rejects_artifact_root_surrounding_whitespace(tmp_path):
+    artifact_root = tmp_path / f"{WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT} "
+    run_id = "20260606T120000Z_wing_readonly_preflight"
+    artifact_path = (
+        artifact_root / run_id / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+    )
+    events_path = artifact_root / run_id / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
+    plan_path = tmp_path / "plan.json"
+    prestart_path = tmp_path / "prestart_summary.json"
+    artifact_path.parent.mkdir(parents=True)
+
+    summary = _valid_summary()
+    summary["artifact_root"] = artifact_root.as_posix()
+    summary["summary_path"] = artifact_path.as_posix()
+    summary["events_path"] = events_path.as_posix()
+    summary["expected_plan_path"] = plan_path.as_posix()
+    summary["backend_port_prestart_summary_path"] = prestart_path.as_posix()
+    _write_prestart_summary(prestart_path)
+    summary["backend_port_prestart_summary_sha256"] = hashlib.sha256(
+        prestart_path.read_bytes()
+    ).hexdigest()
+    plan_bytes = json.dumps(_valid_expected_plan(summary), sort_keys=True).encode(
+        "utf-8"
+    )
+    plan_path.write_bytes(plan_bytes)
+    summary["expected_plan_sha256"] = hashlib.sha256(plan_bytes).hexdigest()
+    artifact_path.write_text(json.dumps(summary), encoding="utf-8")
+    events_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in _valid_events(summary)),
+        encoding="utf-8",
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert "artifact_root_has_surrounding_whitespace" in evidence["summary"]["violations"]
+
+
 def test_preflight_evidence_rejects_missing_existing_backend_connection_boundary():
     artifact = copy.deepcopy(_valid_summary())
     artifact.pop("physical_preflight_requires_existing_backend_connection")
