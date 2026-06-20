@@ -193,6 +193,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   proposal apply, queue import, live write, readiness closure, hardware
   evidence or live authority.
 
+- M100 WING read-only artifact root parent traversal intake guard rail is now
+  automated: candidate WING read-only summaries whose `artifact_root` contains
+  parent traversal fail artifact intake before they can become accepted real
+  WING read-only candidates. This blocks path-escaped artifact roots from
+  passing suffix-based canonical-root checks while still looking
+  string-consistent with `artifact_root/<run_id>/summary.json`. The concrete
+  intake violation is `artifact_root_contains_parent_traversal`. This creates
+  no WING/backend contact, proposal apply, queue import, live write, readiness
+  closure, hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING

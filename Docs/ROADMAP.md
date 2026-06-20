@@ -123,6 +123,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M097 | WING read-only canonical root intake guard | Real WING read-only intake rejects candidates whose artifact_root is not the canonical WING read-only capture root before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED canonical artifact-root guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M098 | WING read-only source path intake guard | Real WING read-only intake rejects copied or stale-source summary files whose source path does not match the declared summary_path before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED source-path binding guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M099 | WING read-only run id path segment intake guard | Real WING read-only intake rejects candidates whose run_id is not a single safe path segment before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED run-id path-segment guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
+| M100 | WING read-only artifact root parent traversal intake guard | Real WING read-only intake rejects candidates whose artifact_root contains parent traversal before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED artifact-root traversal guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 
 ## Active milestone
 

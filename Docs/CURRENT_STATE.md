@@ -1491,6 +1491,19 @@ Generated: 2026-06-20T15:44:02Z
   queue, applies no proposal, grants no live authority, closes no readiness
   row, creates no hardware evidence and does not replace real WING/operator
   validation.
+- M100 WING read-only artifact root parent traversal intake guard is now covered
+  by `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m100_wing_readonly_artifact_root_parent_traversal_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when
+  `artifact_root` contains parent traversal such as `container/../`. This
+  blocks path-escaped artifact roots from passing suffix-based canonical-root
+  checks while still looking string-consistent with
+  `artifact_root/<run_id>/summary.json`. The concrete intake violation is
+  `artifact_root_contains_parent_traversal`. It contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness
+  row, creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1501,4 +1514,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4029 passed, 1 skipped, 1 warning`.
+  `4031 passed, 1 skipped, 1 warning`.

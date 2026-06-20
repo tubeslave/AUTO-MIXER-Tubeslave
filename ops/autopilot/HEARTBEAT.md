@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T16:04:59Z
+Last heartbeat UTC: 2026-06-20T16:19:59Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,14 +12,15 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M099 WING read-only run id path segment intake guard now rejects
-candidate WING read-only summaries whose `run_id` is not one safe path segment
-before they can become accepted real WING read-only candidates.
+Latest check: M100 WING read-only artifact root parent traversal intake guard
+now rejects candidate WING read-only summaries whose `artifact_root` contains
+parent traversal before they can become accepted real WING read-only
+candidates.
 
-Focused WING read-only evidence validation passed with `71 passed`; the M099
-rail passed with `1 passed`; the full WING rail passed with `112 passed`; the
+Focused WING read-only evidence validation passed with `72 passed`; the M100
+rail passed with `1 passed`; the full WING rail passed with `113 passed`; the
 full suite passed in a clean staged worktree with
-`4029 passed, 1 skipped, 1 warning`.
+`4031 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No
