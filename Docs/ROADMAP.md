@@ -71,6 +71,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M045 | Task Queue review-only metric blocker guard | Task Queue Review Only metric counts all rows while promotion planning is blocked | M044 | high offline frontend | UNIT_VERIFIED blocked Task Queue review-only metric; live authority remains blocked | PENDING |
 | M046 | Task Details blocker list blocker guard | Task Details Apply Blockers list shows integration bundle blockers while promotion planning is blocked | M045 | high offline frontend | UNIT_VERIFIED blocked Task Details blocker list; live authority remains blocked | PENDING |
 | M047 | Apply Plan sequence blocker guard | Apply Plan and modal Gate Sequence show blocked integration bundle steps while promotion planning is blocked | M046 | high offline frontend | UNIT_VERIFIED blocked Apply Plan sequence; live authority remains blocked | PENDING |
+| M048 | Operator Decision blocker status guard | Operator Decision panel shows integration bundle blocker status while promotion planning is blocked | M047 | high offline frontend | UNIT_VERIFIED blocked Operator Decision status; live authority remains blocked | PENDING |
 
 ## Active milestone
 

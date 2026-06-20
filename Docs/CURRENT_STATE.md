@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T00:26:39Z
+Generated: 2026-06-20T00:37:22Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T00:26:39Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `c9cbe192 Guard task details blocker list`
+  `0cdf6856 Guard apply plan blocker sequence`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -750,6 +750,18 @@ Generated: 2026-06-20T00:26:39Z
   no queue mutation, no backend/WING contact, no live transport, no live
   authority, no readiness closure, no Full Autonomous readiness and no
   replacement for accepted real hardware/operator validation.
+- M048 Operator Decision blocker status guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m048_operator_decision_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local Operator Decision write-path and backend statuses from
+  `integrationBundleApplyBlocked`; while the blocker is visible it shows
+  `Integration bundle blocked` and `No contact` instead of a ready-looking
+  backend path. This is local frontend presentation hardening only: it mutates
+  no backend status input, changes no task data, creates no queue mutation, no
+  backend/WING contact, no live transport, no live authority, no readiness
+  closure, no Full Autonomous readiness and no replacement for accepted real
+  hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -760,4 +772,4 @@ Generated: 2026-06-20T00:26:39Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4173 passed, 1 skipped, 1 warning`.
+  `4174 passed, 1 skipped, 1 warning`.

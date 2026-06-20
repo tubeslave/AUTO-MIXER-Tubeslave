@@ -318,15 +318,30 @@ function SafetyEvidencePanel({ evidence }: { evidence: SafetyEvidenceItem[] }) {
   );
 }
 
-function OperatorDecisionPanel({ ui, policy }: { ui: UiState; policy: DecisionPolicy }) {
+function OperatorDecisionPanel({
+  ui,
+  policy,
+  integrationBundleApplyBlocked = false
+}: {
+  ui: UiState;
+  policy: DecisionPolicy;
+  integrationBundleApplyBlocked?: boolean;
+}) {
+  const writePathStatus = integrationBundleApplyBlocked
+    ? { value: 'Integration bundle blocked', tone: 'red' as Tone }
+    : { value: ui.backend.applyPath, tone: ui.backend.canApplyToConsole ? 'yellow' as Tone : 'red' as Tone };
+  const backendStatus = integrationBundleApplyBlocked
+    ? { value: 'No contact', tone: 'red' as Tone }
+    : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };
+
   return (
     <Panel title="Operator Decision">
       <div className="space-y-2">
         {[
           { label: 'Current mode', value: getModeDisplayLabel(ui.mode), tone: toneForMode(ui.mode) },
           { label: 'Apply result', value: policy.apply, tone: toneForMode(ui.mode) },
-          { label: 'Write path', value: ui.backend.applyPath, tone: ui.backend.canApplyToConsole ? 'yellow' as const : 'red' as const },
-          { label: 'Backend', value: ui.backend.statusLabel, tone: ui.backend.statusTone }
+          { label: 'Write path', value: writePathStatus.value, tone: writePathStatus.tone },
+          { label: 'Backend', value: backendStatus.value, tone: backendStatus.tone }
         ].map(row => (
           <div className="flex items-center justify-between border-b border-line pb-2 text-[10px]" key={`${row.label}-${row.value}`}>
             <span className="text-muted">{row.label}</span>
@@ -719,7 +734,7 @@ export function TaskQueueWorkspace({
       <div className="grid grid-cols-[1fr_1fr_1fr_1.05fr_1.25fr] gap-2">
         <ApplyPlanPanel plan={guardedApplyPlan} />
         <SafetyEvidencePanel evidence={evidence} />
-        <OperatorDecisionPanel ui={ui} policy={policy} />
+        <OperatorDecisionPanel ui={ui} policy={policy} integrationBundleApplyBlocked={integrationBundleApplyBlocked} />
         <SafetyMonitorPanel safety={safetyMonitor} />
         <ReplayEvidencePanel
           channelIntelligence={channelIntelligence}

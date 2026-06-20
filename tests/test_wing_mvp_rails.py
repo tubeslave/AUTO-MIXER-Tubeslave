@@ -153,6 +153,8 @@ M046_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M046-task-details-blocker-list-bl
 M046_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-blocker-list-blocker-guard-20260620.md"
 M047_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M047-apply-plan-sequence-blocker-guard.md"
 M047_ADR = PROJECT_ROOT / "Docs" / "adr" / "apply-plan-sequence-blocker-guard-20260620.md"
+M048_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M048-operator-decision-blocker-status-guard.md"
+M048_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-decision-blocker-status-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -5825,6 +5827,74 @@ def test_m047_apply_plan_sequence_reflects_integration_bundle_blocker():
     assert "Apply Plan sequences must fail closed" in completion
     assert "M047 Apply Plan sequence blocker guard is now covered" in current
     assert "M047 Apply Plan sequence blocker guard rail is now automated" in report
+
+
+def test_m048_operator_decision_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M048_PLAN.read_text(encoding="utf-8")
+    adr = M048_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m048 = markdown_table_row(roadmap, "M048")
+    assert m048[1] == "Operator Decision blocker status guard"
+    assert m048[2] == (
+        "Operator Decision panel shows integration bundle blocker status while "
+        "promotion planning is blocked"
+    )
+    assert m048[3] == "M047"
+    assert m048[4] == "high offline frontend"
+    assert m048[5] == "UNIT_VERIFIED blocked Operator Decision status; live authority remains blocked"
+    assert m048[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Operator Decision panel now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M048-CP01" in plan
+    assert "M048-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate backend status input" in adr
+
+    assert "function OperatorDecisionPanel({" in task_queue
+    assert "integrationBundleApplyBlocked?: boolean" in task_queue
+    assert "const writePathStatus = integrationBundleApplyBlocked" in task_queue
+    assert "value: 'Integration bundle blocked', tone: 'red' as Tone" in task_queue
+    assert "const backendStatus = integrationBundleApplyBlocked" in task_queue
+    assert "value: 'No contact', tone: 'red' as Tone" in task_queue
+    assert "value: writePathStatus.value, tone: writePathStatus.tone" in task_queue
+    assert "value: backendStatus.value, tone: backendStatus.tone" in task_queue
+    assert (
+        "<OperatorDecisionPanel ui={ui} policy={policy} integrationBundleApplyBlocked={integrationBundleApplyBlocked} />"
+        in task_queue
+    )
+    assert "operator decision status is guarded" in adapter_test
+    assert "Operator Decision statuses must fail closed" in completion
+    assert "M048 Operator Decision blocker status guard is now covered" in current
+    assert "M048 Operator Decision blocker status guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

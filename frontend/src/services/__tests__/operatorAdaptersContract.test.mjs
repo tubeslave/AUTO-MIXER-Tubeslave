@@ -4491,6 +4491,24 @@ test('apply plan sequence is guarded when integration bundle is blocked', async 
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('operator decision status is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function OperatorDecisionPanel\(\{/);
+  assert.match(source, /integrationBundleApplyBlocked\?: boolean/);
+  assert.match(source, /const writePathStatus = integrationBundleApplyBlocked/);
+  assert.match(source, /value: 'Integration bundle blocked', tone: 'red' as Tone/);
+  assert.match(source, /const backendStatus = integrationBundleApplyBlocked/);
+  assert.match(source, /value: 'No contact', tone: 'red' as Tone/);
+  assert.match(source, /value: writePathStatus\.value, tone: writePathStatus\.tone/);
+  assert.match(source, /value: backendStatus\.value, tone: backendStatus\.tone/);
+  assert.match(source, /<OperatorDecisionPanel ui=\{ui\} policy=\{policy\} integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\} \/>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task queue review-only filter includes all rows when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
