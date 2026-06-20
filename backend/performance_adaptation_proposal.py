@@ -268,6 +268,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def analyze_performance_adaptation_need(
     analysis: PerformanceAdaptationAnalysisInput,
     *,
@@ -305,6 +313,7 @@ def analyze_performance_adaptation_need(
     operator_intent = str(analysis.operator_intent or "").strip().lower()
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=str(analysis.target_id),
         source_type=str(analysis.source_role or "unknown"),
@@ -355,8 +364,10 @@ def analyze_performance_adaptation_need(
         blockers.append("trend_confidence_low")
     if safety_confidence < MIN_SAFETY_CONFIDENCE:
         blockers.append("safety_confidence_low")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("performance_adaptation_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("performance_adaptation_current_state_cache_live_authority_present")
     blockers.extend(source_identity_trust.blockers)
 
     confidence = _clip01(
@@ -406,6 +417,7 @@ def analyze_performance_adaptation_need(
         "safety_confidence": round(safety_confidence, 3),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_performance_context_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "rate_limited": True,
         "transport_free": True,

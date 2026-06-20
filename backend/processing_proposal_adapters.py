@@ -409,6 +409,7 @@ PROPOSAL_ONLY_CONTRACTS = {
             "baseline_level",
             "current_level_readback",
             "current_performance_context_cache_freshness",
+            "current_performance_context_cache_no_live_authority",
             "level_drift",
             "trend_persistence",
             "cooldown",

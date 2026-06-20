@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T10:24:42Z.
+- Latest heartbeat: 2026-06-20T11:13:01Z.
 
 ## Что сделано
 
@@ -66,6 +66,15 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   capability required by the project goal, while creating no WING/backend
   contact, proposal apply, live write, readiness closure, hardware evidence or
   live authority.
+
+- M087 performance adaptation read-only context gates rail is now automated:
+  performance-adaptation proposal candidates now require fresh
+  read-only/no-authority current performance context before concert-time level
+  adaptation decisions can trust them. Missing, stale or live-authority context
+  stays analysis-only. This advances concert-time performance adaptation, a
+  separate capability required by the project goal, while creating no
+  WING/backend contact, proposal apply, live write, readiness closure, hardware
+  evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2145,6 +2154,45 @@ The M086 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CAPABILITY_MATRIX.md`,
 `Docs/plans/M086-master-bus-pa-feed-reference-safety-gates.md`,
 `Docs/adr/master-bus-pa-feed-reference-safety-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M087 Performance Adaptation Read-Only Context Gates
+
+The M087 performance adaptation read-only context gate rail is now automated by
+`tests/test_performance_adaptation_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m087_performance_adaptation_readonly_context_gates_stay_readonly`.
+
+Performance-adaptation proposal candidates now require fresh
+read-only/no-authority current performance context before persistent
+musician-level drift can become an operator-facing concert-time adaptation
+proposal. Missing, stale or live-authority context keeps the adaptive mixing
+layer analysis-only.
+
+This is offline performance-adaptation hardening only. It mutates no console
+state, opens no backend/WING transport, sends no OSC/WebSocket write, imports no
+proposal into a queue, applies no proposal, grants no live authority, closes no
+readiness row, creates no hardware evidence and does not replace accepted real
+hardware/operator validation.
+
+This advances concert-time performance adaptation, a separate capability required by the project goal.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_performance_adaptation_proposal.py -q`:
+  `14 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m087_performance_adaptation_readonly_context_gates_stay_readonly -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `100 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4000 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M087 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`,
+`Docs/plans/M087-performance-adaptation-readonly-context-gates.md`,
+`Docs/adr/performance-adaptation-readonly-context-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 

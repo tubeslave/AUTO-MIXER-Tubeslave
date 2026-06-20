@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T10:24:42Z
+Generated: 2026-06-20T11:13:01Z
 
 ## Repository snapshot
 
@@ -1313,6 +1313,20 @@ Generated: 2026-06-20T10:24:42Z
   write path, imports no proposal into a queue, applies no proposal, grants no
   live authority, closes no readiness row, creates no hardware evidence and does
   not replace real WING/operator validation.
+- M087 performance adaptation read-only context gates is now covered by
+  `tests/test_performance_adaptation_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m087_performance_adaptation_readonly_context_gates_stay_readonly`.
+  Performance-adaptation proposal candidates now require fresh
+  read-only/no-authority current performance context before persistent
+  musician-level drift can become an operator-facing concert-time adaptation
+  proposal. Missing, stale or live-authority context keeps the performance
+  adaptation layer analysis-only. This moves the long-term AI mixing engineer
+  path forward into adaptive live mixing and real-time correction decisions, a
+  separate capability required by the project goal, while staying offline and
+  proposal-only: it contacts no WING/backend transport, opens no WebSocket/OSC
+  write path, imports no proposal into a queue, applies no proposal, grants no
+  live authority, closes no readiness row, creates no hardware evidence and does
+  not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1323,4 +1337,4 @@ Generated: 2026-06-20T10:24:42Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `3997 passed, 1 skipped, 1 warning`.
+  `4000 passed, 1 skipped, 1 warning`.

@@ -498,6 +498,7 @@ def test_performance_adaptation_rows_are_tracked_as_proposal_layer_without_live_
         assert row.autonomy_mode_ceiling == "assisted"
         assert "performance_adaptation_proposal" in row.method_ids
         assert row.current_live_write_kinds == ()
+        assert "fresh read-only/no-authority performance context" in row.next_step
 
 
 def test_decision_basis_is_tracked_as_proposal_layer_without_live_widening():

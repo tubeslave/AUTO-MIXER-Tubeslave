@@ -475,7 +475,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_downstream_gate.py",
         ),
         blocker="Shadow gain rides are not yet trusted live authority.",
-        next_step="Route persistent musician-level drift to operator review with fresh trend/readback, cooldown, rollback, headroom, and feedback evidence before any supervised ride promotion.",
+        next_step=(
+            "Route persistent musician-level drift to operator review with "
+            "fresh read-only/no-authority performance context, trend/readback, "
+            "cooldown, rollback, headroom, and feedback evidence before any "
+            "supervised ride promotion."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="live_adaptation",
@@ -490,7 +495,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_downstream_gate.py",
         ),
         blocker="Live adaptation needs latency, quality, and safety proof per action family.",
-        next_step="Keep concert-time adaptation proposal-only until fresh trend/readback, replay match, latency budget, operator review, and per-family hardware proof are complete.",
+        next_step=(
+            "Keep concert-time adaptation proposal-only until fresh "
+            "read-only/no-authority performance context, trend/readback, replay "
+            "match, latency budget, operator review, and per-family hardware "
+            "proof are complete."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="genre_variants",
@@ -543,7 +553,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/source_identity_downstream_gate.py",
         ),
         blocker="Real-time corrections are limited by per-family safety proof and operator mode.",
-        next_step="Route reversible, rate-limited correction candidates to operator review with fresh trend/readback; promote only one fader/gain family after replay and hardware proof.",
+        next_step=(
+            "Route reversible, rate-limited correction candidates to operator "
+            "review with fresh read-only/no-authority performance context and "
+            "trend/readback; promote only one fader/gain family after replay "
+            "and hardware proof."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="console_read_parameters",

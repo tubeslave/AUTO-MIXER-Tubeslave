@@ -232,6 +232,8 @@ M085_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M085-fx-send-monitor-return-safet
 M085_ADR = PROJECT_ROOT / "Docs" / "adr" / "fx-send-monitor-return-safety-gates-20260620.md"
 M086_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M086-master-bus-pa-feed-reference-safety-gates.md"
 M086_ADR = PROJECT_ROOT / "Docs" / "adr" / "master-bus-pa-feed-reference-safety-gates-20260620.md"
+M087_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M087-performance-adaptation-readonly-context-gates.md"
+M087_ADR = PROJECT_ROOT / "Docs" / "adr" / "performance-adaptation-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8983,6 +8985,140 @@ def test_m086_master_bus_pa_feed_reference_safety_gates_stay_readonly():
     assert "M086 master bus PA feed and reference safety gates is now covered" in current
     assert "M086 master bus PA feed and reference safety gates rail is now" in report
     assert "master-bus/output optimization, a separate capability required by the project goal" in report
+
+
+def test_m087_performance_adaptation_readonly_context_gates_stay_readonly():
+    from backend.performance_adaptation_proposal import (
+        PerformanceAdaptationAnalysisInput,
+        analyze_performance_adaptation_need,
+        build_performance_adaptation_proposals,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M087_PLAN.read_text(encoding="utf-8")
+    adr = M087_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m087 = markdown_table_row(roadmap, "M087")
+    assert m087[1] == "Performance adaptation read-only context gates"
+    assert m087[2] == (
+        "Performance-adaptation proposal candidates require fresh "
+        "read-only/no-authority current performance context before concert-time "
+        "level adaptation decisions can trust them"
+    )
+    assert m087[3] == "M083"
+    assert m087[4] == "high offline adaptive mixing"
+    assert m087[5] == "UNIT_VERIFIED performance-adaptation context gate; live authority remains blocked"
+    assert m087[-1] == "PENDING"
+
+    for marker in ("M087-CP01", "M087-CP02", "M087-CP03", "M087-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert "fresh read-only/no-authority current performance context" in capability
+    assert "rate, latency, rollback, headroom and safety evidence" in capability
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 8,
+        "fresh_field_count": 8,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 8,
+        "fresh_field_count": 8,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+
+    base = dict(
+        target_id="ch:7",
+        target_kind="channel",
+        target_label="Lead Guitar",
+        source_role="electric_guitar",
+        arrangement_role="support",
+        baseline_level_lufs=-25.0,
+        current_level_lufs=-21.6,
+        short_term_lufs=-21.2,
+        current_fader_db=-6.0,
+        true_peak_dbfs=-7.0,
+        main_bus_headroom_db=5.0,
+        feedback_risk=0.12,
+        bleed_risk=0.2,
+        baseline_available=True,
+        current_readback_available=True,
+        rollback_available=True,
+        operator_intent="operator_adaptation_review",
+        adaptation_window="performance",
+        active_performance=True,
+        cooldown_elapsed_sec=12.0,
+        persistence_cycles=4,
+        latency_budget_ms=180.0,
+        latency_budget_met=True,
+        source_confidence=0.9,
+        trend_confidence=0.88,
+        safety_confidence=0.86,
+    )
+
+    adaptation_ok = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            **base,
+            current_state_cache_freshness=fresh_context,
+        )
+    )
+    assert adaptation_ok.status == "proposal_only"
+    assert adaptation_ok.evidence["current_performance_context_cache_no_live_authority"] is True
+    assert adaptation_ok.evidence["rate_limited"] is True
+    assert adaptation_ok.to_operator_proposal()["can_apply_live"] is False
+
+    adaptation_missing_context = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(**base)
+    )
+    assert adaptation_missing_context.status == "analysis_only"
+    assert "performance_adaptation_current_state_cache_not_fresh" in adaptation_missing_context.blockers
+    assert adaptation_missing_context.to_operator_proposal()["can_apply_live"] is False
+    assert build_performance_adaptation_proposals([PerformanceAdaptationAnalysisInput(**base)]) == ()
+
+    adaptation_live_context = analyze_performance_adaptation_need(
+        PerformanceAdaptationAnalysisInput(
+            **base,
+            current_state_cache_freshness=live_authority_context,
+        )
+    )
+    assert adaptation_live_context.status == "analysis_only"
+    assert "performance_adaptation_current_state_cache_live_authority_present" in adaptation_live_context.blockers
+    assert adaptation_live_context.evidence["current_performance_context_cache_no_live_authority"] is False
+    assert adaptation_live_context.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M087 performance adaptation read-only context gates is now covered" in current
+    assert "M087 performance adaptation read-only context gates rail is now" in report
+    assert "concert-time performance adaptation, a separate capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
