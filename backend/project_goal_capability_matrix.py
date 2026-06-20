@@ -975,7 +975,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/decision_memory.py",
         ),
         blocker="Evidence packets are operator-review contracts, not live apply authority.",
-        next_step="Attach fresh-context and trusted-source-identity evidence packets to every proposal and rejected shadow decision, project read-only source-identity-aware ranking records, ordering previews, queue-ordering plans, and queue-import dry runs, then replay accepted/rejected outcomes before promotion.",
+        next_step="Attach fresh read-only/no-authority decision context and trusted-source-identity evidence packets to every proposal and rejected shadow decision, require readback state and rollback planning for console-affecting packets, project read-only source-identity-aware ranking records, ordering previews, queue-ordering plans, and queue-import dry runs, then replay accepted/rejected outcomes before promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="long_term_memory_learning",

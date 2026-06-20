@@ -516,6 +516,8 @@ def test_decision_basis_is_tracked_as_proposal_layer_without_live_widening():
     assert "decision_evidence_packet_proposal" in row.method_ids
     assert "backend/source_identity_downstream_gate.py" in row.support_paths
     assert row.current_live_write_kinds == ()
+    assert "fresh read-only/no-authority decision context" in row.next_step
+    assert "readback state and rollback planning" in row.next_step
     assert "trusted-source-identity" in row.next_step
     assert "replay" in row.next_step
 

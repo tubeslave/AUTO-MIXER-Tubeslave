@@ -459,6 +459,7 @@ PROPOSAL_ONLY_CONTRACTS = {
             "arrangement_context",
             "genre_context",
             "current_decision_evidence_context_cache_freshness",
+            "current_decision_evidence_context_cache_no_live_authority",
             "source_identity_downstream_trust",
             "readback_state",
             "rollback_plan",

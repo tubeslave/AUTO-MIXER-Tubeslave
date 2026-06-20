@@ -116,6 +116,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M090 | Pan spatial read-only context gates | Pan proposal candidates require fresh read-only/no-authority current pan and mono/phase context before pan/stereo decisions can trust them | M083 | critical offline console pan | UNIT_VERIFIED pan context gate; live authority remains blocked | PENDING |
 | M091 | Scene/preset management read-only context gates | Scene/preset proposal candidates require fresh read-only/no-authority scene/preset context, scoped diffs and rollback evidence before destructive scene decisions can trust them | M083 | critical offline console scene/preset | UNIT_VERIFIED scene/preset context gate; live authority remains blocked | PENDING |
 | M092 | Mix variant profile read-only context gates | Mix-variant proposal candidates require fresh read-only/no-authority genre/task context, trusted source identity, reference metrics and arrangement context before genre/task variants can fan out | M083 | high offline genre/task mix decision | UNIT_VERIFIED mix-variant context gate; live authority remains blocked | PENDING |
+| M093 | Decision evidence packet read-only context gates | Decision-evidence packet candidates require fresh read-only/no-authority decision context, trusted source identity, readback state and rollback planning before evidence packets can rank downstream proposals | M083 | high offline decision basis | UNIT_VERIFIED decision-evidence context gate; live authority remains blocked | PENDING |
 
 ## Active milestone
 

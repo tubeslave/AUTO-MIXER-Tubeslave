@@ -244,6 +244,8 @@ M091_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M091-scene-preset-readonly-contex
 M091_ADR = PROJECT_ROOT / "Docs" / "adr" / "scene-preset-readonly-context-gates-20260620.md"
 M092_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M092-mix-variant-readonly-context-gates.md"
 M092_ADR = PROJECT_ROOT / "Docs" / "adr" / "mix-variant-readonly-context-gates-20260620.md"
+M093_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M093-decision-evidence-readonly-context-gates.md"
+M093_ADR = PROJECT_ROOT / "Docs" / "adr" / "decision-evidence-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -9888,6 +9890,197 @@ def test_m092_mix_variant_readonly_context_gates_stay_readonly():
     assert "M092 mix variant read-only context gates is now covered" in current
     assert "M092 mix variant read-only context gates rail is now" in report
     assert "genre/task mix-variant profiles, a separate mix-decision capability required by the project goal" in report
+
+
+def test_m093_decision_evidence_readonly_context_gates_stay_readonly():
+    from backend.decision_evidence_packet_proposal import (
+        DecisionEvidenceAnalysisInput,
+        analyze_decision_evidence_packet_need,
+        build_decision_evidence_packet_proposals,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M093_PLAN.read_text(encoding="utf-8")
+    adr = M093_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m093 = markdown_table_row(roadmap, "M093")
+    assert m093[1] == "Decision evidence packet read-only context gates"
+    assert m093[2] == (
+        "Decision-evidence packet candidates require fresh read-only/no-authority "
+        "decision context, trusted source identity, readback state and rollback "
+        "planning before evidence packets can rank downstream proposals"
+    )
+    assert m093[3] == "M083"
+    assert m093[4] == "high offline decision basis"
+    assert m093[5] == (
+        "UNIT_VERIFIED decision-evidence context gate; live authority remains blocked"
+    )
+    assert m093[-1] == "PENDING"
+
+    decision_row = markdown_table_row(capability, "Decision evidence basis")
+    assert "`backend/decision_evidence_packet_proposal.py`" in decision_row[2]
+    assert "`backend/source_identity_downstream_gate.py`" in decision_row[2]
+    assert "fresh read-only/no-authority decision context" in decision_row[4]
+    assert "trusted source identity" in decision_row[4]
+    assert "readback state and rollback planning" in decision_row[4]
+    assert decision_row[5] == "high"
+    assert decision_row[7] == "replay validation with no-authority decision context evidence"
+    assert decision_row[-1] == "none"
+
+    for marker in ("M093-CP01", "M093-CP02", "M093-CP03", "M093-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 9,
+        "fresh_field_count": 9,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    stale_context = {
+        "status": "stale",
+        "field_count": 9,
+        "fresh_field_count": 6,
+        "stale_field_count": 3,
+        "stale_fields": ["audio_analysis", "project_history", "genre_context"],
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 9,
+        "fresh_field_count": 9,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    source_identity_context = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    base_packet = dict(
+        decision_id="proposal:lead_vocal:fader_hold",
+        target_id="ch:1",
+        decision_kind="proposal",
+        proposed_action_family="gain_fader",
+        operator_intent="soundcheck lead vocal balance",
+        operator_review_enabled=True,
+        audio_analysis_available=True,
+        audio_analysis_confidence=0.92,
+        psychoacoustic_model_available=True,
+        psychoacoustic_model_confidence=0.84,
+        statistical_model_available=True,
+        statistical_model_confidence=0.82,
+        project_history_available=True,
+        project_history_confidence=0.78,
+        reference_comparison_available=True,
+        reference_comparison_confidence=0.81,
+        previous_decision_outcomes_available=True,
+        previous_decision_outcomes_confidence=0.76,
+        inter_channel_context_available=True,
+        inter_channel_context_confidence=0.88,
+        arrangement_context_available=True,
+        arrangement_context_confidence=0.86,
+        genre_context_available=True,
+        genre_context_confidence=0.74,
+        current_state_readback_available=True,
+        rollback_plan_available=True,
+        true_peak_headroom_db=5.5,
+        feedback_risk=0.12,
+        latency_budget_ms=120.0,
+        latency_budget_met=True,
+        decision_persistence_cycles=4,
+        conflicting_evidence_count=0,
+        manual_override_active=False,
+        auto_apply_requested=False,
+        active_performance=False,
+        source_identity_trust_state="trusted_for_downstream_priority",
+        source_identity_trust_confidence=0.91,
+        source_identity_replay_outcome_count=8,
+        source_identity_calibration_freshness=source_identity_context,
+    )
+
+    packet_ok = analyze_decision_evidence_packet_need(
+        DecisionEvidenceAnalysisInput(
+            **base_packet,
+            current_state_cache_freshness=fresh_context,
+        )
+    )
+    assert packet_ok.status == "proposal_only"
+    assert packet_ok.evidence["current_decision_evidence_context_cache_no_live_authority"] is True
+    assert packet_ok.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert packet_ok.evidence["source_identity_downstream_trust"]["usable_for_downstream"] is True
+    assert packet_ok.to_operator_proposal()["can_apply_live"] is False
+
+    missing_context = analyze_decision_evidence_packet_need(
+        DecisionEvidenceAnalysisInput(**base_packet)
+    )
+    assert missing_context.status == "analysis_only"
+    assert "decision_evidence_context_cache_not_fresh" in missing_context.blockers
+    assert missing_context.to_operator_proposal()["can_apply_live"] is False
+    assert build_decision_evidence_packet_proposals(
+        [DecisionEvidenceAnalysisInput(**base_packet)]
+    ) == ()
+
+    stale_context_result = analyze_decision_evidence_packet_need(
+        DecisionEvidenceAnalysisInput(
+            **base_packet,
+            current_state_cache_freshness=stale_context,
+        )
+    )
+    assert stale_context_result.status == "analysis_only"
+    assert "decision_evidence_context_cache_not_fresh" in stale_context_result.blockers
+    assert stale_context_result.to_operator_proposal()["can_apply_live"] is False
+
+    live_context_result = analyze_decision_evidence_packet_need(
+        DecisionEvidenceAnalysisInput(
+            **base_packet,
+            current_state_cache_freshness=live_authority_context,
+        )
+    )
+    assert live_context_result.status == "analysis_only"
+    assert (
+        "decision_evidence_context_cache_live_authority_present"
+        in live_context_result.blockers
+    )
+    assert live_context_result.evidence[
+        "current_decision_evidence_context_cache_no_live_authority"
+    ] is False
+    assert live_context_result.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M093 decision evidence read-only context gates is now covered" in current
+    assert "M093 decision evidence read-only context gates rail is now" in report
+    assert "decision evidence and explainability, a separate decision-basis capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -93,6 +93,7 @@ def test_complete_evidence_packet_creates_proposal_only_recommendation():
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["decision_evidence_packet"] is True
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_decision_evidence_context_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 9
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
         "legacy_unverified"
@@ -111,6 +112,7 @@ def test_complete_evidence_packet_creates_proposal_only_recommendation():
     assert proposal["evidence"]["queue_mutation"] is False
     assert proposal["evidence"]["rollback_required_before_promotion"] is True
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_decision_evidence_context_cache_no_live_authority"] is True
 
 
 def test_missing_critical_evidence_blocks_packet():
@@ -208,6 +210,42 @@ def test_stale_decision_evidence_context_blocks_packet():
         "inter_channel_context",
     ]
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_live_authority_decision_evidence_context_blocks_packet():
+    analysis = _complete_input(
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 9,
+            "fresh_field_count": 9,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        }
+    )
+    recommendation = analyze_decision_evidence_packet_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "decision_evidence_context_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_decision_evidence_context_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_decision_evidence_packet_proposals([analysis]) == ()
+
+
+def test_missing_decision_evidence_context_blocks_packet():
+    recommendation = analyze_decision_evidence_packet_need(
+        _complete_input(current_state_cache_freshness=None)
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "decision_evidence_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert recommendation.evidence["current_state_cache_freshness"]["provided"] is False
+    assert build_decision_evidence_packet_proposals(
+        [_complete_input(current_state_cache_freshness=None)]
+    ) == ()
 
 
 def test_source_identity_hold_blocks_decision_evidence_packet():
@@ -361,6 +399,12 @@ def test_decision_evidence_packet_proposal_is_registered_as_goal_capability():
     assert (
         "current_decision_evidence_context_cache_freshness"
         in contracts["decision_evidence_packet_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "current_decision_evidence_context_cache_no_live_authority"
+        in contracts["decision_evidence_packet_proposal"]["proposal_contract"][
+            "safety_evidence_required"
+        ]
     )
     assert (
         "source_identity_downstream_trust"
