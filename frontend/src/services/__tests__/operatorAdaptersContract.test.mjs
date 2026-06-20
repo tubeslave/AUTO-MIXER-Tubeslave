@@ -4540,6 +4540,22 @@ test('safety monitor policy is guarded when integration bundle is blocked', asyn
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('safety monitor goal readiness is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const goalReadinessStatus = integrationBundleApplyBlocked/);
+  assert.match(source, /value: 'Blocked by integration bundle', tone: 'red' as const/);
+  assert.match(source, /value: `\$\{safety\.goalCapabilityObjectiveReadinessScore\}%`/);
+  assert.match(source, /tone: toneForReadinessScore\(safety\.goalCapabilityObjectiveReadinessScore\)/);
+  assert.match(source, /label: 'Goal readiness', value: goalReadinessStatus\.value, tone: goalReadinessStatus\.tone/);
+  assert.match(source, /label: 'Policy', value: policyStatus\.value, tone: policyStatus\.tone/);
+  assert.match(source, /<SafetyMonitorPanel safety=\{safetyMonitor\} integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\} \/>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

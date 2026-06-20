@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T01:50:22Z.
+- Latest heartbeat: 2026-06-20T01:59:24Z.
 
 ## Что сделано
 
@@ -1021,17 +1021,35 @@ mutation, backend/WING contact, live transport, supervised apply opening,
 console apply, readiness closure, Full Autonomous readiness or live authority
 is introduced.
 
+The M057 Safety Monitor goal readiness blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m057_safety_monitor_goal_readiness_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Safety Monitor goal-readiness guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M057-safety-monitor-goal-readiness-blocker-guard.md`,
+`Docs/adr/safety-monitor-goal-readiness-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. Safety Monitor now shows `Blocked by
+integration bundle` in the Goal readiness row while
+`integrationBundleApplyBlocked` is true, preserving the raw readiness score
+when the global blocker is absent. This is local frontend presentation
+hardening only: no readiness input mutation, safety monitor input mutation,
+backend status input mutation, backend result input mutation, task data
+mutation, queue mutation, backend/WING contact, live transport, supervised
+apply opening, console apply, readiness closure, Full Autonomous readiness or
+live authority is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `72 passed`.
+  `73 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m056_safety_monitor_policy_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m057_safety_monitor_goal_readiness_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `69 passed`.
+  `70 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4182 passed, 1 skipped, 1 warning`.
+  `4183 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.
@@ -1407,9 +1425,9 @@ is introduced.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-20T01:50:22Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-06-20T01:59:24Z`, latest
   verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `5093d818`, latest no-WING artifact
+  state/evidence commit `9b31d6d7`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:

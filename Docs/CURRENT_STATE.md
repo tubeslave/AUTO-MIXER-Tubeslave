@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T01:50:22Z
+Generated: 2026-06-20T01:59:24Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T01:50:22Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `5093d818 Guard operator decision apply result`
+  `9b31d6d7 Guard safety monitor policy`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -862,6 +862,19 @@ Generated: 2026-06-20T01:50:22Z
   mutation, no backend/WING contact, no live transport, no live authority, no
   readiness closure, no Full Autonomous readiness and no replacement for
   accepted real hardware/operator validation.
+- M057 Safety Monitor goal readiness blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m057_safety_monitor_goal_readiness_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives `goalReadinessStatus` from `integrationBundleApplyBlocked`; while
+  the blocker is visible, the Safety Monitor Goal readiness row shows
+  `Blocked by integration bundle` instead of the raw readiness percentage.
+  The raw readiness score remains unchanged when the global blocker is absent.
+  This is local frontend presentation hardening only: it mutates no readiness
+  input, no safety monitor input, no backend status input, no backend result
+  input, no task data, creates no queue mutation, no backend/WING contact, no
+  live transport, no live authority, no readiness closure, no Full Autonomous
+  readiness and no replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -872,4 +885,4 @@ Generated: 2026-06-20T01:50:22Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4182 passed, 1 skipped, 1 warning`.
+  `4183 passed, 1 skipped, 1 warning`.

@@ -402,6 +402,12 @@ function SafetyMonitorPanel({
   const policyStatus = integrationBundleApplyBlocked
     ? { value: 'Integration bundle blocked', tone: 'red' as const }
     : { value: safety.liveWritePolicy, tone: safety.liveWritePolicy.includes('fader_gain') ? 'green' as const : 'yellow' as const };
+  const goalReadinessStatus = integrationBundleApplyBlocked
+    ? { value: 'Blocked by integration bundle', tone: 'red' as const }
+    : {
+        value: `${safety.goalCapabilityObjectiveReadinessScore}%`,
+        tone: toneForReadinessScore(safety.goalCapabilityObjectiveReadinessScore)
+      };
 
   return (
     <Panel title="Safety Monitor">
@@ -411,7 +417,7 @@ function SafetyMonitorPanel({
           { label: 'Policy', value: policyStatus.value, tone: policyStatus.tone },
           { label: 'Emergency', value: safety.resetRequired ? 'Reset required' : 'Clear', tone: safety.resetRequired ? 'red' as const : 'green' as const },
           { label: 'Traces', value: `${safety.traceCount} / ${safety.blockedTraceCount} blocked`, tone: safety.blockedTraceCount ? 'yellow' as const : 'green' as const },
-          { label: 'Goal readiness', value: `${safety.goalCapabilityObjectiveReadinessScore}%`, tone: toneForReadinessScore(safety.goalCapabilityObjectiveReadinessScore) },
+          { label: 'Goal readiness', value: goalReadinessStatus.value, tone: goalReadinessStatus.tone },
           { label: 'Readiness priority', value: readinessPriority, tone: safety.goalCapabilityObjectiveReadinessGoalAreaPriorities.length ? 'blue' as const : 'muted' as const },
           { label: 'Top hotspot', value: hotspotText, tone: safety.goalCapabilityObjectiveReadinessHotspots.length ? 'yellow' as const : 'green' as const },
           { label: 'Top blocked goal-area', value: blockedAreaSummary(safety.goalCapabilityObjectiveReadinessByGoalArea), tone: safety.goalCapabilityObjectiveReadinessByGoalArea && Object.keys(safety.goalCapabilityObjectiveReadinessByGoalArea).length ? 'yellow' as const : 'green' as const },
