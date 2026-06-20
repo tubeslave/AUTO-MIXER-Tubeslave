@@ -1251,6 +1251,20 @@ Generated: 2026-06-20T06:31:25Z
   path, applies no proposal, grants no live authority, closes no readiness row,
   creates no hardware evidence and does not replace real WING/operator
   validation.
+- M083 source identity and arrangement read-only context gates is now covered by
+  `tests/test_source_identity_confidence_proposal.py`,
+  `tests/test_arrangement_role_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m083_source_arrangement_context_gates_stay_readonly`.
+  Source-identity review candidates and arrangement-role proposals now require
+  fresh read-only/no-authority context before they can become proposal
+  candidates that downstream mix decisions trust. Missing, stale or
+  live-authority context keeps those layers analysis-only. This moves the
+  long-term AI mixing engineer path forward at the source/role reasoning layer
+  while staying offline and proposal-only: it contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness row,
+  creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1261,4 +1275,4 @@ Generated: 2026-06-20T06:31:25Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4210 passed, 1 skipped, 1 warning`.
+  `4211 passed, 1 skipped, 1 warning`.

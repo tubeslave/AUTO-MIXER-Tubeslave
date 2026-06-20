@@ -304,6 +304,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def analyze_arrangement_role_need(
     analysis: ArrangementRoleAnalysisInput,
     *,
@@ -329,6 +337,7 @@ def analyze_arrangement_role_need(
     masking_impact = _clip01(analysis.masking_impact_score)
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=str(analysis.source_id),
         source_type=source_type,
@@ -365,8 +374,10 @@ def analyze_arrangement_role_need(
         blockers.append("arrangement_role_change_not_needed")
     if proposed_role == "unknown":
         blockers.append("arrangement_role_unknown")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("arrangement_role_context_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("arrangement_role_context_cache_live_authority_present")
     blockers.extend(source_identity_trust.blockers)
 
     confidence = _clip01(
@@ -409,6 +420,7 @@ def analyze_arrangement_role_need(
         "operator_review_enabled": bool(analysis.operator_review_enabled),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_arrangement_role_context_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "decision_evidence_packet": True,

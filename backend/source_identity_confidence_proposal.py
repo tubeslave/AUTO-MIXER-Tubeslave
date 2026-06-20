@@ -126,6 +126,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def _tuple_str(values: Any) -> Tuple[str, ...]:
     if isinstance(values, str):
         return (values,)
@@ -390,6 +398,7 @@ def _recommendation_for_observation(
     observation: SourceIdentityObservation,
     *,
     current_state_freshness: Dict[str, Any],
+    current_state_no_authority: bool,
     min_trusted_confidence: float,
 ) -> Optional[SourceIdentityRecommendation]:
     source_type = normalize_source_type(observation.predicted_source_type)
@@ -428,6 +437,7 @@ def _recommendation_for_observation(
         "downstream_target_families": list(observation.downstream_target_families),
         "downstream_rejection_reasons": list(downstream_reasons),
         "current_source_identity_context_cache_freshness": current_state_freshness.get("status"),
+        "current_source_identity_context_cache_no_live_authority": current_state_no_authority,
         "current_state_cache_freshness": current_state_freshness,
         "transport_free": True,
         "decision_evidence_packet": True,
@@ -461,6 +471,7 @@ def analyze_source_identity_confidence(
 ) -> SourceIdentityResult:
     current_state_freshness = _freshness_payload(current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     min_trusted = _clip01(min_trusted_confidence)
     observations_tuple = tuple(observations)
 
@@ -471,12 +482,13 @@ def analyze_source_identity_confidence(
         "operator_review_enabled": bool(operator_review_enabled),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_source_identity_context_cache_no_live_authority": current_state_no_authority,
         "min_trusted_source_confidence": min_trusted,
         "observation_count": len(observations_tuple),
         "blockers": (),
     }
 
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blocker = "source_identity_context_cache_not_fresh"
         metadata["blockers"] = (blocker,)
         metadata["review_candidate_count"] = 0
@@ -486,6 +498,22 @@ def analyze_source_identity_confidence(
             status="analysis_only",
             recommendations=(),
             warnings=("source identity context cache is not fresh; proposals blocked",),
+            metadata=metadata,
+        )
+
+    if not current_state_no_authority:
+        blocker = "source_identity_context_cache_live_authority_present"
+        metadata["blockers"] = (blocker,)
+        metadata["review_candidate_count"] = 0
+        return SourceIdentityResult(
+            method_id=SOURCE_IDENTITY_METHOD_ID,
+            version=SOURCE_IDENTITY_VERSION,
+            status="analysis_only",
+            recommendations=(),
+            warnings=(
+                "source identity context cache has live authority; collect read-only "
+                "classifier/operator label evidence before review proposals",
+            ),
             metadata=metadata,
         )
 
@@ -508,6 +536,7 @@ def analyze_source_identity_confidence(
             _recommendation_for_observation(
                 observation,
                 current_state_freshness=current_state_freshness,
+                current_state_no_authority=current_state_no_authority,
                 min_trusted_confidence=min_trusted,
             )
             for observation in observations_tuple

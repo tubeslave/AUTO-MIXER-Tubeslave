@@ -32,6 +32,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   only; it creates no WING/backend contact, live write, readiness closure,
   hardware evidence or live authority.
 
+- M083 source identity and arrangement read-only context gates rail is now
+  automated: source-identity review candidates and arrangement-role proposal
+  candidates now require fresh read-only/no-authority context before downstream
+  mix decisions can trust them. Missing, stale or live-authority context stays
+  analysis-only. This is offline AI-mixing capability hardening only; it
+  creates no WING/backend contact, proposal apply, live write, readiness
+  closure, hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING

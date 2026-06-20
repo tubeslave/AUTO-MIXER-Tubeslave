@@ -13,6 +13,17 @@ from backend.processing_registry import get_pipeline_profile, get_processing_met
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _fresh_state(field_count=7):
+    return {
+        "status": "fresh",
+        "field_count": field_count,
+        "fresh_field_count": field_count,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
 def test_arrangement_role_module_is_transport_free():
     source = Path("backend/arrangement_role_proposal.py").read_text()
 
@@ -49,14 +60,7 @@ def test_lead_vocal_creates_proposal_only_arrangement_role_recommendation():
             recent_role_switches=0,
             lead_salience_score=0.9,
             masking_impact_score=0.55,
-            current_state_cache_freshness={
-                "status": "fresh",
-                "field_count": 7,
-                "fresh_field_count": 7,
-                "read_only": True,
-                "live_write": False,
-                "queries_console": False,
-            },
+            current_state_cache_freshness=_fresh_state(),
         )
     )
 
@@ -68,6 +72,7 @@ def test_lead_vocal_creates_proposal_only_arrangement_role_recommendation():
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["decision_evidence_packet"] is True
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_arrangement_role_context_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 7
 
     proposal = recommendation.to_operator_proposal()
@@ -81,6 +86,7 @@ def test_lead_vocal_creates_proposal_only_arrangement_role_recommendation():
     assert proposal["proposed_action"]["proposed_arrangement_role"] == "lead"
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_arrangement_role_context_cache_no_live_authority"] is True
 
 
 def test_ambiguous_or_switching_role_is_analysis_only():
@@ -182,6 +188,74 @@ def test_stale_arrangement_role_context_blocks_role_proposal():
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
+def test_live_authority_arrangement_role_context_blocks_role_proposal():
+    analysis = ArrangementRoleAnalysisInput(
+        source_id="ch:1",
+        source_type="lead vocal",
+        channel_label="Lead Vox",
+        current_arrangement_role="unknown",
+        section_label="verse",
+        source_type_confidence=0.92,
+        role_confidence=0.9,
+        context_confidence=0.86,
+        arrangement_context_available=True,
+        inter_channel_context_available=True,
+        reference_role_available=True,
+        accepted_history_available=True,
+        activity_persistence_cycles=4,
+        competing_role_count=0,
+        recent_role_switches=0,
+        lead_salience_score=0.9,
+        masking_impact_score=0.55,
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 7,
+            "fresh_field_count": 7,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        },
+    )
+    recommendation = analyze_arrangement_role_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "arrangement_role_context_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_arrangement_role_context_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_arrangement_role_proposals([analysis]) == ()
+
+
+def test_missing_arrangement_role_context_blocks_role_proposal():
+    analysis = ArrangementRoleAnalysisInput(
+        source_id="ch:1",
+        source_type="lead vocal",
+        channel_label="Lead Vox",
+        current_arrangement_role="unknown",
+        section_label="verse",
+        source_type_confidence=0.92,
+        role_confidence=0.9,
+        context_confidence=0.86,
+        arrangement_context_available=True,
+        inter_channel_context_available=True,
+        reference_role_available=True,
+        accepted_history_available=True,
+        activity_persistence_cycles=4,
+        competing_role_count=0,
+        recent_role_switches=0,
+        lead_salience_score=0.9,
+        masking_impact_score=0.55,
+    )
+    recommendation = analyze_arrangement_role_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "arrangement_role_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert recommendation.evidence["current_state_cache_freshness"]["provided"] is False
+    assert build_arrangement_role_proposals([analysis]) == ()
+
+
 def test_source_identity_hold_blocks_downstream_arrangement_role_proposal():
     recommendation = analyze_arrangement_role_need(
         ArrangementRoleAnalysisInput(
@@ -269,6 +343,7 @@ def test_build_arrangement_role_proposals_filters_to_proposal_only_items():
                 context_confidence=0.86,
                 activity_persistence_cycles=4,
                 lead_salience_score=0.9,
+                current_state_cache_freshness=_fresh_state(),
             ),
             ArrangementRoleAnalysisInput(
                 source_id="ch:2",
@@ -333,5 +408,9 @@ def test_arrangement_role_proposal_is_registered_as_goal_capability():
     assert contracts["arrangement_role_proposal"]["proposal_contract"]["value_type"] == "arrangement_role"
     assert (
         "current_arrangement_role_context_cache_freshness"
+        in contracts["arrangement_role_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "current_arrangement_role_context_cache_no_live_authority"
         in contracts["arrangement_role_proposal"]["proposal_contract"]["safety_evidence_required"]
     )

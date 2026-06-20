@@ -224,6 +224,8 @@ M081_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M081-wing-review-decision-prestar
 M081_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-review-decision-prestart-proof-binding-20260620.md"
 M082_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M082-wing-handoff-decision-template-proof-fields.md"
 M082_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-handoff-decision-template-proof-fields-20260620.md"
+M083_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M083-source-arrangement-readonly-context-gates.md"
+M083_ADR = PROJECT_ROOT / "Docs" / "adr" / "source-arrangement-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8262,6 +8264,195 @@ def test_m082_wing_handoff_surfaces_decision_template_proof_fields():
     assert "those generated proof fields makes the accepted decision stale or invalid" in runbook
     assert "M082 WING handoff decision template proof fields is now covered" in current
     assert "M082 WING handoff decision template proof fields rail is now automated" in report
+
+
+def test_m083_source_arrangement_context_gates_stay_readonly():
+    from backend.arrangement_role_proposal import (
+        ArrangementRoleAnalysisInput,
+        analyze_arrangement_role_need,
+    )
+    from backend.source_identity_confidence_proposal import (
+        SourceIdentityObservation,
+        analyze_source_identity_confidence,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M083_PLAN.read_text(encoding="utf-8")
+    adr = M083_ADR.read_text(encoding="utf-8")
+    source_identity_module = (
+        PROJECT_ROOT / "backend" / "source_identity_confidence_proposal.py"
+    ).read_text(encoding="utf-8")
+    arrangement_module = (
+        PROJECT_ROOT / "backend" / "arrangement_role_proposal.py"
+    ).read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m083 = markdown_table_row(roadmap, "M083")
+    assert m083[1] == "Source identity and arrangement read-only context gates"
+    assert m083[2] == (
+        "Source-identity and arrangement-role proposal candidates require fresh "
+        "read-only/no-authority context before downstream mix decisions can trust them"
+    )
+    assert m083[3] == "M008"
+    assert m083[4] == "high offline analysis"
+    assert m083[5] == (
+        "UNIT_VERIFIED read-only context gate; live authority remains blocked"
+    )
+    assert m083[-1] == "PENDING"
+
+    assert "M083-CP01" in plan
+    assert "M083-CP02" in plan
+    assert "M083-CP03" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert "_freshness_is_no_authority" in source_identity_module
+    assert "source_identity_context_cache_live_authority_present" in source_identity_module
+    assert "_freshness_is_no_authority" in arrangement_module
+    assert "arrangement_role_context_cache_live_authority_present" in arrangement_module
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 5,
+        "fresh_field_count": 5,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 5,
+        "fresh_field_count": 5,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    observation = SourceIdentityObservation(
+        source_id="ch12",
+        channel_id=12,
+        channel_label="Mystery Pod",
+        predicted_source_type="unknown",
+        source_type_confidence=0.32,
+        match_type="unknown",
+        signal_present=True,
+        activity_confidence=0.72,
+    )
+
+    source_identity_ok = analyze_source_identity_confidence(
+        (observation,),
+        current_state_cache_freshness=fresh_context,
+    )
+    assert source_identity_ok.status == "proposal_only"
+    assert (
+        source_identity_ok.metadata[
+            "current_source_identity_context_cache_no_live_authority"
+        ]
+        is True
+    )
+    assert source_identity_ok.metadata["live_write_allowed"] is False
+
+    source_identity_missing = analyze_source_identity_confidence((observation,))
+    assert source_identity_missing.status == "analysis_only"
+    assert "source_identity_context_cache_not_fresh" in source_identity_missing.metadata[
+        "blockers"
+    ]
+    source_identity_live = analyze_source_identity_confidence(
+        (observation,),
+        current_state_cache_freshness=live_authority_context,
+    )
+    assert source_identity_live.status == "analysis_only"
+    assert "source_identity_context_cache_live_authority_present" in (
+        source_identity_live.metadata["blockers"]
+    )
+    assert (
+        source_identity_live.metadata[
+            "current_source_identity_context_cache_no_live_authority"
+        ]
+        is False
+    )
+
+    arrangement_input = ArrangementRoleAnalysisInput(
+        source_id="ch:1",
+        source_type="lead vocal",
+        channel_label="Lead Vox",
+        current_arrangement_role="unknown",
+        section_label="verse",
+        source_type_confidence=0.92,
+        role_confidence=0.9,
+        context_confidence=0.86,
+        arrangement_context_available=True,
+        inter_channel_context_available=True,
+        reference_role_available=True,
+        accepted_history_available=True,
+        activity_persistence_cycles=4,
+        competing_role_count=0,
+        recent_role_switches=0,
+        lead_salience_score=0.9,
+        masking_impact_score=0.55,
+        current_state_cache_freshness=fresh_context,
+    )
+    arrangement_ok = analyze_arrangement_role_need(arrangement_input)
+    assert arrangement_ok.status == "proposal_only"
+    assert (
+        arrangement_ok.evidence[
+            "current_arrangement_role_context_cache_no_live_authority"
+        ]
+        is True
+    )
+    assert arrangement_ok.to_operator_proposal()["can_apply_live"] is False
+
+    arrangement_missing = analyze_arrangement_role_need(
+        ArrangementRoleAnalysisInput(
+            **{
+                **arrangement_input.__dict__,
+                "current_state_cache_freshness": None,
+            }
+        )
+    )
+    assert arrangement_missing.status == "analysis_only"
+    assert "arrangement_role_context_cache_not_fresh" in arrangement_missing.blockers
+    arrangement_live = analyze_arrangement_role_need(
+        ArrangementRoleAnalysisInput(
+            **{
+                **arrangement_input.__dict__,
+                "current_state_cache_freshness": live_authority_context,
+            }
+        )
+    )
+    assert arrangement_live.status == "analysis_only"
+    assert "arrangement_role_context_cache_live_authority_present" in (
+        arrangement_live.blockers
+    )
+    assert (
+        arrangement_live.evidence[
+            "current_arrangement_role_context_cache_no_live_authority"
+        ]
+        is False
+    )
+
+    assert "M083 source identity and arrangement read-only context gates is now covered" in current
+    assert "M083 source identity and arrangement read-only context gates rail is now" in report
+    assert "automated: source-identity review candidates" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

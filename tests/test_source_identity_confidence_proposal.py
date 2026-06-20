@@ -51,6 +51,7 @@ def test_low_confidence_source_identity_emits_review_proposal_with_downstream_re
     assert result.metadata["proposal_only"] is True
     assert result.metadata["live_write_allowed"] is False
     assert result.metadata["current_state_cache_freshness_status"] == "fresh"
+    assert result.metadata["current_source_identity_context_cache_no_live_authority"] is True
     assert result.metadata["review_candidate_count"] == 1
 
     recommendation = result.recommendations[0]
@@ -65,6 +66,10 @@ def test_low_confidence_source_identity_emits_review_proposal_with_downstream_re
         in recommendation.downstream_rejection_reasons
     )
     assert recommendation.evidence["current_source_identity_context_cache_freshness"] == "fresh"
+    assert (
+        recommendation.evidence["current_source_identity_context_cache_no_live_authority"]
+        is True
+    )
     assert recommendation.evidence["transport_free"] is True
 
 
@@ -121,6 +126,75 @@ def test_stale_source_identity_context_blocks_review_proposals():
     assert result.metadata["live_write_allowed"] is False
 
 
+def test_missing_source_identity_context_blocks_review_proposals():
+    observation = SourceIdentityObservation(
+        source_id="ch12",
+        channel_id=12,
+        channel_label="Mystery Pod",
+        predicted_source_type="unknown",
+        source_type_confidence=0.32,
+        match_type="unknown",
+        classifier_source="channel_recognizer",
+        signal_present=True,
+        activity_confidence=0.72,
+    )
+
+    result = analyze_source_identity_confidence((observation,))
+
+    assert result.status == "analysis_only"
+    assert result.recommendations == ()
+    assert "source identity context cache is not fresh" in " ".join(result.warnings)
+    assert result.metadata["current_state_cache_freshness_status"] == "not_provided"
+    assert result.metadata["current_state_cache_freshness"]["provided"] is False
+    assert "source_identity_context_cache_not_fresh" in result.metadata["blockers"]
+    assert result.metadata["live_write_allowed"] is False
+    assert build_source_identity_confidence_proposals((observation,)) == ()
+
+
+def test_live_authority_source_identity_context_blocks_review_proposals():
+    observation = SourceIdentityObservation(
+        source_id="ch12",
+        channel_id=12,
+        channel_label="Mystery Pod",
+        predicted_source_type="unknown",
+        source_type_confidence=0.32,
+        match_type="unknown",
+        classifier_source="channel_recognizer",
+        signal_present=True,
+        activity_confidence=0.72,
+    )
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 5,
+        "fresh_field_count": 5,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+
+    result = analyze_source_identity_confidence(
+        (observation,),
+        current_state_cache_freshness=live_authority_context,
+    )
+
+    assert result.status == "analysis_only"
+    assert result.recommendations == ()
+    assert "source identity context cache has live authority" in " ".join(result.warnings)
+    assert result.metadata["current_state_cache_freshness_status"] == "fresh"
+    assert result.metadata["current_source_identity_context_cache_no_live_authority"] is False
+    assert result.metadata["current_state_cache_freshness"]["live_write"] is True
+    assert "source_identity_context_cache_live_authority_present" in result.metadata[
+        "blockers"
+    ]
+    assert (
+        build_source_identity_confidence_proposals(
+            (observation,),
+            current_state_cache_freshness=live_authority_context,
+        )
+        == ()
+    )
+
+
 def test_high_confidence_channel_recognizer_result_does_not_create_review_proposal():
     classification = classify_channel_name("LD VOX")
     observation = SourceIdentityObservation.from_channel_classification(
@@ -163,6 +237,7 @@ def test_source_identity_operator_proposals_and_adapter_are_not_queueable_live_a
     assert "requested_change" not in proposal
     assert "unsupported_value_type:source_identity" in proposal["blockers"]
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_source_identity_context_cache_no_live_authority"] is True
     assert proposal["evidence"]["operator_acceptance_required_before_promotion"] is True
 
     adapted = adapt_source_identity_confidence_proposals(proposals)
@@ -196,6 +271,7 @@ def test_source_identity_registry_contract_and_goal_row():
     assert contract["target_kind"] == "source_identity_review"
     assert "source_type_confidence" in evidence
     assert "downstream_rejection_reasons" in evidence
+    assert "current_source_identity_context_cache_no_live_authority" in evidence
     assert "operator_acceptance" in evidence
     assert contract["live_apply_allowed"] is False
 
