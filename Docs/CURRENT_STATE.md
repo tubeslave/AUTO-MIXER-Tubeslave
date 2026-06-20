@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T03:04:01Z
+Generated: 2026-06-20T03:12:23Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T03:04:01Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `e79099b7 Guard replay channel blocked status`
+  `a16134e3 Guard replay report path blocker`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -962,6 +962,21 @@ Generated: 2026-06-20T03:04:01Z
   backend/WING contact, no live transport, no live authority, no readiness
   closure, no Full Autonomous readiness and no replacement for accepted real
   hardware/operator validation.
+- M064 Task Queue status column blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m064_task_queue_status_column_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local Task Queue Status column display values through
+  `taskStatusDisplay(task, integrationBundleApplyBlocked)`; while the blocker
+  is visible, the Task Queue Status column shows `Blocked` instead of the raw
+  task status. The raw task status remains unchanged when the global blocker is
+  absent. This is local frontend presentation hardening only: it mutates no task
+  status input, task data, proposal data, backend status input, backend result
+  input, safety monitor input or readiness input, creates no queue mutation, no
+  row hiding, no supervised apply opening, no supervised apply dispatch, no
+  backend/WING contact, no live transport, no live authority, no readiness
+  closure, no Full Autonomous readiness and no replacement for accepted real
+  hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -972,4 +987,4 @@ Generated: 2026-06-20T03:04:01Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4189 passed, 1 skipped, 1 warning`.
+  `4190 passed, 1 skipped, 1 warning`.

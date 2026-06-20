@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T03:04:01Z.
+- Latest heartbeat: 2026-06-20T03:12:23Z.
 
 ## Что сделано
 
@@ -1156,17 +1156,36 @@ safety monitor input mutation, readiness input mutation, queue mutation,
 backend/WING contact, live transport, supervised apply opening, console apply,
 readiness closure, Full Autonomous readiness or live authority is introduced.
 
+The M064 Task Queue status column blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs`
+and
+`tests/test_wing_mvp_rails.py::test_m064_task_queue_status_column_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Task Queue status-column guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M064-task-queue-status-column-blocker-guard.md`,
+`Docs/adr/task-queue-status-column-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. Task Queue now shows `Blocked` in the
+Status column while `integrationBundleApplyBlocked` is true, preserving the raw
+task status and normal status tone when the global blocker is absent. This is
+local frontend presentation hardening only: no task status input mutation, task
+data mutation, proposal data mutation, backend status input mutation, backend
+result input mutation, safety monitor input mutation, readiness input mutation,
+row hiding, queue mutation, backend/WING contact, live transport, supervised
+apply opening, supervised apply dispatch, console apply, readiness closure, Full
+Autonomous readiness or live authority is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `79 passed`.
+  `80 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m063_replay_evidence_report_path_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m064_task_queue_status_column_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `76 passed`.
+  `77 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4189 passed, 1 skipped, 1 warning`.
+  `4190 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.

@@ -185,6 +185,8 @@ M062_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M062-replay-evidence-channel-stat
 M062_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-channel-status-blocker-guard-20260620.md"
 M063_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M063-replay-evidence-report-path-blocker-guard.md"
 M063_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-report-path-blocker-guard-20260620.md"
+M064_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M064-task-queue-status-column-blocker-guard.md"
+M064_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-status-column-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6930,6 +6932,70 @@ def test_m063_replay_evidence_report_path_reflects_integration_bundle_blocker():
     assert "Replay Evidence report paths must fail closed" in completion
     assert "M063 Replay Evidence report path blocker guard is now covered" in current
     assert "M063 Replay Evidence report path blocker guard rail is now automated" in report
+
+
+def test_m064_task_queue_status_column_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M064_PLAN.read_text(encoding="utf-8")
+    adr = M064_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m064 = markdown_table_row(roadmap, "M064")
+    assert m064[1] == "Task Queue status column blocker guard"
+    assert m064[2] == (
+        "Task Queue Status column shows integration bundle blocker status "
+        "while promotion planning is blocked"
+    )
+    assert m064[3] == "M063"
+    assert m064[4] == "high offline frontend"
+    assert m064[5] == "UNIT_VERIFIED blocked Task Queue status column; live authority remains blocked"
+    assert m064[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Queue Status column now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M064-CP01" in plan
+    assert "M064-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate task status input" in adr
+
+    assert "function taskStatusDisplay(" in task_queue
+    assert "const label = integrationBundleApplyBlocked ? 'Blocked' : task.status" in task_queue
+    assert "const tone = integrationBundleApplyBlocked ? 'red' as const : toneFromState(task.status)" in task_queue
+    assert "const status = taskStatusDisplay(task, integrationBundleApplyBlocked)" in task_queue
+    assert "<StatusBadge tone={status.tone}>{status.label}</StatusBadge>" in task_queue
+    assert "key: 'status'" in task_queue
+    assert "task queue status column shows blocked state" in adapter_test
+    assert "Task Queue status columns must fail closed" in completion
+    assert "M064 Task Queue status column blocker guard is now covered" in current
+    assert "M064 Task Queue status column blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

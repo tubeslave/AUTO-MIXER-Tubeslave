@@ -185,6 +185,15 @@ function taskQueueRowActions(
   return ['Detail', 'Apply', 'Reject'];
 }
 
+function taskStatusDisplay(
+  task: TaskRow,
+  integrationBundleApplyBlocked = false,
+): { label: string; tone: Tone } {
+  const label = integrationBundleApplyBlocked ? 'Blocked' : task.status;
+  const tone = integrationBundleApplyBlocked ? 'red' as const : toneFromState(task.status);
+  return { label, tone };
+}
+
 export function TaskDetailsPanel({
   task,
   ui,
@@ -832,7 +841,15 @@ export function TaskQueueWorkspace({
           },
           { key: 'agent', label: 'Created By', width: '1.15fr' },
           { key: 'target', label: 'Target / Move', width: '1fr', render: task => <span className="truncate"><span className="text-text">{task.target}</span><span className="ml-2 font-mono text-audio">{task.proposal.delta}</span></span> },
-          { key: 'status', label: 'Status', width: '0.9fr', render: task => <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge> },
+          {
+            key: 'status',
+            label: 'Status',
+            width: '0.9fr',
+            render: task => {
+              const status = taskStatusDisplay(task, integrationBundleApplyBlocked);
+              return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>;
+            }
+          },
           { key: 'time', label: 'Last', width: '0.55fr' },
           {
             key: 'actions',
