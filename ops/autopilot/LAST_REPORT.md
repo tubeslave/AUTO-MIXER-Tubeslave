@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T02:43:21Z.
+- Latest heartbeat: 2026-06-20T02:54:04Z.
 
 ## Что сделано
 
@@ -1116,17 +1116,37 @@ mutation, backend/WING contact, live transport, supervised apply opening,
 console apply, readiness closure, Full Autonomous readiness or live authority
 is introduced.
 
+The M062 Replay Evidence channel status blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs`
+and
+`tests/test_wing_mvp_rails.py::test_m062_replay_evidence_channel_status_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Replay Evidence channel status guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M062-replay-evidence-channel-status-blocker-guard.md`,
+`Docs/adr/replay-evidence-channel-status-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. Replay Evidence now shows
+`bundle blocked` in the channel status badge while
+`integrationBundleApplyBlocked` is true, preserving the raw channel
+`gainRideState` and live-apply tone when the global blocker is absent. This is
+local frontend presentation hardening only: no channel evidence input mutation,
+replay run input mutation, decision trace input mutation, task data mutation,
+backend status input mutation, backend result input mutation, safety monitor
+input mutation, readiness input mutation, queue mutation, backend/WING contact,
+live transport, supervised apply opening, console apply, readiness closure, Full
+Autonomous readiness or live authority is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `77 passed`.
+  `78 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m061_replay_evidence_policy_row_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m062_replay_evidence_channel_status_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `74 passed`.
+  `75 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4187 passed, 1 skipped, 1 warning`.
+  `4188 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.

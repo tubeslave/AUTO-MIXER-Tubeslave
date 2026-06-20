@@ -181,6 +181,8 @@ M060_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M060-replay-evidence-latest-run-s
 M060_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-latest-run-status-blocker-guard-20260620.md"
 M061_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M061-replay-evidence-policy-row-blocker-guard.md"
 M061_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-policy-row-blocker-guard-20260620.md"
+M062_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M062-replay-evidence-channel-status-blocker-guard.md"
+M062_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-channel-status-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6790,6 +6792,73 @@ def test_m061_replay_evidence_policy_row_reflects_integration_bundle_blocker():
     assert "Replay Evidence policy rows must fail closed" in completion
     assert "M061 Replay Evidence policy row blocker guard is now covered" in current
     assert "M061 Replay Evidence policy row blocker guard rail is now automated" in report
+
+
+def test_m062_replay_evidence_channel_status_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M062_PLAN.read_text(encoding="utf-8")
+    adr = M062_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m062 = markdown_table_row(roadmap, "M062")
+    assert m062[1] == "Replay Evidence channel status blocker guard"
+    assert m062[2] == (
+        "Replay Evidence channel status badge shows integration bundle blocker "
+        "status while promotion planning is blocked"
+    )
+    assert m062[3] == "M061"
+    assert m062[4] == "high offline frontend"
+    assert m062[5] == "UNIT_VERIFIED blocked Replay Evidence channel status; live authority remains blocked"
+    assert m062[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Replay Evidence channel status now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M062-CP01" in plan
+    assert "M062-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate channel evidence input" in adr
+
+    assert "function ReplayEvidencePanel({" in task_queue
+    assert "const channelStatusLabel = integrationBundleApplyBlocked" in task_queue
+    assert "? 'bundle blocked'" in task_queue
+    assert ": channel?.gainRideState ?? 'shadow'" in task_queue
+    assert "const channelStatusTone = integrationBundleApplyBlocked" in task_queue
+    assert ": channel?.liveApplyAllowed ? 'yellow' as const : 'blue' as const" in task_queue
+    assert "<StatusBadge tone={channelStatusTone}>{channelStatusLabel}</StatusBadge>" in task_queue
+    assert "channel?.liveApplyAllowed ? 'yellow' : 'blue'}>{channel?.gainRideState ?? 'shadow'}" not in task_queue
+    assert "integrationBundleApplyBlocked={integrationBundleApplyBlocked}" in task_queue
+    assert "replay evidence channel status is guarded" in adapter_test
+    assert "Replay Evidence channel statuses must fail closed" in completion
+    assert "M062 Replay Evidence channel status blocker guard is now covered" in current
+    assert "M062 Replay Evidence channel status blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

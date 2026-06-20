@@ -4637,6 +4637,25 @@ test('replay evidence policy row is guarded when integration bundle is blocked',
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence channel status is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const channelStatusLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'bundle blocked'/);
+  assert.match(source, /: channel\?\.gainRideState \?\? 'shadow'/);
+  assert.match(source, /const channelStatusTone = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'red' as const/);
+  assert.match(source, /: channel\?\.liveApplyAllowed \? 'yellow' as const : 'blue' as const/);
+  assert.match(source, /<StatusBadge tone=\{channelStatusTone\}>\{channelStatusLabel\}<\/StatusBadge>/);
+  assert.doesNotMatch(source, /<StatusBadge tone=\{channel\?\.liveApplyAllowed \? 'yellow' : 'blue'\}>\{channel\?\.gainRideState \?\? 'shadow'\}<\/StatusBadge>/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

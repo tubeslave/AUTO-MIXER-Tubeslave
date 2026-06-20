@@ -499,6 +499,12 @@ function ReplayEvidencePanel({
   const replayPolicyDetailClassName = integrationBundleApplyBlocked || latestRun?.liveWrite
     ? 'text-danger'
     : 'text-success';
+  const channelStatusLabel = integrationBundleApplyBlocked
+    ? 'bundle blocked'
+    : channel?.gainRideState ?? 'shadow';
+  const channelStatusTone = integrationBundleApplyBlocked
+    ? 'red' as const
+    : channel?.liveApplyAllowed ? 'yellow' as const : 'blue' as const;
   const traceStatusLabel = integrationBundleApplyBlocked
     ? 'bundle blocked'
     : latestTrace
@@ -544,7 +550,7 @@ function ReplayEvidencePanel({
       </div>
       <div className="mt-1 flex items-center justify-between gap-2 text-[9px]">
         <span className="truncate text-text">{channel ? `${channel.channel} ${channel.name}` : 'No channel evidence'}</span>
-        <StatusBadge tone={channel?.liveApplyAllowed ? 'yellow' : 'blue'}>{channel?.gainRideState ?? 'shadow'}</StatusBadge>
+        <StatusBadge tone={channelStatusTone}>{channelStatusLabel}</StatusBadge>
       </div>
       {latestRun && (
         <div className="mt-0.5 truncate text-[8px] text-muted">

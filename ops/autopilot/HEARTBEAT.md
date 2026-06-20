@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T02:43:21Z
+Last heartbeat UTC: 2026-06-20T02:54:04Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,17 +12,17 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M061 Replay Evidence policy row blocker guard now shows
-`bundle blocked · no live apply` in the Replay Evidence `Policy` row while
+Latest check: M062 Replay Evidence channel status blocker guard now shows
+`bundle blocked` in the Replay Evidence channel status badge while
 `integrationBundleApplyBlocked` is true. The updated frontend keeps this as
-local presentation hardening and does not mutate replay run input, decision
-trace input, task data, backend status input, backend result input, safety
-monitor input, readiness input, add queue mutation, open supervised apply,
-console apply, WING/backend contact or live authority.
+local presentation hardening and does not mutate channel evidence input, replay
+run input, decision trace input, task data, backend status input, backend result
+input, safety monitor input, readiness input, add queue mutation, open supervised
+apply, console apply, WING/backend contact or live authority.
 
-Frontend adapter validation passed with `77 passed`; the frontend build
-passed; the M061 rail passed with `1 passed`; the full rail file passed with
-`74 passed`; and the full suite passed with `4187 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `78 passed`; the frontend build
+passed; the M062 rail passed with `1 passed`; the full rail file passed with
+`75 passed`; and the full suite passed with `4188 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No
