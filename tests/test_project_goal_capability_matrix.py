@@ -895,8 +895,10 @@ def test_scene_preset_control_is_tracked_as_proposal_layer_without_live_widening
     assert "operator review" in row.next_step
     assert "read-only scene/preset inventory" in row.next_step
     assert "scoped diffs" in row.next_step
+    assert "fresh read-only/no-authority scene/preset context" in row.next_step
     assert "Product Layer snapshot freshness" in row.next_step
     assert "read-only rollback evidence" in row.next_step
+    assert "destructive-action proof" in row.next_step
 
 
 def test_snapshot_is_read_only_and_fail_closed_for_live_widening():

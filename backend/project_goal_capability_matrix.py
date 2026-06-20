@@ -855,7 +855,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("scenes", "presets"),
         blocker="Scenes and presets can overwrite broad console state.",
-        next_step="Route read-only scene/preset inventory and scoped diffs to operator review with Product Layer snapshot freshness and read-only rollback evidence; require scope limits and hardware proof before any scene/preset write promotion.",
+        next_step="Route read-only scene/preset inventory and scoped diffs to operator review with fresh read-only/no-authority scene/preset context, Product Layer snapshot freshness, read-only rollback evidence and destructive-action proof; require scope limits and hardware proof before any scene/preset write promotion.",
     ),
     ProjectGoalCapabilityRow(
         id="decision_basis",

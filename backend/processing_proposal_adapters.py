@@ -372,6 +372,7 @@ PROPOSAL_ONLY_CONTRACTS = {
         "safety_evidence": [
             "current_console_state_readback",
             "current_scene_preset_cache_freshness",
+            "current_scene_preset_cache_no_live_authority",
             "snapshots_scenes_snapshot_cache_freshness",
             "user_presets_snapshot_cache_freshness",
             "target_preview",

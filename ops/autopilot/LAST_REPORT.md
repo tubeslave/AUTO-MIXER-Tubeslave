@@ -101,6 +101,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   creating no WING/backend contact, proposal apply, live write, readiness
   closure, hardware evidence or live authority.
 
+- M091 scene preset read-only context gates rail is now automated:
+  scene/preset proposal candidates now require fresh read-only/no-authority
+  current scene/preset context, target preview, scoped diffs, rollback evidence
+  and destructive-scope limits before destructive scene decisions can trust
+  them. Missing, stale or live-authority context stays analysis-only. This
+  advances scene/snapshot/preset management, a separate console-control
+  capability required by the project goal, while creating no WING/backend
+  contact, proposal apply, live write, readiness closure, hardware evidence or
+  live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING
@@ -2332,6 +2342,48 @@ The M090 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
 `Docs/plans/M090-pan-spatial-readonly-context-gates.md`,
 `Docs/adr/pan-spatial-readonly-context-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M091 Scene/Preset Read-Only Context Gates
+
+The M091 scene preset read-only context gate rail is now automated by
+`tests/test_scene_preset_management_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m091_scene_preset_readonly_context_gates_stay_readonly`.
+
+Scene/preset proposal candidates now require fresh read-only/no-authority
+current scene/preset context, target preview, scoped diffs, rollback evidence
+and destructive-scope limits before a scene/snapshot/preset decision can
+become an operator-facing proposal. Missing, stale or live-authority context
+keeps the scene/preset management layer analysis-only.
+
+This is offline scene/preset-control hardening only. It mutates no console
+state, opens no backend/WING transport, sends no OSC/WebSocket write, imports
+no proposal into a queue, applies no proposal, grants no live authority, closes
+no readiness row, creates no hardware evidence and does not replace accepted
+real hardware/operator validation.
+
+This advances scene/snapshot/preset management, a separate console-control capability required by the project goal.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_scene_preset_management_proposal.py -q`:
+  `22 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py::test_scene_preset_control_is_tracked_as_proposal_layer_without_live_widening -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m091_scene_preset_readonly_context_gates_stay_readonly -q`:
+  recorded in `ops/autopilot/STATE.json`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  recorded in `ops/autopilot/STATE.json`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  recorded in `ops/autopilot/STATE.json`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: recorded in
+  `ops/autopilot/STATE.json`.
+
+The M091 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+`Docs/plans/M091-scene-preset-readonly-context-gates.md`,
+`Docs/adr/scene-preset-readonly-context-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 

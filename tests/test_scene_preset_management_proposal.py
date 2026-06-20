@@ -16,6 +16,17 @@ from backend.scene_preset_management_proposal import (
 )
 
 
+def _fresh_state(field_count=7):
+    return {
+        "status": "fresh",
+        "field_count": field_count,
+        "fresh_field_count": field_count,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
 def test_scene_preset_management_module_is_transport_free():
     source = Path("backend/scene_preset_management_proposal.py").read_text()
 
@@ -68,14 +79,7 @@ def test_soundcheck_scoped_scene_recall_creates_proposal_only_recommendation():
             scope_confidence=0.9,
             rollback_confidence=0.88,
             persistence_cycles=3,
-            current_state_cache_freshness={
-                "status": "fresh",
-                "field_count": 7,
-                "fresh_field_count": 7,
-                "read_only": True,
-                "live_write": False,
-                "queries_console": False,
-            },
+            current_state_cache_freshness=_fresh_state(),
         )
     )
 
@@ -87,6 +91,7 @@ def test_soundcheck_scoped_scene_recall_creates_proposal_only_recommendation():
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["destructive_console_state"] is True
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_scene_preset_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 7
 
     proposal = recommendation.to_operator_proposal()
@@ -100,6 +105,7 @@ def test_soundcheck_scoped_scene_recall_creates_proposal_only_recommendation():
     assert proposal["proposed_action"]["action_type"] == "scene_recall"
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_scene_preset_cache_no_live_authority"] is True
 
 
 def test_active_performance_and_broad_scope_block_scene_preset_proposal():
@@ -131,6 +137,7 @@ def test_active_performance_and_broad_scope_block_scene_preset_proposal():
             scope_confidence=0.9,
             rollback_confidence=0.9,
             persistence_cycles=3,
+            current_state_cache_freshness=_fresh_state(),
         )
     )
 
@@ -215,7 +222,7 @@ def test_read_only_scoped_diff_evidence_can_drive_scene_preset_proposal():
             affected_sources_active=False,
             target_confidence=0.92,
             persistence_cycles=3,
-            current_state_cache_freshness={"status": "fresh"},
+            current_state_cache_freshness=_fresh_state(),
             scoped_diff_evidence=diff,
         )
     )
@@ -251,7 +258,7 @@ def test_scoped_diff_evidence_with_live_or_query_claim_blocks_proposal():
             current_mix_signal_dbfs=-82.0,
             target_confidence=0.92,
             persistence_cycles=3,
-            current_state_cache_freshness={"status": "fresh"},
+            current_state_cache_freshness=_fresh_state(),
             scoped_diff_evidence={
                 "available": True,
                 "target_preview_available": True,
@@ -294,7 +301,7 @@ def test_scoped_diff_evidence_broad_scope_blocks_scene_preset_proposal():
             current_mix_signal_dbfs=-82.0,
             target_confidence=0.92,
             persistence_cycles=3,
-            current_state_cache_freshness={"status": "fresh"},
+            current_state_cache_freshness=_fresh_state(),
             scoped_diff_evidence={
                 "available": True,
                 "target_preview_available": True,
@@ -365,7 +372,7 @@ def test_read_only_rollback_evidence_can_drive_scene_preset_proposal():
             target_confidence=0.92,
             scope_confidence=0.9,
             persistence_cycles=3,
-            current_state_cache_freshness={"status": "fresh"},
+            current_state_cache_freshness=_fresh_state(),
             rollback_evidence=rollback,
         )
     )
@@ -404,7 +411,7 @@ def test_rollback_evidence_with_live_or_query_claim_blocks_proposal():
             target_confidence=0.92,
             scope_confidence=0.9,
             persistence_cycles=3,
-            current_state_cache_freshness={"status": "fresh"},
+            current_state_cache_freshness=_fresh_state(),
             rollback_evidence={
                 "available": True,
                 "rollback_snapshot_id": "rollback:pre_scene_recall",
@@ -449,7 +456,7 @@ def test_rollback_evidence_target_scope_mismatch_blocks_proposal():
             target_confidence=0.92,
             scope_confidence=0.9,
             persistence_cycles=3,
-            current_state_cache_freshness={"status": "fresh"},
+            current_state_cache_freshness=_fresh_state(),
             rollback_evidence={
                 "available": True,
                 "rollback_snapshot_id": "rollback:wrong_scope",
@@ -522,6 +529,94 @@ def test_stale_current_scene_preset_state_blocks_proposal_only_recommendation():
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
+def test_live_authority_current_scene_preset_state_blocks_proposal_only_recommendation():
+    analysis = ScenePresetManagementAnalysisInput(
+        artifact_id="scene:12",
+        artifact_name="Band A vocal strip",
+        artifact_type="scene",
+        action_type="recall",
+        target_scope="channel_strip",
+        target_label="Lead Vox scene recall",
+        active_scene_id="scene:pre_show",
+        active_scene_name="Pre-show baseline",
+        artifact_exists=True,
+        target_name_match=True,
+        current_state_readback_available=True,
+        target_preview_available=True,
+        scoped_diff_available=True,
+        rollback_snapshot_available=True,
+        rollback_snapshot_id="rollback:pre_scene_recall",
+        operator_intent="operator_scene_request",
+        change_window="soundcheck",
+        active_performance=False,
+        affected_channel_count=1,
+        estimated_changed_parameter_count=12,
+        destructive_scope_score=0.08,
+        current_mix_signal_dbfs=-82.0,
+        affected_sources_active=False,
+        target_confidence=0.92,
+        scope_confidence=0.9,
+        rollback_confidence=0.88,
+        persistence_cycles=3,
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 7,
+            "fresh_field_count": 7,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        },
+    )
+    recommendation = analyze_scene_preset_management_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "scene_preset_current_state_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_scene_preset_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_scene_preset_management_proposals([analysis]) == ()
+
+
+def test_missing_current_scene_preset_state_blocks_proposal_only_recommendation():
+    analysis = ScenePresetManagementAnalysisInput(
+        artifact_id="scene:12",
+        artifact_name="Band A vocal strip",
+        artifact_type="scene",
+        action_type="recall",
+        target_scope="channel_strip",
+        target_label="Lead Vox scene recall",
+        active_scene_id="scene:pre_show",
+        active_scene_name="Pre-show baseline",
+        artifact_exists=True,
+        target_name_match=True,
+        current_state_readback_available=True,
+        target_preview_available=True,
+        scoped_diff_available=True,
+        rollback_snapshot_available=True,
+        rollback_snapshot_id="rollback:pre_scene_recall",
+        operator_intent="operator_scene_request",
+        change_window="soundcheck",
+        active_performance=False,
+        affected_channel_count=1,
+        estimated_changed_parameter_count=12,
+        destructive_scope_score=0.08,
+        current_mix_signal_dbfs=-82.0,
+        affected_sources_active=False,
+        target_confidence=0.92,
+        scope_confidence=0.9,
+        rollback_confidence=0.88,
+        persistence_cycles=3,
+    )
+    recommendation = analyze_scene_preset_management_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "scene_preset_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert recommendation.evidence["current_state_cache_freshness"]["provided"] is False
+    assert build_scene_preset_management_proposals([analysis]) == ()
+
+
 def test_scene_preset_snapshot_freshness_bridge_uses_fresh_scene_snapshot():
     snapshot = {
         "type": "snapshots_scenes_snapshot",
@@ -588,6 +683,7 @@ def test_scene_preset_snapshot_freshness_bridge_uses_fresh_scene_snapshot():
     assert bridged["snapshot_type"] == "snapshots_scenes_snapshot"
     assert recommendation.status == "proposal_only"
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_scene_preset_cache_no_live_authority"] is True
     assert (
         recommendation.evidence["current_state_cache_freshness"]["snapshot_type"]
         == "snapshots_scenes_snapshot"
@@ -776,6 +872,7 @@ def test_preset_save_requires_explicit_overwrite_permission():
             scope_confidence=0.9,
             rollback_confidence=0.9,
             persistence_cycles=3,
+            current_state_cache_freshness=_fresh_state(),
         )
     )
 
@@ -806,6 +903,7 @@ def test_preset_save_requires_explicit_overwrite_permission():
             scope_confidence=0.9,
             rollback_confidence=0.9,
             persistence_cycles=3,
+            current_state_cache_freshness=_fresh_state(),
         )
     )
 
@@ -876,6 +974,7 @@ def test_build_scene_preset_management_proposals_filters_to_proposal_only_items(
                 scope_confidence=0.9,
                 rollback_confidence=0.9,
                 persistence_cycles=3,
+                current_state_cache_freshness=_fresh_state(),
             ),
             ScenePresetManagementAnalysisInput(
                 artifact_id="scene:13",
@@ -963,6 +1062,10 @@ def test_scene_preset_management_proposal_is_registered_as_goal_capability():
     assert contracts["scene_preset_management_proposal"]["proposal_contract"]["value_type"] == "scene_preset"
     assert (
         "current_scene_preset_cache_freshness"
+        in contracts["scene_preset_management_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "current_scene_preset_cache_no_live_authority"
         in contracts["scene_preset_management_proposal"]["proposal_contract"]["safety_evidence_required"]
     )
     assert (

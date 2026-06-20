@@ -19,7 +19,7 @@ Status: WING/live authority snapshot
 | Routing / patch | SPECIFIED | `backend/routing_management_proposal.py`, routing readback contracts | no | no | fresh read-only/no-authority route context, rollback and physical readback first | none |
 | Bus/group/main/DCA faders | SPECIFIED | bus/DCA physical readback contracts | no | no except later approved supervised proof | physical readback | none |
 | Matrices | SPECIFIED | matrix physical readback contracts | no | no | physical readback | none |
-| Scenes / snapshots / presets | SPECIFIED | snapshot handlers and contracts | no | no | destructive-action ADR and proof | none |
+| Scenes / snapshots / presets | SPECIFIED | `backend/scene_preset_management_proposal.py`, snapshot handlers and contracts | no | no | fresh read-only/no-authority scene/preset context, scoped diffs, rollback and destructive-action proof first | none |
 | Rollback | SPECIFIED | WING proof runbooks | no live action unattended | required before closure | supervised rollback proof | none |
 | Emergency stop | SPECIFIED | WING MVP docs | no live action unattended | required before closure | emergency-stop proof | none |
 | Rate limits / bounds / allowlists | PROTOTYPE | `backend/autofoh_safety.py`, `backend/wing_client.py`, `backend/fault_injection_recovery_contract.py` | docs/tests only | required | fault-injection validation | none |

@@ -240,6 +240,8 @@ M089_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M089-mute-management-readonly-con
 M089_ADR = PROJECT_ROOT / "Docs" / "adr" / "mute-management-readonly-context-gates-20260620.md"
 M090_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M090-pan-spatial-readonly-context-gates.md"
 M090_ADR = PROJECT_ROOT / "Docs" / "adr" / "pan-spatial-readonly-context-gates-20260620.md"
+M091_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M091-scene-preset-readonly-context-gates.md"
+M091_ADR = PROJECT_ROOT / "Docs" / "adr" / "scene-preset-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -1670,7 +1672,11 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
             "physical readback",
         ),
         "Matrices": ("no", "no", "physical readback"),
-        "Scenes / snapshots / presets": ("no", "no", "destructive-action ADR and proof"),
+        "Scenes / snapshots / presets": (
+            "no",
+            "no",
+            "fresh read-only/no-authority scene/preset context, scoped diffs, rollback and destructive-action proof first",
+        ),
     }
     for category, (unattended, supervised_live, next_gate) in console_live_expansion_rows.items():
         row = markdown_table_row(console, category)
@@ -9556,6 +9562,173 @@ def test_m090_pan_spatial_readonly_context_gates_stay_readonly():
     assert "M090 pan spatial read-only context gates is now covered" in current
     assert "M090 pan spatial read-only context gates rail is now" in report
     assert "pan/stereo placement, a separate mixing and console-control capability required by the project goal" in report
+
+
+def test_m091_scene_preset_readonly_context_gates_stay_readonly():
+    from backend.scene_preset_management_proposal import (
+        ScenePresetManagementAnalysisInput,
+        analyze_scene_preset_management_need,
+        build_scene_preset_management_proposals,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M091_PLAN.read_text(encoding="utf-8")
+    adr = M091_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m091 = markdown_table_row(roadmap, "M091")
+    assert m091[1] == "Scene/preset management read-only context gates"
+    assert m091[2] == (
+        "Scene/preset proposal candidates require fresh read-only/no-authority "
+        "scene/preset context, scoped diffs and rollback evidence before "
+        "destructive scene decisions can trust them"
+    )
+    assert m091[3] == "M083"
+    assert m091[4] == "critical offline console scene/preset"
+    assert m091[5] == "UNIT_VERIFIED scene/preset context gate; live authority remains blocked"
+    assert m091[-1] == "PENDING"
+
+    scene_row = markdown_table_row(console, "Scenes / snapshots / presets")
+    assert "`backend/scene_preset_management_proposal.py`" in scene_row[2]
+    assert scene_row[3] == "no"
+    assert scene_row[4] == "no"
+    assert scene_row[5] == (
+        "fresh read-only/no-authority scene/preset context, scoped diffs, "
+        "rollback and destructive-action proof first"
+    )
+    assert scene_row[-1] == "none"
+
+    for marker in ("M091-CP01", "M091-CP02", "M091-CP03", "M091-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 7,
+        "fresh_field_count": 7,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    stale_context = {
+        "status": "stale",
+        "field_count": 7,
+        "fresh_field_count": 4,
+        "stale_field_count": 3,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 7,
+        "fresh_field_count": 7,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    base_scene = dict(
+        artifact_id="scene:12",
+        artifact_name="Band A vocal strip",
+        artifact_type="scene",
+        action_type="recall",
+        target_scope="channel_strip",
+        target_label="Lead Vox scene recall",
+        active_scene_id="scene:pre_show",
+        active_scene_name="Pre-show baseline",
+        artifact_exists=True,
+        target_name_match=True,
+        current_state_readback_available=True,
+        target_preview_available=True,
+        scoped_diff_available=True,
+        rollback_snapshot_available=True,
+        rollback_snapshot_id="rollback:pre_scene_recall",
+        operator_intent="operator_scene_request",
+        change_window="soundcheck",
+        active_performance=False,
+        affected_channel_count=1,
+        affected_bus_count=0,
+        affected_fx_slot_count=0,
+        estimated_changed_parameter_count=12,
+        destructive_scope_score=0.08,
+        current_mix_signal_dbfs=-82.0,
+        affected_sources_active=False,
+        target_confidence=0.92,
+        scope_confidence=0.9,
+        rollback_confidence=0.88,
+        persistence_cycles=3,
+    )
+
+    scene_ok = analyze_scene_preset_management_need(
+        ScenePresetManagementAnalysisInput(
+            **base_scene,
+            current_state_cache_freshness=fresh_context,
+        )
+    )
+    assert scene_ok.status == "proposal_only"
+    assert scene_ok.evidence["current_scene_preset_cache_no_live_authority"] is True
+    assert scene_ok.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert scene_ok.to_operator_proposal()["can_apply_live"] is False
+
+    missing_context = analyze_scene_preset_management_need(
+        ScenePresetManagementAnalysisInput(**base_scene)
+    )
+    assert missing_context.status == "analysis_only"
+    assert "scene_preset_current_state_cache_not_fresh" in missing_context.blockers
+    assert missing_context.to_operator_proposal()["can_apply_live"] is False
+    assert build_scene_preset_management_proposals(
+        [ScenePresetManagementAnalysisInput(**base_scene)]
+    ) == ()
+
+    stale_context_result = analyze_scene_preset_management_need(
+        ScenePresetManagementAnalysisInput(
+            **base_scene,
+            current_state_cache_freshness=stale_context,
+        )
+    )
+    assert stale_context_result.status == "analysis_only"
+    assert "scene_preset_current_state_cache_not_fresh" in stale_context_result.blockers
+    assert stale_context_result.to_operator_proposal()["can_apply_live"] is False
+
+    live_context_result = analyze_scene_preset_management_need(
+        ScenePresetManagementAnalysisInput(
+            **base_scene,
+            current_state_cache_freshness=live_authority_context,
+        )
+    )
+    assert live_context_result.status == "analysis_only"
+    assert (
+        "scene_preset_current_state_cache_live_authority_present"
+        in live_context_result.blockers
+    )
+    assert live_context_result.evidence["current_scene_preset_cache_no_live_authority"] is False
+    assert live_context_result.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M091 scene preset read-only context gates is now covered" in current
+    assert "M091 scene preset read-only context gates rail is now" in report
+    assert "scene/snapshot/preset management, a separate console-control capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

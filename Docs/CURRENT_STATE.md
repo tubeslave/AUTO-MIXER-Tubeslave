@@ -1368,6 +1368,21 @@ Generated: 2026-06-20T11:55:57Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does not
   replace real WING/operator validation.
+- M091 scene preset read-only context gates is now covered by
+  `tests/test_scene_preset_management_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m091_scene_preset_readonly_context_gates_stay_readonly`.
+  Scene/preset proposal candidates now require fresh read-only/no-authority
+  current scene/preset context, target preview, scoped diffs, rollback evidence
+  and destructive-scope limits before a scene/snapshot/preset decision can
+  become an operator-facing proposal. Missing, stale or live-authority context
+  keeps the scene/preset management layer analysis-only. This moves the
+  long-term AI mixing engineer path forward into scene/snapshot/preset
+  management, a separate console-control capability required by the project
+  goal, while staying offline and proposal-only: it contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness
+  row, creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1378,4 +1393,4 @@ Generated: 2026-06-20T11:55:57Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4007 passed, 1 skipped, 1 warning`.
+  `4010 passed, 1 skipped, 1 warning`.

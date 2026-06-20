@@ -278,6 +278,17 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+        and payload.get("snapshot_live_write", False) is False
+        and payload.get("snapshot_queries_console", False) is False
+        and payload.get("snapshot_live_apply_allowed", False) is False
+    )
+
+
 def scene_preset_cache_freshness_from_snapshots(
     artifact_type: Any,
     *,
@@ -496,6 +507,7 @@ def analyze_scene_preset_management_need(
     )
     current_state_freshness = _freshness_payload(current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
 
     target_preview_available = bool(
         analysis.target_preview_available or scoped_diff.get("target_preview_available")
@@ -593,8 +605,10 @@ def analyze_scene_preset_management_need(
         blockers.append("scope_confidence_low")
     if rollback_confidence < MIN_ROLLBACK_CONFIDENCE:
         blockers.append("rollback_confidence_low")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("scene_preset_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("scene_preset_current_state_cache_live_authority_present")
 
     confidence = _clip01(
         0.22 * target_confidence
@@ -641,6 +655,7 @@ def analyze_scene_preset_management_need(
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_scene_preset_cache_no_live_authority": current_state_no_authority,
         "scoped_diff_evidence": scoped_diff,
         "rollback_evidence": rollback,
         "transport_free": True,
