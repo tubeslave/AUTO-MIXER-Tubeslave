@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T02:23:08Z
+Generated: 2026-06-20T02:34:14Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T02:23:08Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `7d94f469 Guard safety monitor blocked surfaces`
+  `6c7e5aee Guard replay evidence blocked status`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -904,6 +904,20 @@ Generated: 2026-06-20T02:23:08Z
   readiness input, creates no queue mutation, no backend/WING contact, no live
   transport, no live authority, no readiness closure, no Full Autonomous
   readiness and no replacement for accepted real hardware/operator validation.
+- M060 Replay Evidence latest run status blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m060_replay_evidence_latest_run_status_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local `latestRunStatusLabel` and `latestRunStatusTone` from
+  `integrationBundleApplyBlocked`; while the blocker is visible, the Replay
+  Evidence `Latest run` badge shows `bundle blocked` instead of the raw replay
+  run status. The raw replay run status remains unchanged when the global
+  blocker is absent. This is local frontend presentation hardening only: it
+  mutates no replay run input, decision trace input, task data, backend status
+  input, backend result input, safety monitor input or readiness input, creates
+  no queue mutation, no backend/WING contact, no live transport, no live
+  authority, no readiness closure, no Full Autonomous readiness and no
+  replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -914,4 +928,4 @@ Generated: 2026-06-20T02:23:08Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4185 passed, 1 skipped, 1 warning`.
+  `4186 passed, 1 skipped, 1 warning`.

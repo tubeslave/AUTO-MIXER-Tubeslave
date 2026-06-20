@@ -484,6 +484,12 @@ function ReplayEvidencePanel({
   const latestRun = replayRuns[0];
   const latestTrace = traces[0];
   const channel = channelIntelligence.find(row => row.recentTraceCount > 0) ?? channelIntelligence[0];
+  const latestRunStatusLabel = integrationBundleApplyBlocked
+    ? 'bundle blocked'
+    : latestRun?.status ?? 'idle';
+  const latestRunStatusTone = integrationBundleApplyBlocked
+    ? 'red' as const
+    : toneForReplayStatus(latestRun?.status ?? 'idle');
   const traceStatusLabel = integrationBundleApplyBlocked
     ? 'bundle blocked'
     : latestTrace
@@ -505,7 +511,7 @@ function ReplayEvidencePanel({
           <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Latest run</div>
           <div className="truncate text-[9px] font-bold text-text">{latestRun?.runId ?? 'No replay yet'}</div>
         </div>
-        <StatusBadge tone={toneForReplayStatus(latestRun?.status ?? 'idle')}>{latestRun?.status ?? 'idle'}</StatusBadge>
+        <StatusBadge tone={latestRunStatusTone}>{latestRunStatusLabel}</StatusBadge>
       </div>
       <div className="mt-1 grid grid-cols-2 gap-1">
         <div className="rounded-[5px] border border-line bg-row px-1.5 py-1">

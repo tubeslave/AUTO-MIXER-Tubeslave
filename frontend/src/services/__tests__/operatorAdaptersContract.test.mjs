@@ -4594,6 +4594,25 @@ test('replay evidence decision trace status is guarded when integration bundle i
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence latest run status is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const latestRunStatusLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'bundle blocked'/);
+  assert.match(source, /: latestRun\?\.status \?\? 'idle'/);
+  assert.match(source, /const latestRunStatusTone = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'red' as const/);
+  assert.match(source, /: toneForReplayStatus\(latestRun\?\.status \?\? 'idle'\)/);
+  assert.match(source, /<StatusBadge tone=\{latestRunStatusTone\}>\{latestRunStatusLabel\}<\/StatusBadge>/);
+  assert.doesNotMatch(source, /<StatusBadge tone=\{toneForReplayStatus\(latestRun\?\.status \?\? 'idle'\)\}>\{latestRun\?\.status \?\? 'idle'\}<\/StatusBadge>/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

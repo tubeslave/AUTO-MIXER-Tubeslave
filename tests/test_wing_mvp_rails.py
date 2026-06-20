@@ -177,6 +177,8 @@ M058_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M058-safety-monitor-blocked-surfa
 M058_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-monitor-blocked-surfaces-blocker-guard-20260620.md"
 M059_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M059-replay-evidence-decision-trace-status-blocker-guard.md"
 M059_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-decision-trace-status-blocker-guard-20260620.md"
+M060_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M060-replay-evidence-latest-run-status-blocker-guard.md"
+M060_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-latest-run-status-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6648,6 +6650,73 @@ def test_m059_replay_evidence_decision_trace_status_reflects_integration_bundle_
     assert "Replay Evidence decision trace statuses must fail closed" in completion
     assert "M059 Replay Evidence decision trace status blocker guard is now covered" in current
     assert "M059 Replay Evidence decision trace status blocker guard rail is now automated" in report
+
+
+def test_m060_replay_evidence_latest_run_status_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M060_PLAN.read_text(encoding="utf-8")
+    adr = M060_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m060 = markdown_table_row(roadmap, "M060")
+    assert m060[1] == "Replay Evidence latest run status blocker guard"
+    assert m060[2] == (
+        "Replay Evidence Latest run badge shows integration bundle blocker "
+        "status while promotion planning is blocked"
+    )
+    assert m060[3] == "M059"
+    assert m060[4] == "high offline frontend"
+    assert m060[5] == "UNIT_VERIFIED blocked Replay Evidence latest run status; live authority remains blocked"
+    assert m060[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Replay Evidence latest run status now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M060-CP01" in plan
+    assert "M060-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate replay run input" in adr
+
+    assert "function ReplayEvidencePanel({" in task_queue
+    assert "const latestRunStatusLabel = integrationBundleApplyBlocked" in task_queue
+    assert "? 'bundle blocked'" in task_queue
+    assert ": latestRun?.status ?? 'idle'" in task_queue
+    assert "const latestRunStatusTone = integrationBundleApplyBlocked" in task_queue
+    assert ": toneForReplayStatus(latestRun?.status ?? 'idle')" in task_queue
+    assert "<StatusBadge tone={latestRunStatusTone}>{latestRunStatusLabel}</StatusBadge>" in task_queue
+    assert "toneForReplayStatus(latestRun?.status ?? 'idle')}>{latestRun?.status ?? 'idle'}" not in task_queue
+    assert "integrationBundleApplyBlocked={integrationBundleApplyBlocked}" in task_queue
+    assert "replay evidence latest run status is guarded" in adapter_test
+    assert "Replay Evidence latest run statuses must fail closed" in completion
+    assert "M060 Replay Evidence latest run status blocker guard is now covered" in current
+    assert "M060 Replay Evidence latest run status blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
