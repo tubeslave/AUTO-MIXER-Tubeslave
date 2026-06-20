@@ -24,6 +24,7 @@ References:
 """
 
 from dataclasses import dataclass, field
+import math
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 try:
@@ -34,6 +35,32 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 METHOD_ID = "cross_adaptive_eq"
 READ_REQUIRED_SOURCE = "cached_or_physical_eq_band_read_required_before_promotion"
+DEFAULT_CHANNEL_PRIORITY = 3
+MIN_ARRANGEMENT_ROLE_CONFIDENCE = 0.55
+ARRANGEMENT_ROLE_PRIORITY_HINTS = {
+    "lead": 1,
+    "featured": 1,
+    "low_anchor": 1,
+    "rhythmic_anchor": 2,
+    "harmonic_support": 3,
+    "backing": 4,
+    "texture": 4,
+    "effect": 5,
+}
+SOURCE_ROLE_PRIORITY_HINTS = {
+    "lead_vocal": 1,
+    "bass": 1,
+    "kick": 2,
+    "snare": 2,
+    "drums": 2,
+    "vocal": 2,
+    "guitar": 3,
+    "keys": 3,
+    "synth": 4,
+    "backing_vocal": 4,
+    "fx_return": 5,
+}
+NON_PROCESSING_ARRANGEMENT_ROLES = {"reference", "utility", "talkback"}
 
 
 @dataclass
@@ -85,12 +112,51 @@ def _freshness_status(payload: Optional[Mapping[str, Any]]) -> str:
 
 def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     if payload is None:
-        return {"status": "not_provided"}
+        return {"status": "not_provided", "provided": False}
     if not isinstance(payload, Mapping):
         return {"status": "unknown", "raw_type": type(payload).__name__}
     normalized = dict(payload)
     normalized["status"] = _freshness_status(payload)
     return normalized
+
+
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
+def _normalize_token(value: Any) -> str:
+    return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _safe_int(value: Any, default: int = DEFAULT_CHANNEL_PRIORITY) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return default
+    return numeric if math.isfinite(numeric) else default
+
+
+def _clip01(value: Any) -> float:
+    return max(0.0, min(1.0, _safe_float(value)))
+
+
+def _first_present(payload: Mapping[str, Any], keys: Tuple[str, ...], default: Any = "") -> Any:
+    for key in keys:
+        value = payload.get(key)
+        if value is not None and value != "":
+            return value
+    return default
 
 
 def _identity_payload_for_channel(
@@ -139,6 +205,144 @@ def _source_identity_gate_by_channel(
         blocked.append({"channel_id": channel_id, **decision.to_dict()})
         blockers.update(decision.blockers)
     return decisions, tuple(blocked), tuple(sorted(blockers))
+
+
+def _arrangement_payload_for_channel(
+    channel_id: int,
+    channel_arrangement_context: Optional[Mapping[Any, Mapping[str, Any]]],
+) -> Mapping[str, Any]:
+    if not isinstance(channel_arrangement_context, Mapping):
+        return {}
+    return (
+        channel_arrangement_context.get(channel_id)
+        or channel_arrangement_context.get(str(channel_id))
+        or {}
+    )
+
+
+def _priority_hint_for_context(arrangement_role: str, source_role: str) -> Optional[int]:
+    role = _normalize_token(arrangement_role)
+    source = _normalize_token(source_role)
+    if role in ARRANGEMENT_ROLE_PRIORITY_HINTS:
+        return ARRANGEMENT_ROLE_PRIORITY_HINTS[role]
+    if source in SOURCE_ROLE_PRIORITY_HINTS:
+        return SOURCE_ROLE_PRIORITY_HINTS[source]
+    return None
+
+
+def _arrangement_context_by_channel(
+    channel_ids: Tuple[int, ...],
+    channel_arrangement_context: Optional[Mapping[Any, Mapping[str, Any]]],
+) -> Tuple[Dict[int, Dict[str, Any]], Tuple[Dict[str, Any], ...], Tuple[str, ...]]:
+    contexts: Dict[int, Dict[str, Any]] = {}
+    blocked = []
+    blockers = set()
+    for channel_id in channel_ids:
+        if not isinstance(channel_arrangement_context, Mapping):
+            context = {
+                "channel_id": channel_id,
+                "status": "missing",
+                "usable_for_unmasking_priority": False,
+                "blockers": ("cross_adaptive_eq_arrangement_context_missing_for_channel",),
+            }
+            contexts[channel_id] = context
+            blocked.append(context)
+            blockers.add("cross_adaptive_eq_arrangement_context_missing_for_channel")
+            continue
+
+        payload = _arrangement_payload_for_channel(channel_id, channel_arrangement_context)
+        if not isinstance(payload, Mapping) or not payload:
+            context = {
+                "channel_id": channel_id,
+                "status": "missing",
+                "usable_for_unmasking_priority": False,
+                "blockers": ("cross_adaptive_eq_arrangement_context_missing_for_channel",),
+            }
+            contexts[channel_id] = context
+            blocked.append(context)
+            blockers.add("cross_adaptive_eq_arrangement_context_missing_for_channel")
+            continue
+
+        arrangement_role = _normalize_token(
+            _first_present(
+                payload,
+                ("arrangement_role", "proposed_arrangement_role", "role"),
+                "unknown",
+            )
+        )
+        source_role = _normalize_token(
+            _first_present(payload, ("source_role", "source_type", "instrument_role"), "unknown")
+        )
+        confidence_default = 0.75 if arrangement_role and arrangement_role != "unknown" else 0.0
+        role_confidence = _clip01(
+            _first_present(
+                payload,
+                ("arrangement_role_confidence", "role_confidence", "confidence"),
+                confidence_default,
+            )
+        )
+        priority_hint = _priority_hint_for_context(arrangement_role, source_role)
+        channel_blockers = set()
+        if arrangement_role in NON_PROCESSING_ARRANGEMENT_ROLES:
+            channel_blockers.add("cross_adaptive_eq_arrangement_role_not_processable")
+        if not arrangement_role or arrangement_role == "unknown":
+            channel_blockers.add("cross_adaptive_eq_arrangement_role_unknown")
+        if priority_hint is None:
+            channel_blockers.add("cross_adaptive_eq_arrangement_priority_unknown")
+        if role_confidence < MIN_ARRANGEMENT_ROLE_CONFIDENCE:
+            channel_blockers.add("cross_adaptive_eq_arrangement_role_confidence_low")
+
+        context = {
+            "channel_id": channel_id,
+            "status": "trusted" if not channel_blockers else "blocked",
+            "arrangement_role": arrangement_role,
+            "source_role": source_role,
+            "role_confidence": round(role_confidence, 3),
+            "priority_hint": priority_hint,
+            "usable_for_unmasking_priority": not channel_blockers,
+            "blockers": tuple(sorted(channel_blockers)),
+        }
+        contexts[channel_id] = context
+        if channel_blockers:
+            blocked.append(context)
+            blockers.update(channel_blockers)
+
+    return contexts, tuple(blocked), tuple(sorted(blockers))
+
+
+def _effective_priorities(
+    channel_ids: Tuple[int, ...],
+    channel_priorities: Mapping[int, int],
+    arrangement_context_by_channel: Mapping[int, Dict[str, Any]],
+) -> Tuple[Dict[int, int], Dict[int, str], Dict[int, Dict[str, Any]]]:
+    explicit_priorities = {
+        _safe_int(channel_id): _safe_int(priority)
+        for channel_id, priority in (channel_priorities or {}).items()
+    }
+    priorities: Dict[int, int] = {}
+    priority_sources: Dict[int, str] = {}
+    enriched_context: Dict[int, Dict[str, Any]] = {
+        channel_id: dict(context)
+        for channel_id, context in arrangement_context_by_channel.items()
+    }
+
+    for channel_id in channel_ids:
+        context = enriched_context.get(channel_id, {})
+        if channel_id in explicit_priorities:
+            priorities[channel_id] = explicit_priorities[channel_id]
+            priority_sources[channel_id] = "explicit_channel_priority"
+        elif context.get("usable_for_unmasking_priority"):
+            priorities[channel_id] = _safe_int(context.get("priority_hint"))
+            priority_sources[channel_id] = "arrangement_role_hint"
+        else:
+            priorities[channel_id] = DEFAULT_CHANNEL_PRIORITY
+            priority_sources[channel_id] = "default_priority"
+
+        if context:
+            context["effective_priority"] = priorities[channel_id]
+            context["priority_source"] = priority_sources[channel_id]
+
+    return priorities, priority_sources, enriched_context
 
 
 class CrossAdaptiveEQ:
@@ -280,6 +484,8 @@ class CrossAdaptiveEQ:
         *,
         current_state_cache_freshness: Optional[Mapping[str, Any]] = None,
         channel_source_identity: Optional[Mapping[Any, Mapping[str, Any]]] = None,
+        channel_arrangement_context: Optional[Mapping[Any, Mapping[str, Any]]] = None,
+        arrangement_context_cache_freshness: Optional[Mapping[str, Any]] = None,
     ) -> CrossAdaptiveEQProposalResult:
         """Build proposal-only cross-channel unmasking actions.
 
@@ -290,6 +496,10 @@ class CrossAdaptiveEQ:
 
         current_state_freshness = _freshness_payload(current_state_cache_freshness)
         freshness_status = str(current_state_freshness.get("status") or "unknown")
+        current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
+        arrangement_freshness = _freshness_payload(arrangement_context_cache_freshness)
+        arrangement_freshness_status = str(arrangement_freshness.get("status") or "unknown")
+        arrangement_no_authority = _freshness_is_no_authority(arrangement_freshness)
         metadata: Dict[str, Any] = {
             "method_id": METHOD_ID,
             "proposal_only": True,
@@ -297,12 +507,26 @@ class CrossAdaptiveEQ:
             "can_import_to_queue": False,
             "current_state_cache_freshness_status": freshness_status,
             "current_state_cache_freshness": current_state_freshness,
+            "current_masking_context_cache_no_live_authority": current_state_no_authority,
+            "arrangement_context_cache_freshness_status": arrangement_freshness_status,
+            "arrangement_context_cache_freshness": arrangement_freshness,
+            "current_arrangement_context_cache_no_live_authority": arrangement_no_authority,
             "old_value_source": READ_REQUIRED_SOURCE,
             "readback_required": True,
             "rollback_required": True,
             "blockers": (),
         }
         channel_ids = tuple(sorted(int(channel_id) for channel_id in channel_band_energy))
+        (
+            arrangement_context,
+            blocked_arrangement_context,
+            arrangement_context_blockers,
+        ) = _arrangement_context_by_channel(channel_ids, channel_arrangement_context)
+        metadata["arrangement_priority_context"] = list(arrangement_context.values())
+        metadata["arrangement_context_blocked_channels"] = list(blocked_arrangement_context)
+        metadata["arrangement_context_blocked_channel_count"] = len(
+            blocked_arrangement_context
+        )
         source_identity_by_channel, blocked_source_identity, source_identity_blockers = (
             _source_identity_gate_by_channel(channel_ids, channel_source_identity)
         )
@@ -313,7 +537,7 @@ class CrossAdaptiveEQ:
         metadata["source_identity_blocked_channels"] = list(blocked_source_identity)
         metadata["source_identity_blocked_channel_count"] = len(blocked_source_identity)
 
-        if freshness_status not in {"fresh", "not_provided"}:
+        if freshness_status != "fresh":
             metadata["adjustment_count"] = 0
             metadata["action_count"] = 0
             metadata["blockers"] = ("cross_adaptive_eq_context_cache_not_fresh",)
@@ -324,6 +548,50 @@ class CrossAdaptiveEQ:
                 warnings=(
                     "cross-channel masking context cache is not fresh; "
                     "collect fresh band-energy and role evidence before EQ proposals",
+                ),
+                metadata=metadata,
+            )
+        if not current_state_no_authority:
+            metadata["adjustment_count"] = 0
+            metadata["action_count"] = 0
+            metadata["blockers"] = ("cross_adaptive_eq_context_cache_live_authority_present",)
+            return CrossAdaptiveEQProposalResult(
+                method_id=METHOD_ID,
+                adjustments=(),
+                suggested_actions=(),
+                warnings=(
+                    "cross-channel masking context cache has live authority; collect "
+                    "read-only masking evidence before linked EQ proposals",
+                ),
+                metadata=metadata,
+            )
+        if arrangement_freshness_status != "fresh":
+            metadata["adjustment_count"] = 0
+            metadata["action_count"] = 0
+            metadata["blockers"] = ("cross_adaptive_eq_arrangement_context_cache_not_fresh",)
+            return CrossAdaptiveEQProposalResult(
+                method_id=METHOD_ID,
+                adjustments=(),
+                suggested_actions=(),
+                warnings=(
+                    "cross-channel arrangement context cache is not fresh; "
+                    "collect fresh arrangement-role evidence before linked EQ proposals",
+                ),
+                metadata=metadata,
+            )
+        if not arrangement_no_authority:
+            metadata["adjustment_count"] = 0
+            metadata["action_count"] = 0
+            metadata["blockers"] = (
+                "cross_adaptive_eq_arrangement_context_cache_live_authority_present",
+            )
+            return CrossAdaptiveEQProposalResult(
+                method_id=METHOD_ID,
+                adjustments=(),
+                suggested_actions=(),
+                warnings=(
+                    "cross-channel arrangement context cache has live authority; collect "
+                    "read-only arrangement-role evidence before linked EQ proposals",
                 ),
                 metadata=metadata,
             )
@@ -341,15 +609,52 @@ class CrossAdaptiveEQ:
                 ),
                 metadata=metadata,
             )
+        if arrangement_context_blockers:
+            metadata["adjustment_count"] = 0
+            metadata["action_count"] = 0
+            metadata["blockers"] = arrangement_context_blockers
+            return CrossAdaptiveEQProposalResult(
+                method_id=METHOD_ID,
+                adjustments=(),
+                suggested_actions=(),
+                warnings=(
+                    "arrangement-role evidence blocks cross-channel unmasking; "
+                    "review channel roles before linked EQ proposals",
+                ),
+                metadata=metadata,
+            )
+
+        effective_priorities, priority_sources, arrangement_context = _effective_priorities(
+            channel_ids,
+            channel_priorities,
+            arrangement_context,
+        )
+        metadata["effective_channel_priorities"] = {
+            str(channel_id): priority
+            for channel_id, priority in effective_priorities.items()
+        }
+        metadata["channel_priority_sources"] = {
+            str(channel_id): source
+            for channel_id, source in priority_sources.items()
+        }
+        metadata["arrangement_priority_context"] = list(arrangement_context.values())
 
         adjustments = tuple(
             self.calculate_corrections(
                 channel_band_energy=channel_band_energy,
-                channel_priorities=channel_priorities,
+                channel_priorities=effective_priorities,
             )
         )
         actions = tuple(
-            self._proposal_action(item, freshness_status, source_identity_by_channel)
+            self._proposal_action(
+                item,
+                freshness_status,
+                current_state_no_authority,
+                source_identity_by_channel,
+                arrangement_freshness_status,
+                arrangement_no_authority,
+                arrangement_context,
+            )
             for item in adjustments
         )
         metadata["adjustment_count"] = len(adjustments)
@@ -372,7 +677,11 @@ class CrossAdaptiveEQ:
         self,
         adjustment: MirrorEQAdjustment,
         freshness_status: str,
+        current_state_no_authority: bool,
         source_identity_by_channel: Mapping[int, Any],
+        arrangement_freshness_status: str,
+        arrangement_no_authority: bool,
+        arrangement_context_by_channel: Mapping[int, Mapping[str, Any]],
     ) -> Dict[str, Any]:
         gain_db = float(adjustment.gain_db)
         gain_limit = abs(self.max_cut_db) if gain_db < 0.0 else abs(self.max_boost_db)
@@ -382,6 +691,12 @@ class CrossAdaptiveEQ:
         source_identity_trust = {
             "masked_channel": masked_trust.to_dict() if masked_trust else None,
             "masker_channel": masker_trust.to_dict() if masker_trust else None,
+        }
+        masked_arrangement = arrangement_context_by_channel.get(adjustment.masked_channel_id)
+        masker_arrangement = arrangement_context_by_channel.get(adjustment.masker_channel_id)
+        arrangement_priority_context = {
+            "masked_channel": dict(masked_arrangement) if masked_arrangement else None,
+            "masker_channel": dict(masker_arrangement) if masker_arrangement else None,
         }
         return {
             "action_type": "cross_channel_unmasking_eq_candidate",
@@ -418,7 +733,15 @@ class CrossAdaptiveEQ:
                 "frequency_match": True,
                 "bounded_gain_delta": bounded,
                 "current_masking_context_cache_freshness": freshness_status,
+                "current_masking_context_cache_no_live_authority": current_state_no_authority,
+                "current_arrangement_context_cache_freshness": (
+                    arrangement_freshness_status
+                ),
+                "current_arrangement_context_cache_no_live_authority": (
+                    arrangement_no_authority
+                ),
                 "source_identity_downstream_trust": source_identity_trust,
+                "arrangement_priority_context": arrangement_priority_context,
                 "sum_bus_check": "required_before_apply",
                 "eq_band_readback": "required_before_apply",
             },

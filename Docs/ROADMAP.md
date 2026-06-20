@@ -107,6 +107,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M081 | WING review decision prestart proof binding | Review decision templates and ledgers bind accepted WING candidates to backend prestart and manifest-verifier proof fields | M002 | critical read-only hardware review | UNIT_VERIFIED stricter WING review decision proof binding; hardware remains waiting | WAITING_FOR_EXTERNAL_VALIDATION |
 | M082 | WING handoff decision template proof fields | Operator handoff packets surface the review-decision template required fields and prestart/verifier proof-field subset | M002 | critical read-only hardware handoff | UNIT_VERIFIED handoff proof-field contract; hardware remains waiting | WAITING_FOR_EXTERNAL_VALIDATION |
 | M083 | Source identity and arrangement read-only context gates | Source-identity and arrangement-role proposal candidates require fresh read-only/no-authority context before downstream mix decisions can trust them | M008 | high offline analysis | UNIT_VERIFIED read-only context gate; live authority remains blocked | PENDING |
+| M084 | Unmasking, frequency and balance context gates | Cross-channel unmasking, frequency separation and bus/group balance proposal candidates require fresh read-only/no-authority context before downstream mix decisions can trust them | M083 | high offline mix decision | UNIT_VERIFIED downstream context gate; live authority remains blocked | PENDING |
 
 ## Active milestone
 

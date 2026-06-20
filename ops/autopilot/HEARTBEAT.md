@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T06:31:25Z
+Last heartbeat UTC: 2026-06-20T07:20:47Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,16 +12,16 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M081 WING review decision prestart proof binding now makes the
-generated review decision template carry backend-port prestart and
-artifact-manifest verifier proof fields from the clean read-only candidate. The
-review decision ledger rejects accepted records when those proof fields are
-missing or stale against the candidate.
+Latest check: M084 unmasking, frequency and balance context gates now make
+cross-channel unmasking, frequency separation and bus/group balance proposal
+candidates require fresh read-only/no-authority context before downstream mix
+decisions can trust them. Missing, stale or live-authority context stays
+analysis-only.
 
-Focused review-stack validation passed with `74 passed`; the M081 rail passed
-with `1 passed`; the full rail file passed with `94 passed`; no-WING
-release-check coverage passed with `448 passed`; and the full suite passed with
-`4209 passed, 1 skipped, 1 warning`.
+Focused downstream proposal validation passed with `36 passed`; the M084 rail
+passed with `1 passed`; the full rail file passed with `97 passed`; memory
+lint passed; and the full suite passed with
+`4212 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

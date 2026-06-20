@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T06:31:25Z.
+- Latest heartbeat: 2026-06-20T07:20:47Z.
 
 ## Что сделано
 
@@ -39,6 +39,15 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   analysis-only. This is offline AI-mixing capability hardening only; it
   creates no WING/backend contact, proposal apply, live write, readiness
   closure, hardware evidence or live authority.
+
+- M084 unmasking, frequency and balance context gates rail is now automated:
+  cross-channel unmasking, frequency separation and bus/group balance proposal
+  candidates now require fresh read-only/no-authority context before downstream
+  mix decisions can trust them. Cross-channel unmasking also consumes
+  arrangement-priority evidence before choosing protected and moving channels.
+  This is a dependency chain toward the project goal, not another pass over the
+  same WING handoff function. It creates no WING/backend contact, proposal
+  apply, live write, readiness closure, hardware evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2001,6 +2010,46 @@ The M080 guard is recorded in `Docs/ROADMAP.md`,
 `Docs/PROJECT_COMPLETION_GATE.md`, `Docs/CAPABILITY_MATRIX.md`,
 `Docs/plans/M080-replay-evidence-report-row-blocker-visibility-guard.md`,
 `Docs/adr/replay-evidence-report-row-blocker-visibility-guard-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M084 Unmasking, Frequency And Balance Context Gates
+
+The M084 downstream mix-decision context gate rail is now automated by
+`tests/test_cross_adaptive_eq.py`, `tests/test_frequency_separation_proposal.py`,
+`tests/test_bus_group_balance_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m084_unmasking_frequency_balance_context_gates_stay_readonly`.
+
+Cross-channel unmasking now requires fresh read-only/no-authority masking and
+arrangement context before linked cut/boost EQ proposals can be emitted.
+Arrangement-role priority evidence can supply effective channel priority when
+explicit priority is absent. Frequency separation now requires fresh
+read-only/no-authority source/stem spectrum context before frequency-lane
+proposals are emitted. Bus/group/DCA balance now requires fresh
+read-only/no-authority bus state before proposal candidates are emitted.
+
+This is offline downstream mix-decision hardening only. It mutates no console
+state, opens no backend/WING transport, sends no OSC/WebSocket write, imports
+no proposal into a queue, applies no proposal, grants no live authority, closes
+no readiness row, creates no hardware evidence and does not replace accepted
+real hardware/operator validation.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_cross_adaptive_eq.py tests/test_frequency_separation_proposal.py tests/test_bus_group_balance_proposal.py -q`:
+  `36 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m084_unmasking_frequency_balance_context_gates_stay_readonly -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `97 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4212 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M084 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`,
+`Docs/plans/M084-unmasking-frequency-balance-context-gates.md`,
+`Docs/adr/unmasking-frequency-balance-context-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 

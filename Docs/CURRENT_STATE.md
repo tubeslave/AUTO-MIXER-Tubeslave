@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T06:31:25Z
+Generated: 2026-06-20T07:20:47Z
 
 ## Repository snapshot
 
@@ -1265,6 +1265,25 @@ Generated: 2026-06-20T06:31:25Z
   queue, applies no proposal, grants no live authority, closes no readiness row,
   creates no hardware evidence and does not replace real WING/operator
   validation.
+- M084 unmasking, frequency and balance context gates is now covered by
+  `tests/test_cross_adaptive_eq.py`,
+  `tests/test_frequency_separation_proposal.py`,
+  `tests/test_bus_group_balance_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m084_unmasking_frequency_balance_context_gates_stay_readonly`.
+  Cross-channel unmasking now requires fresh read-only/no-authority masking and
+  arrangement context before linked cut/boost EQ proposals can be emitted;
+  arrangement-role priority evidence can supply effective unmasking priority.
+  Frequency separation now requires fresh read-only/no-authority source/stem
+  spectrum context before frequency-lane proposals are emitted. Bus/group/DCA
+  balance now requires fresh read-only/no-authority bus state before proposal
+  candidates are emitted. Missing, stale or live-authority context keeps these
+  downstream mix-decision layers analysis-only. This moves the long-term AI
+  mixing engineer path forward from source/role reasoning into EQ, spectral
+  separation and balance decisions while staying offline and proposal-only: it
+  contacts no WING/backend transport, opens no WebSocket/OSC write path,
+  imports no proposal into a queue, applies no proposal, grants no live
+  authority, closes no readiness row, creates no hardware evidence and does not
+  replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1275,4 +1294,4 @@ Generated: 2026-06-20T06:31:25Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4211 passed, 1 skipped, 1 warning`.
+  `4212 passed, 1 skipped, 1 warning`.

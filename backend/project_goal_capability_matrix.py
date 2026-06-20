@@ -356,10 +356,13 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/frequency_separation_proposal.py",
             "backend/source_identity_downstream_gate.py",
         ),
-        blocker="Frequency split decisions are not yet tied to safe console moves.",
+        blocker=(
+            "Frequency split decisions require fresh read-only/no-authority "
+            "source/stem spectrum context and are not yet tied to safe console moves."
+        ),
         next_step=(
-            "Route fresh-context source/stem frequency-lane proposals to operator review "
-            "before deriving any EQ or fader move."
+            "Route fresh read-only/no-authority source/stem frequency-lane proposals "
+            "to operator review before deriving any EQ or fader move."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -376,10 +379,15 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/cross_adaptive_eq.py",
             "backend/source_identity_downstream_gate.py",
         ),
-        blocker="Unmasking can recommend changes but cannot write EQ/fader relationships live; AutoFaderV2 masking EQ returns blocked evidence.",
+        blocker=(
+            "Unmasking requires fresh read-only/no-authority masking and arrangement "
+            "context; it can recommend changes but cannot write EQ/fader relationships "
+            "live; AutoFaderV2 masking EQ returns blocked evidence."
+        ),
         next_step=(
-            "Route fresh masking and arrangement context with trusted source identity "
-            "into linked cut/boost proposals with EQ-band rollback evidence."
+            "Route fresh masking and arrangement context from read-only/no-authority "
+            "evidence with trusted source identity into linked cut/boost proposals "
+            "with EQ-band rollback evidence."
         ),
     ),
     ProjectGoalCapabilityRow(
@@ -443,8 +451,16 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("fader", "groups", "dca"),
         current_live_write_kinds=("fader",),
-        blocker="Only channel fader/gain paths are allowed; bus/DCA/group balance is not proven and AutoFOH bus/DCA/master typed actions are blocked evidence.",
-        next_step="Route bus/group/DCA balance proposals to operator review and prove trusted source identity plus fresh assignment/fader readback before any write promotion.",
+        blocker=(
+            "Only channel fader/gain paths are allowed; bus/DCA/group balance requires "
+            "fresh read-only/no-authority bus/DCA/matrix context and AutoFOH bus/DCA/"
+            "master typed actions are blocked evidence."
+        ),
+        next_step=(
+            "Route bus/group/DCA balance proposals to operator review and prove trusted "
+            "source identity plus fresh read-only/no-authority assignment/fader readback "
+            "before any write promotion."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="musician_level_adaptation",

@@ -118,6 +118,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def _role_for(source_type: str, arrangement_role: str) -> str:
     role = _normalize_token(arrangement_role)
     if role and role != "unknown":
@@ -303,6 +311,7 @@ def _candidate_recommendation(
     level_gap_db: float,
     overlap_strength: float,
     current_state_freshness_status: str,
+    current_state_no_authority: bool,
 ) -> FrequencySeparationRecommendation:
     confidence = round(
         _clip01(
@@ -369,6 +378,7 @@ def _candidate_recommendation(
             },
             "bounded_subtractive_delta": True,
             "current_frequency_context_cache_freshness": current_state_freshness_status,
+            "current_frequency_context_cache_no_live_authority": current_state_no_authority,
             "sum_bus_check": "required_before_apply",
             "eq_band_readback": "required_before_apply",
             "old_value_source": READ_REQUIRED_SOURCE,
@@ -388,6 +398,7 @@ def analyze_frequency_separation_need(
 
     current_state_freshness = _freshness_payload(current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     metadata: Dict[str, Any] = {
         "method_id": FREQUENCY_SEPARATION_METHOD_ID,
         "version": FREQUENCY_SEPARATION_VERSION,
@@ -396,6 +407,7 @@ def analyze_frequency_separation_need(
         "can_import_to_queue": False,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_frequency_context_cache_no_live_authority": current_state_no_authority,
         "old_value_source": READ_REQUIRED_SOURCE,
         "readback_required": True,
         "rollback_required": True,
@@ -407,7 +419,7 @@ def analyze_frequency_separation_need(
     metadata["source_identity_blocked_sources"] = list(blocked_source_identity)
     metadata["source_identity_blocked_source_count"] = len(blocked_source_identity)
 
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         metadata["blockers"] = ("frequency_separation_context_cache_not_fresh",)
         metadata["recommendation_count"] = 0
         return FrequencySeparationResult(
@@ -418,6 +430,20 @@ def analyze_frequency_separation_need(
             warnings=(
                 "frequency separation context cache is not fresh; "
                 "collect fresh source/stem spectrum evidence before proposals",
+            ),
+            metadata=metadata,
+        )
+    if not current_state_no_authority:
+        metadata["blockers"] = ("frequency_separation_context_cache_live_authority_present",)
+        metadata["recommendation_count"] = 0
+        return FrequencySeparationResult(
+            method_id=FREQUENCY_SEPARATION_METHOD_ID,
+            version=FREQUENCY_SEPARATION_VERSION,
+            status="analysis_only",
+            recommendations=(),
+            warnings=(
+                "frequency separation context cache has live authority; "
+                "collect read-only source/stem spectrum evidence before proposals",
             ),
             metadata=metadata,
         )
@@ -479,6 +505,7 @@ def analyze_frequency_separation_need(
                         level_gap_db=level_gap,
                         overlap_strength=overlap_strength,
                         current_state_freshness_status=current_state_freshness_status,
+                        current_state_no_authority=current_state_no_authority,
                     )
                 )
 

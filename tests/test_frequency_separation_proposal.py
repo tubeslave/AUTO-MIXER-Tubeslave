@@ -64,6 +64,7 @@ def test_frequency_separation_emits_fresh_context_lane_proposal():
     assert result.metadata["proposal_only"] is True
     assert result.metadata["live_write_allowed"] is False
     assert result.metadata["current_state_cache_freshness_status"] == "fresh"
+    assert result.metadata["current_frequency_context_cache_no_live_authority"] is True
     assert result.recommendations
 
     recommendation = result.recommendations[0]
@@ -76,6 +77,7 @@ def test_frequency_separation_emits_fresh_context_lane_proposal():
     assert recommendation.evidence["lane_conflict_pair"]["protected_source_id"] == "lead_vox"
     assert recommendation.evidence["bounded_subtractive_delta"] is True
     assert recommendation.evidence["current_frequency_context_cache_freshness"] == "fresh"
+    assert recommendation.evidence["current_frequency_context_cache_no_live_authority"] is True
     assert recommendation.evidence["sum_bus_check"] == "required_before_apply"
     assert recommendation.evidence["eq_band_readback"] == "required_before_apply"
     assert recommendation.evidence["rollback_value_source"] == READ_REQUIRED_SOURCE
@@ -93,6 +95,52 @@ def test_stale_frequency_context_blocks_frequency_separation_proposals():
     assert result.metadata["current_state_cache_freshness_status"] == "stale"
     assert "frequency_separation_context_cache_not_fresh" in result.metadata["blockers"]
     assert result.metadata["live_write_allowed"] is False
+
+
+def test_live_authority_frequency_context_blocks_frequency_separation_proposals():
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    result = analyze_frequency_separation_need(
+        _sources(),
+        current_state_cache_freshness=live_authority_context,
+    )
+
+    assert result.status == "analysis_only"
+    assert result.recommendations == ()
+    assert "frequency separation context cache has live authority" in " ".join(
+        result.warnings
+    )
+    assert result.metadata["current_state_cache_freshness_status"] == "fresh"
+    assert result.metadata["current_frequency_context_cache_no_live_authority"] is False
+    assert result.metadata["current_state_cache_freshness"]["live_write"] is True
+    assert "frequency_separation_context_cache_live_authority_present" in result.metadata[
+        "blockers"
+    ]
+    assert (
+        build_frequency_separation_proposals(
+            _sources(),
+            current_state_cache_freshness=live_authority_context,
+        )
+        == ()
+    )
+
+
+def test_missing_frequency_context_blocks_frequency_separation_proposals():
+    result = analyze_frequency_separation_need(_sources())
+
+    assert result.status == "analysis_only"
+    assert result.recommendations == ()
+    assert "frequency separation context cache is not fresh" in " ".join(result.warnings)
+    assert result.metadata["current_state_cache_freshness_status"] == "not_provided"
+    assert result.metadata["current_state_cache_freshness"]["provided"] is False
+    assert "frequency_separation_context_cache_not_fresh" in result.metadata["blockers"]
+    assert build_frequency_separation_proposals(_sources()) == ()
 
 
 def test_blocked_source_identity_blocks_frequency_separation_proposals():
@@ -178,6 +226,7 @@ def test_frequency_separation_operator_proposals_are_not_queueable_live_actions(
     assert proposal["can_apply_live"] is False
     assert "unsupported_value_type:frequency_split" in proposal["blockers"]
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["current_frequency_context_cache_no_live_authority"] is True
     assert proposal["evidence"]["readback_required_before_promotion"] is True
     assert proposal["evidence"]["rollback_required_before_promotion"] is True
 
@@ -202,6 +251,7 @@ def test_frequency_separation_registry_contract_and_goal_row():
     assert contract["value_type"] == "frequency_split"
     assert contract["target_kind"] == "source_stem_frequency_lane"
     assert "current_frequency_context_cache_freshness" in evidence
+    assert "current_frequency_context_cache_no_live_authority" in evidence
     assert "source_stem_contribution" in evidence
     assert "rollback_eq_band_readback" in evidence
     assert contract["live_apply_allowed"] is False

@@ -226,6 +226,8 @@ M082_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M082-wing-handoff-decision-templa
 M082_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-handoff-decision-template-proof-fields-20260620.md"
 M083_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M083-source-arrangement-readonly-context-gates.md"
 M083_ADR = PROJECT_ROOT / "Docs" / "adr" / "source-arrangement-readonly-context-gates-20260620.md"
+M084_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M084-unmasking-frequency-balance-context-gates.md"
+M084_ADR = PROJECT_ROOT / "Docs" / "adr" / "unmasking-frequency-balance-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8453,6 +8455,215 @@ def test_m083_source_arrangement_context_gates_stay_readonly():
     assert "M083 source identity and arrangement read-only context gates is now covered" in current
     assert "M083 source identity and arrangement read-only context gates rail is now" in report
     assert "automated: source-identity review candidates" in report
+
+
+def test_m084_unmasking_frequency_balance_context_gates_stay_readonly():
+    from backend.bus_group_balance_proposal import (
+        BusGroupBalanceAnalysisInput,
+        analyze_bus_group_balance_need,
+    )
+    from backend.cross_adaptive_eq import CrossAdaptiveEQ
+    from backend.frequency_separation_proposal import (
+        FrequencySeparationSource,
+        analyze_frequency_separation_need,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M084_PLAN.read_text(encoding="utf-8")
+    adr = M084_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m084 = markdown_table_row(roadmap, "M084")
+    assert m084[1] == "Unmasking, frequency and balance context gates"
+    assert m084[2] == (
+        "Cross-channel unmasking, frequency separation and bus/group balance "
+        "proposal candidates require fresh read-only/no-authority context before "
+        "downstream mix decisions can trust them"
+    )
+    assert m084[3] == "M083"
+    assert m084[4] == "high offline mix decision"
+    assert m084[5] == (
+        "UNIT_VERIFIED downstream context gate; live authority remains blocked"
+    )
+    assert m084[-1] == "PENDING"
+
+    for marker in ("M084-CP01", "M084-CP02", "M084-CP03", "M084-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert "fresh read-only/no-authority bus/DCA/matrix context" in capability
+    assert "fresh read-only/no-authority spectrum context" in capability
+    assert "fresh read-only/no-authority masking and arrangement context" in capability
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    arrangement_context = {
+        1: {
+            "arrangement_role": "lead",
+            "source_role": "lead_vocal",
+            "role_confidence": 0.86,
+        },
+        2: {
+            "arrangement_role": "harmonic_support",
+            "source_role": "guitar",
+            "role_confidence": 0.84,
+        },
+    }
+
+    unmasking_ok = CrossAdaptiveEQ(overlap_tolerance_db=6.0).analyze_unmasking_proposals(
+        channel_band_energy={1: {"mid": -20.0}, 2: {"mid": -21.0}},
+        channel_priorities={},
+        current_state_cache_freshness=fresh_context,
+        arrangement_context_cache_freshness=fresh_context,
+        channel_arrangement_context=arrangement_context,
+    )
+    assert unmasking_ok.suggested_actions
+    assert unmasking_ok.metadata["live_write_allowed"] is False
+    assert unmasking_ok.metadata["current_masking_context_cache_no_live_authority"] is True
+    assert unmasking_ok.metadata["current_arrangement_context_cache_no_live_authority"] is True
+    assert unmasking_ok.metadata["effective_channel_priorities"] == {"1": 1, "2": 3}
+
+    unmasking_missing = CrossAdaptiveEQ().analyze_unmasking_proposals(
+        channel_band_energy={1: {"mid": -20.0}, 2: {"mid": -21.0}},
+        channel_priorities={1: 1, 2: 3},
+        current_state_cache_freshness=fresh_context,
+        arrangement_context_cache_freshness=fresh_context,
+    )
+    assert unmasking_missing.suggested_actions == ()
+    assert "cross_adaptive_eq_arrangement_context_missing_for_channel" in (
+        unmasking_missing.metadata["blockers"]
+    )
+    unmasking_live = CrossAdaptiveEQ().analyze_unmasking_proposals(
+        channel_band_energy={1: {"mid": -20.0}, 2: {"mid": -21.0}},
+        channel_priorities={1: 1, 2: 3},
+        current_state_cache_freshness=live_authority_context,
+        arrangement_context_cache_freshness=fresh_context,
+        channel_arrangement_context=arrangement_context,
+    )
+    assert unmasking_live.suggested_actions == ()
+    assert "cross_adaptive_eq_context_cache_live_authority_present" in (
+        unmasking_live.metadata["blockers"]
+    )
+
+    sources = (
+        FrequencySeparationSource(
+            source_id="lead_vox",
+            channel_id=1,
+            label="Lead Vox",
+            source_type="lead_vocal",
+            arrangement_role="lead",
+            stem_id="band",
+            priority=1,
+            band_energy_db={"high_mid": -20.0},
+            stem_contribution={"high_mid": 0.44},
+            confidence=0.88,
+        ),
+        FrequencySeparationSource(
+            source_id="gtr_l",
+            channel_id=7,
+            label="GTR L",
+            source_type="guitar",
+            arrangement_role="harmonic_support",
+            stem_id="band",
+            priority=3,
+            band_energy_db={"high_mid": -21.0},
+            stem_contribution={"high_mid": 0.37},
+            confidence=0.81,
+        ),
+    )
+    frequency_ok = analyze_frequency_separation_need(
+        sources,
+        current_state_cache_freshness=fresh_context,
+    )
+    assert frequency_ok.status == "proposal_only"
+    assert frequency_ok.metadata["live_write_allowed"] is False
+    assert frequency_ok.metadata["current_frequency_context_cache_no_live_authority"] is True
+    assert frequency_ok.recommendations
+    frequency_live = analyze_frequency_separation_need(
+        sources,
+        current_state_cache_freshness=live_authority_context,
+    )
+    assert frequency_live.status == "analysis_only"
+    assert frequency_live.recommendations == ()
+    assert "frequency_separation_context_cache_live_authority_present" in (
+        frequency_live.metadata["blockers"]
+    )
+
+    balance_input = BusGroupBalanceAnalysisInput(
+        bus_id="group:drums",
+        bus_kind="group",
+        bus_label="DRUMS",
+        source_role="drums",
+        current_fader_db=-5.0,
+        integrated_lufs=-26.1,
+        short_term_lufs=-25.8,
+        true_peak_dbfs=-8.0,
+        summed_child_lufs=-25.6,
+        child_count=8,
+        dominant_child_share=0.35,
+        main_bus_headroom_db=6.0,
+        feedback_risk=0.1,
+        assignment_confidence=0.9,
+        confidence=0.9,
+        persistence_cycles=3,
+        current_state_cache_freshness=fresh_context,
+    )
+    balance_ok = analyze_bus_group_balance_need(balance_input)
+    assert balance_ok.status == "proposal_only"
+    assert balance_ok.evidence["current_bus_group_dca_matrix_cache_no_live_authority"] is True
+    assert balance_ok.to_operator_proposal()["can_apply_live"] is False
+
+    balance_live = analyze_bus_group_balance_need(
+        BusGroupBalanceAnalysisInput(
+            **{
+                **balance_input.__dict__,
+                "current_state_cache_freshness": live_authority_context,
+            }
+        )
+    )
+    assert balance_live.status == "analysis_only"
+    assert "bus_group_current_state_cache_live_authority_present" in balance_live.blockers
+    assert balance_live.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M084 unmasking, frequency and balance context gates is now covered" in current
+    assert "M084 unmasking, frequency and balance context gates rail is now" in report
+    assert "This is a dependency chain toward the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
