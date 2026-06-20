@@ -246,6 +246,8 @@ M092_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M092-mix-variant-readonly-context
 M092_ADR = PROJECT_ROOT / "Docs" / "adr" / "mix-variant-readonly-context-gates-20260620.md"
 M093_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M093-decision-evidence-readonly-context-gates.md"
 M093_ADR = PROJECT_ROOT / "Docs" / "adr" / "decision-evidence-readonly-context-gates-20260620.md"
+M094_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M094-project-director-external-validation-scope-guard.md"
+M094_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-external-validation-scope-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -309,6 +311,7 @@ CP04_HANDOFF_REPORT = (
     / "AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md"
 )
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
+PROJECT_DIRECTOR_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "project_director_agent.py"
 RUNNER_TOOL = PROJECT_ROOT / "tools" / "wing_readonly_preflight_runner.py"
 PROMPT = PROJECT_ROOT / "tools" / "codex_autoloop" / "codex_cycle_prompt.md"
 
@@ -496,6 +499,18 @@ def load_progress_module():
 def load_runner_module():
     spec = importlib.util.spec_from_file_location(
         "wing_readonly_preflight_runner_for_mvp_rails", RUNNER_TOOL
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_project_director_module():
+    sys.path.insert(0, str(PROJECT_DIRECTOR_TOOL.parent))
+    spec = importlib.util.spec_from_file_location(
+        "project_director_agent_for_mvp_rails", PROJECT_DIRECTOR_TOOL
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -10081,6 +10096,85 @@ def test_m093_decision_evidence_readonly_context_gates_stay_readonly():
     assert "M093 decision evidence read-only context gates is now covered" in current
     assert "M093 decision evidence read-only context gates rail is now" in report
     assert "decision evidence and explainability, a separate decision-basis capability required by the project goal" in report
+
+
+def test_m094_project_director_external_validation_scope_guard_stays_readonly():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    heartbeat = AUTOPILOT_HEARTBEAT.read_text(encoding="utf-8")
+    plan = M094_PLAN.read_text(encoding="utf-8")
+    adr = M094_ADR.read_text(encoding="utf-8")
+    director = load_project_director_module()
+
+    directive = director.build_directive(
+        project_root=PROJECT_ROOT,
+        lookback_commits=1,
+        report_limit=1,
+    )
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m094 = markdown_table_row(roadmap, "M094")
+    assert m094[1] == "Project Director external-validation scope guard"
+    assert m094[2] == (
+        "Project Director narrows autonomous work to WING external-validation "
+        "handoff/intake or control-plane state while M001 waits for real "
+        "WING/operator evidence"
+    )
+    assert m094[3] == "M001"
+    assert m094[4] == "critical autopilot direction"
+    assert m094[5] == (
+        "UNIT_VERIFIED external-validation scope guard; live authority remains blocked"
+    )
+    assert m094[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    for marker in ("M094-CP01", "M094-CP02", "M094-CP03"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert directive["selected_blocker"] == "WING read-only connection proof"
+    assert directive["selected_blocker_status"] == "tooling_ready_waits_real_wing"
+    assert directive["selected_action_requires_external_validation"] is True
+    assert directive["external_validation_wait"] is True
+    assert directive["stop_broad_work"] is True
+    assert (
+        directive["allowed_autonomous_scope"]
+        == "external_validation_handoff_or_control_plane_only"
+    )
+    assert any("control-plane docs/state/rails" in item for item in directive["allowed_scope"])
+    assert not any("stay offline/proposal-only" in item for item in directive["allowed_scope"])
+    assert any(
+        "No additional proposal-only context-gate milestone" in item
+        for item in directive["forbidden_scope"]
+    )
+    assert any("real WING artifact" in item for item in directive["forbidden_scope"])
+
+    assert "M094 Project Director external-validation scope guard is now covered" in current
+    assert "M094 Project Director external-validation scope guard rail is now" in report
+    assert "proposal-only context-gate" in current
+    assert "milestones are not allowed" in current
+    assert "external_validation_handoff_or_control_plane_only" in report
+    assert "Writer lease: none" in heartbeat
+    assert "No WING/backend contact was made" in heartbeat
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

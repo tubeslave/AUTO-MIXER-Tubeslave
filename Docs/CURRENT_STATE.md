@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T13:05:14Z
+Generated: 2026-06-20T13:55:58Z
 
 ## Repository snapshot
 
@@ -1412,6 +1412,21 @@ Generated: 2026-06-20T13:05:14Z
   write path, imports no proposal into a queue, applies no proposal, grants no
   live authority, closes no readiness row, creates no hardware evidence and
   does not replace real WING/operator validation.
+- M094 Project Director external-validation scope guard is now covered by
+  `tests/test_project_director_agent.py` and
+  `tests/test_wing_mvp_rails.py::test_m094_project_director_external_validation_scope_guard_stays_readonly`.
+  Project Director now marks the current WING read-only selected action as an
+  external validation wait and narrows autonomous work to
+  `external_validation_handoff_or_control_plane_only`: WING read-only
+  handoff/intake preservation or control-plane docs/state/rails. While M001 is
+  waiting for real WING/operator evidence, new proposal-only context-gate
+  milestones are not allowed unless the selected WING blocker or operator
+  explicitly requests them. This keeps Goal mode pointed at the real next
+  proof instead of simulating progress with another offline capability gate.
+  It contacts no WING/backend transport, opens no WebSocket/OSC write path,
+  imports no proposal into a queue, applies no proposal, grants no live
+  authority, closes no readiness row, creates no hardware evidence and does
+  not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1422,4 +1437,4 @@ Generated: 2026-06-20T13:05:14Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4016 passed, 1 skipped, 1 warning`.
+  `4018 passed, 1 skipped, 1 warning`.

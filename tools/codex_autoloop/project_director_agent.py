@@ -25,6 +25,25 @@ import update_mvp_progress  # noqa: E402
 
 
 DEFAULT_OUTPUT = PROJECT_ROOT / ".paperclip" / "reports" / "project_director_latest.md"
+EXTERNAL_VALIDATION_STATUSES = frozenset(
+    {
+        "tooling_ready_waits_real_wing",
+        "blocked_by_readonly_preflight",
+        "blocked_by_real_artifact_review",
+        "waiting_for_external_validation",
+    }
+)
+EXTERNAL_VALIDATION_ACTION_MARKERS = (
+    "real wing",
+    "wing rack",
+    "intended backend/wing session",
+    "operator-supervised",
+    "operator review",
+    "hardware",
+    "real artifact",
+    "wing_readonly_preflight",
+    "wing_readonly_preflight.md",
+)
 
 
 def utc_now() -> str:
@@ -45,6 +64,51 @@ def required_file_candidates_from_evidence(evidence_files: Sequence[str]) -> lis
 
 def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def selected_action_requires_external_validation(*, status: str, action: str) -> bool:
+    action_lc = action.lower()
+    return status in EXTERNAL_VALIDATION_STATUSES and any(
+        marker in action_lc for marker in EXTERNAL_VALIDATION_ACTION_MARKERS
+    )
+
+
+def allowed_scope_for_selected_action(
+    *, selected_blocker: str, external_validation_wait: bool
+) -> list[str]:
+    if external_validation_wait:
+        return [
+            "Continue Goal-mode only for the selected external WING validation handoff/intake.",
+            f"Work only on the selected first non-closed MVP blocker: {selected_blocker}.",
+            "Maintain control-plane docs/state/rails that preserve the WING handoff and operator intake.",
+            "Use real WING artifacts only when hardware is connected and an operator is supervising.",
+            "Keep all live writes behind explicit supervised operator approval.",
+        ]
+    return [
+        "Continue uninterrupted Goal-mode development.",
+        "Work only on the selected first non-closed MVP blocker.",
+        "Develop correction methods only when they support that blocker or stay offline/proposal-only.",
+        "Use docs/runbooks and real WING artifacts when hardware is connected.",
+        "Keep all live writes behind explicit supervised operator approval.",
+    ]
+
+
+def forbidden_scope_for_selected_action(*, external_validation_wait: bool) -> list[str]:
+    forbidden_scope = [
+        "No new memory-trust chains unless they close the selected blocker.",
+        "No new queue-import chains unless they close the selected blocker.",
+        "No new result-consumer/report-only/read-model work unless it closes the selected blocker.",
+        "No live EQ/dynamics/routing/mute/FX/scene/matrix/DCA/autonomous writes.",
+        "Do not close readiness from offline, shadow, or candidate evidence.",
+    ]
+    if external_validation_wait:
+        forbidden_scope.extend(
+            [
+                "No additional proposal-only context-gate milestone while M001 waits for external WING validation unless the selected WING blocker or operator explicitly requests it.",
+                "Do not simulate progress by adding offline capability gates when the selected action requires a real WING artifact.",
+            ]
+        )
+    return forbidden_scope
 
 
 def build_directive(*, project_root: Path, lookback_commits: int, report_limit: int) -> dict:
@@ -87,6 +151,10 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         first_open
         and current_first_command
         and current_first_command != first_open["next action"]
+    )
+    external_validation_wait = selected_action_requires_external_validation(
+        status=selected_status,
+        action=selected_action,
     )
     stop_broad_work = bool(guard_report["stop_the_line"]) or selected_status != "closed"
     required_files = update_mvp_progress.unique_ordered(
@@ -136,20 +204,20 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         "selected_evidence_file_count": len(selected_evidence_files),
         "selected_evidence_files": selected_evidence_files,
         "stop_broad_work": stop_broad_work,
-        "allowed_scope": [
-            "Continue uninterrupted Goal-mode development.",
-            "Work only on the selected first non-closed MVP blocker.",
-            "Develop correction methods only when they support that blocker or stay offline/proposal-only.",
-            "Use docs/runbooks and real WING artifacts when hardware is connected.",
-            "Keep all live writes behind explicit supervised operator approval.",
-        ],
-        "forbidden_scope": [
-            "No new memory-trust chains unless they close the selected blocker.",
-            "No new queue-import chains unless they close the selected blocker.",
-            "No new result-consumer/report-only/read-model work unless it closes the selected blocker.",
-            "No live EQ/dynamics/routing/mute/FX/scene/matrix/DCA/autonomous writes.",
-            "Do not close readiness from offline, shadow, or candidate evidence.",
-        ],
+        "external_validation_wait": external_validation_wait,
+        "selected_action_requires_external_validation": external_validation_wait,
+        "allowed_autonomous_scope": (
+            "external_validation_handoff_or_control_plane_only"
+            if external_validation_wait
+            else "selected_blocker_only"
+        ),
+        "allowed_scope": allowed_scope_for_selected_action(
+            selected_blocker=selected_blocker,
+            external_validation_wait=external_validation_wait,
+        ),
+        "forbidden_scope": forbidden_scope_for_selected_action(
+            external_validation_wait=external_validation_wait
+        ),
         "required_files": required_files,
     }
 
@@ -168,6 +236,9 @@ def render_markdown(directive: dict) -> str:
         f"Guard score: `{directive['guard_score']}`",
         f"Stop broad work: `{str(directive['stop_broad_work']).lower()}`",
         f"Continue Goal mode: `{str(directive['continue_goal_mode']).lower()}`",
+        "External validation wait: "
+        f"`{str(directive.get('external_validation_wait', False)).lower()}`",
+        f"Allowed autonomous scope: `{directive.get('allowed_autonomous_scope', 'selected_blocker_only')}`",
         "",
         "## Selected Work",
         "",

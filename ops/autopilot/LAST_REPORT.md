@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T11:55:57Z.
+- Latest heartbeat: 2026-06-20T13:55:58Z.
 
 ## Что сделано
 
@@ -130,6 +130,18 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   required by the project goal, while creating no WING/backend contact,
   proposal apply, queue import, live write, readiness closure, hardware
   evidence or live authority.
+
+- M094 Project Director external-validation scope guard rail is now automated:
+  when the selected first non-closed blocker is the WING read-only connection
+  proof and the selected action requires real WING/operator evidence, Project
+  Director narrows autonomous work to
+  `external_validation_handoff_or_control_plane_only`. New proposal-only
+  context-gate milestones are forbidden while M001 waits unless the selected
+  WING blocker or operator explicitly requests them. This addresses the risk of
+  Goal mode improving another offline function while the active blocker needs a
+  real WING artifact, while creating no WING/backend contact, proposal apply,
+  queue import, live write, readiness closure, hardware evidence or live
+  authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.

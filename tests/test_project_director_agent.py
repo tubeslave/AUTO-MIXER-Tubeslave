@@ -1262,7 +1262,40 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
     assert "tools/no_wing_release_check.py" in directive["required_files"]
     assert "tools/verify_no_wing_artifact_manifest.py" in directive["required_files"]
-    assert any("Develop correction methods" in item for item in directive["allowed_scope"])
+    assert directive["external_validation_wait"] is True
+    assert (
+        directive["allowed_autonomous_scope"]
+        == "external_validation_handoff_or_control_plane_only"
+    )
+    assert any("control-plane docs/state/rails" in item for item in directive["allowed_scope"])
+    assert not any("stay offline/proposal-only" in item for item in directive["allowed_scope"])
+    assert any(
+        "No additional proposal-only context-gate milestone" in item
+        for item in directive["forbidden_scope"]
+    )
+
+
+def test_project_director_blocks_extra_context_gate_work_while_wing_waits():
+    director = load_director_module()
+
+    directive = director.build_directive(
+        project_root=PROJECT_ROOT,
+        lookback_commits=1,
+        report_limit=1,
+    )
+
+    assert directive["selected_blocker"] == "WING read-only connection proof"
+    assert directive["selected_blocker_status"] == "tooling_ready_waits_real_wing"
+    assert directive["selected_action_requires_external_validation"] is True
+    assert directive["stop_broad_work"] is True
+    assert (
+        directive["allowed_autonomous_scope"]
+        == "external_validation_handoff_or_control_plane_only"
+    )
+    assert "next_manual_artifact_required" in directive["selected_action"]
+    assert "proposal-only context-gate" in "\n".join(directive["forbidden_scope"])
+    assert "real WING artifact" in "\n".join(directive["forbidden_scope"])
+    assert "stay offline/proposal-only" not in "\n".join(directive["allowed_scope"])
 
 
 def test_project_director_derives_required_files_from_selected_blocker_evidence():
@@ -1309,6 +1342,8 @@ def test_project_director_markdown_is_operator_readable():
         "selected_action": "Run read-only preflight.",
         "selected_evidence_file_count": 1,
         "selected_evidence_files": ["tools/wing_readonly_preflight_runner.py"],
+        "external_validation_wait": True,
+        "allowed_autonomous_scope": "external_validation_handoff_or_control_plane_only",
         "allowed_scope": ["Work only on the selected first non-closed MVP blocker."],
         "forbidden_scope": ["No queue-import chains."],
         "required_files": ["Docs/MVP_WING_SUPERVISED.md"],
@@ -1319,6 +1354,11 @@ def test_project_director_markdown_is_operator_readable():
     assert "# Project Director Agent Directive" in markdown
     assert "Selected blocker" in markdown
     assert "Continue Goal mode: `true`" in markdown
+    assert "External validation wait: `true`" in markdown
+    assert (
+        "Allowed autonomous scope: `external_validation_handoff_or_control_plane_only`"
+        in markdown
+    )
     assert "Selected action source: `Current First Command`" in markdown
     assert "Selected action sha256: `" in markdown
     assert "Current first command baseline coverage required: `true`" in markdown

@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T13:05:14Z
+Last heartbeat UTC: 2026-06-20T13:55:58Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,16 +12,17 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M093 decision evidence read-only context gates now make
-decision-evidence packet candidates require fresh read-only/no-authority
-current decision context, trusted source identity, readback state and rollback
-planning before evidence packets can rank downstream proposals. Missing, stale
-or live-authority context stays analysis-only.
+Latest check: M094 Project Director external-validation scope guard now marks
+the current WING read-only selected action as an external validation wait and
+narrows autonomous work to `external_validation_handoff_or_control_plane_only`.
+New proposal-only context-gate milestones are forbidden while M001 waits for
+real WING/operator evidence unless the selected WING blocker or operator
+explicitly requests them.
 
-Focused decision-evidence validation passed with `16 passed`; the M093 rail
-passed with `1 passed`; the full WING rail passed with `106 passed`; the full
+Focused Project Director validation passed with `5 passed`; the M094 rail
+passed with `1 passed`; the full WING rail passed with `107 passed`; the full
 suite passed in a clean staged worktree with
-`4016 passed, 1 skipped, 1 warning`.
+`4018 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No
