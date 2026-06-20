@@ -1584,6 +1584,18 @@ Generated: 2026-06-20T15:44:02Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does not
   replace real WING/operator validation.
+- M107 Project Director intake loop lookback floor is now covered by
+  `tests/test_project_director_agent.py` and
+  `tests/test_wing_mvp_rails.py::test_m107_project_director_intake_loop_guard_lookback_floor_persists`.
+  Project Director now records the requested lookback, effective lookback and
+  intake-loop guard floor, and normal/default evidence collection is raised to
+  that floor before recent commit subjects are analyzed. This keeps
+  `external_validation_wait_or_named_gap_only` active when additional
+  direction-guard commits would otherwise push the WING read-only streak
+  outside the requested lookback window. It contacts no WING/backend transport,
+  opens no WebSocket/OSC write path, imports no proposal into a queue, applies
+  no proposal, grants no live authority, closes no readiness row, creates no
+  hardware evidence and does not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1594,4 +1606,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4043 passed, 1 skipped, 1 warning`.
+  `4045 passed, 1 skipped, 1 warning`.

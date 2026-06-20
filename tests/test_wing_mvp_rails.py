@@ -272,6 +272,8 @@ M105_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M105-project-director-post-m104-i
 M105_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-post-m104-intake-loop-guard-20260620.md"
 M106_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M106-project-director-post-m105-intake-loop-persistence.md"
 M106_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-post-m105-intake-loop-persistence-20260620.md"
+M107_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M107-project-director-intake-loop-lookback-floor.md"
+M107_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-intake-loop-lookback-floor-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -11085,6 +11087,80 @@ def test_m106_project_director_post_m105_intake_loop_guard_persists():
     assert "M106 Project Director post-M105 intake loop persistence rail is now" in report
     assert "direction-guard commits sit above the WING read-only streak" in current
     assert "direction-guard commits sit above the WING read-only streak" in report
+
+
+def test_m107_project_director_intake_loop_guard_lookback_floor_persists():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M107_PLAN.read_text(encoding="utf-8")
+    adr = M107_ADR.read_text(encoding="utf-8")
+    director = load_project_director_module()
+
+    directive = director.build_directive(
+        project_root=PROJECT_ROOT,
+        lookback_commits=12,
+        report_limit=1,
+    )
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m107 = markdown_table_row(roadmap, "M107")
+    assert m107[1] == "Project Director intake loop lookback floor"
+    assert m107[2] == (
+        "Project Director keeps the post-M104 intake-loop guard active even "
+        "when additional direction-guard commits would otherwise push the WING "
+        "read-only streak outside the requested lookback window"
+    )
+    assert m107[3] == "M001"
+    assert m107[4] == "critical autopilot direction"
+    assert m107[5] == (
+        "UNIT_VERIFIED intake-loop lookback floor; live authority remains blocked"
+    )
+    assert m107[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    for marker in ("M107-CP01", "M107-CP02", "M107-CP03"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+    assert directive["pre_hardware_intake_guard_requested_lookback_commits"] == 12
+    assert directive["pre_hardware_intake_guard_effective_lookback_commits"] >= (
+        directive["pre_hardware_intake_guard_lookback_floor"]
+    )
+    assert directive["pre_hardware_intake_guard_lookback_floor"] == 14
+    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+    assert (
+        directive["allowed_autonomous_scope"]
+        == "external_validation_wait_or_named_gap_only"
+    )
+    assert any(
+        "Do not keep improving the same WING read-only intake function" in item
+        for item in directive["forbidden_scope"]
+    )
+
+    assert "M107 Project Director intake loop lookback floor is now covered" in current
+    assert "M107 Project Director intake loop lookback floor rail is now" in report
+    assert "requested lookback window" in current
+    assert "requested lookback window" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -1337,6 +1337,42 @@ def test_project_director_detects_post_m104_intake_guard_streak():
     )
 
 
+def test_project_director_detects_intake_guard_streak_under_direction_commits():
+    director = load_director_module()
+
+    recent_subjects = [
+        "Keep intake guard lookback stable",
+        "Keep project director intake guard active",
+        "Guard project director intake loop",
+        "Guard WING readonly capture time order",
+        "Guard WING readonly run id timestamp",
+        "Guard WING readonly run id format",
+        "Guard WING readonly artifact root whitespace",
+        "Guard WING readonly artifact root traversal",
+        "Guard WING readonly run id path segment",
+        "Guard WING readonly source path binding",
+        "Guard WING readonly canonical artifact root",
+        "Guard WING readonly declared artifact paths",
+        "Guard WING readonly reserved artifact intake",
+        "Guard project director external validation scope",
+    ]
+
+    streak = director.wing_readonly_intake_guard_streak(recent_subjects)
+
+    assert director.intake_loop_guard_lookback_floor() == 14
+    assert director.effective_lookback_commits_for_intake_guard(12) == 14
+    assert director.effective_lookback_commits_for_intake_guard(1) == 1
+    assert len(streak) == 10
+    assert streak[0] == "Guard WING readonly capture time order"
+    assert (
+        director.pre_hardware_intake_hardening_loop_guard_required(
+            external_validation_wait=True,
+            recent_commit_subjects=recent_subjects,
+        )
+        is True
+    )
+
+
 def test_project_director_narrows_post_m104_intake_hardening_loop():
     director = load_director_module()
 
@@ -1349,6 +1385,9 @@ def test_project_director_narrows_post_m104_intake_hardening_loop():
     assert directive["selected_blocker"] == "WING read-only connection proof"
     assert directive["selected_action_requires_external_validation"] is True
     assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+    assert directive["pre_hardware_intake_guard_requested_lookback_commits"] == 12
+    assert directive["pre_hardware_intake_guard_effective_lookback_commits"] == 14
+    assert directive["pre_hardware_intake_guard_lookback_floor"] == 14
     assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
     assert (
         directive["allowed_autonomous_scope"]

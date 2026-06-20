@@ -5,17 +5,17 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "e8a38bc0",
-  "last_heartbeat_utc": "2026-06-20T17:54:44Z",
+  "last_heartbeat_utc": "2026-06-20T18:06:52Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": "Real WING Rack read-only artifact and operator review are required before the roadmap can advance to physical readback.",
   "next_action": "Wait for operator-supervised WING read-only preflight using ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json.",
   "last_validation_summary": {
-    "status": "m106_project_director_post_m105_intake_loop_persistence_validated",
+    "status": "m107_project_director_intake_loop_lookback_floor_validated",
     "hardware_evidence": false,
     "product_runtime_changed": false,
-    "product_runtime_change_scope": "Read-only M106 Project Director post-M105 intake loop persistence fix, focused Project Director tests, rail test and docs; latest verified product/runtime checkpoint remains e8a38bc0. Project Director now finds the longest WING read-only intake-hardening streak inside recent commit history so external_validation_wait_or_named_gap_only remains active after direction-guard commits sit above the WING streak. No hardware contact, no backend WebSocket, no OSC write, no proposal apply, no queue import, no live authority grant, no readiness closure, and no live scope widening.",
-    "pytest": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4043 passed, 1 skipped, 1 warning",
+    "product_runtime_change_scope": "Read-only M107 Project Director intake-loop lookback floor fix, focused Project Director tests, rail test and docs; latest verified product/runtime checkpoint remains e8a38bc0. Project Director now raises normal/default evidence collection to the intake-loop guard lookback floor, so external_validation_wait_or_named_gap_only remains active after additional direction-guard commits would otherwise push the WING read-only streak outside the requested lookback window. No hardware contact, no backend WebSocket, no OSC write, no proposal apply, no queue import, no live authority grant, no readiness closure, and no live scope widening.",
+    "pytest": "staged-only PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4045 passed, 1 skipped, 1 warning",
     "no_wing_quick": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/no_wing_release_check.py --quick: passed",
     "artifact_manifest_verifier": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/verify_no_wing_artifact_manifest.py artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check: passed",
     "memory_lint": "/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS",
@@ -194,7 +194,7 @@
     "m081_wing_review_decision_prestart_proof_binding_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_tool.py -q: 74 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m081_wing_review_decision_binds_prestart_proof -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 94 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q: 448 passed",
     "post_m001_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4211 passed, 1 skipped, 1 warning",
     "evidence_placement": "validate-only summaries are stored under ops/autopilot/evidence, not artifacts/wing_readonly_preflight",
-    "heartbeat_reconciliation": "2026-06-20T17:54:44Z recorded M106 Project Director post-M105 intake loop persistence: Project Director now finds the longest consecutive Guard WING readonly intake-hardening streak inside recent commit history, so external_validation_wait_or_named_gap_only remains active after direction-guard commits sit above the WING read-only streak. The guard remains read-only with no backend WebSocket, no OSC write, no proposal apply, no queue import, no readiness closure, no hardware evidence, no Full Autonomous readiness and no live authority. M001 still waits for a real WING read-only artifact.",
+    "heartbeat_reconciliation": "2026-06-20T18:06:52Z recorded M107 Project Director intake loop lookback floor: Project Director now raises normal/default evidence collection to the intake-loop guard lookback floor, so external_validation_wait_or_named_gap_only remains active after additional direction-guard commits would otherwise push the WING read-only streak outside the requested lookback window. The guard remains read-only with no backend WebSocket, no OSC write, no proposal apply, no queue import, no readiness closure, no hardware evidence, no Full Autonomous readiness and no live authority. M001 still waits for a real WING read-only artifact.",
     "authority": {
       "live_authority_granted": false,
       "readiness_closure_allowed": false,
@@ -234,7 +234,9 @@
     "m105_project_director_post_m104_intake_loop_guard_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_director_agent.py -q: 7 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m105_project_director_post_m104_intake_loop_guard_stays_readonly -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 118 passed; staged-only PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4042 passed, 1 skipped, 1 warning; /opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS; ops/autopilot/STATE.json JSON validation: PASS; ops/autopilot/RUN_LEDGER.jsonl JSONL validation: PASS",
     "m105_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M105_PROJECT_DIRECTOR_POST_M104_INTAKE_LOOP_GUARD_20260620.md",
     "m106_project_director_post_m105_intake_loop_persistence_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_director_agent.py -q: 7 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m106_project_director_post_m105_intake_loop_guard_persists -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 119 passed; staged-only PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4043 passed, 1 skipped, 1 warning; /opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS; ops/autopilot/STATE.json JSON validation: PASS; ops/autopilot/RUN_LEDGER.jsonl JSONL validation: PASS",
-    "m106_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M106_PROJECT_DIRECTOR_POST_M105_INTAKE_LOOP_PERSISTENCE_20260620.md"
+    "m106_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M106_PROJECT_DIRECTOR_POST_M105_INTAKE_LOOP_PERSISTENCE_20260620.md",
+    "m107_project_director_intake_loop_lookback_floor_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_director_agent.py -q: 8 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m107_project_director_intake_loop_guard_lookback_floor_persists -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 120 passed; staged-only PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4045 passed, 1 skipped, 1 warning; /opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS; ops/autopilot/STATE.json JSON validation: PASS; ops/autopilot/RUN_LEDGER.jsonl JSONL validation: PASS",
+    "m107_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M107_PROJECT_DIRECTOR_INTAKE_LOOP_LOOKBACK_FLOOR_20260620.md"
   },
   "external_validation_requirements": [
     "Real WING Rack read-only artifact",

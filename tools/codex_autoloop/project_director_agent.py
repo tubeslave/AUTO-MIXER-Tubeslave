@@ -25,6 +25,7 @@ import update_mvp_progress  # noqa: E402
 
 
 DEFAULT_OUTPUT = PROJECT_ROOT / ".paperclip" / "reports" / "project_director_latest.md"
+DEFAULT_LOOKBACK_COMMITS = 12
 EXTERNAL_VALIDATION_STATUSES = frozenset(
     {
         "tooling_ready_waits_real_wing",
@@ -45,6 +46,7 @@ EXTERNAL_VALIDATION_ACTION_MARKERS = (
     "wing_readonly_preflight.md",
 )
 POST_M104_INTAKE_GUARD_MIN_STREAK = 10
+POST_M104_INTAKE_GUARD_LOOKBACK_BUFFER = 4
 POST_M104_INTAKE_GUARD_COMPLETION_MARKERS = (
     "capture time order",
 )
@@ -103,6 +105,19 @@ def wing_readonly_intake_guard_streak(subjects: Sequence[str]) -> list[str]:
     if len(streak) > len(best_streak):
         best_streak = streak
     return best_streak
+
+
+def intake_loop_guard_lookback_floor() -> int:
+    return (
+        POST_M104_INTAKE_GUARD_MIN_STREAK
+        + POST_M104_INTAKE_GUARD_LOOKBACK_BUFFER
+    )
+
+
+def effective_lookback_commits_for_intake_guard(lookback_commits: int) -> int:
+    if lookback_commits < DEFAULT_LOOKBACK_COMMITS:
+        return lookback_commits
+    return max(lookback_commits, intake_loop_guard_lookback_floor())
 
 
 def pre_hardware_intake_hardening_loop_guard_required(
@@ -192,9 +207,12 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
             current_first_command
         )
     )
+    effective_lookback_commits = effective_lookback_commits_for_intake_guard(
+        lookback_commits
+    )
     evidence = codex_direction_guard.collect_repo_evidence(
         project_root,
-        lookback_commits=lookback_commits,
+        lookback_commits=effective_lookback_commits,
         report_limit=report_limit,
     )
     guard_report = codex_direction_guard.analyze_evidence(evidence)
@@ -284,6 +302,11 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         "external_validation_wait": external_validation_wait,
         "selected_action_requires_external_validation": external_validation_wait,
         "pre_hardware_intake_hardening_loop_guard": pre_hardware_intake_loop_guard,
+        "pre_hardware_intake_guard_requested_lookback_commits": lookback_commits,
+        "pre_hardware_intake_guard_effective_lookback_commits": (
+            effective_lookback_commits
+        ),
+        "pre_hardware_intake_guard_lookback_floor": intake_loop_guard_lookback_floor(),
         "pre_hardware_intake_guard_recent_streak_count": len(intake_guard_streak),
         "pre_hardware_intake_guard_min_streak": POST_M104_INTAKE_GUARD_MIN_STREAK,
         "pre_hardware_intake_guard_recent_subjects": intake_guard_streak,
@@ -326,6 +349,12 @@ def render_markdown(directive: dict) -> str:
         f"`{str(directive.get('external_validation_wait', False)).lower()}`",
         "Pre-hardware intake hardening loop guard: "
         f"`{str(directive.get('pre_hardware_intake_hardening_loop_guard', False)).lower()}`",
+        "- Pre-hardware intake guard requested lookback commits: "
+        f"`{directive.get('pre_hardware_intake_guard_requested_lookback_commits', 0)}`",
+        "- Pre-hardware intake guard effective lookback commits: "
+        f"`{directive.get('pre_hardware_intake_guard_effective_lookback_commits', 0)}`",
+        "- Pre-hardware intake guard lookback floor: "
+        f"`{directive.get('pre_hardware_intake_guard_lookback_floor', 0)}`",
         "- Pre-hardware intake guard recent streak count: "
         f"`{directive.get('pre_hardware_intake_guard_recent_streak_count', 0)}`",
         "- Pre-hardware intake guard min streak: "
@@ -383,7 +412,7 @@ def write_output(path: Path, text: str) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate Automixer Project Director directive.")
     parser.add_argument("--project-root", default=str(PROJECT_ROOT))
-    parser.add_argument("--lookback-commits", type=int, default=12)
+    parser.add_argument("--lookback-commits", type=int, default=DEFAULT_LOOKBACK_COMMITS)
     parser.add_argument("--report-limit", type=int, default=10)
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))

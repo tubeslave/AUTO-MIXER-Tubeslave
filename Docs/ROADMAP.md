@@ -130,6 +130,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M104 | WING read-only capture time order intake guard | Real WING read-only intake rejects candidates whose captured_at is earlier than the UTC capture timestamp encoded in run_id | M001 | critical read-only hardware intake | UNIT_VERIFIED capture-time ordering guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M105 | Project Director post-M104 intake loop guard | Project Director detects the post-M104 WING read-only intake-hardening streak and narrows further autonomous work to real external validation or a named unverified contract gap | M001 | critical autopilot direction | UNIT_VERIFIED post-M104 intake-loop guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M106 | Project Director post-M105 intake loop persistence | Project Director keeps the post-M104 intake-loop guard active even after direction-guard commits sit above the WING read-only streak | M001 | critical autopilot direction | UNIT_VERIFIED post-M105 loop persistence; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
+| M107 | Project Director intake loop lookback floor | Project Director keeps the post-M104 intake-loop guard active even when additional direction-guard commits would otherwise push the WING read-only streak outside the requested lookback window | M001 | critical autopilot direction | UNIT_VERIFIED intake-loop lookback floor; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 
 ## Active milestone
 

@@ -276,6 +276,18 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   `4043 passed, 1 skipped, 1 warning`, memory lint PASS, `STATE.json`
   validation PASS and `RUN_LEDGER.jsonl` validation PASS.
 
+- M107 Project Director intake loop lookback floor rail is now automated:
+  Project Director records requested lookback, effective lookback and the
+  intake-loop guard floor, then raises normal/default evidence collection to
+  that floor before analyzing recent commit subjects. This keeps the M105/M106
+  guard active when additional direction-guard commits would otherwise push the
+  WING read-only streak outside the requested lookback window. This creates no
+  WING/backend contact, proposal apply, queue import, live write, readiness
+  closure, hardware evidence or live authority.
+  Validation: Project Director focused tests, M107 rail, full WING rail,
+  staged-only full suite, memory lint, `STATE.json` validation and
+  `RUN_LEDGER.jsonl` validation are recorded in `ops/autopilot/STATE.json`.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING
