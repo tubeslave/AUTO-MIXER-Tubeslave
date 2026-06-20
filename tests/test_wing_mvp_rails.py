@@ -209,6 +209,8 @@ M074_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M074-supervised-apply-parameter-b
 M074_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-parameter-blocker-guard-20260620.md"
 M075_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M075-supervised-apply-old-value-blocker-guard.md"
 M075_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-old-value-blocker-guard-20260620.md"
+M076_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M076-replay-evidence-start-action-blocker-guard.md"
+M076_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-start-action-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -7729,6 +7731,76 @@ def test_m075_supervised_apply_old_value_reflects_integration_bundle_blocker():
     assert "Supervised Apply old values must fail closed" in completion
     assert "M075 Supervised Apply old value blocker guard is now covered" in current
     assert "M075 Supervised Apply old value blocker guard rail is now automated" in report
+
+
+def test_m076_replay_evidence_start_action_is_blocked_by_integration_bundle():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M076_PLAN.read_text(encoding="utf-8")
+    adr = M076_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m076 = markdown_table_row(roadmap, "M076")
+    assert m076[1] == "Replay Evidence start action blocker guard"
+    assert m076[2] == (
+        "Replay Evidence Start Offline action is disabled while promotion "
+        "planning is blocked"
+    )
+    assert m076[3] == "M075"
+    assert m076[4] == "high offline frontend"
+    assert m076[5] == "UNIT_VERIFIED blocked Replay Evidence start action; live authority remains blocked"
+    assert m076[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Replay Evidence Start Offline action now stays disabled when visible blockers exist" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M076-CP01" in plan
+    assert "M076-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate replay run input" in adr
+
+    assert "function ReplayEvidencePanel({" in task_queue
+    assert "const replayStartBlocked = integrationBundleApplyBlocked" in task_queue
+    assert "const replayStartLabel = replayStartBlocked ? 'Replay Blocked' : 'Start Offline'" in task_queue
+    assert "const replayStartButtonClassName = replayStartBlocked" in task_queue
+    assert "const handleStartReplay = () => {" in task_queue
+    assert "if (replayStartBlocked) return" in task_queue
+    assert "onStartReplay()" in task_queue
+    assert (
+        '<button className={replayStartButtonClassName} disabled={replayStartBlocked} '
+        'onClick={handleStartReplay} type="button">{replayStartLabel}</button>'
+    ) in task_queue
+    assert "onClick={onStartReplay}" not in task_queue
+    assert "replay evidence start action is blocked" in adapter_test
+    assert "Replay Evidence start actions must fail closed" in completion
+    assert "M076 Replay Evidence start action blocker guard is now covered" in current
+    assert "M076 Replay Evidence start action blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

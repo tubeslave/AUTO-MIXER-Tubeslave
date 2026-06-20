@@ -588,6 +588,15 @@ function ReplayEvidencePanel({
   const replayReportClassName = integrationBundleApplyBlocked
     ? 'mt-0.5 truncate text-[8px] text-danger'
     : 'mt-0.5 truncate text-[8px] text-muted';
+  const replayStartBlocked = integrationBundleApplyBlocked;
+  const replayStartLabel = replayStartBlocked ? 'Replay Blocked' : 'Start Offline';
+  const replayStartButtonClassName = replayStartBlocked
+    ? 'am-button border-danger/40 bg-danger/10 py-1 text-[9px] text-danger disabled:cursor-not-allowed disabled:opacity-70'
+    : 'am-button py-1 text-[9px] text-audio';
+  const handleStartReplay = () => {
+    if (replayStartBlocked) return;
+    onStartReplay();
+  };
   const traceStatusLabel = integrationBundleApplyBlocked
     ? 'bundle blocked'
     : latestTrace
@@ -602,7 +611,7 @@ function ReplayEvidencePanel({
   return (
     <Panel
       title="Replay Engine / Evidence"
-      action={<button className="am-button py-1 text-[9px] text-audio" onClick={onStartReplay} type="button">Start Offline</button>}
+      action={<button className={replayStartButtonClassName} disabled={replayStartBlocked} onClick={handleStartReplay} type="button">{replayStartLabel}</button>}
     >
       <div className="flex items-center justify-between gap-2 rounded-[5px] border border-line bg-row px-1.5 py-1">
         <div className="min-w-0">

@@ -99,6 +99,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M073 | Task Details proposal parameter blocker guard | Task Details Proposal Preview Parameter shows blocked-parameter status while promotion planning is blocked | M072 | high offline frontend | UNIT_VERIFIED blocked Task Details proposal parameter; live authority remains blocked | PENDING |
 | M074 | Supervised Apply parameter blocker guard | Supervised Apply Proposal Target Parameter shows blocked-parameter status while promotion planning is blocked | M073 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply parameter; live authority remains blocked | PENDING |
 | M075 | Supervised Apply old value blocker guard | Supervised Apply Proposal Target Old value shows no-readback status while promotion planning is blocked | M074 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply old value; live authority remains blocked | PENDING |
+| M076 | Replay Evidence start action blocker guard | Replay Evidence Start Offline action is disabled while promotion planning is blocked | M075 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence start action; live authority remains blocked | PENDING |
 
 ## Active milestone
 

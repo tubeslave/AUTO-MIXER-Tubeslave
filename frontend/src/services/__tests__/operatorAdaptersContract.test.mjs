@@ -4676,6 +4676,25 @@ test('replay evidence report path is guarded when integration bundle is blocked'
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence start action is blocked when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const replayStartBlocked = integrationBundleApplyBlocked/);
+  assert.match(source, /const replayStartLabel = replayStartBlocked \? 'Replay Blocked' : 'Start Offline'/);
+  assert.match(source, /const replayStartButtonClassName = replayStartBlocked/);
+  assert.match(source, /const handleStartReplay = \(\) => \{/);
+  assert.match(source, /if \(replayStartBlocked\) return/);
+  assert.match(source, /onStartReplay\(\)/);
+  assert.match(source, /<button className=\{replayStartButtonClassName\} disabled=\{replayStartBlocked\} onClick=\{handleStartReplay\} type="button">\{replayStartLabel\}<\/button>/);
+  assert.doesNotMatch(source, /onClick=\{onStartReplay\}/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T05:12:50Z
+Generated: 2026-06-20T05:18:57Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T05:12:50Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `86ac8f47 Guard supervised apply parameter`
+  `302f560b Guard supervised apply old value`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -1144,6 +1144,22 @@ Generated: 2026-06-20T05:12:50Z
   opening, no supervised apply dispatch, no backend/WING contact, no live
   transport, no live authority, no readiness closure, no Full Autonomous
   readiness and no replacement for accepted real hardware/operator validation.
+- M076 Replay Evidence start action blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m076_replay_evidence_start_action_is_blocked_by_integration_bundle`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local Replay Evidence start-action values from
+  `replayStartBlocked`. While the blocker is visible, the action shows
+  `Replay Blocked`, is disabled and returns before `onStartReplay`, so the
+  blocked evidence surface cannot start a Product Layer replay request. The
+  normal `Start Offline` action remains unchanged when the global blocker is
+  absent. This is local frontend action hardening only: it mutates no replay
+  run input, decision trace input, channel evidence input, task data, backend
+  status input, backend result input, safety monitor input or readiness input,
+  creates no queue mutation, no row hiding, no supervised apply opening, no
+  supervised apply dispatch, no backend/WING contact while blocked, no live
+  transport, no live authority, no readiness closure, no Full Autonomous
+  readiness and no replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -1154,4 +1170,4 @@ Generated: 2026-06-20T05:12:50Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4201 passed, 1 skipped, 1 warning`.
+  `4202 passed, 1 skipped, 1 warning`.

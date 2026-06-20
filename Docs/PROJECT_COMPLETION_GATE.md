@@ -467,6 +467,14 @@ authority, close readiness, contact WING/backend, mark Full Autonomous ready,
 apply to console, replace backend safety gates, or replace accepted real
 hardware/operator validation.
 
+Replay Evidence start actions must fail closed when offline integration bundle
+blockers are visible. Replay-start-visible enforcement cannot mutate replay run
+input, decision trace input, channel evidence input, task data, backend result
+input, hide rows, queue proposals, open supervised apply, dispatch supervised
+apply, contact backend, contact WING, grant live authority, close readiness,
+mark Full Autonomous ready, apply to console, replace backend safety gates, or
+replace accepted real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
