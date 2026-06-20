@@ -718,6 +718,15 @@ def _run_id_matches_wing_readonly_capture_format(value: str) -> bool:
     return bool(WING_READONLY_PREFLIGHT_RUN_ID_PATTERN.fullmatch(value))
 
 
+def _run_id_has_valid_utc_timestamp(value: str) -> bool:
+    timestamp = value.removesuffix("_wing_readonly_preflight")
+    try:
+        datetime.strptime(timestamp, "%Y%m%dT%H%M%SZ")
+    except ValueError:
+        return False
+    return True
+
+
 def _validate_candidate_artifact_intake_paths(
     payload: Mapping[str, Any],
     *,
@@ -758,6 +767,8 @@ def _validate_candidate_artifact_intake_paths(
         return
     if not _run_id_matches_wing_readonly_capture_format(run_id):
         violations.append("run_id_not_wing_readonly_capture_format")
+    elif not _run_id_has_valid_utc_timestamp(run_id):
+        violations.append("run_id_not_valid_utc_timestamp")
     if not isinstance(artifact_root, str) or not artifact_root:
         return
     for field, artifact_name in declared_paths.items():

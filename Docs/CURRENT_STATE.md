@@ -1530,6 +1530,19 @@ Generated: 2026-06-20T15:44:02Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does not
   replace real WING/operator validation.
+- M103 WING read-only run id timestamp intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m103_wing_readonly_run_id_timestamp_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when the
+  timestamp prefix in `run_id` is not a valid UTC capture time. This blocks
+  impossible timestamp strings such as `20261340T250000Z_wing_readonly_preflight`
+  from passing as runner-produced capture ids while still matching the
+  canonical run-id pattern and declared artifact paths. The concrete intake
+  violation is `run_id_not_valid_utc_timestamp`. It contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness
+  row, creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1540,4 +1553,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4035 passed, 1 skipped, 1 warning`.
+  `4037 passed, 1 skipped, 1 warning`.

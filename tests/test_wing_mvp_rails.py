@@ -264,6 +264,8 @@ M101_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M101-wing-readonly-artifact-root-
 M101_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-artifact-root-whitespace-intake-guard-20260620.md"
 M102_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M102-wing-readonly-run-id-format-intake-guard.md"
 M102_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-run-id-format-intake-guard-20260620.md"
+M103_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M103-wing-readonly-run-id-timestamp-intake-guard.md"
+M103_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-run-id-timestamp-intake-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -10785,6 +10787,79 @@ def test_m102_wing_readonly_run_id_format_intake_guard_stays_readonly():
     assert "M102 WING read-only run id format intake guard rail is now" in report
     assert "run_id_not_wing_readonly_capture_format" in current
     assert "run_id_not_wing_readonly_capture_format" in report
+
+
+def test_m103_wing_readonly_run_id_timestamp_intake_guard_stays_readonly():
+    from backend.wing_readonly_preflight_evidence import (
+        validate_wing_readonly_preflight_artifact,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M103_PLAN.read_text(encoding="utf-8")
+    adr = M103_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m103 = markdown_table_row(roadmap, "M103")
+    assert m103[1] == "WING read-only run id timestamp intake guard"
+    assert m103[2] == (
+        "Real WING read-only intake rejects candidates whose run_id timestamp "
+        "is not a valid UTC capture time before manual review can accept them"
+    )
+    assert m103[3] == "M001"
+    assert m103[4] == "critical read-only hardware intake"
+    assert m103[5] == (
+        "UNIT_VERIFIED run-id timestamp guard; live authority remains blocked"
+    )
+    assert m103[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    for marker in ("M103-CP01", "M103-CP02", "M103-CP03"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    validation = validate_wing_readonly_preflight_artifact(
+        {
+            "proof_artifact_schema": "wing_readonly_preflight.v1",
+            "proof_runner": "wing_readonly_preflight_runner",
+            "artifact_root": "artifacts/wing_readonly_preflight",
+            "run_id": "20261340T250000Z_wing_readonly_preflight",
+            "summary_path": (
+                "artifacts/wing_readonly_preflight/"
+                "20261340T250000Z_wing_readonly_preflight/summary.json"
+            ),
+            "events_path": (
+                "artifacts/wing_readonly_preflight/"
+                "20261340T250000Z_wing_readonly_preflight/events.jsonl"
+            ),
+        }
+    )
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "run_id_not_valid_utc_timestamp" in validation["violations"]
+
+    assert "M103 WING read-only run id timestamp intake guard is now covered" in current
+    assert "M103 WING read-only run id timestamp intake guard rail is now" in report
+    assert "run_id_not_valid_utc_timestamp" in current
+    assert "run_id_not_valid_utc_timestamp" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

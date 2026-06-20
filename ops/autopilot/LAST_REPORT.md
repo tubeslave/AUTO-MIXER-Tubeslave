@@ -224,6 +224,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   contact, proposal apply, queue import, live write, readiness closure,
   hardware evidence or live authority.
 
+- M103 WING read-only run id timestamp intake guard rail is now automated:
+  candidate WING read-only summaries whose `run_id` timestamp prefix is not a
+  valid UTC capture time fail artifact intake before they can become accepted
+  real WING read-only candidates. This blocks impossible timestamp strings such
+  as `20261340T250000Z_wing_readonly_preflight` from passing as runner-produced
+  capture ids while still matching the canonical run-id pattern. The concrete
+  intake violation is `run_id_not_valid_utc_timestamp`. This creates no
+  WING/backend contact, proposal apply, queue import, live write, readiness
+  closure, hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING
