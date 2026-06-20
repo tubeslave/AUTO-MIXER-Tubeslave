@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T04:12:28Z
+Generated: 2026-06-20T04:30:22Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T04:12:28Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `753c65a1 Guard supervised apply new value`
+  `4cbfbcb5 Guard supervised apply rollback`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -1069,6 +1069,21 @@ Generated: 2026-06-20T04:12:28Z
   opening, no supervised apply dispatch, no backend/WING contact, no live
   transport, no live authority, no readiness closure, no Full Autonomous
   readiness and no replacement for accepted real hardware/operator validation.
+- M071 Task Details proposal rollback blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m071_task_details_proposal_rollback_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local Task Details Proposal Preview rollback display values through
+  `taskProposalRollbackDisplay(proposal, integrationBundleApplyBlocked)`; while
+  the blocker is visible, the detail rollback value shows `No live apply`
+  instead of the raw proposal rollback. The raw proposal rollback remains
+  unchanged when the global blocker is absent. This is local frontend
+  presentation hardening only: it mutates no proposal data, task status input,
+  task data, backend status input, backend result input, safety monitor input or
+  readiness input, creates no queue mutation, no row hiding, no supervised apply
+  opening, no supervised apply dispatch, no backend/WING contact, no live
+  transport, no live authority, no readiness closure, no Full Autonomous
+  readiness and no replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -1079,4 +1094,4 @@ Generated: 2026-06-20T04:12:28Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4196 passed, 1 skipped, 1 warning`.
+  `4197 passed, 1 skipped, 1 warning`.

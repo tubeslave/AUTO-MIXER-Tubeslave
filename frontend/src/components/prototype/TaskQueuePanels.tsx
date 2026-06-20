@@ -261,6 +261,7 @@ export function TaskDetailsPanel({
   const detailStatus = taskStatusDisplay(task, integrationBundleApplyBlocked);
   const detailProposalRisk = taskProposalRiskDisplay(proposal, integrationBundleApplyBlocked);
   const detailProposalDelta = taskProposalDeltaDisplay(proposal, integrationBundleApplyBlocked);
+  const detailProposalRollback = taskProposalRollbackDisplay(proposal, integrationBundleApplyBlocked);
 
   return (
     <Panel title="Task Details">
@@ -288,7 +289,7 @@ export function TaskDetailsPanel({
           <span className="text-muted">Parameter</span><span className="truncate text-text">{proposal.parameter}</span>
           <span className="text-muted">Delta</span><span className={`truncate font-bold ${detailProposalDelta.className}`}>{detailProposalDelta.label}</span>
           <span className="text-muted">Proof</span><span className="truncate text-text">{proposal.proof}</span>
-          <span className="text-muted">Rollback</span><span className="truncate text-text">{proposal.rollback}</span>
+          <span className="text-muted">Rollback</span><span className={`truncate ${detailProposalRollback.className}`}>{detailProposalRollback.label}</span>
           {task.requestedValueType && (
             <>
               <span className="text-muted">Value type</span><span className="truncate text-danger">{task.requestedValueType.replace(/_/g, ' ')}</span>
