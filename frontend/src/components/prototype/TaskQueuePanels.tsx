@@ -490,6 +490,15 @@ function ReplayEvidencePanel({
   const latestRunStatusTone = integrationBundleApplyBlocked
     ? 'red' as const
     : toneForReplayStatus(latestRun?.status ?? 'idle');
+  const replayPolicyLabel = integrationBundleApplyBlocked
+    ? 'bundle blocked'
+    : latestRun?.offlineOnly === false ? 'review' : 'offline only';
+  const replayPolicyDetail = integrationBundleApplyBlocked
+    ? 'no live apply'
+    : latestRun?.liveWrite ? 'live write' : 'no live write';
+  const replayPolicyDetailClassName = integrationBundleApplyBlocked || latestRun?.liveWrite
+    ? 'text-danger'
+    : 'text-success';
   const traceStatusLabel = integrationBundleApplyBlocked
     ? 'bundle blocked'
     : latestTrace
@@ -517,9 +526,9 @@ function ReplayEvidencePanel({
         <div className="rounded-[5px] border border-line bg-row px-1.5 py-1">
           <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Policy</div>
           <div className="truncate text-[9px] font-bold text-muted">
-            {latestRun?.offlineOnly === false ? 'review' : 'offline only'} ·{' '}
-            <span className={latestRun?.liveWrite ? 'text-danger' : 'text-success'}>
-              {latestRun?.liveWrite ? 'live write' : 'no live write'}
+            {replayPolicyLabel} ·{' '}
+            <span className={replayPolicyDetailClassName}>
+              {replayPolicyDetail}
             </span>
           </div>
         </div>

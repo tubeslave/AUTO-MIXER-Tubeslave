@@ -4613,6 +4613,30 @@ test('replay evidence latest run status is guarded when integration bundle is bl
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence policy row is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const replayPolicyLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'bundle blocked'/);
+  assert.match(source, /: latestRun\?\.offlineOnly === false \? 'review' : 'offline only'/);
+  assert.match(source, /const replayPolicyDetail = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'no live apply'/);
+  assert.match(source, /: latestRun\?\.liveWrite \? 'live write' : 'no live write'/);
+  assert.match(source, /const replayPolicyDetailClassName = integrationBundleApplyBlocked \|\| latestRun\?\.liveWrite/);
+  assert.match(source, /\? 'text-danger'/);
+  assert.match(source, /: 'text-success'/);
+  assert.match(source, /\{replayPolicyLabel\} ·\{' '\}/);
+  assert.match(source, /<span className=\{replayPolicyDetailClassName\}>/);
+  assert.match(source, /\{replayPolicyDetail\}/);
+  assert.doesNotMatch(source, /\{latestRun\?\.offlineOnly === false \? 'review' : 'offline only'\} ·/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

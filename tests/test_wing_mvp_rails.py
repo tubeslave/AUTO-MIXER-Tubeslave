@@ -179,6 +179,8 @@ M059_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M059-replay-evidence-decision-tra
 M059_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-decision-trace-status-blocker-guard-20260620.md"
 M060_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M060-replay-evidence-latest-run-status-blocker-guard.md"
 M060_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-latest-run-status-blocker-guard-20260620.md"
+M061_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M061-replay-evidence-policy-row-blocker-guard.md"
+M061_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-policy-row-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6717,6 +6719,77 @@ def test_m060_replay_evidence_latest_run_status_reflects_integration_bundle_bloc
     assert "Replay Evidence latest run statuses must fail closed" in completion
     assert "M060 Replay Evidence latest run status blocker guard is now covered" in current
     assert "M060 Replay Evidence latest run status blocker guard rail is now automated" in report
+
+
+def test_m061_replay_evidence_policy_row_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M061_PLAN.read_text(encoding="utf-8")
+    adr = M061_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m061 = markdown_table_row(roadmap, "M061")
+    assert m061[1] == "Replay Evidence policy row blocker guard"
+    assert m061[2] == (
+        "Replay Evidence Policy row shows integration bundle blocker status "
+        "while promotion planning is blocked"
+    )
+    assert m061[3] == "M060"
+    assert m061[4] == "high offline frontend"
+    assert m061[5] == "UNIT_VERIFIED blocked Replay Evidence policy row; live authority remains blocked"
+    assert m061[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Replay Evidence Policy row now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M061-CP01" in plan
+    assert "M061-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate replay run input" in adr
+
+    assert "function ReplayEvidencePanel({" in task_queue
+    assert "const replayPolicyLabel = integrationBundleApplyBlocked" in task_queue
+    assert "? 'bundle blocked'" in task_queue
+    assert ": latestRun?.offlineOnly === false ? 'review' : 'offline only'" in task_queue
+    assert "const replayPolicyDetail = integrationBundleApplyBlocked" in task_queue
+    assert "? 'no live apply'" in task_queue
+    assert ": latestRun?.liveWrite ? 'live write' : 'no live write'" in task_queue
+    assert "const replayPolicyDetailClassName = integrationBundleApplyBlocked || latestRun?.liveWrite" in task_queue
+    assert "{replayPolicyLabel} ·{' '}" in task_queue
+    assert "<span className={replayPolicyDetailClassName}>" in task_queue
+    assert "{replayPolicyDetail}" in task_queue
+    assert "{latestRun?.offlineOnly === false ? 'review' : 'offline only'} ·" not in task_queue
+    assert "integrationBundleApplyBlocked={integrationBundleApplyBlocked}" in task_queue
+    assert "replay evidence policy row is guarded" in adapter_test
+    assert "Replay Evidence policy rows must fail closed" in completion
+    assert "M061 Replay Evidence policy row blocker guard is now covered" in current
+    assert "M061 Replay Evidence policy row blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

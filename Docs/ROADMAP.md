@@ -84,6 +84,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M058 | Safety Monitor blocked surfaces blocker guard | Safety Monitor Blocked footer shows integration bundle blocker while promotion planning is blocked | M057 | high offline frontend | UNIT_VERIFIED blocked Safety Monitor blocked surfaces; live authority remains blocked | PENDING |
 | M059 | Replay Evidence decision trace status blocker guard | Replay Evidence Trace row shows integration bundle blocker status while promotion planning is blocked | M058 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence decision trace status; live authority remains blocked | PENDING |
 | M060 | Replay Evidence latest run status blocker guard | Replay Evidence Latest run badge shows integration bundle blocker status while promotion planning is blocked | M059 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence latest run status; live authority remains blocked | PENDING |
+| M061 | Replay Evidence policy row blocker guard | Replay Evidence Policy row shows integration bundle blocker status while promotion planning is blocked | M060 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence policy row; live authority remains blocked | PENDING |
 
 ## Active milestone
 

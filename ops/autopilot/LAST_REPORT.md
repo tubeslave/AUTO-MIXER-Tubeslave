@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T02:34:14Z.
+- Latest heartbeat: 2026-06-20T02:43:21Z.
 
 ## Что сделано
 
@@ -1096,17 +1096,37 @@ mutation, backend/WING contact, live transport, supervised apply opening,
 console apply, readiness closure, Full Autonomous readiness or live authority
 is introduced.
 
+The M061 Replay Evidence policy row blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs`
+and
+`tests/test_wing_mvp_rails.py::test_m061_replay_evidence_policy_row_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Replay Evidence policy row guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M061-replay-evidence-policy-row-blocker-guard.md`,
+`Docs/adr/replay-evidence-policy-row-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. Replay Evidence now shows
+`bundle blocked · no live apply` in the `Policy` row while
+`integrationBundleApplyBlocked` is true, preserving the raw replay policy and
+live-write detail when the global blocker is absent. This is local frontend
+presentation hardening only: no replay run input mutation, decision trace input
+mutation, task data mutation, backend status input mutation, backend result
+input mutation, safety monitor input mutation, readiness input mutation, queue
+mutation, backend/WING contact, live transport, supervised apply opening,
+console apply, readiness closure, Full Autonomous readiness or live authority
+is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `76 passed`.
+  `77 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m060_replay_evidence_latest_run_status_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m061_replay_evidence_policy_row_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `73 passed`.
+  `74 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4186 passed, 1 skipped, 1 warning`.
+  `4187 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.
