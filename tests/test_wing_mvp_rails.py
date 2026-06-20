@@ -217,6 +217,8 @@ M078_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M078-replay-evidence-trace-detail
 M078_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-trace-detail-blocker-guard-20260620.md"
 M079_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M079-replay-evidence-channel-identity-blocker-guard.md"
 M079_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-channel-identity-blocker-guard-20260620.md"
+M080_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M080-replay-evidence-report-row-blocker-visibility-guard.md"
+M080_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-report-row-blocker-visibility-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8014,6 +8016,70 @@ def test_m079_replay_evidence_channel_identity_reflects_integration_bundle_block
     assert "Replay Evidence channel identities must fail closed" in completion
     assert "M079 Replay Evidence channel identity blocker guard is now covered" in current
     assert "M079 Replay Evidence channel identity blocker guard rail is now automated" in report
+
+
+def test_m080_replay_evidence_report_row_visible_under_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M080_PLAN.read_text(encoding="utf-8")
+    adr = M080_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m080 = markdown_table_row(roadmap, "M080")
+    assert m080[1] == "Replay Evidence report row blocker visibility guard"
+    assert m080[2] == (
+        "Replay Evidence report row remains visible with blocker status while "
+        "promotion planning is blocked"
+    )
+    assert m080[3] == "M079"
+    assert m080[4] == "high offline frontend"
+    assert m080[5] == "UNIT_VERIFIED visible blocked Replay Evidence report row; live authority remains blocked"
+    assert m080[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Replay Evidence report row now remains visible with blocker status when visible blockers exist" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M080-CP01" in plan
+    assert "M080-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate replay report input" in adr
+
+    assert "function ReplayEvidencePanel({" in task_queue
+    assert "const replayReportVisible = integrationBundleApplyBlocked || Boolean(latestRun)" in task_queue
+    assert "{replayReportVisible && (" in task_queue
+    assert "<div className={replayReportClassName}>" in task_queue
+    assert "Report: {replayReportLabel}" in task_queue
+    assert "{latestRun && (" not in task_queue
+    assert "replay evidence report row remains visible" in adapter_test
+    assert "Replay Evidence report rows must remain visible" in completion
+    assert "M080 Replay Evidence report row blocker visibility guard is now covered" in current
+    assert "M080 Replay Evidence report row blocker visibility guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

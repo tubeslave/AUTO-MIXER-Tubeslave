@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T05:59:14Z
+Generated: 2026-06-20T06:14:46Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T05:59:14Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `342e7db2 Guard replay evidence trace detail`
+  `53e27441 Guard replay evidence channel identity`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -1208,6 +1208,22 @@ Generated: 2026-06-20T05:59:14Z
   dispatch, no backend/WING contact, no live transport, no live authority, no
   readiness closure, no Full Autonomous readiness and no replacement for
   accepted real hardware/operator validation.
+- M080 Replay Evidence report row blocker visibility guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m080_replay_evidence_report_row_visible_under_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local Replay Evidence report-row visibility through
+  `replayReportVisible`; while the blocker is visible, the report row remains
+  visible with blocked report status even when no latest replay run exists. The
+  previous latest-run based visibility remains unchanged when the global
+  blocker is absent. This is local frontend presentation hardening only: it
+  mutates no replay report input, replay run input, decision trace input,
+  channel evidence input, task data, backend status input, backend result
+  input, safety monitor input or readiness input, creates no queue mutation, no
+  row hiding, no replay start, no supervised apply opening, no supervised apply
+  dispatch, no backend/WING contact, no live transport, no live authority, no
+  readiness closure, no Full Autonomous readiness and no replacement for
+  accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -1218,4 +1234,4 @@ Generated: 2026-06-20T05:59:14Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4205 passed, 1 skipped, 1 warning`.
+  `4206 passed, 1 skipped, 1 warning`.

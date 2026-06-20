@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T05:59:14Z
+Last heartbeat UTC: 2026-06-20T06:14:46Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,18 +12,18 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M079 Replay Evidence channel identity blocker guard now shows
-`No channel proof` in the Replay Evidence channel identity text while
-`integrationBundleApplyBlocked` is true. The updated frontend keeps this as
-local presentation hardening and does not mutate channel evidence input, replay
-run input, decision trace input, task data, backend status input, backend
-result input, safety monitor input, readiness input, hide rows, add queue
-mutation, start replay, open supervised apply, dispatch supervised apply,
-console apply, WING/backend contact or live authority.
+Latest check: M080 Replay Evidence report row blocker visibility guard now keeps
+the Replay Evidence report row visible while `integrationBundleApplyBlocked` is
+true, even when no latest replay run exists. The updated frontend keeps this as
+local presentation hardening and does not mutate replay report input, replay
+run input, decision trace input, channel evidence input, task data, backend
+status input, backend result input, safety monitor input, readiness input, hide
+rows, add queue mutation, start replay, open supervised apply, dispatch
+supervised apply, console apply, WING/backend contact or live authority.
 
-Frontend adapter validation passed with `95 passed`; the frontend build
-passed; the M079 rail passed with `1 passed`; the full rail file passed with
-`92 passed`; and the full suite passed with `4205 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `96 passed`; the frontend build
+passed; the M080 rail passed with `1 passed`; the full rail file passed with
+`93 passed`; and the full suite passed with `4206 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

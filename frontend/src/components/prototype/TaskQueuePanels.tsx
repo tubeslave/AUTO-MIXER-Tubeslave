@@ -602,6 +602,7 @@ function ReplayEvidencePanel({
   const replayReportClassName = integrationBundleApplyBlocked
     ? 'mt-0.5 truncate text-[8px] text-danger'
     : 'mt-0.5 truncate text-[8px] text-muted';
+  const replayReportVisible = integrationBundleApplyBlocked || Boolean(latestRun);
   const replayStartBlocked = integrationBundleApplyBlocked;
   const replayStartLabel = replayStartBlocked ? 'Replay Blocked' : 'Start Offline';
   const replayStartButtonClassName = replayStartBlocked
@@ -666,7 +667,7 @@ function ReplayEvidencePanel({
         <span className={channelEvidenceClassName}>{channelEvidenceLabel}</span>
         <StatusBadge tone={channelStatusTone}>{channelStatusLabel}</StatusBadge>
       </div>
-      {latestRun && (
+      {replayReportVisible && (
         <div className={replayReportClassName}>
           Report: {replayReportLabel}
         </div>

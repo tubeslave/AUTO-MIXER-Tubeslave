@@ -4736,6 +4736,22 @@ test('replay evidence report path is guarded when integration bundle is blocked'
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence report row remains visible when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const replayReportVisible = integrationBundleApplyBlocked \|\| Boolean\(latestRun\)/);
+  assert.match(source, /\{replayReportVisible && \(/);
+  assert.match(source, /<div className=\{replayReportClassName\}>/);
+  assert.match(source, /Report: \{replayReportLabel\}/);
+  assert.doesNotMatch(source, /\{latestRun && \(\s*<div className=\{replayReportClassName\}>/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('replay evidence start action is blocked when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
