@@ -39,6 +39,9 @@ function taskQueueMetrics(
   const applyableCount = integrationBundleApplyBlocked
     ? 0
     : taskRows.filter(task => task.canApply !== false).length;
+  const reviewOnlyCount = integrationBundleApplyBlocked
+    ? taskRows.length
+    : taskRows.filter(task => task.reviewOnly || task.canApply === false).length;
 
   return [
     { label: 'Total Queue', value: String(taskRows.length), sub: 'operator proposals', tone: 'blue' },
@@ -48,7 +51,7 @@ function taskQueueMetrics(
       sub: integrationBundleApplyBlocked ? 'integration bundle' : 'fader / gain only',
       tone: integrationBundleApplyBlocked ? 'red' : 'green'
     },
-    { label: 'Review Only', value: String(taskRows.filter(task => task.reviewOnly || task.canApply === false).length), sub: 'no live apply', tone: 'red' },
+    { label: 'Review Only', value: String(reviewOnlyCount), sub: 'no live apply', tone: 'red' },
     { label: 'Pending', value: String(taskRows.filter(task => task.status === 'Pending').length), sub: 'operator wait', tone: 'yellow' },
     { label: 'Applied', value: String(taskRows.filter(task => task.status === 'Applied').length), sub: 'supervised history', tone: 'green' }
   ];

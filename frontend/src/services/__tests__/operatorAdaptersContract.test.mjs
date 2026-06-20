@@ -4445,6 +4445,20 @@ test('task queue metrics show apply blocked when integration bundle is blocked',
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task queue review-only metric counts all rows when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const reviewOnlyCount = integrationBundleApplyBlocked/);
+  assert.match(source, /\? taskRows\.length/);
+  assert.match(source, /: taskRows\.filter\(task => task\.reviewOnly \|\| task\.canApply === false\)\.length/);
+  assert.match(source, /label: 'Review Only', value: String\(reviewOnlyCount\)/);
+  assert.match(source, /taskQueueMetrics\(taskRows, integrationBundleApplyBlocked\)/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task queue review-only filter includes all rows when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
