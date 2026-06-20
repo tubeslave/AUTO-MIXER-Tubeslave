@@ -4852,6 +4852,23 @@ test('task details proposal risk badge shows blocked state when integration bund
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task details proposal delta shows blocked state when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskProposalDeltaDisplay\(/);
+  assert.match(source, /proposal: ProposalPreview/);
+  assert.match(source, /const label = integrationBundleApplyBlocked \? 'Blocked' : proposal\.delta/);
+  assert.match(source, /const className = integrationBundleApplyBlocked \? 'text-danger' : 'text-audio'/);
+  assert.match(source, /const detailProposalDelta = taskProposalDeltaDisplay\(proposal, integrationBundleApplyBlocked\)/);
+  assert.match(source, /className=\{`truncate font-bold \$\{detailProposalDelta\.className\}`\}/);
+  assert.match(source, /\{detailProposalDelta\.label\}/);
+  assert.doesNotMatch(source, /<span className="truncate font-bold text-audio">\{proposal\.delta\}<\/span>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task details apply button is visibly blocked when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

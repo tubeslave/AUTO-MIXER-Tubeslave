@@ -203,6 +203,15 @@ function taskProposalRiskDisplay(
   return { label, tone };
 }
 
+function taskProposalDeltaDisplay(
+  proposal: ProposalPreview,
+  integrationBundleApplyBlocked = false,
+): { label: string; className: string } {
+  const label = integrationBundleApplyBlocked ? 'Blocked' : proposal.delta;
+  const className = integrationBundleApplyBlocked ? 'text-danger' : 'text-audio';
+  return { label, className };
+}
+
 function taskMoveDisplay(
   task: TaskRow,
   integrationBundleApplyBlocked = false,
@@ -242,6 +251,7 @@ export function TaskDetailsPanel({
   const ensembleEvidence = ensembleEvidenceForTask(task);
   const detailStatus = taskStatusDisplay(task, integrationBundleApplyBlocked);
   const detailProposalRisk = taskProposalRiskDisplay(proposal, integrationBundleApplyBlocked);
+  const detailProposalDelta = taskProposalDeltaDisplay(proposal, integrationBundleApplyBlocked);
 
   return (
     <Panel title="Task Details">
@@ -267,7 +277,7 @@ export function TaskDetailsPanel({
         <div className="grid grid-cols-[76px_1fr] gap-y-1.5 text-[10px]">
           <span className="text-muted">Target</span><span className="truncate text-text">{task.target ?? 'Session'}</span>
           <span className="text-muted">Parameter</span><span className="truncate text-text">{proposal.parameter}</span>
-          <span className="text-muted">Delta</span><span className="truncate font-bold text-audio">{proposal.delta}</span>
+          <span className="text-muted">Delta</span><span className={`truncate font-bold ${detailProposalDelta.className}`}>{detailProposalDelta.label}</span>
           <span className="text-muted">Proof</span><span className="truncate text-text">{proposal.proof}</span>
           <span className="text-muted">Rollback</span><span className="truncate text-text">{proposal.rollback}</span>
           {task.requestedValueType && (
