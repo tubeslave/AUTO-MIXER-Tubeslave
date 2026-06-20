@@ -274,6 +274,13 @@ grant live authority, close readiness, contact WING/backend, mark Full
 Autonomous ready, apply to console, replace backend safety gates, or replace
 accepted real hardware/operator validation.
 
+Task Details apply buttons must fail closed when offline integration bundle
+blockers are visible. Detail-apply-button-visible enforcement cannot mutate task
+data, queue proposals, open supervised apply, dispatch supervised apply, grant
+live authority, close readiness, contact WING/backend, mark Full Autonomous
+ready, apply to console, replace backend safety gates, or replace accepted real
+hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

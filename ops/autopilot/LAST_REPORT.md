@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T01:00:50Z.
+- Latest heartbeat: 2026-06-20T01:15:28Z.
 
 ## Что сделано
 
@@ -940,17 +940,33 @@ mutation, backend/WING contact, live transport, supervised apply opening,
 console apply, readiness closure, Full Autonomous readiness or live authority
 is introduced.
 
+The M052 Task Details apply button blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m052_task_details_apply_button_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Task Details apply-button guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M052-task-details-apply-button-blocker-guard.md`,
+`Docs/adr/task-details-apply-button-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. Task Details now shows a disabled
+`Apply Blocked` button while `integrationBundleApplyBlocked` is true, preserving
+the local `Inspect` path for ordinary review-only task blockers. This is local
+frontend presentation hardening only: no task data mutation, backend result
+input mutation, queue mutation, backend/WING contact, live transport,
+supervised apply opening, console apply, readiness closure, Full Autonomous
+readiness or live authority is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `67 passed`.
+  `68 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m051_supervised_apply_gate_rows_reflect_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m052_task_details_apply_button_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `64 passed`.
+  `65 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4177 passed, 1 skipped, 1 warning`.
+  `4178 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.

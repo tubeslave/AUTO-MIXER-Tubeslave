@@ -195,6 +195,10 @@ export function TaskDetailsPanel({
   const detailApplyBlockers = integrationBundleApplyBlocked
     ? Array.from(new Set(['offline_integration_bundle_blockers_visible', ...blockers]))
     : blockers;
+  const detailApplyButtonLabel = integrationBundleApplyBlocked ? 'Apply Blocked' : policy.actionLabel;
+  const detailApplyButtonClassName = integrationBundleApplyBlocked
+    ? 'am-button border-danger/40 bg-danger/10 text-danger disabled:cursor-not-allowed disabled:opacity-70'
+    : 'am-button text-online';
   const ensembleEvidence = ensembleEvidenceForTask(task);
 
   return (
@@ -274,10 +278,17 @@ export function TaskDetailsPanel({
         <p className="mt-3 text-[10px] leading-4 text-muted">{policy.hint}</p>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
-        {applyBlocked ? (
+        {applyBlocked && !integrationBundleApplyBlocked ? (
           <button className="am-button text-audio" onClick={() => focusTaskDetail(actions, task)} type="button">Inspect</button>
         ) : (
-          <button className="am-button text-online" onClick={() => requestTaskApply(task, ui, actions, integrationBundleApplyBlocked)} type="button">{policy.actionLabel}</button>
+          <button
+            className={detailApplyButtonClassName}
+            disabled={integrationBundleApplyBlocked}
+            onClick={() => requestTaskApply(task, ui, actions, integrationBundleApplyBlocked)}
+            type="button"
+          >
+            {detailApplyButtonLabel}
+          </button>
         )}
         <button className="am-button text-danger" onClick={() => actions.setTaskStatus(task.id, 'Rejected')} type="button">Reject</button>
       </div>

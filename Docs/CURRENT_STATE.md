@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T01:00:50Z
+Generated: 2026-06-20T01:15:28Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T01:00:50Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `ca22381d Guard supervised apply backend result`
+  `e729642e Guard supervised apply gate rows`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -798,6 +798,19 @@ Generated: 2026-06-20T01:00:50Z
   backend/WING contact, no live transport, no live authority, no readiness
   closure, no Full Autonomous readiness and no replacement for accepted real
   hardware/operator validation.
+- M052 Task Details apply button blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m052_task_details_apply_button_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives `detailApplyButtonLabel` and `detailApplyButtonClassName` from
+  `integrationBundleApplyBlocked`; while the blocker is visible, the Task
+  Details apply button shows a disabled `Apply Blocked` state and cannot open
+  Supervised Apply. Local review-only task blockers still show `Inspect`. This
+  is local frontend presentation hardening only: it mutates no task data,
+  changes no backend result input, creates no queue mutation, no backend/WING
+  contact, no live transport, no live authority, no readiness closure, no Full
+  Autonomous readiness and no replacement for accepted real hardware/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -808,4 +821,4 @@ Generated: 2026-06-20T01:00:50Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4177 passed, 1 skipped, 1 warning`.
+  `4178 passed, 1 skipped, 1 warning`.

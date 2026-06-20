@@ -161,6 +161,8 @@ M050_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M050-supervised-apply-backend-res
 M050_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-backend-result-blocker-guard-20260620.md"
 M051_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M051-supervised-apply-gate-row-blocker-guard.md"
 M051_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-gate-row-blocker-guard-20260620.md"
+M052_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M052-task-details-apply-button-blocker-guard.md"
+M052_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-apply-button-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6109,6 +6111,73 @@ def test_m051_supervised_apply_gate_rows_reflect_integration_bundle_blocker():
     assert "Supervised Apply gate rows must fail closed" in completion
     assert "M051 Supervised Apply gate row blocker guard is now covered" in current
     assert "M051 Supervised Apply gate row blocker guard rail is now automated" in report
+
+
+def test_m052_task_details_apply_button_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M052_PLAN.read_text(encoding="utf-8")
+    adr = M052_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m052 = markdown_table_row(roadmap, "M052")
+    assert m052[1] == "Task Details apply button blocker guard"
+    assert m052[2] == (
+        "Task Details apply button shows blocked state while promotion "
+        "planning is blocked"
+    )
+    assert m052[3] == "M051"
+    assert m052[4] == "high offline frontend"
+    assert m052[5] == "UNIT_VERIFIED blocked Task Details apply button; live authority remains blocked"
+    assert m052[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Details apply button now shows blocked state when integration bundle blockers are visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M052-CP01" in plan
+    assert "M052-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate task data" in adr
+
+    assert "const detailApplyButtonLabel = integrationBundleApplyBlocked" in task_queue
+    assert "? 'Apply Blocked'" in task_queue
+    assert "const detailApplyButtonClassName = integrationBundleApplyBlocked" in task_queue
+    assert "applyBlocked && !integrationBundleApplyBlocked" in task_queue
+    assert "disabled={integrationBundleApplyBlocked}" in task_queue
+    assert "{detailApplyButtonLabel}" in task_queue
+    assert "requestTaskApply(task, ui, actions, integrationBundleApplyBlocked)" in (
+        task_queue
+    )
+    assert "task details apply button is visibly blocked" in adapter_test
+    assert "Task Details apply buttons must fail closed" in completion
+    assert "M052 Task Details apply button blocker guard is now covered" in current
+    assert "M052 Task Details apply button blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
