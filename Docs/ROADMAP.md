@@ -76,6 +76,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M050 | Supervised Apply backend result blocker guard | Supervised Apply modal hides matched backend results while promotion planning is blocked | M049 | high offline frontend | UNIT_VERIFIED hidden Supervised Apply backend result; live authority remains blocked | PENDING |
 | M051 | Supervised Apply gate row blocker guard | Supervised Apply modal Apply Gate rows show no-contact and no-live status while promotion planning is blocked | M050 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply gate rows; live authority remains blocked | PENDING |
 | M052 | Task Details apply button blocker guard | Task Details apply button shows blocked state while promotion planning is blocked | M051 | high offline frontend | UNIT_VERIFIED blocked Task Details apply button; live authority remains blocked | PENDING |
+| M053 | Task Queue row reject blocker guard | Task Queue row actions hide reject while promotion planning is blocked | M052 | high offline frontend | UNIT_VERIFIED blocked Task Queue row reject action; live authority remains blocked | PENDING |
 
 ## Active milestone
 

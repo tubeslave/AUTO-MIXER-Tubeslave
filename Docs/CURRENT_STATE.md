@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T01:15:28Z
+Generated: 2026-06-20T01:25:19Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T01:15:28Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `e729642e Guard supervised apply gate rows`
+  `948cd385 Guard task details apply button`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -811,6 +811,18 @@ Generated: 2026-06-20T01:15:28Z
   contact, no live transport, no live authority, no readiness closure, no Full
   Autonomous readiness and no replacement for accepted real hardware/operator
   validation.
+- M053 Task Queue row reject blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m053_task_queue_row_reject_action_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives row actions through `taskQueueRowActions`; while the blocker is
+  visible, Task Queue rows expose only `Detail` and hide row-level `Reject`.
+  Local review-only rows still expose `Reject` when the global blocker is
+  absent. This is local frontend presentation hardening only: it mutates no task
+  data, changes no backend result input, creates no queue mutation, no
+  backend/WING contact, no live transport, no live authority, no readiness
+  closure, no Full Autonomous readiness and no replacement for accepted real
+  hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -821,4 +833,4 @@ Generated: 2026-06-20T01:15:28Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4178 passed, 1 skipped, 1 warning`.
+  `4179 passed, 1 skipped, 1 warning`.

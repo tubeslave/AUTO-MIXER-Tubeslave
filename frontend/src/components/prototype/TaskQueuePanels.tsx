@@ -176,6 +176,15 @@ function requestTaskApply(
   actions.setTaskStatus(task.id, 'Applied');
 }
 
+function taskQueueRowActions(
+  task: TaskRow,
+  integrationBundleApplyBlocked = false,
+): string[] {
+  if (integrationBundleApplyBlocked) return ['Detail'];
+  if (task.canApply === false || task.reviewOnly) return ['Detail', 'Reject'];
+  return ['Detail', 'Apply', 'Reject'];
+}
+
 export function TaskDetailsPanel({
   task,
   ui,
@@ -756,7 +765,7 @@ export function TaskQueueWorkspace({
             width: '90px',
             render: task => (
               <ActionCluster
-                actions={integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly ? ['Detail', 'Reject'] : ['Detail', 'Apply', 'Reject']}
+                actions={taskQueueRowActions(task, integrationBundleApplyBlocked)}
                 onAction={action => {
                   if (action === 'Apply') requestTaskApply(task, ui, actions, integrationBundleApplyBlocked);
                   else if (action === 'Reject') actions.setTaskStatus(task.id, 'Rejected');

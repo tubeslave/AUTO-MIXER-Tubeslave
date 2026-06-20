@@ -4574,7 +4574,7 @@ test('task queue review-only filter includes all rows when integration bundle is
 
   assert.match(source, /label: 'Review only'/);
   assert.match(source, /predicate: task => integrationBundleApplyBlocked \|\| Boolean\(task\.reviewOnly \|\| task\.canApply === false\)/);
-  assert.match(source, /actions=\{integrationBundleApplyBlocked \|\| task\.canApply === false \|\| task\.reviewOnly \? \['Detail', 'Reject'\] : \['Detail', 'Apply', 'Reject'\]\}/);
+  assert.match(source, /actions=\{taskQueueRowActions\(task, integrationBundleApplyBlocked\)\}/);
   assert.match(source, /taskQueueMetrics\(taskRows, integrationBundleApplyBlocked\)/);
   assert.equal(source.includes('queueMutation'), false);
 });
@@ -4588,7 +4588,22 @@ test('task queue row badge shows blocked state when integration bundle is blocke
   assert.match(source, /\(integrationBundleApplyBlocked \|\| task\.reviewOnly\)/);
   assert.match(source, /integrationBundleApplyBlocked \? 'Blocked' : 'Review'/);
   assert.match(source, /predicate: task => integrationBundleApplyBlocked \|\| Boolean\(task\.reviewOnly \|\| task\.canApply === false\)/);
-  assert.match(source, /actions=\{integrationBundleApplyBlocked \|\| task\.canApply === false \|\| task\.reviewOnly \? \['Detail', 'Reject'\] : \['Detail', 'Apply', 'Reject'\]\}/);
+  assert.match(source, /actions=\{taskQueueRowActions\(task, integrationBundleApplyBlocked\)\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
+test('task queue row reject action is hidden when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskQueueRowActions\(/);
+  assert.match(source, /if \(integrationBundleApplyBlocked\) return \['Detail'\]/);
+  assert.match(source, /if \(task\.canApply === false \|\| task\.reviewOnly\) return \['Detail', 'Reject'\]/);
+  assert.match(source, /return \['Detail', 'Apply', 'Reject'\]/);
+  assert.match(source, /actions=\{taskQueueRowActions\(task, integrationBundleApplyBlocked\)\}/);
+  assert.match(source, /else if \(action === 'Reject'\) actions\.setTaskStatus\(task\.id, 'Rejected'\)/);
   assert.equal(source.includes('queueMutation'), false);
 });
 

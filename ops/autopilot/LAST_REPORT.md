@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T01:15:28Z.
+- Latest heartbeat: 2026-06-20T01:25:19Z.
 
 ## Что сделано
 
@@ -956,17 +956,33 @@ input mutation, queue mutation, backend/WING contact, live transport,
 supervised apply opening, console apply, readiness closure, Full Autonomous
 readiness or live authority is introduced.
 
+The M053 Task Queue row reject blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m053_task_queue_row_reject_action_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Task Queue row-reject guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M053-task-queue-row-reject-blocker-guard.md`,
+`Docs/adr/task-queue-row-reject-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. Task Queue rows now expose only
+`Detail` and hide row-level `Reject` while `integrationBundleApplyBlocked` is
+true, preserving row `Reject` for local review-only tasks when the global
+blocker is absent. This is local frontend presentation hardening only: no task
+data mutation, backend result input mutation, queue mutation, backend/WING
+contact, live transport, supervised apply opening, console apply, readiness
+closure, Full Autonomous readiness or live authority is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `68 passed`.
+  `69 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m052_task_details_apply_button_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m053_task_queue_row_reject_action_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `65 passed`.
+  `66 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4178 passed, 1 skipped, 1 warning`.
+  `4179 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.
