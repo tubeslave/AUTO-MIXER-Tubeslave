@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T00:53:23Z.
+- Latest heartbeat: 2026-06-20T01:00:50Z.
 
 ## Что сделано
 
@@ -924,17 +924,33 @@ mutation, backend/WING contact, live transport, supervised apply opening,
 console apply, readiness closure, Full Autonomous readiness or live authority
 is introduced.
 
+The M051 Supervised Apply gate row blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m051_supervised_apply_gate_rows_reflect_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Supervised Apply gate-row guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M051-supervised-apply-gate-row-blocker-guard.md`,
+`Docs/adr/supervised-apply-gate-row-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. The Supervised Apply modal now shows
+blocked apply, no backend contact and no live apply while
+`integrationBundleApplyBlocked` is true. This is local frontend presentation
+hardening only: no backend result input mutation, task data change, queue
+mutation, backend/WING contact, live transport, supervised apply opening,
+console apply, readiness closure, Full Autonomous readiness or live authority
+is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `66 passed`.
+  `67 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m050_supervised_apply_backend_result_is_hidden_by_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m051_supervised_apply_gate_rows_reflect_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `63 passed`.
+  `64 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4176 passed, 1 skipped, 1 warning`.
+  `4177 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.

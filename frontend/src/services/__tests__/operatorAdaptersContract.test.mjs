@@ -4531,13 +4531,38 @@ test('supervised apply backend result is hidden when integration bundle is block
   );
 
   assert.match(source, /const visibleBackendResultMatches = resultMatches && !integrationBundleApplyBlocked/);
-  assert.match(source, /const applyRequestLabel = visibleBackendResultMatches \? backendResult\?\.applyRequest \?\? applyRequest : applyRequest/);
-  assert.match(source, /const readbackLabel = visibleBackendResultMatches \? backendResult\?\.readbackStatus \?\? 'Required after backend apply' : 'Required after backend apply'/);
-  assert.match(source, /const rollbackLabel = visibleBackendResultMatches \? backendResult\?\.rollbackStatus \?\? 'Snapshot required' : 'Snapshot required'/);
+  assert.match(source, /: visibleBackendResultMatches \? backendResult\?\.applyRequest \?\? applyRequest : applyRequest/);
+  assert.match(source, /: visibleBackendResultMatches \? backendResult\?\.readbackStatus \?\? 'Required after backend apply' : 'Required after backend apply'/);
+  assert.match(source, /: visibleBackendResultMatches \? backendResult\?\.rollbackStatus \?\? 'Snapshot required' : 'Snapshot required'/);
   assert.match(source, /const backendResultTone = visibleBackendResultMatches \? backendResult\?\.tone \?\? approvalTone : approvalTone/);
   assert.match(source, /visibleBackendResultMatches && readbackLabel\.includes\('verified'\)/);
   assert.match(source, /visibleBackendResultMatches && rollbackLabel\.includes\('available'\)/);
   assert.match(source, /\{visibleBackendResultMatches && \(/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
+test('supervised apply gate rows are blocked when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const modalGateBlockerStatus = integrationBundleApplyBlocked/);
+  assert.match(source, /applyRequest: 'Blocked'/);
+  assert.match(source, /readback: 'No backend contact'/);
+  assert.match(source, /rollback: 'No live apply'/);
+  assert.match(source, /readbackTone: 'red' as Tone/);
+  assert.match(source, /rollbackTone: 'red' as Tone/);
+  assert.match(source, /const applyRequestLabel = modalGateBlockerStatus/);
+  assert.match(source, /\? modalGateBlockerStatus\.applyRequest/);
+  assert.match(source, /const readbackLabel = modalGateBlockerStatus/);
+  assert.match(source, /\? modalGateBlockerStatus\.readback/);
+  assert.match(source, /const rollbackLabel = modalGateBlockerStatus/);
+  assert.match(source, /\? modalGateBlockerStatus\.rollback/);
+  assert.match(source, /const readbackTone = modalGateBlockerStatus/);
+  assert.match(source, /const rollbackTone = modalGateBlockerStatus/);
+  assert.match(source, /label: 'Readback status', value: readbackLabel, tone: readbackTone/);
+  assert.match(source, /label: 'Rollback status', value: rollbackLabel, tone: rollbackTone/);
   assert.equal(source.includes('queueMutation'), false);
 });
 
