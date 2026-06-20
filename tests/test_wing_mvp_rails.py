@@ -270,6 +270,8 @@ M104_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M104-wing-readonly-capture-time-o
 M104_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-capture-time-order-intake-guard-20260620.md"
 M105_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M105-project-director-post-m104-intake-loop-guard.md"
 M105_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-post-m104-intake-loop-guard-20260620.md"
+M106_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M106-project-director-post-m105-intake-loop-persistence.md"
+M106_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-post-m105-intake-loop-persistence-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -11012,6 +11014,77 @@ def test_m105_project_director_post_m104_intake_loop_guard_stays_readonly():
     assert "M105 Project Director post-M104 intake loop guard rail is now" in report
     assert "external_validation_wait_or_named_gap_only" in current
     assert "external_validation_wait_or_named_gap_only" in report
+
+
+def test_m106_project_director_post_m105_intake_loop_guard_persists():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M106_PLAN.read_text(encoding="utf-8")
+    adr = M106_ADR.read_text(encoding="utf-8")
+    director = load_project_director_module()
+
+    directive = director.build_directive(
+        project_root=PROJECT_ROOT,
+        lookback_commits=12,
+        report_limit=1,
+    )
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m106 = markdown_table_row(roadmap, "M106")
+    assert m106[1] == "Project Director post-M105 intake loop persistence"
+    assert m106[2] == (
+        "Project Director keeps the post-M104 intake-loop guard active even "
+        "after direction-guard commits sit above the WING read-only streak"
+    )
+    assert m106[3] == "M001"
+    assert m106[4] == "critical autopilot direction"
+    assert m106[5] == (
+        "UNIT_VERIFIED post-M105 loop persistence; live authority remains blocked"
+    )
+    assert m106[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    for marker in ("M106-CP01", "M106-CP02", "M106-CP03"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+    assert directive["pre_hardware_intake_guard_recent_subjects"][0] == (
+        "Guard WING readonly capture time order"
+    )
+    assert (
+        directive["allowed_autonomous_scope"]
+        == "external_validation_wait_or_named_gap_only"
+    )
+    assert any(
+        "No further generic WING read-only intake guard milestone after M104" in item
+        for item in directive["forbidden_scope"]
+    )
+
+    assert "M106 Project Director post-M105 intake loop persistence is now covered" in current
+    assert "M106 Project Director post-M105 intake loop persistence rail is now" in report
+    assert "direction-guard commits sit above the WING read-only streak" in current
+    assert "direction-guard commits sit above the WING read-only streak" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

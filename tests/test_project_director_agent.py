@@ -1302,6 +1302,7 @@ def test_project_director_detects_post_m104_intake_guard_streak():
     director = load_director_module()
 
     recent_subjects = [
+        "Guard project director intake loop",
         "Guard WING readonly capture time order",
         "Guard WING readonly run id timestamp",
         "Guard WING readonly run id format",
@@ -1319,6 +1320,7 @@ def test_project_director_detects_post_m104_intake_guard_streak():
 
     assert len(streak) == 10
     assert streak[0] == "Guard WING readonly capture time order"
+    assert streak[-1] == "Guard WING readonly reserved artifact intake"
     assert (
         director.pre_hardware_intake_hardening_loop_guard_required(
             external_validation_wait=True,

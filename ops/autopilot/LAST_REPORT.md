@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T17:31:31Z.
+- Latest heartbeat: 2026-06-20T17:54:44Z.
 
 ## Что сделано
 
@@ -261,6 +261,19 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   Validation: Project Director `7 passed`, M105 rail `1 passed`, full WING
   rail `118 passed`, staged-only full suite
   `4042 passed, 1 skipped, 1 warning`, memory lint PASS, `STATE.json`
+  validation PASS and `RUN_LEDGER.jsonl` validation PASS.
+
+- M106 Project Director post-M105 intake loop persistence rail is now
+  automated: Project Director finds the longest consecutive WING read-only
+  intake guard streak inside recent commit history, so the M105 guard remains
+  active after direction-guard commits sit above the WING read-only streak.
+  This fixes the named persistence gap where prefix-only streak detection
+  disabled `external_validation_wait_or_named_gap_only` after the M105 commit
+  itself. This creates no WING/backend contact, proposal apply, queue import,
+  live write, readiness closure, hardware evidence or live authority.
+  Validation: Project Director `7 passed`, M106 rail `1 passed`, full WING
+  rail `119 passed`, staged-only full suite
+  `4043 passed, 1 skipped, 1 warning`, memory lint PASS, `STATE.json`
   validation PASS and `RUN_LEDGER.jsonl` validation PASS.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as

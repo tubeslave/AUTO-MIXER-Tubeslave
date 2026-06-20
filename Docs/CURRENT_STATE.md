@@ -1572,6 +1572,18 @@ Generated: 2026-06-20T15:44:02Z
   opens no WebSocket/OSC write path, imports no proposal into a queue, applies
   no proposal, grants no live authority, closes no readiness row, creates no
   hardware evidence and does not replace real WING/operator validation.
+- M106 Project Director post-M105 intake loop persistence is now covered by
+  `tests/test_project_director_agent.py` and
+  `tests/test_wing_mvp_rails.py::test_m106_project_director_post_m105_intake_loop_guard_persists`.
+  Project Director now finds the longest consecutive WING read-only intake
+  guard streak inside recent commit history, so the M105 guard remains active
+  after direction-guard commits sit above the WING read-only streak. This fixes
+  the named M105 persistence gap where prefix-only streak detection disabled
+  `external_validation_wait_or_named_gap_only` after the M105 commit itself.
+  It contacts no WING/backend transport, opens no WebSocket/OSC write path,
+  imports no proposal into a queue, applies no proposal, grants no live
+  authority, closes no readiness row, creates no hardware evidence and does not
+  replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1582,4 +1594,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4042 passed, 1 skipped, 1 warning`.
+  `4043 passed, 1 skipped, 1 warning`.

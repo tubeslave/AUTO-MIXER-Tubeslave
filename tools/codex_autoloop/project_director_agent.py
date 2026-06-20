@@ -91,12 +91,18 @@ def is_wing_readonly_intake_guard_subject(subject: str) -> bool:
 
 
 def wing_readonly_intake_guard_streak(subjects: Sequence[str]) -> list[str]:
+    best_streak: list[str] = []
     streak: list[str] = []
     for subject in subjects:
-        if not is_wing_readonly_intake_guard_subject(subject):
-            break
-        streak.append(subject)
-    return streak
+        if is_wing_readonly_intake_guard_subject(subject):
+            streak.append(subject)
+            continue
+        if len(streak) > len(best_streak):
+            best_streak = streak
+        streak = []
+    if len(streak) > len(best_streak):
+        best_streak = streak
+    return best_streak
 
 
 def pre_hardware_intake_hardening_loop_guard_required(
