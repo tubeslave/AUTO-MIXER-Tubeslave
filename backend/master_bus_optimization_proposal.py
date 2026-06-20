@@ -21,6 +21,7 @@ MIN_EQ_DELTA_DB = 0.4
 MASTER_STATIC_UP_GAIN_CAP_DB = 1.0
 MASTER_STATIC_DOWN_GAIN_CAP_DB = 3.0
 MASTER_TRUE_PEAK_RESERVE_DB = 0.5
+REFERENCE_FEED_ROLE_TOKENS = ("reference", "measurement", "capture", "analysis")
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,12 @@ class MasterBusAnalysisInput:
     current_limiter_ceiling_dbfs: Optional[float] = None
     master_headroom_db: Optional[float] = None
     limiter_or_dynamics_proof: bool = False
+    output_feed_role: str = "pa_main"
+    output_feed_label: str = "PA main"
+    pa_feed_readback_available: bool = False
+    pa_feed_safe_for_master_change: bool = False
+    pa_feed_cache_freshness: Optional[Dict[str, Any]] = None
+    is_reference_feed: bool = False
     confidence: float = 0.75
     persistence_cycles: int = 1
     current_state_cache_freshness: Optional[Dict[str, Any]] = None
@@ -189,7 +196,12 @@ def _severity(
     target_gain_reduction_db: float,
 ) -> str:
     blocker_set = set(blockers)
-    if "true_peak_headroom_insufficient" in blocker_set or abs(loudness_gap_db) >= 5.0:
+    if (
+        "true_peak_headroom_insufficient" in blocker_set
+        or "master_reference_feed_excluded" in blocker_set
+        or "pa_feed_safety_not_confirmed" in blocker_set
+        or abs(loudness_gap_db) >= 5.0
+    ):
         return "high"
     if (
         abs(loudness_gap_db) >= 1.5
@@ -238,6 +250,19 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     normalized["provided"] = True
     normalized.setdefault("status", _freshness_status(payload))
     return normalized
+
+
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
+def _is_reference_feed(analysis: MasterBusAnalysisInput) -> bool:
+    role = str(analysis.output_feed_role or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return bool(analysis.is_reference_feed or any(token in role for token in REFERENCE_FEED_ROLE_TOKENS))
 
 
 def _tonal_moves(analysis: MasterBusAnalysisInput) -> Tuple[float, float, float]:
@@ -308,10 +333,25 @@ def analyze_master_bus_need(
     stereo_correlation = _clip(_safe_float(analysis.stereo_correlation), -1.0, 1.0)
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
+    pa_feed_freshness = _freshness_payload(analysis.pa_feed_cache_freshness)
+    pa_feed_freshness_status = str(pa_feed_freshness.get("status") or "unknown")
+    pa_feed_no_authority = _freshness_is_no_authority(pa_feed_freshness)
+    output_feed_role = str(analysis.output_feed_role or "unknown").strip().lower() or "unknown"
 
     blockers = []
     if integrated_lufs <= -70.0 or true_peak <= -90.0:
         blockers.append("master_signal_below_analysis_floor")
+    if _is_reference_feed(analysis):
+        blockers.append("master_reference_feed_excluded")
+    if not analysis.pa_feed_readback_available:
+        blockers.append("pa_feed_readback_missing")
+    if not analysis.pa_feed_safe_for_master_change:
+        blockers.append("pa_feed_safety_not_confirmed")
+    if pa_feed_freshness_status != "fresh":
+        blockers.append("pa_feed_cache_not_fresh")
+    if pa_feed_freshness_status == "fresh" and not pa_feed_no_authority:
+        blockers.append("pa_feed_cache_live_authority_present")
     if loudness_gap > 0.0 and headroom <= MASTER_TRUE_PEAK_RESERVE_DB:
         blockers.append("true_peak_headroom_insufficient")
     if loudness_gap > suggested_trim + 0.2 and not analysis.limiter_or_dynamics_proof:
@@ -320,8 +360,10 @@ def analyze_master_bus_need(
         blockers.append("master_loudness_requires_approved_limiter_or_dynamics_stage")
     if stereo_correlation < -0.15:
         blockers.append("stereo_correlation_phase_risk")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("master_bus_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("master_bus_current_state_cache_live_authority_present")
 
     eq_magnitude = max(abs(broad_eq_tilt), abs(low_shelf), abs(high_shelf))
     ceiling_move_needed = current_ceiling > profile.max_true_peak_dbfs + 0.1
@@ -348,7 +390,8 @@ def analyze_master_bus_need(
     if status == "proposal_only":
         reason = (
             f"{label} can target {profile.target_integrated_lufs:.1f} LUFS with "
-            f"{suggested_trim:+.1f} dB trim and bounded master-bus tone/dynamics settings."
+            f"{suggested_trim:+.1f} dB trim and bounded master-bus tone/dynamics settings "
+            f"after PA feed safety is confirmed."
         )
     else:
         reason = f"{label} does not meet safe master-bus proposal criteria."
@@ -371,9 +414,18 @@ def analyze_master_bus_need(
         "stereo_correlation": round(stereo_correlation, 3),
         "current_limiter_ceiling_dbfs": round(current_ceiling, 2),
         "limiter_or_dynamics_proof": bool(analysis.limiter_or_dynamics_proof),
+        "output_feed_role": output_feed_role,
+        "output_feed_label": str(analysis.output_feed_label or ""),
+        "pa_feed_readback_available": bool(analysis.pa_feed_readback_available),
+        "pa_feed_safe_for_master_change": bool(analysis.pa_feed_safe_for_master_change),
+        "pa_feed_cache_freshness_status": pa_feed_freshness_status,
+        "pa_feed_cache_freshness": pa_feed_freshness,
+        "pa_feed_cache_no_live_authority": pa_feed_no_authority,
+        "is_reference_feed": bool(_is_reference_feed(analysis)),
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_main_bus_processing_cache_no_live_authority": current_state_no_authority,
         "transport_free": True,
         "lufs_only_loudness_up_is_not_listening_master": True,
     }

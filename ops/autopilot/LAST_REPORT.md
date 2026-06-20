@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T07:35:10Z.
+- Latest heartbeat: 2026-06-20T10:24:42Z.
 
 ## Что сделано
 
@@ -57,6 +57,15 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   effects and sends, a separate capability required by the project goal, while
   creating no WING/backend contact, proposal apply, live write, readiness
   closure, hardware evidence or live authority.
+
+- M086 master bus PA feed and reference safety gates rail is now automated:
+  master-bus proposal candidates now require fresh read-only/no-authority
+  main-bus and PA-feed context, explicit PA-feed safety and reference-feed
+  exclusion. Missing, stale, reference-feed or live-authority context stays
+  analysis-only. This advances master-bus/output optimization, a separate
+  capability required by the project goal, while creating no WING/backend
+  contact, proposal apply, live write, readiness closure, hardware evidence or
+  live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2097,6 +2106,45 @@ The M085 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CAPABILITY_MATRIX.md`,
 `Docs/plans/M085-fx-send-monitor-return-safety-gates.md`,
 `Docs/adr/fx-send-monitor-return-safety-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M086 Master Bus PA Feed And Reference Safety Gates
+
+The M086 master-bus PA feed and reference safety rail is now automated by
+`tests/test_master_bus_optimization_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m086_master_bus_pa_feed_reference_safety_gates_stay_readonly`.
+
+Master-bus proposal candidates now require fresh read-only/no-authority main-bus
+context, PA-feed readback, explicit PA-feed safety, fresh no-authority PA-feed
+context and reference-feed exclusion before they can become proposal candidates.
+Missing, stale, reference-feed or live-authority context keeps the
+master/output layer analysis-only.
+
+This is offline master-bus/output hardening only. It mutates no console state,
+opens no backend/WING transport, sends no OSC/WebSocket write, imports no
+proposal into a queue, applies no proposal, grants no live authority, closes no
+readiness row, creates no hardware evidence and does not replace accepted real
+hardware/operator validation.
+
+This advances master-bus/output optimization, a separate capability required by the project goal.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_master_bus_optimization_proposal.py -q`:
+  `14 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m086_master_bus_pa_feed_reference_safety_gates_stay_readonly -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `99 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `3997 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M086 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`,
+`Docs/plans/M086-master-bus-pa-feed-reference-safety-gates.md`,
+`Docs/adr/master-bus-pa-feed-reference-safety-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 

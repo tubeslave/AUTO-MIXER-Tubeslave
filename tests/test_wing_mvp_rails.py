@@ -230,6 +230,8 @@ M084_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M084-unmasking-frequency-balance-
 M084_ADR = PROJECT_ROOT / "Docs" / "adr" / "unmasking-frequency-balance-context-gates-20260620.md"
 M085_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M085-fx-send-monitor-return-safety-gates.md"
 M085_ADR = PROJECT_ROOT / "Docs" / "adr" / "fx-send-monitor-return-safety-gates-20260620.md"
+M086_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M086-master-bus-pa-feed-reference-safety-gates.md"
+M086_ADR = PROJECT_ROOT / "Docs" / "adr" / "master-bus-pa-feed-reference-safety-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8819,6 +8821,168 @@ def test_m085_fx_send_monitor_return_safety_gates_stay_readonly():
     assert "M085 FX send monitor and return safety gates is now covered" in current
     assert "M085 FX send monitor and return safety gates rail is now" in report
     assert "effects and sends, a separate capability required by the project goal" in report
+
+
+def test_m086_master_bus_pa_feed_reference_safety_gates_stay_readonly():
+    from backend.master_bus_optimization_proposal import (
+        MasterBusAnalysisInput,
+        analyze_master_bus_need,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M086_PLAN.read_text(encoding="utf-8")
+    adr = M086_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m086 = markdown_table_row(roadmap, "M086")
+    assert m086[1] == "Master bus PA feed and reference safety gates"
+    assert m086[2] == (
+        "Master-bus proposal candidates require fresh read-only/no-authority "
+        "main-bus and PA-feed context, explicit PA-feed safety and "
+        "reference-feed exclusion"
+    )
+    assert m086[3] == "M084"
+    assert m086[4] == "critical offline master output"
+    assert m086[5] == "UNIT_VERIFIED master/output safety gate; live authority remains blocked"
+    assert m086[-1] == "PENDING"
+
+    for marker in ("M086-CP01", "M086-CP02", "M086-CP03", "M086-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert "PA-feed risk or reference-feed exclusion" in capability
+    assert "fresh read-only/no-authority main-bus and PA-feed context" in capability
+
+    fresh_main_context = {
+        "status": "fresh",
+        "field_count": 8,
+        "fresh_field_count": 8,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    fresh_pa_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_pa_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+
+    base = dict(
+        bus_label="Main L/R",
+        target_profile="live",
+        integrated_lufs=-18.7,
+        short_term_lufs=-18.3,
+        true_peak_dbfs=-4.5,
+        crest_factor_db=10.5,
+        lra_db=5.0,
+        spectral_tilt_db=1.8,
+        low_end_excess_db=1.4,
+        harshness_db=0.4,
+        stereo_correlation=0.1,
+        confidence=0.9,
+        persistence_cycles=3,
+    )
+
+    master_ok = analyze_master_bus_need(
+        MasterBusAnalysisInput(
+            **base,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=fresh_pa_context,
+            current_state_cache_freshness=fresh_main_context,
+        )
+    )
+    assert master_ok.status == "proposal_only"
+    assert master_ok.evidence["pa_feed_cache_no_live_authority"] is True
+    assert master_ok.evidence["current_main_bus_processing_cache_no_live_authority"] is True
+    assert master_ok.evidence["is_reference_feed"] is False
+    assert master_ok.to_operator_proposal()["can_apply_live"] is False
+
+    master_missing_pa = analyze_master_bus_need(
+        MasterBusAnalysisInput(**base, current_state_cache_freshness=fresh_main_context)
+    )
+    assert master_missing_pa.status == "analysis_only"
+    assert "pa_feed_readback_missing" in master_missing_pa.blockers
+    assert "pa_feed_safety_not_confirmed" in master_missing_pa.blockers
+    assert "pa_feed_cache_not_fresh" in master_missing_pa.blockers
+
+    master_reference = analyze_master_bus_need(
+        MasterBusAnalysisInput(
+            **{**base, "bus_label": "Master Reference Capture"},
+            bus_id="dante_reference",
+            output_feed_role="master_reference_capture",
+            is_reference_feed=True,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=fresh_pa_context,
+            current_state_cache_freshness=fresh_main_context,
+        )
+    )
+    assert master_reference.status == "analysis_only"
+    assert "master_reference_feed_excluded" in master_reference.blockers
+    assert master_reference.evidence["is_reference_feed"] is True
+
+    master_live_pa = analyze_master_bus_need(
+        MasterBusAnalysisInput(
+            **base,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=live_authority_pa_context,
+            current_state_cache_freshness=fresh_main_context,
+        )
+    )
+    assert master_live_pa.status == "analysis_only"
+    assert "pa_feed_cache_live_authority_present" in master_live_pa.blockers
+    assert master_live_pa.evidence["pa_feed_cache_no_live_authority"] is False
+
+    master_missing_main = analyze_master_bus_need(
+        MasterBusAnalysisInput(
+            **base,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=fresh_pa_context,
+        )
+    )
+    assert master_missing_main.status == "analysis_only"
+    assert "master_bus_current_state_cache_not_fresh" in master_missing_main.blockers
+    assert master_missing_main.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M086 master bus PA feed and reference safety gates is now covered" in current
+    assert "M086 master bus PA feed and reference safety gates rail is now" in report
+    assert "master-bus/output optimization, a separate capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

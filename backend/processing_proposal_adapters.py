@@ -301,7 +301,13 @@ PROPOSAL_ONLY_CONTRACTS = {
             "spectral_tilt",
             "reference_profile",
             "limiter_or_dynamics_proof",
+            "pa_feed_readback",
+            "pa_feed_safety",
+            "pa_feed_cache_freshness",
+            "pa_feed_cache_no_live_authority",
+            "reference_feed_exclusion",
             "current_main_bus_processing_cache_freshness",
+            "current_main_bus_processing_cache_no_live_authority",
         ],
     },
     "bus_group_balance_proposal": {

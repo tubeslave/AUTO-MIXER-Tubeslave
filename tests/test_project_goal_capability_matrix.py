@@ -468,6 +468,9 @@ def test_master_bus_is_tracked_as_transport_free_proposal_layer():
     assert row.autonomy_mode_ceiling == "assisted"
     assert "master_bus_optimization_proposal" in row.method_ids
     assert "operator review" in row.next_step
+    assert "true-peak headroom" in row.next_step
+    assert "PA-feed safety" in row.next_step
+    assert "reference-feed exclusion" in row.next_step
     assert row.current_live_write_kinds == ()
 
 

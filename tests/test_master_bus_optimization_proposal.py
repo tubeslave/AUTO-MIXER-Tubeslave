@@ -11,6 +11,17 @@ from backend.processing_registry import get_pipeline_profile, get_processing_met
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _fresh(fields=6):
+    return {
+        "status": "fresh",
+        "field_count": fields,
+        "fresh_field_count": fields,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
 def test_master_bus_proposal_module_is_transport_free():
     source = Path("backend/master_bus_optimization_proposal.py").read_text()
 
@@ -41,6 +52,9 @@ def test_healthy_master_creates_proposal_only_recommendation():
             low_end_excess_db=1.4,
             harshness_db=0.4,
             stereo_correlation=0.1,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=_fresh(),
             confidence=0.9,
             persistence_cycles=3,
             current_state_cache_freshness={
@@ -64,7 +78,13 @@ def test_healthy_master_creates_proposal_only_recommendation():
     assert recommendation.blockers == ()
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["lufs_only_loudness_up_is_not_listening_master"] is True
+    assert recommendation.evidence["output_feed_role"] == "pa_main"
+    assert recommendation.evidence["pa_feed_readback_available"] is True
+    assert recommendation.evidence["pa_feed_safe_for_master_change"] is True
+    assert recommendation.evidence["pa_feed_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["pa_feed_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_main_bus_processing_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
 
     proposal = recommendation.to_operator_proposal()
@@ -77,7 +97,10 @@ def test_healthy_master_creates_proposal_only_recommendation():
     assert "unsupported_value_type:master_bus" in proposal["blockers"]
     assert proposal["proposed_action"]["suggested_trim_db"] == recommendation.suggested_trim_db
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["pa_feed_safe_for_master_change"] is True
+    assert proposal["evidence"]["pa_feed_cache_no_live_authority"] is True
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_main_bus_processing_cache_no_live_authority"] is True
 
 
 def test_peak_limited_loudness_up_is_analysis_only_without_dynamics_proof():
@@ -115,6 +138,10 @@ def test_low_end_and_harshness_create_broad_eq_fields():
             low_end_excess_db=4.0,
             harshness_db=3.0,
             stereo_correlation=0.3,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=_fresh(),
+            current_state_cache_freshness=_fresh(8),
             confidence=0.85,
             persistence_cycles=3,
         )
@@ -126,6 +153,58 @@ def test_low_end_and_harshness_create_broad_eq_fields():
     assert recommendation.high_shelf_db < 0.0
     assert recommendation.evidence["low_end_excess_db"] == 4.0
     assert recommendation.evidence["harshness_db"] == 3.0
+
+
+def test_missing_pa_feed_safety_blocks_master_bus_proposal():
+    recommendation = analyze_master_bus_need(
+        MasterBusAnalysisInput(
+            target_profile="live",
+            integrated_lufs=-18.7,
+            short_term_lufs=-18.3,
+            true_peak_dbfs=-4.5,
+            crest_factor_db=10.5,
+            lra_db=5.0,
+            spectral_tilt_db=1.8,
+            confidence=0.9,
+            persistence_cycles=3,
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "pa_feed_readback_missing" in recommendation.blockers
+    assert "pa_feed_safety_not_confirmed" in recommendation.blockers
+    assert "pa_feed_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["pa_feed_cache_freshness_status"] == "not_provided"
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_reference_feed_is_excluded_from_master_output_proposals():
+    recommendation = analyze_master_bus_need(
+        MasterBusAnalysisInput(
+            bus_id="dante_reference",
+            bus_label="Master Reference Capture",
+            target_profile="live",
+            integrated_lufs=-18.7,
+            short_term_lufs=-18.3,
+            true_peak_dbfs=-4.5,
+            crest_factor_db=10.5,
+            lra_db=5.0,
+            spectral_tilt_db=1.8,
+            output_feed_role="master_reference_capture",
+            is_reference_feed=True,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=_fresh(),
+            confidence=0.9,
+            persistence_cycles=3,
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "master_reference_feed_excluded" in recommendation.blockers
+    assert recommendation.severity == "high"
+    assert recommendation.evidence["is_reference_feed"] is True
+    assert recommendation.evidence["output_feed_role"] == "master_reference_capture"
 
 
 def test_stale_current_master_bus_state_blocks_proposal_only_recommendation():
@@ -142,6 +221,9 @@ def test_stale_current_master_bus_state_blocks_proposal_only_recommendation():
             low_end_excess_db=1.4,
             harshness_db=0.4,
             stereo_correlation=0.1,
+            pa_feed_readback_available=True,
+            pa_feed_safe_for_master_change=True,
+            pa_feed_cache_freshness=_fresh(),
             confidence=0.9,
             persistence_cycles=3,
             current_state_cache_freshness={
@@ -168,6 +250,106 @@ def test_stale_current_master_bus_state_blocks_proposal_only_recommendation():
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
+def test_live_authority_pa_feed_cache_blocks_master_bus_proposal_only_recommendation():
+    analysis = MasterBusAnalysisInput(
+        bus_label="Main L/R",
+        target_profile="live",
+        integrated_lufs=-18.7,
+        short_term_lufs=-18.3,
+        true_peak_dbfs=-4.5,
+        crest_factor_db=10.5,
+        lra_db=5.0,
+        spectral_tilt_db=1.8,
+        low_end_excess_db=1.4,
+        harshness_db=0.4,
+        stereo_correlation=0.1,
+        pa_feed_readback_available=True,
+        pa_feed_safe_for_master_change=True,
+        pa_feed_cache_freshness={
+            "status": "fresh",
+            "field_count": 6,
+            "fresh_field_count": 6,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        },
+        current_state_cache_freshness=_fresh(8),
+        confidence=0.9,
+        persistence_cycles=3,
+    )
+    recommendation = analyze_master_bus_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "pa_feed_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["pa_feed_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["pa_feed_cache_no_live_authority"] is False
+    assert recommendation.evidence["pa_feed_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_master_bus_proposals([analysis]) == ()
+
+
+def test_live_authority_current_master_bus_state_blocks_proposal_only_recommendation():
+    analysis = MasterBusAnalysisInput(
+        bus_label="Main L/R",
+        target_profile="live",
+        integrated_lufs=-18.7,
+        short_term_lufs=-18.3,
+        true_peak_dbfs=-4.5,
+        crest_factor_db=10.5,
+        lra_db=5.0,
+        spectral_tilt_db=1.8,
+        low_end_excess_db=1.4,
+        harshness_db=0.4,
+        stereo_correlation=0.1,
+        pa_feed_readback_available=True,
+        pa_feed_safe_for_master_change=True,
+        pa_feed_cache_freshness=_fresh(),
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 8,
+            "fresh_field_count": 8,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        },
+        confidence=0.9,
+        persistence_cycles=3,
+    )
+    recommendation = analyze_master_bus_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "master_bus_current_state_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_main_bus_processing_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["queries_console"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_master_bus_proposals([analysis]) == ()
+
+
+def test_missing_current_master_bus_state_blocks_proposal_only_recommendation():
+    analysis = MasterBusAnalysisInput(
+        bus_label="Main L/R",
+        target_profile="live",
+        integrated_lufs=-18.7,
+        short_term_lufs=-18.3,
+        true_peak_dbfs=-4.5,
+        crest_factor_db=10.5,
+        lra_db=5.0,
+        spectral_tilt_db=1.8,
+        pa_feed_readback_available=True,
+        pa_feed_safe_for_master_change=True,
+        pa_feed_cache_freshness=_fresh(),
+        confidence=0.9,
+        persistence_cycles=3,
+    )
+    recommendation = analyze_master_bus_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "master_bus_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert build_master_bus_proposals([analysis]) == ()
+
+
 def test_build_master_bus_proposals_filters_to_proposal_only_items():
     proposals = build_master_bus_proposals(
         [
@@ -176,6 +358,10 @@ def test_build_master_bus_proposals_filters_to_proposal_only_items():
                 target_profile="live",
                 integrated_lufs=-18.7,
                 true_peak_dbfs=-4.5,
+                pa_feed_readback_available=True,
+                pa_feed_safe_for_master_change=True,
+                pa_feed_cache_freshness=_fresh(),
+                current_state_cache_freshness=_fresh(8),
                 confidence=0.9,
                 persistence_cycles=3,
             ),
@@ -240,5 +426,21 @@ def test_master_bus_proposal_is_registered_as_goal_capability():
     assert contracts["master_bus_optimization_proposal"]["proposal_contract"]["value_type"] == "master_bus"
     assert (
         "current_main_bus_processing_cache_freshness"
+        in contracts["master_bus_optimization_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "pa_feed_safety"
+        in contracts["master_bus_optimization_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "pa_feed_cache_no_live_authority"
+        in contracts["master_bus_optimization_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "reference_feed_exclusion"
+        in contracts["master_bus_optimization_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "current_main_bus_processing_cache_no_live_authority"
         in contracts["master_bus_optimization_proposal"]["proposal_contract"]["safety_evidence_required"]
     )

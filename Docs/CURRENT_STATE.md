@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T07:35:10Z
+Generated: 2026-06-20T10:24:42Z
 
 ## Repository snapshot
 
@@ -1299,6 +1299,20 @@ Generated: 2026-06-20T07:35:10Z
   proposal into a queue, applies no proposal, grants no live authority, closes
   no readiness row, creates no hardware evidence and does not replace real
   WING/operator validation.
+- M086 master bus PA feed and reference safety gates is now covered by
+  `tests/test_master_bus_optimization_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m086_master_bus_pa_feed_reference_safety_gates_stay_readonly`.
+  Master-bus proposal candidates now require fresh read-only/no-authority
+  main-bus context, PA-feed readback, explicit PA-feed safety, fresh
+  no-authority PA-feed context and reference-feed exclusion before they can
+  become proposal candidates. Missing, stale, reference-feed or live-authority
+  context keeps the master/output layer analysis-only. This moves the long-term
+  AI mixing engineer path forward into master-bus/output optimization, a
+  separate capability required by the project goal, while staying offline and
+  proposal-only: it contacts no WING/backend transport, opens no WebSocket/OSC
+  write path, imports no proposal into a queue, applies no proposal, grants no
+  live authority, closes no readiness row, creates no hardware evidence and does
+  not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1308,5 +1322,5 @@ Generated: 2026-06-20T07:35:10Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest clean staged M085 verification passed with
-  `3991 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `e8a38bc0` passed with
+  `3997 passed, 1 skipped, 1 warning`.
