@@ -4524,6 +4524,23 @@ test('supervised apply final readiness is guarded when integration bundle is blo
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply backend result is hidden when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const visibleBackendResultMatches = resultMatches && !integrationBundleApplyBlocked/);
+  assert.match(source, /const applyRequestLabel = visibleBackendResultMatches \? backendResult\?\.applyRequest \?\? applyRequest : applyRequest/);
+  assert.match(source, /const readbackLabel = visibleBackendResultMatches \? backendResult\?\.readbackStatus \?\? 'Required after backend apply' : 'Required after backend apply'/);
+  assert.match(source, /const rollbackLabel = visibleBackendResultMatches \? backendResult\?\.rollbackStatus \?\? 'Snapshot required' : 'Snapshot required'/);
+  assert.match(source, /const backendResultTone = visibleBackendResultMatches \? backendResult\?\.tone \?\? approvalTone : approvalTone/);
+  assert.match(source, /visibleBackendResultMatches && readbackLabel\.includes\('verified'\)/);
+  assert.match(source, /visibleBackendResultMatches && rollbackLabel\.includes\('available'\)/);
+  assert.match(source, /\{visibleBackendResultMatches && \(/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task queue review-only filter includes all rows when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

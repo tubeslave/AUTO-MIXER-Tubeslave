@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T00:45:41Z.
+- Latest heartbeat: 2026-06-20T00:53:23Z.
 
 ## Что сделано
 
@@ -908,17 +908,33 @@ mutation, backend/WING contact, live transport, supervised apply opening,
 console apply, readiness closure, Full Autonomous readiness or live authority
 is introduced.
 
+The M050 Supervised Apply backend result blocker guard rail is now automated
+by `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m050_supervised_apply_backend_result_is_hidden_by_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Supervised Apply backend-result guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M050-supervised-apply-backend-result-blocker-guard.md`,
+`Docs/adr/supervised-apply-backend-result-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. The Supervised Apply modal now hides
+matched backend result rows and the `Backend Result` panel while
+`integrationBundleApplyBlocked` is true. This is local frontend presentation
+hardening only: no backend result input mutation, task data change, queue
+mutation, backend/WING contact, live transport, supervised apply opening,
+console apply, readiness closure, Full Autonomous readiness or live authority
+is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `65 passed`.
+  `66 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m049_supervised_apply_final_readiness_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m050_supervised_apply_backend_result_is_hidden_by_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `62 passed`.
+  `63 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4175 passed, 1 skipped, 1 warning`.
+  `4176 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.

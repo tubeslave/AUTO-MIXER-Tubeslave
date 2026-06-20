@@ -515,10 +515,11 @@ function SupervisedApplyModal({
     backendResult
     && (!backendResult.proposalId || backendResult.proposalId === task.proposalId || backendResult.proposalId === task.id)
   );
-  const applyRequestLabel = resultMatches ? backendResult?.applyRequest ?? applyRequest : applyRequest;
-  const readbackLabel = resultMatches ? backendResult?.readbackStatus ?? 'Required after backend apply' : 'Required after backend apply';
-  const rollbackLabel = resultMatches ? backendResult?.rollbackStatus ?? 'Snapshot required' : 'Snapshot required';
-  const backendResultTone = resultMatches ? backendResult?.tone ?? approvalTone : approvalTone;
+  const visibleBackendResultMatches = resultMatches && !integrationBundleApplyBlocked;
+  const applyRequestLabel = visibleBackendResultMatches ? backendResult?.applyRequest ?? applyRequest : applyRequest;
+  const readbackLabel = visibleBackendResultMatches ? backendResult?.readbackStatus ?? 'Required after backend apply' : 'Required after backend apply';
+  const rollbackLabel = visibleBackendResultMatches ? backendResult?.rollbackStatus ?? 'Snapshot required' : 'Snapshot required';
+  const backendResultTone = visibleBackendResultMatches ? backendResult?.tone ?? approvalTone : approvalTone;
   const finalReadinessStatus = integrationBundleApplyBlocked
     ? { value: 'Blocked by integration bundle', tone: 'red' as Tone }
     : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };
@@ -570,8 +571,8 @@ function SupervisedApplyModal({
                 {[
                   { label: 'Required approval', value: approvalLabel, tone: approvalTone },
                   { label: 'Apply request', value: applyRequestLabel, tone: backendResultTone },
-                  { label: 'Readback status', value: readbackLabel, tone: resultMatches && readbackLabel.includes('verified') ? 'green' as const : 'yellow' as const },
-                  { label: 'Rollback status', value: rollbackLabel, tone: resultMatches && rollbackLabel.includes('available') ? 'green' as const : resultMatches && rollbackLabel.includes('failed') ? 'red' as const : 'yellow' as const },
+                  { label: 'Readback status', value: readbackLabel, tone: visibleBackendResultMatches && readbackLabel.includes('verified') ? 'green' as const : 'yellow' as const },
+                  { label: 'Rollback status', value: rollbackLabel, tone: visibleBackendResultMatches && rollbackLabel.includes('available') ? 'green' as const : visibleBackendResultMatches && rollbackLabel.includes('failed') ? 'red' as const : 'yellow' as const },
                   { label: 'Final readiness', value: finalReadinessStatus.value, tone: finalReadinessStatus.tone },
                   { label: 'Direct writes', value: 'Disabled', tone: 'red' as const }
                 ].map(row => (
@@ -593,7 +594,7 @@ function SupervisedApplyModal({
                 ))}
               </div>
             </div>
-            {resultMatches && (
+            {visibleBackendResultMatches && (
               <div className="rounded-[7px] border border-line bg-row p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="am-label">Backend Result</div>

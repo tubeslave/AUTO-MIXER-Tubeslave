@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T00:45:41Z
+Generated: 2026-06-20T00:53:23Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T00:45:41Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `4eaf3d19 Guard operator decision blocker status`
+  `e4967b46 Guard supervised apply readiness status`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -774,6 +774,18 @@ Generated: 2026-06-20T00:45:41Z
   backend/WING contact, no live transport, no live authority, no readiness
   closure, no Full Autonomous readiness and no replacement for accepted real
   hardware/operator validation.
+- M050 Supervised Apply backend result blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m050_supervised_apply_backend_result_is_hidden_by_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives `visibleBackendResultMatches` from `resultMatches` and
+  `integrationBundleApplyBlocked`; while the blocker is visible, matched
+  backend result rows and the `Backend Result` panel do not render as active
+  modal evidence. This is local frontend presentation hardening only: it
+  mutates no backend result input, changes no task data, creates no queue
+  mutation, no backend/WING contact, no live transport, no live authority, no
+  readiness closure, no Full Autonomous readiness and no replacement for
+  accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -784,4 +796,4 @@ Generated: 2026-06-20T00:45:41Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4175 passed, 1 skipped, 1 warning`.
+  `4176 passed, 1 skipped, 1 warning`.

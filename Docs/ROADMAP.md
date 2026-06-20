@@ -73,6 +73,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M047 | Apply Plan sequence blocker guard | Apply Plan and modal Gate Sequence show blocked integration bundle steps while promotion planning is blocked | M046 | high offline frontend | UNIT_VERIFIED blocked Apply Plan sequence; live authority remains blocked | PENDING |
 | M048 | Operator Decision blocker status guard | Operator Decision panel shows integration bundle blocker status while promotion planning is blocked | M047 | high offline frontend | UNIT_VERIFIED blocked Operator Decision status; live authority remains blocked | PENDING |
 | M049 | Supervised Apply readiness blocker guard | Supervised Apply modal Final readiness shows integration bundle blocker status while promotion planning is blocked | M048 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply readiness; live authority remains blocked | PENDING |
+| M050 | Supervised Apply backend result blocker guard | Supervised Apply modal hides matched backend results while promotion planning is blocked | M049 | high offline frontend | UNIT_VERIFIED hidden Supervised Apply backend result; live authority remains blocked | PENDING |
 
 ## Active milestone
 

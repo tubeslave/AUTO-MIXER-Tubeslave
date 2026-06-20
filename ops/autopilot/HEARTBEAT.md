@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T00:45:41Z
+Last heartbeat UTC: 2026-06-20T00:53:23Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,16 +12,16 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M049 Supervised Apply readiness blocker guard now shows
-integration-bundle blocked `Final readiness` status in the Supervised Apply
-modal while `integrationBundleApplyBlocked` is true. The updated frontend keeps
-this as local presentation hardening and does not mutate backend status input,
-change task data, add queue mutation, open supervised apply, console apply,
+Latest check: M050 Supervised Apply backend result blocker guard now hides
+matched backend results in the Supervised Apply modal while
+`integrationBundleApplyBlocked` is true. The updated frontend keeps this as
+local presentation hardening and does not mutate backend result input, change
+task data, add queue mutation, open supervised apply, console apply,
 WING/backend contact or live authority.
 
-Frontend adapter validation passed with `65 passed`; the frontend build
-passed; the M049 rail passed with `1 passed`; the full rail file passed with
-`62 passed`; and the full suite passed with `4175 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `66 passed`; the frontend build
+passed; the M050 rail passed with `1 passed`; the full rail file passed with
+`63 passed`; and the full suite passed with `4176 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

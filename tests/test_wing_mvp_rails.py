@@ -157,6 +157,8 @@ M048_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M048-operator-decision-blocker-st
 M048_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-decision-blocker-status-guard-20260620.md"
 M049_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M049-supervised-apply-readiness-blocker-guard.md"
 M049_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-readiness-blocker-guard-20260620.md"
+M050_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M050-supervised-apply-backend-result-blocker-guard.md"
+M050_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-backend-result-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -5961,6 +5963,80 @@ def test_m049_supervised_apply_final_readiness_reflects_integration_bundle_block
     assert "Supervised Apply readiness statuses must fail closed" in completion
     assert "M049 Supervised Apply readiness blocker guard is now covered" in current
     assert "M049 Supervised Apply readiness blocker guard rail is now automated" in report
+
+
+def test_m050_supervised_apply_backend_result_is_hidden_by_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M050_PLAN.read_text(encoding="utf-8")
+    adr = M050_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m050 = markdown_table_row(roadmap, "M050")
+    assert m050[1] == "Supervised Apply backend result blocker guard"
+    assert m050[2] == (
+        "Supervised Apply modal hides matched backend results while promotion "
+        "planning is blocked"
+    )
+    assert m050[3] == "M049"
+    assert m050[4] == "high offline frontend"
+    assert m050[5] == "UNIT_VERIFIED hidden Supervised Apply backend result; live authority remains blocked"
+    assert m050[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Supervised Apply matched backend results now hide when integration bundle blockers are visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M050-CP01" in plan
+    assert "M050-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate backend result input" in adr
+
+    assert "const visibleBackendResultMatches = resultMatches && !integrationBundleApplyBlocked" in (
+        task_queue
+    )
+    assert "const applyRequestLabel = visibleBackendResultMatches ? backendResult?.applyRequest ?? applyRequest : applyRequest" in (
+        task_queue
+    )
+    assert "const readbackLabel = visibleBackendResultMatches ? backendResult?.readbackStatus ?? 'Required after backend apply' : 'Required after backend apply'" in (
+        task_queue
+    )
+    assert "const rollbackLabel = visibleBackendResultMatches ? backendResult?.rollbackStatus ?? 'Snapshot required' : 'Snapshot required'" in (
+        task_queue
+    )
+    assert "const backendResultTone = visibleBackendResultMatches ? backendResult?.tone ?? approvalTone : approvalTone" in (
+        task_queue
+    )
+    assert "visibleBackendResultMatches && readbackLabel.includes('verified')" in task_queue
+    assert "visibleBackendResultMatches && rollbackLabel.includes('available')" in task_queue
+    assert "{visibleBackendResultMatches && (" in task_queue
+    assert "supervised apply backend result is hidden" in adapter_test
+    assert "Supervised Apply backend result panels must fail closed" in completion
+    assert "M050 Supervised Apply backend result blocker guard is now covered" in current
+    assert "M050 Supervised Apply backend result blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
