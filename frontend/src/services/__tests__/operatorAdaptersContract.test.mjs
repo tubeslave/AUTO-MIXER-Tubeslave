@@ -4805,6 +4805,21 @@ test('task details badge shows blocked state when integration bundle is blocked'
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task details status value shows blocked state when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskStatusDisplay\(/);
+  assert.match(source, /const detailStatus = taskStatusDisplay\(task, integrationBundleApplyBlocked\)/);
+  assert.match(source, /<StatusBadge tone=\{detailStatus\.tone\}>\{detailStatus\.label\}<\/StatusBadge>/);
+  assert.match(source, /const label = integrationBundleApplyBlocked \? 'Blocked' : task\.status/);
+  assert.match(source, /const tone = integrationBundleApplyBlocked \? 'red' as const : toneFromState\(task\.status\)/);
+  assert.doesNotMatch(source, /<StatusBadge tone=\{toneFromState\(task\.status\)\}>\{task\.status\}<\/StatusBadge>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task details apply button is visibly blocked when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

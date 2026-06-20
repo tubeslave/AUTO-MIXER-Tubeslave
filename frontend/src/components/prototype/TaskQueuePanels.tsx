@@ -222,6 +222,7 @@ export function TaskDetailsPanel({
     ? 'am-button border-danger/40 bg-danger/10 text-danger disabled:cursor-not-allowed disabled:opacity-70'
     : 'am-button text-danger';
   const ensembleEvidence = ensembleEvidenceForTask(task);
+  const detailStatus = taskStatusDisplay(task, integrationBundleApplyBlocked);
 
   return (
     <Panel title="Task Details">
@@ -231,7 +232,7 @@ export function TaskDetailsPanel({
       </div>
       <h3 className="text-base font-bold">{task.title}</h3>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
-        <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge>
+        <StatusBadge tone={detailStatus.tone}>{detailStatus.label}</StatusBadge>
         <StatusBadge tone={toneForMode(ui.mode)}>{getModeDisplayLabel(ui.mode)}</StatusBadge>
         {(integrationBundleApplyBlocked || task.reviewOnly) && (
           <StatusBadge tone="red">{integrationBundleApplyBlocked ? 'Blocked' : 'Review only'}</StatusBadge>

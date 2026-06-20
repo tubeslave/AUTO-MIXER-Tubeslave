@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T03:12:23Z
+Generated: 2026-06-20T03:22:26Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T03:12:23Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `a16134e3 Guard replay report path blocker`
+  `7322750e Guard task queue blocked status`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -977,6 +977,22 @@ Generated: 2026-06-20T03:12:23Z
   backend/WING contact, no live transport, no live authority, no readiness
   closure, no Full Autonomous readiness and no replacement for accepted real
   hardware/operator validation.
+- M065 Task Details status value blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m065_task_details_status_value_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  reuses local Task Queue status display values through
+  `taskStatusDisplay(task, integrationBundleApplyBlocked)` for the Task Details
+  primary task-status badge; while the blocker is visible, Task Details shows
+  `Blocked` instead of the raw task status. The raw task status remains
+  unchanged when the global blocker is absent. This is local frontend
+  presentation hardening only: it mutates no task status input, task data,
+  proposal data, backend status input, backend result input, safety monitor
+  input or readiness input, creates no queue mutation, no row hiding, no
+  supervised apply opening, no supervised apply dispatch, no backend/WING
+  contact, no live transport, no live authority, no readiness closure, no Full
+  Autonomous readiness and no replacement for accepted real hardware/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -987,4 +1003,4 @@ Generated: 2026-06-20T03:12:23Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4190 passed, 1 skipped, 1 warning`.
+  `4191 passed, 1 skipped, 1 warning`.

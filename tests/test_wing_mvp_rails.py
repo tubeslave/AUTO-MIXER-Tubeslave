@@ -187,6 +187,8 @@ M063_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M063-replay-evidence-report-path-
 M063_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-report-path-blocker-guard-20260620.md"
 M064_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M064-task-queue-status-column-blocker-guard.md"
 M064_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-status-column-blocker-guard-20260620.md"
+M065_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M065-task-details-status-value-blocker-guard.md"
+M065_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-status-value-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6996,6 +6998,70 @@ def test_m064_task_queue_status_column_reflects_integration_bundle_blocker():
     assert "Task Queue status columns must fail closed" in completion
     assert "M064 Task Queue status column blocker guard is now covered" in current
     assert "M064 Task Queue status column blocker guard rail is now automated" in report
+
+
+def test_m065_task_details_status_value_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M065_PLAN.read_text(encoding="utf-8")
+    adr = M065_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m065 = markdown_table_row(roadmap, "M065")
+    assert m065[1] == "Task Details status value blocker guard"
+    assert m065[2] == (
+        "Task Details primary status badge shows integration bundle blocker "
+        "status while promotion planning is blocked"
+    )
+    assert m065[3] == "M064"
+    assert m065[4] == "high offline frontend"
+    assert m065[5] == "UNIT_VERIFIED blocked Task Details status value; live authority remains blocked"
+    assert m065[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Details status value now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M065-CP01" in plan
+    assert "M065-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate task status input" in adr
+
+    assert "function taskStatusDisplay(" in task_queue
+    assert "const detailStatus = taskStatusDisplay(task, integrationBundleApplyBlocked)" in task_queue
+    assert "<StatusBadge tone={detailStatus.tone}>{detailStatus.label}</StatusBadge>" in task_queue
+    assert "const label = integrationBundleApplyBlocked ? 'Blocked' : task.status" in task_queue
+    assert "const tone = integrationBundleApplyBlocked ? 'red' as const : toneFromState(task.status)" in task_queue
+    assert "<StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge>" not in task_queue
+    assert "task details status value shows blocked state" in adapter_test
+    assert "Task Details status values must fail closed" in completion
+    assert "M065 Task Details status value blocker guard is now covered" in current
+    assert "M065 Task Details status value blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
