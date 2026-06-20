@@ -718,13 +718,17 @@ def _run_id_matches_wing_readonly_capture_format(value: str) -> bool:
     return bool(WING_READONLY_PREFLIGHT_RUN_ID_PATTERN.fullmatch(value))
 
 
-def _run_id_has_valid_utc_timestamp(value: str) -> bool:
+def _run_id_utc_timestamp(value: str) -> datetime | None:
     timestamp = value.removesuffix("_wing_readonly_preflight")
     try:
-        datetime.strptime(timestamp, "%Y%m%dT%H%M%SZ")
+        parsed = datetime.strptime(timestamp, "%Y%m%dT%H%M%SZ")
     except ValueError:
-        return False
-    return True
+        return None
+    return parsed.replace(tzinfo=timezone.utc)
+
+
+def _run_id_has_valid_utc_timestamp(value: str) -> bool:
+    return _run_id_utc_timestamp(value) is not None
 
 
 def _validate_candidate_artifact_intake_paths(
@@ -1182,6 +1186,7 @@ def _validate_event_log(
         violations.append("event_log_empty")
         return None, ()
     summary_run_id = str(payload.get("run_id") or "")
+    run_id_timestamp = _run_id_utc_timestamp(summary_run_id)
     event_log_run_id_matches_summary = True
     for index, event in enumerate(events):
         if event.get("run_id") != summary_run_id:
@@ -1202,6 +1207,8 @@ def _validate_event_log(
             violations.append(f"event_log_timestamp_invalid:{index}")
             continue
         parsed_event_timestamps.append(parsed_timestamp)
+        if run_id_timestamp is not None and parsed_timestamp < run_id_timestamp:
+            violations.append(f"event_log_timestamp_before_run_id:{index}")
         if captured_timestamp is not None and parsed_timestamp > captured_timestamp:
             violations.append(f"event_log_timestamp_after_captured_at:{index}")
     if any(
@@ -1428,10 +1435,20 @@ def validate_wing_readonly_preflight_artifact(
     if payload.get("reason") != EXPECTED_RUN_SUMMARY_REASON:
         violations.append("reason_not_passed")
     captured_at = payload.get("captured_at")
+    captured_timestamp: datetime | None = None
     if not isinstance(captured_at, str) or not captured_at:
         violations.append("captured_at_missing")
-    elif not _is_utc_timestamp(captured_at):
+    else:
+        captured_timestamp = _parse_utc_timestamp(captured_at)
+    if isinstance(captured_at, str) and captured_at and captured_timestamp is None:
         violations.append("captured_at_invalid")
+    run_id_timestamp = _run_id_utc_timestamp(str(payload.get("run_id") or ""))
+    if (
+        captured_timestamp is not None
+        and run_id_timestamp is not None
+        and captured_timestamp < run_id_timestamp
+    ):
+        violations.append("captured_at_before_run_id_timestamp")
     if payload.get("connection_mode") != "wing":
         violations.append("connection_mode_not_wing")
     if payload.get("request_id_policy") != REQUEST_ID_POLICY:

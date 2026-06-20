@@ -1048,6 +1048,28 @@ def test_file_preflight_evidence_rejects_invalid_run_id_timestamp(tmp_path):
     assert "run_id_not_valid_utc_timestamp" in evidence["summary"]["violations"]
 
 
+def test_file_preflight_evidence_rejects_capture_time_before_run_id(tmp_path):
+    run_id = "20260608T010000Z_wing_readonly_preflight"
+    summary = _valid_summary()
+    summary["run_id"] = run_id
+    summary["captured_at"] = "2026-06-07T01:00:00Z"
+    artifact_path = _write_file_artifact(
+        tmp_path / WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT / run_id,
+        summary=summary,
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert "captured_at_before_run_id_timestamp" in evidence["summary"]["violations"]
+    assert "event_log_timestamp_before_run_id:0" in evidence["summary"]["violations"]
+
+
 def test_file_preflight_evidence_rejects_artifact_root_parent_traversal(tmp_path):
     artifact_root = (
         tmp_path / "container" / ".." / WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT

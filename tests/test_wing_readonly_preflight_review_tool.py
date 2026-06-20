@@ -200,10 +200,14 @@ def _event(
     *,
     run_id: str = "20260606T120000Z_wing_readonly_preflight",
 ) -> dict:
+    run_timestamp = run_id.removesuffix("_wing_readonly_preflight")
     return {
         "run_id": run_id,
         "seq": seq,
-        "timestamp": "2026-06-06T12:00:00.000Z",
+        "timestamp": (
+            f"{run_timestamp[:4]}-{run_timestamp[4:6]}-{run_timestamp[6:8]}"
+            f"T{run_timestamp[9:11]}:{run_timestamp[11:13]}:{run_timestamp[13:15]}.000Z"
+        ),
         "event_type": event_type,
         "payload": payload,
     }

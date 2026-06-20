@@ -1543,6 +1543,21 @@ Generated: 2026-06-20T15:44:02Z
   queue, applies no proposal, grants no live authority, closes no readiness
   row, creates no hardware evidence and does not replace real WING/operator
   validation.
+- M104 WING read-only capture time order intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py`,
+  `tests/test_wing_readonly_preflight_review_tool.py` and
+  `tests/test_wing_mvp_rails.py::test_m104_wing_readonly_capture_time_order_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when
+  `captured_at` is earlier than the UTC capture timestamp encoded in `run_id`.
+  File-backed event logs also fail when event timestamps are earlier than the
+  same run-id timestamp. This blocks stale or cross-run evidence from preserving
+  individually valid timestamps while claiming an impossible capture order. The
+  concrete intake violations are `captured_at_before_run_id_timestamp` and
+  `event_log_timestamp_before_run_id:<index>`. It contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness
+  row, creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1553,4 +1568,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4037 passed, 1 skipped, 1 warning`.
+  `4039 passed, 1 skipped, 1 warning`.

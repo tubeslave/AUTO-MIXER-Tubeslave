@@ -234,6 +234,18 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   WING/backend contact, proposal apply, queue import, live write, readiness
   closure, hardware evidence or live authority.
 
+- M104 WING read-only capture time order intake guard rail is now automated:
+  candidate WING read-only summaries whose `captured_at` is earlier than the
+  UTC capture timestamp encoded in `run_id` fail artifact intake before they
+  can become accepted real WING read-only candidates. File-backed event logs
+  also fail when event timestamps precede that same run-id timestamp. This
+  blocks stale or cross-run evidence from claiming an impossible capture order
+  while still using individually valid timestamps. The concrete intake
+  violations are `captured_at_before_run_id_timestamp` and
+  `event_log_timestamp_before_run_id:<index>`. This creates no WING/backend
+  contact, proposal apply, queue import, live write, readiness closure,
+  hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING
