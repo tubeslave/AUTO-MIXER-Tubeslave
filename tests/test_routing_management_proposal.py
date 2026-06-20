@@ -11,6 +11,17 @@ from backend.routing_management_proposal import (
 )
 
 
+def _fresh_state(field_count=6):
+    return {
+        "status": "fresh",
+        "field_count": field_count,
+        "fresh_field_count": field_count,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
 def test_routing_management_module_is_transport_free():
     source = Path("backend/routing_management_proposal.py").read_text()
 
@@ -57,14 +68,7 @@ def test_soundcheck_channel_route_diff_creates_proposal_only_recommendation():
             source_confidence=0.9,
             route_confidence=0.92,
             persistence_cycles=3,
-            current_state_cache_freshness={
-                "status": "fresh",
-                "field_count": 6,
-                "fresh_field_count": 6,
-                "read_only": True,
-                "live_write": False,
-                "queries_console": False,
-            },
+            current_state_cache_freshness=_fresh_state(),
         )
     )
 
@@ -75,6 +79,7 @@ def test_soundcheck_channel_route_diff_creates_proposal_only_recommendation():
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["destructive_console_state"] is True
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_route_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 6
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
         "legacy_unverified"
@@ -91,6 +96,7 @@ def test_soundcheck_channel_route_diff_creates_proposal_only_recommendation():
     assert proposal["proposed_action"]["proposed_source"]["group"] == "DANTE"
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_route_cache_no_live_authority"] is True
 
 
 def test_active_performance_and_active_route_block_routing_proposal():
@@ -305,6 +311,88 @@ def test_stale_current_routing_state_blocks_proposal_only_recommendation():
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
+def test_live_authority_current_routing_state_blocks_proposal_only_recommendation():
+    analysis = RoutingManagementAnalysisInput(
+        route_id="ch:10:input",
+        route_kind="channel_input",
+        target_label="Lead Vox input",
+        current_source_group="LOCAL",
+        current_source_channel=10,
+        current_source_label="Local 10",
+        proposed_source_group="DANTE",
+        proposed_source_channel=10,
+        proposed_source_label="Dante Vox 10",
+        expected_source_role="lead_vocal",
+        route_readback_available=True,
+        rollback_route_available=True,
+        snapshot_baseline_id="soundcheck_pre_patch",
+        operator_intent="operator_patch_request",
+        route_change_window="soundcheck",
+        active_performance=False,
+        current_route_signal_dbfs=-82.0,
+        proposed_source_signal_dbfs=-28.0,
+        proposed_source_verified=True,
+        destructive_scope_score=0.1,
+        affected_target_count=1,
+        source_confidence=0.9,
+        route_confidence=0.92,
+        persistence_cycles=3,
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 6,
+            "fresh_field_count": 6,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        },
+    )
+    recommendation = analyze_routing_management_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "routing_current_state_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_route_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_routing_management_proposals([analysis]) == ()
+
+
+def test_missing_current_routing_state_blocks_proposal_only_recommendation():
+    analysis = RoutingManagementAnalysisInput(
+        route_id="ch:10:input",
+        route_kind="channel_input",
+        target_label="Lead Vox input",
+        current_source_group="LOCAL",
+        current_source_channel=10,
+        current_source_label="Local 10",
+        proposed_source_group="DANTE",
+        proposed_source_channel=10,
+        proposed_source_label="Dante Vox 10",
+        expected_source_role="lead_vocal",
+        route_readback_available=True,
+        rollback_route_available=True,
+        snapshot_baseline_id="soundcheck_pre_patch",
+        operator_intent="operator_patch_request",
+        route_change_window="soundcheck",
+        active_performance=False,
+        current_route_signal_dbfs=-82.0,
+        proposed_source_signal_dbfs=-28.0,
+        proposed_source_verified=True,
+        destructive_scope_score=0.1,
+        affected_target_count=1,
+        source_confidence=0.9,
+        route_confidence=0.92,
+        persistence_cycles=3,
+    )
+    recommendation = analyze_routing_management_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "routing_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert recommendation.evidence["current_state_cache_freshness"]["provided"] is False
+    assert build_routing_management_proposals([analysis]) == ()
+
+
 def test_unchanged_route_is_analysis_only():
     recommendation = analyze_routing_management_need(
         RoutingManagementAnalysisInput(
@@ -355,6 +443,7 @@ def test_build_routing_management_proposals_filters_to_proposal_only_items():
                 source_confidence=0.9,
                 route_confidence=0.9,
                 persistence_cycles=3,
+                current_state_cache_freshness=_fresh_state(),
             ),
             RoutingManagementAnalysisInput(
                 route_id="ch:11:input",
@@ -426,6 +515,10 @@ def test_routing_management_proposal_is_registered_as_goal_capability():
     assert contracts["routing_management_proposal"]["proposal_contract"]["value_type"] == "routing"
     assert (
         "current_route_cache_freshness"
+        in contracts["routing_management_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "current_route_cache_no_live_authority"
         in contracts["routing_management_proposal"]["proposal_contract"]["safety_evidence_required"]
     )
     assert (

@@ -788,7 +788,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("routing",),
         blocker="Routing writes can rewrite broad mixer state.",
-        next_step="Route routing diffs to operator review only after read-only topology map evidence; require trusted source identity, fresh full route readback, rollback, scope limits, and hardware proof before any routing write promotion.",
+        next_step=(
+            "Route routing diffs to operator review only after read-only "
+            "topology map evidence; require trusted source identity, fresh "
+            "read-only/no-authority full route readback, rollback, scope "
+            "limits, and hardware proof before any routing write promotion."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="console_dca_group_matrix_control",

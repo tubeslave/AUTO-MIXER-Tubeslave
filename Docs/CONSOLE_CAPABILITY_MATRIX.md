@@ -16,7 +16,7 @@ Status: WING/live authority snapshot
 | Gate / expander | PROTOTYPE | gate modules | no | no | chatter/bleed replay plus hardware proof | none |
 | De-esser | SPECIFIED | de-esser briefs/proposals | no | no | unit/replay first | none |
 | FX sends / returns | PROTOTYPE | `backend/fx_send_proposal.py` | no | no | readback and rollback proof | none |
-| Routing / patch | SPECIFIED | routing readback contracts | no | no | read-only physical readback first | none |
+| Routing / patch | SPECIFIED | `backend/routing_management_proposal.py`, routing readback contracts | no | no | fresh read-only/no-authority route context, rollback and physical readback first | none |
 | Bus/group/main/DCA faders | SPECIFIED | bus/DCA physical readback contracts | no | no except later approved supervised proof | physical readback | none |
 | Matrices | SPECIFIED | matrix physical readback contracts | no | no | physical readback | none |
 | Scenes / snapshots / presets | SPECIFIED | snapshot handlers and contracts | no | no | destructive-action ADR and proof | none |

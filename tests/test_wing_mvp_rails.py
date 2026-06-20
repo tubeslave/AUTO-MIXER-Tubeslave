@@ -234,6 +234,8 @@ M086_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M086-master-bus-pa-feed-reference
 M086_ADR = PROJECT_ROOT / "Docs" / "adr" / "master-bus-pa-feed-reference-safety-gates-20260620.md"
 M087_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M087-performance-adaptation-readonly-context-gates.md"
 M087_ADR = PROJECT_ROOT / "Docs" / "adr" / "performance-adaptation-readonly-context-gates-20260620.md"
+M088_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M088-routing-management-readonly-context-gates.md"
+M088_ADR = PROJECT_ROOT / "Docs" / "adr" / "routing-management-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -1641,7 +1643,11 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
         "Gate / expander": ("no", "no", "chatter/bleed replay plus hardware proof"),
         "De-esser": ("no", "no", "unit/replay first"),
         "FX sends / returns": ("no", "no", "readback and rollback proof"),
-        "Routing / patch": ("no", "no", "read-only physical readback first"),
+        "Routing / patch": (
+            "no",
+            "no",
+            "fresh read-only/no-authority route context, rollback and physical readback first",
+        ),
         "Bus/group/main/DCA faders": (
             "no",
             "no except later approved supervised proof",
@@ -9119,6 +9125,141 @@ def test_m087_performance_adaptation_readonly_context_gates_stay_readonly():
     assert "M087 performance adaptation read-only context gates is now covered" in current
     assert "M087 performance adaptation read-only context gates rail is now" in report
     assert "concert-time performance adaptation, a separate capability required by the project goal" in report
+
+
+def test_m088_routing_management_readonly_context_gates_stay_readonly():
+    from backend.routing_management_proposal import (
+        RoutingManagementAnalysisInput,
+        analyze_routing_management_need,
+        build_routing_management_proposals,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M088_PLAN.read_text(encoding="utf-8")
+    adr = M088_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m088 = markdown_table_row(roadmap, "M088")
+    assert m088[1] == "Routing management read-only context gates"
+    assert m088[2] == (
+        "Routing proposal candidates require fresh read-only/no-authority "
+        "current route context before console-routing decisions can trust them"
+    )
+    assert m088[3] == "M083"
+    assert m088[4] == "critical offline console routing"
+    assert m088[5] == "UNIT_VERIFIED routing context gate; live authority remains blocked"
+    assert m088[-1] == "PENDING"
+
+    routing_row = markdown_table_row(console, "Routing / patch")
+    assert "`backend/routing_management_proposal.py`" in routing_row[2]
+    assert routing_row[3] == "no"
+    assert routing_row[4] == "no"
+    assert routing_row[5] == "fresh read-only/no-authority route context, rollback and physical readback first"
+    assert routing_row[-1] == "none"
+
+    for marker in ("M088-CP01", "M088-CP02", "M088-CP03", "M088-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+
+    base = dict(
+        route_id="ch:10:input",
+        route_kind="channel_input",
+        target_label="Lead Vox input",
+        current_source_group="LOCAL",
+        current_source_channel=10,
+        current_source_label="Local 10",
+        proposed_source_group="DANTE",
+        proposed_source_channel=10,
+        proposed_source_label="Dante Vox 10",
+        expected_source_role="lead_vocal",
+        route_readback_available=True,
+        rollback_route_available=True,
+        snapshot_baseline_id="soundcheck_pre_patch",
+        operator_intent="operator_patch_request",
+        route_change_window="soundcheck",
+        active_performance=False,
+        current_route_signal_dbfs=-82.0,
+        proposed_source_signal_dbfs=-28.0,
+        proposed_source_verified=True,
+        destructive_scope_score=0.1,
+        affected_target_count=1,
+        source_confidence=0.9,
+        route_confidence=0.92,
+        persistence_cycles=3,
+    )
+
+    route_ok = analyze_routing_management_need(
+        RoutingManagementAnalysisInput(
+            **base,
+            current_state_cache_freshness=fresh_context,
+        )
+    )
+    assert route_ok.status == "proposal_only"
+    assert route_ok.evidence["current_route_cache_no_live_authority"] is True
+    assert route_ok.evidence["destructive_console_state"] is True
+    assert route_ok.to_operator_proposal()["can_apply_live"] is False
+
+    route_missing_context = analyze_routing_management_need(
+        RoutingManagementAnalysisInput(**base)
+    )
+    assert route_missing_context.status == "analysis_only"
+    assert "routing_current_state_cache_not_fresh" in route_missing_context.blockers
+    assert route_missing_context.to_operator_proposal()["can_apply_live"] is False
+    assert build_routing_management_proposals([RoutingManagementAnalysisInput(**base)]) == ()
+
+    route_live_context = analyze_routing_management_need(
+        RoutingManagementAnalysisInput(
+            **base,
+            current_state_cache_freshness=live_authority_context,
+        )
+    )
+    assert route_live_context.status == "analysis_only"
+    assert "routing_current_state_cache_live_authority_present" in route_live_context.blockers
+    assert route_live_context.evidence["current_route_cache_no_live_authority"] is False
+    assert route_live_context.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M088 routing management read-only context gates is now covered" in current
+    assert "M088 routing management read-only context gates rail is now" in report
+    assert "console routing, a separate console-control capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

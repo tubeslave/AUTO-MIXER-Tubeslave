@@ -111,6 +111,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M085 | FX send monitor and return safety gates | FX send proposal candidates require fresh read-only/no-authority send/return context, mapped no-authority FX schema hints, monitor-safety evidence and rollback/readback sources | M083 | high offline FX decision | UNIT_VERIFIED FX send safety gate; live authority remains blocked | PENDING |
 | M086 | Master bus PA feed and reference safety gates | Master-bus proposal candidates require fresh read-only/no-authority main-bus and PA-feed context, explicit PA-feed safety and reference-feed exclusion | M084 | critical offline master output | UNIT_VERIFIED master/output safety gate; live authority remains blocked | PENDING |
 | M087 | Performance adaptation read-only context gates | Performance-adaptation proposal candidates require fresh read-only/no-authority current performance context before concert-time level adaptation decisions can trust them | M083 | high offline adaptive mixing | UNIT_VERIFIED performance-adaptation context gate; live authority remains blocked | PENDING |
+| M088 | Routing management read-only context gates | Routing proposal candidates require fresh read-only/no-authority current route context before console-routing decisions can trust them | M083 | critical offline console routing | UNIT_VERIFIED routing context gate; live authority remains blocked | PENDING |
 
 ## Active milestone
 

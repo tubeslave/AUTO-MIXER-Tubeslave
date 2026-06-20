@@ -354,6 +354,7 @@ PROPOSAL_ONLY_CONTRACTS = {
             "route_diff",
             "current_route_readback",
             "current_route_cache_freshness",
+            "current_route_cache_no_live_authority",
             "proposed_source_readback",
             "rollback_route",
             "operator_intent",

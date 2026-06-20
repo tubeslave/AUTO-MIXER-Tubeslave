@@ -248,6 +248,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def _route_source_identity(
     analysis: RoutingManagementAnalysisInput,
     proposed_norm: Tuple[str, Optional[int]],
@@ -295,6 +303,7 @@ def analyze_routing_management_need(
     operator_intent = str(analysis.operator_intent or "").strip().lower()
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     source_identity_id, source_identity_type = _route_source_identity(
         analysis,
         proposed_norm,
@@ -336,8 +345,10 @@ def analyze_routing_management_need(
         blockers.append("source_confidence_low")
     if route_confidence < MIN_ROUTE_CONFIDENCE:
         blockers.append("route_confidence_low")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("routing_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("routing_current_state_cache_live_authority_present")
     blockers.extend(source_identity_trust.blockers)
 
     confidence = _clip01(
@@ -379,6 +390,7 @@ def analyze_routing_management_need(
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_route_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "destructive_console_state": True,

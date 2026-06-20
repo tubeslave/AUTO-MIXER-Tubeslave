@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T11:13:01Z.
+- Latest heartbeat: 2026-06-20T11:28:50Z.
 
 ## Что сделано
 
@@ -75,6 +75,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   separate capability required by the project goal, while creating no
   WING/backend contact, proposal apply, live write, readiness closure, hardware
   evidence or live authority.
+
+- M088 routing management read-only context gates rail is now automated:
+  routing proposal candidates now require fresh read-only/no-authority current
+  route context before console-routing decisions can trust them. Missing, stale
+  or live-authority context stays analysis-only. This advances console routing,
+  a separate console-control capability required by the project goal, while
+  creating no WING/backend contact, proposal apply, live write, readiness
+  closure, hardware evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2193,6 +2201,44 @@ The M087 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CAPABILITY_MATRIX.md`,
 `Docs/plans/M087-performance-adaptation-readonly-context-gates.md`,
 `Docs/adr/performance-adaptation-readonly-context-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M088 Routing Management Read-Only Context Gates
+
+The M088 routing management read-only context gate rail is now automated by
+`tests/test_routing_management_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m088_routing_management_readonly_context_gates_stay_readonly`.
+
+Routing proposal candidates now require fresh read-only/no-authority current
+route context before a route diff can become an operator-facing console-routing
+proposal. Missing, stale or live-authority context keeps the routing management
+layer analysis-only.
+
+This is offline routing-control hardening only. It mutates no console state,
+opens no backend/WING transport, sends no OSC/WebSocket write, imports no
+proposal into a queue, applies no proposal, grants no live authority, closes no
+readiness row, creates no hardware evidence and does not replace accepted real
+hardware/operator validation.
+
+This advances console routing, a separate console-control capability required by the project goal.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_routing_management_proposal.py -q`:
+  `14 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m088_routing_management_readonly_context_gates_stay_readonly -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `101 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4003 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M088 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+`Docs/plans/M088-routing-management-readonly-context-gates.md`,
+`Docs/adr/routing-management-readonly-context-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 
