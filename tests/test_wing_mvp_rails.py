@@ -165,6 +165,8 @@ M052_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M052-task-details-apply-button-bl
 M052_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-apply-button-blocker-guard-20260620.md"
 M053_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M053-task-queue-row-reject-blocker-guard.md"
 M053_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-row-reject-blocker-guard-20260620.md"
+M054_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M054-task-details-reject-button-blocker-guard.md"
+M054_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-reject-button-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6246,6 +6248,71 @@ def test_m053_task_queue_row_reject_action_reflects_integration_bundle_blocker()
     assert "Task Queue row reject actions must fail closed" in completion
     assert "M053 Task Queue row reject blocker guard is now covered" in current
     assert "M053 Task Queue row reject blocker guard rail is now automated" in report
+
+
+def test_m054_task_details_reject_button_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M054_PLAN.read_text(encoding="utf-8")
+    adr = M054_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m054 = markdown_table_row(roadmap, "M054")
+    assert m054[1] == "Task Details reject button blocker guard"
+    assert m054[2] == (
+        "Task Details reject button shows blocked state while promotion "
+        "planning is blocked"
+    )
+    assert m054[3] == "M053"
+    assert m054[4] == "high offline frontend"
+    assert m054[5] == "UNIT_VERIFIED blocked Task Details reject button; live authority remains blocked"
+    assert m054[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Details reject button now shows blocked state when integration bundle blockers are visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M054-CP01" in plan
+    assert "M054-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate task data" in adr
+
+    assert "const detailRejectButtonLabel = integrationBundleApplyBlocked" in task_queue
+    assert "? 'Reject Blocked'" in task_queue
+    assert "const detailRejectButtonClassName = integrationBundleApplyBlocked" in task_queue
+    assert "className={detailRejectButtonClassName}" in task_queue
+    assert "disabled={integrationBundleApplyBlocked}" in task_queue
+    assert "{detailRejectButtonLabel}" in task_queue
+    assert "actions.setTaskStatus(task.id, 'Rejected')" in task_queue
+    assert "task details reject button is visibly blocked" in adapter_test
+    assert "Task Details reject buttons must fail closed" in completion
+    assert "M054 Task Details reject button blocker guard is now covered" in current
+    assert "M054 Task Details reject button blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

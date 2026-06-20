@@ -4637,6 +4637,22 @@ test('task details apply button is visibly blocked when integration bundle is bl
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task details reject button is visibly blocked when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const detailRejectButtonLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'Reject Blocked'/);
+  assert.match(source, /const detailRejectButtonClassName = integrationBundleApplyBlocked/);
+  assert.match(source, /className=\{detailRejectButtonClassName\}/);
+  assert.match(source, /disabled=\{integrationBundleApplyBlocked\}/);
+  assert.match(source, /\{detailRejectButtonLabel\}/);
+  assert.match(source, /actions\.setTaskStatus\(task\.id, 'Rejected'\)/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('dashboard mixer header uses the selected channel dynamically', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'),

@@ -208,6 +208,10 @@ export function TaskDetailsPanel({
   const detailApplyButtonClassName = integrationBundleApplyBlocked
     ? 'am-button border-danger/40 bg-danger/10 text-danger disabled:cursor-not-allowed disabled:opacity-70'
     : 'am-button text-online';
+  const detailRejectButtonLabel = integrationBundleApplyBlocked ? 'Reject Blocked' : 'Reject';
+  const detailRejectButtonClassName = integrationBundleApplyBlocked
+    ? 'am-button border-danger/40 bg-danger/10 text-danger disabled:cursor-not-allowed disabled:opacity-70'
+    : 'am-button text-danger';
   const ensembleEvidence = ensembleEvidenceForTask(task);
 
   return (
@@ -299,7 +303,14 @@ export function TaskDetailsPanel({
             {detailApplyButtonLabel}
           </button>
         )}
-        <button className="am-button text-danger" onClick={() => actions.setTaskStatus(task.id, 'Rejected')} type="button">Reject</button>
+        <button
+          className={detailRejectButtonClassName}
+          disabled={integrationBundleApplyBlocked}
+          onClick={() => actions.setTaskStatus(task.id, 'Rejected')}
+          type="button"
+        >
+          {detailRejectButtonLabel}
+        </button>
       </div>
     </Panel>
   );
