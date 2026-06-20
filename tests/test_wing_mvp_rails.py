@@ -268,6 +268,8 @@ M103_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M103-wing-readonly-run-id-timesta
 M103_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-run-id-timestamp-intake-guard-20260620.md"
 M104_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M104-wing-readonly-capture-time-order-intake-guard.md"
 M104_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-capture-time-order-intake-guard-20260620.md"
+M105_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M105-project-director-post-m104-intake-loop-guard.md"
+M105_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-post-m104-intake-loop-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -10936,6 +10938,80 @@ def test_m104_wing_readonly_capture_time_order_intake_guard_stays_readonly():
     assert "M104 WING read-only capture time order intake guard rail is now" in report
     assert "captured_at_before_run_id_timestamp" in current
     assert "captured_at_before_run_id_timestamp" in report
+
+
+def test_m105_project_director_post_m104_intake_loop_guard_stays_readonly():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M105_PLAN.read_text(encoding="utf-8")
+    adr = M105_ADR.read_text(encoding="utf-8")
+    director = load_project_director_module()
+
+    directive = director.build_directive(
+        project_root=PROJECT_ROOT,
+        lookback_commits=12,
+        report_limit=1,
+    )
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m105 = markdown_table_row(roadmap, "M105")
+    assert m105[1] == "Project Director post-M104 intake loop guard"
+    assert m105[2] == (
+        "Project Director detects the post-M104 WING read-only intake-hardening "
+        "streak and narrows further autonomous work to real external validation "
+        "or a named unverified contract gap"
+    )
+    assert m105[3] == "M001"
+    assert m105[4] == "critical autopilot direction"
+    assert m105[5] == (
+        "UNIT_VERIFIED post-M104 intake-loop guard; live authority remains blocked"
+    )
+    assert m105[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    for marker in ("M105-CP01", "M105-CP02", "M105-CP03"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+    assert (
+        directive["allowed_autonomous_scope"]
+        == "external_validation_wait_or_named_gap_only"
+    )
+    assert any("After M104" in item for item in directive["allowed_scope"])
+    assert any(
+        "No further generic WING read-only intake guard milestone after M104" in item
+        for item in directive["forbidden_scope"]
+    )
+    assert any(
+        "Do not keep improving the same WING read-only intake function" in item
+        for item in directive["forbidden_scope"]
+    )
+
+    assert "M105 Project Director post-M104 intake loop guard is now covered" in current
+    assert "M105 Project Director post-M104 intake loop guard rail is now" in report
+    assert "external_validation_wait_or_named_gap_only" in current
+    assert "external_validation_wait_or_named_gap_only" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

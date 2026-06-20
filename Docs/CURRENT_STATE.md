@@ -1558,6 +1558,20 @@ Generated: 2026-06-20T15:44:02Z
   queue, applies no proposal, grants no live authority, closes no readiness
   row, creates no hardware evidence and does not replace real WING/operator
   validation.
+- M105 Project Director post-M104 intake loop guard is now covered by
+  `tests/test_project_director_agent.py` and
+  `tests/test_wing_mvp_rails.py::test_m105_project_director_post_m104_intake_loop_guard_stays_readonly`.
+  Project Director now detects the consecutive post-M104 `Guard WING readonly`
+  intake-hardening streak and sets
+  `pre_hardware_intake_hardening_loop_guard: true`. While M001 waits for
+  external WING validation, the allowed autonomous scope narrows to
+  `external_validation_wait_or_named_gap_only`: another generic WING
+  read-only intake guard is not treated as progress unless a real WING
+  artifact arrives, the operator explicitly requests it, or a named
+  unverified contract gap is present. It contacts no WING/backend transport,
+  opens no WebSocket/OSC write path, imports no proposal into a queue, applies
+  no proposal, grants no live authority, closes no readiness row, creates no
+  hardware evidence and does not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1568,4 +1582,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4039 passed, 1 skipped, 1 warning`.
+  `4042 passed, 1 skipped, 1 warning`.

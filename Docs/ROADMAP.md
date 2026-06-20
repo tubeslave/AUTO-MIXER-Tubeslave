@@ -128,6 +128,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M102 | WING read-only run id format intake guard | Real WING read-only intake rejects candidates whose run_id is not the runner-generated UTC capture format before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED run-id format guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M103 | WING read-only run id timestamp intake guard | Real WING read-only intake rejects candidates whose run_id timestamp is not a valid UTC capture time before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED run-id timestamp guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M104 | WING read-only capture time order intake guard | Real WING read-only intake rejects candidates whose captured_at is earlier than the UTC capture timestamp encoded in run_id | M001 | critical read-only hardware intake | UNIT_VERIFIED capture-time ordering guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
+| M105 | Project Director post-M104 intake loop guard | Project Director detects the post-M104 WING read-only intake-hardening streak and narrows further autonomous work to real external validation or a named unverified contract gap | M001 | critical autopilot direction | UNIT_VERIFIED post-M104 intake-loop guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 
 ## Active milestone
 

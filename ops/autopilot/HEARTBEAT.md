@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T17:07:02Z
+Last heartbeat UTC: 2026-06-20T17:31:31Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -10,19 +10,17 @@ Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
 Writer lease: none
 
-Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
+Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`, or name a concrete unverified contract gap before selecting more WING read-only intake work.
 
-Latest check: M104 WING read-only capture time order intake guard now rejects
-candidate WING read-only summaries whose `captured_at` is earlier than the UTC
-capture timestamp encoded in `run_id` before they can become accepted real WING
-read-only candidates. File-backed event logs also reject timestamps earlier
-than the same run-id capture time.
+Latest check: M105 Project Director post-M104 intake loop guard now detects the
+recent consecutive `Guard WING readonly ...` intake-hardening streak and narrows
+allowed autonomous scope to `external_validation_wait_or_named_gap_only` while
+M001 waits for external WING validation.
 
-Focused WING read-only evidence validation passed with `76 passed`; review-tool
-template validation passed with `19 passed`; the M104 rail passed with
-`1 passed`; the full WING rail passed with `117 passed`; the full suite passed
-in a clean staged worktree with
-`4039 passed, 1 skipped, 1 warning`.
+Focused Project Director validation passed with `7 passed`; the M105 rail
+passed with `1 passed`; the full WING rail passed with `118 passed`; the
+staged-only full suite passed with `4042 passed, 1 skipped, 1 warning`; memory
+lint, `STATE.json` validation and `RUN_LEDGER.jsonl` validation passed.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

@@ -1298,6 +1298,71 @@ def test_project_director_blocks_extra_context_gate_work_while_wing_waits():
     assert "stay offline/proposal-only" not in "\n".join(directive["allowed_scope"])
 
 
+def test_project_director_detects_post_m104_intake_guard_streak():
+    director = load_director_module()
+
+    recent_subjects = [
+        "Guard WING readonly capture time order",
+        "Guard WING readonly run id timestamp",
+        "Guard WING readonly run id format",
+        "Guard WING readonly artifact root whitespace",
+        "Guard WING readonly artifact root traversal",
+        "Guard WING readonly run id path segment",
+        "Guard WING readonly source path binding",
+        "Guard WING readonly canonical artifact root",
+        "Guard WING readonly declared artifact paths",
+        "Guard WING readonly reserved artifact intake",
+        "Guard project director external validation scope",
+    ]
+
+    streak = director.wing_readonly_intake_guard_streak(recent_subjects)
+
+    assert len(streak) == 10
+    assert streak[0] == "Guard WING readonly capture time order"
+    assert (
+        director.pre_hardware_intake_hardening_loop_guard_required(
+            external_validation_wait=True,
+            recent_commit_subjects=recent_subjects,
+        )
+        is True
+    )
+    assert (
+        director.pre_hardware_intake_hardening_loop_guard_required(
+            external_validation_wait=False,
+            recent_commit_subjects=recent_subjects,
+        )
+        is False
+    )
+
+
+def test_project_director_narrows_post_m104_intake_hardening_loop():
+    director = load_director_module()
+
+    directive = director.build_directive(
+        project_root=PROJECT_ROOT,
+        lookback_commits=12,
+        report_limit=1,
+    )
+
+    assert directive["selected_blocker"] == "WING read-only connection proof"
+    assert directive["selected_action_requires_external_validation"] is True
+    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+    assert (
+        directive["allowed_autonomous_scope"]
+        == "external_validation_wait_or_named_gap_only"
+    )
+    assert any("After M104" in item for item in directive["allowed_scope"])
+    assert any(
+        "No further generic WING read-only intake guard milestone after M104" in item
+        for item in directive["forbidden_scope"]
+    )
+    assert any(
+        "Do not keep improving the same WING read-only intake function" in item
+        for item in directive["forbidden_scope"]
+    )
+
+
 def test_project_director_derives_required_files_from_selected_blocker_evidence():
     director = load_director_module()
 

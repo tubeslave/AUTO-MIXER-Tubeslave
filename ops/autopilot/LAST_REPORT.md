@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T15:27:07Z.
+- Latest heartbeat: 2026-06-20T17:31:31Z.
 
 ## Что сделано
 
@@ -245,6 +245,23 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   `event_log_timestamp_before_run_id:<index>`. This creates no WING/backend
   contact, proposal apply, queue import, live write, readiness closure,
   hardware evidence or live authority.
+
+- M105 Project Director post-M104 intake loop guard rail is now automated:
+  Project Director detects the consecutive post-M104 `Guard WING readonly`
+  intake-hardening streak and sets
+  `pre_hardware_intake_hardening_loop_guard: true`. While M001 waits for
+  external WING validation, allowed autonomous scope narrows to
+  `external_validation_wait_or_named_gap_only`. Another generic WING read-only
+  intake guard is not treated as progress unless a real WING artifact arrives,
+  the operator explicitly requests it, or a named unverified contract gap is
+  present. This directly addresses the risk of endlessly improving the same
+  WING read-only intake function while creating no WING/backend contact,
+  proposal apply, queue import, live write, readiness closure, hardware
+  evidence or live authority.
+  Validation: Project Director `7 passed`, M105 rail `1 passed`, full WING
+  rail `118 passed`, staged-only full suite
+  `4042 passed, 1 skipped, 1 warning`, memory lint PASS, `STATE.json`
+  validation PASS and `RUN_LEDGER.jsonl` validation PASS.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2610,7 +2627,9 @@ The M093 rail is recorded in `Docs/ROADMAP.md`,
 
 Wait for the operator-supervised real WING read-only preflight. Do not contact
 WING from unattended automation. There is no dependency-ready autonomous
-roadmap milestone until that external validation exists.
+roadmap milestone until that external validation exists, unless a real artifact,
+explicit operator request or named unverified contract gap justifies a focused
+handoff/intake fix.
 
 ## Stop procedure
 

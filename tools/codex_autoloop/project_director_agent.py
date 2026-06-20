@@ -44,6 +44,10 @@ EXTERNAL_VALIDATION_ACTION_MARKERS = (
     "wing_readonly_preflight",
     "wing_readonly_preflight.md",
 )
+POST_M104_INTAKE_GUARD_MIN_STREAK = 10
+POST_M104_INTAKE_GUARD_COMPLETION_MARKERS = (
+    "capture time order",
+)
 
 
 def utc_now() -> str:
@@ -66,6 +70,50 @@ def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def normalized_scope_text(text: str) -> str:
+    return " ".join(text.lower().replace("_", " ").replace("-", " ").split())
+
+
+def recent_commit_subjects_from_evidence(
+    evidence: Sequence[tuple[str, str]],
+) -> list[str]:
+    subjects: list[str] = []
+    for source, text in evidence:
+        if source != "git_log":
+            continue
+        _, _, subject = text.partition(" ")
+        subjects.append(subject.strip() if subject else text.strip())
+    return [subject for subject in subjects if subject]
+
+
+def is_wing_readonly_intake_guard_subject(subject: str) -> bool:
+    return "guard wing readonly" in normalized_scope_text(subject)
+
+
+def wing_readonly_intake_guard_streak(subjects: Sequence[str]) -> list[str]:
+    streak: list[str] = []
+    for subject in subjects:
+        if not is_wing_readonly_intake_guard_subject(subject):
+            break
+        streak.append(subject)
+    return streak
+
+
+def pre_hardware_intake_hardening_loop_guard_required(
+    *, external_validation_wait: bool, recent_commit_subjects: Sequence[str]
+) -> bool:
+    if not external_validation_wait:
+        return False
+    streak = wing_readonly_intake_guard_streak(recent_commit_subjects)
+    if len(streak) < POST_M104_INTAKE_GUARD_MIN_STREAK:
+        return False
+    return any(
+        marker in normalized_scope_text(subject)
+        for subject in streak
+        for marker in POST_M104_INTAKE_GUARD_COMPLETION_MARKERS
+    )
+
+
 def selected_action_requires_external_validation(*, status: str, action: str) -> bool:
     action_lc = action.lower()
     return status in EXTERNAL_VALIDATION_STATUSES and any(
@@ -74,16 +122,24 @@ def selected_action_requires_external_validation(*, status: str, action: str) ->
 
 
 def allowed_scope_for_selected_action(
-    *, selected_blocker: str, external_validation_wait: bool
+    *,
+    selected_blocker: str,
+    external_validation_wait: bool,
+    pre_hardware_intake_loop_guard: bool = False,
 ) -> list[str]:
     if external_validation_wait:
-        return [
+        allowed_scope = [
             "Continue Goal-mode only for the selected external WING validation handoff/intake.",
             f"Work only on the selected first non-closed MVP blocker: {selected_blocker}.",
             "Maintain control-plane docs/state/rails that preserve the WING handoff and operator intake.",
             "Use real WING artifacts only when hardware is connected and an operator is supervising.",
             "Keep all live writes behind explicit supervised operator approval.",
         ]
+        if pre_hardware_intake_loop_guard:
+            allowed_scope.append(
+                "After M104, select more WING read-only intake hardening only for a new real artifact, explicit operator request, or named unverified contract gap."
+            )
+        return allowed_scope
     return [
         "Continue uninterrupted Goal-mode development.",
         "Work only on the selected first non-closed MVP blocker.",
@@ -93,7 +149,9 @@ def allowed_scope_for_selected_action(
     ]
 
 
-def forbidden_scope_for_selected_action(*, external_validation_wait: bool) -> list[str]:
+def forbidden_scope_for_selected_action(
+    *, external_validation_wait: bool, pre_hardware_intake_loop_guard: bool = False
+) -> list[str]:
     forbidden_scope = [
         "No new memory-trust chains unless they close the selected blocker.",
         "No new queue-import chains unless they close the selected blocker.",
@@ -106,6 +164,13 @@ def forbidden_scope_for_selected_action(*, external_validation_wait: bool) -> li
             [
                 "No additional proposal-only context-gate milestone while M001 waits for external WING validation unless the selected WING blocker or operator explicitly requests it.",
                 "Do not simulate progress by adding offline capability gates when the selected action requires a real WING artifact.",
+            ]
+        )
+    if pre_hardware_intake_loop_guard:
+        forbidden_scope.extend(
+            [
+                "No further generic WING read-only intake guard milestone after M104 without a new real WING artifact, explicit operator request, or named unverified contract gap.",
+                "Do not keep improving the same WING read-only intake function as a substitute for M002 physical readback evidence.",
             ]
         )
     return forbidden_scope
@@ -127,6 +192,7 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         report_limit=report_limit,
     )
     guard_report = codex_direction_guard.analyze_evidence(evidence)
+    recent_commit_subjects = recent_commit_subjects_from_evidence(evidence)
 
     if first_open:
         selected_blocker = first_open["blocker"]
@@ -155,6 +221,11 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
     external_validation_wait = selected_action_requires_external_validation(
         status=selected_status,
         action=selected_action,
+    )
+    intake_guard_streak = wing_readonly_intake_guard_streak(recent_commit_subjects)
+    pre_hardware_intake_loop_guard = pre_hardware_intake_hardening_loop_guard_required(
+        external_validation_wait=external_validation_wait,
+        recent_commit_subjects=recent_commit_subjects,
     )
     stop_broad_work = bool(guard_report["stop_the_line"]) or selected_status != "closed"
     required_files = update_mvp_progress.unique_ordered(
@@ -206,7 +277,14 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         "stop_broad_work": stop_broad_work,
         "external_validation_wait": external_validation_wait,
         "selected_action_requires_external_validation": external_validation_wait,
+        "pre_hardware_intake_hardening_loop_guard": pre_hardware_intake_loop_guard,
+        "pre_hardware_intake_guard_recent_streak_count": len(intake_guard_streak),
+        "pre_hardware_intake_guard_min_streak": POST_M104_INTAKE_GUARD_MIN_STREAK,
+        "pre_hardware_intake_guard_recent_subjects": intake_guard_streak,
         "allowed_autonomous_scope": (
+            "external_validation_wait_or_named_gap_only"
+            if pre_hardware_intake_loop_guard
+            else
             "external_validation_handoff_or_control_plane_only"
             if external_validation_wait
             else "selected_blocker_only"
@@ -214,9 +292,11 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         "allowed_scope": allowed_scope_for_selected_action(
             selected_blocker=selected_blocker,
             external_validation_wait=external_validation_wait,
+            pre_hardware_intake_loop_guard=pre_hardware_intake_loop_guard,
         ),
         "forbidden_scope": forbidden_scope_for_selected_action(
-            external_validation_wait=external_validation_wait
+            external_validation_wait=external_validation_wait,
+            pre_hardware_intake_loop_guard=pre_hardware_intake_loop_guard,
         ),
         "required_files": required_files,
     }
@@ -238,6 +318,12 @@ def render_markdown(directive: dict) -> str:
         f"Continue Goal mode: `{str(directive['continue_goal_mode']).lower()}`",
         "External validation wait: "
         f"`{str(directive.get('external_validation_wait', False)).lower()}`",
+        "Pre-hardware intake hardening loop guard: "
+        f"`{str(directive.get('pre_hardware_intake_hardening_loop_guard', False)).lower()}`",
+        "- Pre-hardware intake guard recent streak count: "
+        f"`{directive.get('pre_hardware_intake_guard_recent_streak_count', 0)}`",
+        "- Pre-hardware intake guard min streak: "
+        f"`{directive.get('pre_hardware_intake_guard_min_streak', 0)}`",
         f"Allowed autonomous scope: `{directive.get('allowed_autonomous_scope', 'selected_blocker_only')}`",
         "",
         "## Selected Work",
