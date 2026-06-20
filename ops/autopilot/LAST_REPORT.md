@@ -183,6 +183,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   contact, proposal apply, queue import, live write, readiness closure,
   hardware evidence or live authority.
 
+- M099 WING read-only run id path segment intake guard rail is now automated:
+  candidate WING read-only summaries whose `run_id` is not a single safe path
+  segment fail artifact intake before they can become accepted real WING
+  read-only candidates. This blocks parent-traversal run ids from escaping the
+  canonical WING artifact root while still looking string-consistent with
+  `artifact_root/<run_id>/summary.json`. The concrete intake violation is
+  `run_id_not_single_safe_path_segment`. This creates no WING/backend contact,
+  proposal apply, queue import, live write, readiness closure, hardware
+  evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING

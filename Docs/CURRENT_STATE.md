@@ -1478,6 +1478,19 @@ Generated: 2026-06-20T15:44:02Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does not
   replace real WING/operator validation.
+- M099 WING read-only run id path segment intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m099_wing_readonly_run_id_path_segment_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when `run_id` is
+  not one safe path segment, including parent traversal such as `../stale`.
+  This blocks path-like run ids from escaping the canonical WING read-only
+  artifact root while still looking string-consistent with
+  `artifact_root/<run_id>/summary.json`. The concrete intake violation is
+  `run_id_not_single_safe_path_segment`. It contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness
+  row, creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1488,4 +1501,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4027 passed, 1 skipped, 1 warning`.
+  `4029 passed, 1 skipped, 1 warning`.

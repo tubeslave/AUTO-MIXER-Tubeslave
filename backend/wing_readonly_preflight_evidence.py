@@ -692,6 +692,10 @@ def _path_matches_wing_readonly_capture_root(value: Any) -> bool:
     return normalized == expected_root or normalized.endswith(f"/{expected_root}")
 
 
+def _run_id_is_single_safe_path_segment(value: str) -> bool:
+    return value not in {".", ".."} and "/" not in value and "\\" not in value
+
+
 def _validate_candidate_artifact_intake_paths(
     payload: Mapping[str, Any],
     *,
@@ -722,6 +726,9 @@ def _validate_candidate_artifact_intake_paths(
             if Path(declared_summary_path).as_posix() != summary_path.as_posix():
                 violations.append("source_path_declared_summary_path_mismatch")
     if not isinstance(run_id, str) or not run_id:
+        return
+    if not _run_id_is_single_safe_path_segment(run_id):
+        violations.append("run_id_not_single_safe_path_segment")
         return
     if not isinstance(artifact_root, str) or not artifact_root:
         return
