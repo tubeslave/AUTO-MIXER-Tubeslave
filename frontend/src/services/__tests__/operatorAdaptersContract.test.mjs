@@ -4656,6 +4656,26 @@ test('replay evidence channel status is guarded when integration bundle is block
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence report path is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const replayReportLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'bundle blocked'/);
+  assert.match(source, /: latestRun\?\.reportPath \|\| 'pending'/);
+  assert.match(source, /const replayReportClassName = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'mt-0\.5 truncate text-\[8px\] text-danger'/);
+  assert.match(source, /: 'mt-0\.5 truncate text-\[8px\] text-muted'/);
+  assert.match(source, /<div className=\{replayReportClassName\}>/);
+  assert.match(source, /Report: \{replayReportLabel\}/);
+  assert.doesNotMatch(source, /Report: \{latestRun\.reportPath \|\| 'pending'\}/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

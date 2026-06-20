@@ -505,6 +505,12 @@ function ReplayEvidencePanel({
   const channelStatusTone = integrationBundleApplyBlocked
     ? 'red' as const
     : channel?.liveApplyAllowed ? 'yellow' as const : 'blue' as const;
+  const replayReportLabel = integrationBundleApplyBlocked
+    ? 'bundle blocked'
+    : latestRun?.reportPath || 'pending';
+  const replayReportClassName = integrationBundleApplyBlocked
+    ? 'mt-0.5 truncate text-[8px] text-danger'
+    : 'mt-0.5 truncate text-[8px] text-muted';
   const traceStatusLabel = integrationBundleApplyBlocked
     ? 'bundle blocked'
     : latestTrace
@@ -553,8 +559,8 @@ function ReplayEvidencePanel({
         <StatusBadge tone={channelStatusTone}>{channelStatusLabel}</StatusBadge>
       </div>
       {latestRun && (
-        <div className="mt-0.5 truncate text-[8px] text-muted">
-          Report: {latestRun.reportPath || 'pending'}
+        <div className={replayReportClassName}>
+          Report: {replayReportLabel}
         </div>
       )}
     </Panel>

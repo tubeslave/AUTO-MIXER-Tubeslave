@@ -86,6 +86,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M060 | Replay Evidence latest run status blocker guard | Replay Evidence Latest run badge shows integration bundle blocker status while promotion planning is blocked | M059 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence latest run status; live authority remains blocked | PENDING |
 | M061 | Replay Evidence policy row blocker guard | Replay Evidence Policy row shows integration bundle blocker status while promotion planning is blocked | M060 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence policy row; live authority remains blocked | PENDING |
 | M062 | Replay Evidence channel status blocker guard | Replay Evidence channel status badge shows integration bundle blocker status while promotion planning is blocked | M061 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence channel status; live authority remains blocked | PENDING |
+| M063 | Replay Evidence report path blocker guard | Replay Evidence report path text shows integration bundle blocker status while promotion planning is blocked | M062 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence report path; live authority remains blocked | PENDING |
 
 ## Active milestone
 
