@@ -4459,6 +4459,21 @@ test('task queue review-only metric counts all rows when integration bundle is b
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task details blocker list includes integration bundle blocker when blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const detailApplyBlockers = integrationBundleApplyBlocked/);
+  assert.match(source, /Array\.from\(new Set\(\['offline_integration_bundle_blockers_visible', \.\.\.blockers\]\)\)/);
+  assert.match(source, /\? Array\.from\(new Set\(\['offline_integration_bundle_blockers_visible', \.\.\.blockers\]\)\)/);
+  assert.match(source, /: blockers/);
+  assert.match(source, /detailApplyBlockers\.length > 0/);
+  assert.match(source, /detailApplyBlockers\.slice\(0, 4\)\.map\(blocker =>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task queue review-only filter includes all rows when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

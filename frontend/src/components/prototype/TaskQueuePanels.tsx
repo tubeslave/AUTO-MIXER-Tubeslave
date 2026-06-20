@@ -177,6 +177,9 @@ export function TaskDetailsPanel({
   const proposal = task.proposal;
   const applyBlocked = integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly;
   const blockers = task.applyBlockers ?? [];
+  const detailApplyBlockers = integrationBundleApplyBlocked
+    ? Array.from(new Set(['offline_integration_bundle_blockers_visible', ...blockers]))
+    : blockers;
   const ensembleEvidence = ensembleEvidenceForTask(task);
 
   return (
@@ -232,11 +235,11 @@ export function TaskDetailsPanel({
           </div>
         </div>
       )}
-      {blockers.length > 0 && (
+      {detailApplyBlockers.length > 0 && (
         <div className="mt-3 rounded-[6px] border border-danger/30 bg-danger/10 p-2">
           <div className="am-label mb-1 text-danger">Apply Blockers</div>
           <div className="space-y-1 text-[10px] text-muted">
-            {blockers.slice(0, 4).map(blocker => (
+            {detailApplyBlockers.slice(0, 4).map(blocker => (
               <div className="truncate" key={blocker}>{blocker.replace(/_/g, ' ')}</div>
             ))}
           </div>
