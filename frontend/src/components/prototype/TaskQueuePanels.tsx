@@ -186,7 +186,9 @@ export function TaskDetailsPanel({
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
         <StatusBadge tone={toneFromState(task.status)}>{task.status}</StatusBadge>
         <StatusBadge tone={toneForMode(ui.mode)}>{getModeDisplayLabel(ui.mode)}</StatusBadge>
-        {task.reviewOnly && <StatusBadge tone="red">Review only</StatusBadge>}
+        {(integrationBundleApplyBlocked || task.reviewOnly) && (
+          <StatusBadge tone="red">{integrationBundleApplyBlocked ? 'Blocked' : 'Review only'}</StatusBadge>
+        )}
         <span className="rounded-[4px] border border-line bg-row px-1.5 py-0.5 text-muted">{task.agent}</span>
         <span className="font-mono text-muted">{task.time}</span>
       </div>

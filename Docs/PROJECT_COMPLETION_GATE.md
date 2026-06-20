@@ -217,6 +217,13 @@ authority, close readiness, contact WING/backend, mark Full Autonomous ready,
 apply to console, replace backend safety gates, or replace accepted real
 hardware/operator validation.
 
+Task Details status badges must fail closed when offline integration bundle
+blockers are visible. Detail-badge-visible enforcement cannot change task data,
+hide rows, queue proposals, open supervised apply, dispatch supervised apply,
+grant live authority, close readiness, contact WING/backend, mark Full
+Autonomous ready, apply to console, replace backend safety gates, or replace
+accepted real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

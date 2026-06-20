@@ -145,6 +145,8 @@ M042_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M042-task-queue-review-filter-blo
 M042_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-review-filter-blocker-guard-20260619.md"
 M043_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M043-task-queue-row-badge-blocker-guard.md"
 M043_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-row-badge-blocker-guard-20260619.md"
+M044_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M044-task-details-badge-blocker-guard.md"
+M044_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-badge-blocker-guard-20260619.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -5557,6 +5559,72 @@ def test_m043_task_queue_row_badge_reflects_integration_bundle_blocker():
     assert "Task Queue row badges must fail closed" in completion
     assert "M043 Task Queue row badge blocker guard is now covered" in current
     assert "M043 Task Queue row badge blocker guard rail is now automated" in (
+        report
+    )
+
+
+def test_m044_task_details_badge_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M044_PLAN.read_text(encoding="utf-8")
+    adr = M044_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m044 = markdown_table_row(roadmap, "M044")
+    assert m044[1] == "Task Details badge blocker guard"
+    assert m044[2] == (
+        "Task Details status badges show blocked state while promotion "
+        "planning is blocked"
+    )
+    assert m044[3] == "M043"
+    assert m044[4] == "high offline frontend"
+    assert m044[5] == "UNIT_VERIFIED blocked Task Details badges; live authority remains blocked"
+    assert m044[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Details now shows blocked badges when offline integration bundle blockers are visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M044-CP01" in plan
+    assert "M044-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not change task data" in adr
+
+    assert "const applyBlocked = integrationBundleApplyBlocked || task.canApply === false || task.reviewOnly" in (
+        task_queue
+    )
+    assert "(integrationBundleApplyBlocked || task.reviewOnly)" in task_queue
+    assert "integrationBundleApplyBlocked ? 'Blocked' : 'Review only'" in task_queue
+    assert "requestTaskApply(task, ui, actions, integrationBundleApplyBlocked)" in (
+        task_queue
+    )
+    assert "task details badge shows blocked state" in adapter_test
+    assert "Task Details status badges must fail closed" in completion
+    assert "M044 Task Details badge blocker guard is now covered" in current
+    assert "M044 Task Details badge blocker guard rail is now automated" in (
         report
     )
 
