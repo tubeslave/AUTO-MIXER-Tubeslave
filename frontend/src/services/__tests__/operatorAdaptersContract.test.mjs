@@ -4926,6 +4926,18 @@ test('supervised apply new value shows blocked state when integration bundle is 
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply parameter shows blocked parameter when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const supervisedProposalParameter = taskProposalParameterDisplay\(proposal, integrationBundleApplyBlocked\)/);
+  assert.match(source, /<span className="text-muted">Parameter<\/span><b className=\{`truncate \$\{supervisedProposalParameter\.className\}`\}>\{supervisedProposalParameter\.label\}<\/b>/);
+  assert.doesNotMatch(source, /<span className="text-muted">Parameter<\/span><b className="truncate text-text">\{proposal\.parameter\}<\/b>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply rollback shows no live apply when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

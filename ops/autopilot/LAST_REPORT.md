@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T04:53:12Z.
+- Latest heartbeat: 2026-06-20T05:02:52Z.
 
 ## Что сделано
 
@@ -1352,17 +1352,37 @@ hiding, queue mutation, backend/WING contact, live transport, supervised apply
 opening, supervised apply dispatch, console apply, readiness closure, Full
 Autonomous readiness or live authority is introduced.
 
+The M074 Supervised Apply parameter blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs`
+and
+`tests/test_wing_mvp_rails.py::test_m074_supervised_apply_parameter_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Supervised Apply parameter guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M074-supervised-apply-parameter-blocker-guard.md`,
+`Docs/adr/supervised-apply-parameter-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. Supervised Apply now shows
+`Blocked parameter` in the Proposal Target `Parameter` while
+`integrationBundleApplyBlocked` is true, preserving the raw proposal parameter
+and normal styling when the global blocker is absent. This is local frontend
+presentation hardening only: no proposal data mutation, task status input
+mutation, task data mutation, backend status input mutation, backend result
+input mutation, safety monitor input mutation, readiness input mutation, row
+hiding, queue mutation, backend/WING contact, live transport, supervised apply
+opening, supervised apply dispatch, console apply, readiness closure, Full
+Autonomous readiness or live authority is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `89 passed`.
+  `90 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m073_task_details_proposal_parameter_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m074_supervised_apply_parameter_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `86 passed`.
+  `87 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4199 passed, 1 skipped, 1 warning`.
+  `4200 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.

@@ -708,6 +708,7 @@ function SupervisedApplyModal({
   const finalReadinessStatus = integrationBundleApplyBlocked
     ? { value: 'Blocked by integration bundle', tone: 'red' as Tone }
     : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };
+  const supervisedProposalParameter = taskProposalParameterDisplay(proposal, integrationBundleApplyBlocked);
   const supervisedProposalNewValue = taskProposalDeltaDisplay(proposal, integrationBundleApplyBlocked);
   const supervisedProposalRollback = taskProposalRollbackDisplay(proposal, integrationBundleApplyBlocked);
 
@@ -733,7 +734,7 @@ function SupervisedApplyModal({
               <div className="am-label mb-2">Proposal Target</div>
               <div className="grid grid-cols-[92px_1fr] gap-y-2 text-[11px]">
                 <span className="text-muted">Target</span><b className="truncate text-text">{task.target ?? task.title}</b>
-                <span className="text-muted">Parameter</span><b className="truncate text-text">{proposal.parameter}</b>
+                <span className="text-muted">Parameter</span><b className={`truncate ${supervisedProposalParameter.className}`}>{supervisedProposalParameter.label}</b>
                 <span className="text-muted">Old value</span><b className="truncate text-muted">Current console snapshot</b>
                 <span className="text-muted">New value</span><b className={`truncate ${supervisedProposalNewValue.className}`}>{supervisedProposalNewValue.label}</b>
                 <span className="text-muted">Rollback</span><b className={`truncate ${supervisedProposalRollback.className}`}>{supervisedProposalRollback.label}</b>

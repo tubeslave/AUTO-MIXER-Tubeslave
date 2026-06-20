@@ -205,6 +205,8 @@ M072_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M072-task-details-proposal-proof-
 M072_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-proposal-proof-blocker-guard-20260620.md"
 M073_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M073-task-details-proposal-parameter-blocker-guard.md"
 M073_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-proposal-parameter-blocker-guard-20260620.md"
+M074_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M074-supervised-apply-parameter-blocker-guard.md"
+M074_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-parameter-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -7596,6 +7598,70 @@ def test_m073_task_details_proposal_parameter_reflects_integration_bundle_blocke
     assert "Task Details proposal parameter values must fail closed" in completion
     assert "M073 Task Details proposal parameter blocker guard is now covered" in current
     assert "M073 Task Details proposal parameter blocker guard rail is now automated" in report
+
+
+def test_m074_supervised_apply_parameter_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M074_PLAN.read_text(encoding="utf-8")
+    adr = M074_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m074 = markdown_table_row(roadmap, "M074")
+    assert m074[1] == "Supervised Apply parameter blocker guard"
+    assert m074[2] == (
+        "Supervised Apply Proposal Target Parameter shows blocked-parameter "
+        "status while promotion planning is blocked"
+    )
+    assert m074[3] == "M073"
+    assert m074[4] == "high offline frontend"
+    assert m074[5] == "UNIT_VERIFIED blocked Supervised Apply parameter; live authority remains blocked"
+    assert m074[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Supervised Apply parameter now shows blocked-parameter status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M074-CP01" in plan
+    assert "M074-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate proposal data" in adr
+
+    assert "function taskProposalParameterDisplay(" in task_queue
+    assert "const label = integrationBundleApplyBlocked ? 'Blocked parameter' : proposal.parameter" in task_queue
+    assert "const supervisedProposalParameter = taskProposalParameterDisplay(proposal, integrationBundleApplyBlocked)" in task_queue
+    assert "className={`truncate ${supervisedProposalParameter.className}`}" in task_queue
+    assert "{supervisedProposalParameter.label}" in task_queue
+    assert '<span className="text-muted">Parameter</span><b className="truncate text-text">{proposal.parameter}</b>' not in task_queue
+    assert "supervised apply parameter shows blocked parameter" in adapter_test
+    assert "Supervised Apply parameter values must fail closed" in completion
+    assert "M074 Supervised Apply parameter blocker guard is now covered" in current
+    assert "M074 Supervised Apply parameter blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
