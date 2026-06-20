@@ -406,7 +406,8 @@ def _write_artifact(
     summary = summary or _valid_summary()
     requested_run_dir_name = run_dir.name
     if requested_run_dir_name not in {"run", summary["run_id"]}:
-        summary["run_id"] = f"{summary['run_id']}_{requested_run_dir_name}"
+        second = (sum(ord(char) for char in requested_run_dir_name) % 59) + 1
+        summary["run_id"] = f"20260606T1200{second:02d}Z_wing_readonly_preflight"
     if WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT not in run_dir.as_posix():
         run_dir = run_dir.parent / WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
     run_dir = run_dir if run_dir.name == summary["run_id"] else run_dir / summary["run_id"]

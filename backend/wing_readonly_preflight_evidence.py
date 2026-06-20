@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -87,6 +88,9 @@ DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS = (
 RESERVED_NON_WING_EVIDENCE_ROOTS = (
     "artifacts/no_wing_release_check",
     "ops/autopilot/evidence",
+)
+WING_READONLY_PREFLIGHT_RUN_ID_PATTERN = re.compile(
+    r"^\d{8}T\d{6}Z_wing_readonly_preflight$"
 )
 EVIDENCE_STATUSES = {
     "operator_preflight_required",
@@ -710,6 +714,10 @@ def _run_id_is_single_safe_path_segment(value: str) -> bool:
     return value not in {".", ".."} and "/" not in value and "\\" not in value
 
 
+def _run_id_matches_wing_readonly_capture_format(value: str) -> bool:
+    return bool(WING_READONLY_PREFLIGHT_RUN_ID_PATTERN.fullmatch(value))
+
+
 def _validate_candidate_artifact_intake_paths(
     payload: Mapping[str, Any],
     *,
@@ -748,6 +756,8 @@ def _validate_candidate_artifact_intake_paths(
     if not _run_id_is_single_safe_path_segment(run_id):
         violations.append("run_id_not_single_safe_path_segment")
         return
+    if not _run_id_matches_wing_readonly_capture_format(run_id):
+        violations.append("run_id_not_wing_readonly_capture_format")
     if not isinstance(artifact_root, str) or not artifact_root:
         return
     for field, artifact_name in declared_paths.items():

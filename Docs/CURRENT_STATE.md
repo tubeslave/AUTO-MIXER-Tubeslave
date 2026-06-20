@@ -1516,6 +1516,20 @@ Generated: 2026-06-20T15:44:02Z
   queue, applies no proposal, grants no live authority, closes no readiness
   row, creates no hardware evidence and does not replace real WING/operator
   validation.
+- M102 WING read-only run id format intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py`,
+  `tests/test_wing_readonly_preflight_review_tool.py` and
+  `tests/test_wing_mvp_rails.py::test_m102_wing_readonly_run_id_format_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when `run_id` is
+  not the runner-generated UTC capture format
+  `YYYYMMDDTHHMMSSZ_wing_readonly_preflight`. This blocks manually renamed or
+  hand-built run directories from passing as real runner captures while still
+  looking string-consistent with `artifact_root/<run_id>/summary.json`. The
+  concrete intake violation is `run_id_not_wing_readonly_capture_format`. It
+  contacts no WING/backend transport, opens no WebSocket/OSC write path,
+  imports no proposal into a queue, applies no proposal, grants no live
+  authority, closes no readiness row, creates no hardware evidence and does not
+  replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1526,4 +1540,4 @@ Generated: 2026-06-20T15:44:02Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4033 passed, 1 skipped, 1 warning`.
+  `4035 passed, 1 skipped, 1 warning`.

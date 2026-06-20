@@ -213,6 +213,17 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   contact, proposal apply, queue import, live write, readiness closure,
   hardware evidence or live authority.
 
+- M102 WING read-only run id format intake guard rail is now automated:
+  candidate WING read-only summaries whose `run_id` is not the runner-generated
+  UTC capture format `YYYYMMDDTHHMMSSZ_wing_readonly_preflight` fail artifact
+  intake before they can become accepted real WING read-only candidates. This
+  blocks manually renamed or hand-built run directories from passing as real
+  runner captures while still looking string-consistent with
+  `artifact_root/<run_id>/summary.json`. The concrete intake violation is
+  `run_id_not_wing_readonly_capture_format`. This creates no WING/backend
+  contact, proposal apply, queue import, live write, readiness closure,
+  hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING

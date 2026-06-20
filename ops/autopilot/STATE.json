@@ -5,17 +5,17 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "e8a38bc0",
-  "last_heartbeat_utc": "2026-06-20T16:29:18Z",
+  "last_heartbeat_utc": "2026-06-20T16:38:10Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": "Real WING Rack read-only artifact and operator review are required before the roadmap can advance to physical readback.",
   "next_action": "Wait for operator-supervised WING read-only preflight using ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json.",
   "last_validation_summary": {
-    "status": "m101_wing_readonly_artifact_root_whitespace_intake_guard_validated",
+    "status": "m102_wing_readonly_run_id_format_intake_guard_validated",
     "hardware_evidence": false,
     "product_runtime_changed": false,
-    "product_runtime_change_scope": "Read-only M101 WING artifact-root whitespace intake guard, focused WING read-only evidence tests, rail test and docs; latest verified product/runtime checkpoint remains e8a38bc0. WING read-only evidence intake now rejects candidate summaries whose artifact_root has surrounding whitespace before they can become accepted real WING read-only candidates. No hardware contact, no backend WebSocket, no OSC write, no proposal apply, no queue import, no live authority grant, no readiness closure, and no live scope widening.",
-    "pytest": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4033 passed, 1 skipped, 1 warning",
+    "product_runtime_change_scope": "Read-only M102 WING run-id format intake guard, focused WING read-only evidence tests, rail test and docs; latest verified product/runtime checkpoint remains e8a38bc0. WING read-only evidence intake now rejects candidate summaries whose run_id is not the runner-generated UTC capture format before they can become accepted real WING read-only candidates. No hardware contact, no backend WebSocket, no OSC write, no proposal apply, no queue import, no live authority grant, no readiness closure, and no live scope widening.",
+    "pytest": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4035 passed, 1 skipped, 1 warning",
     "no_wing_quick": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/no_wing_release_check.py --quick: passed",
     "artifact_manifest_verifier": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/verify_no_wing_artifact_manifest.py artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check: passed",
     "memory_lint": "/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS",
@@ -194,7 +194,7 @@
     "m081_wing_review_decision_prestart_proof_binding_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_decision_tool.py tests/test_wing_readonly_preflight_review_decision.py tests/test_wing_readonly_preflight_review_tool.py -q: 74 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m081_wing_review_decision_binds_prestart_proof -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 94 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_no_wing_release_check.py -q: 448 passed",
     "post_m001_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4211 passed, 1 skipped, 1 warning",
     "evidence_placement": "validate-only summaries are stored under ops/autopilot/evidence, not artifacts/wing_readonly_preflight",
-    "heartbeat_reconciliation": "2026-06-20T16:29:18Z recorded M101 WING read-only artifact root whitespace intake guard: candidate WING read-only summaries whose artifact_root has surrounding whitespace now fail artifact intake before they can become accepted real WING read-only candidates. The guard remains read-only with no backend WebSocket, no OSC write, no proposal apply, no queue import, no readiness closure, no hardware evidence, no Full Autonomous readiness and no live authority. M001 still waits for a real WING read-only artifact.",
+    "heartbeat_reconciliation": "2026-06-20T16:38:10Z recorded M102 WING read-only run id format intake guard: candidate WING read-only summaries whose run_id is not the runner-generated UTC capture format now fail artifact intake before they can become accepted real WING read-only candidates. The guard remains read-only with no backend WebSocket, no OSC write, no proposal apply, no queue import, no readiness closure, no hardware evidence, no Full Autonomous readiness and no live authority. M001 still waits for a real WING read-only artifact.",
     "authority": {
       "live_authority_granted": false,
       "readiness_closure_allowed": false,
@@ -224,7 +224,9 @@
     "m100_wing_readonly_artifact_root_parent_traversal_intake_guard_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_evidence.py -q: 72 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m100_wing_readonly_artifact_root_parent_traversal_intake_guard_stays_readonly -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 113 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4031 passed, 1 skipped, 1 warning; /opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS; ops/autopilot/STATE.json JSON validation: PASS; ops/autopilot/RUN_LEDGER.jsonl JSONL validation: PASS",
     "m100_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M100_WING_READONLY_ARTIFACT_ROOT_PARENT_TRAVERSAL_INTAKE_GUARD_20260620.md",
     "m101_wing_readonly_artifact_root_whitespace_intake_guard_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_evidence.py -q: 73 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m101_wing_readonly_artifact_root_whitespace_intake_guard_stays_readonly -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 114 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4033 passed, 1 skipped, 1 warning; /opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS; ops/autopilot/STATE.json JSON validation: PASS; ops/autopilot/RUN_LEDGER.jsonl JSONL validation: PASS",
-    "m101_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M101_WING_READONLY_ARTIFACT_ROOT_WHITESPACE_INTAKE_GUARD_20260620.md"
+    "m101_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M101_WING_READONLY_ARTIFACT_ROOT_WHITESPACE_INTAKE_GUARD_20260620.md",
+    "m102_wing_readonly_run_id_format_intake_guard_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_evidence.py -q: 74 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_readonly_preflight_review_tool.py::test_review_decision_template_requires_explicit_source_for_multiple_candidates -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m102_wing_readonly_run_id_format_intake_guard_stays_readonly -q: 1 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 115 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4035 passed, 1 skipped, 1 warning; /opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .: PASS; ops/autopilot/STATE.json JSON validation: PASS; ops/autopilot/RUN_LEDGER.jsonl JSONL validation: PASS",
+    "m102_report": "Docs/reports/AUTOMIXER_AUTOPILOT_M102_WING_READONLY_RUN_ID_FORMAT_INTAKE_GUARD_20260620.md"
   },
   "external_validation_requirements": [
     "Real WING Rack read-only artifact",

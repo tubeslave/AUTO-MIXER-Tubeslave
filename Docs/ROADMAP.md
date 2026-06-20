@@ -125,6 +125,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M099 | WING read-only run id path segment intake guard | Real WING read-only intake rejects candidates whose run_id is not a single safe path segment before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED run-id path-segment guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M100 | WING read-only artifact root parent traversal intake guard | Real WING read-only intake rejects candidates whose artifact_root contains parent traversal before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED artifact-root traversal guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M101 | WING read-only artifact root whitespace intake guard | Real WING read-only intake rejects candidates whose artifact_root has surrounding whitespace before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED artifact-root whitespace guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
+| M102 | WING read-only run id format intake guard | Real WING read-only intake rejects candidates whose run_id is not the runner-generated UTC capture format before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED run-id format guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 
 ## Active milestone
 
