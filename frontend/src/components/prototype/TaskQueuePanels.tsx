@@ -567,6 +567,12 @@ function ReplayEvidencePanel({
   const latestRunStatusTone = integrationBundleApplyBlocked
     ? 'red' as const
     : toneForReplayStatus(latestRun?.status ?? 'idle');
+  const latestRunIdLabel = integrationBundleApplyBlocked
+    ? 'No replay start'
+    : latestRun?.runId ?? 'No replay yet';
+  const latestRunIdClassName = integrationBundleApplyBlocked
+    ? 'truncate text-[9px] font-bold text-danger'
+    : 'truncate text-[9px] font-bold text-text';
   const replayPolicyLabel = integrationBundleApplyBlocked
     ? 'bundle blocked'
     : latestRun?.offlineOnly === false ? 'review' : 'offline only';
@@ -616,7 +622,7 @@ function ReplayEvidencePanel({
       <div className="flex items-center justify-between gap-2 rounded-[5px] border border-line bg-row px-1.5 py-1">
         <div className="min-w-0">
           <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Latest run</div>
-          <div className="truncate text-[9px] font-bold text-text">{latestRun?.runId ?? 'No replay yet'}</div>
+          <div className={latestRunIdClassName}>{latestRunIdLabel}</div>
         </div>
         <StatusBadge tone={latestRunStatusTone}>{latestRunStatusLabel}</StatusBadge>
       </div>

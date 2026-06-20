@@ -4613,6 +4613,25 @@ test('replay evidence latest run status is guarded when integration bundle is bl
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence latest run id is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const latestRunIdLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'No replay start'/);
+  assert.match(source, /: latestRun\?\.runId \?\? 'No replay yet'/);
+  assert.match(source, /const latestRunIdClassName = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'truncate text-\[9px\] font-bold text-danger'/);
+  assert.match(source, /: 'truncate text-\[9px\] font-bold text-text'/);
+  assert.match(source, /<div className=\{latestRunIdClassName\}>\{latestRunIdLabel\}<\/div>/);
+  assert.doesNotMatch(source, /<div className="truncate text-\[9px\] font-bold text-text">\{latestRun\?\.runId \?\? 'No replay yet'\}<\/div>/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('replay evidence policy row is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
