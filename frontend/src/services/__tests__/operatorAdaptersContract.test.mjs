@@ -4594,6 +4594,27 @@ test('replay evidence decision trace status is guarded when integration bundle i
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence trace detail is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const traceDetailLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'No trace proof'/);
+  assert.match(source, /\? `\$\{latestRun\.traceCount\} rows`/);
+  assert.match(source, /\? `\$\{latestTrace\.actionType\} \$\{latestTrace\.delta \? `\$\{latestTrace\.delta\} dB` : ''\}`/);
+  assert.match(source, /: 'No decision trace'/);
+  assert.match(source, /const traceDetailClassName = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'truncate text-\[9px\] font-bold text-danger'/);
+  assert.match(source, /: 'truncate text-\[9px\] font-bold text-text'/);
+  assert.match(source, /<div className=\{traceDetailClassName\}>\{traceDetailLabel\}<\/div>/);
+  assert.doesNotMatch(source, /<div className="truncate text-\[9px\] font-bold text-text">\s*\{latestRun \? `\$\{latestRun\.traceCount\} rows`/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('replay evidence latest run status is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

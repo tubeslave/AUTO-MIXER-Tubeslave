@@ -101,6 +101,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M075 | Supervised Apply old value blocker guard | Supervised Apply Proposal Target Old value shows no-readback status while promotion planning is blocked | M074 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply old value; live authority remains blocked | PENDING |
 | M076 | Replay Evidence start action blocker guard | Replay Evidence Start Offline action is disabled while promotion planning is blocked | M075 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence start action; live authority remains blocked | PENDING |
 | M077 | Replay Evidence latest run id blocker guard | Replay Evidence Latest run id shows no-replay-start status while promotion planning is blocked | M076 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence latest run id; live authority remains blocked | PENDING |
+| M078 | Replay Evidence trace detail blocker guard | Replay Evidence Trace detail shows no-trace-proof status while promotion planning is blocked | M077 | high offline frontend | UNIT_VERIFIED blocked Replay Evidence trace detail; live authority remains blocked | PENDING |
 
 ## Active milestone
 

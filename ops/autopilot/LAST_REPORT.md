@@ -1857,6 +1857,47 @@ live authority is introduced.
   operations, heartbeat, blockers and this report. It found no real WING
   read-only artifact under `artifacts/wing_readonly_preflight/`.
 
+## M078 Replay Evidence Trace Detail Blocker Guard
+
+The M078 Replay Evidence trace detail blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m078_replay_evidence_trace_detail_reflects_integration_bundle_blocker`.
+
+The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` derives
+local `traceDetailLabel` and `traceDetailClassName` values from
+`integrationBundleApplyBlocked`. While the blocker is visible, the Replay
+Evidence `Trace` detail text shows `No trace proof` instead of raw replay trace
+counts or raw decision-trace action/delta. The raw trace count, action/delta or
+`No decision trace` remains unchanged when the global blocker is absent.
+
+This is frontend presentation hardening only. It mutates no decision trace
+input, replay run input, channel evidence input, task data, backend status
+input, backend result input, safety monitor input or readiness input. It
+creates no row hiding, no queue mutation, no replay start, no supervised apply
+opening, no supervised apply dispatch, no backend/WING contact, no live
+transport, no live authority, no readiness closure, no Full Autonomous
+readiness and no replacement for accepted real hardware/operator validation.
+
+Validation recorded for this rail:
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `94 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m078_replay_evidence_trace_detail_reflects_integration_bundle_blocker -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `91 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4204 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M078 guard is recorded in `Docs/ROADMAP.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/plans/M078-replay-evidence-trace-detail-blocker-guard.md`,
+`Docs/adr/replay-evidence-trace-detail-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
 ## Оставшаяся работа
 
 Wait for the operator-supervised real WING read-only preflight. Do not contact

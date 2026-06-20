@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T05:30:39Z
+Last heartbeat UTC: 2026-06-20T05:41:57Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,18 +12,18 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M077 Replay Evidence latest run id blocker guard now shows
-`No replay start` in the Replay Evidence `Latest run` text while
+Latest check: M078 Replay Evidence trace detail blocker guard now shows
+`No trace proof` in the Replay Evidence `Trace` detail text while
 `integrationBundleApplyBlocked` is true. The updated frontend keeps this as
-local presentation hardening and does not mutate replay run input, decision
-trace input, channel evidence input, task data, backend status input, backend
+local presentation hardening and does not mutate decision trace input, replay
+run input, channel evidence input, task data, backend status input, backend
 result input, safety monitor input, readiness input, hide rows, add queue
 mutation, start replay, open supervised apply, dispatch supervised apply,
 console apply, WING/backend contact or live authority.
 
-Frontend adapter validation passed with `93 passed`; the frontend build
-passed; the M077 rail passed with `1 passed`; the full rail file passed with
-`90 passed`; and the full suite passed with `4203 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `94 passed`; the frontend build
+passed; the M078 rail passed with `1 passed`; the full rail file passed with
+`91 passed`; and the full suite passed with `4204 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

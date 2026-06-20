@@ -213,6 +213,8 @@ M076_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M076-replay-evidence-start-action
 M076_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-start-action-blocker-guard-20260620.md"
 M077_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M077-replay-evidence-latest-run-id-blocker-guard.md"
 M077_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-latest-run-id-blocker-guard-20260620.md"
+M078_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M078-replay-evidence-trace-detail-blocker-guard.md"
+M078_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-trace-detail-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -7870,6 +7872,75 @@ def test_m077_replay_evidence_latest_run_id_reflects_integration_bundle_blocker(
     assert "Replay Evidence latest run ids must fail closed" in completion
     assert "M077 Replay Evidence latest run id blocker guard is now covered" in current
     assert "M077 Replay Evidence latest run id blocker guard rail is now automated" in report
+
+
+def test_m078_replay_evidence_trace_detail_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M078_PLAN.read_text(encoding="utf-8")
+    adr = M078_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m078 = markdown_table_row(roadmap, "M078")
+    assert m078[1] == "Replay Evidence trace detail blocker guard"
+    assert m078[2] == (
+        "Replay Evidence Trace detail shows no-trace-proof status while "
+        "promotion planning is blocked"
+    )
+    assert m078[3] == "M077"
+    assert m078[4] == "high offline frontend"
+    assert m078[5] == "UNIT_VERIFIED blocked Replay Evidence trace detail; live authority remains blocked"
+    assert m078[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Replay Evidence trace detail now shows no-trace-proof status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M078-CP01" in plan
+    assert "M078-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate decision trace input" in adr
+
+    assert "function ReplayEvidencePanel({" in task_queue
+    assert "const traceDetailLabel = integrationBundleApplyBlocked" in task_queue
+    assert "? 'No trace proof'" in task_queue
+    assert "? `${latestRun.traceCount} rows`" in task_queue
+    assert "? `${latestTrace.actionType} ${latestTrace.delta ? `${latestTrace.delta} dB` : ''}`" in task_queue
+    assert ": 'No decision trace'" in task_queue
+    assert "const traceDetailClassName = integrationBundleApplyBlocked" in task_queue
+    assert "? 'truncate text-[9px] font-bold text-danger'" in task_queue
+    assert ": 'truncate text-[9px] font-bold text-text'" in task_queue
+    assert "<div className={traceDetailClassName}>{traceDetailLabel}</div>" in task_queue
+    assert '<div className="truncate text-[9px] font-bold text-text">' not in task_queue
+    assert "replay evidence trace detail is guarded" in adapter_test
+    assert "Replay Evidence trace details must fail closed" in completion
+    assert "M078 Replay Evidence trace detail blocker guard is now covered" in current
+    assert "M078 Replay Evidence trace detail blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

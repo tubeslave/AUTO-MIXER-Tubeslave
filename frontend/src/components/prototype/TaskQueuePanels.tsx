@@ -613,6 +613,16 @@ function ReplayEvidencePanel({
     : latestTrace
       ? latestTrace.blockedReason ? 'red' as const : latestTrace.tone
       : 'muted' as const;
+  const traceDetailLabel = integrationBundleApplyBlocked
+    ? 'No trace proof'
+    : latestRun
+      ? `${latestRun.traceCount} rows`
+      : latestTrace
+        ? `${latestTrace.actionType} ${latestTrace.delta ? `${latestTrace.delta} dB` : ''}`
+        : 'No decision trace';
+  const traceDetailClassName = integrationBundleApplyBlocked
+    ? 'truncate text-[9px] font-bold text-danger'
+    : 'truncate text-[9px] font-bold text-text';
 
   return (
     <Panel
@@ -639,9 +649,7 @@ function ReplayEvidencePanel({
         <div className="rounded-[5px] border border-line bg-row px-1.5 py-1">
           <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Trace</div>
           <div className="flex min-w-0 items-center justify-between gap-1">
-            <div className="truncate text-[9px] font-bold text-text">
-              {latestRun ? `${latestRun.traceCount} rows` : latestTrace ? `${latestTrace.actionType} ${latestTrace.delta ? `${latestTrace.delta} dB` : ''}` : 'No decision trace'}
-            </div>
+            <div className={traceDetailClassName}>{traceDetailLabel}</div>
             <StatusBadge tone={traceStatusTone}>{traceStatusLabel}</StatusBadge>
           </div>
         </div>
