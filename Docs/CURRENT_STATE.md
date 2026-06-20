@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T07:20:47Z
+Generated: 2026-06-20T07:35:10Z
 
 ## Repository snapshot
 
@@ -1284,6 +1284,21 @@ Generated: 2026-06-20T07:20:47Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does not
   replace real WING/operator validation.
+- M085 FX send monitor and return safety gates is now covered by
+  `tests/test_fx_send_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m085_fx_send_monitor_return_safety_gates_stay_readonly`.
+  FX send proposals now require fresh read-only/no-authority send/return
+  context, mapped no-authority FX parameter schema hints, monitor-safety
+  evidence when monitor exposure exists, return-level safety evidence, and
+  old-value/rollback readback sources before they can become proposal
+  candidates. Missing, stale, generic, mismatched or live-authority context
+  keeps the FX send layer analysis-only. This moves the long-term AI mixing
+  engineer path forward into effects and sends, a separate capability required
+  by the project goal, while staying offline and proposal-only: it contacts no
+  WING/backend transport, opens no WebSocket/OSC write path, imports no
+  proposal into a queue, applies no proposal, grants no live authority, closes
+  no readiness row, creates no hardware evidence and does not replace real
+  WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1293,5 +1308,5 @@ Generated: 2026-06-20T07:20:47Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `e8a38bc0` passed with
-  `4212 passed, 1 skipped, 1 warning`.
+  but the latest clean staged M085 verification passed with
+  `3991 passed, 1 skipped, 1 warning`.

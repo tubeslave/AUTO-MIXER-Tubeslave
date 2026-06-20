@@ -440,11 +440,15 @@ def test_fx_is_tracked_as_transport_free_proposal_layer():
     assert "backend/auto_fx.py" in effects.support_paths
     assert "AutoReverb" in effects.blocker
     assert "fail-closed" in effects.blocker
+    assert "monitor-safe" in effects.next_step
     assert "read-only FX schema hints" in effects.next_step
     assert sends is not None
     assert sends.status == "proposal_only"
     assert "fx_send_proposal" in sends.method_ids
     assert "backend/auto_fx.py" in sends.support_paths
+    assert "monitor safety" in sends.blocker
+    assert "return-level" in sends.blocker
+    assert "monitor safety" in sends.next_step
     assert console is not None
     assert console.status == "proposal_only"
     assert "fx_send_proposal" in console.method_ids
@@ -453,6 +457,7 @@ def test_fx_is_tracked_as_transport_free_proposal_layer():
     assert "AutoReverb" in console.blocker
     assert "blocked evidence" in console.blocker
     assert "schema hints" in console.next_step
+    assert "monitor safety" in console.next_step
 
 
 def test_master_bus_is_tracked_as_transport_free_proposal_layer():
@@ -880,7 +885,8 @@ def test_scene_preset_control_is_tracked_as_proposal_layer_without_live_widening
     assert "backend/operator_product_state.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "operator review" in row.next_step
-    assert "read-only scoped scene/preset diffs" in row.next_step
+    assert "read-only scene/preset inventory" in row.next_step
+    assert "scoped diffs" in row.next_step
     assert "Product Layer snapshot freshness" in row.next_step
     assert "read-only rollback evidence" in row.next_step
 

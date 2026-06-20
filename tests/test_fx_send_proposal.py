@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from backend.fx_send_proposal import (
+    FX_READ_REQUIRED_SOURCE,
     FXSendAnalysisInput,
     analyze_fx_send_need,
     build_fx_send_proposals,
@@ -11,6 +12,29 @@ from backend.fx_send_proposal import (
 from backend.processing_proposal_adapters import build_proposal_only_method_contracts
 from backend.processing_registry import get_pipeline_profile, get_processing_method
 from backend.project_goal_capability_matrix import get_project_goal_capability
+
+
+def _fresh(fields=6):
+    return {
+        "status": "fresh",
+        "field_count": fields,
+        "fresh_field_count": fields,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
+def _schema(family="reverb"):
+    return {
+        "status": "mapped",
+        "schema_family": family,
+        "schema_source": "automixer_generic_fx_parameter_hints",
+        "mapped_parameter_count": 6,
+        "generic_parameter_count": 0,
+        "physical_model_schema_verified": False,
+        "live_write_authority": False,
+    }
 
 
 def test_fx_send_proposal_module_is_transport_free():
@@ -44,23 +68,8 @@ def test_lead_vocal_creates_proposal_only_fx_send_recommendation():
             intelligibility_risk=0.2,
             source_confidence=0.92,
             persistence_cycles=3,
-            current_state_cache_freshness={
-                "status": "fresh",
-                "field_count": 6,
-                "fresh_field_count": 6,
-                "read_only": True,
-                "live_write": False,
-                "queries_console": False,
-            },
-            current_fx_parameter_schema={
-                "status": "mapped",
-                "schema_family": "reverb",
-                "schema_source": "automixer_generic_fx_parameter_hints",
-                "mapped_parameter_count": 6,
-                "generic_parameter_count": 0,
-                "physical_model_schema_verified": False,
-                "live_write_authority": False,
-            },
+            current_state_cache_freshness=_fresh(),
+            current_fx_parameter_schema=_schema("reverb"),
         )
     )
 
@@ -79,6 +88,11 @@ def test_lead_vocal_creates_proposal_only_fx_send_recommendation():
     assert recommendation.evidence["current_fx_parameter_schema_status"] == "mapped"
     assert recommendation.evidence["current_fx_parameter_schema"]["schema_family"] == "reverb"
     assert recommendation.evidence["expected_fx_schema_family"] == "reverb"
+    assert recommendation.evidence["return_level_safety"]["status"] == "passed"
+    assert recommendation.evidence["monitor_safety"]["status"] == "passed"
+    assert recommendation.evidence["monitor_safety"]["post_fader_send_required"] is True
+    assert recommendation.evidence["current_fx_send_return_cache_freshness"]["status"] == "fresh"
+    assert recommendation.evidence["current_fx_send_return_cache_no_live_authority"] is True
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
 
     proposal = recommendation.to_operator_proposal()
@@ -87,8 +101,15 @@ def test_lead_vocal_creates_proposal_only_fx_send_recommendation():
     assert proposal["can_apply_live"] is False
     assert "requested_change" not in proposal
     assert "unsupported_value_type:fx_send" in proposal["blockers"]
+    assert proposal["old_value"]["source"] == FX_READ_REQUIRED_SOURCE
+    assert proposal["rollback_value"]["source"] == FX_READ_REQUIRED_SOURCE
     assert proposal["evidence"]["live_write"] is False
+    assert proposal["evidence"]["old_value_source"] == FX_READ_REQUIRED_SOURCE
+    assert proposal["evidence"]["rollback_value_source"] == FX_READ_REQUIRED_SOURCE
+    assert proposal["evidence"]["monitor_safety"]["status"] == "passed"
+    assert proposal["evidence"]["return_level_safety"]["status"] == "passed"
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_fx_send_return_cache_no_live_authority"] is True
     assert proposal["evidence"]["current_fx_parameter_schema_status"] == "mapped"
 
 
@@ -143,7 +164,7 @@ def test_fx_send_can_derive_schema_evidence_from_fx_inserts_snapshot():
             intelligibility_risk=0.2,
             source_confidence=0.92,
             persistence_cycles=3,
-            current_state_cache_freshness={"status": "fresh"},
+            current_state_cache_freshness=_fresh(),
             current_fx_inserts_snapshot=snapshot,
         )
     )
@@ -172,6 +193,8 @@ def test_requested_tempo_delay_uses_tempo_and_remains_non_applyable():
             intelligibility_risk=0.15,
             source_confidence=0.9,
             persistence_cycles=3,
+            current_state_cache_freshness=_fresh(),
+            current_fx_parameter_schema=_schema("delay"),
         )
     )
 
@@ -216,6 +239,52 @@ def test_feedback_or_headroom_blocks_fx_send_proposal():
     assert "feedback_risk_high" in recommendation.blockers
 
 
+def test_monitor_safety_blocks_fx_send_proposal_without_fresh_safe_context():
+    stale_monitor = analyze_fx_send_need(
+        FXSendAnalysisInput(
+            channel_id=6,
+            source_role="lead_vocal",
+            current_send_db=-30.0,
+            return_headroom_db=6.0,
+            feedback_risk=0.1,
+            intelligibility_risk=0.2,
+            monitor_send_exposure=True,
+            monitor_safety_risk=0.1,
+            monitor_safety_freshness={"status": "stale"},
+            source_confidence=0.9,
+            persistence_cycles=3,
+            current_state_cache_freshness=_fresh(),
+            current_fx_parameter_schema=_schema("reverb"),
+        )
+    )
+    risky_monitor = analyze_fx_send_need(
+        FXSendAnalysisInput(
+            channel_id=6,
+            source_role="lead_vocal",
+            current_send_db=-30.0,
+            return_headroom_db=6.0,
+            feedback_risk=0.1,
+            intelligibility_risk=0.2,
+            monitor_send_exposure=True,
+            monitor_safety_risk=0.72,
+            monitor_safety_freshness={"status": "fresh"},
+            source_confidence=0.9,
+            persistence_cycles=3,
+            current_state_cache_freshness=_fresh(),
+            current_fx_parameter_schema=_schema("reverb"),
+        )
+    )
+
+    assert stale_monitor.status == "analysis_only"
+    assert "fx_monitor_safety_context_not_fresh" in stale_monitor.blockers
+    assert stale_monitor.evidence["monitor_safety"]["status"] == "blocked"
+    assert stale_monitor.severity == "high"
+    assert risky_monitor.status == "analysis_only"
+    assert "monitor_safety_risk_high" in risky_monitor.blockers
+    assert risky_monitor.evidence["monitor_safety"]["monitor_safety_risk"] == 0.72
+    assert risky_monitor.evidence["monitor_safety"]["status"] == "blocked"
+
+
 def test_stale_current_fx_state_blocks_proposal_only_recommendation():
     recommendation = analyze_fx_send_need(
         FXSendAnalysisInput(
@@ -253,6 +322,86 @@ def test_stale_current_fx_state_blocks_proposal_only_recommendation():
         "fx_slot_type",
     ]
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_live_authority_current_fx_state_blocks_proposal_only_recommendation():
+    analysis = FXSendAnalysisInput(
+        channel_id=6,
+        channel_label="Lead Vox",
+        source_role="lead_vocal",
+        current_send_db=-28.0,
+        arrangement_role="lead_space",
+        contribution_share=0.85,
+        return_headroom_db=6.0,
+        feedback_risk=0.1,
+        intelligibility_risk=0.2,
+        source_confidence=0.92,
+        persistence_cycles=3,
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 6,
+            "fresh_field_count": 6,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        },
+        current_fx_parameter_schema=_schema("reverb"),
+    )
+    recommendation = analyze_fx_send_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "fx_current_state_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_fx_send_return_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_fx_send_return_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_fx_send_proposals([analysis]) == ()
+
+
+def test_missing_current_fx_state_blocks_proposal_only_recommendation():
+    analysis = FXSendAnalysisInput(
+        channel_id=6,
+        channel_label="Lead Vox",
+        source_role="lead_vocal",
+        current_send_db=-28.0,
+        arrangement_role="lead_space",
+        contribution_share=0.85,
+        return_headroom_db=6.0,
+        feedback_risk=0.1,
+        intelligibility_risk=0.2,
+        source_confidence=0.92,
+        persistence_cycles=3,
+        current_fx_parameter_schema=_schema("reverb"),
+    )
+    recommendation = analyze_fx_send_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "fx_current_state_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert build_fx_send_proposals([analysis]) == ()
+
+
+def test_missing_fx_parameter_schema_blocks_proposal_only_recommendation():
+    analysis = FXSendAnalysisInput(
+        channel_id=6,
+        channel_label="Lead Vox",
+        source_role="lead_vocal",
+        current_send_db=-28.0,
+        arrangement_role="lead_space",
+        contribution_share=0.85,
+        return_headroom_db=6.0,
+        feedback_risk=0.1,
+        intelligibility_risk=0.2,
+        source_confidence=0.92,
+        persistence_cycles=3,
+        current_state_cache_freshness=_fresh(),
+    )
+    recommendation = analyze_fx_send_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "fx_parameter_schema_not_mapped" in recommendation.blockers
+    assert recommendation.evidence["current_fx_parameter_schema_status"] == "not_provided"
+    assert build_fx_send_proposals([analysis]) == ()
 
 
 def test_generic_fx_parameter_schema_blocks_fx_send_proposal():
@@ -386,6 +535,47 @@ def test_mismatched_fx_parameter_schema_family_blocks_fx_send_proposal():
     assert recommendation.evidence["current_fx_parameter_schema"]["schema_family"] == "reverb"
 
 
+def test_fx_parameter_schema_with_live_authority_blocks_fx_send_proposal():
+    recommendation = analyze_fx_send_need(
+        FXSendAnalysisInput(
+            channel_id=6,
+            channel_label="Lead Vox",
+            source_role="lead_vocal",
+            current_send_db=-28.0,
+            tempo_bpm=120.0,
+            arrangement_role="lead_space",
+            contribution_share=0.85,
+            return_headroom_db=6.0,
+            feedback_risk=0.1,
+            intelligibility_risk=0.2,
+            source_confidence=0.92,
+            persistence_cycles=3,
+            current_state_cache_freshness={"status": "fresh"},
+            current_fx_parameter_schema={
+                "status": "mapped",
+                "schema_family": "reverb",
+                "schema_source": "unit_test_live_authority_schema",
+                "mapped_parameter_count": 6,
+                "generic_parameter_count": 0,
+                "physical_model_schema_verified": False,
+                "live_write_authority": True,
+            },
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "fx_parameter_schema_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_fx_parameter_schema_status"] == "mapped"
+    assert (
+        recommendation.evidence["current_fx_parameter_schema"]["live_write_authority"]
+        is True
+    )
+    assert recommendation.evidence["fx_parameter_schema_no_live_authority"] is False
+    proposal = recommendation.to_operator_proposal()
+    assert proposal["can_apply_live"] is False
+    assert "fx_parameter_schema_live_authority_present" in proposal["blockers"]
+
+
 def test_source_identity_hold_blocks_downstream_fx_send_proposal():
     recommendation = analyze_fx_send_need(
         FXSendAnalysisInput(
@@ -490,6 +680,8 @@ def test_build_fx_send_proposals_filters_to_proposal_only_items():
                 intelligibility_risk=0.2,
                 source_confidence=0.9,
                 persistence_cycles=3,
+                current_state_cache_freshness=_fresh(),
+                current_fx_parameter_schema=_schema("reverb"),
             ),
             FXSendAnalysisInput(
                 channel_id=1,
@@ -572,13 +764,13 @@ def test_build_fx_send_proposals_uses_shared_fx_snapshot_schema():
                 intelligibility_risk=0.2,
                 source_confidence=0.9,
                 persistence_cycles=3,
-                current_state_cache_freshness={"status": "fresh"},
+                current_state_cache_freshness=_fresh(),
             ),
             FXSendAnalysisInput(
                 channel_id=1,
                 source_role="kick",
                 current_send_db=-36.0,
-                current_state_cache_freshness={"status": "fresh"},
+                current_state_cache_freshness=_fresh(),
             ),
         ],
         current_fx_inserts_snapshot=snapshot,
@@ -757,10 +949,26 @@ def test_fx_send_proposal_is_registered_as_goal_capability():
         in contracts["fx_send_proposal"]["proposal_contract"]["safety_evidence_required"]
     )
     assert (
+        "current_fx_send_return_cache_no_live_authority"
+        in contracts["fx_send_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
         "current_fx_parameter_schema_hints"
         in contracts["fx_send_proposal"]["proposal_contract"]["safety_evidence_required"]
     )
     assert (
         "source_identity_downstream_trust"
+        in contracts["fx_send_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "monitor_safety"
+        in contracts["fx_send_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "return_level_safety"
+        in contracts["fx_send_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "old_value_source"
         in contracts["fx_send_proposal"]["proposal_contract"]["safety_evidence_required"]
     )

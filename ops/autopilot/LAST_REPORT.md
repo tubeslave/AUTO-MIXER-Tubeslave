@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T07:20:47Z.
+- Latest heartbeat: 2026-06-20T07:35:10Z.
 
 ## Что сделано
 
@@ -48,6 +48,15 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   This is a dependency chain toward the project goal, not another pass over the
   same WING handoff function. It creates no WING/backend contact, proposal
   apply, live write, readiness closure, hardware evidence or live authority.
+
+- M085 FX send monitor and return safety gates rail is now automated:
+  FX send proposal candidates now require fresh read-only/no-authority
+  send/return context, mapped no-authority FX schema hints, monitor-safety
+  evidence and old-value/rollback readback sources. Missing, stale, generic,
+  mismatched or live-authority context stays analysis-only. This advances
+  effects and sends, a separate capability required by the project goal, while
+  creating no WING/backend contact, proposal apply, live write, readiness
+  closure, hardware evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2050,6 +2059,44 @@ The M084 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CAPABILITY_MATRIX.md`,
 `Docs/plans/M084-unmasking-frequency-balance-context-gates.md`,
 `Docs/adr/unmasking-frequency-balance-context-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M085 FX Send Monitor And Return Safety Gates
+
+The M085 FX send monitor and return safety rail is now automated by
+`tests/test_fx_send_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m085_fx_send_monitor_return_safety_gates_stay_readonly`.
+
+FX send proposals now require fresh read-only/no-authority send/return context,
+mapped no-authority FX parameter schema hints, monitor-safety evidence when
+monitor exposure exists, return-level safety evidence, and old-value/rollback
+readback sources before they can become proposal candidates. Missing, stale,
+generic, mismatched or live-authority context keeps the FX send layer
+analysis-only.
+
+This is offline effects/send hardening only. It mutates no console state, opens
+no backend/WING transport, sends no OSC/WebSocket write, imports no proposal
+into a queue, applies no proposal, grants no live authority, closes no readiness
+row, creates no hardware evidence and does not replace accepted real
+hardware/operator validation.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_fx_send_proposal.py -q`:
+  `24 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m085_fx_send_monitor_return_safety_gates_stay_readonly -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `98 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `3991 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M085 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`,
+`Docs/plans/M085-fx-send-monitor-return-safety-gates.md`,
+`Docs/adr/fx-send-monitor-return-safety-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 

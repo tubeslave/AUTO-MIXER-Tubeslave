@@ -20,12 +20,14 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 FX_METHOD_ID = "fx_send_proposal"
 FX_VERSION = "fx_send_proposal_v1"
+FX_READ_REQUIRED_SOURCE = "cached_or_physical_fx_read_required_before_promotion"
 MIN_SEND_DB = -36.0
 MAX_SEND_DB = -12.0
 MAX_RETURN_LEVEL_DB = -3.0
 MIN_RETURN_HEADROOM_DB = 3.0
 HIGH_FEEDBACK_RISK = 0.55
 HIGH_INTELLIGIBILITY_RISK = 0.65
+HIGH_MONITOR_SAFETY_RISK = 0.35
 MIN_SEND_DELTA_DB = 1.5
 
 DRY_ANCHOR_FAMILIES = {"kick", "bass", "sub", "master", "reference"}
@@ -151,6 +153,9 @@ class FXSendAnalysisInput:
     return_headroom_db: float = 6.0
     feedback_risk: float = 0.0
     intelligibility_risk: float = 0.0
+    monitor_send_exposure: bool = False
+    monitor_safety_risk: float = 0.0
+    monitor_safety_freshness: Optional[Dict[str, Any]] = None
     source_confidence: float = 0.75
     persistence_cycles: int = 1
     requested_fx_type: Optional[str] = None
@@ -199,6 +204,15 @@ class FXSendRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
+        evidence = {
+            **self.evidence,
+            "old_value_source": FX_READ_REQUIRED_SOURCE,
+            "rollback_value_source": FX_READ_REQUIRED_SOURCE,
+            "live_write": False,
+            "queue_mutation": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
         return {
             "id": self.id,
             "method_id": FX_METHOD_ID,
@@ -234,13 +248,15 @@ class FXSendRecommendation:
                 "delay_ms": self.delay_ms,
                 "ducking_db": self.ducking_db,
             },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
+            "old_value": {
+                "source": FX_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
             },
+            "rollback_value": {
+                "source": FX_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
+            },
+            "evidence": evidence,
         }
 
 
@@ -259,12 +275,16 @@ def _severity(
     if "source_identity_not_trusted_for_downstream" in blocker_set:
         return "medium"
     if blocker_set & {
+        "fx_current_state_cache_live_authority_present",
+        "fx_parameter_schema_live_authority_present",
         "fx_parameter_schema_family_mismatch",
         "fx_inserts_snapshot_cache_not_fresh",
         "fx_parameter_schema_not_mapped",
         "fx_parameter_schema_not_scoped_to_fx_type",
     }:
         return "medium"
+    if blocker_set & {"monitor_safety_risk_high", "fx_monitor_safety_context_not_fresh"}:
+        return "high"
     magnitude = abs(delta or 0.0)
     if feedback_risk >= 0.45 or intelligibility_risk >= 0.5 or magnitude >= 8.0:
         return "high"
@@ -302,6 +322,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     normalized["provided"] = True
     normalized.setdefault("status", _freshness_status(payload))
     return normalized
+
+
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
 
 
 def _schema_status(payload: Optional[Mapping[str, Any]]) -> str:
@@ -439,12 +467,16 @@ def analyze_fx_send_need(
     current = None if analysis.current_send_db is None else round(_safe_float(analysis.current_send_db), 1)
     feedback_risk = _clip01(analysis.feedback_risk)
     intelligibility_risk = _clip01(analysis.intelligibility_risk)
+    monitor_safety_risk = _clip01(analysis.monitor_safety_risk)
     contribution = _clip01(analysis.contribution_share)
     source_confidence = _clip01(analysis.source_confidence)
     headroom = _safe_float(analysis.return_headroom_db)
     persistence = max(1, int(analysis.persistence_cycles or 1))
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
+    monitor_safety_freshness = _freshness_payload(analysis.monitor_safety_freshness)
+    monitor_safety_freshness_status = str(monitor_safety_freshness.get("status") or "unknown")
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=f"ch:{int(analysis.channel_id)}",
         source_type=str(analysis.source_role or "unknown"),
@@ -466,8 +498,14 @@ def analyze_fx_send_need(
         blockers.append("feedback_risk_high")
     if preset.fx_type in {"delay", "reverb"} and intelligibility_risk >= HIGH_INTELLIGIBILITY_RISK:
         blockers.append("intelligibility_risk_high")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if analysis.monitor_send_exposure and monitor_safety_freshness_status != "fresh":
+        blockers.append("fx_monitor_safety_context_not_fresh")
+    if monitor_safety_risk >= HIGH_MONITOR_SAFETY_RISK:
+        blockers.append("monitor_safety_risk_high")
+    if current_state_freshness_status != "fresh":
         blockers.append("fx_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("fx_current_state_cache_live_authority_present")
     expected_fx_schema_family = _expected_schema_family(preset.fx_type)
     schema_input = (
         analysis.current_fx_parameter_schema
@@ -477,7 +515,7 @@ def analyze_fx_send_need(
     fx_parameter_schema = _fx_parameter_schema_payload(schema_input)
     fx_parameter_schema_status = str(fx_parameter_schema.get("status") or "unknown")
     provided_schema_family = str(fx_parameter_schema.get("schema_family") or "unknown").strip().lower()
-    if fx_parameter_schema_status not in {"mapped", "not_provided"}:
+    if fx_parameter_schema_status != "mapped":
         blockers.append("fx_parameter_schema_not_mapped")
     elif fx_parameter_schema_status == "mapped" and provided_schema_family == "unknown":
         blockers.append("fx_parameter_schema_not_scoped_to_fx_type")
@@ -487,6 +525,8 @@ def analyze_fx_send_need(
         and provided_schema_family != expected_fx_schema_family
     ):
         blockers.append("fx_parameter_schema_family_mismatch")
+    if fx_parameter_schema.get("live_write_authority") is not False:
+        blockers.append("fx_parameter_schema_live_authority_present")
     snapshot_schema_freshness_status = str(
         fx_parameter_schema.get("snapshot_cache_freshness_status") or "not_provided"
     ).strip().lower()
@@ -502,6 +542,8 @@ def analyze_fx_send_need(
         target = min(MIN_SEND_DB, target - 4.0)
     if feedback_risk >= 0.35:
         target = min(MIN_SEND_DB, target - 5.0)
+    if monitor_safety_risk >= 0.2:
+        target = min(MIN_SEND_DB, target - 3.0)
     target = round(_clip(target, MIN_SEND_DB, MAX_SEND_DB), 1)
     delta = None if current is None else round(target - current, 1)
     if delta is not None and abs(delta) < MIN_SEND_DELTA_DB:
@@ -516,7 +558,25 @@ def analyze_fx_send_need(
         + 0.15 * (1.0 - intelligibility_risk)
         + 0.10 * min(max(headroom, 0.0) / 8.0, 1.0)
         + 0.05 * contribution
+        - 0.10 * monitor_safety_risk
     )
+    return_level_safety = {
+        "status": "passed" if headroom >= MIN_RETURN_HEADROOM_DB else "blocked",
+        "target_return_level_db": round(_clip(preset.return_level_db, MIN_SEND_DB, MAX_RETURN_LEVEL_DB), 1),
+        "return_headroom_db": round(headroom, 2),
+        "max_return_level_db": MAX_RETURN_LEVEL_DB,
+        "min_return_headroom_db": MIN_RETURN_HEADROOM_DB,
+    }
+    monitor_safety = {
+        "status": "blocked"
+        if "fx_monitor_safety_context_not_fresh" in blockers
+        or "monitor_safety_risk_high" in blockers
+        else "passed",
+        "monitor_send_exposure": bool(analysis.monitor_send_exposure),
+        "monitor_safety_risk": round(monitor_safety_risk, 3),
+        "monitor_safety_freshness_status": monitor_safety_freshness_status,
+        "post_fader_send_required": True,
+    }
 
     evidence = {
         "source": FX_VERSION,
@@ -529,14 +589,32 @@ def analyze_fx_send_need(
         "return_headroom_db": round(headroom, 2),
         "feedback_risk": round(feedback_risk, 3),
         "intelligibility_risk": round(intelligibility_risk, 3),
+        "monitor_safety_risk": round(monitor_safety_risk, 3),
+        "monitor_send_exposure": bool(analysis.monitor_send_exposure),
+        "monitor_safety_freshness_status": monitor_safety_freshness_status,
+        "monitor_safety_freshness": monitor_safety_freshness,
+        "monitor_safety": monitor_safety,
+        "return_level_safety": return_level_safety,
         "source_confidence": round(source_confidence, 3),
         "persistence_cycles": persistence,
+        "current_send_db": current,
+        "target_send_db": target,
+        "delta_send_db": delta,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_fx_send_return_cache_freshness": current_state_freshness,
+        "current_fx_send_return_cache_no_live_authority": current_state_no_authority,
         "current_fx_parameter_schema_status": fx_parameter_schema_status,
         "current_fx_parameter_schema": fx_parameter_schema,
+        "fx_parameter_schema_no_live_authority": (
+            fx_parameter_schema.get("live_write_authority") is False
+        ),
         "expected_fx_schema_family": expected_fx_schema_family,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
+        "old_value_source": FX_READ_REQUIRED_SOURCE,
+        "rollback_value_source": FX_READ_REQUIRED_SOURCE,
+        "readback_required_before_promotion": True,
+        "rollback_required_before_promotion": True,
         "transport_free": True,
         "post_fader_send_required_before_promotion": True,
         "return_filtering_required": True,

@@ -228,6 +228,8 @@ M083_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M083-source-arrangement-readonly-
 M083_ADR = PROJECT_ROOT / "Docs" / "adr" / "source-arrangement-readonly-context-gates-20260620.md"
 M084_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M084-unmasking-frequency-balance-context-gates.md"
 M084_ADR = PROJECT_ROOT / "Docs" / "adr" / "unmasking-frequency-balance-context-gates-20260620.md"
+M085_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M085-fx-send-monitor-return-safety-gates.md"
+M085_ADR = PROJECT_ROOT / "Docs" / "adr" / "fx-send-monitor-return-safety-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8664,6 +8666,159 @@ def test_m084_unmasking_frequency_balance_context_gates_stay_readonly():
     assert "M084 unmasking, frequency and balance context gates is now covered" in current
     assert "M084 unmasking, frequency and balance context gates rail is now" in report
     assert "This is a dependency chain toward the project goal" in report
+
+
+def test_m085_fx_send_monitor_return_safety_gates_stay_readonly():
+    from backend.fx_send_proposal import FXSendAnalysisInput, analyze_fx_send_need
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M085_PLAN.read_text(encoding="utf-8")
+    adr = M085_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m085 = markdown_table_row(roadmap, "M085")
+    assert m085[1] == "FX send monitor and return safety gates"
+    assert m085[2] == (
+        "FX send proposal candidates require fresh read-only/no-authority "
+        "send/return context, mapped no-authority FX schema hints, "
+        "monitor-safety evidence and rollback/readback sources"
+    )
+    assert m085[3] == "M083"
+    assert m085[4] == "high offline FX decision"
+    assert m085[5] == "UNIT_VERIFIED FX send safety gate; live authority remains blocked"
+    assert m085[-1] == "PENDING"
+
+    for marker in ("M085-CP01", "M085-CP02", "M085-CP03", "M085-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert "fresh read-only/no-authority send/return context" in capability
+    assert "mapped FX schema hints" in capability
+    assert "monitor safety and return-level safety" in capability
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 6,
+        "fresh_field_count": 6,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    mapped_schema = {
+        "status": "mapped",
+        "schema_family": "reverb",
+        "schema_source": "automixer_generic_fx_parameter_hints",
+        "mapped_parameter_count": 6,
+        "generic_parameter_count": 0,
+        "physical_model_schema_verified": False,
+        "live_write_authority": False,
+    }
+    live_schema = {**mapped_schema, "live_write_authority": True}
+
+    base = dict(
+        channel_id=6,
+        channel_label="Lead Vox",
+        source_role="lead_vocal",
+        current_send_db=-28.0,
+        arrangement_role="lead_space",
+        contribution_share=0.85,
+        return_headroom_db=6.0,
+        feedback_risk=0.1,
+        intelligibility_risk=0.2,
+        source_confidence=0.92,
+        persistence_cycles=3,
+    )
+
+    fx_ok = analyze_fx_send_need(
+        FXSendAnalysisInput(
+            **base,
+            current_state_cache_freshness=fresh_context,
+            current_fx_parameter_schema=mapped_schema,
+        )
+    )
+    assert fx_ok.status == "proposal_only"
+    assert fx_ok.evidence["current_fx_send_return_cache_no_live_authority"] is True
+    assert fx_ok.evidence["fx_parameter_schema_no_live_authority"] is True
+    assert fx_ok.evidence["monitor_safety"]["status"] == "passed"
+    assert fx_ok.evidence["return_level_safety"]["status"] == "passed"
+    assert fx_ok.to_operator_proposal()["can_apply_live"] is False
+
+    fx_missing_context = analyze_fx_send_need(
+        FXSendAnalysisInput(**base, current_fx_parameter_schema=mapped_schema)
+    )
+    assert fx_missing_context.status == "analysis_only"
+    assert "fx_current_state_cache_not_fresh" in fx_missing_context.blockers
+    assert fx_missing_context.to_operator_proposal()["can_apply_live"] is False
+
+    fx_live_context = analyze_fx_send_need(
+        FXSendAnalysisInput(
+            **base,
+            current_state_cache_freshness=live_authority_context,
+            current_fx_parameter_schema=mapped_schema,
+        )
+    )
+    assert fx_live_context.status == "analysis_only"
+    assert "fx_current_state_cache_live_authority_present" in fx_live_context.blockers
+    assert fx_live_context.evidence["current_fx_send_return_cache_no_live_authority"] is False
+
+    fx_live_schema = analyze_fx_send_need(
+        FXSendAnalysisInput(
+            **base,
+            current_state_cache_freshness=fresh_context,
+            current_fx_parameter_schema=live_schema,
+        )
+    )
+    assert fx_live_schema.status == "analysis_only"
+    assert "fx_parameter_schema_live_authority_present" in fx_live_schema.blockers
+    assert fx_live_schema.evidence["fx_parameter_schema_no_live_authority"] is False
+
+    fx_monitor_blocked = analyze_fx_send_need(
+        FXSendAnalysisInput(
+            **base,
+            monitor_send_exposure=True,
+            monitor_safety_risk=0.72,
+            monitor_safety_freshness={"status": "fresh"},
+            current_state_cache_freshness=fresh_context,
+            current_fx_parameter_schema=mapped_schema,
+        )
+    )
+    assert fx_monitor_blocked.status == "analysis_only"
+    assert "monitor_safety_risk_high" in fx_monitor_blocked.blockers
+    assert fx_monitor_blocked.evidence["monitor_safety"]["status"] == "blocked"
+
+    assert "M085 FX send monitor and return safety gates is now covered" in current
+    assert "M085 FX send monitor and return safety gates rail is now" in report
+    assert "effects and sends, a separate capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
