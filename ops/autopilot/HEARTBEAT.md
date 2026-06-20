@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T03:32:27Z
+Last heartbeat UTC: 2026-06-20T03:42:02Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,17 +12,17 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M066 Task Details proposal risk blocker guard now shows `Blocked`
-in the Task Details Proposal Preview risk badge while
-`integrationBundleApplyBlocked` is true. The updated frontend keeps this as
-local presentation hardening and does not mutate proposal data, task status
-input, task data, backend status input, backend result input, safety monitor
-input, readiness input, hide rows, add queue mutation, open supervised apply,
-dispatch supervised apply, console apply, WING/backend contact or live authority.
+Latest check: M067 Task Queue move delta blocker guard now shows `Blocked` in
+the Task Queue `Target / Move` delta while `integrationBundleApplyBlocked` is
+true. The updated frontend keeps this as local presentation hardening and does
+not mutate proposal data, task status input, task data, backend status input,
+backend result input, safety monitor input, readiness input, hide rows, add
+queue mutation, open supervised apply, dispatch supervised apply, console apply,
+WING/backend contact or live authority.
 
-Frontend adapter validation passed with `82 passed`; the frontend build
-passed; the M066 rail passed with `1 passed`; the full rail file passed with
-`79 passed`; and the full suite passed with `4192 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `83 passed`; the frontend build
+passed; the M067 rail passed with `1 passed`; the full rail file passed with
+`80 passed`; and the full suite passed with `4193 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

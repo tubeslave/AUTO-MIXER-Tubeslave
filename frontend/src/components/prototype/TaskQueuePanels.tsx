@@ -203,6 +203,15 @@ function taskProposalRiskDisplay(
   return { label, tone };
 }
 
+function taskMoveDisplay(
+  task: TaskRow,
+  integrationBundleApplyBlocked = false,
+): { label: string; className: string } {
+  const label = integrationBundleApplyBlocked ? 'Blocked' : task.proposal.delta;
+  const className = integrationBundleApplyBlocked ? 'text-danger' : 'text-audio';
+  return { label, className };
+}
+
 export function TaskDetailsPanel({
   task,
   ui,
@@ -851,7 +860,15 @@ export function TaskQueueWorkspace({
             )
           },
           { key: 'agent', label: 'Created By', width: '1.15fr' },
-          { key: 'target', label: 'Target / Move', width: '1fr', render: task => <span className="truncate"><span className="text-text">{task.target}</span><span className="ml-2 font-mono text-audio">{task.proposal.delta}</span></span> },
+          {
+            key: 'target',
+            label: 'Target / Move',
+            width: '1fr',
+            render: task => {
+              const move = taskMoveDisplay(task, integrationBundleApplyBlocked);
+              return <span className="truncate"><span className="text-text">{task.target}</span><span className={`ml-2 font-mono ${move.className}`}>{move.label}</span></span>;
+            }
+          },
           {
             key: 'status',
             label: 'Status',

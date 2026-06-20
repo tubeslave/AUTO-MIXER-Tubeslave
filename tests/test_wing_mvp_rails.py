@@ -191,6 +191,8 @@ M065_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M065-task-details-status-value-bl
 M065_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-status-value-blocker-guard-20260620.md"
 M066_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M066-task-details-proposal-risk-blocker-guard.md"
 M066_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-proposal-risk-blocker-guard-20260620.md"
+M067_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M067-task-queue-move-delta-blocker-guard.md"
+M067_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-move-delta-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -7129,6 +7131,71 @@ def test_m066_task_details_proposal_risk_reflects_integration_bundle_blocker():
     assert "Task Details proposal risk badges must fail closed" in completion
     assert "M066 Task Details proposal risk blocker guard is now covered" in current
     assert "M066 Task Details proposal risk blocker guard rail is now automated" in report
+
+
+def test_m067_task_queue_move_delta_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M067_PLAN.read_text(encoding="utf-8")
+    adr = M067_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m067 = markdown_table_row(roadmap, "M067")
+    assert m067[1] == "Task Queue move delta blocker guard"
+    assert m067[2] == (
+        "Task Queue Target / Move delta shows integration bundle blocker "
+        "status while promotion planning is blocked"
+    )
+    assert m067[3] == "M066"
+    assert m067[4] == "high offline frontend"
+    assert m067[5] == "UNIT_VERIFIED blocked Task Queue move delta; live authority remains blocked"
+    assert m067[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Task Queue move delta now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M067-CP01" in plan
+    assert "M067-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate proposal data" in adr
+
+    assert "function taskMoveDisplay(" in task_queue
+    assert "const label = integrationBundleApplyBlocked ? 'Blocked' : task.proposal.delta" in task_queue
+    assert "const className = integrationBundleApplyBlocked ? 'text-danger' : 'text-audio'" in task_queue
+    assert "const move = taskMoveDisplay(task, integrationBundleApplyBlocked)" in task_queue
+    assert "className={`ml-2 font-mono ${move.className}`}" in task_queue
+    assert "{move.label}" in task_queue
+    assert '<span className="ml-2 font-mono text-audio">{task.proposal.delta}</span>' not in task_queue
+    assert "task queue move column shows blocked state" in adapter_test
+    assert "Task Queue move deltas must fail closed" in completion
+    assert "M067 Task Queue move delta blocker guard is now covered" in current
+    assert "M067 Task Queue move delta blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

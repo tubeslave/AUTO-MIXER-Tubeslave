@@ -4776,6 +4776,22 @@ test('task queue status column shows blocked state when integration bundle is bl
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task queue move column shows blocked state when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskMoveDisplay\(/);
+  assert.match(source, /const label = integrationBundleApplyBlocked \? 'Blocked' : task\.proposal\.delta/);
+  assert.match(source, /const className = integrationBundleApplyBlocked \? 'text-danger' : 'text-audio'/);
+  assert.match(source, /const move = taskMoveDisplay\(task, integrationBundleApplyBlocked\)/);
+  assert.match(source, /className=\{`ml-2 font-mono \$\{move\.className\}`\}/);
+  assert.match(source, /\{move\.label\}/);
+  assert.doesNotMatch(source, /<span className="ml-2 font-mono text-audio">\{task\.proposal\.delta\}<\/span>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task queue row reject action is hidden when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
