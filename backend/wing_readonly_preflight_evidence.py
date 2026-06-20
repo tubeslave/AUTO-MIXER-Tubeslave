@@ -690,6 +690,12 @@ def _validate_candidate_artifact_intake_paths(
     summary_path: Path | None,
     violations: list[str],
 ) -> None:
+    artifact_root = payload.get("artifact_root")
+    run_id = payload.get("run_id")
+    declared_paths = {
+        "summary_path": WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
+        "events_path": WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    }
     if _path_is_under_reserved_non_wing_evidence_root(payload.get("artifact_root")):
         violations.append("artifact_root_reserved_for_non_wing_evidence")
     for field in ("summary_path", "events_path"):
@@ -699,6 +705,18 @@ def _validate_candidate_artifact_intake_paths(
         summary_path
     ):
         violations.append("source_path_reserved_for_non_wing_evidence")
+    if not isinstance(run_id, str) or not run_id:
+        return
+    if not isinstance(artifact_root, str) or not artifact_root:
+        return
+    for field, artifact_name in declared_paths.items():
+        actual_path = payload.get(field)
+        if not isinstance(actual_path, str) or not actual_path:
+            violations.append(f"{field}_missing")
+            continue
+        expected_path = (Path(artifact_root) / run_id / artifact_name).as_posix()
+        if _artifact_path_string(actual_path) != expected_path:
+            violations.append(f"{field}_declared_artifact_path_mismatch")
 
 
 def _expected_artifact_for_run(expected_artifact: str, run_id: str) -> str:

@@ -824,6 +824,36 @@ def test_preflight_evidence_rejects_reserved_autopilot_evidence_candidate_path(t
     assert "events_path_reserved_for_non_wing_evidence" in validation["violations"]
 
 
+def test_preflight_evidence_rejects_declared_artifact_path_mismatch():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["summary_path"] = (
+        "artifacts/wing_readonly_preflight/stale-run/summary.json"
+    )
+    artifact["events_path"] = (
+        "artifacts/wing_readonly_preflight/stale-run/events.jsonl"
+    )
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "summary_path_declared_artifact_path_mismatch" in validation["violations"]
+    assert "events_path_declared_artifact_path_mismatch" in validation["violations"]
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert (
+        "summary_path_declared_artifact_path_mismatch"
+        in evidence["summary"]["violations"]
+    )
+    assert (
+        "events_path_declared_artifact_path_mismatch"
+        in evidence["summary"]["violations"]
+    )
+
+
 def test_preflight_evidence_rejects_missing_existing_backend_connection_boundary():
     artifact = copy.deepcopy(_valid_summary())
     artifact.pop("physical_preflight_requires_existing_backend_connection")

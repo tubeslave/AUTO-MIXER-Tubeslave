@@ -48,17 +48,26 @@ def test_review_decision_checklist_ids_match_shared_contract():
 
 
 def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
-    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    source_id = (
+        "artifacts/wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/summary.json"
+    )
     candidate_review = {
         "source_id": source_id,
         "summary_path": source_id,
-        "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "events_path": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+        ),
         "expected_artifacts": [
             f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
             f"artifacts/wing_readonly_preflight/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
         ],
         "expected_summary_artifact": source_id,
-        "expected_events_artifact": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "expected_events_artifact": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+        ),
         "summary_path_matches_expected_artifact": True,
         "events_path_matches_expected_artifact": True,
         "backend_port_prestart_check_required": True,
@@ -262,7 +271,10 @@ def test_accepted_candidate_prestart_trace_uses_shared_contract_helper():
 
 
 def test_accepted_candidate_artifact_root_contract_rejects_parent_traversal():
-    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
+    source_id = (
+        "artifacts/wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/summary.json"
+    )
     traversal_summary = (
         "artifacts/wing_readonly_preflight/../stale_preflight/run/summary.json"
     )
@@ -299,8 +311,14 @@ def test_accepted_candidate_artifact_root_contract_rejects_parent_traversal():
 
 
 def test_accepted_candidate_artifact_root_contract_rejects_parent_traversal_in_root():
-    source_id = "artifacts/wing_readonly_preflight/run/summary.json"
-    events_path = "artifacts/wing_readonly_preflight/run/events.jsonl"
+    source_id = (
+        "artifacts/wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/summary.json"
+    )
+    events_path = (
+        "artifacts/wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+    )
     artifact_roots, violations = (
         wing_readonly_preflight_accepted_candidate_artifact_root_contract(
             [source_id],
@@ -431,9 +449,15 @@ def _valid_summary() -> dict:
                 "value": -0.25,
             },
         ],
-        "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+        "summary_path": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T120000Z_wing_readonly_preflight/summary.json"
+        ),
         "summary_sha256": "1" * 64,
-        "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "events_path": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+        ),
         "events_sha256": "2" * 64,
     }
 
@@ -470,10 +494,12 @@ def _evidence_with_candidate() -> dict:
         "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
     ]
     candidate["expected_summary_artifact"] = (
-        "artifacts/wing_readonly_preflight/run/summary.json"
+        "artifacts/wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/summary.json"
     )
     candidate["expected_events_artifact"] = (
-        "artifacts/wing_readonly_preflight/run/events.jsonl"
+        "artifacts/wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/events.jsonl"
     )
     candidate["summary_path_matches_expected_artifact"] = True
     candidate["events_path_matches_expected_artifact"] = True
@@ -492,9 +518,15 @@ def _accepted_record(**overrides) -> dict:
         "run_id": "20260606T120000Z_wing_readonly_preflight",
         "artifact_captured_at": "2026-06-07T01:00:00Z",
         "artifact_root": "artifacts/wing_readonly_preflight",
-        "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+        "summary_path": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T120000Z_wing_readonly_preflight/summary.json"
+        ),
         "summary_sha256": "1" * 64,
-        "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+        "events_path": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+        ),
         "events_sha256": "2" * 64,
         "channels": [3],
         "value_types": ["fader", "gain"],
@@ -566,19 +598,27 @@ def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():
             "run_id": "20260606T120000Z_wing_readonly_preflight",
             "captured_at": "2026-06-07T01:00:00Z",
             "artifact_root": "artifacts/wing_readonly_preflight",
-            "summary_path": "artifacts/wing_readonly_preflight/run/summary.json",
+            "summary_path": (
+                "artifacts/wing_readonly_preflight/"
+                "20260606T120000Z_wing_readonly_preflight/summary.json"
+            ),
             "summary_sha256": "1" * 64,
-            "events_path": "artifacts/wing_readonly_preflight/run/events.jsonl",
+            "events_path": (
+                "artifacts/wing_readonly_preflight/"
+                "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+            ),
             "events_sha256": "2" * 64,
             "expected_artifacts": [
                 "artifacts/wing_readonly_preflight/<run_id>/summary.json",
                 "artifacts/wing_readonly_preflight/<run_id>/events.jsonl",
             ],
             "expected_summary_artifact": (
-                "artifacts/wing_readonly_preflight/run/summary.json"
+                "artifacts/wing_readonly_preflight/"
+                "20260606T120000Z_wing_readonly_preflight/summary.json"
             ),
             "expected_events_artifact": (
-                "artifacts/wing_readonly_preflight/run/events.jsonl"
+                "artifacts/wing_readonly_preflight/"
+                "20260606T120000Z_wing_readonly_preflight/events.jsonl"
             ),
             "summary_path_matches_expected_artifact": True,
             "events_path_matches_expected_artifact": True,

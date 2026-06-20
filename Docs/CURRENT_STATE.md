@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T14:12:50Z
+Generated: 2026-06-20T15:08:08Z
 
 ## Repository snapshot
 
@@ -1439,6 +1439,20 @@ Generated: 2026-06-20T14:12:50Z
   WebSocket/OSC write path, imports no proposal into a queue, applies no
   proposal, grants no live authority, closes no readiness row, creates no
   hardware evidence and does not replace real WING/operator validation.
+- M096 WING read-only declared path intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m096_wing_readonly_declared_path_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when
+  `summary_path` or `events_path` does not match the declared
+  `artifact_root/<run_id>/summary.json|events.jsonl` shape. This blocks stale
+  or cross-run summaries from becoming accepted real WING read-only candidates
+  before operator review. The concrete intake violations are
+  `summary_path_declared_artifact_path_mismatch` and
+  `events_path_declared_artifact_path_mismatch`. It contacts no WING/backend
+  transport, opens no WebSocket/OSC write path, imports no proposal into a
+  queue, applies no proposal, grants no live authority, closes no readiness
+  row, creates no hardware evidence and does not replace real WING/operator
+  validation.
 
 ## Unresolved unknowns
 
@@ -1449,4 +1463,4 @@ Generated: 2026-06-20T14:12:50Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4021 passed, 1 skipped, 1 warning`.
+  `4023 passed, 1 skipped, 1 warning`.

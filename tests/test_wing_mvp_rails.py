@@ -250,6 +250,8 @@ M094_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M094-project-director-external-va
 M094_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-external-validation-scope-guard-20260620.md"
 M095_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M095-wing-readonly-reserved-root-intake-guard.md"
 M095_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-reserved-root-intake-guard-20260620.md"
+M096_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M096-wing-readonly-declared-path-intake-guard.md"
+M096_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-declared-path-intake-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -10251,6 +10253,79 @@ def test_m095_wing_readonly_reserved_root_intake_guard_stays_readonly():
     assert "M095 WING read-only reserved-root intake guard rail is now" in report
     assert "artifacts/no_wing_release_check" in current
     assert "ops/autopilot/evidence" in report
+
+
+def test_m096_wing_readonly_declared_path_intake_guard_stays_readonly():
+    from backend.wing_readonly_preflight_evidence import (
+        validate_wing_readonly_preflight_artifact,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M096_PLAN.read_text(encoding="utf-8")
+    adr = M096_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m096 = markdown_table_row(roadmap, "M096")
+    assert m096[1] == "WING read-only declared path intake guard"
+    assert m096[2] == (
+        "Real WING read-only intake rejects candidates whose summary/events "
+        "paths do not match declared artifact_root and run_id before manual "
+        "review can accept them"
+    )
+    assert m096[3] == "M001"
+    assert m096[4] == "critical read-only hardware intake"
+    assert m096[5] == (
+        "UNIT_VERIFIED declared artifact path-shape guard; live authority remains blocked"
+    )
+    assert m096[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    for marker in ("M096-CP01", "M096-CP02", "M096-CP03"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    validation = validate_wing_readonly_preflight_artifact(
+        {
+            "proof_artifact_schema": "wing_readonly_preflight.v1",
+            "proof_runner": "wing_readonly_preflight_runner",
+            "artifact_root": "artifacts/wing_readonly_preflight",
+            "run_id": "20260606T120000Z_wing_readonly_preflight",
+            "summary_path": "artifacts/wing_readonly_preflight/stale/summary.json",
+            "events_path": "artifacts/wing_readonly_preflight/stale/events.jsonl",
+        }
+    )
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert (
+        "summary_path_declared_artifact_path_mismatch" in validation["violations"]
+    )
+    assert (
+        "events_path_declared_artifact_path_mismatch" in validation["violations"]
+    )
+
+    assert "M096 WING read-only declared path intake guard is now covered" in current
+    assert "M096 WING read-only declared path intake guard rail is now" in report
+    assert "summary_path_declared_artifact_path_mismatch" in current
+    assert "events_path_declared_artifact_path_mismatch" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():
