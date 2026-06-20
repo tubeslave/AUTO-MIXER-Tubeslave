@@ -92,6 +92,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M066 | Task Details proposal risk blocker guard | Task Details Proposal Preview risk badge shows integration bundle blocker status while promotion planning is blocked | M065 | high offline frontend | UNIT_VERIFIED blocked Task Details proposal risk; live authority remains blocked | PENDING |
 | M067 | Task Queue move delta blocker guard | Task Queue Target / Move delta shows integration bundle blocker status while promotion planning is blocked | M066 | high offline frontend | UNIT_VERIFIED blocked Task Queue move delta; live authority remains blocked | PENDING |
 | M068 | Task Details proposal delta blocker guard | Task Details Proposal Preview delta shows integration bundle blocker status while promotion planning is blocked | M067 | high offline frontend | UNIT_VERIFIED blocked Task Details proposal delta; live authority remains blocked | PENDING |
+| M069 | Supervised Apply new value blocker guard | Supervised Apply Proposal Target New value shows integration bundle blocker status while promotion planning is blocked | M068 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply new value; live authority remains blocked | PENDING |
 
 ## Active milestone
 

@@ -678,6 +678,7 @@ function SupervisedApplyModal({
   const finalReadinessStatus = integrationBundleApplyBlocked
     ? { value: 'Blocked by integration bundle', tone: 'red' as Tone }
     : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };
+  const supervisedProposalNewValue = taskProposalDeltaDisplay(proposal, integrationBundleApplyBlocked);
 
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-[#05080d]/80 p-5 backdrop-blur-sm" role="dialog" aria-label="Supervised Apply Proposal">
@@ -703,7 +704,7 @@ function SupervisedApplyModal({
                 <span className="text-muted">Target</span><b className="truncate text-text">{task.target ?? task.title}</b>
                 <span className="text-muted">Parameter</span><b className="truncate text-text">{proposal.parameter}</b>
                 <span className="text-muted">Old value</span><b className="truncate text-muted">Current console snapshot</b>
-                <span className="text-muted">New value</span><b className="truncate text-audio">{proposal.delta}</b>
+                <span className="text-muted">New value</span><b className={`truncate ${supervisedProposalNewValue.className}`}>{supervisedProposalNewValue.label}</b>
                 <span className="text-muted">Rollback</span><b className="truncate text-text">{proposal.rollback}</b>
               </div>
             </div>

@@ -4869,6 +4869,18 @@ test('task details proposal delta shows blocked state when integration bundle is
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply new value shows blocked state when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const supervisedProposalNewValue = taskProposalDeltaDisplay\(proposal, integrationBundleApplyBlocked\)/);
+  assert.match(source, /<span className="text-muted">New value<\/span><b className=\{`truncate \$\{supervisedProposalNewValue\.className\}`\}>\{supervisedProposalNewValue\.label\}<\/b>/);
+  assert.doesNotMatch(source, /<span className="text-muted">New value<\/span><b className="truncate text-audio">\{proposal\.delta\}<\/b>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task details apply button is visibly blocked when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
