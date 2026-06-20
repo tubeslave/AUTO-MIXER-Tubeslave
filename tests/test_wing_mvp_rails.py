@@ -151,6 +151,8 @@ M045_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M045-task-queue-review-only-metri
 M045_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-queue-review-only-metric-blocker-guard-20260620.md"
 M046_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M046-task-details-blocker-list-blocker-guard.md"
 M046_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-blocker-list-blocker-guard-20260620.md"
+M047_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M047-apply-plan-sequence-blocker-guard.md"
+M047_ADR = PROJECT_ROOT / "Docs" / "adr" / "apply-plan-sequence-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -5758,6 +5760,71 @@ def test_m046_task_details_blocker_list_reflects_integration_bundle_blocker():
     assert "M046 Task Details blocker list blocker guard rail is now automated" in (
         report
     )
+
+
+def test_m047_apply_plan_sequence_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M047_PLAN.read_text(encoding="utf-8")
+    adr = M047_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m047 = markdown_table_row(roadmap, "M047")
+    assert m047[1] == "Apply Plan sequence blocker guard"
+    assert m047[2] == (
+        "Apply Plan and modal Gate Sequence show blocked integration bundle "
+        "steps while promotion planning is blocked"
+    )
+    assert m047[3] == "M046"
+    assert m047[4] == "high offline frontend"
+    assert m047[5] == "UNIT_VERIFIED blocked Apply Plan sequence; live authority remains blocked"
+    assert m047[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Apply Plan sequences now show blocked integration bundle steps when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M047-CP01" in plan
+    assert "M047-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate apply plan input" in adr
+
+    assert "function applyPlanForIntegrationBundleBlocker(" in task_queue
+    assert "if (!integrationBundleApplyBlocked) return plan" in task_queue
+    assert "value: 'Bundle blocked', tone: 'red'" in task_queue
+    assert "value: 'No contact', tone: 'red'" in task_queue
+    assert "const guardedApplyPlan = applyPlanForIntegrationBundleBlocker(applyPlan, integrationBundleApplyBlocked)" in (
+        task_queue
+    )
+    assert "const modalApplyPlan = applyPlanForIntegrationBundleBlocker(" in task_queue
+    assert "<ApplyPlanPanel plan={guardedApplyPlan} />" in task_queue
+    assert "apply plan sequence is guarded" in adapter_test
+    assert "Apply Plan sequences must fail closed" in completion
+    assert "M047 Apply Plan sequence blocker guard is now covered" in current
+    assert "M047 Apply Plan sequence blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

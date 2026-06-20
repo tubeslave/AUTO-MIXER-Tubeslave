@@ -4474,6 +4474,23 @@ test('task details blocker list includes integration bundle blocker when blocked
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('apply plan sequence is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function applyPlanForIntegrationBundleBlocker\(/);
+  assert.match(source, /if \(!integrationBundleApplyBlocked\) return plan/);
+  assert.match(source, /value: 'Bundle blocked', tone: 'red'/);
+  assert.match(source, /value: 'No contact', tone: 'red'/);
+  assert.match(source, /const guardedApplyPlan = applyPlanForIntegrationBundleBlocker\(applyPlan, integrationBundleApplyBlocked\)/);
+  assert.match(source, /const modalApplyPlan = applyPlanForIntegrationBundleBlocker\(/);
+  assert.match(source, /<ApplyPlanPanel plan=\{guardedApplyPlan\} \/>/);
+  assert.match(source, /applyPlan=\{modalApplyPlan\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task queue review-only filter includes all rows when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

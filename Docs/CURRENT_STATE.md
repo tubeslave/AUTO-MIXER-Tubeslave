@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T00:16:53Z
+Generated: 2026-06-20T00:26:39Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T00:16:53Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `c39f12d2 Guard task queue review metric`
+  `c9cbe192 Guard task details blocker list`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -738,6 +738,18 @@ Generated: 2026-06-20T00:16:53Z
   hides no rows, creates no queue mutation, no backend/WING contact, no live
   transport, no live authority, no readiness closure, no Full Autonomous
   readiness and no replacement for accepted real hardware/operator validation.
+- M047 Apply Plan sequence blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m047_apply_plan_sequence_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives blocked Apply Plan steps from `integrationBundleApplyBlocked`; while
+  the blocker is visible the bottom `Apply Plan` panel and modal
+  `Gate Sequence` show held snapshot, bundle-blocked gate, blocked apply,
+  no-contact readback and no-live undo. This is local frontend presentation
+  hardening only: it mutates no apply-plan input, changes no task data, creates
+  no queue mutation, no backend/WING contact, no live transport, no live
+  authority, no readiness closure, no Full Autonomous readiness and no
+  replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -748,4 +760,4 @@ Generated: 2026-06-20T00:16:53Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4172 passed, 1 skipped, 1 warning`.
+  `4173 passed, 1 skipped, 1 warning`.

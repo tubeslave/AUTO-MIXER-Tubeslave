@@ -57,6 +57,21 @@ function taskQueueMetrics(
   ];
 }
 
+function applyPlanForIntegrationBundleBlocker(
+  plan: ApplyPlanStep[],
+  integrationBundleApplyBlocked = false,
+): ApplyPlanStep[] {
+  if (!integrationBundleApplyBlocked) return plan;
+
+  return [
+    { label: 'Snap', value: 'Held', tone: 'yellow' },
+    { label: 'Gate', value: 'Bundle blocked', tone: 'red' },
+    { label: 'Apply', value: 'Blocked', tone: 'red' },
+    { label: 'Read', value: 'No contact', tone: 'red' },
+    { label: 'Undo', value: 'No live', tone: 'red' },
+  ];
+}
+
 function goalAreaReadinessSummary(rows: GoalCapabilityObjectiveReadinessPriority[]): string {
   const row = rows[0];
   if (!row) return 'none';
@@ -620,9 +635,13 @@ export function TaskQueueWorkspace({
     ? taskRows.find(task => task.id === ui.supervisedProposalTaskId)
     : undefined;
   const modalEvidence = modalTask ? safetyEvidenceForTask(modalTask, ui.mode) : evidence;
-  const modalApplyPlan = modalTask ? applyPlanForTask(modalTask, ui.mode) : applyPlan;
   const blockedReasonMessages = directorBlockedReasonMessages(runtime.blockedReasons);
   const integrationBundleApplyBlocked = blockedReasonMessages.length > 0;
+  const guardedApplyPlan = applyPlanForIntegrationBundleBlocker(applyPlan, integrationBundleApplyBlocked);
+  const modalApplyPlan = applyPlanForIntegrationBundleBlocker(
+    modalTask ? applyPlanForTask(modalTask, ui.mode) : applyPlan,
+    integrationBundleApplyBlocked,
+  );
   const taskQueueBlockerNotice = blockedReasonMessages.length > 0 && taskRows.length > 0
     ? `Promotion planning blocked. Task Queue evidence remains review-only: ${blockedReasonMessages[0]}`
     : '';
@@ -698,7 +717,7 @@ export function TaskQueueWorkspace({
         ]}
       />
       <div className="grid grid-cols-[1fr_1fr_1fr_1.05fr_1.25fr] gap-2">
-        <ApplyPlanPanel plan={applyPlan} />
+        <ApplyPlanPanel plan={guardedApplyPlan} />
         <SafetyEvidencePanel evidence={evidence} />
         <OperatorDecisionPanel ui={ui} policy={policy} />
         <SafetyMonitorPanel safety={safetyMonitor} />

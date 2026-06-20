@@ -860,17 +860,33 @@ no task data change, row hiding, queue mutation, backend/WING contact, live
 transport, supervised apply opening, console apply, readiness closure,
 Full Autonomous readiness or live authority is introduced.
 
+The M047 Apply Plan sequence blocker guard rail is now automated by
+`frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m047_apply_plan_sequence_reflects_integration_bundle_blocker`.
+It updates `frontend/src/components/prototype/TaskQueuePanels.tsx` and binds
+the Apply Plan sequence guard through `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`, `Docs/PROJECT_COMPLETION_GATE.md`,
+`Docs/plans/M047-apply-plan-sequence-blocker-guard.md`,
+`Docs/adr/apply-plan-sequence-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md` and this report. The Task Queue `Apply Plan` panel and
+Supervised Apply modal `Gate Sequence` now show held snapshot, bundle-blocked
+gate, blocked apply, no-contact readback and no-live undo while
+`integrationBundleApplyBlocked` is true. This is local frontend presentation
+hardening only: no apply-plan input mutation, task data change, queue mutation,
+backend/WING contact, live transport, supervised apply opening, console apply,
+readiness closure, Full Autonomous readiness or live authority is introduced.
+
 ## Проверка
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
-  `62 passed`.
+  `63 passed`.
 - `npm --prefix frontend run build`: passed.
-- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m046_task_details_blocker_list_reflects_integration_bundle_blocker -q`:
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m047_apply_plan_sequence_reflects_integration_bundle_blocker -q`:
   `1 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
-  `59 passed`.
+  `60 passed`.
 - `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
-  `4172 passed, 1 skipped, 1 warning`.
+  `4173 passed, 1 skipped, 1 warning`.
 
 - `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
   `55 passed`.
