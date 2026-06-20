@@ -4572,6 +4572,28 @@ test('safety monitor blocked surfaces include integration bundle blocker when bl
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence decision trace status is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /integrationBundleApplyBlocked = false/);
+  assert.match(source, /integrationBundleApplyBlocked\?: boolean/);
+  assert.match(source, /const traceStatusLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'bundle blocked'/);
+  assert.match(source, /\? latestTrace\.blockedReason \? 'blocked' : latestTrace\.proofStatus/);
+  assert.match(source, /: 'no trace'/);
+  assert.match(source, /const traceStatusTone = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'red' as const/);
+  assert.match(source, /\? latestTrace\.blockedReason \? 'red' as const : latestTrace\.tone/);
+  assert.match(source, /: 'muted' as const/);
+  assert.match(source, /<StatusBadge tone=\{traceStatusTone\}>\{traceStatusLabel\}<\/StatusBadge>/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

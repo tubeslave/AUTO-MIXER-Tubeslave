@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T02:12:35Z
+Last heartbeat UTC: 2026-06-20T02:23:08Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,17 +12,17 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M058 Safety Monitor blocked surfaces blocker guard now shows
-`offline_integration_bundle_blockers_visible` in the `Blocked` footer while
+Latest check: M059 Replay Evidence decision trace status blocker guard now
+shows `bundle blocked` in the Replay Evidence Trace row while
 `integrationBundleApplyBlocked` is true. The updated frontend keeps this as
-local presentation hardening and does not mutate safety monitor input,
-readiness input, backend status input, backend result input, task data, add
-queue mutation, open supervised apply, console apply, WING/backend contact or
-live authority.
+local presentation hardening and does not mutate decision trace input, replay
+input, task data, backend status input, backend result input, safety monitor
+input, readiness input, add queue mutation, open supervised apply, console
+apply, WING/backend contact or live authority.
 
-Frontend adapter validation passed with `74 passed`; the frontend build
-passed; the M058 rail passed with `1 passed`; the full rail file passed with
-`71 passed`; and the full suite passed with `4184 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `75 passed`; the frontend build
+passed; the M059 rail passed with `1 passed`; the full rail file passed with
+`72 passed`; and the full suite passed with `4185 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

@@ -472,16 +472,28 @@ function ReplayEvidencePanel({
   traces,
   replayRuns,
   channelIntelligence,
+  integrationBundleApplyBlocked = false,
   onStartReplay
 }: {
   traces: DecisionTraceRecord[];
   replayRuns: ReplayRunRecord[];
   channelIntelligence: ChannelIntelligenceRecord[];
+  integrationBundleApplyBlocked?: boolean;
   onStartReplay: () => void;
 }) {
   const latestRun = replayRuns[0];
   const latestTrace = traces[0];
   const channel = channelIntelligence.find(row => row.recentTraceCount > 0) ?? channelIntelligence[0];
+  const traceStatusLabel = integrationBundleApplyBlocked
+    ? 'bundle blocked'
+    : latestTrace
+      ? latestTrace.blockedReason ? 'blocked' : latestTrace.proofStatus
+      : 'no trace';
+  const traceStatusTone = integrationBundleApplyBlocked
+    ? 'red' as const
+    : latestTrace
+      ? latestTrace.blockedReason ? 'red' as const : latestTrace.tone
+      : 'muted' as const;
 
   return (
     <Panel
@@ -507,8 +519,11 @@ function ReplayEvidencePanel({
         </div>
         <div className="rounded-[5px] border border-line bg-row px-1.5 py-1">
           <div className="truncate text-[8px] uppercase tracking-[0.06em] text-dim">Trace</div>
-          <div className="truncate text-[9px] font-bold text-text">
-            {latestRun ? `${latestRun.traceCount} rows` : latestTrace ? `${latestTrace.actionType} ${latestTrace.delta ? `${latestTrace.delta} dB` : ''}` : 'No decision trace'}
+          <div className="flex min-w-0 items-center justify-between gap-1">
+            <div className="truncate text-[9px] font-bold text-text">
+              {latestRun ? `${latestRun.traceCount} rows` : latestTrace ? `${latestTrace.actionType} ${latestTrace.delta ? `${latestTrace.delta} dB` : ''}` : 'No decision trace'}
+            </div>
+            <StatusBadge tone={traceStatusTone}>{traceStatusLabel}</StatusBadge>
           </div>
         </div>
       </div>
@@ -816,6 +831,7 @@ export function TaskQueueWorkspace({
         <SafetyMonitorPanel safety={safetyMonitor} integrationBundleApplyBlocked={integrationBundleApplyBlocked} />
         <ReplayEvidencePanel
           channelIntelligence={channelIntelligence}
+          integrationBundleApplyBlocked={integrationBundleApplyBlocked}
           onStartReplay={actions.startReplayRun}
           replayRuns={replayRuns}
           traces={decisionTraces}

@@ -328,6 +328,15 @@ readiness, contact WING/backend, mark Full Autonomous ready, apply to console,
 replace backend safety gates, or replace accepted real hardware/operator
 validation.
 
+Replay Evidence decision trace statuses must fail closed when offline
+integration bundle blockers are visible. Replay-evidence-decision-trace-visible
+enforcement cannot mutate decision trace input, replay input, task data, backend
+status input, backend result input, safety monitor input, readiness input, hide
+rows, queue proposals, open supervised apply, dispatch supervised apply, grant
+live authority, close readiness, contact WING/backend, mark Full Autonomous
+ready, apply to console, replace backend safety gates, or replace accepted real
+hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.
