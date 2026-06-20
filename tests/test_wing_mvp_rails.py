@@ -169,6 +169,8 @@ M054_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M054-task-details-reject-button-b
 M054_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-reject-button-blocker-guard-20260620.md"
 M055_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M055-operator-decision-apply-result-blocker-guard.md"
 M055_ADR = PROJECT_ROOT / "Docs" / "adr" / "operator-decision-apply-result-blocker-guard-20260620.md"
+M056_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M056-safety-monitor-policy-blocker-guard.md"
+M056_ADR = PROJECT_ROOT / "Docs" / "adr" / "safety-monitor-policy-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -6379,6 +6381,70 @@ def test_m055_operator_decision_apply_result_reflects_integration_bundle_blocker
     assert "Operator Decision apply result statuses must fail closed" in completion
     assert "M055 Operator Decision apply result blocker guard is now covered" in current
     assert "M055 Operator Decision apply result blocker guard rail is now automated" in report
+
+
+def test_m056_safety_monitor_policy_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M056_PLAN.read_text(encoding="utf-8")
+    adr = M056_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m056 = markdown_table_row(roadmap, "M056")
+    assert m056[1] == "Safety Monitor policy blocker guard"
+    assert m056[2] == (
+        "Safety Monitor Policy row shows blocked state while promotion "
+        "planning is blocked"
+    )
+    assert m056[3] == "M055"
+    assert m056[4] == "high offline frontend"
+    assert m056[5] == "UNIT_VERIFIED blocked Safety Monitor policy; live authority remains blocked"
+    assert m056[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Safety Monitor Policy now shows integration bundle blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M056-CP01" in plan
+    assert "M056-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate safety monitor input" in adr
+
+    assert "function SafetyMonitorPanel({" in task_queue
+    assert "const policyStatus = integrationBundleApplyBlocked" in task_queue
+    assert "value: 'Integration bundle blocked', tone: 'red' as const" in task_queue
+    assert "value: safety.liveWritePolicy, tone: safety.liveWritePolicy.includes('fader_gain') ? 'green' as const : 'yellow' as const" in task_queue
+    assert "label: 'Policy', value: policyStatus.value, tone: policyStatus.tone" in task_queue
+    assert "<SafetyMonitorPanel safety={safetyMonitor} integrationBundleApplyBlocked={integrationBundleApplyBlocked} />" in task_queue
+    assert "safety monitor policy is guarded" in adapter_test
+    assert "Safety Monitor policy statuses must fail closed" in completion
+    assert "M056 Safety Monitor policy blocker guard is now covered" in current
+    assert "M056 Safety Monitor policy blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

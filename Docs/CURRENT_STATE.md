@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T01:39:58Z
+Generated: 2026-06-20T01:50:22Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T01:39:58Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `abb1850f Guard task details reject button`
+  `5093d818 Guard operator decision apply result`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -849,6 +849,19 @@ Generated: 2026-06-20T01:39:58Z
   contact, no live transport, no live authority, no readiness closure, no Full
   Autonomous readiness and no replacement for accepted real hardware/operator
   validation.
+- M056 Safety Monitor policy blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m056_safety_monitor_policy_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives `policyStatus` from `integrationBundleApplyBlocked`; while the
+  blocker is visible, the Safety Monitor Policy row shows `Integration bundle
+  blocked` instead of the raw live-write policy. The raw safety policy remains
+  unchanged when the global blocker is absent. This is local frontend
+  presentation hardening only: it mutates no safety monitor input, no backend
+  status input, no backend result input, no task data, creates no queue
+  mutation, no backend/WING contact, no live transport, no live authority, no
+  readiness closure, no Full Autonomous readiness and no replacement for
+  accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -859,4 +872,4 @@ Generated: 2026-06-20T01:39:58Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4181 passed, 1 skipped, 1 warning`.
+  `4182 passed, 1 skipped, 1 warning`.

@@ -4524,6 +4524,22 @@ test('operator decision apply result is guarded when integration bundle is block
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('safety monitor policy is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function SafetyMonitorPanel\(\{/);
+  assert.match(source, /integrationBundleApplyBlocked\?: boolean/);
+  assert.match(source, /const policyStatus = integrationBundleApplyBlocked/);
+  assert.match(source, /value: 'Integration bundle blocked', tone: 'red' as const/);
+  assert.match(source, /value: safety\.liveWritePolicy, tone: safety\.liveWritePolicy\.includes\('fader_gain'\) \? 'green' as const : 'yellow' as const/);
+  assert.match(source, /label: 'Policy', value: policyStatus\.value, tone: policyStatus\.tone/);
+  assert.match(source, /<SafetyMonitorPanel safety=\{safetyMonitor\} integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\} \/>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

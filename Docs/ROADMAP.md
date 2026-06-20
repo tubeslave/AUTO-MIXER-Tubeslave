@@ -79,6 +79,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M053 | Task Queue row reject blocker guard | Task Queue row actions hide reject while promotion planning is blocked | M052 | high offline frontend | UNIT_VERIFIED blocked Task Queue row reject action; live authority remains blocked | PENDING |
 | M054 | Task Details reject button blocker guard | Task Details reject button shows blocked state while promotion planning is blocked | M053 | high offline frontend | UNIT_VERIFIED blocked Task Details reject button; live authority remains blocked | PENDING |
 | M055 | Operator Decision apply result blocker guard | Operator Decision Apply result row shows blocked state while promotion planning is blocked | M054 | high offline frontend | UNIT_VERIFIED blocked Operator Decision apply result; live authority remains blocked | PENDING |
+| M056 | Safety Monitor policy blocker guard | Safety Monitor Policy row shows blocked state while promotion planning is blocked | M055 | high offline frontend | UNIT_VERIFIED blocked Safety Monitor policy; live authority remains blocked | PENDING |
 
 ## Active milestone
 

@@ -387,19 +387,28 @@ function OperatorDecisionPanel({
   );
 }
 
-function SafetyMonitorPanel({ safety }: { safety: SafetyMonitorState }) {
+function SafetyMonitorPanel({
+  safety,
+  integrationBundleApplyBlocked = false
+}: {
+  safety: SafetyMonitorState;
+  integrationBundleApplyBlocked?: boolean;
+}) {
   const readinessPriority = goalAreaReadinessSummary(safety.goalCapabilityObjectiveReadinessGoalAreaPriorities);
   const proofReadinessPriority = goalAreaReadinessSummary(safety.proofGoalCapabilityObjectiveReadinessGoalAreaPriorities);
   const hotspotText = hotspotSummary(safety.goalCapabilityObjectiveReadinessHotspots);
   const proofHotspotText = hotspotSummary(safety.proofGoalCapabilityObjectiveReadinessHotspots);
   const proofBlockedAreaText = blockedAreaSummary(safety.proofGoalCapabilityObjectiveReadinessByGoalArea);
+  const policyStatus = integrationBundleApplyBlocked
+    ? { value: 'Integration bundle blocked', tone: 'red' as const }
+    : { value: safety.liveWritePolicy, tone: safety.liveWritePolicy.includes('fader_gain') ? 'green' as const : 'yellow' as const };
 
   return (
     <Panel title="Safety Monitor">
       <div className="grid grid-cols-2 gap-1">
         {[
           { label: 'Mode', value: safety.operatorMode, tone: safety.operatorMode === 'supervised' ? 'yellow' as const : 'blue' as const },
-          { label: 'Policy', value: safety.liveWritePolicy, tone: safety.liveWritePolicy.includes('fader_gain') ? 'green' as const : 'yellow' as const },
+          { label: 'Policy', value: policyStatus.value, tone: policyStatus.tone },
           { label: 'Emergency', value: safety.resetRequired ? 'Reset required' : 'Clear', tone: safety.resetRequired ? 'red' as const : 'green' as const },
           { label: 'Traces', value: `${safety.traceCount} / ${safety.blockedTraceCount} blocked`, tone: safety.blockedTraceCount ? 'yellow' as const : 'green' as const },
           { label: 'Goal readiness', value: `${safety.goalCapabilityObjectiveReadinessScore}%`, tone: toneForReadinessScore(safety.goalCapabilityObjectiveReadinessScore) },
@@ -794,7 +803,7 @@ export function TaskQueueWorkspace({
         <ApplyPlanPanel plan={guardedApplyPlan} />
         <SafetyEvidencePanel evidence={evidence} />
         <OperatorDecisionPanel ui={ui} policy={policy} integrationBundleApplyBlocked={integrationBundleApplyBlocked} />
-        <SafetyMonitorPanel safety={safetyMonitor} />
+        <SafetyMonitorPanel safety={safetyMonitor} integrationBundleApplyBlocked={integrationBundleApplyBlocked} />
         <ReplayEvidencePanel
           channelIntelligence={channelIntelligence}
           onStartReplay={actions.startReplayRun}
