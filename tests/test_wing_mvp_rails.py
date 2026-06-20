@@ -219,6 +219,8 @@ M079_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M079-replay-evidence-channel-iden
 M079_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-channel-identity-blocker-guard-20260620.md"
 M080_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M080-replay-evidence-report-row-blocker-visibility-guard.md"
 M080_ADR = PROJECT_ROOT / "Docs" / "adr" / "replay-evidence-report-row-blocker-visibility-guard-20260620.md"
+M081_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M081-wing-review-decision-prestart-proof-binding.md"
+M081_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-review-decision-prestart-proof-binding-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -8080,6 +8082,76 @@ def test_m080_replay_evidence_report_row_visible_under_integration_bundle_blocke
     assert "Replay Evidence report rows must remain visible" in completion
     assert "M080 Replay Evidence report row blocker visibility guard is now covered" in current
     assert "M080 Replay Evidence report row blocker visibility guard rail is now automated" in report
+
+
+def test_m081_wing_review_decision_binds_prestart_proof():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M081_PLAN.read_text(encoding="utf-8")
+    adr = M081_ADR.read_text(encoding="utf-8")
+    contract = (PROJECT_ROOT / "backend" / "wing_readonly_preflight_contract.py").read_text(
+        encoding="utf-8"
+    )
+    review_tool = (PROJECT_ROOT / "tools" / "review_wing_readonly_preflight_artifacts.py").read_text(
+        encoding="utf-8"
+    )
+    review_decision = (
+        PROJECT_ROOT / "backend" / "wing_readonly_preflight_review_decision.py"
+    ).read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m081 = markdown_table_row(roadmap, "M081")
+    assert m081[1] == "WING review decision prestart proof binding"
+    assert m081[2] == (
+        "Review decision templates and ledgers bind accepted WING candidates "
+        "to backend prestart and manifest-verifier proof fields"
+    )
+    assert m081[3] == "M002"
+    assert m081[4] == "critical read-only hardware review"
+    assert m081[5] == (
+        "UNIT_VERIFIED stricter WING review decision proof binding; hardware remains waiting"
+    )
+    assert m081[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "WING review decision records now bind backend prestart and manifest-verifier proof fields" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M081-CP01" in plan
+    assert "M081-CP02" in plan
+    assert "M081-CP03" in plan
+    assert "WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS" in contract
+    assert "decision_template_candidate_prestart_proof_incomplete" in review_tool
+    assert "review_decision_{field}_missing" in review_decision
+    assert "review_decision_{field}_mismatch" in review_decision
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    assert "WING review decision proof binding must remain offline" in completion
+    assert "M081 WING review decision prestart proof binding is now covered" in current
+    assert "M081 WING review decision prestart proof binding rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T05:30:39Z.
+- Latest heartbeat: 2026-06-20T06:31:25Z.
 
 ## Что сделано
 
@@ -16,6 +16,13 @@ no-WING/read-only evidence. M001 is now waiting for external WING/operator
 validation.
 
 After CP05, verified no-WING safety-scope hardening commits were added:
+
+- M081 WING review decision prestart proof binding rail is now automated:
+  review decision templates and accepted decision records must carry the same
+  backend-port prestart and artifact-manifest verifier proof fields that
+  validated the WING read-only candidate. This is offline review-contract
+  hardening only; it creates no WING/backend contact, live write, readiness
+  closure, hardware evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.

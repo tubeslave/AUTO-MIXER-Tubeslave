@@ -25,6 +25,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_SUPERVISED_PRESTART_GATE_REQUIRED_DECISION_STATUS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -453,6 +454,7 @@ def _sha256_file(path: Path) -> str:
 
 def _decision_record(summary_path: Path, **overrides) -> dict:
     events_path = summary_path.parent / "events.jsonl"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
     record = {
         "review_id": "review-wing-readonly-1",
         "artifact_source_id": str(summary_path),
@@ -476,6 +478,10 @@ def _decision_record(summary_path: Path, **overrides) -> dict:
         "reviewed_by": "operator",
         "reviewed_at": "2026-06-07T01:05:00Z",
         "checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
+        **{
+            field: summary[field]
+            for field in WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+        },
     }
     record.update(overrides)
     return record

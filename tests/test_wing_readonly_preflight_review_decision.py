@@ -19,6 +19,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -484,6 +485,7 @@ def _evidence_with_candidate() -> dict:
 
 
 def _accepted_record(**overrides) -> dict:
+    valid_summary = _valid_summary()
     record = {
         "review_id": "review-wing-readonly-1",
         "artifact_source_id": "inline_payload_0",
@@ -507,6 +509,10 @@ def _accepted_record(**overrides) -> dict:
         "reviewed_by": "operator",
         "reviewed_at": "2026-06-07T01:05:00Z",
         "checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
+        **{
+            field: valid_summary[field]
+            for field in WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
+        },
     }
     record.update(overrides)
     return record
@@ -704,6 +710,29 @@ def test_review_decision_ledger_records_accepted_candidate_without_live_authorit
     assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["readiness_closure_allowed_by_decision"] is False
     assert ledger["summary"]["live_authority_granted"] is False
+
+
+def test_review_decision_ledger_requires_record_prestart_proof_binding():
+    record = _accepted_record()
+    record.pop("artifact_manifest_verifier_passed_before_websocket")
+    record["backend_port_prestart_summary_sha256"] = "4" * 64
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_records=[record],
+    )
+
+    assert ledger["status"] == "operator_review_decision_replacement_required"
+    assert ledger["summary"]["accepted_record_count"] == 0
+    assert ledger["summary"]["manual_readiness_update_candidate_available"] is False
+    violations = set(ledger["records"][0]["violations"])
+    assert (
+        "review_decision_artifact_manifest_verifier_passed_before_websocket_missing"
+        in violations
+    )
+    assert "review_decision_backend_port_prestart_summary_sha256_mismatch" in violations
+    assert ledger["records"][0]["operator_accepted_readonly_preflight_candidate"] is False
+    assert ledger["records"][0]["live_authority_granted"] is False
 
 
 def test_review_decision_ledger_blocks_accepted_candidate_without_request_sequence_trace():
@@ -917,7 +946,7 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_contr
 
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=evidence,
-        decision_records=[_accepted_record()],
+        decision_records=[_accepted_record(backend_port_prestart_check_required=False)],
     )
 
     assert ledger["status"] == "operator_review_decision_records_available"
@@ -975,7 +1004,7 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_prestart_summa
 
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=evidence,
-        decision_records=[_accepted_record()],
+        decision_records=[_accepted_record(backend_port_prestart_summary_sha256=None)],
     )
 
     assert ledger["status"] == "operator_review_decision_records_available"
@@ -998,7 +1027,9 @@ def test_review_decision_ledger_blocks_accepted_candidate_with_malformed_prestar
 
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=evidence,
-        decision_records=[_accepted_record()],
+        decision_records=[
+            _accepted_record(backend_port_prestart_summary_sha256="not-a-sha256")
+        ],
     )
 
     assert ledger["status"] == "operator_review_decision_records_available"
@@ -1021,7 +1052,9 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_required_false
 
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=evidence,
-        decision_records=[_accepted_record()],
+        decision_records=[
+            _accepted_record(backend_port_prestart_gate_live_authority_granted=True)
+        ],
     )
 
     assert ledger["status"] == "operator_review_decision_records_available"
@@ -1052,7 +1085,11 @@ def test_review_decision_ledger_blocks_accepted_candidate_without_verifier_webso
 
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=evidence,
-        decision_records=[_accepted_record()],
+        decision_records=[
+            _accepted_record(
+                artifact_manifest_verifier_websocket_opened_after_pass=False
+            )
+        ],
     )
 
     assert ledger["status"] == "operator_review_decision_records_available"

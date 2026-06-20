@@ -20,6 +20,7 @@ from backend.wing_readonly_preflight_evidence import (
 )
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
@@ -779,6 +780,8 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     )
     assert template["request_id_correlation_required"] is True
     assert template["event_log_run_id_matches_summary"] is True
+    for field in WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS:
+        assert template[field] == report["artifact_reviews"][0][field]
     assert template["decision"] == "pending_operator_decision"
     assert template["reviewed_by"] == ""
     assert template["reviewed_at"] == ""
@@ -799,6 +802,29 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     assert "review_decision_reviewer_missing" in violations
     assert "review_decision_reviewed_at_missing" in violations
     assert "review_decision_template_status_unedited" in violations
+
+
+def test_review_decision_template_rejects_mutated_prestart_proof_binding(tmp_path: Path):
+    _write_artifact(tmp_path / "preflight" / "run")
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0]["backend_port_prestart_summary_sha256"] = ""
+
+    with pytest.raises(
+        ValueError,
+        match="decision_template_candidate_prestart_proof_incomplete",
+    ):
+        review_tool.build_review_decision_template(report)
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+    report["artifact_reviews"][0][
+        "artifact_manifest_verifier_passed_before_websocket"
+    ] = False
+
+    with pytest.raises(
+        ValueError,
+        match="decision_template_candidate_prestart_proof_incomplete",
+    ):
+        review_tool.build_review_decision_template(report)
 
 
 def test_review_decision_template_rejects_coerced_readback_counts(tmp_path: Path):

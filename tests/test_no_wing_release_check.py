@@ -15560,30 +15560,9 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
                 "confirm_no_live_authority",
             ],
             "review_manual_checklist_complete": True,
-                "review_decision_template_required_fields": [
-                    "review_id",
-                    "artifact_source_id",
-                    "run_id",
-                    "artifact_captured_at",
-                    "artifact_root",
-                    "summary_path",
-                    "summary_sha256",
-                "events_path",
-                "events_sha256",
-                "channels",
-                "value_types",
-                "operator_confirmed_channels",
-                "operator_confirmed_session_ready",
-                "readback_count",
-                "physical_readback_count",
-                "request_id_policy",
-                "request_id_correlation_required",
-                "event_log_run_id_matches_summary",
-                "decision",
-                "reviewed_by",
-                "reviewed_at",
-                "checklist_ids",
-            ],
+            "review_decision_template_required_fields": list(
+                WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+            ),
             "review_decision_template_contract_complete": True,
             "review_decision_template_status": (
                 WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS

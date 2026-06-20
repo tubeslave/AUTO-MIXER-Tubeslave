@@ -27,10 +27,12 @@ from backend.wing_readonly_preflight_contract import (  # noqa: E402
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES,
+    wing_readonly_preflight_candidate_prestart_contract_violations,
 )
 from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
     REQUIRED_REVIEW_CHECKLIST_IDS,
@@ -45,6 +47,9 @@ DEFAULT_DECISION_TEMPLATE_OUTPUT = (
 REVIEW_DECISION_TEMPLATE_STATUS = WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS
 REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = tuple(
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS
+)
+REVIEW_DECISION_PRESTART_PROOF_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
 )
 REVIEW_DECISION_TEMPLATE_REQUIRED_EDITS = (
     "set decision to accepted or rejected after manual review",
@@ -420,6 +425,9 @@ def build_review_decision_template(
     event_log_run_id_matches_summary = (
         candidate.get("event_log_run_id_matches_summary") is True
     )
+    prestart_proof_violations = (
+        wing_readonly_preflight_candidate_prestart_contract_violations(candidate)
+    )
     if (
         not source_id
         or not run_id
@@ -444,6 +452,8 @@ def build_review_decision_template(
         or not event_log_run_id_matches_summary
     ):
         raise ValueError("decision_template_candidate_identity_incomplete")
+    if prestart_proof_violations:
+        raise ValueError("decision_template_candidate_prestart_proof_incomplete")
     template = {
         "template_status": REVIEW_DECISION_TEMPLATE_STATUS,
         "template_generated_at": generated_at or utc_now(),
@@ -470,6 +480,9 @@ def build_review_decision_template(
         "reviewed_at": "",
         "checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
     }
+    template.update(
+        {field: candidate.get(field) for field in REVIEW_DECISION_PRESTART_PROOF_FIELDS}
+    )
     template.update({flag: False for flag in UNSAFE_DECISION_FLAGS})
     return template
 

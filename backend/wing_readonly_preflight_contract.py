@@ -52,7 +52,7 @@ WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS = (
     "confirm_event_log_run_id_binding",
     "confirm_no_live_authority",
 )
-WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_BASE_REQUIRED_FIELDS = (
     "review_id",
     "artifact_source_id",
     "run_id",
@@ -144,6 +144,35 @@ WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
     "artifact_manifest_verifier_must_pass_before_websocket",
     "artifact_manifest_verifier_passed_before_websocket",
     "artifact_manifest_verifier_websocket_opened_after_pass",
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS = (
+    "backend_port_prestart_check_required",
+    "backend_port_prestart_check_must_pass_before_starting_backend",
+    "backend_port_prestart_check_command",
+    "backend_port_prestart_check_command_text",
+    "backend_port_prestart_check_failure_detail_fields",
+    "backend_port_prestart_summary_required",
+    "backend_port_prestart_summary_path",
+    "backend_port_prestart_summary_sha256",
+    "backend_port_prestart_summary_type",
+    "backend_port_prestart_summary_status",
+    "backend_port_prestart_summary_connection_policy",
+    "backend_port_prestart_summary_read_only",
+    "backend_port_prestart_summary_live_write",
+    "backend_port_prestart_summary_contacts_backend",
+    "backend_port_prestart_summary_contacts_wing",
+    "backend_port_prestart_summary_mutates_console_state",
+    "backend_port_prestart_summary_queries_console",
+    "backend_port_prestart_summary_executes_tests",
+    "backend_port_prestart_check_status",
+    *WING_READONLY_PREFLIGHT_ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS,
+    *WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    *WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
+    *WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+)
+WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = (
+    *WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_BASE_REQUIRED_FIELDS,
+    *WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
 )
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS = "passed"
 WING_READONLY_PREFLIGHT_RUN_SUMMARY_REASON = "wing_readonly_preflight_passed"

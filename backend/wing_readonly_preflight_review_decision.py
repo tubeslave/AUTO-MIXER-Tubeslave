@@ -26,6 +26,7 @@ try:
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
@@ -50,6 +51,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
@@ -79,6 +81,9 @@ ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
     f"artifact_manifest_verifier_must_pass_before_{WS_TOKEN}",
     f"artifact_manifest_verifier_passed_before_{WS_TOKEN}",
     f"artifact_manifest_verifier_{WS_TOKEN}_opened_after_pass",
+)
+REVIEW_DECISION_PRESTART_PROOF_FIELDS = tuple(
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
 )
 DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS = (
     "artifacts/wing_readonly_preflight_review_decisions",
@@ -622,6 +627,12 @@ def _validated_record(
                 violations.append("review_decision_events_sha256_missing")
             elif events_sha256 != candidate_events_sha256:
                 violations.append("review_decision_events_sha256_mismatch")
+        for field in REVIEW_DECISION_PRESTART_PROOF_FIELDS:
+            candidate_value = candidate.get(field)
+            if field not in record:
+                violations.append(f"review_decision_{field}_missing")
+            elif record.get(field) != candidate_value:
+                violations.append(f"review_decision_{field}_mismatch")
     if unsafe_flags:
         violations.append("review_decision_unsafe_authority_claim")
 
@@ -645,6 +656,7 @@ def _validated_record(
         "request_id_policy": request_id_policy,
         "request_id_correlation_required": request_id_correlation_required,
         "event_log_run_id_matches_summary": event_log_run_id_matches_summary,
+        **{field: record.get(field) for field in REVIEW_DECISION_PRESTART_PROOF_FIELDS},
         "decision": decision if decision in REVIEW_DECISIONS else "invalid",
         "reviewed_by": reviewed_by,
         "reviewed_at": reviewed_at,

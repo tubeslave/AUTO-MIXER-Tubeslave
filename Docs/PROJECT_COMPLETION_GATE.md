@@ -512,6 +512,14 @@ apply, contact backend, contact WING, grant live authority, close readiness,
 mark Full Autonomous ready, apply to console, replace backend safety gates, or
 replace accepted real hardware/operator validation.
 
+WING review decision proof binding must remain offline and fail closed. Manual
+review decision templates and accepted decision records must bind the candidate
+to the backend-port prestart summary, authority-denial flags and
+artifact-manifest verifier ordering that validated the read-only WING
+candidate. This proof binding cannot contact WING/backend, grant live
+authority, close readiness, send OSC/WebSocket writes, mark Full Autonomous
+ready, apply to console, or replace accepted real hardware/operator validation.
+
 ## Non-completion states
 
 - `RUNNING`: есть dependency-ready autonomous work.

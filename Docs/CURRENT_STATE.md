@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T06:14:46Z
+Generated: 2026-06-20T06:31:25Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T06:14:46Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `53e27441 Guard replay evidence channel identity`
+  `73ab5d92 Keep replay evidence report row visible`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -1224,6 +1224,20 @@ Generated: 2026-06-20T06:14:46Z
   dispatch, no backend/WING contact, no live transport, no live authority, no
   readiness closure, no Full Autonomous readiness and no replacement for
   accepted real hardware/operator validation.
+- M081 WING review decision prestart proof binding is now covered by
+  `tests/test_wing_readonly_preflight_review_tool.py`,
+  `tests/test_wing_readonly_preflight_review_decision.py` and
+  `tests/test_wing_mvp_rails.py::test_m081_wing_review_decision_binds_prestart_proof`.
+  The updated shared WING read-only preflight contract exposes
+  `WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS`; generated
+  review decision templates now copy backend-port prestart summary, authority
+  denial and artifact-manifest verifier ordering fields from the clean
+  candidate; and the review decision ledger rejects accepted records whose
+  proof binding is missing or stale against the candidate. This is offline
+  review-contract hardening for the physical readback path only: it contacts no
+  WING/backend transport, opens no WebSocket/OSC write path, applies no
+  proposal, grants no live authority, closes no readiness row, creates no
+  hardware evidence and does not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1234,4 +1248,4 @@ Generated: 2026-06-20T06:14:46Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4206 passed, 1 skipped, 1 warning`.
+  `4209 passed, 1 skipped, 1 warning`.
