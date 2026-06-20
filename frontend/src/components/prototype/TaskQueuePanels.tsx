@@ -408,6 +408,10 @@ function SafetyMonitorPanel({
         value: `${safety.goalCapabilityObjectiveReadinessScore}%`,
         tone: toneForReadinessScore(safety.goalCapabilityObjectiveReadinessScore)
       };
+  const blockedSurfaces = integrationBundleApplyBlocked
+    ? Array.from(new Set(['offline_integration_bundle_blockers_visible', ...safety.blockedSurfaces]))
+    : safety.blockedSurfaces;
+  const blockedSurfaceText = blockedSurfaces.slice(0, 4).join(', ') || 'none';
 
   return (
     <Panel title="Safety Monitor">
@@ -432,7 +436,7 @@ function SafetyMonitorPanel({
         ))}
       </div>
       <div className="mt-2 truncate text-[10px] text-muted">
-        Blocked: {safety.blockedSurfaces.slice(0, 4).join(', ') || 'none'}
+        Blocked: {blockedSurfaceText}
       </div>
     </Panel>
   );

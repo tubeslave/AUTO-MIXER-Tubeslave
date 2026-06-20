@@ -81,6 +81,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M055 | Operator Decision apply result blocker guard | Operator Decision Apply result row shows blocked state while promotion planning is blocked | M054 | high offline frontend | UNIT_VERIFIED blocked Operator Decision apply result; live authority remains blocked | PENDING |
 | M056 | Safety Monitor policy blocker guard | Safety Monitor Policy row shows blocked state while promotion planning is blocked | M055 | high offline frontend | UNIT_VERIFIED blocked Safety Monitor policy; live authority remains blocked | PENDING |
 | M057 | Safety Monitor goal readiness blocker guard | Safety Monitor Goal readiness row shows blocked state while promotion planning is blocked | M056 | high offline frontend | UNIT_VERIFIED blocked Safety Monitor goal readiness; live authority remains blocked | PENDING |
+| M058 | Safety Monitor blocked surfaces blocker guard | Safety Monitor Blocked footer shows integration bundle blocker while promotion planning is blocked | M057 | high offline frontend | UNIT_VERIFIED blocked Safety Monitor blocked surfaces; live authority remains blocked | PENDING |
 
 ## Active milestone
 

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T01:59:24Z
+Generated: 2026-06-20T02:12:35Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T01:59:24Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `9b31d6d7 Guard safety monitor policy`
+  `b70365f9 Guard safety monitor goal readiness`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -875,6 +875,21 @@ Generated: 2026-06-20T01:59:24Z
   input, no task data, creates no queue mutation, no backend/WING contact, no
   live transport, no live authority, no readiness closure, no Full Autonomous
   readiness and no replacement for accepted real hardware/operator validation.
+- M058 Safety Monitor blocked surfaces blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m058_safety_monitor_blocked_surfaces_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local `blockedSurfaces` and `blockedSurfaceText` from
+  `integrationBundleApplyBlocked`; while the blocker is visible, the Safety
+  Monitor `Blocked` footer includes
+  `offline_integration_bundle_blockers_visible` instead of reporting
+  `Blocked: none`. The raw safety monitor blocked-surface input remains
+  unchanged when the global blocker is absent. This is local frontend
+  presentation hardening only: it mutates no safety monitor input, no readiness
+  input, no backend status input, no backend result input, no task data,
+  creates no queue mutation, no backend/WING contact, no live transport, no
+  live authority, no readiness closure, no Full Autonomous readiness and no
+  replacement for accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -885,4 +900,4 @@ Generated: 2026-06-20T01:59:24Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4183 passed, 1 skipped, 1 warning`.
+  `4184 passed, 1 skipped, 1 warning`.

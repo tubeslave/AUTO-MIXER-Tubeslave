@@ -4556,6 +4556,22 @@ test('safety monitor goal readiness is guarded when integration bundle is blocke
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('safety monitor blocked surfaces include integration bundle blocker when blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /const blockedSurfaces = integrationBundleApplyBlocked/);
+  assert.match(source, /Array\.from\(new Set\(\['offline_integration_bundle_blockers_visible', \.\.\.safety\.blockedSurfaces\]\)\)/);
+  assert.match(source, /: safety\.blockedSurfaces/);
+  assert.match(source, /const blockedSurfaceText = blockedSurfaces\.slice\(0, 4\)\.join\(', '\) \|\| 'none'/);
+  assert.match(source, /Blocked: \{blockedSurfaceText\}/);
+  assert.doesNotMatch(source, /Blocked: \{safety\.blockedSurfaces\.slice\(0, 4\)\.join\(', '\) \|\| 'none'\}/);
+  assert.match(source, /<SafetyMonitorPanel safety=\{safetyMonitor\} integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\} \/>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
