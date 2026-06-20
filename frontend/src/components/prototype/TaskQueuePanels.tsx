@@ -194,6 +194,15 @@ function taskStatusDisplay(
   return { label, tone };
 }
 
+function taskProposalRiskDisplay(
+  proposal: ProposalPreview,
+  integrationBundleApplyBlocked = false,
+): { label: string; tone: Tone } {
+  const label = integrationBundleApplyBlocked ? 'Blocked' : proposal.risk;
+  const tone = integrationBundleApplyBlocked ? 'red' as const : proposal.tone;
+  return { label, tone };
+}
+
 export function TaskDetailsPanel({
   task,
   ui,
@@ -223,6 +232,7 @@ export function TaskDetailsPanel({
     : 'am-button text-danger';
   const ensembleEvidence = ensembleEvidenceForTask(task);
   const detailStatus = taskStatusDisplay(task, integrationBundleApplyBlocked);
+  const detailProposalRisk = taskProposalRiskDisplay(proposal, integrationBundleApplyBlocked);
 
   return (
     <Panel title="Task Details">
@@ -243,7 +253,7 @@ export function TaskDetailsPanel({
       <div className="mt-3 rounded-[6px] border border-line bg-row p-2">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="am-label">Proposal Preview</div>
-          <StatusBadge tone={proposal.tone}>{proposal.risk}</StatusBadge>
+          <StatusBadge tone={detailProposalRisk.tone}>{detailProposalRisk.label}</StatusBadge>
         </div>
         <div className="grid grid-cols-[76px_1fr] gap-y-1.5 text-[10px]">
           <span className="text-muted">Target</span><span className="truncate text-text">{task.target ?? 'Session'}</span>

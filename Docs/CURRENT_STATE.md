@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T03:22:26Z
+Generated: 2026-06-20T03:32:27Z
 
 ## Repository snapshot
 
@@ -9,7 +9,7 @@ Generated: 2026-06-20T03:22:26Z
 - Latest verified product/runtime commit:
   `e8a38bc0 Verify no-WING coverage in manifest gate`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `7322750e Guard task queue blocked status`
+  `268b7319 Guard task details blocked status`
 - Tracked/untracked worktree state: dirty before this setup, with many
   unrelated modified backend/tests/docs files and generated artifacts.
 - Complete tracked file count from `rg --files`: 14140.
@@ -993,6 +993,21 @@ Generated: 2026-06-20T03:22:26Z
   contact, no live transport, no live authority, no readiness closure, no Full
   Autonomous readiness and no replacement for accepted real hardware/operator
   validation.
+- M066 Task Details proposal risk blocker guard is now covered by
+  `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+  `tests/test_wing_mvp_rails.py::test_m066_task_details_proposal_risk_reflects_integration_bundle_blocker`.
+  The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` module
+  derives local Task Details Proposal Preview risk display values through
+  `taskProposalRiskDisplay(proposal, integrationBundleApplyBlocked)`; while the
+  blocker is visible, the proposal risk badge shows `Blocked` instead of the
+  raw proposal risk. The raw proposal risk remains unchanged when the global
+  blocker is absent. This is local frontend presentation hardening only: it
+  mutates no proposal data, task status input, task data, backend status input,
+  backend result input, safety monitor input or readiness input, creates no
+  queue mutation, no row hiding, no supervised apply opening, no supervised
+  apply dispatch, no backend/WING contact, no live transport, no live authority,
+  no readiness closure, no Full Autonomous readiness and no replacement for
+  accepted real hardware/operator validation.
 
 ## Unresolved unknowns
 
@@ -1003,4 +1018,4 @@ Generated: 2026-06-20T03:22:26Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4191 passed, 1 skipped, 1 warning`.
+  `4192 passed, 1 skipped, 1 warning`.

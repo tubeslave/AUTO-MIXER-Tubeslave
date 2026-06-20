@@ -4820,6 +4820,22 @@ test('task details status value shows blocked state when integration bundle is b
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task details proposal risk badge shows blocked state when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskProposalRiskDisplay\(/);
+  assert.match(source, /proposal: ProposalPreview/);
+  assert.match(source, /const label = integrationBundleApplyBlocked \? 'Blocked' : proposal\.risk/);
+  assert.match(source, /const tone = integrationBundleApplyBlocked \? 'red' as const : proposal\.tone/);
+  assert.match(source, /const detailProposalRisk = taskProposalRiskDisplay\(proposal, integrationBundleApplyBlocked\)/);
+  assert.match(source, /<StatusBadge tone=\{detailProposalRisk\.tone\}>\{detailProposalRisk\.label\}<\/StatusBadge>/);
+  assert.doesNotMatch(source, /<StatusBadge tone=\{proposal\.tone\}>\{proposal\.risk\}<\/StatusBadge>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task details apply button is visibly blocked when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
