@@ -197,6 +197,8 @@ M068_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M068-task-details-proposal-delta-
 M068_ADR = PROJECT_ROOT / "Docs" / "adr" / "task-details-proposal-delta-blocker-guard-20260620.md"
 M069_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M069-supervised-apply-new-value-blocker-guard.md"
 M069_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-new-value-blocker-guard-20260620.md"
+M070_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M070-supervised-apply-rollback-blocker-guard.md"
+M070_ADR = PROJECT_ROOT / "Docs" / "adr" / "supervised-apply-rollback-blocker-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -7328,6 +7330,71 @@ def test_m069_supervised_apply_new_value_reflects_integration_bundle_blocker():
     assert "Supervised Apply new values must fail closed" in completion
     assert "M069 Supervised Apply new value blocker guard is now covered" in current
     assert "M069 Supervised Apply new value blocker guard rail is now automated" in report
+
+
+def test_m070_supervised_apply_rollback_reflects_integration_bundle_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    completion = PROJECT_COMPLETION_GATE.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M070_PLAN.read_text(encoding="utf-8")
+    adr = M070_ADR.read_text(encoding="utf-8")
+    task_queue = FRONTEND_TASK_QUEUE_PANEL.read_text(encoding="utf-8")
+    adapter_test = FRONTEND_OPERATOR_ADAPTER_TEST.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m070 = markdown_table_row(roadmap, "M070")
+    assert m070[1] == "Supervised Apply rollback blocker guard"
+    assert m070[2] == (
+        "Supervised Apply Proposal Target Rollback shows no-live-apply "
+        "status while promotion planning is blocked"
+    )
+    assert m070[3] == "M069"
+    assert m070[4] == "high offline frontend"
+    assert m070[5] == "UNIT_VERIFIED blocked Supervised Apply rollback; live authority remains blocked"
+    assert m070[-1] == "PENDING"
+
+    memory_eval = markdown_table_row(capability, "Long-term memory and evaluation")
+    assert "Supervised Apply rollback now shows no-live-apply blocker status when visible" in (
+        memory_eval[4]
+    )
+    assert memory_eval[-1] == "none"
+
+    assert "M070-CP01" in plan
+    assert "M070-CP02" in plan
+    assert "No backend contact" in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "This does not mutate proposal data" in adr
+
+    assert "function taskProposalRollbackDisplay(" in task_queue
+    assert "const label = integrationBundleApplyBlocked ? 'No live apply' : proposal.rollback" in task_queue
+    assert "const className = integrationBundleApplyBlocked ? 'text-danger' : 'text-text'" in task_queue
+    assert "const supervisedProposalRollback = taskProposalRollbackDisplay(proposal, integrationBundleApplyBlocked)" in task_queue
+    assert "className={`truncate ${supervisedProposalRollback.className}`}" in task_queue
+    assert "{supervisedProposalRollback.label}" in task_queue
+    assert '<span className="text-muted">Rollback</span><b className="truncate text-text">{proposal.rollback}</b>' not in task_queue
+    assert "supervised apply rollback shows no live apply" in adapter_test
+    assert "Supervised Apply rollback values must fail closed" in completion
+    assert "M070 Supervised Apply rollback blocker guard is now covered" in current
+    assert "M070 Supervised Apply rollback blocker guard rail is now automated" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

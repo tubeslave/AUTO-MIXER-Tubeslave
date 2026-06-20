@@ -4881,6 +4881,21 @@ test('supervised apply new value shows blocked state when integration bundle is 
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply rollback shows no live apply when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskProposalRollbackDisplay\(/);
+  assert.match(source, /const label = integrationBundleApplyBlocked \? 'No live apply' : proposal\.rollback/);
+  assert.match(source, /const className = integrationBundleApplyBlocked \? 'text-danger' : 'text-text'/);
+  assert.match(source, /const supervisedProposalRollback = taskProposalRollbackDisplay\(proposal, integrationBundleApplyBlocked\)/);
+  assert.match(source, /<span className="text-muted">Rollback<\/span><b className=\{`truncate \$\{supervisedProposalRollback\.className\}`\}>\{supervisedProposalRollback\.label\}<\/b>/);
+  assert.doesNotMatch(source, /<span className="text-muted">Rollback<\/span><b className="truncate text-text">\{proposal\.rollback\}<\/b>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task details apply button is visibly blocked when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
