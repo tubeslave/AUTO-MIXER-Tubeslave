@@ -364,13 +364,16 @@ function OperatorDecisionPanel({
   const backendStatus = integrationBundleApplyBlocked
     ? { value: 'No contact', tone: 'red' as Tone }
     : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };
+  const applyResultStatus = integrationBundleApplyBlocked
+    ? { value: 'Apply blocked', tone: 'red' as Tone }
+    : { value: policy.apply, tone: toneForMode(ui.mode) };
 
   return (
     <Panel title="Operator Decision">
       <div className="space-y-2">
         {[
           { label: 'Current mode', value: getModeDisplayLabel(ui.mode), tone: toneForMode(ui.mode) },
-          { label: 'Apply result', value: policy.apply, tone: toneForMode(ui.mode) },
+          { label: 'Apply result', value: applyResultStatus.value, tone: applyResultStatus.tone },
           { label: 'Write path', value: writePathStatus.value, tone: writePathStatus.tone },
           { label: 'Backend', value: backendStatus.value, tone: backendStatus.tone }
         ].map(row => (
