@@ -95,6 +95,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M069 | Supervised Apply new value blocker guard | Supervised Apply Proposal Target New value shows integration bundle blocker status while promotion planning is blocked | M068 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply new value; live authority remains blocked | PENDING |
 | M070 | Supervised Apply rollback blocker guard | Supervised Apply Proposal Target Rollback shows no-live-apply status while promotion planning is blocked | M069 | high offline frontend | UNIT_VERIFIED blocked Supervised Apply rollback; live authority remains blocked | PENDING |
 | M071 | Task Details proposal rollback blocker guard | Task Details Proposal Preview Rollback shows no-live-apply status while promotion planning is blocked | M070 | high offline frontend | UNIT_VERIFIED blocked Task Details proposal rollback; live authority remains blocked | PENDING |
+| M072 | Task Details proposal proof blocker guard | Task Details Proposal Preview Proof shows no-live-proof status while promotion planning is blocked | M071 | high offline frontend | UNIT_VERIFIED blocked Task Details proposal proof; live authority remains blocked | PENDING |
 
 ## Active milestone
 

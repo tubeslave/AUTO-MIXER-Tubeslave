@@ -4869,6 +4869,21 @@ test('task details proposal delta shows blocked state when integration bundle is
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('task details proposal proof shows no live proof when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function taskProposalProofDisplay\(/);
+  assert.match(source, /const label = integrationBundleApplyBlocked \? 'No live proof' : proposal\.proof/);
+  assert.match(source, /const className = integrationBundleApplyBlocked \? 'text-danger' : 'text-text'/);
+  assert.match(source, /const detailProposalProof = taskProposalProofDisplay\(proposal, integrationBundleApplyBlocked\)/);
+  assert.match(source, /<span className="text-muted">Proof<\/span><span className=\{`truncate \$\{detailProposalProof\.className\}`\}>\{detailProposalProof\.label\}<\/span>/);
+  assert.doesNotMatch(source, /<span className="text-muted">Proof<\/span><span className="truncate text-text">\{proposal\.proof\}<\/span>/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task details proposal rollback shows no live apply when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

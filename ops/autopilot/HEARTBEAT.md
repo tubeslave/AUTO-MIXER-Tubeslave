@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T04:30:22Z
+Last heartbeat UTC: 2026-06-20T04:39:04Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,8 +12,8 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M071 Task Details proposal rollback blocker guard now shows `No
-live apply` in the Task Details Proposal Preview `Rollback` while
+Latest check: M072 Task Details proposal proof blocker guard now shows `No live
+proof` in the Task Details Proposal Preview `Proof` while
 `integrationBundleApplyBlocked` is true. The updated frontend keeps this as
 local presentation hardening and does not mutate proposal data, task status
 input, task data, backend status input, backend result input, safety monitor
@@ -21,9 +21,9 @@ input, readiness input, hide rows, add queue mutation, open supervised apply,
 dispatch supervised apply, console apply, WING/backend contact or live
 authority.
 
-Frontend adapter validation passed with `87 passed`; the frontend build
-passed; the M071 rail passed with `1 passed`; the full rail file passed with
-`84 passed`; and the full suite passed with `4197 passed, 1 skipped, 1 warning`.
+Frontend adapter validation passed with `88 passed`; the frontend build
+passed; the M072 rail passed with `1 passed`; the full rail file passed with
+`85 passed`; and the full suite passed with `4198 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No
