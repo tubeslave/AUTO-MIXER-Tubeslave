@@ -364,6 +364,15 @@ apply, dispatch supervised apply, grant live authority, close readiness,
 contact WING/backend, mark Full Autonomous ready, apply to console, replace
 backend safety gates, or replace accepted real hardware/operator validation.
 
+Replay Evidence channel identities must fail closed when offline integration
+bundle blockers are visible. Replay-evidence-channel-identity-visible
+enforcement cannot mutate channel evidence input, replay run input, decision
+trace input, task data, backend status input, backend result input, safety
+monitor input, readiness input, hide rows, queue proposals, open supervised
+apply, dispatch supervised apply, grant live authority, close readiness,
+contact WING/backend, mark Full Autonomous ready, apply to console, replace
+backend safety gates, or replace accepted real hardware/operator validation.
+
 Replay Evidence policy rows must fail closed when offline integration bundle
 blockers are visible. Replay-evidence-policy-row-visible enforcement cannot
 mutate replay run input, decision trace input, task data, backend status input,

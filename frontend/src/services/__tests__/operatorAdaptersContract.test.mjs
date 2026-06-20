@@ -4615,6 +4615,26 @@ test('replay evidence trace detail is guarded when integration bundle is blocked
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('replay evidence channel identity is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function ReplayEvidencePanel\(\{/);
+  assert.match(source, /const channelEvidenceLabel = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'No channel proof'/);
+  assert.match(source, /\? `\$\{channel\.channel\} \$\{channel\.name\}`/);
+  assert.match(source, /: 'No channel evidence'/);
+  assert.match(source, /const channelEvidenceClassName = integrationBundleApplyBlocked/);
+  assert.match(source, /\? 'truncate text-danger'/);
+  assert.match(source, /: 'truncate text-text'/);
+  assert.match(source, /<span className=\{channelEvidenceClassName\}>\{channelEvidenceLabel\}<\/span>/);
+  assert.doesNotMatch(source, /<span className="truncate text-text">\{channel \? `\$\{channel\.channel\} \$\{channel\.name\}` : 'No channel evidence'\}<\/span>/);
+  assert.match(source, /<ReplayEvidencePanel[\s\S]*integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('replay evidence latest run status is guarded when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),

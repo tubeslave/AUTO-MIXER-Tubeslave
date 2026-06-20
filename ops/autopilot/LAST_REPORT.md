@@ -1898,6 +1898,47 @@ The M078 guard is recorded in `Docs/ROADMAP.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 
+## M079 Replay Evidence Channel Identity Blocker Guard
+
+The M079 Replay Evidence channel identity blocker guard rail is now automated
+by `frontend/src/services/__tests__/operatorAdaptersContract.test.mjs` and
+`tests/test_wing_mvp_rails.py::test_m079_replay_evidence_channel_identity_reflects_integration_bundle_blocker`.
+
+The updated `frontend/src/components/prototype/TaskQueuePanels.tsx` derives
+local `channelEvidenceLabel` and `channelEvidenceClassName` values from
+`integrationBundleApplyBlocked`. While the blocker is visible, the Replay
+Evidence channel identity text shows `No channel proof` instead of raw channel
+id/name evidence. The raw channel id/name or `No channel evidence` remains
+unchanged when the global blocker is absent.
+
+This is frontend presentation hardening only. It mutates no channel evidence
+input, replay run input, decision trace input, task data, backend status input,
+backend result input, safety monitor input or readiness input. It creates no
+row hiding, no queue mutation, no replay start, no supervised apply opening, no
+supervised apply dispatch, no backend/WING contact, no live transport, no live
+authority, no readiness closure, no Full Autonomous readiness and no
+replacement for accepted real hardware/operator validation.
+
+Validation recorded for this rail:
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`:
+  `95 passed`.
+- `npm --prefix frontend run build`: passed.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m079_replay_evidence_channel_identity_reflects_integration_bundle_blocker -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `92 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4205 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M079 guard is recorded in `Docs/ROADMAP.md`,
+`Docs/PROJECT_COMPLETION_GATE.md`, `Docs/CAPABILITY_MATRIX.md`,
+`Docs/plans/M079-replay-evidence-channel-identity-blocker-guard.md`,
+`Docs/adr/replay-evidence-channel-identity-blocker-guard-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
 ## Оставшаяся работа
 
 Wait for the operator-supervised real WING read-only preflight. Do not contact
