@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T12:14:45Z
+Last heartbeat UTC: 2026-06-20T12:44:36Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,16 +12,16 @@ Writer lease: none
 
 Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`.
 
-Latest check: M091 scene preset read-only context gates now make scene/preset
-proposal candidates require fresh read-only/no-authority current scene/preset
-context, target preview, scoped diffs, rollback evidence and destructive-scope
-limits before scene/snapshot/preset decisions can trust them. Missing, stale or
-live-authority context stays analysis-only.
+Latest check: M092 mix variant read-only context gates now make mix-variant
+proposal candidates require fresh read-only/no-authority current mix-variant
+context, trusted source identity, reference metrics, arrangement context and
+follow-up proposal fan-out before genre/task variants can trust them. Missing,
+stale or live-authority context stays analysis-only.
 
-Focused scene/preset validation passed with `22 passed`; the M091 rail passed
-with `1 passed`; the full WING rail passed with `104 passed`; the full suite
+Focused mix-variant validation passed with `14 passed`; the M092 rail passed
+with `1 passed`; the full WING rail passed with `105 passed`; the full suite
 passed in a clean staged worktree with
-`4010 passed, 1 skipped, 1 warning`.
+`4013 passed, 1 skipped, 1 warning`.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made. No

@@ -13,6 +13,17 @@ from backend.processing_registry import get_pipeline_profile, get_processing_met
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _fresh_state(field_count=8):
+    return {
+        "status": "fresh",
+        "field_count": field_count,
+        "fresh_field_count": field_count,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+
+
 def test_mix_variant_profile_module_is_transport_free():
     source = Path("backend/mix_variant_profile_proposal.py").read_text()
 
@@ -57,14 +68,7 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
             reference_confidence=0.84,
             arrangement_confidence=0.88,
             persistence_cycles=3,
-            current_state_cache_freshness={
-                "status": "fresh",
-                "field_count": 8,
-                "fresh_field_count": 8,
-                "read_only": True,
-                "live_write": False,
-                "queries_console": False,
-            },
+            current_state_cache_freshness=_fresh_state(),
         )
     )
 
@@ -80,6 +84,7 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
     assert recommendation.evidence["no_named_artist_style_clone"] is True
     assert recommendation.evidence["ayaic_level_planes"] is True
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_mix_variant_context_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
         "legacy_unverified"
@@ -96,6 +101,7 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
     assert "bus_group_balance_proposal" in proposal["proposed_action"]["followup_proposal_methods"]
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_mix_variant_context_cache_no_live_authority"] is True
 
 
 def test_style_clone_and_active_performance_block_mix_variant():
@@ -312,6 +318,84 @@ def test_stale_mix_variant_context_blocks_profile_proposal():
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
 
 
+def test_live_authority_mix_variant_context_blocks_profile_proposal():
+    analysis = MixVariantProfileAnalysisInput(
+        variant_id="variant:pop-rock-live",
+        genre="pop rock",
+        task="live",
+        current_profile_id="custom:live_foh",
+        reference_id="ref:house_pop_rock",
+        reference_lufs=-17.8,
+        reference_metrics_available=True,
+        arrangement_context_available=True,
+        arrangement_roles=("lead_vocal", "drums", "bass", "guitar", "keys"),
+        detected_source_count=18,
+        stem_count=5,
+        operator_intent="operator_variant_request",
+        mix_window="soundcheck",
+        current_integrated_lufs=-18.5,
+        current_true_peak_dbfs=-5.5,
+        main_bus_headroom_db=4.5,
+        feedback_risk=0.18,
+        genre_confidence=0.92,
+        task_confidence=0.9,
+        reference_confidence=0.84,
+        arrangement_confidence=0.88,
+        persistence_cycles=3,
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 8,
+            "fresh_field_count": 8,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        },
+    )
+    recommendation = analyze_mix_variant_profile_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "mix_variant_context_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_mix_variant_context_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_mix_variant_profile_proposals([analysis]) == ()
+
+
+def test_missing_mix_variant_context_blocks_profile_proposal():
+    analysis = MixVariantProfileAnalysisInput(
+        variant_id="variant:pop-rock-live",
+        genre="pop rock",
+        task="live",
+        current_profile_id="custom:live_foh",
+        reference_id="ref:house_pop_rock",
+        reference_lufs=-17.8,
+        reference_metrics_available=True,
+        arrangement_context_available=True,
+        arrangement_roles=("lead_vocal", "drums", "bass", "guitar", "keys"),
+        detected_source_count=18,
+        stem_count=5,
+        operator_intent="operator_variant_request",
+        mix_window="soundcheck",
+        current_integrated_lufs=-18.5,
+        current_true_peak_dbfs=-5.5,
+        main_bus_headroom_db=4.5,
+        feedback_risk=0.18,
+        genre_confidence=0.92,
+        task_confidence=0.9,
+        reference_confidence=0.84,
+        arrangement_confidence=0.88,
+        persistence_cycles=3,
+    )
+    recommendation = analyze_mix_variant_profile_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "mix_variant_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert recommendation.evidence["current_state_cache_freshness"]["provided"] is False
+    assert build_mix_variant_profile_proposals([analysis]) == ()
+
+
 def test_loudness_up_requires_true_peak_headroom_evidence():
     recommendation = analyze_mix_variant_profile_need(
         MixVariantProfileAnalysisInput(
@@ -381,6 +465,7 @@ def test_build_mix_variant_profile_proposals_filters_to_proposal_only_items():
                 reference_confidence=0.8,
                 arrangement_confidence=0.85,
                 persistence_cycles=3,
+                current_state_cache_freshness=_fresh_state(),
             ),
             MixVariantProfileAnalysisInput(
                 variant_id="variant:blocked",
@@ -456,6 +541,10 @@ def test_mix_variant_profile_proposal_is_registered_as_goal_capability():
     assert contracts["mix_variant_profile_proposal"]["proposal_contract"]["value_type"] == "mix_variant_profile"
     assert (
         "current_mix_variant_context_cache_freshness"
+        in contracts["mix_variant_profile_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "current_mix_variant_context_cache_no_live_authority"
         in contracts["mix_variant_profile_proposal"]["proposal_contract"]["safety_evidence_required"]
     )
     assert (

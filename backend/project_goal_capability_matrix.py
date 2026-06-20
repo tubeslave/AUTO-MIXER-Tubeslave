@@ -521,7 +521,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
             "backend/ml/reference_profiles.py",
         ),
         blocker="Genre variants can fan out into many mix and console surfaces.",
-        next_step="Route mix-variant profiles to operator review; require trusted source identity, fresh reference metrics, arrangement context, and follow-up proposal fan-out before any live or preset apply.",
+        next_step="Route mix-variant profiles to operator review; require fresh read-only/no-authority mix-variant context, trusted source identity, fresh reference metrics, arrangement context, and follow-up proposal fan-out before any live or preset apply.",
     ),
     ProjectGoalCapabilityRow(
         id="master_bus_optimization",

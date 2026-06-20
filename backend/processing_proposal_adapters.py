@@ -395,6 +395,7 @@ PROPOSAL_ONLY_CONTRACTS = {
             "task_confidence",
             "arrangement_context",
             "current_mix_variant_context_cache_freshness",
+            "current_mix_variant_context_cache_no_live_authority",
             "reference_metrics",
             "ayaic_level_planes",
             "source_identity_downstream_trust",

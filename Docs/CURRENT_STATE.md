@@ -1383,6 +1383,21 @@ Generated: 2026-06-20T11:55:57Z
   queue, applies no proposal, grants no live authority, closes no readiness
   row, creates no hardware evidence and does not replace real WING/operator
   validation.
+- M092 mix variant read-only context gates is now covered by
+  `tests/test_mix_variant_profile_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m092_mix_variant_readonly_context_gates_stay_readonly`.
+  Mix-variant profile candidates now require fresh read-only/no-authority
+  current mix-variant context, trusted source identity, reference metrics,
+  arrangement context and follow-up proposal fan-out before a genre/task
+  variant can become an operator-facing proposal. Missing, stale or
+  live-authority context keeps the mix-variant profile layer analysis-only.
+  This moves the long-term AI mixing engineer path forward into genre/task
+  mix-variant profiles, a separate mix-decision capability required by the
+  project goal, while staying offline and proposal-only: it contacts no
+  WING/backend transport, opens no WebSocket/OSC write path, imports no
+  proposal into a queue, applies no proposal, applies no preset or scene,
+  grants no live authority, closes no readiness row, creates no hardware
+  evidence and does not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1393,4 +1408,4 @@ Generated: 2026-06-20T11:55:57Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4010 passed, 1 skipped, 1 warning`.
+  `4013 passed, 1 skipped, 1 warning`.

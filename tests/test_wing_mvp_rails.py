@@ -242,6 +242,8 @@ M090_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M090-pan-spatial-readonly-context
 M090_ADR = PROJECT_ROOT / "Docs" / "adr" / "pan-spatial-readonly-context-gates-20260620.md"
 M091_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M091-scene-preset-readonly-context-gates.md"
 M091_ADR = PROJECT_ROOT / "Docs" / "adr" / "scene-preset-readonly-context-gates-20260620.md"
+M092_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M092-mix-variant-readonly-context-gates.md"
+M092_ADR = PROJECT_ROOT / "Docs" / "adr" / "mix-variant-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -9729,6 +9731,163 @@ def test_m091_scene_preset_readonly_context_gates_stay_readonly():
     assert "M091 scene preset read-only context gates is now covered" in current
     assert "M091 scene preset read-only context gates rail is now" in report
     assert "scene/snapshot/preset management, a separate console-control capability required by the project goal" in report
+
+
+def test_m092_mix_variant_readonly_context_gates_stay_readonly():
+    from backend.mix_variant_profile_proposal import (
+        MixVariantProfileAnalysisInput,
+        analyze_mix_variant_profile_need,
+        build_mix_variant_profile_proposals,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M092_PLAN.read_text(encoding="utf-8")
+    adr = M092_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m092 = markdown_table_row(roadmap, "M092")
+    assert m092[1] == "Mix variant profile read-only context gates"
+    assert m092[2] == (
+        "Mix-variant proposal candidates require fresh read-only/no-authority "
+        "genre/task context, trusted source identity, reference metrics and "
+        "arrangement context before genre/task variants can fan out"
+    )
+    assert m092[3] == "M083"
+    assert m092[4] == "high offline genre/task mix decision"
+    assert m092[5] == "UNIT_VERIFIED mix-variant context gate; live authority remains blocked"
+    assert m092[-1] == "PENDING"
+
+    genre_row = markdown_table_row(capability, "Genre and task context")
+    assert "`backend/mix_variant_profile_proposal.py`" in genre_row[2]
+    assert "fresh read-only/no-authority genre/task context" in genre_row[4]
+    assert "trusted source identity" in genre_row[4]
+    assert "reference metrics" in genre_row[4]
+    assert "arrangement context" in genre_row[4]
+    assert genre_row[6] == "source identity"
+    assert genre_row[7] == "replay validation with no-authority context evidence"
+    assert genre_row[-1] == "none"
+
+    for marker in ("M092-CP01", "M092-CP02", "M092-CP03", "M092-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 8,
+        "fresh_field_count": 8,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    stale_context = {
+        "status": "stale",
+        "field_count": 8,
+        "fresh_field_count": 5,
+        "stale_field_count": 3,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 8,
+        "fresh_field_count": 8,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+    base_variant = dict(
+        variant_id="variant:pop-rock-live",
+        genre="pop rock",
+        task="live",
+        current_profile_id="custom:live_foh",
+        reference_id="ref:house_pop_rock",
+        reference_lufs=-17.8,
+        reference_metrics_available=True,
+        arrangement_context_available=True,
+        arrangement_roles=("lead_vocal", "drums", "bass", "guitar", "keys"),
+        detected_source_count=18,
+        stem_count=5,
+        operator_intent="operator_variant_request",
+        mix_window="soundcheck",
+        current_integrated_lufs=-18.5,
+        current_true_peak_dbfs=-5.5,
+        main_bus_headroom_db=4.5,
+        feedback_risk=0.18,
+        genre_confidence=0.92,
+        task_confidence=0.9,
+        reference_confidence=0.84,
+        arrangement_confidence=0.88,
+        persistence_cycles=3,
+    )
+
+    variant_ok = analyze_mix_variant_profile_need(
+        MixVariantProfileAnalysisInput(
+            **base_variant,
+            current_state_cache_freshness=fresh_context,
+        )
+    )
+    assert variant_ok.status == "proposal_only"
+    assert variant_ok.evidence["current_mix_variant_context_cache_no_live_authority"] is True
+    assert variant_ok.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert variant_ok.to_operator_proposal()["can_apply_live"] is False
+
+    missing_context = analyze_mix_variant_profile_need(
+        MixVariantProfileAnalysisInput(**base_variant)
+    )
+    assert missing_context.status == "analysis_only"
+    assert "mix_variant_context_cache_not_fresh" in missing_context.blockers
+    assert missing_context.to_operator_proposal()["can_apply_live"] is False
+    assert build_mix_variant_profile_proposals(
+        [MixVariantProfileAnalysisInput(**base_variant)]
+    ) == ()
+
+    stale_context_result = analyze_mix_variant_profile_need(
+        MixVariantProfileAnalysisInput(
+            **base_variant,
+            current_state_cache_freshness=stale_context,
+        )
+    )
+    assert stale_context_result.status == "analysis_only"
+    assert "mix_variant_context_cache_not_fresh" in stale_context_result.blockers
+    assert stale_context_result.to_operator_proposal()["can_apply_live"] is False
+
+    live_context_result = analyze_mix_variant_profile_need(
+        MixVariantProfileAnalysisInput(
+            **base_variant,
+            current_state_cache_freshness=live_authority_context,
+        )
+    )
+    assert live_context_result.status == "analysis_only"
+    assert "mix_variant_context_cache_live_authority_present" in live_context_result.blockers
+    assert live_context_result.evidence["current_mix_variant_context_cache_no_live_authority"] is False
+    assert live_context_result.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M092 mix variant read-only context gates is now covered" in current
+    assert "M092 mix variant read-only context gates rail is now" in report
+    assert "genre/task mix-variant profiles, a separate mix-decision capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -484,6 +484,11 @@ def test_genre_variants_are_tracked_as_proposal_layer_without_live_widening():
     assert "mix_variant_profile_proposal" in row.method_ids
     assert row.current_live_write_kinds == ()
     assert "operator review" in row.next_step
+    assert "fresh read-only/no-authority mix-variant context" in row.next_step
+    assert "trusted source identity" in row.next_step
+    assert "fresh reference metrics" in row.next_step
+    assert "arrangement context" in row.next_step
+    assert "follow-up proposal fan-out" in row.next_step
 
 
 def test_performance_adaptation_rows_are_tracked_as_proposal_layer_without_live_widening():

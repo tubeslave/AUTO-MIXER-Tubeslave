@@ -111,6 +111,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   contact, proposal apply, live write, readiness closure, hardware evidence or
   live authority.
 
+- M092 mix variant read-only context gates rail is now automated:
+  mix-variant proposal candidates now require fresh read-only/no-authority
+  current mix-variant context, trusted source identity, reference metrics,
+  arrangement context and follow-up proposal fan-out before genre/task variants
+  can trust them. Missing, stale or live-authority context stays analysis-only.
+  This advances genre/task mix-variant profiles, a separate mix-decision
+  capability required by the project goal, while creating no WING/backend
+  contact, proposal apply, live write, preset apply, scene apply, readiness
+  closure, hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING
@@ -2384,6 +2394,48 @@ The M091 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
 `Docs/plans/M091-scene-preset-readonly-context-gates.md`,
 `Docs/adr/scene-preset-readonly-context-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M092 Mix Variant Read-Only Context Gates
+
+The M092 mix variant read-only context gate rail is now automated by
+`tests/test_mix_variant_profile_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m092_mix_variant_readonly_context_gates_stay_readonly`.
+
+Mix-variant proposal candidates now require fresh read-only/no-authority
+current mix-variant context, trusted source identity, reference metrics,
+arrangement context and follow-up proposal fan-out before a genre/task variant
+can become an operator-facing proposal. Missing, stale or live-authority
+context keeps the mix-variant profile layer analysis-only.
+
+This is offline genre/task mix-decision hardening only. It mutates no console
+state, opens no backend/WING transport, sends no OSC/WebSocket write, imports
+no proposal into a queue, applies no proposal, applies no preset or scene,
+grants no live authority, closes no readiness row, creates no hardware evidence
+and does not replace accepted real hardware/operator validation.
+
+This advances genre/task mix-variant profiles, a separate mix-decision capability required by the project goal.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_mix_variant_profile_proposal.py -q`:
+  `14 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_project_goal_capability_matrix.py::test_genre_variants_are_tracked_as_proposal_layer_without_live_widening -q`:
+  recorded in `ops/autopilot/STATE.json`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m092_mix_variant_readonly_context_gates_stay_readonly -q`:
+  recorded in `ops/autopilot/STATE.json`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  recorded in `ops/autopilot/STATE.json`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  recorded in `ops/autopilot/STATE.json`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: recorded in
+  `ops/autopilot/STATE.json`.
+
+The M092 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CAPABILITY_MATRIX.md`,
+`Docs/plans/M092-mix-variant-readonly-context-gates.md`,
+`Docs/adr/mix-variant-readonly-context-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 
