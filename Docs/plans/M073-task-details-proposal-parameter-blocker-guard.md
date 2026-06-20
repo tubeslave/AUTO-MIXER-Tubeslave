@@ -1,0 +1,56 @@
+# M073 Task Details Proposal Parameter Blocker Guard
+
+## Context
+
+M001 remains `WAITING_FOR_EXTERNAL_VALIDATION`: real WING Rack read-only
+evidence and operator review are still required before physical readback or
+supervised live proof. Task Details already shows blocked status, blocked risk,
+blocked delta, no-live-proof, no-live-apply, blocker lists and disabled
+apply/reject controls while offline integration-bundle blockers are visible.
+
+The Task Details `Proposal Preview` still renders the raw `Parameter` proposal
+text. A raw parameter value can look like a concrete console parameter is
+eligible for apply while global promotion planning is blocked and no live apply
+has occurred.
+
+## Scope
+
+- Add local blocked parameter display derivation for Task Details `Parameter`.
+- Show `Blocked parameter` with danger styling while
+  `integrationBundleApplyBlocked` is true.
+- Preserve the normal proposal parameter text when the blocker is absent.
+- Add a frontend contract assertion and a WING MVP rail for the visible guard.
+- Update roadmap, capability matrix, completion gate, current state, heartbeat,
+  last report and run ledger.
+
+## Out of Scope
+
+- No backend contact.
+- No WING contact.
+- No OSC or websocket transport.
+- No queue mutation.
+- No task data mutation.
+- No proposal data mutation.
+- No task status input mutation.
+- No backend result mutation.
+- No row hiding.
+- No supervised apply opening.
+- No dispatch of supervised apply.
+- No readiness closure.
+- No live authority grant.
+- No Full Autonomous readiness claim.
+
+## Checkpoints
+
+- M073-CP01: Task Details derives the Proposal Preview `Parameter` display from
+  `taskProposalParameterDisplay(proposal, integrationBundleApplyBlocked)`.
+- M073-CP02: Frontend and WING rails prove the guard remains presentation-only
+  and cannot grant live authority.
+
+## Validation
+
+- `npm --prefix frontend test -- src/services/__tests__/operatorAdaptersContract.test.mjs`
+- `npm --prefix frontend run build`
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m073_task_details_proposal_parameter_reflects_integration_bundle_blocker -q`
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`

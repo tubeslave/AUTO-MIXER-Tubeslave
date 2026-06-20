@@ -212,6 +212,15 @@ function taskProposalDeltaDisplay(
   return { label, className };
 }
 
+function taskProposalParameterDisplay(
+  proposal: ProposalPreview,
+  integrationBundleApplyBlocked = false,
+): { label: string; className: string } {
+  const label = integrationBundleApplyBlocked ? 'Blocked parameter' : proposal.parameter;
+  const className = integrationBundleApplyBlocked ? 'text-danger' : 'text-text';
+  return { label, className };
+}
+
 function taskProposalProofDisplay(
   proposal: ProposalPreview,
   integrationBundleApplyBlocked = false,
@@ -270,6 +279,7 @@ export function TaskDetailsPanel({
   const detailStatus = taskStatusDisplay(task, integrationBundleApplyBlocked);
   const detailProposalRisk = taskProposalRiskDisplay(proposal, integrationBundleApplyBlocked);
   const detailProposalDelta = taskProposalDeltaDisplay(proposal, integrationBundleApplyBlocked);
+  const detailProposalParameter = taskProposalParameterDisplay(proposal, integrationBundleApplyBlocked);
   const detailProposalProof = taskProposalProofDisplay(proposal, integrationBundleApplyBlocked);
   const detailProposalRollback = taskProposalRollbackDisplay(proposal, integrationBundleApplyBlocked);
 
@@ -296,7 +306,7 @@ export function TaskDetailsPanel({
         </div>
         <div className="grid grid-cols-[76px_1fr] gap-y-1.5 text-[10px]">
           <span className="text-muted">Target</span><span className="truncate text-text">{task.target ?? 'Session'}</span>
-          <span className="text-muted">Parameter</span><span className="truncate text-text">{proposal.parameter}</span>
+          <span className="text-muted">Parameter</span><span className={`truncate ${detailProposalParameter.className}`}>{detailProposalParameter.label}</span>
           <span className="text-muted">Delta</span><span className={`truncate font-bold ${detailProposalDelta.className}`}>{detailProposalDelta.label}</span>
           <span className="text-muted">Proof</span><span className={`truncate ${detailProposalProof.className}`}>{detailProposalProof.label}</span>
           <span className="text-muted">Rollback</span><span className={`truncate ${detailProposalRollback.className}`}>{detailProposalRollback.label}</span>
