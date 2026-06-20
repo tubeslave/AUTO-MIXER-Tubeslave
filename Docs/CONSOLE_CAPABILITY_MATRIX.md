@@ -9,7 +9,7 @@ Status: WING/live authority snapshot
 | Channel fader | PROTOTYPE | `backend/wing_client.py`, `backend/operator_mode_policy.py` | no live write | yes only after explicit approval | supervised fader proof | none |
 | Preamp trim/gain-down | PROTOTYPE | `backend/wing_client.py`, gain proposal code | no live write | yes only after explicit approval and gain-down bounds | supervised gain-down proof | none |
 | Gain-up / boost | SPECIFIED | `CLAUDE.md`, gain safety docs | no | no by default | explicit opt-in plus hardware proof | none |
-| Pan | PROTOTYPE | `backend/operator_mode_policy.py`, pan proposal code | no | no for WING MVP | separate ADR and hardware proof | none |
+| Pan | PROTOTYPE | `backend/pan_spatial_proposal.py`, pan proposal code | no | no for WING MVP | fresh read-only/no-authority pan and mono/phase context, rollback and physical readback first | none |
 | Mute/unmute | PROTOTYPE | `backend/mute_management_proposal.py`, safety docs | no | no | fresh read-only/no-authority mute context, rollback and physical readback first | none |
 | EQ / HPF | PROTOTYPE | EQ modules, `backend/phase_aware_eq_guard.py` | no | no | protected-band, feedback, readback, rollback proof | none |
 | Compressor / dynamics | PROTOTYPE | compressor modules | no | no | headroom, GR and readback proof | none |

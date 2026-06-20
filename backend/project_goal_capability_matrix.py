@@ -715,7 +715,11 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("pan",),
         blocker="No supervised pan write proof; AutoPanner, adaptive panner, and controller pan separation return blocked evidence only.",
-        next_step="Keep pan settings proposal-only until readback, mono/phase compatibility, and rollback proof are complete.",
+        next_step=(
+            "Keep pan settings proposal-only until fresh read-only/no-authority "
+            "current pan readback, mono/phase-safe context, rollback proof and "
+            "hardware proof are complete."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="console_eq_control",

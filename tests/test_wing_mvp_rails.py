@@ -238,6 +238,8 @@ M088_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M088-routing-management-readonly-
 M088_ADR = PROJECT_ROOT / "Docs" / "adr" / "routing-management-readonly-context-gates-20260620.md"
 M089_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M089-mute-management-readonly-context-gates.md"
 M089_ADR = PROJECT_ROOT / "Docs" / "adr" / "mute-management-readonly-context-gates-20260620.md"
+M090_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M090-pan-spatial-readonly-context-gates.md"
+M090_ADR = PROJECT_ROOT / "Docs" / "adr" / "pan-spatial-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -1096,7 +1098,7 @@ def test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_appro
     assert gain[4] == "yes only after explicit approval and gain-down bounds"
     assert gain[-2:] == ["supervised gain-down proof", "none"]
     assert pan[4] == "no for WING MVP"
-    assert "separate ADR and hardware proof" in pan[5]
+    assert "fresh read-only/no-authority pan and mono/phase context" in pan[5]
     assert rollback[4] == "required before closure"
     assert rollback[-1] == "none"
 
@@ -1520,7 +1522,11 @@ def test_m008_assisted_processing_expansion_stays_proposal_only_with_identity_ga
         "EQ / HPF": ("no", "no", "protected-band, feedback, readback, rollback proof"),
         "Compressor / dynamics": ("no", "no", "headroom, GR and readback proof"),
         "Gate / expander": ("no", "no", "chatter/bleed replay plus hardware proof"),
-        "Pan": ("no", "no for WING MVP", "separate ADR and hardware proof"),
+        "Pan": (
+            "no",
+            "no for WING MVP",
+            "fresh read-only/no-authority pan and mono/phase context, rollback and physical readback first",
+        ),
         "FX sends / returns": ("no", "no", "readback and rollback proof"),
         "Bus/group/main/DCA faders": (
             "no",
@@ -1638,7 +1644,11 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
     assert "apply_readback_missing" in gain_trim["blockers"]
 
     console_live_expansion_rows = {
-        "Pan": ("no", "no for WING MVP", "separate ADR and hardware proof"),
+        "Pan": (
+            "no",
+            "no for WING MVP",
+            "fresh read-only/no-authority pan and mono/phase context, rollback and physical readback first",
+        ),
         "Mute/unmute": (
             "no",
             "no",
@@ -9391,6 +9401,161 @@ def test_m089_mute_management_readonly_context_gates_stay_readonly():
     assert "M089 mute management read-only context gates is now covered" in current
     assert "M089 mute management read-only context gates rail is now" in report
     assert "console mute/unmute, a separate console-control capability required by the project goal" in report
+
+
+def test_m090_pan_spatial_readonly_context_gates_stay_readonly():
+    from backend.pan_spatial_proposal import (
+        PanAnalysisInput,
+        analyze_pan_need,
+        build_pan_proposals,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M090_PLAN.read_text(encoding="utf-8")
+    adr = M090_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m090 = markdown_table_row(roadmap, "M090")
+    assert m090[1] == "Pan spatial read-only context gates"
+    assert m090[2] == (
+        "Pan proposal candidates require fresh read-only/no-authority current "
+        "pan and mono/phase context before pan/stereo decisions can trust them"
+    )
+    assert m090[3] == "M083"
+    assert m090[4] == "critical offline console pan"
+    assert m090[5] == "UNIT_VERIFIED pan context gate; live authority remains blocked"
+    assert m090[-1] == "PENDING"
+
+    pan_row = markdown_table_row(console, "Pan")
+    assert "`backend/pan_spatial_proposal.py`" in pan_row[2]
+    assert pan_row[3] == "no"
+    assert pan_row[4] == "no for WING MVP"
+    assert pan_row[5] == (
+        "fresh read-only/no-authority pan and mono/phase context, rollback and physical readback first"
+    )
+    assert pan_row[-1] == "none"
+
+    for marker in ("M090-CP01", "M090-CP02", "M090-CP03", "M090-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    fresh_pan_context = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    fresh_mono_phase_context = {
+        "status": "fresh",
+        "field_count": 3,
+        "fresh_field_count": 3,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+
+    center_base = dict(
+        channel_id=4,
+        channel_label="Lead Vox",
+        source_role="lead_vocal",
+        current_pan_percent=-24.0,
+        mono_compatibility_risk=0.15,
+        contribution_share=0.9,
+        role_confidence=0.95,
+        persistence_cycles=3,
+    )
+    stereo_base = dict(
+        channel_id=9,
+        channel_label="GTR L",
+        source_role="guitar",
+        current_pan_percent=0.0,
+        stereo_pair_id="gtr_pair",
+        stereo_pair_side="left",
+        mono_compatibility_risk=0.2,
+        phase_correlation=0.84,
+        mono_sum_delta_db=-0.4,
+        contribution_share=0.65,
+        role_confidence=0.8,
+        persistence_cycles=3,
+    )
+
+    pan_ok = analyze_pan_need(
+        PanAnalysisInput(
+            **stereo_base,
+            current_state_cache_freshness=fresh_pan_context,
+            mono_phase_check_freshness=fresh_mono_phase_context,
+        )
+    )
+    assert pan_ok.status == "proposal_only"
+    assert pan_ok.evidence["current_pan_cache_no_live_authority"] is True
+    assert pan_ok.evidence["mono_phase_check_no_live_authority"] is True
+    assert pan_ok.evidence["mono_phase_safety"]["status"] == "passed"
+    assert pan_ok.to_operator_proposal()["can_apply_live"] is False
+
+    missing_pan_context = analyze_pan_need(PanAnalysisInput(**center_base))
+    assert missing_pan_context.status == "analysis_only"
+    assert "pan_current_state_cache_not_fresh" in missing_pan_context.blockers
+    assert missing_pan_context.to_operator_proposal()["can_apply_live"] is False
+    assert build_pan_proposals([PanAnalysisInput(**center_base)]) == ()
+
+    live_pan_context = analyze_pan_need(
+        PanAnalysisInput(
+            **center_base,
+            current_state_cache_freshness=live_authority_context,
+        )
+    )
+    assert live_pan_context.status == "analysis_only"
+    assert "pan_current_state_cache_live_authority_present" in live_pan_context.blockers
+    assert live_pan_context.evidence["current_pan_cache_no_live_authority"] is False
+    assert live_pan_context.to_operator_proposal()["can_apply_live"] is False
+
+    live_mono_phase_context = analyze_pan_need(
+        PanAnalysisInput(
+            **stereo_base,
+            current_state_cache_freshness=fresh_pan_context,
+            mono_phase_check_freshness=live_authority_context,
+        )
+    )
+    assert live_mono_phase_context.status == "analysis_only"
+    assert "pan_mono_phase_check_live_authority_present" in live_mono_phase_context.blockers
+    assert live_mono_phase_context.evidence["mono_phase_check_no_live_authority"] is False
+    assert live_mono_phase_context.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M090 pan spatial read-only context gates is now covered" in current
+    assert "M090 pan spatial read-only context gates rail is now" in report
+    assert "pan/stereo placement, a separate mixing and console-control capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T11:38:10Z
+Generated: 2026-06-20T11:55:57Z
 
 ## Repository snapshot
 
@@ -1353,6 +1353,21 @@ Generated: 2026-06-20T11:38:10Z
   write path, imports no proposal into a queue, applies no proposal, grants no
   live authority, closes no readiness row, creates no hardware evidence and
   does not replace real WING/operator validation.
+- M090 pan spatial read-only context gates is now covered by
+  `tests/test_pan_spatial_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m090_pan_spatial_readonly_context_gates_stay_readonly`.
+  Pan proposal candidates now require fresh read-only/no-authority current pan
+  context before a pan-state diff can become an operator-facing console pan
+  proposal. Non-center pan also requires fresh read-only/no-authority
+  mono/phase safety context before the pan/stereo layer can trust it. Missing,
+  stale, unsafe or live-authority context keeps the pan spatial layer
+  analysis-only. This moves the long-term AI mixing engineer path forward into
+  pan/stereo placement, a separate mixing and console-control capability
+  required by the project goal, while staying offline and proposal-only: it
+  contacts no WING/backend transport, opens no WebSocket/OSC write path,
+  imports no proposal into a queue, applies no proposal, grants no live
+  authority, closes no readiness row, creates no hardware evidence and does not
+  replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1363,4 +1378,4 @@ Generated: 2026-06-20T11:38:10Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4006 passed, 1 skipped, 1 warning`.
+  `4007 passed, 1 skipped, 1 warning`.

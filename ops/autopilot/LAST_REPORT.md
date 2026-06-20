@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T11:38:10Z.
+- Latest heartbeat: 2026-06-20T11:55:57Z.
 
 ## Что сделано
 
@@ -91,6 +91,15 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   mute/unmute, a separate console-control capability required by the project
   goal, while creating no WING/backend contact, proposal apply, live write,
   readiness closure, hardware evidence or live authority.
+
+- M090 pan spatial read-only context gates rail is now automated:
+  pan proposal candidates now require fresh read-only/no-authority current pan
+  context and fresh read-only/no-authority mono/phase context before pan/stereo
+  decisions can trust non-center pan. Missing, stale, unsafe or live-authority
+  context stays analysis-only. This advances pan/stereo placement, a separate
+  mixing and console-control capability required by the project goal, while
+  creating no WING/backend contact, proposal apply, live write, readiness
+  closure, hardware evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2285,6 +2294,44 @@ The M089 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
 `Docs/plans/M089-mute-management-readonly-context-gates.md`,
 `Docs/adr/mute-management-readonly-context-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M090 Pan Spatial Read-Only Context Gates
+
+The M090 pan spatial read-only context gate rail is now automated by
+`tests/test_pan_spatial_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m090_pan_spatial_readonly_context_gates_stay_readonly`.
+
+Pan proposal candidates now require fresh read-only/no-authority current pan
+context before a pan-state diff can become an operator-facing console-pan
+proposal. Non-center pan also requires fresh read-only/no-authority mono/phase
+safety context before the pan/stereo layer can trust it.
+
+This is offline pan-control hardening only. It mutates no console state, opens
+no backend/WING transport, sends no OSC/WebSocket write, imports no proposal
+into a queue, applies no proposal, grants no live authority, closes no
+readiness row, creates no hardware evidence and does not replace accepted real
+hardware/operator validation.
+
+This advances pan/stereo placement, a separate mixing and console-control capability required by the project goal.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_pan_spatial_proposal.py -q`:
+  `16 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m090_pan_spatial_readonly_context_gates_stay_readonly -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `103 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4007 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M090 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+`Docs/plans/M090-pan-spatial-readonly-context-gates.md`,
+`Docs/adr/pan-spatial-readonly-context-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 

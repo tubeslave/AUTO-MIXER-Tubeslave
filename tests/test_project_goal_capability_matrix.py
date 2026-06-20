@@ -412,7 +412,8 @@ def test_panning_is_tracked_as_transport_free_proposal_layer():
     assert "backend/auto_panner_adaptive.py" in console.support_paths
     assert "adaptive panner" in console.blocker
     assert "blocked evidence" in console.blocker
-    assert "mono/phase compatibility" in console.next_step
+    assert "fresh read-only/no-authority current pan readback" in console.next_step
+    assert "mono/phase-safe context" in console.next_step
 
 
 def test_phase_correction_tracks_fail_closed_delay_polarity_boundary():
