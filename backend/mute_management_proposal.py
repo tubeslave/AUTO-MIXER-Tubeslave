@@ -234,6 +234,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def analyze_mute_management_need(
     analysis: MuteManagementAnalysisInput,
     *,
@@ -259,6 +267,7 @@ def analyze_mute_management_need(
     cue_seconds = None if analysis.expected_next_cue_sec is None else max(0.0, _safe_float(analysis.expected_next_cue_sec))
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=f"ch:{channel}",
         source_type=str(analysis.source_role or "unknown"),
@@ -312,8 +321,10 @@ def analyze_mute_management_need(
         blockers.append("upcoming_cue_too_close_for_mute")
     if action_type == "unmute_proposal" and feedback_risk >= HIGH_FEEDBACK_RISK:
         blockers.append("feedback_risk_high_for_unmute")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("mute_current_state_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("mute_current_state_cache_live_authority_present")
     blockers.extend(source_identity_trust.blockers)
 
     changed = proposed_muted != current_muted
@@ -360,6 +371,7 @@ def analyze_mute_management_need(
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_mute_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "manual_mute_authority_preserved": True,

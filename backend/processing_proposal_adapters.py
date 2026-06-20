@@ -336,6 +336,7 @@ PROPOSAL_ONLY_CONTRACTS = {
             "source_role",
             "current_mute_state",
             "current_mute_cache_freshness",
+            "current_mute_cache_no_live_authority",
             "auto_muted_by_system",
             "signal_activity",
             "idle_duration",

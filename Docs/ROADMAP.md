@@ -112,6 +112,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M086 | Master bus PA feed and reference safety gates | Master-bus proposal candidates require fresh read-only/no-authority main-bus and PA-feed context, explicit PA-feed safety and reference-feed exclusion | M084 | critical offline master output | UNIT_VERIFIED master/output safety gate; live authority remains blocked | PENDING |
 | M087 | Performance adaptation read-only context gates | Performance-adaptation proposal candidates require fresh read-only/no-authority current performance context before concert-time level adaptation decisions can trust them | M083 | high offline adaptive mixing | UNIT_VERIFIED performance-adaptation context gate; live authority remains blocked | PENDING |
 | M088 | Routing management read-only context gates | Routing proposal candidates require fresh read-only/no-authority current route context before console-routing decisions can trust them | M083 | critical offline console routing | UNIT_VERIFIED routing context gate; live authority remains blocked | PENDING |
+| M089 | Mute management read-only context gates | Mute/unmute proposal candidates require fresh read-only/no-authority current mute context before console-mute decisions can trust them | M083 | critical offline console mute | UNIT_VERIFIED mute context gate; live authority remains blocked | PENDING |
 
 ## Active milestone
 

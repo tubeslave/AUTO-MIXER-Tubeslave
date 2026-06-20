@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T11:28:50Z.
+- Latest heartbeat: 2026-06-20T11:38:10Z.
 
 ## Что сделано
 
@@ -83,6 +83,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   a separate console-control capability required by the project goal, while
   creating no WING/backend contact, proposal apply, live write, readiness
   closure, hardware evidence or live authority.
+
+- M089 mute management read-only context gates rail is now automated:
+  mute/unmute proposal candidates now require fresh read-only/no-authority
+  current mute context before console-mute decisions can trust them. Missing,
+  stale or live-authority context stays analysis-only. This advances console
+  mute/unmute, a separate console-control capability required by the project
+  goal, while creating no WING/backend contact, proposal apply, live write,
+  readiness closure, hardware evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
@@ -2239,6 +2247,44 @@ The M088 rail is recorded in `Docs/ROADMAP.md`,
 `Docs/CONSOLE_CAPABILITY_MATRIX.md`,
 `Docs/plans/M088-routing-management-readonly-context-gates.md`,
 `Docs/adr/routing-management-readonly-context-gates-20260620.md`,
+`Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
+`ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
+
+## M089 Mute Management Read-Only Context Gates
+
+The M089 mute management read-only context gate rail is now automated by
+`tests/test_mute_management_proposal.py` and
+`tests/test_wing_mvp_rails.py::test_m089_mute_management_readonly_context_gates_stay_readonly`.
+
+Mute/unmute proposal candidates now require fresh read-only/no-authority
+current mute context before a mute-state diff can become an operator-facing
+console-mute proposal. Missing, stale or live-authority context keeps the mute
+management layer analysis-only.
+
+This is offline mute-control hardening only. It mutates no console state, opens
+no backend/WING transport, sends no OSC/WebSocket write, imports no proposal
+into a queue, applies no proposal, grants no live authority, closes no
+readiness row, creates no hardware evidence and does not replace accepted real
+hardware/operator validation.
+
+This advances console mute/unmute, a separate console-control capability required by the project goal.
+
+Validation recorded for this rail:
+
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_mute_management_proposal.py -q`:
+  `15 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_m089_mute_management_readonly_context_gates_stay_readonly -q`:
+  `1 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q`:
+  `102 passed`.
+- `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `4006 passed, 1 skipped, 1 warning`.
+- `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
+
+The M089 rail is recorded in `Docs/ROADMAP.md`,
+`Docs/CONSOLE_CAPABILITY_MATRIX.md`,
+`Docs/plans/M089-mute-management-readonly-context-gates.md`,
+`Docs/adr/mute-management-readonly-context-gates-20260620.md`,
 `Docs/CURRENT_STATE.md`, `ops/autopilot/STATE.json`,
 `ops/autopilot/HEARTBEAT.md` and `ops/autopilot/RUN_LEDGER.jsonl`.
 

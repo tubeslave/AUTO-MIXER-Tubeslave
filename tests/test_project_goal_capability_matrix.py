@@ -860,6 +860,8 @@ def test_mute_control_is_tracked_as_proposal_layer_without_live_widening():
     assert "backend/auto_soundcheck_engine.py" in row.support_paths
     assert row.current_live_write_kinds == ()
     assert "AutoSoundcheck mute restore returns blocked evidence" in row.blocker
+    assert "fresh read-only/no-authority current mute readback" in row.next_step
+    assert "manual-mute preservation" in row.next_step
     assert "operator review" in row.next_step
 
 

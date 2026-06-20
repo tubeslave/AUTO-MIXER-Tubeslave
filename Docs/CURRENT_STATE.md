@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T11:28:50Z
+Generated: 2026-06-20T11:38:10Z
 
 ## Repository snapshot
 
@@ -1340,6 +1340,19 @@ Generated: 2026-06-20T11:28:50Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does not
   replace real WING/operator validation.
+- M089 mute management read-only context gates is now covered by
+  `tests/test_mute_management_proposal.py` and
+  `tests/test_wing_mvp_rails.py::test_m089_mute_management_readonly_context_gates_stay_readonly`.
+  Mute/unmute proposal candidates now require fresh read-only/no-authority
+  current mute context before a mute-state diff can become an operator-facing
+  console mute proposal. Missing, stale or live-authority context keeps the
+  mute management layer analysis-only. This moves the long-term AI mixing
+  engineer path forward into console mute/unmute, a separate console-control
+  capability required by the project goal, while staying offline and
+  proposal-only: it contacts no WING/backend transport, opens no WebSocket/OSC
+  write path, imports no proposal into a queue, applies no proposal, grants no
+  live authority, closes no readiness row, creates no hardware evidence and
+  does not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1350,4 +1363,4 @@ Generated: 2026-06-20T11:28:50Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4003 passed, 1 skipped, 1 warning`.
+  `4006 passed, 1 skipped, 1 warning`.

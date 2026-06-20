@@ -236,6 +236,8 @@ M087_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M087-performance-adaptation-reado
 M087_ADR = PROJECT_ROOT / "Docs" / "adr" / "performance-adaptation-readonly-context-gates-20260620.md"
 M088_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M088-routing-management-readonly-context-gates.md"
 M088_ADR = PROJECT_ROOT / "Docs" / "adr" / "routing-management-readonly-context-gates-20260620.md"
+M089_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M089-mute-management-readonly-context-gates.md"
+M089_ADR = PROJECT_ROOT / "Docs" / "adr" / "mute-management-readonly-context-gates-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -1637,7 +1639,11 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
 
     console_live_expansion_rows = {
         "Pan": ("no", "no for WING MVP", "separate ADR and hardware proof"),
-        "Mute/unmute": ("no", "no", "separate ADR and proof"),
+        "Mute/unmute": (
+            "no",
+            "no",
+            "fresh read-only/no-authority mute context, rollback and physical readback first",
+        ),
         "EQ / HPF": ("no", "no", "protected-band, feedback, readback, rollback proof"),
         "Compressor / dynamics": ("no", "no", "headroom, GR and readback proof"),
         "Gate / expander": ("no", "no", "chatter/bleed replay plus hardware proof"),
@@ -9260,6 +9266,131 @@ def test_m088_routing_management_readonly_context_gates_stay_readonly():
     assert "M088 routing management read-only context gates is now covered" in current
     assert "M088 routing management read-only context gates rail is now" in report
     assert "console routing, a separate console-control capability required by the project goal" in report
+
+
+def test_m089_mute_management_readonly_context_gates_stay_readonly():
+    from backend.mute_management_proposal import (
+        MuteManagementAnalysisInput,
+        analyze_mute_management_need,
+        build_mute_management_proposals,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    console = CONSOLE_CAPABILITY_MATRIX.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M089_PLAN.read_text(encoding="utf-8")
+    adr = M089_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m089 = markdown_table_row(roadmap, "M089")
+    assert m089[1] == "Mute management read-only context gates"
+    assert m089[2] == (
+        "Mute/unmute proposal candidates require fresh read-only/no-authority "
+        "current mute context before console-mute decisions can trust them"
+    )
+    assert m089[3] == "M083"
+    assert m089[4] == "critical offline console mute"
+    assert m089[5] == "UNIT_VERIFIED mute context gate; live authority remains blocked"
+    assert m089[-1] == "PENDING"
+
+    mute_row = markdown_table_row(console, "Mute/unmute")
+    assert "`backend/mute_management_proposal.py`" in mute_row[2]
+    assert mute_row[3] == "no"
+    assert mute_row[4] == "no"
+    assert mute_row[5] == "fresh read-only/no-authority mute context, rollback and physical readback first"
+    assert mute_row[-1] == "none"
+
+    for marker in ("M089-CP01", "M089-CP02", "M089-CP03", "M089-CP04"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    fresh_context = {
+        "status": "fresh",
+        "field_count": 5,
+        "fresh_field_count": 5,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    live_authority_context = {
+        "status": "fresh",
+        "field_count": 5,
+        "fresh_field_count": 5,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+
+    base = dict(
+        channel_id=12,
+        channel_label="Floor Tom",
+        source_role="floor_tom",
+        current_muted=False,
+        allow_auto_mute_candidate=True,
+        rms_dbfs=-67.0,
+        peak_dbfs=-55.0,
+        noise_floor_dbfs=-66.0,
+        idle_duration_sec=48.0,
+        source_confidence=0.9,
+        bleed_risk=0.25,
+        feedback_risk=0.05,
+        dropout_risk=0.1,
+        expected_next_cue_sec=40.0,
+        persistence_cycles=3,
+    )
+
+    mute_ok = analyze_mute_management_need(
+        MuteManagementAnalysisInput(
+            **base,
+            current_state_cache_freshness=fresh_context,
+        )
+    )
+    assert mute_ok.status == "proposal_only"
+    assert mute_ok.evidence["current_mute_cache_no_live_authority"] is True
+    assert mute_ok.to_operator_proposal()["can_apply_live"] is False
+
+    mute_missing_context = analyze_mute_management_need(
+        MuteManagementAnalysisInput(**base)
+    )
+    assert mute_missing_context.status == "analysis_only"
+    assert "mute_current_state_cache_not_fresh" in mute_missing_context.blockers
+    assert mute_missing_context.to_operator_proposal()["can_apply_live"] is False
+    assert build_mute_management_proposals([MuteManagementAnalysisInput(**base)]) == ()
+
+    mute_live_context = analyze_mute_management_need(
+        MuteManagementAnalysisInput(
+            **base,
+            current_state_cache_freshness=live_authority_context,
+        )
+    )
+    assert mute_live_context.status == "analysis_only"
+    assert "mute_current_state_cache_live_authority_present" in mute_live_context.blockers
+    assert mute_live_context.evidence["current_mute_cache_no_live_authority"] is False
+    assert mute_live_context.to_operator_proposal()["can_apply_live"] is False
+
+    assert "M089 mute management read-only context gates is now covered" in current
+    assert "M089 mute management read-only context gates rail is now" in report
+    assert "console mute/unmute, a separate console-control capability required by the project goal" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

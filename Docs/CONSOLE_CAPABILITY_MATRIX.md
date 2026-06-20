@@ -10,7 +10,7 @@ Status: WING/live authority snapshot
 | Preamp trim/gain-down | PROTOTYPE | `backend/wing_client.py`, gain proposal code | no live write | yes only after explicit approval and gain-down bounds | supervised gain-down proof | none |
 | Gain-up / boost | SPECIFIED | `CLAUDE.md`, gain safety docs | no | no by default | explicit opt-in plus hardware proof | none |
 | Pan | PROTOTYPE | `backend/operator_mode_policy.py`, pan proposal code | no | no for WING MVP | separate ADR and hardware proof | none |
-| Mute/unmute | QUARANTINED | recent quarantine commits and safety docs | no | no | separate ADR and proof | none |
+| Mute/unmute | PROTOTYPE | `backend/mute_management_proposal.py`, safety docs | no | no | fresh read-only/no-authority mute context, rollback and physical readback first | none |
 | EQ / HPF | PROTOTYPE | EQ modules, `backend/phase_aware_eq_guard.py` | no | no | protected-band, feedback, readback, rollback proof | none |
 | Compressor / dynamics | PROTOTYPE | compressor modules | no | no | headroom, GR and readback proof | none |
 | Gate / expander | PROTOTYPE | gate modules | no | no | chatter/bleed replay plus hardware proof | none |

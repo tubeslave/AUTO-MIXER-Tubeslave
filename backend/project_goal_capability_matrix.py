@@ -692,7 +692,12 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         ),
         target_console_surfaces=("mute",),
         blocker="Mute automation can create dropouts and is not in the supervised proof path; AutoSoundcheck mute restore returns blocked evidence only.",
-        next_step="Route mute/unmute recommendations to operator review; require fresh intent/readback, rollback, and hardware proof before any mute write promotion.",
+        next_step=(
+            "Route mute/unmute recommendations to operator review only after "
+            "fresh read-only/no-authority current mute readback; require "
+            "manual-mute preservation, rollback and hardware proof before any "
+            "mute write promotion."
+        ),
     ),
     ProjectGoalCapabilityRow(
         id="console_pan_control",
