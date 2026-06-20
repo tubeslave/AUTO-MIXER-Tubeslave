@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T15:08:08Z
+Generated: 2026-06-20T15:27:07Z
 
 ## Repository snapshot
 
@@ -1453,6 +1453,19 @@ Generated: 2026-06-20T15:08:08Z
   queue, applies no proposal, grants no live authority, closes no readiness
   row, creates no hardware evidence and does not replace real WING/operator
   validation.
+- M097 WING read-only canonical root intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m097_wing_readonly_canonical_root_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries now fail artifact intake when
+  `artifact_root` is not the canonical WING read-only capture root,
+  `artifacts/wing_readonly_preflight`, or an absolute path ending in that
+  canonical root. This blocks stale or alternate-root summaries from becoming
+  accepted real WING read-only candidates before operator review. The concrete
+  intake violation is `artifact_root_not_wing_readonly_capture_root`. It
+  contacts no WING/backend transport, opens no WebSocket/OSC write path,
+  imports no proposal into a queue, applies no proposal, grants no live
+  authority, closes no readiness row, creates no hardware evidence and does not
+  replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1463,4 +1476,4 @@ Generated: 2026-06-20T15:08:08Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4023 passed, 1 skipped, 1 warning`.
+  `4025 passed, 1 skipped, 1 warning`.

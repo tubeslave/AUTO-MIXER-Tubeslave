@@ -684,6 +684,14 @@ def _path_is_under_reserved_non_wing_evidence_root(value: Any) -> bool:
     return False
 
 
+def _path_matches_wing_readonly_capture_root(value: Any) -> bool:
+    if not isinstance(value, (str, Path)):
+        return False
+    normalized = Path(value).as_posix().strip().removeprefix("./").rstrip("/")
+    expected_root = WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+    return normalized == expected_root or normalized.endswith(f"/{expected_root}")
+
+
 def _validate_candidate_artifact_intake_paths(
     payload: Mapping[str, Any],
     *,
@@ -696,8 +704,11 @@ def _validate_candidate_artifact_intake_paths(
         "summary_path": WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
         "events_path": WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     }
-    if _path_is_under_reserved_non_wing_evidence_root(payload.get("artifact_root")):
+    if _path_is_under_reserved_non_wing_evidence_root(artifact_root):
         violations.append("artifact_root_reserved_for_non_wing_evidence")
+    elif isinstance(artifact_root, str) and artifact_root:
+        if not _path_matches_wing_readonly_capture_root(artifact_root):
+            violations.append("artifact_root_not_wing_readonly_capture_root")
     for field in ("summary_path", "events_path"):
         if _path_is_under_reserved_non_wing_evidence_root(payload.get(field)):
             violations.append(f"{field}_reserved_for_non_wing_evidence")

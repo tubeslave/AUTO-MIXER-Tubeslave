@@ -120,6 +120,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M094 | Project Director external-validation scope guard | Project Director narrows autonomous work to WING external-validation handoff/intake or control-plane state while M001 waits for real WING/operator evidence | M001 | critical autopilot direction | UNIT_VERIFIED external-validation scope guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M095 | WING read-only reserved-root intake guard | Real WING read-only intake rejects spoofed candidates from reserved no-WING and autopilot evidence roots before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED reserved-root intake guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M096 | WING read-only declared path intake guard | Real WING read-only intake rejects candidates whose summary/events paths do not match declared artifact_root and run_id before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED declared artifact path-shape guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
+| M097 | WING read-only canonical root intake guard | Real WING read-only intake rejects candidates whose artifact_root is not the canonical WING read-only capture root before manual review can accept them | M001 | critical read-only hardware intake | UNIT_VERIFIED canonical artifact-root guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 
 ## Active milestone
 

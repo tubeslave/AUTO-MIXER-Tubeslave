@@ -19,6 +19,7 @@ from backend.wing_readonly_preflight_evidence import (
     EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
 )
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
@@ -403,6 +404,11 @@ def _write_artifact(
     tamper_events: bool = False,
 ) -> Path:
     summary = summary or _valid_summary()
+    requested_run_dir_name = run_dir.name
+    if requested_run_dir_name not in {"run", summary["run_id"]}:
+        summary["run_id"] = f"{summary['run_id']}_{requested_run_dir_name}"
+    if WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT not in run_dir.as_posix():
+        run_dir = run_dir.parent / WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
     run_dir = run_dir if run_dir.name == summary["run_id"] else run_dir / summary["run_id"]
     run_dir.mkdir(parents=True)
     summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME

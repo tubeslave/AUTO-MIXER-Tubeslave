@@ -21,6 +21,7 @@ from backend.wing_readonly_preflight_review_decision import (
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS,
 )
 from backend.wing_readonly_preflight_contract import (
+    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
     WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_ARTIFACT_ROOT_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_PRESTART_BLOCKER,
@@ -377,6 +378,8 @@ def _valid_expected_plan(summary: dict) -> dict:
 
 def _write_artifact(run_dir: Path) -> Path:
     summary = _valid_summary()
+    if WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT not in run_dir.as_posix():
+        run_dir = run_dir.parent / WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
     run_dir = run_dir if run_dir.name == summary["run_id"] else run_dir / summary["run_id"]
     run_dir.mkdir(parents=True)
     summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME

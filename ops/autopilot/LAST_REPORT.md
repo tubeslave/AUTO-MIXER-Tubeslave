@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T15:08:08Z.
+- Latest heartbeat: 2026-06-20T15:27:07Z.
 
 ## Что сделано
 
@@ -160,6 +160,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   passing into manual review as real hardware proof. The concrete intake
   violations are `summary_path_declared_artifact_path_mismatch` and
   `events_path_declared_artifact_path_mismatch`. This creates no WING/backend
+  contact, proposal apply, queue import, live write, readiness closure,
+  hardware evidence or live authority.
+
+- M097 WING read-only canonical root intake guard rail is now automated:
+  candidate WING read-only summaries whose `artifact_root` is not the canonical
+  WING read-only capture root, `artifacts/wing_readonly_preflight`, fail
+  artifact intake before they can become accepted real WING read-only
+  candidates. This blocks stale or alternate-root summaries from passing into
+  manual review as real hardware proof. The concrete intake violation is
+  `artifact_root_not_wing_readonly_capture_root`. This creates no WING/backend
   contact, proposal apply, queue import, live write, readiness closure,
   hardware evidence or live authority.
 

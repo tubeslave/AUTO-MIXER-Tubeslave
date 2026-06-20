@@ -512,6 +512,13 @@ def _write_prestart_summary(path: Path, *, status: str = "passed") -> None:
 
 def _write_file_artifact(artifact_dir: Path, summary: dict | None = None, events: list[dict] | None = None) -> Path:
     payload = copy.deepcopy(summary or _valid_summary())
+    artifact_dir_posix = artifact_dir.as_posix()
+    if (
+        WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT not in artifact_dir_posix
+        and "artifacts/no_wing_release_check" not in artifact_dir_posix
+        and "ops/autopilot/evidence" not in artifact_dir_posix
+    ):
+        artifact_dir = artifact_dir.parent / WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
     run_dir = (
         artifact_dir
         if artifact_dir.name == payload["run_id"]
@@ -850,6 +857,34 @@ def test_preflight_evidence_rejects_declared_artifact_path_mismatch():
     )
     assert (
         "events_path_declared_artifact_path_mismatch"
+        in evidence["summary"]["violations"]
+    )
+
+
+def test_preflight_evidence_rejects_noncanonical_wing_candidate_root():
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["artifact_root"] = "artifacts/stale_wing_readonly_preflight"
+    artifact["summary_path"] = (
+        "artifacts/stale_wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/summary.json"
+    )
+    artifact["events_path"] = (
+        "artifacts/stale_wing_readonly_preflight/"
+        "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+    )
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "artifact_root_not_wing_readonly_capture_root" in validation["violations"]
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert (
+        "artifact_root_not_wing_readonly_capture_root"
         in evidence["summary"]["violations"]
     )
 
