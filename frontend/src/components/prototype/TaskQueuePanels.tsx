@@ -519,6 +519,9 @@ function SupervisedApplyModal({
   const readbackLabel = resultMatches ? backendResult?.readbackStatus ?? 'Required after backend apply' : 'Required after backend apply';
   const rollbackLabel = resultMatches ? backendResult?.rollbackStatus ?? 'Snapshot required' : 'Snapshot required';
   const backendResultTone = resultMatches ? backendResult?.tone ?? approvalTone : approvalTone;
+  const finalReadinessStatus = integrationBundleApplyBlocked
+    ? { value: 'Blocked by integration bundle', tone: 'red' as Tone }
+    : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };
 
   return (
     <div className="absolute inset-0 z-40 grid place-items-center bg-[#05080d]/80 p-5 backdrop-blur-sm" role="dialog" aria-label="Supervised Apply Proposal">
@@ -569,7 +572,7 @@ function SupervisedApplyModal({
                   { label: 'Apply request', value: applyRequestLabel, tone: backendResultTone },
                   { label: 'Readback status', value: readbackLabel, tone: resultMatches && readbackLabel.includes('verified') ? 'green' as const : 'yellow' as const },
                   { label: 'Rollback status', value: rollbackLabel, tone: resultMatches && rollbackLabel.includes('available') ? 'green' as const : resultMatches && rollbackLabel.includes('failed') ? 'red' as const : 'yellow' as const },
-                  { label: 'Final readiness', value: ui.backend.statusLabel, tone: ui.backend.statusTone },
+                  { label: 'Final readiness', value: finalReadinessStatus.value, tone: finalReadinessStatus.tone },
                   { label: 'Direct writes', value: 'Disabled', tone: 'red' as const }
                 ].map(row => (
                   <div className="flex items-center justify-between border-b border-line pb-2 text-[10px]" key={row.label}>

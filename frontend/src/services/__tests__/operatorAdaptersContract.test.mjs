@@ -4509,6 +4509,21 @@ test('operator decision status is guarded when integration bundle is blocked', a
   assert.equal(source.includes('queueMutation'), false);
 });
 
+test('supervised apply final readiness is guarded when integration bundle is blocked', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
+    'utf8',
+  );
+
+  assert.match(source, /function SupervisedApplyModal\(\{/);
+  assert.match(source, /const finalReadinessStatus = integrationBundleApplyBlocked/);
+  assert.match(source, /value: 'Blocked by integration bundle', tone: 'red' as Tone/);
+  assert.match(source, /value: ui\.backend\.statusLabel, tone: ui\.backend\.statusTone/);
+  assert.match(source, /label: 'Final readiness', value: finalReadinessStatus\.value, tone: finalReadinessStatus\.tone/);
+  assert.match(source, /disabled=\{!canRequestBackendGate\}/);
+  assert.equal(source.includes('queueMutation'), false);
+});
+
 test('task queue review-only filter includes all rows when integration bundle is blocked', async () => {
   const source = await fs.readFile(
     path.join(srcRoot, 'components/prototype/TaskQueuePanels.tsx'),
