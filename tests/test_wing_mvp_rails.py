@@ -248,6 +248,8 @@ M093_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M093-decision-evidence-readonly-c
 M093_ADR = PROJECT_ROOT / "Docs" / "adr" / "decision-evidence-readonly-context-gates-20260620.md"
 M094_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M094-project-director-external-validation-scope-guard.md"
 M094_ADR = PROJECT_ROOT / "Docs" / "adr" / "project-director-external-validation-scope-guard-20260620.md"
+M095_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M095-wing-readonly-reserved-root-intake-guard.md"
+M095_ADR = PROJECT_ROOT / "Docs" / "adr" / "wing-readonly-reserved-root-intake-guard-20260620.md"
 PROCESSING_PIPELINE_PREVIEW = PROJECT_ROOT / "backend" / "processing_pipeline_preview.py"
 PROCESSING_PIPELINE_PREVIEW_INTEGRATION_BUNDLE_TEST = (
     PROJECT_ROOT
@@ -10175,6 +10177,80 @@ def test_m094_project_director_external_validation_scope_guard_stays_readonly():
     assert "external_validation_handoff_or_control_plane_only" in report
     assert "Writer lease: none" in heartbeat
     assert "No WING/backend contact was made" in heartbeat
+
+
+def test_m095_wing_readonly_reserved_root_intake_guard_stays_readonly():
+    from backend.wing_readonly_preflight_evidence import (
+        validate_wing_readonly_preflight_artifact,
+    )
+
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    plan = M095_PLAN.read_text(encoding="utf-8")
+    adr = M095_ADR.read_text(encoding="utf-8")
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert state["last_validation_summary"]["hardware_evidence"] is False
+    assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
+    assert state["last_validation_summary"]["authority"]["readiness_closure_allowed"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_backend"] is False
+    assert state["last_validation_summary"]["authority"]["contacts_wing"] is False
+    assert state["last_validation_summary"]["authority"]["live_write"] is False
+
+    m095 = markdown_table_row(roadmap, "M095")
+    assert m095[1] == "WING read-only reserved-root intake guard"
+    assert m095[2] == (
+        "Real WING read-only intake rejects spoofed candidates from reserved "
+        "no-WING and autopilot evidence roots before manual review can accept them"
+    )
+    assert m095[3] == "M001"
+    assert m095[4] == "critical read-only hardware intake"
+    assert m095[5] == (
+        "UNIT_VERIFIED reserved-root intake guard; live authority remains blocked"
+    )
+    assert m095[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
+
+    for marker in ("M095-CP01", "M095-CP02", "M095-CP03"):
+        assert marker in plan
+    for heading in (
+        "## Context",
+        "## Options Considered",
+        "## Decision",
+        "## Why This Won",
+        "## Rejected Alternatives",
+        "## Implementation Plan",
+        "## Test Plan",
+        "## Risks and Rollback",
+    ):
+        assert heading in adr
+    assert "No live transport" in adr
+
+    validation = validate_wing_readonly_preflight_artifact(
+        {
+            "proof_artifact_schema": "wing_readonly_preflight.v1",
+            "proof_runner": "wing_readonly_preflight_runner",
+            "artifact_root": "artifacts/no_wing_release_check/spoofed-wing",
+            "summary_path": (
+                "artifacts/no_wing_release_check/spoofed-wing/"
+                "20260606T120000Z_wing_readonly_preflight/summary.json"
+            ),
+            "events_path": (
+                "artifacts/no_wing_release_check/spoofed-wing/"
+                "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+            ),
+        }
+    )
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "artifact_root_reserved_for_non_wing_evidence" in validation["violations"]
+    assert "summary_path_reserved_for_non_wing_evidence" in validation["violations"]
+    assert "events_path_reserved_for_non_wing_evidence" in validation["violations"]
+
+    assert "M095 WING read-only reserved-root intake guard is now covered" in current
+    assert "M095 WING read-only reserved-root intake guard rail is now" in report
+    assert "artifacts/no_wing_release_check" in current
+    assert "ops/autopilot/evidence" in report
 
 
 def test_mvp_doc_declares_scope_and_stop_rules():

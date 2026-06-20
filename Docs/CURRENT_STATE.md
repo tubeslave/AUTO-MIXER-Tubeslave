@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T13:55:58Z
+Generated: 2026-06-20T14:12:50Z
 
 ## Repository snapshot
 
@@ -1427,6 +1427,18 @@ Generated: 2026-06-20T13:55:58Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does
   not replace real WING/operator validation.
+- M095 WING read-only reserved-root intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m095_wing_readonly_reserved_root_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries under `artifacts/no_wing_release_check`
+  or `ops/autopilot/evidence` now fail artifact intake before they can become
+  accepted real WING read-only candidates. Prestart no-WING summaries remain
+  valid only as prestart evidence; they cannot replace the real external WING
+  Rack artifact. This keeps the M001 handoff pointed at actual hardware proof
+  while staying read-only: it contacts no WING/backend transport, opens no
+  WebSocket/OSC write path, imports no proposal into a queue, applies no
+  proposal, grants no live authority, closes no readiness row, creates no
+  hardware evidence and does not replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1437,4 +1449,4 @@ Generated: 2026-06-20T13:55:58Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4018 passed, 1 skipped, 1 warning`.
+  `4021 passed, 1 skipped, 1 warning`.

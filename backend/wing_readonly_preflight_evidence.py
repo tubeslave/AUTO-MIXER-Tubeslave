@@ -84,6 +84,10 @@ WING_READONLY_PREFLIGHT_RUNNER = WING_READONLY_PREFLIGHT_PROOF_RUNNER
 DEFAULT_WING_READONLY_PREFLIGHT_ARTIFACT_ROOTS = (
     WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
 )
+RESERVED_NON_WING_EVIDENCE_ROOTS = (
+    "artifacts/no_wing_release_check",
+    "ops/autopilot/evidence",
+)
 EVIDENCE_STATUSES = {
     "operator_preflight_required",
     "readonly_preflight_candidate_available",
@@ -660,6 +664,41 @@ def _artifact_path_string(value: Any) -> str:
     if not isinstance(value, str) or not value:
         return ""
     return Path(value).as_posix()
+
+
+def _path_is_under_reserved_non_wing_evidence_root(value: Any) -> bool:
+    if not isinstance(value, (str, Path)):
+        return False
+    normalized = Path(value).as_posix().strip()
+    if not normalized:
+        return False
+    normalized = normalized.removeprefix("./").rstrip("/")
+    for root in RESERVED_NON_WING_EVIDENCE_ROOTS:
+        if (
+            normalized == root
+            or normalized.startswith(f"{root}/")
+            or normalized.endswith(f"/{root}")
+            or f"/{root}/" in normalized
+        ):
+            return True
+    return False
+
+
+def _validate_candidate_artifact_intake_paths(
+    payload: Mapping[str, Any],
+    *,
+    summary_path: Path | None,
+    violations: list[str],
+) -> None:
+    if _path_is_under_reserved_non_wing_evidence_root(payload.get("artifact_root")):
+        violations.append("artifact_root_reserved_for_non_wing_evidence")
+    for field in ("summary_path", "events_path"):
+        if _path_is_under_reserved_non_wing_evidence_root(payload.get(field)):
+            violations.append(f"{field}_reserved_for_non_wing_evidence")
+    if summary_path is not None and _path_is_under_reserved_non_wing_evidence_root(
+        summary_path
+    ):
+        violations.append("source_path_reserved_for_non_wing_evidence")
 
 
 def _expected_artifact_for_run(expected_artifact: str, run_id: str) -> str:
@@ -1299,6 +1338,11 @@ def validate_wing_readonly_preflight_artifact(
     artifact_root = payload.get("artifact_root")
     if not isinstance(artifact_root, str) or not artifact_root:
         violations.append("artifact_root_missing")
+    _validate_candidate_artifact_intake_paths(
+        payload,
+        summary_path=summary_path,
+        violations=violations,
+    )
     if payload.get("status") != EXPECTED_RUN_SUMMARY_STATUS:
         violations.append("status_not_passed")
     if payload.get("reason") != EXPECTED_RUN_SUMMARY_REASON:

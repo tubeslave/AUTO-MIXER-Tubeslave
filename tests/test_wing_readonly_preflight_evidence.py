@@ -785,6 +785,45 @@ def test_preflight_evidence_rejects_missing_artifact_root():
     assert "artifact_root_missing" in validation["violations"]
 
 
+def test_preflight_evidence_rejects_reserved_no_wing_candidate_root(tmp_path):
+    artifact_path = _write_file_artifact(
+        tmp_path / "artifacts" / "no_wing_release_check" / "spoofed-wing"
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert "artifact_root_reserved_for_non_wing_evidence" in evidence["summary"]["violations"]
+    assert "summary_path_reserved_for_non_wing_evidence" in evidence["summary"]["violations"]
+    assert "events_path_reserved_for_non_wing_evidence" in evidence["summary"]["violations"]
+    assert "source_path_reserved_for_non_wing_evidence" in evidence["summary"]["violations"]
+
+
+def test_preflight_evidence_rejects_reserved_autopilot_evidence_candidate_path(tmp_path):
+    artifact = copy.deepcopy(_valid_summary())
+    artifact["artifact_root"] = "ops/autopilot/evidence/M001_spoofed_wing"
+    artifact["summary_path"] = (
+        "ops/autopilot/evidence/M001_spoofed_wing/"
+        "20260606T120000Z_wing_readonly_preflight/summary.json"
+    )
+    artifact["events_path"] = (
+        "ops/autopilot/evidence/M001_spoofed_wing/"
+        "20260606T120000Z_wing_readonly_preflight/events.jsonl"
+    )
+
+    validation = validate_wing_readonly_preflight_artifact(artifact)
+
+    assert validation["accepted_as_readonly_preflight_candidate"] is False
+    assert "artifact_root_reserved_for_non_wing_evidence" in validation["violations"]
+    assert "summary_path_reserved_for_non_wing_evidence" in validation["violations"]
+    assert "events_path_reserved_for_non_wing_evidence" in validation["violations"]
+
+
 def test_preflight_evidence_rejects_missing_existing_backend_connection_boundary():
     artifact = copy.deepcopy(_valid_summary())
     artifact.pop("physical_preflight_requires_existing_backend_connection")

@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T13:55:58Z.
+- Latest heartbeat: 2026-06-20T14:12:50Z.
 
 ## Что сделано
 
@@ -142,6 +142,15 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   real WING artifact, while creating no WING/backend contact, proposal apply,
   queue import, live write, readiness closure, hardware evidence or live
   authority.
+
+- M095 WING read-only reserved-root intake guard rail is now automated:
+  candidate WING read-only summaries under `artifacts/no_wing_release_check`
+  or `ops/autopilot/evidence` fail artifact intake before they can become
+  accepted real WING read-only candidates. Prestart no-WING summaries remain
+  allowed only as prestart evidence. This protects the M001 handoff from
+  confusing no-WING/control-plane evidence with the required real WING Rack
+  artifact, while creating no WING/backend contact, proposal apply, queue
+  import, live write, readiness closure, hardware evidence or live authority.
 
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
