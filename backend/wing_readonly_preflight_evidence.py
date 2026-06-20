@@ -716,6 +716,11 @@ def _validate_candidate_artifact_intake_paths(
         summary_path
     ):
         violations.append("source_path_reserved_for_non_wing_evidence")
+    if summary_path is not None:
+        declared_summary_path = payload.get("summary_path")
+        if isinstance(declared_summary_path, str) and declared_summary_path:
+            if Path(declared_summary_path).as_posix() != summary_path.as_posix():
+                violations.append("source_path_declared_summary_path_mismatch")
     if not isinstance(run_id, str) or not run_id:
         return
     if not isinstance(artifact_root, str) or not artifact_root:

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-06-20T15:27:07Z
+Generated: 2026-06-20T15:44:02Z
 
 ## Repository snapshot
 
@@ -1466,6 +1466,18 @@ Generated: 2026-06-20T15:27:07Z
   imports no proposal into a queue, applies no proposal, grants no live
   authority, closes no readiness row, creates no hardware evidence and does not
   replace real WING/operator validation.
+- M098 WING read-only source path intake guard is now covered by
+  `tests/test_wing_readonly_preflight_evidence.py` and
+  `tests/test_wing_mvp_rails.py::test_m098_wing_readonly_source_path_intake_guard_stays_readonly`.
+  Candidate WING read-only summaries loaded from disk now fail artifact intake
+  when the source file path does not match the payload's declared
+  `summary_path`. This blocks copied or stale-source summary files from
+  becoming accepted real WING read-only candidates before operator review. The
+  concrete intake violation is `source_path_declared_summary_path_mismatch`.
+  It contacts no WING/backend transport, opens no WebSocket/OSC write path,
+  imports no proposal into a queue, applies no proposal, grants no live
+  authority, closes no readiness row, creates no hardware evidence and does not
+  replace real WING/operator validation.
 
 ## Unresolved unknowns
 
@@ -1476,4 +1488,4 @@ Generated: 2026-06-20T15:27:07Z
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
   but the latest verified full-suite run for `e8a38bc0` passed with
-  `4025 passed, 1 skipped, 1 warning`.
+  `4027 passed, 1 skipped, 1 warning`.

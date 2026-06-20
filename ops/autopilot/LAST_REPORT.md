@@ -173,6 +173,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   contact, proposal apply, queue import, live write, readiness closure,
   hardware evidence or live authority.
 
+- M098 WING read-only source path intake guard rail is now automated:
+  candidate WING read-only summaries loaded from disk whose actual source path
+  does not match the payload's declared `summary_path` fail artifact intake
+  before they can become accepted real WING read-only candidates. This blocks
+  copied or stale-source summary files from passing into manual review as real
+  hardware proof. The concrete intake violation is
+  `source_path_declared_summary_path_mismatch`. This creates no WING/backend
+  contact, proposal apply, queue import, live write, readiness closure,
+  hardware evidence or live authority.
+
 - `2b25d91f` - WING safety/product surfaces report the deployment boundary as
   supervised `fader`/`gain`.
 - `12f56180` - processing live executor scope is filtered to the WING

@@ -889,6 +889,31 @@ def test_preflight_evidence_rejects_noncanonical_wing_candidate_root():
     )
 
 
+def test_file_preflight_evidence_rejects_source_path_mismatch(tmp_path):
+    declared_summary_path = _write_file_artifact(tmp_path / "preflight" / "real")
+    stale_summary_path = (
+        declared_summary_path.parent.parent / "stale-source" / "summary.json"
+    )
+    stale_summary_path.parent.mkdir(parents=True)
+    stale_summary_path.write_text(
+        declared_summary_path.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_paths=(stale_summary_path,),
+        artifact_roots=(),
+    )
+
+    assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
+    assert evidence["summary"]["valid_candidate_count"] == 0
+    assert evidence["artifacts"][0]["accepted_as_readonly_preflight_candidate"] is False
+    assert (
+        "source_path_declared_summary_path_mismatch"
+        in evidence["summary"]["violations"]
+    )
+
+
 def test_preflight_evidence_rejects_missing_existing_backend_connection_boundary():
     artifact = copy.deepcopy(_valid_summary())
     artifact.pop("physical_preflight_requires_existing_backend_connection")
