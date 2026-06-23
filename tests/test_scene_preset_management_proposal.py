@@ -27,6 +27,20 @@ def _fresh_state(field_count=7):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["live_write"] is False
+    assert payload["queue_mutation"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["can_import_to_queue"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["mutates_mixer"] is False
+
+
 def test_scene_preset_management_module_is_transport_free():
     source = Path("backend/scene_preset_management_proposal.py").read_text()
 
@@ -93,19 +107,172 @@ def test_soundcheck_scoped_scene_recall_creates_proposal_only_recommendation():
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
     assert recommendation.evidence["current_scene_preset_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 7
+    summary = recommendation.scene_preset_safety_summary()
+    assert summary["status"] == "passed"
+    assert summary["artifact_type"] == "scene"
+    assert summary["action_type"] == "scene_recall"
+    assert summary["target_scope"] == "channel_strip"
+    assert summary["current_state_readback_available"] is True
+    assert summary["current_console_state_readback"]["status"] == "available"
+    assert summary["snapshots_scenes_snapshot_cache_freshness"]["status"] == "fresh"
+    assert summary["user_presets_snapshot_cache_freshness"]["status"] == (
+        "not_required_for_artifact_type"
+    )
+    assert summary["target_preview_available"] is True
+    assert summary["target_preview"]["status"] == "available"
+    assert summary["scoped_diff_available"] is True
+    assert summary["scoped_diff"]["status"] == "available"
+    assert summary["read_only_scoped_diff_evidence"]["status"] == "passed"
+    assert summary["rollback_snapshot_available"] is True
+    assert summary["rollback_snapshot_id"] == "rollback:pre_scene_recall"
+    assert summary["rollback_snapshot"]["status"] == "available"
+    assert summary["read_only_rollback_evidence"]["status"] == "passed"
+    assert summary["operator_intent"] == "operator_scene_request"
+    assert summary["active_performance"] is False
+    assert summary["active_performance_guard"]["status"] == "passed"
+    assert summary["destructive_scope_score"] == 0.08
+    assert summary["destructive_scope_check"]["status"] == "passed"
+    assert summary["active_signal_guard"]["status"] == "passed"
+    assert summary["current_scene_preset_cache_freshness_status"] == "fresh"
+    assert summary["current_scene_preset_cache_no_live_authority"] is True
+    assert summary["required_safety_checks"] == {
+        "current_console_state_readback": "required_before_live_promotion",
+        "current_scene_preset_cache_freshness": "required_before_live_promotion",
+        "current_scene_preset_cache_no_live_authority": "required_before_live_promotion",
+        "snapshots_scenes_snapshot_cache_freshness": "required_before_live_promotion",
+        "user_presets_snapshot_cache_freshness": "required_before_live_promotion",
+        "target_preview": "required_before_live_promotion",
+        "scoped_diff": "required_before_live_promotion",
+        "read_only_scoped_diff_evidence": "required_before_live_promotion",
+        "rollback_snapshot": "required_before_live_promotion",
+        "read_only_rollback_evidence": "required_before_live_promotion",
+        "operator_intent": "required_before_live_promotion",
+        "active_performance_guard": "required_before_live_promotion",
+        "destructive_scope_check": "required_before_live_promotion",
+        "active_signal_guard": "required_before_live_promotion",
+    }
+    assert summary["rollback_expectation"] == {
+        "required_before_live_promotion": True,
+        "operator_reviewed_full_state_snapshot_required": True,
+        "restore_previous_scene_or_preset_state_after_physical_readback": True,
+        "restore_previous_channel_strip_state_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+    readback = summary["future_wing_readback_contract"]
+    assert readback["target_kind"] == "scoped_scene_or_user_preset"
+    assert readback["old_value_source"] == (
+        "cached_or_physical_full_state_read_required_before_promotion"
+    )
+    assert readback["required_before_live_promotion"] is True
+    assert readback["requires_real_wing_proof"] is True
+    assert readback["requires_operator_approval"] is True
+    assert readback["requires_separate_non_fader_adr"] is True
+    assert "scene_state_restore_write" in readback["blocked_live_actions"]
+    assert "preset_state_store_write" in readback["blocked_live_actions"]
+    assert "scene_preset_live_apply_quarantined" in summary["safety_blockers"]
+    assert "full_state_snapshot_read_only_until_promoted" in summary["safety_blockers"]
+    assert summary["readback_required_before_promotion"] is True
+    assert summary["rollback_required_before_promotion"] is True
+    assert summary["live_write"] is False
+    assert summary["queue_mutation"] is False
+    _assert_top_level_denial(summary)
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "scene_preset_management_proposal"
     assert proposal["kind"] == "scene_preset"
-    assert proposal["can_import_to_queue"] is False
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
     assert "requested_change" not in proposal
     assert "requested_changes" not in proposal
     assert "unsupported_value_type:scene_preset" in proposal["blockers"]
+    assert "scene_preset_live_apply_quarantined" in proposal["blockers"]
+    assert "non_fader_live_expansion_requires_separate_adr" in proposal["blockers"]
     assert proposal["proposed_action"]["action_type"] == "scene_recall"
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["current_scene_preset_cache_no_live_authority"] is True
+    assert proposal["scene_preset_safety_summary"] == summary
+    assert proposal["proposed_action"]["scene_preset_safety_summary"] == summary
+    assert proposal["evidence"]["scene_preset_safety_summary"] == summary
+    assert proposal["safety_blockers"] == summary["safety_blockers"]
+    assert proposal["required_safety_checks"] == summary["required_safety_checks"]
+    assert proposal["rollback_expectation"] == summary["rollback_expectation"]
+    assert proposal["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
+    assert proposal["proposed_action"]["current_console_state_readback"] == summary[
+        "current_console_state_readback"
+    ]
+    assert proposal["proposed_action"]["scoped_diff"] == summary["scoped_diff"]
+    assert proposal["proposed_action"]["read_only_scoped_diff_evidence"] == summary[
+        "read_only_scoped_diff_evidence"
+    ]
+    assert proposal["proposed_action"]["rollback_snapshot"] == summary[
+        "rollback_snapshot"
+    ]
+    assert proposal["proposed_action"]["active_signal_guard"] == summary[
+        "active_signal_guard"
+    ]
+    assert proposal["evidence"]["current_console_state_readback"] == summary[
+        "current_console_state_readback"
+    ]
+    assert proposal["evidence"]["read_only_rollback_evidence"] == summary[
+        "read_only_rollback_evidence"
+    ]
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "routing_groups_scenes"
+    assert correction["bounded_delta"]["parameter_deltas"]["artifact_id"] == (
+        recommendation.artifact_id
+    )
+    assert correction["bounded_delta"]["parameter_deltas"]["target_scope"] == (
+        recommendation.target_scope
+    )
+    assert correction["future_wing_readback_contract"]["target_kind"] == (
+        "scoped_scene_or_user_preset"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == (
+        "complete"
+    )
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert "read_only_inventory" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    evidence_checks = correction["headroom_feedback_true_peak_checks"][
+        "evidence_checks"
+    ]
+    assert evidence_checks["current_scene_preset_cache_no_live_authority"] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    for key in (
+        "current_console_state_readback",
+        "current_scene_preset_cache_freshness",
+        "snapshots_scenes_snapshot_cache_freshness",
+        "user_presets_snapshot_cache_freshness",
+        "target_preview",
+        "scoped_diff",
+        "read_only_scoped_diff_evidence",
+        "rollback_snapshot",
+        "read_only_rollback_evidence",
+        "active_performance_guard",
+        "destructive_scope_check",
+        "active_signal_guard",
+    ):
+        assert evidence_checks[key] == source_evidence[key]
+    assert source_evidence["scene_preset_safety_summary"] == summary
+    assert source_evidence["current_scene_preset_cache_no_live_authority"] is True
+    assert source_evidence["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
+    assert source_evidence["scoped_diff"]["status"] == "available"
+    assert source_evidence["rollback_snapshot"]["status"] == "available"
 
 
 def test_active_performance_and_broad_scope_block_scene_preset_proposal():
@@ -145,7 +312,15 @@ def test_active_performance_and_broad_scope_block_scene_preset_proposal():
     assert "active_performance_scene_preset_blocked" in recommendation.blockers
     assert "scene_preset_scope_too_broad" in recommendation.blockers
     assert "active_signal_requires_manual_scene_preset_change" in recommendation.blockers
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.scene_preset_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["active_performance"] is True
+    assert summary["affected_channel_count"] == 16
+    assert "scene_preset_scope_too_broad" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["scene_preset_safety_summary"] == summary
 
 
 def test_missing_preview_or_rollback_blocks_scene_preset_proposal():
@@ -281,7 +456,15 @@ def test_scoped_diff_evidence_with_live_or_query_claim_blocks_proposal():
     assert "scene_preset_scoped_diff_live_write_claim" in recommendation.blockers
     assert "scene_preset_scoped_diff_queries_console" in recommendation.blockers
     assert "scene_preset_scoped_diff_mutates_console_state" in recommendation.blockers
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.scene_preset_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["scoped_diff_read_only"] is False
+    assert summary["scoped_diff_live_write"] is True
+    assert "scene_preset_scoped_diff_live_write_claim" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["scene_preset_safety_summary"] == summary
 
 
 def test_scoped_diff_evidence_broad_scope_blocks_scene_preset_proposal():
@@ -430,7 +613,15 @@ def test_rollback_evidence_with_live_or_query_claim_blocks_proposal():
     assert "scene_preset_rollback_live_write_claim" in recommendation.blockers
     assert "scene_preset_rollback_queries_console" in recommendation.blockers
     assert "scene_preset_rollback_mutates_console_state" in recommendation.blockers
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.scene_preset_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["rollback_read_only"] is False
+    assert summary["rollback_live_write"] is True
+    assert "scene_preset_rollback_live_write_claim" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["scene_preset_safety_summary"] == summary
 
 
 def test_rollback_evidence_target_scope_mismatch_blocks_proposal():
@@ -526,7 +717,14 @@ def test_stale_current_scene_preset_state_blocks_proposal_only_recommendation():
         "active_scene",
         "rollback_snapshot",
     ]
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.scene_preset_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_scene_preset_cache_freshness_status"] == "stale"
+    assert "scene_preset_current_state_cache_not_fresh" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["scene_preset_safety_summary"] == summary
 
 
 def test_live_authority_current_scene_preset_state_blocks_proposal_only_recommendation():
@@ -574,7 +772,14 @@ def test_live_authority_current_scene_preset_state_blocks_proposal_only_recommen
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
     assert recommendation.evidence["current_scene_preset_cache_no_live_authority"] is False
     assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.scene_preset_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_scene_preset_cache_no_live_authority"] is False
+    assert "scene_preset_current_state_cache_live_authority_present" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["scene_preset_safety_summary"] == summary
     assert build_scene_preset_management_proposals([analysis]) == ()
 
 

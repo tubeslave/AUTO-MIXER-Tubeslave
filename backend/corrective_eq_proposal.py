@@ -16,6 +16,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 CORRECTIVE_EQ_METHOD_ID = "corrective_eq_proposal"
 CORRECTIVE_EQ_VERSION = "corrective_eq_proposal_v1"
@@ -201,19 +206,131 @@ class CorrectiveEQRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def eq_band_protection_summary(self) -> Dict[str, Any]:
+        band_identity = dict(self.evidence.get("band_identity") or {})
+        protected_band_policy = dict(
+            self.evidence.get("protected_band_policy") or {}
+        )
+        bounded_gain_delta = dict(self.evidence.get("bounded_gain_delta") or {})
+        filter_type_policy = dict(self.evidence.get("filter_type_policy") or {})
+        relevant_blockers = [
+            blocker
+            for blocker in self.blockers
+            if blocker.startswith("eq_")
+            or blocker
+            in {
+                "feedback_notch_band_preserved",
+                "manual_eq_band_preserved",
+                "feedback_risk_blocks_eq_boost",
+                "insufficient_true_peak_headroom_for_eq_boost",
+                "unsupported_eq_filter_type",
+            }
+        ]
+        return {
+            "status": "passed" if not relevant_blockers else "blocked",
+            "channel_id": self.channel_id,
+            "band_id": self.current_band_id,
+            "filter_type": self.filter_type,
+            "filter_type_policy_status": filter_type_policy.get("status"),
+            "band_identity_status": band_identity.get("status"),
+            "current_band_frequency_hz": band_identity.get(
+                "current_band_frequency_hz"
+            ),
+            "target_frequency_hz": self.target_frequency_hz,
+            "band_match_octaves": band_identity.get("band_match_octaves"),
+            "max_band_match_octaves": band_identity.get("max_band_match_octaves"),
+            "bounded_gain_status": bounded_gain_delta.get("status"),
+            "proposed_gain_db": self.proposed_gain_db,
+            "proposed_q": self.proposed_q,
+            "feedback_notch_band_protected": not bool(
+                protected_band_policy.get("current_band_is_feedback_notch")
+            ),
+            "manual_eq_band_protected": not bool(
+                protected_band_policy.get("current_band_is_manual")
+            ),
+            "protected_band_policy_status": protected_band_policy.get("status"),
+            "feedback_risk": self.evidence.get("feedback_risk"),
+            "phase_risk": self.evidence.get("phase_risk"),
+            "current_eq_context_cache_freshness_status": self.evidence.get(
+                "current_state_cache_freshness_status"
+            ),
+            "current_eq_context_cache_no_live_authority": self.evidence.get(
+                "current_eq_context_cache_no_live_authority"
+            ),
+            "current_phase_audio_context_cache_freshness_status": self.evidence.get(
+                "current_phase_audio_context_cache_freshness_status"
+            ),
+            "current_phase_audio_context_cache_no_live_authority": self.evidence.get(
+                "current_phase_audio_context_cache_no_live_authority"
+            ),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "blockers": relevant_blockers,
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
+        eq_band_protection_summary = self.eq_band_protection_summary()
+        band_identity = dict(self.evidence.get("band_identity") or {})
+        bounded_gain_delta = dict(self.evidence.get("bounded_gain_delta") or {})
         evidence = {
             **self.evidence,
+            "eq_band_protection_summary": eq_band_protection_summary,
             "old_value_source": EQ_READ_REQUIRED_SOURCE,
             "rollback_value_source": EQ_READ_REQUIRED_SOURCE,
+            "rollback_eq_band_readback": {
+                "channel_id": self.channel_id,
+                "band_id": self.current_band_id,
+                "filter_type": self.filter_type,
+                "frequency_hz": band_identity.get("current_band_frequency_hz"),
+                "gain_db": bounded_gain_delta.get("current_gain_db"),
+                "q": band_identity.get("current_band_q"),
+                "source": EQ_READ_REQUIRED_SOURCE,
+                "required_before_live_promotion": True,
+                "live_write": False,
+            },
             "live_write": False,
             "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
             "readback_required_before_promotion": True,
             "rollback_required_before_promotion": True,
         }
-        return {
+        blockers = [
+            "unsupported_value_type:eq",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            *self.blockers,
+        ]
+        proposed_action = {
+            "action_type": self.action_type,
+            "band_id": self.current_band_id,
+            "filter_type": self.filter_type,
+            "frequency_hz": self.target_frequency_hz,
+            "gain_db": self.proposed_gain_db,
+            "q": self.proposed_q,
+            "eq_band_protection_summary": eq_band_protection_summary,
+        }
+        proposal = {
             "id": self.id,
             "method_id": CORRECTIVE_EQ_METHOD_ID,
             "source": CORRECTIVE_EQ_METHOD_ID,
@@ -225,22 +342,19 @@ class CorrectiveEQRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:eq",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
-            ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "band_id": self.current_band_id,
-                "filter_type": self.filter_type,
-                "frequency_hz": self.target_frequency_hz,
-                "gain_db": self.proposed_gain_db,
-                "q": self.proposed_q,
-            },
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "eq_band_protection_summary": eq_band_protection_summary,
             "old_value": {
                 "source": EQ_READ_REQUIRED_SOURCE,
                 "required_before_apply": True,
@@ -251,6 +365,14 @@ class CorrectiveEQRecommendation:
             },
             "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=CORRECTIVE_EQ_METHOD_ID,
+            target=self.channel_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _severity(gain_db: float, blockers: Iterable[str]) -> str:
@@ -347,6 +469,7 @@ def analyze_corrective_eq_need(
             "feedback_risk_blocks_eq_boost",
         }.intersection(blockers_tuple)
         else "passed",
+        "current_gain_db": analysis.current_band_gain_db,
         "proposed_gain_db": proposed_gain,
         "max_cut_db": MIN_EQ_GAIN_DB,
         "max_default_boost_db": MAX_DEFAULT_BOOST_DB,
@@ -363,6 +486,7 @@ def analyze_corrective_eq_need(
         else "blocked",
         "band_id": analysis.current_band_id,
         "current_band_frequency_hz": analysis.current_band_frequency_hz,
+        "current_band_q": analysis.current_band_q,
         "target_frequency_hz": target_frequency,
         "band_match_octaves": None if band_match is None else round(band_match, 3),
         "max_band_match_octaves": MAX_BAND_MATCH_OCTAVES,

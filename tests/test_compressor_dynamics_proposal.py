@@ -24,6 +24,76 @@ def _fresh(fields=10):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["live_write"] is False
+    assert payload["queue_mutation"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["can_import_to_queue"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["mutates_mixer"] is False
+
+
+def _assert_dynamics_operator_contract(payload, *, expected_blocker=None):
+    assert payload["required_safety_checks"] == {
+        "source_identity": "required_before_live_promotion",
+        "gain_reduction_review": "required_before_live_promotion",
+        "attack_release_bounds": "required_before_live_promotion",
+        "makeup_gain_headroom": "required_before_live_promotion",
+        "true_peak_headroom": "required_before_live_promotion",
+        "feedback_risk": "required_before_live_promotion",
+        "bypass_state_readback": "required_before_live_promotion",
+    }
+    assert payload["rollback_expectation"] == {
+        "required_before_live_promotion": True,
+        "restore_previous_dynamics_values_after_physical_readback": True,
+        "restore_previous_bypass_state_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+    readback = payload["future_wing_readback_contract"]
+    assert readback["required"] is True
+    assert readback["required_before_live_promotion"] is True
+    assert readback["target_kind"] == "channel_dynamics"
+    assert readback["old_value_source"] == DYNAMICS_READ_REQUIRED_SOURCE
+    assert readback["readback_targets"] == [
+        "dyn_on",
+        "threshold",
+        "ratio",
+        "attack",
+        "release",
+        "makeup_gain",
+        "gain_reduction_meter",
+        "bypass_state",
+    ]
+    assert readback["blocked_live_actions"] == [
+        "compressor_enable_write",
+        "compressor_parameter_write",
+        "compressor_write",
+        "makeup_gain_write",
+    ]
+    assert readback["requires_real_wing_proof"] is True
+    assert readback["requires_operator_approval"] is True
+    assert readback["requires_separate_non_fader_adr"] is True
+    assert "Compressor/Dynamics evidence is offline-only" in payload[
+        "operator_explanation"
+    ]
+    assert payload["safety_blockers"][:7] == [
+        "compressor_dynamics_live_apply_quarantined",
+        "unsupported_value_type:compressor",
+        "not_in_supervised_fader_gain_executor",
+        "real_wing_proof_required_before_live_apply",
+        "non_fader_live_expansion_requires_separate_adr",
+        "operator_approval_required_before_supervised_dynamics_apply",
+        "hardware_readback_and_rollback_not_proven",
+    ]
+    if expected_blocker is not None:
+        assert expected_blocker in payload["safety_blockers"]
+
+
 def test_compressor_proposal_module_is_transport_free():
     source = Path("backend/compressor_dynamics_proposal.py").read_text()
 
@@ -89,19 +159,116 @@ def test_dynamic_vocal_creates_proposal_only_compressor_recommendation():
     )
     assert recommendation.evidence["makeup_gain_feedback_limited"] is False
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
+    summary = recommendation.dynamics_safety_summary()
+    assert summary["status"] == "passed"
+    assert summary["source_family"] == "vocal"
+    assert summary["makeup_gain_db"] == recommendation.makeup_gain_db
+    assert summary["requested_makeup_gain_db"] == recommendation.makeup_gain_db
+    assert summary["makeup_gain_is_bounded_by_headroom"] is True
+    assert summary["feedback_safety_status"] == "passed"
+    assert summary["feedback_blocks_makeup_gain"] is False
+    assert summary["current_dynamics_cache_freshness_status"] == "fresh"
+    assert summary["current_dynamics_cache_no_live_authority"] is True
+    _assert_dynamics_operator_contract(summary)
+    assert summary["readback_required_before_promotion"] is True
+    assert summary["rollback_required_before_promotion"] is True
+    assert summary["live_write"] is False
+    assert summary["queue_mutation"] is False
+    _assert_top_level_denial(summary)
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "compressor_dynamics_proposal"
-    assert proposal["can_import_to_queue"] is False
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
+    _assert_dynamics_operator_contract(proposal)
+    assert proposal["safety_blockers"] == summary["safety_blockers"]
     assert "requested_change" not in proposal
     assert "unsupported_value_type:compressor" in proposal["blockers"]
     assert proposal["old_value"]["source"] == DYNAMICS_READ_REQUIRED_SOURCE
     assert proposal["rollback_value"]["source"] == DYNAMICS_READ_REQUIRED_SOURCE
     assert proposal["proposed_action"]["makeup_gain_db"] == recommendation.makeup_gain_db
+    assert proposal["dynamics_safety_summary"] == summary
+    assert proposal["proposed_action"]["dynamics_safety_summary"] == summary
+    assert proposal["proposed_action"]["required_safety_checks"] == summary[
+        "required_safety_checks"
+    ]
+    assert proposal["proposed_action"]["rollback_expectation"] == summary[
+        "rollback_expectation"
+    ]
+    assert proposal["proposed_action"]["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
+    assert proposal["evidence"]["dynamics_safety_summary"] == summary
+    assert proposal["evidence"]["operator_explanation"] == summary[
+        "operator_explanation"
+    ]
+    assert proposal["evidence"]["required_safety_checks"] == summary[
+        "required_safety_checks"
+    ]
+    assert proposal["evidence"]["rollback_expectation"] == summary[
+        "rollback_expectation"
+    ]
+    assert proposal["evidence"]["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
     assert proposal["evidence"]["old_value_source"] == DYNAMICS_READ_REQUIRED_SOURCE
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["crest_factor"] == recommendation.evidence[
+        "crest_factor_db"
+    ]
+    assert proposal["evidence"]["loudness_range"] == recommendation.evidence[
+        "lra_db"
+    ]
+    assert proposal["evidence"]["gain_reduction_estimate"] == {
+        "existing_gain_reduction_db": 1.0,
+        "target_gain_reduction_db": recommendation.target_gain_reduction_db,
+        "status": "operator_review_required_before_live_promotion",
+    }
+    assert proposal["evidence"]["bounded_makeup_headroom"]["bounded"] is True
+    assert proposal["evidence"]["true_peak_headroom"] == 5.0
+    assert proposal["evidence"]["rollback_dynamics_readback"] == (
+        DYNAMICS_READ_REQUIRED_SOURCE
+    )
+    assert proposal["evidence"]["bypass_state"] == (
+        "readback_required_before_live_promotion"
+    )
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "compressor_dynamics"
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == (
+        "complete"
+    )
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["bounded_delta"]["delta_db"] == recommendation.makeup_gain_db
+    assert correction["bounded_delta"]["parameter_deltas"]["threshold_db"] == (
+        recommendation.threshold_db
+    )
+    assert correction["bounded_delta"]["parameter_deltas"]["ratio"] == recommendation.ratio
+    assert correction["bounded_delta"]["parameter_deltas"]["makeup_gain_db"] == (
+        recommendation.makeup_gain_db
+    )
+    assert correction["future_wing_readback_contract"]["target_kind"] == "channel_dynamics"
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert "makeup_gain" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_dynamics_cache_no_live_authority"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["dynamics_safety_summary"] == summary
+    assert source_evidence["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
+    assert source_evidence["current_dynamics_cache_no_live_authority"] is True
+    assert source_evidence["makeup_gain_feedback_limited"] is False
 
 
 def test_flat_or_already_controlled_source_is_analysis_only():
@@ -176,9 +343,24 @@ def test_high_feedback_risk_blocks_compressor_makeup_proposal():
     assert recommendation.evidence["makeup_gain_feedback_limited"] is True
     assert recommendation.evidence["feedback_safety"]["status"] == "blocked"
     assert recommendation.evidence["feedback_safety"]["blocks_makeup_gain"] is True
+    summary = recommendation.dynamics_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["feedback_safety_status"] == "blocked"
+    assert summary["feedback_blocks_makeup_gain"] is True
+    assert "feedback_risk_blocks_compressor_makeup" in summary["blockers"]
+    _assert_dynamics_operator_contract(
+        summary,
+        expected_blocker="feedback_risk_blocks_compressor_makeup",
+    )
+    _assert_top_level_denial(summary)
     proposal = recommendation.to_operator_proposal()
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
+    _assert_dynamics_operator_contract(
+        proposal,
+        expected_blocker="feedback_risk_blocks_compressor_makeup",
+    )
     assert proposal["proposed_action"]["makeup_gain_db"] == 0.0
+    assert proposal["dynamics_safety_summary"] == summary
     assert proposal["evidence"]["requested_makeup_gain_db"] > 0.0
     assert proposal["evidence"]["makeup_gain_feedback_limited"] is True
 
@@ -221,7 +403,7 @@ def test_stale_current_compressor_state_blocks_proposal_only_recommendation():
         "ratio",
         "makeup_db",
     ]
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    _assert_top_level_denial(recommendation.to_operator_proposal())
 
 
 def test_missing_current_compressor_state_blocks_proposal_only_recommendation():
@@ -286,8 +468,17 @@ def test_live_authority_current_compressor_state_blocks_proposal_only_recommenda
     assert (
         recommendation.evidence["current_dynamics_cache_no_live_authority"] is False
     )
+    summary = recommendation.dynamics_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_dynamics_cache_no_live_authority"] is False
+    assert (
+        "compressor_current_state_cache_live_authority_present"
+        in summary["blockers"]
+    )
+    _assert_top_level_denial(summary)
     proposal = recommendation.to_operator_proposal()
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
+    assert proposal["dynamics_safety_summary"] == summary
     assert (
         "compressor_current_state_cache_live_authority_present"
         in proposal["blockers"]
@@ -333,7 +524,7 @@ def test_source_identity_hold_blocks_downstream_compressor_proposal():
     assert trust["usable_for_downstream"] is False
     assert trust["evidence"]["queue_mutation"] is False
     assert trust["evidence"]["model_mutation"] is False
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    _assert_top_level_denial(recommendation.to_operator_proposal())
 
 
 def test_stale_source_identity_replay_context_blocks_downstream_compressor_proposal():
@@ -379,7 +570,7 @@ def test_stale_source_identity_replay_context_blocks_downstream_compressor_propo
         "accepted_labels",
         "replay_outcomes",
     ]
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    _assert_top_level_denial(recommendation.to_operator_proposal())
 
 
 def test_compressor_helpers_classify_roles_and_derive_crest_factor():
@@ -417,6 +608,7 @@ def test_build_compressor_proposals_filters_to_proposal_only_items():
 
     assert len(proposals) == 1
     assert proposals[0]["channel"] == 5
+    _assert_top_level_denial(proposals[0])
 
 
 def test_build_compressor_proposals_filters_stale_state_items():

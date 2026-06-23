@@ -167,6 +167,35 @@ def _is_utc_timestamp(value: str) -> bool:
     return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
+def _freshness_status(payload: Mapping[str, Any]) -> str:
+    return str(payload.get("status") or "missing").strip().lower() or "missing"
+
+
+def _freshness_violations(payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (
+            "memory_trust_promotion_rollback_verification_record_freshness_missing",
+        )
+    violations = []
+    if _freshness_status(payload) != "fresh":
+        violations.append(
+            "memory_trust_promotion_rollback_verification_record_freshness_not_fresh"
+        )
+    if payload.get("read_only") is not True:
+        violations.append(
+            "memory_trust_promotion_rollback_verification_record_freshness_read_only_not_true"
+        )
+    if payload.get("live_write") is not False:
+        violations.append(
+            "memory_trust_promotion_rollback_verification_record_freshness_live_write_not_false"
+        )
+    if payload.get("queries_console") is not False:
+        violations.append(
+            "memory_trust_promotion_rollback_verification_record_freshness_queries_console_not_false"
+        )
+    return tuple(violations)
+
+
 def _record_id(record: Mapping[str, Any], index: int) -> str:
     explicit = _string(record.get("promotion_apply_audit_id"))
     if explicit:
@@ -422,6 +451,7 @@ def _verification_record_violations(
         violations.append(
             "memory_trust_promotion_rollback_verification_record_separate_priority_gate_not_true"
         )
+    violations.extend(_freshness_violations(_mapping(record.get("current_state_cache_freshness"))))
     for flag in REQUIRED_VERIFICATION_FALSE_FLAGS:
         if record.get(flag) is not False:
             violations.append(
@@ -478,6 +508,7 @@ def _verified_record(record: Mapping[str, Any]) -> Dict[str, Any]:
         "rollback_target_trust_state": record.get("rollback_target_trust_state"),
         "rollback_strategy": record.get("rollback_strategy"),
         "verification_evidence_status": record.get("verification_evidence_status"),
+        "current_state_cache_freshness": record.get("current_state_cache_freshness"),
         "decision": "verified",
         "verified_by": record.get("verified_by"),
         "verified_at": record.get("verified_at"),

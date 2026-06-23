@@ -443,6 +443,68 @@ class AutoFaderControllerV2:
         self.last_non_fader_write_count = 0
         self.last_blocked_non_fader_calls: list[Dict[str, Any]] = []
 
+    @staticmethod
+    def _non_fader_authority_denial() -> Dict[str, Any]:
+        return {
+            "live_write": False,
+            "queue_mutation": False,
+            "live_write_allowed": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "safety_blockers": [
+                "auto_fader_v2_non_fader_direct_apply_quarantined",
+                "real_wing_proof_required_before_live_apply",
+                "non_fader_live_expansion_requires_separate_adr",
+                "operator_approval_required_before_supervised_non_fader_apply",
+                "hardware_readback_and_rollback_not_proven",
+            ],
+            "operator_explanation": (
+                "AutoFader V2 produced non-fader correction evidence only. "
+                "Review it offline; live apply stays blocked until real WING "
+                "proof, separate non-fader ADR, physical readback, rollback "
+                "proof and operator approval exist."
+            ),
+            "required_safety_checks": {
+                "source_identity": "required_before_live_promotion",
+                "true_peak_headroom": "required_before_live_promotion",
+                "feedback_risk": "required_before_live_promotion",
+                "mono_phase_safety": "required_for_pan_separation_before_promotion",
+                "manual_band_protection": "required_for_eq_before_promotion",
+                "chatter_guard": "required_for_gate_before_promotion",
+            },
+            "rollback_expectation": {
+                "required_before_live_promotion": True,
+                "restore_previous_console_value_after_physical_readback": True,
+                "manual_operator_rollback_required_if_promoted": True,
+            },
+            "future_wing_readback_contract": {
+                "required": True,
+                "target_kind": "auto_fader_v2_non_fader_control",
+                "readback_targets": [
+                    "gate_state",
+                    "eq_band_state",
+                    "pan_state",
+                    "fader_fallback_state",
+                ],
+                "blocked_live_actions": [
+                    "set_gate_on",
+                    "set_eq_band",
+                    "set_channel_pan",
+                    "set_channel_fader",
+                ],
+                "requires_real_wing_proof": True,
+                "requires_operator_approval": True,
+                "requires_separate_non_fader_adr": True,
+            },
+        }
+
     def _no_non_fader_write_result(self, reason: str) -> Dict[str, Any]:
         return {
             "applied": False,
@@ -452,10 +514,8 @@ class AutoFaderControllerV2:
             "blocked_call_count": 0,
             "reason": reason,
             "write_policy": self.non_fader_write_policy,
-            "live_write_allowed": self.live_non_fader_write_allowed,
-            "can_apply_live": False,
             "mixer_client_present": self.mixer_client is not None,
-            "mutates_mixer": False,
+            **self._non_fader_authority_denial(),
         }
 
     def _store_blocked_non_fader_write(
@@ -482,10 +542,8 @@ class AutoFaderControllerV2:
             "blocked_call_count": len(calls),
             "reason": reason,
             "write_policy": self.non_fader_write_policy,
-            "live_write_allowed": self.live_non_fader_write_allowed,
-            "can_apply_live": False,
             "mixer_client_present": self.mixer_client is not None,
-            "mutates_mixer": False,
+            **self._non_fader_authority_denial(),
         }
 
     def _block_eq_adjustments(
@@ -579,50 +637,21 @@ class AutoFaderControllerV2:
         quarantined until current-pan readback, mono checks, and rollback proof.
         """
         if not self.pan_separation_enabled or not self.mixer_client:
-            return {
-                "applied": False,
-                "blocked": False,
-                "calls": [],
-                "blocked_calls": [],
-                "reason": "pan_separation_disabled_or_no_mixer_client",
-                "write_policy": "proposal_only_quarantined",
-                "live_write_allowed": False,
-                "can_apply_live": False,
-                "mixer_client_present": self.mixer_client is not None,
-                "mutates_mixer": False,
-            }
+            return self._no_non_fader_write_result(
+                "pan_separation_disabled_or_no_mixer_client"
+            )
 
         sample_metric = next(iter(all_metrics.values()), None)
         if sample_metric is None or not self._has_stereo_metrics(sample_metric):
             if not self._warned_missing_pan_support:
                 logger.info("Pan separation skipped: stereo L/R metrics are unavailable in C++ bridge")
                 self._warned_missing_pan_support = True
-            return {
-                "applied": False,
-                "blocked": False,
-                "calls": [],
-                "blocked_calls": [],
-                "reason": "stereo_metrics_unavailable",
-                "write_policy": "proposal_only_quarantined",
-                "live_write_allowed": False,
-                "can_apply_live": False,
-                "mixer_client_present": True,
-                "mutates_mixer": False,
-            }
+            return self._no_non_fader_write_result("stereo_metrics_unavailable")
 
         if not vocal_channels or not background_channels:
-            return {
-                "applied": False,
-                "blocked": False,
-                "calls": [],
-                "blocked_calls": [],
-                "reason": "missing_vocal_or_background_channels",
-                "write_policy": "proposal_only_quarantined",
-                "live_write_allowed": False,
-                "can_apply_live": False,
-                "mixer_client_present": True,
-                "mutates_mixer": False,
-            }
+            return self._no_non_fader_write_result(
+                "missing_vocal_or_background_channels"
+            )
 
         # Keep lead vocal near center and gently push backgrounds away.
         lead_vocal = vocal_channels[0]
@@ -645,18 +674,10 @@ class AutoFaderControllerV2:
             "Pan separation live writes blocked; %s pan commands kept as evidence",
             len(blocked_calls),
         )
-        return {
-            "applied": False,
-            "blocked": True,
-            "calls": [],
-            "blocked_calls": blocked_calls,
-            "reason": "pan_separation_direct_apply_quarantined",
-            "write_policy": "proposal_only_quarantined",
-            "live_write_allowed": False,
-            "can_apply_live": False,
-            "mixer_client_present": True,
-            "mutates_mixer": False,
-        }
+        return self._store_blocked_non_fader_write(
+            reason="pan_separation_direct_apply_quarantined",
+            blocked_calls=blocked_calls,
+        )
     
     def _validate_real_audio_input(self) -> bool:
         """

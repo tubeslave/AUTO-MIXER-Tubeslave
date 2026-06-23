@@ -26,6 +26,33 @@ from backend.processing_registry import (
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+
+
+def _unsafe_sequence_context():
+    context = _sequence_context()
+    context.update(
+        {
+            "status": "fresh",
+            "read_only": False,
+            "live_write": True,
+            "apply_attempted": True,
+        }
+    )
+    return context
+
+
 def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
     return {
         "sequence_policy_gate_record_id": (
@@ -38,6 +65,7 @@ def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
         "policy_key": f"{proposal_id}/memory-write:{proposal_id}",
         "target_policy_state": "trusted_for_sequence_policy",
         "sequence_policy_gate_status": "trusted",
+        "current_sequence_review_freshness": _sequence_context(),
         "rollback_verified": True,
         "sequence_policy_eligible": True,
         "eligible_for_sequence_policy_consumer": True,
@@ -295,6 +323,12 @@ def test_sequence_policy_queue_importer_dry_run_preserves_inputs():
     spec = importer["queue_import_specs"][0]
     assert spec["proposal_id"] == "proposal-sequence-fader"
     assert spec["planned_queue_index"] == 0
+    assert spec["source_idempotency_key"] == (
+        "memory-write:proposal-sequence-fader"
+    )
+    assert spec["current_sequence_review_freshness"]["status"] == "fresh"
+    assert spec["current_sequence_review_freshness"]["read_only"] is True
+    assert spec["current_sequence_review_freshness"]["live_write"] is False
     assert spec["queue_import_dry_run"] is True
     assert spec["queue_import_applied"] is False
     assert spec["queue_mutation"] is False
@@ -307,6 +341,12 @@ def test_sequence_policy_queue_importer_dry_run_preserves_inputs():
         == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
     )
     assert payload["requested_change"]["value_type"] == "fader"
+    assert payload["sequence_policy_queue_import"]["source_idempotency_key"] == (
+        "memory-write:proposal-sequence-fader"
+    )
+    assert payload["sequence_policy_queue_import"][
+        "current_sequence_review_freshness"
+    ]["status"] == "fresh"
     assert payload["sequence_policy_queue_import"]["planned_queue_index"] == 0
     assert payload["sequence_policy_queue_import"]["rank_source"] == "sequence_policy_consumer"
     assert (
@@ -316,6 +356,70 @@ def test_sequence_policy_queue_importer_dry_run_preserves_inputs():
         is True
     )
     assert payload["sequence_policy_queue_import"]["live_write"] is False
+
+
+def test_sequence_policy_queue_importer_rejects_missing_sequence_context():
+    proposals = _preview_proposals()
+    plan = _queue_ordering_plan(proposals)
+    plan["queue_ordering_plan_records"][0].pop("current_sequence_review_freshness")
+
+    importer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+            target_queue=OperatorProposalQueue(),
+            apply=True,
+            operator_ack=True,
+        )
+    )
+
+    assert (
+        importer["status"]
+        == "sequence_memory_trust_promotion_queue_importer_replacement_required"
+    )
+    assert importer["summary"]["queue_import_spec_count"] == 0
+    assert importer["summary"]["queue_import_result_count"] == 0
+    assert importer["summary"]["queue_mutation"] is False
+    assert importer["summary"]["live_authority_granted"] is False
+    assert importer["queue_import_specs"] == []
+    assert importer["queue_import_results"] == []
+    assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan:"
+        "proposal-sequence-fader"
+    ) in importer["summary"]["invalid_record_ids"]
+
+
+def test_sequence_policy_queue_importer_rejects_live_authority_sequence_context():
+    proposals = _preview_proposals()
+    plan = _queue_ordering_plan(proposals)
+    plan["queue_ordering_plan_records"][0][
+        "current_sequence_review_freshness"
+    ] = _unsafe_sequence_context()
+
+    importer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+            target_queue=OperatorProposalQueue(),
+            apply=True,
+            operator_ack=True,
+        )
+    )
+
+    assert (
+        importer["status"]
+        == "sequence_memory_trust_promotion_queue_importer_replacement_required"
+    )
+    assert importer["summary"]["queue_import_spec_count"] == 0
+    assert importer["summary"]["queue_import_result_count"] == 0
+    assert importer["summary"]["queue_mutation"] is False
+    assert importer["summary"]["live_authority_granted"] is False
+    assert importer["queue_import_specs"] == []
+    assert importer["queue_import_results"] == []
+    assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan:"
+        "proposal-sequence-fader"
+    ) in importer["summary"]["invalid_record_ids"]
 
 
 def test_sequence_policy_queue_importer_requires_operator_ack_and_target_queue():
@@ -387,6 +491,16 @@ def test_sequence_policy_queue_importer_applies_to_explicit_queue_only():
         "proposal-sequence-fader",
         "proposal-other",
     ]
+    assert importer["summary"]["queue_mutation_count"] == 2
+    assert importer["summary"]["queue_mutation_proposal_ids"] == [
+        "proposal-sequence-fader",
+        "proposal-other",
+    ]
+    assert importer["summary"]["idempotent_import_noop_count"] == 0
+    assert importer["summary"]["idempotent_import_noop_proposal_ids"] == []
+    assert importer["summary"]["blocked_import_count"] == 0
+    assert importer["summary"]["blocked_import_proposal_ids"] == []
+    assert importer["summary"]["identity_violation_count"] == 0
     assert queue.summary()["pending_count"] == 2
     pending = queue.pending_actions()
     assert pending[0]["id"] == "proposal-sequence-fader"
@@ -400,6 +514,259 @@ def test_sequence_policy_queue_importer_applies_to_explicit_queue_only():
     assert result["queue_import_applied"] is True
     assert result["live_write"] is False
     assert result["can_apply_live"] is False
+
+
+def test_sequence_policy_queue_importer_blocks_partial_apply_batch():
+    class PartiallyBlockingQueue:
+        def __init__(self):
+            self.queue = OperatorProposalQueue()
+            self.create_count = 0
+
+        def create(self, payload, operator_mode):
+            self.create_count += 1
+            if self.create_count == 1:
+                return self.queue.create(payload, operator_mode)
+            return {
+                "type": "operator_proposal_created",
+                "status": "blocked",
+                "success": False,
+                "reason": "unit_test_partial_queue_block",
+                "operator_mode": operator_mode,
+                "proposal": None,
+            }
+
+        def find(self, proposal_id=None, index=None):
+            return self.queue.find(proposal_id=proposal_id, index=index)
+
+        def summary(self):
+            return self.queue.summary()
+
+    proposals = _preview_proposals()
+    plan = _queue_ordering_plan(proposals)
+    queue = PartiallyBlockingQueue()
+
+    importer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+            target_queue=queue,
+            apply=True,
+            operator_ack=True,
+        )
+    )
+
+    assert (
+        importer["status"]
+        == "sequence_memory_trust_promotion_queue_importer_apply_blocked"
+    )
+    assert importer["safety"]["read_only"] is True
+    assert importer["safety"]["queue_import_applied"] is False
+    assert importer["safety"]["queue_mutation"] is True
+    assert importer["safety"]["live_write"] is False
+    assert importer["safety"]["live_authority_granted"] is False
+    assert importer["summary"]["queue_import_result_count"] == 2
+    assert importer["summary"]["imported_proposal_count"] == 1
+    assert importer["summary"]["imported_proposal_ids"] == [
+        "proposal-sequence-fader",
+    ]
+    assert importer["summary"]["queue_import_applied"] is False
+    assert importer["summary"]["queue_mutation"] is True
+    assert importer["summary"]["queue_mutation_count"] == 1
+    assert importer["summary"]["queue_mutation_proposal_ids"] == [
+        "proposal-sequence-fader",
+    ]
+    assert importer["summary"]["blocked_import_count"] == 1
+    assert importer["summary"]["blocked_import_proposal_ids"] == [
+        "proposal-other",
+    ]
+    assert importer["summary"]["identity_violation_count"] == 1
+    assert (
+        "operator_mode_or_queue_policy_blocked_sequence_policy_queue_import"
+        in importer["summary"]["blocked_by"]
+    )
+    assert queue.summary()["pending_count"] == 1
+
+    first, second = importer["queue_import_results"]
+    assert first["proposal_id"] == "proposal-sequence-fader"
+    assert first["status"] == "created"
+    assert first["success"] is True
+    assert first["queue_import_applied"] is True
+    assert first["queue_mutation"] is True
+    assert second["proposal_id"] == "proposal-other"
+    assert second["status"] == "blocked"
+    assert second["success"] is False
+    assert second["queue_import_applied"] is False
+    assert second["queue_mutation"] is False
+    assert second["identity_violations"] == [
+        "sequence_policy_queue_importer_queue_create_failed",
+    ]
+
+
+def test_sequence_policy_queue_importer_allows_matching_duplicate_as_idempotent_noop():
+    proposals = _preview_proposals()
+    plan = _queue_ordering_plan(proposals)
+    queue = OperatorProposalQueue()
+
+    first = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+            target_queue=queue,
+            apply=True,
+            operator_ack=True,
+        )
+    )
+    second = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+            target_queue=queue,
+            apply=True,
+            operator_ack=True,
+        )
+    )
+
+    assert first["status"] == "sequence_memory_trust_promotion_queue_importer_applied"
+    assert second["status"] == "sequence_memory_trust_promotion_queue_importer_applied"
+    assert second["safety"]["queue_mutation"] is False
+    assert second["summary"]["queue_mutation"] is False
+    assert queue.summary()["pending_count"] == 2
+    assert second["summary"]["imported_proposal_ids"] == [
+        "proposal-sequence-fader",
+        "proposal-other",
+    ]
+    assert second["summary"]["queue_mutation_count"] == 0
+    assert second["summary"]["queue_mutation_proposal_ids"] == []
+    assert second["summary"]["idempotent_import_noop_count"] == 2
+    assert second["summary"]["idempotent_import_noop_proposal_ids"] == [
+        "proposal-sequence-fader",
+        "proposal-other",
+    ]
+    assert second["summary"]["blocked_import_count"] == 0
+    assert second["summary"]["blocked_import_proposal_ids"] == []
+    assert second["summary"]["identity_violation_count"] == 0
+    for result in second["queue_import_results"]:
+        assert result["status"] == "exists"
+        assert result["success"] is True
+        assert result["queue_import_applied"] is True
+        assert result["queue_mutation"] is False
+        assert result["identity_violations"] == []
+
+
+def test_sequence_policy_queue_importer_blocks_stale_duplicate_pending_identity():
+    proposals = _preview_proposals()
+    plan = _queue_ordering_plan(proposals)
+    queue = OperatorProposalQueue()
+    stale = deepcopy(proposals[1])
+    stale["id"] = stale["proposal_id"]
+    stale["sequence_policy_queue_import"] = {
+        "queue_ordering_plan_record_id": "stale-plan:proposal-sequence-fader",
+        "source_idempotency_key": "memory-write:stale-proposal",
+        "planned_queue_index": 0,
+        "live_write": False,
+        "can_apply_live": False,
+    }
+    queue.create(
+        stale,
+        {
+            "mode": "supervised",
+            "capabilities": {
+                "can_create_proposals": True,
+                "can_apply_to_console": False,
+                "requires_approval": True,
+                "allowed_live_write_kinds": [],
+            },
+        },
+    )
+
+    importer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+            target_queue=queue,
+            apply=True,
+            operator_ack=True,
+        )
+    )
+
+    assert (
+        importer["status"]
+        == "sequence_memory_trust_promotion_queue_importer_apply_blocked"
+    )
+    assert importer["summary"]["imported_proposal_count"] == 0
+    assert importer["summary"]["imported_proposal_ids"] == []
+    assert importer["summary"]["queue_mutation"] is False
+    assert importer["summary"]["queue_import_applied"] is False
+    assert importer["summary"]["queue_mutation_count"] == 0
+    assert importer["summary"]["queue_mutation_proposal_ids"] == []
+    assert importer["summary"]["idempotent_import_noop_count"] == 0
+    assert importer["summary"]["idempotent_import_noop_proposal_ids"] == []
+    assert importer["summary"]["blocked_import_count"] == 2
+    assert importer["summary"]["blocked_import_proposal_ids"] == [
+        "proposal-sequence-fader",
+        "proposal-other",
+    ]
+    assert importer["summary"]["identity_violation_count"] == 3
+    assert queue.summary()["pending_count"] == 1
+
+    stale_result = importer["queue_import_results"][0]
+    skipped_result = importer["queue_import_results"][1]
+    assert stale_result["proposal_id"] == "proposal-sequence-fader"
+    assert stale_result["status"] == "blocked"
+    assert stale_result["success"] is False
+    assert stale_result["queue_import_applied"] is False
+    assert stale_result["queue_mutation"] is False
+    assert (
+        "sequence_policy_queue_importer_existing_source_idempotency_key_mismatch"
+        in stale_result["identity_violations"]
+    )
+    assert (
+        "sequence_policy_queue_importer_existing_current_sequence_review_freshness_mismatch"
+        in stale_result["identity_violations"]
+    )
+    assert skipped_result["status"] == "skipped"
+    assert skipped_result["success"] is False
+    assert (
+        skipped_result["blocked_by"]
+        == [
+            "sequence_policy_queue_importer_batch_blocked_by_existing_identity_conflict"
+        ]
+    )
+
+
+def test_sequence_policy_queue_importer_rejects_forged_plan_identity():
+    proposals = _preview_proposals()
+    plan = _queue_ordering_plan(proposals)
+    plan["queue_ordering_plan_records"][0]["source_idempotency_key"] = (
+        "memory-write:proposal-other"
+    )
+
+    importer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+            target_queue=OperatorProposalQueue(),
+            apply=True,
+            operator_ack=True,
+        )
+    )
+
+    assert (
+        importer["status"]
+        == "sequence_memory_trust_promotion_queue_importer_replacement_required"
+    )
+    assert importer["summary"]["queue_import_spec_count"] == 0
+    assert importer["summary"]["queue_import_result_count"] == 0
+    assert importer["summary"]["queue_mutation"] is False
+    assert importer["summary"]["sequence_execution_allowed_by_importer"] is False
+    assert importer["summary"]["sequence_policy_change_allowed_by_importer"] is False
+    assert importer["summary"]["live_authority_granted"] is False
+    assert importer["queue_import_specs"] == []
+    assert importer["queue_import_results"] == []
+    assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan:"
+        "proposal-sequence-fader"
+    ) in importer["summary"]["invalid_record_ids"]
 
 
 def test_sequence_policy_queue_importer_rejects_forged_plan_authority():

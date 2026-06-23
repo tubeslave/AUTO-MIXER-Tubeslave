@@ -93,6 +93,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 @dataclass(frozen=True)
 class SourceIdentityDownstreamTrustDecision:
     source_id: str
@@ -127,13 +135,18 @@ def evaluate_source_identity_downstream_trust(
     outcomes = max(0, _safe_int(replay_outcome_count))
     freshness = _freshness_payload(current_state_cache_freshness)
     freshness_status = str(freshness.get("status") or "unknown")
+    freshness_no_authority = _freshness_is_no_authority(freshness)
 
     blockers = []
     status = "legacy_unverified"
     usable = True
 
-    if freshness_status not in {"fresh", "not_provided"}:
+    if freshness_status != "fresh" and normalized_state in TRUSTED_STATES:
         blockers.append("source_identity_replay_context_not_fresh")
+    elif freshness_status not in {"fresh", "not_provided"}:
+        blockers.append("source_identity_replay_context_not_fresh")
+    if freshness_status == "fresh" and not freshness_no_authority:
+        blockers.append("source_identity_replay_context_live_authority_present")
     if normalized_state in TRUSTED_STATES:
         status = "trusted"
     elif normalized_state in HOLD_STATES:
@@ -161,6 +174,7 @@ def evaluate_source_identity_downstream_trust(
         "trust_confidence": round(confidence, 3),
         "replay_outcome_count": outcomes,
         "current_source_identity_replay_context_cache_freshness": freshness_status,
+        "current_source_identity_replay_context_cache_no_live_authority": freshness_no_authority,
         "current_state_cache_freshness": freshness,
         "usable_for_downstream": usable,
         "legacy_missing_calibration_allowed": normalized_state in LEGACY_ALLOWED_STATES,

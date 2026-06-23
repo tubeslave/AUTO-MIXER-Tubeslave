@@ -85,6 +85,41 @@ REQUIRED_WRITER_FALSE_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+REQUIRED_MEMORY_WRITER_REQUEST_SPEC_FALSE_FLAGS = (
+    "memory_writer_handler_invoked",
+    "memory_file_write_applied",
+    "memory_write_allowed_by_consumer",
+    "execution_allowed_by_consumer",
+    "live_write",
+    "apply_attempted",
+    "queue_mutation",
+    "proposal_status_mutation",
+    "idempotency_reserved",
+    "manual_console_write_called",
+    "policy_mutation",
+    "memory_mutation",
+    "memory_file_mutation",
+    "runtime_memory_mutation",
+    "model_mutation",
+    "live_authority_granted",
+    "full_autonomous_ready",
+    "can_apply_live",
+)
+REQUIRED_MEMORY_WRITER_REQUEST_SPEC_IDENTITY_FIELDS = (
+    "source_memory_draft_request_spec_id",
+    "source_audit_policy_gate_request_spec_id",
+    "source_audit_request_spec_id",
+    "source_executor_request_spec_id",
+    "source_execution_gate_request_spec_id",
+    "source_dry_run_request_spec_id",
+    "source_sequence_plan_request_spec_id",
+    "source_preflight_request_spec_id",
+    "queue_ordering_plan_record_id",
+    "consumer_record_id",
+    "sequence_policy_gate_record_id",
+    "policy_key",
+    "source_idempotency_key",
+)
 
 
 def _utc_now() -> str:
@@ -115,6 +150,34 @@ def _summary_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
+
+
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(proposal_id: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{proposal_id}:current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{proposal_id}:current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(
+            f"{proposal_id}:current_sequence_review_freshness_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{proposal_id}:current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
 
 
 def _draft_record_id(record: Mapping[str, Any], index: int) -> str:
@@ -333,6 +396,66 @@ def _writer_summary_violations(
     return tuple(violations)
 
 
+def _memory_writer_request_specs_violations(
+    specs: Tuple[Mapping[str, Any], ...],
+    *,
+    expected_ids: Tuple[str, ...],
+    prefix: str,
+) -> Tuple[str, ...]:
+    violations = []
+    spec_ids = tuple(_string(spec.get("proposal_id")) for spec in specs)
+    if spec_ids != expected_ids:
+        violations.append(
+            "sequence_policy_memory_writer_dry_run_consumer_request_specs_candidate_ids_mismatch"
+        )
+    for index, spec in enumerate(specs):
+        proposal_id = _string(spec.get("proposal_id")) or f"memory_writer_request_spec:{index}"
+        record_id = _string(spec.get("memory_writer_request_spec_id")) or proposal_id
+        if spec.get("planned_memory_write_index") != index:
+            violations.append(f"{record_id}:planned_memory_write_index_mismatch")
+        if spec.get("source_memory_draft_index") != index:
+            violations.append(f"{record_id}:source_memory_draft_index_mismatch")
+        if spec.get("idempotency_key") != f"{prefix}:{proposal_id}":
+            violations.append(f"{record_id}:idempotency_key_mismatch")
+        if spec.get("target_memory_path") != REQUIRED_TARGET_MEMORY_PATH:
+            violations.append(f"{record_id}:target_memory_path_mismatch")
+        if spec.get("memory_writer_handler") != "write_operator_proposal_apply_sequence_policy_memory":
+            violations.append(f"{record_id}:memory_writer_handler_mismatch")
+        if spec.get("read_only") is not True:
+            violations.append(f"{record_id}:read_only_not_true")
+        if spec.get("memory_draft_result_consumer_only") is not True:
+            violations.append(f"{record_id}:memory_draft_result_consumer_only_not_true")
+        if spec.get("operator_must_set_apply_true") is not True:
+            violations.append(f"{record_id}:operator_must_set_apply_true_not_true")
+        if spec.get("operator_must_set_operator_ack_true") is not True:
+            violations.append(f"{record_id}:operator_must_set_operator_ack_true_not_true")
+        if _summary_int(spec.get("planned_queue_index")) is None:
+            violations.append(f"{proposal_id}:planned_queue_index_invalid")
+        if spec.get("rank_source") != "sequence_policy_consumer":
+            violations.append(f"{proposal_id}:rank_source_mismatch")
+        for field in REQUIRED_MEMORY_WRITER_REQUEST_SPEC_IDENTITY_FIELDS:
+            if not _string(spec.get(field)):
+                violations.append(f"{proposal_id}:{field}_missing")
+        violations.extend(
+            _context_violations(
+                proposal_id,
+                _mapping(spec.get("current_sequence_review_freshness")),
+            )
+        )
+        source_idempotency_key = _string(spec.get("source_idempotency_key"))
+        policy_key = _string(spec.get("policy_key"))
+        if (
+            source_idempotency_key
+            and policy_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(f"{proposal_id}:policy_key_identity_mismatch")
+        for flag in REQUIRED_MEMORY_WRITER_REQUEST_SPEC_FALSE_FLAGS:
+            if spec.get(flag) is not False:
+                violations.append(f"{record_id}:{flag}_not_false")
+    return tuple(violations)
+
+
 def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer(
     *,
     memory_draft_result_consumer: Mapping[str, Any] | None = None,
@@ -344,9 +467,16 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     writer = _mapping(memory_writer_dry_run_result)
     consumer_summary = _mapping(consumer.get("summary"))
     expected_ids = _string_list(consumer_summary.get("memory_draft_proposal_ids"))
+    prefix = _string(consumer_summary.get("idempotency_key_prefix"))
     request = _mapping(consumer.get("memory_writer_request"))
     request_payload = _mapping(request.get("memory_draft_payload"))
     request_records = _record_list(request_payload.get("memory_draft_records"))
+    memory_writer_request_specs = _record_list(consumer.get("memory_writer_request_specs"))
+    memory_writer_request_specs_by_proposal_id = {
+        _string(spec.get("proposal_id")): spec
+        for spec in memory_writer_request_specs
+        if _string(spec.get("proposal_id"))
+    }
     blocked_results = _record_list(writer.get("blocked_results"))
     blocked_reasons = _blocked_reasons(blocked_results)
     invalid_record_ids = tuple(
@@ -354,6 +484,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             (
                 *_consumer_envelope_violations(consumer),
                 *_consumer_summary_violations(consumer_summary, expected_ids=expected_ids),
+                *_memory_writer_request_specs_violations(
+                    memory_writer_request_specs,
+                    expected_ids=expected_ids,
+                    prefix=prefix,
+                ),
                 *(
                     ("sequence_policy_memory_writer_dry_run_consumer_draft_consumer_status_not_available",)
                     if consumer.get("status")
@@ -390,6 +525,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     request_available = (
         status == "sequence_memory_trust_promotion_queue_import_memory_writer_apply_request_available"
     )
+    selected_memory_writer_request_specs = tuple(
+        memory_writer_request_specs_by_proposal_id.get(proposal_id, {})
+        for proposal_id in expected_ids
+        if request_available
+    )
     apply_specs = tuple(
         {
             "memory_writer_apply_request_spec_id": (
@@ -398,6 +538,76 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "proposal_id": proposal_id,
             "draft_id": record.get("draft_id"),
             "planned_memory_apply_index": index,
+            "idempotency_key": f"{prefix}:{proposal_id}",
+            "source_memory_writer_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "memory_writer_request_spec_id"
+                )
+            ),
+            "source_memory_draft_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_memory_draft_request_spec_id"
+                )
+            ),
+            "source_audit_policy_gate_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_audit_policy_gate_request_spec_id"
+                )
+            ),
+            "source_audit_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_audit_request_spec_id"
+                )
+            ),
+            "source_executor_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_executor_request_spec_id"
+                )
+            ),
+            "source_execution_gate_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_execution_gate_request_spec_id"
+                )
+            ),
+            "source_dry_run_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_dry_run_request_spec_id"
+                )
+            ),
+            "source_sequence_plan_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_sequence_plan_request_spec_id"
+                )
+            ),
+            "source_preflight_request_spec_id": _string(
+                memory_writer_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_preflight_request_spec_id"
+                )
+            ),
+            "queue_ordering_plan_record_id": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("queue_ordering_plan_record_id"),
+            "consumer_record_id": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("consumer_record_id"),
+            "sequence_policy_gate_record_id": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("sequence_policy_gate_record_id"),
+            "policy_key": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("policy_key"),
+            "source_idempotency_key": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("source_idempotency_key"),
+            "current_sequence_review_freshness": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("current_sequence_review_freshness"),
+            "planned_queue_index": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("planned_queue_index"),
+            "rank_source": memory_writer_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("rank_source"),
             "target_memory_path": REQUIRED_TARGET_MEMORY_PATH,
             "read_only": True,
             "memory_writer_dry_run_result_consumer_only": True,
@@ -470,8 +680,10 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         "summary": {
             "expected_memory_writer_dry_run_count": len(expected_ids),
             "memory_writer_dry_run_record_count": len(expected_ids),
+            "memory_writer_request_spec_count": len(memory_writer_request_specs),
             "invalid_record_count": len(invalid_record_ids),
             "dry_run_blocker_count": len(blocked_results),
+            "idempotency_key_prefix": prefix,
             "target_memory_path": REQUIRED_TARGET_MEMORY_PATH,
             "memory_writer_dry_run_result_consumer_only": True,
             "memory_writer_apply_request_available": request_available,
@@ -496,6 +708,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "full_autonomous_ready": False,
             "can_apply_live": False,
             "memory_writer_dry_run_proposal_ids": list(expected_ids),
+            "memory_writer_request_spec_proposal_ids": [
+                spec.get("proposal_id") for spec in memory_writer_request_specs
+            ],
             "invalid_record_ids": list(invalid_record_ids),
             "blocked_by": list(blocked_by),
             "next_global_step": (
@@ -517,6 +732,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "memory_draft_payload": {
                 **dict(request_payload),
                 "memory_draft_records": list(request_records),
+                "memory_writer_request_specs": list(selected_memory_writer_request_specs),
             }
             if request_available
             else {},

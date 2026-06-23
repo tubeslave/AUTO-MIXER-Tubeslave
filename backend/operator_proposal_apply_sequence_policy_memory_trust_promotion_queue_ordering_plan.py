@@ -111,6 +111,32 @@ def _is_utc_timestamp(value: str) -> bool:
     return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(prefix: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{prefix}_current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{prefix}_current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(f"{prefix}_current_sequence_review_freshness_read_only_not_true")
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{prefix}_current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
+
+
 def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
     counts: Dict[str, int] = {}
     for value in values:
@@ -239,6 +265,34 @@ def _ordering_row_violations(record: Mapping[str, Any]) -> Tuple[str, ...]:
     rank_source = record.get("rank_source")
     if rank_source not in ALLOWED_RANK_SOURCES:
         violations.append("sequence_policy_queue_ordering_plan_row_rank_source_unknown")
+    if rank_source == "sequence_policy_consumer":
+        for field in (
+            "consumer_record_id",
+            "sequence_policy_gate_record_id",
+            "policy_key",
+            "source_idempotency_key",
+        ):
+            if not _string(record.get(field)):
+                violations.append(
+                    f"sequence_policy_queue_ordering_plan_row_{field}_missing"
+                )
+        proposal_id = _string(record.get("proposal_id"))
+        source_idempotency_key = _string(record.get("source_idempotency_key"))
+        policy_key = _string(record.get("policy_key"))
+        if (
+            proposal_id
+            and source_idempotency_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(
+                "sequence_policy_queue_ordering_plan_row_policy_key_identity_mismatch"
+            )
+        violations.extend(
+            _context_violations(
+                "sequence_policy_queue_ordering_plan_row",
+                _mapping(record.get("current_sequence_review_freshness")),
+            )
+        )
     for field in ("original_index", "recommended_index"):
         if _summary_int(record.get(field)) is None:
             violations.append(f"sequence_policy_queue_ordering_plan_row_{field}_invalid")
@@ -306,12 +360,16 @@ def _queue_ordering_plan_records(
                 "consumer_record_id": row.get("consumer_record_id"),
                 "sequence_policy_gate_record_id": row.get("sequence_policy_gate_record_id"),
                 "policy_key": row.get("policy_key"),
+                "source_idempotency_key": row.get("source_idempotency_key"),
                 "original_index": row.get("original_index"),
                 "recommended_index": row.get("recommended_index"),
                 "planned_queue_index": planned_index,
                 "rank_source": row.get("rank_source"),
                 "recommended_sequence_policy_bucket": row.get(
                     "recommended_sequence_policy_bucket"
+                ),
+                "current_sequence_review_freshness": row.get(
+                    "current_sequence_review_freshness"
                 ),
                 "base_policy_score": row.get("base_policy_score"),
                 "adjusted_policy_score": row.get("adjusted_policy_score"),

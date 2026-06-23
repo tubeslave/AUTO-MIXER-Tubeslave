@@ -87,6 +87,36 @@ REQUIRED_POLICY_GATE_FALSE_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+REQUIRED_AUDIT_POLICY_GATE_REQUEST_SPEC_FALSE_FLAGS = (
+    "audit_policy_gate_invoked",
+    "policy_gate_created",
+    "execution_allowed_by_consumer",
+    "live_write",
+    "apply_attempted",
+    "queue_mutation",
+    "proposal_status_mutation",
+    "idempotency_reserved",
+    "manual_console_write_called",
+    "policy_mutation",
+    "runtime_memory_mutation",
+    "model_mutation",
+    "live_authority_granted",
+    "full_autonomous_ready",
+    "can_apply_live",
+)
+REQUIRED_AUDIT_POLICY_GATE_REQUEST_SPEC_IDENTITY_FIELDS = (
+    "source_audit_request_spec_id",
+    "source_executor_request_spec_id",
+    "source_execution_gate_request_spec_id",
+    "source_dry_run_request_spec_id",
+    "source_sequence_plan_request_spec_id",
+    "source_preflight_request_spec_id",
+    "queue_ordering_plan_record_id",
+    "consumer_record_id",
+    "sequence_policy_gate_record_id",
+    "policy_key",
+    "source_idempotency_key",
+)
 
 
 def _utc_now() -> str:
@@ -117,6 +147,34 @@ def _summary_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
+
+
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(proposal_id: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{proposal_id}:current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{proposal_id}:current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(
+            f"{proposal_id}:current_sequence_review_freshness_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{proposal_id}:current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
 
 
 def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
@@ -320,6 +378,60 @@ def _policy_evidence_violations(
     return tuple(violations)
 
 
+def _audit_policy_gate_request_specs_violations(
+    specs: Tuple[Mapping[str, Any], ...],
+    *,
+    expected_ids: Tuple[str, ...],
+    prefix: str,
+) -> Tuple[str, ...]:
+    violations = []
+    spec_ids = tuple(_string(spec.get("proposal_id")) for spec in specs)
+    if spec_ids != expected_ids:
+        violations.append(
+            "sequence_policy_audit_policy_gate_result_consumer_request_specs_candidate_ids_mismatch"
+        )
+    for index, spec in enumerate(specs):
+        proposal_id = _string(spec.get("proposal_id")) or f"audit_policy_gate_request_spec:{index}"
+        record_id = _string(spec.get("audit_policy_gate_request_spec_id")) or proposal_id
+        if spec.get("planned_policy_gate_index") != index:
+            violations.append(f"{record_id}:planned_policy_gate_index_mismatch")
+        if spec.get("source_audit_row_index") != index:
+            violations.append(f"{record_id}:source_audit_row_index_mismatch")
+        if spec.get("idempotency_key") != f"{prefix}:{proposal_id}":
+            violations.append(f"{record_id}:idempotency_key_mismatch")
+        if spec.get("audit_policy_gate_handler") != "gate_operator_proposal_apply_sequence_audit_policy":
+            violations.append(f"{record_id}:audit_policy_gate_handler_mismatch")
+        if spec.get("read_only") is not True:
+            violations.append(f"{record_id}:read_only_not_true")
+        if spec.get("execution_audit_result_consumer_only") is not True:
+            violations.append(f"{record_id}:execution_audit_result_consumer_only_not_true")
+        if _summary_int(spec.get("planned_queue_index")) is None:
+            violations.append(f"{proposal_id}:planned_queue_index_invalid")
+        if spec.get("rank_source") != "sequence_policy_consumer":
+            violations.append(f"{proposal_id}:rank_source_mismatch")
+        for field in REQUIRED_AUDIT_POLICY_GATE_REQUEST_SPEC_IDENTITY_FIELDS:
+            if not _string(spec.get(field)):
+                violations.append(f"{proposal_id}:{field}_missing")
+        violations.extend(
+            _context_violations(
+                proposal_id,
+                _mapping(spec.get("current_sequence_review_freshness")),
+            )
+        )
+        source_idempotency_key = _string(spec.get("source_idempotency_key"))
+        policy_key = _string(spec.get("policy_key"))
+        if (
+            source_idempotency_key
+            and policy_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(f"{proposal_id}:policy_key_identity_mismatch")
+        for flag in REQUIRED_AUDIT_POLICY_GATE_REQUEST_SPEC_FALSE_FLAGS:
+            if spec.get(flag) is not False:
+                violations.append(f"{record_id}:{flag}_not_false")
+    return tuple(violations)
+
+
 def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_audit_policy_gate_result_consumer(
     *,
     execution_audit_result_consumer: Mapping[str, Any] | None = None,
@@ -332,6 +444,14 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     consumer_summary = _mapping(consumer.get("summary"))
     expected_ids = _string_list(consumer_summary.get("execution_audit_row_proposal_ids"))
     prefix = _string(consumer_summary.get("idempotency_key_prefix"))
+    audit_policy_gate_request_specs = _record_list(
+        consumer.get("audit_policy_gate_request_specs")
+    )
+    audit_policy_gate_request_specs_by_proposal_id = {
+        _string(spec.get("proposal_id")): spec
+        for spec in audit_policy_gate_request_specs
+        if _string(spec.get("proposal_id"))
+    }
     rows = _record_list(policy_gate.get("policy_evidence"))
     blocked_rows = tuple(row for row in rows if row.get("status") == "blocked")
     row_ids = tuple(_policy_row_id(row, index) for index, row in enumerate(rows))
@@ -347,6 +467,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             (
                 *_consumer_envelope_violations(consumer),
                 *_consumer_summary_violations(consumer_summary, expected_ids=expected_ids),
+                *_audit_policy_gate_request_specs_violations(
+                    audit_policy_gate_request_specs,
+                    expected_ids=expected_ids,
+                    prefix=prefix,
+                ),
                 *(
                     ("sequence_policy_audit_policy_gate_result_consumer_audit_consumer_status_not_available",)
                     if consumer.get("status")
@@ -408,6 +533,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         status == "sequence_memory_trust_promotion_queue_import_memory_draft_request_available"
     )
     selected_rows = rows if request_available else ()
+    selected_audit_policy_gate_request_specs = tuple(
+        audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {})
+        for proposal_id in row_ids
+        if request_available
+    )
     draft_specs = tuple(
         {
             "memory_draft_request_spec_id": (
@@ -416,6 +546,65 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "proposal_id": proposal_id,
             "planned_memory_draft_index": index,
             "source_policy_evidence_index": index,
+            "source_audit_policy_gate_request_spec_id": _string(
+                audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "audit_policy_gate_request_spec_id"
+                )
+            ),
+            "source_audit_request_spec_id": _string(
+                audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_audit_request_spec_id"
+                )
+            ),
+            "source_executor_request_spec_id": _string(
+                audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_executor_request_spec_id"
+                )
+            ),
+            "source_execution_gate_request_spec_id": _string(
+                audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_execution_gate_request_spec_id"
+                )
+            ),
+            "source_dry_run_request_spec_id": _string(
+                audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_dry_run_request_spec_id"
+                )
+            ),
+            "source_sequence_plan_request_spec_id": _string(
+                audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_sequence_plan_request_spec_id"
+                )
+            ),
+            "source_preflight_request_spec_id": _string(
+                audit_policy_gate_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_preflight_request_spec_id"
+                )
+            ),
+            "queue_ordering_plan_record_id": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("queue_ordering_plan_record_id"),
+            "consumer_record_id": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("consumer_record_id"),
+            "sequence_policy_gate_record_id": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("sequence_policy_gate_record_id"),
+            "policy_key": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("policy_key"),
+            "source_idempotency_key": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("source_idempotency_key"),
+            "current_sequence_review_freshness": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("current_sequence_review_freshness"),
+            "planned_queue_index": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("planned_queue_index"),
+            "rank_source": audit_policy_gate_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("rank_source"),
             "idempotency_key": f"{prefix}:{proposal_id}",
             "read_only": True,
             "audit_policy_gate_result_consumer_only": True,
@@ -480,6 +669,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         },
         "summary": {
             "expected_policy_evidence_count": len(expected_ids),
+            "audit_policy_gate_request_spec_count": len(audit_policy_gate_request_specs),
             "policy_evidence_count": len(rows),
             "ready_policy_evidence_count": len(rows) - len(blocked_rows),
             "blocked_policy_evidence_count": len(blocked_rows),
@@ -505,6 +695,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "full_autonomous_ready": False,
             "can_apply_live": False,
             "expected_policy_evidence_proposal_ids": list(expected_ids),
+            "audit_policy_gate_request_spec_proposal_ids": [
+                spec.get("proposal_id") for spec in audit_policy_gate_request_specs
+            ],
             "policy_evidence_proposal_ids": list(row_ids),
             "ready_policy_evidence_proposal_ids": [
                 _policy_row_id(row, index)
@@ -536,6 +729,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "policy_gate_payload": {
                 **dict(policy_gate),
                 "policy_evidence": list(selected_rows),
+                "audit_policy_gate_request_specs": list(selected_audit_policy_gate_request_specs),
             }
             if request_available
             else {},

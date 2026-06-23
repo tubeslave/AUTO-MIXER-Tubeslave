@@ -1,0 +1,94 @@
+{
+  "artifact_manifest_artifact_count": 2,
+  "artifact_manifest_artifact_count_matches_required": true,
+  "artifact_manifest_artifact_ids": [
+    "summary_json",
+    "summary_md"
+  ],
+  "artifact_manifest_artifact_paths": [
+    "summary.json",
+    "summary.md"
+  ],
+  "artifact_manifest_contract_cross_surface_expected_match": true,
+  "artifact_manifest_contract_cross_surface_live_authority_granted": false,
+  "artifact_manifest_contract_cross_surface_match": true,
+  "artifact_manifest_contract_cross_surface_mismatches": [],
+  "artifact_manifest_contract_cross_surface_readiness_closure_allowed": false,
+  "artifact_manifest_contract_cross_surface_required": true,
+  "artifact_manifest_contract_cross_surface_required_fields": [
+    "artifact_manifest_contract_id",
+    "artifact_manifest_contract_sha256",
+    "artifact_manifest_contract_sha256_matches_expected"
+  ],
+  "artifact_manifest_contract_cross_surface_required_surfaces": [
+    "summary.json",
+    "summary.md",
+    "artifact-manifest.json"
+  ],
+  "artifact_manifest_contract_fields": [
+    "artifact_manifest_path",
+    "artifact_manifest_required_artifact_ids",
+    "artifact_manifest_required_artifact_paths",
+    "artifact_manifest_required_artifact_sha256_fields",
+    "artifact_manifest_readiness_closure_allowed",
+    "artifact_manifest_live_authority_granted",
+    "live_write",
+    "mutates_console_state",
+    "queries_console"
+  ],
+  "artifact_manifest_contract_id": "no_wing_release_check_artifact_manifest_contract.v1",
+  "artifact_manifest_contract_required": true,
+  "artifact_manifest_contract_sha256": "896bfcabe15fd49bce5ecd9f3a1f7dea662bd38ba60d3ed3c2d94e2b90eda8d7",
+  "artifact_manifest_contract_sha256_available": true,
+  "artifact_manifest_contract_sha256_matches_expected": true,
+  "artifact_manifest_live_authority_granted": false,
+  "artifact_manifest_path": "artifact-manifest.json",
+  "artifact_manifest_readiness_closure_allowed": false,
+  "artifact_manifest_required": true,
+  "artifact_manifest_required_artifact_count": 2,
+  "artifact_manifest_required_artifact_ids": [
+    "summary_json",
+    "summary_md"
+  ],
+  "artifact_manifest_required_artifact_paths": [
+    "summary.json",
+    "summary.md"
+  ],
+  "artifact_manifest_required_artifact_paths_present": true,
+  "artifact_manifest_required_artifact_sha256_available": true,
+  "artifact_manifest_required_artifacts_present": true,
+  "artifact_manifest_summary_json_contract_id_matches_manifest": true,
+  "artifact_manifest_summary_json_contract_sha256_match_flag": true,
+  "artifact_manifest_summary_json_contract_sha256_matches_manifest": true,
+  "artifact_manifest_summary_json_path": "summary.json",
+  "artifact_manifest_summary_json_sha256": "b82fd02378c5699b10743e9ba02dc19a89e2bd0656ef56debe8f3c3e47cecff4",
+  "artifact_manifest_summary_json_sha256_available": true,
+  "artifact_manifest_summary_md_contract_id_matches_manifest": true,
+  "artifact_manifest_summary_md_contract_sha256_match_flag": true,
+  "artifact_manifest_summary_md_contract_sha256_matches_manifest": true,
+  "artifact_manifest_summary_md_path": "summary.md",
+  "artifact_manifest_summary_md_sha256": "f307d331a75b8243c9ff7b78a941487935584215775e75fc030f864e1d5e8e26",
+  "artifact_manifest_summary_md_sha256_available": true,
+  "artifacts": [
+    {
+      "artifact_id": "summary_json",
+      "byte_count": 540370,
+      "path": "summary.json",
+      "required": true,
+      "sha256": "b82fd02378c5699b10743e9ba02dc19a89e2bd0656ef56debe8f3c3e47cecff4"
+    },
+    {
+      "artifact_id": "summary_md",
+      "byte_count": 218644,
+      "path": "summary.md",
+      "required": true,
+      "sha256": "f307d331a75b8243c9ff7b78a941487935584215775e75fc030f864e1d5e8e26"
+    }
+  ],
+  "generated_at": "2026-06-14T21:40:17Z",
+  "live_write": false,
+  "mutates_console_state": false,
+  "queries_console": false,
+  "schema_version": 1,
+  "type": "no_wing_release_check_artifact_manifest"
+}

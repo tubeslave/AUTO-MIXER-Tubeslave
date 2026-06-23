@@ -17,6 +17,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 BUS_GROUP_METHOD_ID = "bus_group_balance_proposal"
 BUS_GROUP_VERSION = "bus_group_balance_proposal_v1"
@@ -177,10 +182,161 @@ class BusGroupBalanceRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def ayaic_level_plane_summary(self) -> Dict[str, Any]:
+        child_to_bus_delta = self.evidence.get("child_to_bus_delta_db")
+        feedback_risk = self.evidence.get("feedback_risk")
+        assignment_confidence = self.evidence.get("assignment_confidence")
+        dominant_child_share = self.evidence.get("dominant_child_share")
+        main_bus_headroom = self.evidence.get("main_bus_headroom_db")
+        return {
+            "summary_type": "ayaic_bus_group_level_plane_review",
+            "ayaic_level_plane": True,
+            "target_plane_lufs": self.target_plane_lufs,
+            "target_plane_reason": self.target_plane_reason,
+            "source_family": self.source_family,
+            "bus_kind": self.bus_kind,
+            "bus_id": self.bus_id,
+            "current_integrated_lufs": self.current_integrated_lufs,
+            "short_term_lufs": self.short_term_lufs,
+            "summed_child_lufs": self.summed_child_lufs,
+            "child_to_bus_delta_db": child_to_bus_delta,
+            "suggested_delta_db": self.suggested_delta_db,
+            "target_fader_db": self.target_fader_db,
+            "true_peak_headroom_db": self.true_peak_headroom_db,
+            "main_bus_headroom_db": main_bus_headroom,
+            "feedback_risk": feedback_risk,
+            "assignment_confidence": assignment_confidence,
+            "child_count": self.evidence.get("child_count"),
+            "dominant_child_share": dominant_child_share,
+            "bounded_delta_policy": "small_bus_group_dca_matrix_delta_with_ayaic_and_sum_bus_limits",
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "operator_review_required": True,
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "live_apply_allowed": False,
+            "queue_import_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "can_authorize_live": False,
+            "mutates_mixer": False,
+        }
+
+    def operator_contract_evidence(self) -> Dict[str, Any]:
+        """Return evidence keys required by the shared operator contract."""
+
+        cache_freshness = self.evidence.get("current_state_cache_freshness")
+        return {
+            "ayaic_target_plane": {
+                "bus_id": self.bus_id,
+                "bus_kind": self.bus_kind,
+                "target_plane_lufs": self.target_plane_lufs,
+                "target_plane_reason": self.target_plane_reason,
+                "source_family": self.source_family,
+                "read_only_or_dry_run_only": True,
+                "live_write": False,
+            },
+            "assignment_readback": {
+                "bus_id": self.bus_id,
+                "bus_kind": self.bus_kind,
+                "child_count": self.evidence.get("child_count"),
+                "summed_child_lufs": self.summed_child_lufs,
+                "dominant_child_share": self.evidence.get("dominant_child_share"),
+                "assignment_confidence": self.evidence.get("assignment_confidence"),
+                "source": "cached_or_operator_supplied_bus_assignment",
+                "readback_required_before_live_promotion": True,
+                "live_write": False,
+            },
+            "bounded_bus_group_delta": {
+                "bus_id": self.bus_id,
+                "bus_kind": self.bus_kind,
+                "current_fader_db": self.current_fader_db,
+                "target_fader_db": self.target_fader_db,
+                "suggested_delta_db": self.suggested_delta_db,
+                "max_up_delta_db": MAX_UP_DELTA_DB,
+                "max_down_delta_db": MAX_DOWN_DELTA_DB,
+                "fader_ceiling_db": FADER_CEILING_DB,
+                "true_peak_headroom_db": self.true_peak_headroom_db,
+                "main_bus_headroom_db": self.evidence.get("main_bus_headroom_db"),
+                "bounded": True,
+                "read_only_or_dry_run_only": True,
+                "live_write": False,
+            },
+            "current_bus_fader": {
+                "bus_id": self.bus_id,
+                "bus_kind": self.bus_kind,
+                "current_fader_db": self.current_fader_db,
+                "target_fader_db": self.target_fader_db,
+                "suggested_delta_db": self.suggested_delta_db,
+                "fader_ceiling_db": FADER_CEILING_DB,
+                "source": "cached_or_operator_supplied_bus_fader",
+                "readback_required_before_live_promotion": True,
+                "live_write": False,
+            },
+            "current_bus_group_dca_matrix_cache_freshness": cache_freshness,
+            "rollback_bus_group_dca_matrix_readback": {
+                "bus_id": self.bus_id,
+                "bus_kind": self.bus_kind,
+                "rollback_fader_db": self.current_fader_db,
+                "assignment_map_readback_required": True,
+                "cache_freshness_status": self.evidence.get(
+                    "current_state_cache_freshness_status"
+                ),
+                "cache_no_live_authority": self.evidence.get(
+                    "current_bus_group_dca_matrix_cache_no_live_authority"
+                ),
+                "source": "cached_or_operator_supplied_bus_group_dca_matrix_state",
+                "required_before_live_promotion": True,
+                "read_only_or_dry_run_only": True,
+                "live_write": False,
+            },
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        blockers = [
+            "unsupported_value_type:bus_group_balance",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            *self.blockers,
+        ]
+        level_plane_summary = self.ayaic_level_plane_summary()
+        proposed_action = {
+            "action_type": self.action_type,
+            "bus_id": self.bus_id,
+            "bus_kind": self.bus_kind,
+            "target_plane_lufs": self.target_plane_lufs,
+            "current_integrated_lufs": self.current_integrated_lufs,
+            "current_fader_db": self.current_fader_db,
+            "suggested_delta_db": self.suggested_delta_db,
+            "target_fader_db": self.target_fader_db,
+            "true_peak_headroom_db": self.true_peak_headroom_db,
+            "ayaic_level_plane_summary": level_plane_summary,
+        }
+        evidence = {
+            **self.evidence,
+            **self.operator_contract_evidence(),
+            "ayaic_level_plane_summary": level_plane_summary,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        proposal = {
             "id": self.id,
             "method_id": BUS_GROUP_METHOD_ID,
             "source": BUS_GROUP_METHOD_ID,
@@ -191,32 +347,29 @@ class BusGroupBalanceRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:bus_group_balance",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
-            ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "bus_id": self.bus_id,
-                "bus_kind": self.bus_kind,
-                "target_plane_lufs": self.target_plane_lufs,
-                "current_integrated_lufs": self.current_integrated_lufs,
-                "suggested_delta_db": self.suggested_delta_db,
-                "target_fader_db": self.target_fader_db,
-                "true_peak_headroom_db": self.true_peak_headroom_db,
-            },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
-            },
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "evidence": evidence,
+            "ayaic_level_plane_summary": level_plane_summary,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=BUS_GROUP_METHOD_ID,
+            target=self.bus_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _derive_headroom(analysis: BusGroupBalanceAnalysisInput) -> float:

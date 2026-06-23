@@ -187,6 +187,16 @@ def test_promotion_memory_writer_apply_result_consumer_emits_index_request(tmp_p
         "sequence_memory_trust_promotion_queue_import_promotion_memory_index_request_available"
     )
     assert consumer["summary"]["expected_memory_write_result_count"] == 1
+    assert consumer["summary"]["promotion_acceptance_record_template_count"] == 1
+    assert consumer["summary"]["memory_trust_review_request_spec_count"] == 2
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "fresh"
+    assert consumer["summary"]["promotion_acceptance_record_template_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert consumer["summary"]["memory_trust_review_request_spec_proposal_ids"] == [
+        "proposal-first",
+        "proposal-second",
+    ]
     assert consumer["summary"]["memory_write_result_count"] == 1
     assert consumer["summary"]["invalid_record_count"] == 0
     assert consumer["summary"]["promotion_memory_index_request_available"] is True
@@ -219,6 +229,20 @@ def test_promotion_memory_writer_apply_result_consumer_emits_index_request(tmp_p
     assert request["promotion_memory_writer_apply_result_consumer"][
         "memory_write_result_proposal_ids"
     ] == ["proposal-first"]
+    assert request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == dry_run_consumer["promotion_memory_writer_apply_request"][
+        "promotion_acceptance_record_templates"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
+    assert request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == dry_run_consumer["promotion_memory_writer_apply_request"][
+        "memory_trust_review_request_specs"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
 
     spec = consumer["promotion_memory_index_request_specs"][0]
     assert spec["proposal_id"] == "proposal-first"
@@ -313,6 +337,186 @@ def test_promotion_memory_writer_apply_result_consumer_rejects_forged_apply_evid
     )
     assert any(item.endswith(":write_result_draft_id_mismatch") for item in invalid)
     assert consumer["promotion_memory_index_request_specs"] == []
+
+
+def test_promotion_memory_writer_apply_result_consumer_rejects_forged_prior_summary_ids(
+    tmp_path,
+):
+    dry_run_consumer = _promotion_memory_writer_dry_run_result_consumer_ready(tmp_path)
+    writer = _writer_apply_payload(dry_run_consumer)
+    forged_prior = deepcopy(dry_run_consumer)
+    forged_prior["summary"]["memory_writer_dry_run_proposal_ids"] = [
+        "proposal-second"
+    ]
+    forged_prior["summary"]["idempotency_key_prefix"] = "forged-prefix"
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer(
+            promotion_memory_writer_dry_run_result_consumer=forged_prior,
+            promotion_memory_writer_apply_result=writer,
+            root_path=str(tmp_path),
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_memory_index_request_available"] is False
+    assert consumer["summary"]["source_memory_file_write_applied"] is False
+    assert consumer["summary"]["memory_file_mutation"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "promotion_memory_writer_apply_result_consumer_prior_summary_prefix_mismatch"
+        in invalid
+    )
+    assert (
+        "promotion_memory_writer_apply_result_consumer_prior_summary_proposal_ids_mismatch"
+        in invalid
+    )
+    assert consumer["promotion_memory_index_request_specs"] == []
+    assert (
+        "promotion_memory_writer_apply_result_consumer"
+        not in consumer["promotion_memory_index_request"]
+    )
+
+
+def test_promotion_memory_writer_apply_result_consumer_rejects_missing_sequence_review_freshness(
+    tmp_path,
+):
+    dry_run_consumer = deepcopy(_promotion_memory_writer_dry_run_result_consumer_ready(tmp_path))
+    writer = _writer_apply_payload(dry_run_consumer)
+    request = dry_run_consumer["promotion_memory_writer_apply_request"]
+    for template in request["promotion_acceptance_record_templates"]:
+        template.pop("current_sequence_review_freshness", None)
+    request.pop("memory_trust_review_request_specs", None)
+    dry_run_consumer["summary"].pop("fresh_sequence_review_context_status", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer(
+            promotion_memory_writer_dry_run_result_consumer=dry_run_consumer,
+            promotion_memory_writer_apply_result=writer,
+            root_path=str(tmp_path),
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_memory_index_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "missing"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "promotion_memory_writer_apply_result_consumer_prior_summary_freshness_not_fresh"
+        in invalid
+    )
+    assert (
+        "promotion_memory_writer_apply_result_consumer_prior_summary_review_request_spec_count_mismatch"
+        in invalid
+    )
+    assert (
+        "promotion_memory_writer_apply_result_consumer_prior_summary_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert (
+        "promotion_memory_writer_apply_result_consumer_prior_request_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert "proposal-first_current_sequence_review_freshness_missing" in invalid
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_memory_index_request"]
+    )
+    assert (
+        "memory_trust_review_request_specs"
+        not in consumer["promotion_memory_index_request"]
+    )
+
+
+def test_promotion_memory_writer_apply_result_consumer_rejects_live_sequence_review_freshness(
+    tmp_path,
+):
+    dry_run_consumer = deepcopy(_promotion_memory_writer_dry_run_result_consumer_ready(tmp_path))
+    writer = _writer_apply_payload(dry_run_consumer)
+    live_freshness = {
+        "status": "fresh",
+        "read_only": False,
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    request = dry_run_consumer["promotion_memory_writer_apply_request"]
+    request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+    request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer(
+            promotion_memory_writer_dry_run_result_consumer=dry_run_consumer,
+            promotion_memory_writer_apply_result=writer,
+            root_path=str(tmp_path),
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_memory_index_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "invalid"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first_current_sequence_review_freshness_read_only_not_true" in invalid
+    assert "proposal-first_current_sequence_review_freshness_live_write_not_false" in invalid
+    assert (
+        "proposal-first_current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
+    )
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_memory_index_request"]
+    )
+
+
+def test_promotion_memory_writer_apply_result_consumer_rejects_forged_acceptance_template_identity(
+    tmp_path,
+):
+    dry_run_consumer = deepcopy(_promotion_memory_writer_dry_run_result_consumer_ready(tmp_path))
+    writer = _writer_apply_payload(dry_run_consumer)
+    template = dry_run_consumer["promotion_memory_writer_apply_request"][
+        "promotion_acceptance_record_templates"
+    ][0]
+    template["consumer_record_id"] = ""
+    template["source_memory_trust_review_request_spec_id"] = "forged-review-spec"
+    template["current_sequence_review_freshness"] = {
+        **template["current_sequence_review_freshness"],
+        "status": "stale",
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer(
+            promotion_memory_writer_dry_run_result_consumer=dry_run_consumer,
+            promotion_memory_writer_apply_result=writer,
+            root_path=str(tmp_path),
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_memory_index_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:consumer_record_id_missing" in invalid
+    assert "proposal-first:source_memory_trust_review_request_spec_id_mismatch" in invalid
+    assert "proposal-first:current_sequence_review_freshness_request_spec_mismatch" in invalid
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_memory_index_request"]
+    )
 
 
 def test_promotion_memory_writer_apply_result_consumer_is_registered_non_live():

@@ -38,7 +38,7 @@ hardware proof, rollback proof, emergency-stop proof, and operator approval.
 | FX / Sends | vocal reverb, delay, monitor-safe sends | no live writes | proposal-only FX send plans and return-level safety |
 | Routing / Groups | subgroup assignment, matrices, buses | no live writes | read-only maps and proposal-only routing plans |
 | Scenes / Presets | snapshots, scenes, user presets | no live writes | read-only inventory and manual import/export guidance |
-| Master / Output | master bus, limiter, matrices, PA feed | no live writes | offline/proposal-only level-plane and true-peak recommendations |
+| Master / Output | master bus, limiter, matrices, PA feed | no live writes | offline/proposal-only level-plane, true-peak, and PA-feed-safe recommendations |
 
 ## Promotion Ladder
 

@@ -37,6 +37,47 @@ def _acceptance_ledger_consumer(tmp_path):
     )
 
 
+def _acceptance_ledger_consumer_with_source_context(tmp_path):
+    consumer = _acceptance_ledger_consumer(tmp_path)
+    request = consumer["promotion_plan_request"]
+    source_template = {
+        **request["acceptance_record_templates"][0],
+        "promotion_acceptance_record_template_id": (
+            "operator_sequence_memory_trust_promotion_acceptance_template:proposal-first"
+        ),
+        "promotion_contract_record_id": (
+            "operator_sequence_memory_trust_promotion_contract:proposal-first"
+        ),
+        "promotion_candidate_id": "operator_sequence_memory_trust_promotion:proposal-first",
+        "previous_policy_state": "not_trusted_for_sequence_policy",
+        "rollback_strategy": "manual_revert_to_previous_sequence_policy_state",
+        "source_acceptance_record_template_id": request[
+            "acceptance_record_templates"
+        ][0]["acceptance_record_template_id"],
+        "source_review_candidate_id": request["acceptance_record_templates"][0][
+            "review_candidate_id"
+        ],
+        "source_memory_record_id": request["acceptance_record_templates"][0][
+            "memory_record_id"
+        ],
+    }
+    request["promotion_acceptance_record_templates"] = [source_template]
+    request["promotion_memory_trust_review_request_specs"] = deepcopy(
+        request["memory_trust_review_request_specs"]
+    )
+    consumer["summary"]["source_promotion_acceptance_record_template_count"] = 1
+    consumer["summary"]["source_sequence_review_context_status"] = "fresh"
+    consumer["summary"][
+        "source_promotion_acceptance_record_template_proposal_ids"
+    ] = ["proposal-first"]
+    consumer["summary"]["memory_trust_review_request_spec_count"] = 2
+    consumer["summary"]["memory_trust_review_request_spec_proposal_ids"] = [
+        "proposal-first",
+        "proposal-second",
+    ]
+    return consumer
+
+
 def _promotion_plan(acceptance_consumer):
     return build_operator_proposal_apply_sequence_policy_memory_trust_promotion_plan(
         acceptance_ledger=acceptance_consumer["promotion_plan_request"][
@@ -162,8 +203,13 @@ def test_promotion_plan_result_consumer_emits_contract_request(tmp_path):
     )
     assert consumer["summary"]["expected_promotion_candidate_count"] == 1
     assert consumer["summary"]["promotion_candidate_count"] == 1
+    assert consumer["summary"]["acceptance_record_template_count"] == 2
     assert consumer["summary"]["accepted_record_count"] == 1
     assert consumer["summary"]["rejected_record_count"] == 1
+    assert consumer["summary"]["acceptance_record_template_proposal_ids"] == [
+        "proposal-first",
+        "proposal-second",
+    ]
     assert consumer["summary"]["invalid_record_count"] == 0
     assert consumer["summary"]["promotion_contract_request_available"] is True
     assert consumer["summary"]["promotion_contract_handler_invoked"] is False
@@ -173,6 +219,7 @@ def test_promotion_plan_result_consumer_emits_contract_request(tmp_path):
     assert consumer["summary"]["policy_mutation"] is False
     assert consumer["summary"]["model_mutation"] is False
     assert consumer["summary"]["live_authority_granted"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "fresh"
     request = consumer["promotion_contract_request"]
     assert request["handler"] == (
         "contract_operator_proposal_apply_sequence_policy_memory_trust_promotion"
@@ -184,6 +231,25 @@ def test_promotion_plan_result_consumer_emits_contract_request(tmp_path):
     assert request["operator_must_supply_rollback_evidence"] is True
     assert request["promotion_plan"]["status"] == (
         "sequence_memory_trust_promotion_plan_candidate_available"
+    )
+    assert request["acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert request["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == acceptance_consumer["promotion_plan_request"]["acceptance_record_templates"][
+        0
+    ]["current_sequence_review_freshness"]
+    assert request["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ]["status"] == "fresh"
+    assert request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == acceptance_consumer["promotion_plan_request"][
+        "memory_trust_review_request_specs"
+    ][0]["current_sequence_review_freshness"]
+    assert request["acceptance_record_templates"][0]["policy_key"] == (
+        "proposal-first/memory-write:proposal-first"
     )
     assert request["execution_allowed_by_consumer"] is False
     assert request["policy_mutation"] is False
@@ -198,6 +264,55 @@ def test_promotion_plan_result_consumer_emits_contract_request(tmp_path):
     assert contract["summary"]["contract_record_count"] == 1
     assert contract["summary"]["sequence_policy_promotion_allowed_by_contract"] is False
     assert contract["summary"]["execution_allowed_by_contract"] is False
+
+
+def test_promotion_plan_result_consumer_preserves_promotion_source_context(tmp_path):
+    acceptance_consumer = _acceptance_ledger_consumer_with_source_context(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=acceptance_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_contract_request_available"
+    )
+    assert consumer["summary"]["acceptance_record_template_count"] == 2
+    assert consumer["summary"]["source_promotion_acceptance_record_template_count"] == 1
+    assert consumer["summary"]["promotion_memory_trust_review_request_spec_count"] == 2
+    assert consumer["summary"]["source_sequence_review_context_status"] == "fresh"
+    assert consumer["summary"][
+        "source_promotion_acceptance_record_template_proposal_ids"
+    ] == ["proposal-first"]
+    assert consumer["summary"][
+        "promotion_memory_trust_review_request_spec_proposal_ids"
+    ] == ["proposal-first", "proposal-second"]
+    assert consumer["summary"]["invalid_record_count"] == 0
+
+    request = consumer["promotion_contract_request"]
+    assert request["memory_trust_review_request_specs"][0]["proposal_id"] == (
+        "proposal-first"
+    )
+    assert request["promotion_acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == acceptance_consumer["promotion_plan_request"][
+        "promotion_acceptance_record_templates"
+    ][0]["current_sequence_review_freshness"]
+    assert request["promotion_memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == acceptance_consumer["promotion_plan_request"][
+        "promotion_memory_trust_review_request_specs"
+    ][0]["current_sequence_review_freshness"]
+    assert request["promotion_memory_trust_review_request_specs"][1][
+        "proposal_id"
+    ] == "proposal-second"
+    assert request["live_authority_granted"] is False
 
 
 def test_promotion_plan_result_consumer_rejects_not_ready_plan(tmp_path):
@@ -290,6 +405,305 @@ def test_promotion_plan_result_consumer_rejects_forged_prior_consumer(tmp_path):
         "sequence_policy_promotion_plan_result_consumer_acceptance_consumer_summary_accepted_record_count_mismatch"
         in invalid
     )
+
+
+def test_promotion_plan_result_consumer_rejects_forged_prior_template_summary(
+    tmp_path,
+):
+    acceptance_consumer = deepcopy(_acceptance_ledger_consumer(tmp_path))
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    acceptance_consumer["summary"]["acceptance_record_template_count"] = 1
+    acceptance_consumer["summary"]["acceptance_record_template_proposal_ids"] = [
+        "proposal-first"
+    ]
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=acceptance_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "sequence_policy_promotion_plan_result_consumer_acceptance_consumer_summary_acceptance_record_template_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_plan_result_consumer_acceptance_consumer_acceptance_record_template_proposal_ids_mismatch"
+        in invalid
+    )
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+
+
+def test_promotion_plan_result_consumer_rejects_forged_acceptance_template_identity(
+    tmp_path,
+):
+    acceptance_consumer = _acceptance_ledger_consumer(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    forged_consumer = deepcopy(acceptance_consumer)
+    forged_consumer["promotion_plan_request"]["acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] = "forged-memory-write:proposal-first"
+    forged_consumer["promotion_plan_request"]["acceptance_record_templates"][1][
+        "consumer_record_id"
+    ] = ""
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=forged_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:policy_key_identity_mismatch" in invalid
+    assert "proposal-second:consumer_record_id_missing" in invalid
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+    assert "acceptance_record_templates" not in consumer["promotion_contract_request"]
+
+
+def test_promotion_plan_result_consumer_rejects_missing_sequence_context(tmp_path):
+    acceptance_consumer = _acceptance_ledger_consumer(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    for template in acceptance_consumer["promotion_plan_request"][
+        "acceptance_record_templates"
+    ]:
+        template.pop("current_sequence_review_freshness", None)
+    for spec in acceptance_consumer["promotion_plan_request"][
+        "memory_trust_review_request_specs"
+    ]:
+        spec.pop("current_sequence_review_freshness", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=acceptance_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "missing"
+    assert (
+        "proposal-first:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+    assert "acceptance_record_templates" not in consumer["promotion_contract_request"]
+
+
+def test_promotion_plan_result_consumer_rejects_live_sequence_context(tmp_path):
+    acceptance_consumer = _acceptance_ledger_consumer(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    live_context = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    acceptance_consumer["promotion_plan_request"]["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_context
+    acceptance_consumer["promotion_plan_request"]["memory_trust_review_request_specs"][
+        0
+    ]["current_sequence_review_freshness"] = live_context
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=acceptance_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in invalid
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_live_write_not_false"
+        in invalid
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
+    )
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+    assert "acceptance_record_templates" not in consumer["promotion_contract_request"]
+
+
+def test_promotion_plan_result_consumer_rejects_missing_promotion_source_freshness(
+    tmp_path,
+):
+    acceptance_consumer = _acceptance_ledger_consumer_with_source_context(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    for template in acceptance_consumer["promotion_plan_request"][
+        "promotion_acceptance_record_templates"
+    ]:
+        template.pop("current_sequence_review_freshness", None)
+    for spec in acceptance_consumer["promotion_plan_request"][
+        "promotion_memory_trust_review_request_specs"
+    ]:
+        spec.pop("current_sequence_review_freshness", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=acceptance_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    assert consumer["summary"]["source_sequence_review_context_status"] == "missing"
+    assert (
+        "proposal-first:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+    assert "promotion_acceptance_record_templates" not in consumer[
+        "promotion_contract_request"
+    ]
+
+
+def test_promotion_plan_result_consumer_rejects_live_promotion_source_freshness(
+    tmp_path,
+):
+    acceptance_consumer = _acceptance_ledger_consumer_with_source_context(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    live_context = {
+        "status": "fresh",
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    acceptance_consumer["promotion_plan_request"][
+        "promotion_acceptance_record_templates"
+    ][0]["current_sequence_review_freshness"] = live_context
+    acceptance_consumer["promotion_plan_request"][
+        "promotion_memory_trust_review_request_specs"
+    ][0]["current_sequence_review_freshness"] = live_context
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=acceptance_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    assert consumer["summary"]["source_sequence_review_context_status"] == "invalid"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in invalid
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_live_write_not_false"
+        in invalid
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
+    )
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+    assert "promotion_acceptance_record_templates" not in consumer[
+        "promotion_contract_request"
+    ]
+
+
+def test_promotion_plan_result_consumer_rejects_forged_promotion_source_spec_identity(
+    tmp_path,
+):
+    acceptance_consumer = _acceptance_ledger_consumer_with_source_context(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    acceptance_consumer["promotion_plan_request"][
+        "promotion_acceptance_record_templates"
+    ][0]["source_memory_trust_review_request_spec_id"] = "forged-review-spec"
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=acceptance_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    assert (
+        "proposal-first:source_memory_trust_review_request_spec_id_mismatch"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+    assert "promotion_acceptance_record_templates" not in consumer[
+        "promotion_contract_request"
+    ]
+
+
+def test_promotion_plan_result_consumer_rejects_self_consistent_forged_template_provenance(
+    tmp_path,
+):
+    acceptance_consumer = _acceptance_ledger_consumer(tmp_path)
+    promotion_plan = _promotion_plan(acceptance_consumer)
+    forged_consumer = deepcopy(acceptance_consumer)
+    template = forged_consumer["promotion_plan_request"][
+        "acceptance_record_templates"
+    ][0]
+    template["review_candidate_id"] = "operator_sequence_memory_trust_review:forged"
+    template["memory_record_id"] = "operator_sequence_policy_memory_index:forged"
+    template["idempotency_key"] = "seq-policy:proposal-first-forged"
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer(
+            memory_trust_acceptance_ledger_result_consumer=forged_consumer,
+            promotion_plan_result=promotion_plan,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_contract_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:review_candidate_id_acceptance_record_mismatch" in invalid
+    assert "proposal-first:memory_record_id_acceptance_record_mismatch" in invalid
+    assert "proposal-first:idempotency_key_acceptance_record_mismatch" in invalid
+    assert "promotion_plan" not in consumer["promotion_contract_request"]
+    assert "acceptance_record_templates" not in consumer["promotion_contract_request"]
 
 
 def test_promotion_plan_result_consumer_is_registered_non_live():

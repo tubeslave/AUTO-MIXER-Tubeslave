@@ -90,6 +90,8 @@ def test_persistent_loud_musician_creates_proposal_only_downward_adaptation():
     assert proposal["kind"] == "performance_adaptation"
     assert proposal["can_import_to_queue"] is False
     assert proposal["can_apply_live"] is False
+    assert proposal["queue_import_allowed"] is False
+    assert proposal["live_apply_allowed"] is False
     assert "requested_change" not in proposal
     assert "requested_changes" not in proposal
     assert "unsupported_value_type:performance_adaptation" in proposal["blockers"]
@@ -97,6 +99,30 @@ def test_persistent_loud_musician_creates_proposal_only_downward_adaptation():
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["current_performance_context_cache_no_live_authority"] is True
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "performance_adaptation"
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == "complete"
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    for required_field in correction["source_evidence"]["required_evidence_fields"]:
+        assert required_field in source_evidence
+    assert source_evidence["current_level_readback"] == {
+        "value_lufs": -21.6,
+        "available": True,
+    }
+    assert source_evidence["rollback_state"] == {
+        "available": True,
+        "required_before_live_promotion": True,
+    }
 
 
 def test_upward_adaptation_requires_headroom_and_low_feedback_bleed():

@@ -121,6 +121,32 @@ def _is_utc_timestamp(value: str) -> bool:
     return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(prefix: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{prefix}_current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{prefix}_current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(f"{prefix}_current_sequence_review_freshness_read_only_not_true")
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{prefix}_current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
+
+
 def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
     counts: Dict[str, int] = {}
     for value in values:
@@ -325,6 +351,34 @@ def _plan_record_violations(record: Mapping[str, Any]) -> Tuple[str, ...]:
             violations.append(f"sequence_policy_queue_importer_plan_record_{field}_invalid")
     if record.get("rank_source") not in ALLOWED_RANK_SOURCES:
         violations.append("sequence_policy_queue_importer_plan_record_rank_source_unknown")
+    if record.get("rank_source") == "sequence_policy_consumer":
+        for field in (
+            "consumer_record_id",
+            "sequence_policy_gate_record_id",
+            "policy_key",
+            "source_idempotency_key",
+        ):
+            if not _string(record.get(field)):
+                violations.append(
+                    f"sequence_policy_queue_importer_plan_record_{field}_missing"
+                )
+        proposal_id = _string(record.get("proposal_id"))
+        source_idempotency_key = _string(record.get("source_idempotency_key"))
+        policy_key = _string(record.get("policy_key"))
+        if (
+            proposal_id
+            and source_idempotency_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(
+                "sequence_policy_queue_importer_plan_record_policy_key_identity_mismatch"
+            )
+        violations.extend(
+            _context_violations(
+                "sequence_policy_queue_importer_plan_record",
+                _mapping(record.get("current_sequence_review_freshness")),
+            )
+        )
     if record.get("operator_review_required") is not True:
         violations.append("sequence_policy_queue_importer_plan_record_review_required_not_true")
     if record.get("operator_ack_required_before_queue_import") is not True:
@@ -398,6 +452,10 @@ def _import_payload(
         "consumer_record_id": plan_record.get("consumer_record_id"),
         "sequence_policy_gate_record_id": plan_record.get("sequence_policy_gate_record_id"),
         "policy_key": plan_record.get("policy_key"),
+        "source_idempotency_key": plan_record.get("source_idempotency_key"),
+        "current_sequence_review_freshness": plan_record.get(
+            "current_sequence_review_freshness"
+        ),
         "planned_queue_index": plan_record.get("planned_queue_index"),
         "rank_source": plan_record.get("rank_source"),
         "recommended_sequence_policy_bucket": plan_record.get(
@@ -436,6 +494,10 @@ def _queue_import_specs(
                 "recommended_sequence_policy_bucket": plan_record.get(
                     "recommended_sequence_policy_bucket"
                 ),
+                "source_idempotency_key": plan_record.get("source_idempotency_key"),
+                "current_sequence_review_freshness": plan_record.get(
+                    "current_sequence_review_freshness"
+                ),
                 "operator_proposal_payload": _import_payload(
                     plan_record,
                     payload_by_id[proposal_id],
@@ -469,17 +531,156 @@ def _queue_import_specs(
     return tuple(specs)
 
 
+def _proposal_import_metadata(proposal: Mapping[str, Any]) -> Mapping[str, Any]:
+    raw = _mapping(proposal.get("raw"))
+    return _mapping(raw.get("sequence_policy_queue_import")) or _mapping(
+        proposal.get("sequence_policy_queue_import")
+    )
+
+
+def _proposal_dict(value: Any) -> Mapping[str, Any]:
+    if isinstance(value, Mapping):
+        return value
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return _mapping(to_dict())
+    return {}
+
+
+def _existing_queue_proposal(target_queue: Any, proposal_id: str) -> Mapping[str, Any]:
+    finder = getattr(target_queue, "find", None)
+    if not callable(finder) or not proposal_id:
+        return {}
+    try:
+        return _proposal_dict(finder(proposal_id=proposal_id))
+    except TypeError:
+        return {}
+
+
+def _existing_queue_identity_violations(
+    spec: Mapping[str, Any],
+    *,
+    target_queue: Any,
+) -> Tuple[str, ...]:
+    proposal = _existing_queue_proposal(target_queue, _string(spec.get("proposal_id")))
+    if not proposal:
+        return ()
+    metadata = _proposal_import_metadata(proposal)
+    if not metadata:
+        return ("sequence_policy_queue_importer_existing_import_metadata_missing",)
+    expected = {
+        "queue_ordering_plan_record_id": spec.get("queue_ordering_plan_record_id"),
+        "source_idempotency_key": spec.get("source_idempotency_key"),
+        "current_sequence_review_freshness": spec.get(
+            "current_sequence_review_freshness"
+        ),
+        "planned_queue_index": spec.get("planned_queue_index"),
+    }
+    return tuple(
+        f"sequence_policy_queue_importer_existing_{key}_mismatch"
+        for key, value in expected.items()
+        if metadata.get(key) != value
+    )
+
+
+def _result_identity_violations(
+    spec: Mapping[str, Any],
+    *,
+    created: Mapping[str, Any],
+) -> Tuple[str, ...]:
+    proposal = _mapping(created.get("proposal"))
+    if created.get("success") is not True:
+        return ("sequence_policy_queue_importer_queue_create_failed",)
+    if not proposal:
+        return ("sequence_policy_queue_importer_result_proposal_missing",)
+    if proposal.get("id") != spec.get("proposal_id"):
+        return ("sequence_policy_queue_importer_result_proposal_id_mismatch",)
+    metadata = _proposal_import_metadata(proposal)
+    if not metadata:
+        return ("sequence_policy_queue_importer_result_import_metadata_missing",)
+    expected = {
+        "queue_ordering_plan_record_id": spec.get("queue_ordering_plan_record_id"),
+        "source_idempotency_key": spec.get("source_idempotency_key"),
+        "current_sequence_review_freshness": spec.get(
+            "current_sequence_review_freshness"
+        ),
+        "planned_queue_index": spec.get("planned_queue_index"),
+    }
+    return tuple(
+        f"sequence_policy_queue_importer_result_import_{key}_mismatch"
+        for key, value in expected.items()
+        if metadata.get(key) != value
+    )
+
+
 def _apply_import_specs(
     queue_import_specs: Tuple[Mapping[str, Any], ...],
     target_queue: Any,
     operator_mode: Mapping[str, Any],
 ) -> Tuple[Dict[str, Any], ...]:
+    existing_violations = {
+        _string(spec.get("proposal_id")): _existing_queue_identity_violations(
+            spec,
+            target_queue=target_queue,
+        )
+        for spec in queue_import_specs
+    }
+    if any(existing_violations.values()):
+        return tuple(
+            {
+                "queue_import_result_id": (
+                    "sequence_policy_queue_importer_result:"
+                    f"{spec.get('proposal_id')}"
+                ),
+                "queue_import_spec_id": spec.get("queue_import_spec_id"),
+                "proposal_id": spec.get("proposal_id"),
+                "planned_queue_index": spec.get("planned_queue_index"),
+                "status": (
+                    "blocked"
+                    if existing_violations.get(_string(spec.get("proposal_id")))
+                    else "skipped"
+                ),
+                "success": False,
+                "queue_mutation": False,
+                "queue_import_applied": False,
+                "operator_proposal": _existing_queue_proposal(
+                    target_queue,
+                    _string(spec.get("proposal_id")),
+                ),
+                "identity_violations": list(
+                    existing_violations.get(_string(spec.get("proposal_id"))) or ()
+                ),
+                "blocked_by": list(
+                    existing_violations.get(_string(spec.get("proposal_id")))
+                    or (
+                        "sequence_policy_queue_importer_batch_blocked_by_existing_identity_conflict",
+                    )
+                ),
+                "live_write": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "model_mutation": False,
+                "runtime_memory_mutation": False,
+                "sequence_policy_trust_store_mutation": False,
+                "proposal_state_mutation": False,
+                "sequence_execution_allowed_by_importer": False,
+                "sequence_policy_change_allowed_by_importer": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "can_apply_live": False,
+            }
+            for spec in queue_import_specs
+        )
+
     results = []
     for spec in queue_import_specs:
         result = target_queue.create(
             dict(spec["operator_proposal_payload"]),
             dict(operator_mode),
         )
+        identity_violations = _result_identity_violations(spec, created=result)
+        success = result.get("success") is True and not identity_violations
         results.append(
             {
                 "queue_import_result_id": (
@@ -490,10 +691,12 @@ def _apply_import_specs(
                 "proposal_id": spec.get("proposal_id"),
                 "planned_queue_index": spec.get("planned_queue_index"),
                 "status": result.get("status"),
-                "success": result.get("success") is True,
-                "queue_mutation": result.get("success") is True,
-                "queue_import_applied": result.get("success") is True,
+                "success": success,
+                "queue_mutation": success and result.get("status") == "created",
+                "queue_import_applied": success,
                 "operator_proposal": result.get("proposal"),
+                "identity_violations": list(identity_violations),
+                "blocked_by": list(identity_violations),
                 "live_write": False,
                 "mutates_console_state": False,
                 "queries_console": False,
@@ -595,7 +798,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             target_queue,
             effective_operator_mode,
         )
-        if any(result.get("success") is True for result in queue_import_results):
+        if queue_import_results and all(
+            result.get("success") is True for result in queue_import_results
+        ):
             status = "sequence_memory_trust_promotion_queue_importer_applied"
             blocked_by = ()
         else:
@@ -612,6 +817,29 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         result["proposal_id"]
         for result in queue_import_results
         if result.get("queue_import_applied") is True and _string(result.get("proposal_id"))
+    )
+    queue_mutated = any(result.get("queue_mutation") is True for result in queue_import_results)
+    queue_mutation_ids = tuple(
+        result["proposal_id"]
+        for result in queue_import_results
+        if result.get("queue_mutation") is True and _string(result.get("proposal_id"))
+    )
+    idempotent_noop_ids = tuple(
+        result["proposal_id"]
+        for result in queue_import_results
+        if result.get("status") == "exists"
+        and result.get("success") is True
+        and result.get("queue_mutation") is False
+        and _string(result.get("proposal_id"))
+    )
+    blocked_import_ids = tuple(
+        result["proposal_id"]
+        for result in queue_import_results
+        if result.get("success") is not True and _string(result.get("proposal_id"))
+    )
+    identity_violation_count = sum(
+        len(_string_list(result.get("identity_violations")))
+        for result in queue_import_results
     )
 
     return {
@@ -638,7 +866,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "queue_import_applied": applied,
             "sequence_consumer_required_before_execution": True,
             "proposal_order_mutation": False,
-            "queue_mutation": applied,
+            "queue_mutation": queue_mutated,
             "model_mutation": False,
             "runtime_memory_mutation": False,
             "sequence_policy_trust_store_mutation": False,
@@ -659,6 +887,10 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "queue_import_spec_count": len(queue_import_specs),
             "queue_import_result_count": len(queue_import_results),
             "imported_proposal_count": len(imported_ids),
+            "queue_mutation_count": len(queue_mutation_ids),
+            "idempotent_import_noop_count": len(idempotent_noop_ids),
+            "blocked_import_count": len(blocked_import_ids),
+            "identity_violation_count": identity_violation_count,
             "invalid_record_count": len(invalid_record_ids),
             "apply_requested": bool(apply),
             "operator_ack": bool(operator_ack),
@@ -667,7 +899,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "queue_import_applied": applied,
             "sequence_consumer_required_before_execution": True,
             "proposal_order_mutation": False,
-            "queue_mutation": applied,
+            "queue_mutation": queue_mutated,
             "mutates_console_state": False,
             "queries_console": False,
             "model_mutation": False,
@@ -686,6 +918,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
                 spec["proposal_id"] for spec in queue_import_specs
             ],
             "imported_proposal_ids": list(imported_ids),
+            "queue_mutation_proposal_ids": list(queue_mutation_ids),
+            "idempotent_import_noop_proposal_ids": list(idempotent_noop_ids),
+            "blocked_import_proposal_ids": list(blocked_import_ids),
             "missing_proposal_payload_ids": list(missing_payload_ids),
             "invalid_record_ids": list(invalid_record_ids),
             "blocked_by": list(blocked_by),

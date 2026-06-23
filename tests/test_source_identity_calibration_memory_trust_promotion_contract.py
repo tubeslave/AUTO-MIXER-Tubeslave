@@ -202,6 +202,22 @@ def test_memory_trust_promotion_contract_requires_fresh_replay_context():
     ]["blocked_by"]
 
 
+def test_memory_trust_promotion_contract_requires_provided_replay_context():
+    contract = build_source_identity_calibration_memory_trust_promotion_contract(
+        promotion_plan=_promotion_plan(),
+        rollback_evidence=_rollback_evidence(),
+    )
+
+    assert contract["status"] == "memory_trust_promotion_contract_not_ready"
+    assert contract["summary"]["current_state_cache_freshness_status"] == "missing"
+    assert contract["summary"]["contract_record_count"] == 0
+    assert "fresh_replay_context_required_before_promotion_contract" in contract[
+        "summary"
+    ]["blocked_by"]
+    assert contract["safety"]["runtime_memory_mutation_allowed_by_contract"] is False
+    assert contract["safety"]["downstream_priority_change_allowed_by_contract"] is False
+
+
 def test_memory_trust_promotion_contract_requires_rollback_evidence():
     contract = build_source_identity_calibration_memory_trust_promotion_contract(
         promotion_plan=_promotion_plan(),

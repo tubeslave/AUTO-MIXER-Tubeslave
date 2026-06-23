@@ -75,6 +75,7 @@ from operator_recommendation_bridge import (
     build_soundcheck_operator_proposals,
     import_operator_proposals,
 )
+from processing_proposal_adapters import build_operator_correction_payload
 from automation_trace import AutomationDecisionTrace, AutomationTraceStore
 from decision_memory import DecisionMemoryStore
 
@@ -110,6 +111,59 @@ _load_repo_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+QUARANTINED_WRITE_SURFACE_OPERATOR_METHODS = {
+    "start_realtime_correction": "lufs_gain_staging",
+    "reset_trim": "lufs_gain_staging",
+    "start_realtime_fader": "auto_fader_v1",
+    "apply_auto_balance": "auto_fader_v1",
+    "set_eq": "auto_eq",
+    "apply_eq_correction": "auto_eq",
+    "reset_eq": "auto_eq",
+    "reset_all_eq": "auto_eq",
+    "apply_channel_correction": "auto_eq",
+    "apply_all_corrections": "auto_eq",
+    "set_compressor": "auto_compressor",
+    "start_auto_compressor": "auto_compressor",
+    "start_auto_compressor_soundcheck": "auto_compressor",
+    "start_auto_compressor_live": "auto_compressor",
+    "set_auto_compressor_profile": "auto_compressor",
+    "set_auto_compressor_manual": "auto_compressor",
+    "set_pan": "auto_panner",
+    "apply_phase_corrections": "phase_alignment",
+    "reset_phase_delay": "phase_alignment",
+    "set_insert": "fx_direct_apply",
+    "set_fx_model": "fx_direct_apply",
+    "set_fx_on": "fx_direct_apply",
+    "set_fx_mix": "fx_direct_apply",
+    "set_fx_parameter": "fx_direct_apply",
+    "route_output": "routing_management_proposal",
+    "route_multiple_outputs": "routing_management_proposal",
+    "set_channel_input": "routing_management_proposal",
+    "set_channel_alt_input": "routing_management_proposal",
+    "load_snap": "scene_preset_management_proposal",
+    "save_snap": "scene_preset_management_proposal",
+    "restore_snapshot": "scene_preset_management_proposal",
+    "set_mute": "mute_management_proposal",
+    "mute_channel": "mute_management_proposal",
+    "unmute_channel": "mute_management_proposal",
+    "apply_system_measurement": "master_bus_optimization_proposal",
+    "reset_system_measurement": "master_bus_optimization_proposal",
+    "voice_command:set_fader": "auto_fader_v1",
+    "voice_command:set_gain": "lufs_gain_staging",
+    "voice_command:set_pan": "auto_panner",
+    "voice_command:load_snap": "scene_preset_management_proposal",
+    "voice_command:mute_channel": "mute_management_proposal",
+    "voice_command:volume_up": "auto_fader_v1",
+    "voice_command:volume_down": "auto_fader_v1",
+    "voice_command:eq_on": "auto_eq",
+    "voice_command:eq_band_up": "auto_eq",
+    "voice_command:eq_band_down": "auto_eq",
+    "voice_command:compressor_on": "auto_compressor",
+    "voice_command:compressor_threshold": "auto_compressor",
+    "voice_command:compressor_gain_up": "auto_compressor",
+    "voice_command:compressor_gain_down": "auto_compressor",
+}
 
 MANUAL_WRITE_KIND_CONFIG = {
     "fader": {
@@ -443,7 +497,16 @@ class AutoMixerServer:
 
     def record_automation_decision_trace(self, **payload: Any) -> Dict[str, Any]:
         try:
-            trace = AutomationDecisionTrace(**payload).to_dict()
+            known_fields = AutomationDecisionTrace.__dataclass_fields__
+            trace_payload = {key: value for key, value in payload.items() if key in known_fields}
+            extra_payload = {key: value for key, value in payload.items() if key not in known_fields}
+            if extra_payload:
+                metadata = dict(trace_payload.get("metadata") or {})
+                for key, value in extra_payload.items():
+                    metadata.setdefault(key, value)
+                trace_payload["metadata"] = metadata
+            trace = AutomationDecisionTrace(**trace_payload).to_dict()
+            trace.update(extra_payload)
             recorded = self.automation_trace_store.append(trace)
             memory_store = getattr(self, "decision_memory_store", None)
             trace_store = getattr(self, "automation_trace_store", None)
@@ -641,6 +704,76 @@ class AutoMixerServer:
             summary["reason"] = "no_soundcheck_recommendations"
         return summary
 
+    def _quarantined_write_operator_correction(
+        self,
+        *,
+        surface: str,
+        result_type: str,
+        request: Optional[Dict[str, Any]],
+        extra: Optional[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        method_id = QUARANTINED_WRITE_SURFACE_OPERATOR_METHODS.get(surface)
+        if not method_id:
+            return None
+
+        request_payload = dict(request or {})
+        extra_payload = dict(extra or {})
+        target = (
+            request_payload.get("channel")
+            or request_payload.get("target_bus")
+            or request_payload.get("snap_name")
+            or request_payload.get("snapshot_path")
+            or request_payload.get("output_group")
+            or surface
+        )
+        blockers = [
+            "deployment_write_surface_quarantined",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+        ]
+        proposed_action = {
+            "action_type": f"blocked_direct_write:{surface}",
+            "surface": surface,
+            "result_type": result_type,
+            "request": request_payload,
+            "operator_confirmation_required": True,
+        }
+        proposal = {
+            "id": f"quarantined_wing_write:{surface}",
+            "method_id": method_id,
+            "source": "wing_deployment_boundary",
+            "title": f"{surface}: blocked WING write",
+            "reason": (
+                "Direct WING write surface is quarantined; this is "
+                "operator-review evidence only."
+            ),
+            "target": target,
+            "kind": "quarantined_write_surface",
+            "severity": "high",
+            "confidence": 1.0,
+            "blockers": blockers,
+            "raw": {
+                "surface": surface,
+                "result_type": result_type,
+                "request": request_payload,
+                "extra": extra_payload,
+            },
+            "evidence": {
+                "live_write": False,
+                "queue_mutation": False,
+                "deployment_write_surface_quarantined": True,
+                "readback_required_before_promotion": True,
+                "rollback_required_before_promotion": True,
+            },
+        }
+        return build_operator_correction_payload(
+            proposal=proposal,
+            method_id=method_id,
+            target=target,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+
     async def _block_quarantined_wing_write_surface(
         self,
         websocket: Optional[WebSocketServerProtocol],
@@ -669,6 +802,14 @@ class AutoMixerServer:
             payload["request"] = request
         if extra:
             payload.update(extra)
+        operator_correction = self._quarantined_write_operator_correction(
+            surface=surface,
+            result_type=result_type,
+            request=request,
+            extra=extra,
+        )
+        if operator_correction:
+            payload["operator_correction"] = operator_correction
 
         logger.warning(
             "Blocked quarantined WING deployment write surface",
@@ -701,21 +842,23 @@ class AutoMixerServer:
         }
 
     async def _block_quarantined_voice_command_if_needed(self, command: Dict[str, Any]) -> bool:
-        cmd_type = str((command or {}).get("type") or "").strip()
+        cmd_type = str((command or {}).get("type") or "").strip().lower()
         if (
             not self._is_wing_deployment_write_boundary_active()
             or not self._is_voice_command_write_surface(cmd_type)
         ):
             return False
 
+        request_payload = dict(command or {})
+        surface = f"voice_command:{cmd_type}"
         payload = {
             "type": "voice_command_blocked",
             "status": "blocked",
             "success": False,
             "reason": "deployment_write_surface_quarantined",
-            "surface": f"voice_command:{cmd_type}",
+            "surface": surface,
             "command": cmd_type,
-            "request": dict(command or {}),
+            "request": request_payload,
             "message": (
                 "WING deployment path is limited to Product Layer proposals and "
                 "approved manual fader/gain/pan writes; direct voice-command writes "
@@ -723,6 +866,14 @@ class AutoMixerServer:
             ),
             "manual_write_supervision": self.get_manual_write_supervision_status(),
         }
+        operator_correction = self._quarantined_write_operator_correction(
+            surface=surface,
+            result_type="voice_command_blocked",
+            request=request_payload,
+            extra={"command": cmd_type},
+        )
+        if operator_correction:
+            payload["operator_correction"] = operator_correction
         artifact_path = self._record_manual_write_event("voice_command_blocked", payload)
         if artifact_path:
             payload["artifact_path"] = artifact_path
@@ -3225,26 +3376,37 @@ class AutoMixerServer:
                                         safe_gain_settings: dict = None):
         """Start Safe Gain Staging calibration (новый метод: анализ → одноразовое применение)."""
         logger.info("Starting Safe Gain Staging calibration (new method)...")
+        request_payload = {
+            "device_id": device_id,
+            "channels": channels or [],
+            "mode": mode,
+            "safe_gain_settings": safe_gain_settings or {},
+        }
+        extra_payload = {"active": False, "realtime_enabled": False}
         if await self._block_quarantined_wing_write_surface(
             None,
             surface="start_realtime_correction",
             result_type="gain_staging_status",
-            request={
-                "device_id": device_id,
-                "channels": channels or [],
-                "mode": mode,
-                "safe_gain_settings": safe_gain_settings or {},
-            },
-            extra={"active": False, "realtime_enabled": False},
+            request=request_payload,
+            extra=extra_payload,
         ):
-            await self.broadcast({
+            payload = {
                 "type": "gain_staging_status",
                 "active": False,
                 "realtime_enabled": False,
                 "status": "blocked",
                 "reason": "deployment_write_surface_quarantined",
                 "surface": "start_realtime_correction",
-            })
+            }
+            operator_correction = self._quarantined_write_operator_correction(
+                surface="start_realtime_correction",
+                result_type="gain_staging_status",
+                request=request_payload,
+                extra=extra_payload,
+            )
+            if operator_correction:
+                payload["operator_correction"] = operator_correction
+            await self.broadcast(payload)
             return
         
         # Check mixer connection
@@ -4748,6 +4910,14 @@ class AutoMixerServer:
 
     async def apply_system_measurement(self, websocket, target_bus: str = "master", target_id: int = 1):
         """Apply previously calculated system EQ corrections to the target bus."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="apply_system_measurement",
+            result_type="system_measurement_apply_result",
+            request={"target_bus": target_bus, "target_id": target_id},
+        ):
+            return
+
         if not self.system_measurement_controller:
             await self.send_to_client(websocket, {
                 "type": "system_measurement_apply_result",
@@ -4778,6 +4948,14 @@ class AutoMixerServer:
 
     async def reset_system_measurement(self, websocket, target_bus: str = "master", target_id: int = 1):
         """Reset EQ on the target bus used for system measurement."""
+        if await self._block_quarantined_wing_write_surface(
+            websocket,
+            surface="reset_system_measurement",
+            result_type="system_measurement_reset_result",
+            request={"target_bus": target_bus, "target_id": target_id},
+        ):
+            return
+
         if not self.system_measurement_controller:
             self.system_measurement_controller = SystemMeasurementController(mixer_client=self.mixer_client)
 

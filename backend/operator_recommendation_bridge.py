@@ -9,15 +9,38 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+
 try:
     from operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 SAFE_GAIN_SOURCE = "safe_gain_calibrator"
 SOUNDCHECK_SOURCE = "soundcheck_recommendation_bundle"
 CACHE_FRESHNESS_STALE_AFTER_SEC = 30.0
+PROPOSAL_LAYER_BLOCKERS = (
+    "hardware_readback_and_rollback_not_proven",
+    "real_wing_proof_required_before_live_apply",
+)
+AUTHORITY_DENIAL_FIELDS = {
+    "can_apply_live": False,
+    "can_import_to_queue": False,
+    "queue_import_allowed": False,
+    "live_apply_allowed": False,
+    "read_only_or_dry_run_only": True,
+    "live_authority_granted": False,
+    "readiness_closure_allowed": False,
+    "queue_action": "not_queueable_until_promoted",
+    "live_write": False,
+    "queue_mutation": False,
+    "mutates_mixer": False,
+}
 # Operator recommendations feed the current WING deployment apply rail.
 RECOMMENDATION_APPLY_VALUE_TYPES = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
@@ -228,6 +251,193 @@ def _safe_current_trim(client: Any, channel: int) -> Optional[float]:
         except Exception:
             pass
     return _cached_trim_from_state(client, channel)
+
+
+def _operator_correction_blockers(proposal: Dict[str, Any]) -> List[str]:
+    raw = proposal.get("raw") if isinstance(proposal.get("raw"), dict) else {}
+    blockers: List[str] = []
+    for item in proposal.get("apply_blockers") or raw.get("apply_blockers") or []:
+        blockers.append(str(item))
+    if not isinstance(proposal.get("requested_change"), dict):
+        if isinstance(proposal.get("blocked_requested_change"), dict) or isinstance(
+            raw.get("blocked_requested_change"), dict
+        ):
+            blockers.append("cache_freshness_required_before_applyable_proposal")
+        else:
+            blockers.append("missing_applyable_fader_gain_requested_change")
+    blockers.extend(PROPOSAL_LAYER_BLOCKERS)
+    deduped: List[str] = []
+    seen = set()
+    for blocker in blockers:
+        if blocker in seen:
+            continue
+        seen.add(blocker)
+        deduped.append(blocker)
+    return deduped
+
+
+def _blocked_proposed_action(proposal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    raw = proposal.get("raw") if isinstance(proposal.get("raw"), dict) else {}
+    blocked_change = proposal.get("blocked_requested_change") or raw.get("blocked_requested_change")
+    if not isinstance(blocked_change, dict):
+        return None
+    return {
+        "status": "blocked_before_applyable_proposal",
+        "blocked_requested_change": dict(blocked_change),
+        "apply_status": proposal.get("apply_status") or raw.get("apply_status"),
+        "apply_blockers": proposal.get("apply_blockers") or raw.get("apply_blockers") or [],
+    }
+
+
+def _apply_authority_denial_fields(payload: Dict[str, Any]) -> None:
+    for key, value in AUTHORITY_DENIAL_FIELDS.items():
+        if key == "queue_action":
+            payload.setdefault(key, value)
+        else:
+            payload[key] = value
+
+
+def _operator_review_policy_for_change(change: Dict[str, Any]) -> str:
+    delta_db = _coerce_float(change.get("delta_db"))
+    if delta_db is not None and delta_db <= 0.0:
+        return "gain_down_or_fader_down_review_required_before_apply"
+    return "gain_up_or_fader_up_requires_operator_review_and_real_wing_proof"
+
+
+def _change_operator_evidence(change: Dict[str, Any], proposal: Dict[str, Any]) -> Dict[str, Any]:
+    value_type = str(change.get("value_type") or "").strip().lower()
+    delta_db = _round(change.get("delta_db"))
+    old_value = change.get("old_value") if "old_value" in change else change.get("current_value")
+    proposed_value = (
+        change.get("proposed_value") if "proposed_value" in change else change.get("value")
+    )
+    rollback_value = change.get("rollback_value", old_value)
+    evidence: Dict[str, Any] = {
+        "requested_change": dict(change),
+        "value_type": value_type or None,
+        "channel": change.get("channel"),
+        "old_value": old_value,
+        "proposed_value": proposed_value,
+        "delta_db": delta_db,
+        "readback_required": bool(change.get("readback_required", True)),
+        "rollback_value": rollback_value,
+        "safety_evidence": list(change.get("safety_evidence") or []),
+        "bounded_gain_or_fader_delta": {
+            "value_type": value_type or None,
+            "delta_db": delta_db,
+            "old_value": old_value,
+            "proposed_value": proposed_value,
+            "bounded": True,
+            "operator_review_required": True,
+        },
+    }
+
+    if value_type == "gain":
+        suggestion = {}
+        raw = proposal.get("raw") if isinstance(proposal.get("raw"), dict) else {}
+        if isinstance(raw.get("suggestion"), dict):
+            suggestion = raw["suggestion"]
+        evidence.update({
+            "input_level_evidence": {
+                "peak_db": _round(suggestion.get("peak_db")),
+                "target_peak_db": _round(suggestion.get("target_peak_db")),
+                "input_trim_role": suggestion.get("input_trim_role"),
+                "source": proposal.get("source"),
+                "channel": change.get("channel"),
+            },
+            "overload_or_weak_signal_problem": (
+                "weak_signal_gain_up_review"
+                if delta_db is not None and delta_db > 0.0
+                else "overload_or_headroom_gain_down_review"
+            ),
+            "headroom_margin": {
+                "current_peak_db": _round(suggestion.get("peak_db")),
+                "target_peak_db": _round(suggestion.get("target_peak_db")),
+                "operator_review_required": True,
+            },
+            "true_peak_headroom": {
+                "status": "required_before_apply",
+                "current_peak_db": _round(suggestion.get("peak_db")),
+            },
+            "bleed_risk": suggestion.get("bleed_risk", "operator_review_required"),
+            "bounded_gain_delta": evidence["bounded_gain_or_fader_delta"],
+            "gain_down_or_operator_review_gain_up": (
+                "gain_up_requires_operator_review"
+                if delta_db is not None and delta_db > 0.0
+                else "gain_down_headroom_cut_review"
+            ),
+            "rollback_input_trim_readback": {
+                "value_db": rollback_value,
+                "required_before_live_promotion": True,
+            },
+        })
+    elif value_type == "fader":
+        evidence.update({
+            "current_fader_readback": {
+                "value_db": old_value,
+                "required_before_live_promotion": True,
+            },
+            "ayaic_level_plane": "operator_evidence_required",
+            "bounded_fader_delta": evidence["bounded_gain_or_fader_delta"],
+            "true_peak_headroom": "required_before_apply",
+            "feedback_risk": "operator_feedback_check_required_before_apply",
+            "fader_ceiling": 0.0,
+            "rollback_fader_readback": {
+                "value_db": rollback_value,
+                "required_before_live_promotion": True,
+            },
+        })
+    evidence["operator_review_policy"] = _operator_review_policy_for_change(change)
+    return evidence
+
+
+def _normalize_operator_evidence(
+    proposal: Dict[str, Any],
+    requested_change: Optional[Dict[str, Any]],
+) -> None:
+    raw = proposal.get("raw") if isinstance(proposal.get("raw"), dict) else {}
+    evidence = proposal.get("evidence") if isinstance(proposal.get("evidence"), dict) else {}
+    evidence = dict(evidence)
+    blocked_change = proposal.get("blocked_requested_change") or raw.get("blocked_requested_change")
+    evidence_change = requested_change if isinstance(requested_change, dict) else blocked_change
+    if isinstance(evidence_change, dict):
+        evidence.update(_change_operator_evidence(evidence_change, proposal))
+    if isinstance(blocked_change, dict) and requested_change is None:
+        evidence["blocked_requested_change"] = dict(blocked_change)
+    cache_freshness = proposal.get("cache_freshness") or raw.get("cache_freshness")
+    if cache_freshness is not None:
+        evidence["cache_freshness"] = cache_freshness
+    for key in ("apply_status", "apply_blockers"):
+        value = proposal.get(key) if key in proposal else raw.get(key)
+        if value is not None:
+            evidence[key] = value
+    evidence["live_write"] = False
+    evidence["queue_mutation"] = False
+    _apply_authority_denial_fields(evidence)
+    proposal["evidence"] = evidence
+
+
+def _attach_operator_correction(
+    proposal: Dict[str, Any],
+    *,
+    method_id: str,
+) -> Dict[str, Any]:
+    _apply_authority_denial_fields(proposal)
+    requested_change = (
+        proposal.get("requested_change")
+        if isinstance(proposal.get("requested_change"), dict)
+        else None
+    )
+    _normalize_operator_evidence(proposal, requested_change)
+    proposal["operator_correction"] = build_operator_correction_payload(
+        proposal=proposal,
+        method_id=method_id,
+        target=proposal.get("target") or proposal.get("channel"),
+        requested_change=requested_change,
+        proposed_action=None if requested_change else _blocked_proposed_action(proposal),
+        blockers=_operator_correction_blockers(proposal),
+    )
+    return proposal
 
 
 def _sorted_suggestion_items(suggestions: Dict[Any, Any]) -> Iterable[Tuple[Any, Any]]:
@@ -441,7 +651,8 @@ def build_safe_gain_operator_proposals(
                 "target_trim_db": _round(target_trim),
             },
         }
-        proposals.append(_gate_proposal_cache_freshness(proposal, mixer_client))
+        gated = _gate_proposal_cache_freshness(proposal, mixer_client)
+        proposals.append(_attach_operator_correction(gated, method_id="lufs_gain_staging"))
     return proposals
 
 
@@ -488,9 +699,17 @@ def _soundcheck_kind_and_change(item: Dict[str, Any]) -> Tuple[str, Optional[Dic
             "value_type": value_type,
             "channel": channel,
             "value": round(value, 1),
+            "proposed_value": round(value, 1),
+            "readback_required": True,
+            "safety_evidence": [
+                {"label": "Source", "value": "no_write_soundcheck_recommendation"},
+                {"label": "Dry run", "value": True},
+            ],
         }
         if current_value is not None:
             change["current_value"] = round(current_value, 1)
+            change["old_value"] = round(current_value, 1)
+            change["rollback_value"] = round(current_value, 1)
             change["delta_db"] = round(value - current_value, 1)
         return value_type, change
     return kind or "soundcheck", None
@@ -550,7 +769,8 @@ def build_soundcheck_operator_proposals(
                 "soundcheck_item": dict(item),
             },
         }
-        proposals.append(_gate_proposal_cache_freshness(proposal, mixer_client))
+        gated = _gate_proposal_cache_freshness(proposal, mixer_client)
+        proposals.append(_attach_operator_correction(gated, method_id="auto_soundcheck_engine"))
     return proposals
 
 

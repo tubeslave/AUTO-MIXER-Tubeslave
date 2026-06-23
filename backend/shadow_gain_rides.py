@@ -27,6 +27,22 @@ OSCILLATION_DIRECTION_CHANGES = 2
 SHADOW_PROMOTION_LIVE_WRITE_KINDS = tuple(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
 
 
+def _proposal_denial_fields() -> Dict[str, Any]:
+    return {
+        "queue_action": "not_queueable_until_promoted",
+        "can_import_to_queue": False,
+        "can_apply_live": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "live_write": False,
+        "queue_mutation": False,
+        "mutates_mixer": False,
+    }
+
+
 def _coerce_float(value: Any) -> Optional[float]:
     try:
         return float(value)
@@ -188,7 +204,7 @@ def build_shadow_gain_ride_candidates(
                 "current_value": _round(channel.get("control_state", {}).get("fader_db")),
                 "proposed_value": None,
                 "rollback_value": _round(channel.get("control_state", {}).get("fader_db")),
-                "live_apply_allowed": False,
+                **_proposal_denial_fields(),
                 "blocked_reason": blocked_reason,
                 "safety_limits": {
                     "max_step_db": MAX_SHADOW_STEP_DB,
@@ -242,10 +258,11 @@ def shadow_gain_ride_trace(candidate: Dict[str, Any], *, mode: str = "shadow") -
         },
         "proof_status": "shadow_only",
         "blocked_reason": candidate.get("blocked_reason"),
+        **_proposal_denial_fields(),
         "metadata": {
             "candidate_id": candidate.get("id"),
             "name": candidate.get("name"),
-            "live_apply_allowed": False,
+            **_proposal_denial_fields(),
             "safety_evidence": candidate.get("safety_evidence", []),
             "scoring": candidate.get("scoring", {}),
         },

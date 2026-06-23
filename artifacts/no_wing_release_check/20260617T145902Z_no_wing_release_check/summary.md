@@ -1,0 +1,1160 @@
+# No-WING Release Check
+
+- generated_at: `2026-06-17T14:59:02Z`
+- status: `failed`
+- connection_policy: `no_hardware_no_network_no_live_writes`
+- live_write: `false`
+- artifact_manifest_summary_surface_required: `true`
+- artifact_manifest_summary_surface_required_fields: `["artifact_manifest_contract_id", "artifact_manifest_contract_required", "artifact_manifest_contract_fields", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_available", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_required", "artifact_manifest_contract_cross_surface_required_surfaces", "artifact_manifest_contract_cross_surface_required_fields", "artifact_manifest_contract_cross_surface_expected_match", "artifact_manifest_summary_json_contract_id_matches_manifest", "artifact_manifest_summary_json_contract_sha256_matches_manifest", "artifact_manifest_summary_json_contract_sha256_match_flag", "artifact_manifest_summary_md_contract_id_matches_manifest", "artifact_manifest_summary_md_contract_sha256_matches_manifest", "artifact_manifest_summary_md_contract_sha256_match_flag", "artifact_manifest_summary_json_cross_surface_readiness_closure_denied", "artifact_manifest_summary_json_cross_surface_live_authority_denied", "artifact_manifest_summary_md_cross_surface_readiness_closure_denied", "artifact_manifest_summary_md_cross_surface_live_authority_denied", "artifact_manifest_contract_cross_surface_mismatches", "artifact_manifest_contract_cross_surface_match", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted", "artifact_manifest_required", "artifact_manifest_path", "artifact_manifest_required_artifact_count", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted", "artifact_manifest_verifier_required", "artifact_manifest_verifier_command", "artifact_manifest_verifier_target_artifact_dir", "artifact_manifest_verifier_status_required", "artifact_manifest_verifier_failed_checks_required", "artifact_manifest_verifier_report_required_fields", "artifact_manifest_verifier_contacts_wing", "artifact_manifest_verifier_mutates_console_state", "artifact_manifest_verifier_queries_console", "artifact_manifest_verifier_readiness_closure_allowed", "artifact_manifest_verifier_live_authority_granted", "artifact_manifest_self_consistency_required", "artifact_manifest_self_consistency_artifact_count_matches_required", "artifact_manifest_self_consistency_required_artifact_ids_match_contract", "artifact_manifest_self_consistency_artifact_ids_match_required", "artifact_manifest_self_consistency_artifact_ids_unique", "artifact_manifest_self_consistency_required_artifact_paths_match_contract", "artifact_manifest_self_consistency_artifact_paths_match_required", "artifact_manifest_self_consistency_artifact_paths_unique", "artifact_manifest_self_consistency_required_sha_fields_match_contract", "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_sha256_availability_matches_entries", "artifact_manifest_self_consistency_read_only_required", "artifact_manifest_self_consistency_live_write_denied", "artifact_manifest_self_consistency_contacts_wing_denied", "artifact_manifest_self_consistency_contacts_backend_denied", "artifact_manifest_self_consistency_mutates_console_state_denied", "artifact_manifest_self_consistency_queries_console_denied", "artifact_manifest_self_consistency_executes_tests_denied", "artifact_manifest_self_consistency_readiness_closure_denied", "artifact_manifest_self_consistency_live_authority_denied", "artifact_manifest_self_consistency_mismatches", "artifact_manifest_self_consistency_match", "artifact_manifest_self_consistency_readiness_closure_allowed", "artifact_manifest_self_consistency_live_authority_granted", "artifact_manifest_self_consistency_summary_surface_required", "artifact_manifest_self_consistency_summary_surface_required_fields", "artifact_manifest_self_consistency_summary_surface_json_mismatches", "artifact_manifest_self_consistency_summary_surface_markdown_mismatches", "artifact_manifest_self_consistency_summary_surface_mismatches", "artifact_manifest_self_consistency_summary_surface_match", "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed", "artifact_manifest_self_consistency_summary_surface_live_authority_granted"]`
+- artifact_manifest_summary_surface_missing_fields: `[]`
+- artifact_manifest_summary_surface_required_field_lines: `["artifact_manifest_summary_surface_required", "artifact_manifest_summary_surface_required_fields", "artifact_manifest_summary_surface_missing_fields", "artifact_manifest_summary_surface_required_field_lines", "artifact_manifest_summary_surface_missing_field_lines", "artifact_manifest_summary_surface_field_lines_rendered", "artifact_manifest_contract_id", "artifact_manifest_contract_required", "artifact_manifest_contract_fields", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_available", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_required", "artifact_manifest_contract_cross_surface_required_surfaces", "artifact_manifest_contract_cross_surface_required_fields", "artifact_manifest_contract_cross_surface_expected_match", "artifact_manifest_summary_json_contract_id_matches_manifest", "artifact_manifest_summary_json_contract_sha256_matches_manifest", "artifact_manifest_summary_json_contract_sha256_match_flag", "artifact_manifest_summary_md_contract_id_matches_manifest", "artifact_manifest_summary_md_contract_sha256_matches_manifest", "artifact_manifest_summary_md_contract_sha256_match_flag", "artifact_manifest_summary_json_cross_surface_readiness_closure_denied", "artifact_manifest_summary_json_cross_surface_live_authority_denied", "artifact_manifest_summary_md_cross_surface_readiness_closure_denied", "artifact_manifest_summary_md_cross_surface_live_authority_denied", "artifact_manifest_contract_cross_surface_mismatches", "artifact_manifest_contract_cross_surface_match", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted", "artifact_manifest_required", "artifact_manifest_path", "artifact_manifest_required_artifact_count", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted", "artifact_manifest_verifier_required", "artifact_manifest_verifier_command", "artifact_manifest_verifier_target_artifact_dir", "artifact_manifest_verifier_status_required", "artifact_manifest_verifier_failed_checks_required", "artifact_manifest_verifier_report_required_fields", "artifact_manifest_verifier_contacts_wing", "artifact_manifest_verifier_mutates_console_state", "artifact_manifest_verifier_queries_console", "artifact_manifest_verifier_readiness_closure_allowed", "artifact_manifest_verifier_live_authority_granted", "artifact_manifest_self_consistency_required", "artifact_manifest_self_consistency_artifact_count_matches_required", "artifact_manifest_self_consistency_required_artifact_ids_match_contract", "artifact_manifest_self_consistency_artifact_ids_match_required", "artifact_manifest_self_consistency_artifact_ids_unique", "artifact_manifest_self_consistency_required_artifact_paths_match_contract", "artifact_manifest_self_consistency_artifact_paths_match_required", "artifact_manifest_self_consistency_artifact_paths_unique", "artifact_manifest_self_consistency_required_sha_fields_match_contract", "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_sha256_availability_matches_entries", "artifact_manifest_self_consistency_read_only_required", "artifact_manifest_self_consistency_live_write_denied", "artifact_manifest_self_consistency_contacts_wing_denied", "artifact_manifest_self_consistency_contacts_backend_denied", "artifact_manifest_self_consistency_mutates_console_state_denied", "artifact_manifest_self_consistency_queries_console_denied", "artifact_manifest_self_consistency_executes_tests_denied", "artifact_manifest_self_consistency_readiness_closure_denied", "artifact_manifest_self_consistency_live_authority_denied", "artifact_manifest_self_consistency_mismatches", "artifact_manifest_self_consistency_match", "artifact_manifest_self_consistency_readiness_closure_allowed", "artifact_manifest_self_consistency_live_authority_granted", "artifact_manifest_self_consistency_summary_surface_required", "artifact_manifest_self_consistency_summary_surface_required_fields", "artifact_manifest_self_consistency_summary_surface_json_mismatches", "artifact_manifest_self_consistency_summary_surface_markdown_mismatches", "artifact_manifest_self_consistency_summary_surface_mismatches", "artifact_manifest_self_consistency_summary_surface_match", "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed", "artifact_manifest_self_consistency_summary_surface_live_authority_granted"]`
+- artifact_manifest_summary_surface_missing_field_lines: `[]`
+- artifact_manifest_summary_surface_field_lines_rendered: `true`
+- artifact_manifest_contract_id: `no_wing_release_check_artifact_manifest_contract.v1`
+- artifact_manifest_contract_required: `true`
+- artifact_manifest_contract_fields: `["artifact_manifest_path", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted", "read_only", "live_write", "contacts_wing", "contacts_backend", "mutates_console_state", "queries_console", "executes_tests", "readiness_closure_allowed", "live_authority_granted"]`
+- artifact_manifest_contract_sha256: `b8328d3f1d4379ed09e8e4482fd5e3a2af6b8b38987d7041719107b258972b61`
+- artifact_manifest_contract_sha256_available: `true`
+- artifact_manifest_contract_sha256_matches_expected: `true`
+- artifact_manifest_contract_cross_surface_required: `true`
+- artifact_manifest_contract_cross_surface_required_surfaces: `["summary.json", "summary.md", "artifact-manifest.json"]`
+- artifact_manifest_contract_cross_surface_required_fields: `["artifact_manifest_contract_id", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted"]`
+- artifact_manifest_contract_cross_surface_expected_match: `true`
+- artifact_manifest_summary_json_contract_id_matches_manifest: `true`
+- artifact_manifest_summary_json_contract_sha256_matches_manifest: `true`
+- artifact_manifest_summary_json_contract_sha256_match_flag: `true`
+- artifact_manifest_summary_md_contract_id_matches_manifest: `true`
+- artifact_manifest_summary_md_contract_sha256_matches_manifest: `true`
+- artifact_manifest_summary_md_contract_sha256_match_flag: `true`
+- artifact_manifest_summary_json_cross_surface_readiness_closure_denied: `true`
+- artifact_manifest_summary_json_cross_surface_live_authority_denied: `true`
+- artifact_manifest_summary_md_cross_surface_readiness_closure_denied: `true`
+- artifact_manifest_summary_md_cross_surface_live_authority_denied: `true`
+- artifact_manifest_contract_cross_surface_mismatches: `[]`
+- artifact_manifest_contract_cross_surface_match: `true`
+- artifact_manifest_contract_cross_surface_readiness_closure_allowed: `false`
+- artifact_manifest_contract_cross_surface_live_authority_granted: `false`
+- artifact_manifest_required: `true`
+- artifact_manifest_path: `artifact-manifest.json`
+- artifact_manifest_required_artifact_count: `2`
+- artifact_manifest_required_artifact_ids: `["summary_json", "summary_md"]`
+- artifact_manifest_required_artifact_paths: `["summary.json", "summary.md"]`
+- artifact_manifest_required_artifact_sha256_fields: `["artifact_manifest_summary_json_sha256", "artifact_manifest_summary_md_sha256"]`
+- artifact_manifest_readiness_closure_allowed: `false`
+- artifact_manifest_live_authority_granted: `false`
+- artifact_manifest_verifier_required: `true`
+- artifact_manifest_verifier_command: `PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>`
+- artifact_manifest_verifier_target_artifact_dir: `<no_wing_artifact_dir>`
+- artifact_manifest_verifier_status_required: `passed`
+- artifact_manifest_verifier_failed_checks_required: `[]`
+- artifact_manifest_verifier_report_required_fields: `["status", "failed_checks", "failed_checks_missing_check_entries", "checks", "verifier_report_required_fields", "verifier_report_required_fields_missing", "verifier_report_required_fields_match_contract", "artifact_manifest_self_consistency_match", "artifact_manifest_contract_cross_surface_match", "artifact_manifest_self_consistency_summary_surface_match", "read_only", "live_write", "contacts_wing", "contacts_backend", "mutates_console_state", "queries_console", "executes_tests", "readiness_closure_allowed", "live_authority_granted"]`
+- artifact_manifest_verifier_contacts_wing: `false`
+- artifact_manifest_verifier_mutates_console_state: `false`
+- artifact_manifest_verifier_queries_console: `false`
+- artifact_manifest_verifier_readiness_closure_allowed: `false`
+- artifact_manifest_verifier_live_authority_granted: `false`
+- artifact_manifest_self_consistency_required: `true`
+- artifact_manifest_self_consistency_artifact_count_matches_required: `true`
+- artifact_manifest_self_consistency_required_artifact_ids_match_contract: `true`
+- artifact_manifest_self_consistency_artifact_ids_match_required: `true`
+- artifact_manifest_self_consistency_artifact_ids_unique: `true`
+- artifact_manifest_self_consistency_required_artifact_paths_match_contract: `true`
+- artifact_manifest_self_consistency_artifact_paths_match_required: `true`
+- artifact_manifest_self_consistency_artifact_paths_unique: `true`
+- artifact_manifest_self_consistency_required_sha_fields_match_contract: `true`
+- artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level: `true`
+- artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level: `true`
+- artifact_manifest_self_consistency_sha256_availability_matches_entries: `true`
+- artifact_manifest_self_consistency_read_only_required: `true`
+- artifact_manifest_self_consistency_live_write_denied: `true`
+- artifact_manifest_self_consistency_contacts_wing_denied: `true`
+- artifact_manifest_self_consistency_contacts_backend_denied: `true`
+- artifact_manifest_self_consistency_mutates_console_state_denied: `true`
+- artifact_manifest_self_consistency_queries_console_denied: `true`
+- artifact_manifest_self_consistency_executes_tests_denied: `true`
+- artifact_manifest_self_consistency_readiness_closure_denied: `true`
+- artifact_manifest_self_consistency_live_authority_denied: `true`
+- artifact_manifest_self_consistency_mismatches: `[]`
+- artifact_manifest_self_consistency_match: `true`
+- artifact_manifest_self_consistency_readiness_closure_allowed: `false`
+- artifact_manifest_self_consistency_live_authority_granted: `false`
+- artifact_manifest_self_consistency_summary_surface_required: `true`
+- artifact_manifest_self_consistency_summary_surface_required_fields: `["artifact_manifest_self_consistency_required", "artifact_manifest_self_consistency_artifact_count_matches_required", "artifact_manifest_self_consistency_required_artifact_ids_match_contract", "artifact_manifest_self_consistency_artifact_ids_match_required", "artifact_manifest_self_consistency_artifact_ids_unique", "artifact_manifest_self_consistency_required_artifact_paths_match_contract", "artifact_manifest_self_consistency_artifact_paths_match_required", "artifact_manifest_self_consistency_artifact_paths_unique", "artifact_manifest_self_consistency_required_sha_fields_match_contract", "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_sha256_availability_matches_entries", "artifact_manifest_self_consistency_read_only_required", "artifact_manifest_self_consistency_live_write_denied", "artifact_manifest_self_consistency_contacts_wing_denied", "artifact_manifest_self_consistency_contacts_backend_denied", "artifact_manifest_self_consistency_mutates_console_state_denied", "artifact_manifest_self_consistency_queries_console_denied", "artifact_manifest_self_consistency_executes_tests_denied", "artifact_manifest_self_consistency_readiness_closure_denied", "artifact_manifest_self_consistency_live_authority_denied", "artifact_manifest_self_consistency_mismatches", "artifact_manifest_self_consistency_match", "artifact_manifest_self_consistency_readiness_closure_allowed", "artifact_manifest_self_consistency_live_authority_granted"]`
+- artifact_manifest_self_consistency_summary_surface_json_mismatches: `[]`
+- artifact_manifest_self_consistency_summary_surface_markdown_mismatches: `[]`
+- artifact_manifest_self_consistency_summary_surface_mismatches: `[]`
+- artifact_manifest_self_consistency_summary_surface_match: `true`
+- artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed: `false`
+- artifact_manifest_self_consistency_summary_surface_live_authority_granted: `false`
+
+## Checks
+
+- `backend_port_free`: `passed`
+- `write_surface_static_scan`: `passed`
+- `read_surface_fixture_evidence`: `passed`
+- `read_surface_fixture_evidence_schema`: `passed`
+- `read_surface_remediation_plan_schema`: `passed`
+- `read_surface_physical_readback_capture_plan_schema`: `passed`
+- `wing_readonly_preflight_evidence_schema`: `passed`
+- `wing_readonly_preflight_review_decision_ledger_schema`: `passed`
+- `raw_mixer_state_physical_readback_contract_schema`: `passed`
+- `raw_mixer_state_physical_readback_artifact_intake_schema`: `passed`
+- `channel_basic_controls_physical_readback_contract_schema`: `passed`
+- `channel_basic_controls_physical_readback_artifact_intake_schema`: `passed`
+- `channel_processing_physical_readback_contract_schema`: `passed`
+- `channel_processing_physical_readback_artifact_intake_schema`: `passed`
+- `bus_group_main_dca_physical_readback_contract_schema`: `passed`
+- `bus_group_main_dca_physical_readback_artifact_intake_schema`: `passed`
+- `matrix_state_physical_readback_contract_schema`: `passed`
+- `matrix_state_physical_readback_artifact_intake_schema`: `passed`
+- `fx_slots_inserts_physical_readback_contract_schema`: `passed`
+- `fx_slots_inserts_physical_readback_artifact_intake_schema`: `passed`
+- `routing_sends_physical_readback_contract_schema`: `passed`
+- `routing_sends_physical_readback_artifact_intake_schema`: `passed`
+- `snapshots_scenes_physical_readback_contract_schema`: `passed`
+- `snapshots_scenes_physical_readback_artifact_intake_schema`: `passed`
+- `user_presets_physical_readback_contract_schema`: `passed`
+- `user_presets_physical_readback_artifact_intake_schema`: `passed`
+- `dlive_state_physical_readback_contract_schema`: `passed`
+- `dlive_state_physical_readback_artifact_intake_schema`: `passed`
+- `read_surface_physical_readback_artifact_review_queue_schema`: `passed`
+- `read_surface_physical_readback_fixture_acceptance_ledger_schema`: `passed`
+- `read_surface_physical_readback_fixture_closure_plan_schema`: `passed`
+- `backend_pytest`: `passed`
+- `offline_operator_validation_harness`: `passed`
+- `wing_readonly_preflight_plan`: `failed`
+
+## Read Surface Fixture Evidence
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- full_autonomous_ready: `false`
+- snapshot_status: `fixture_evidence_incomplete`
+- surface_count: `10`
+- surface_with_fixture_count: `10`
+- declared_fixture_path_count: `20`
+- declared_test_name_count: `55`
+- physical_gap_surface_count: `10`
+- summary_recomputed_from_rows: `true`
+- fixture_declaration_validation: `true`
+- contract_gap_consistency_enforced: `true`
+- status_counts: `{"fixture_evidence_present": 0, "missing_fixture_evidence": 0, "partial_fixture_evidence": 10}`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- violations: `[]`
+
+## Read Surface Remediation Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- plan_status: `read_remediation_required`
+- action_count: `10`
+- incomplete_surface_count: `10`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- next_physical_readback_target_action_ids: `["remediate_raw_mixer_state_cache"]`
+- target_action_consistency: `true`
+- violations: `[]`
+
+## Read Surface Physical Readback Capture Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_plan: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- plan_status: `operator_capture_required`
+- capture_step_count: `1`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- target_action_consistency: `true`
+- required_artifact_contracts: `["physical_readback_fixture", "raw_mixer_state_physical_readback_contract", "physical_readback_fixture_missing", "hardware_parity_unproven", "per_field_stale_cache_fixture_incomplete"]`
+- blocked_by: `["physical_readback_fixtures_incomplete", "operator_must_capture_and_review_physical_readback_artifact"]`
+- step_surface_id: `raw_mixer_state_cache`
+- step_remediation_action_id: `remediate_raw_mixer_state_cache`
+- violations: `[]`
+
+## WING Read-Only Preflight Evidence
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- readiness_closure_allowed_by_evidence: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- evidence_status: `operator_preflight_required`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- readiness_update_candidate_available: `false`
+- mvp_blocker_matrix_ids: `["wing_readonly_connection_proof", "physical_console_readback_proof", "operator_visible_evidence_report", "readiness_matrix_update_based_on_real_proof"]`
+- mvp_blockers_closed_by_evidence: `[]`
+- latest_valid_candidate_run_id: `None`
+- artifact_operator_next_steps: `[]`
+- capture_tool_path: `tools/wing_readonly_preflight_runner.py`
+- capture_tool_available: `true`
+- plan_command: `["python3", "tools/wing_readonly_preflight_runner.py", "--url", "ws://localhost:8765", "--channels", "3", "--operator-confirm-channels", "3", "--operator-confirm-session-ready", "--value-types", "fader,gain,pan", "--require-physical-readback", "--artifact-root", "artifacts/wing_readonly_preflight", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--plan-only", "--plan-output", "artifacts/wing_readonly_preflight_plan/latest_plan.json"]`
+- plan_command_uses_plan_only: `true`
+- expected_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- runner_argparse_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- runner_argparse_target_defaults_match_contract: `true`
+- expected_supported_value_types: `["fader", "gain", "pan"]`
+- runner_supported_value_types: `["fader", "gain", "pan"]`
+- expected_proof_runner: `wing_readonly_preflight_runner`
+- runner_proof_runner: `wing_readonly_preflight_runner`
+- evidence_proof_runner: `wing_readonly_preflight_runner`
+- runner_proof_runner_match_contract: `true`
+- evidence_proof_runner_match_contract: `true`
+- expected_run_summary_status: `passed`
+- expected_run_summary_reason: `wing_readonly_preflight_passed`
+- runner_run_summary_status: `passed`
+- runner_run_summary_reason: `wing_readonly_preflight_passed`
+- evidence_expected_run_summary_status: `passed`
+- evidence_expected_run_summary_reason: `wing_readonly_preflight_passed`
+- runner_run_summary_status_match_contract: `true`
+- runner_run_summary_reason_match_contract: `true`
+- evidence_run_summary_status_match_contract: `true`
+- evidence_run_summary_reason_match_contract: `true`
+- evidence_allowed_value_types: `["fader", "gain", "pan"]`
+- runner_supported_value_types_match_contract: `true`
+- evidence_allowed_value_types_match_contract: `true`
+- expected_physical_readback_statuses: `["verified_from_physical_readback"]`
+- expected_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- runner_physical_readback_statuses: `["verified_from_physical_readback"]`
+- runner_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- runner_physical_readback_statuses_match_contract: `true`
+- runner_physical_readback_sources_match_contract: `true`
+- evidence_physical_readback_statuses: `["verified_from_physical_readback"]`
+- evidence_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- evidence_physical_readback_statuses_match_contract: `true`
+- evidence_physical_readback_sources_match_contract: `true`
+- plan_command_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- plan_command_target_defaults_match_contract: `true`
+- plan_command_output: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- plan_command_output_matches_contract: `true`
+- plan_command_channels: `3`
+- plan_command_operator_confirmed_channels: `3`
+- plan_command_value_types: `fader,gain,pan`
+- plan_command_artifact_root: `artifacts/wing_readonly_preflight`
+- plan_command_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- plan_command_matches_capture: `true`
+- prestart_backend_port_check_required: `true`
+- prestart_backend_port_check_must_pass_before_starting_backend: `true`
+- prestart_backend_port_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+- prestart_backend_port_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
+- capture_command_template: `["python3", "tools/wing_readonly_preflight_runner.py", "--url", "ws://localhost:8765", "--channels", "3", "--operator-confirm-channels", "3", "--operator-confirm-session-ready", "--value-types", "fader,gain,pan", "--require-physical-readback", "--artifact-root", "artifacts/wing_readonly_preflight", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--expected-plan", "artifacts/wing_readonly_preflight_plan/latest_plan.json"]`
+- capture_command_url: `ws://localhost:8765`
+- capture_command_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- capture_command_target_defaults_match_contract: `true`
+- capture_command_channels: `3`
+- capture_command_operator_confirmed_channels: `3`
+- capture_command_requires_operator_channel_confirmation: `true`
+- capture_command_operator_confirmation_matches_channels: `true`
+- capture_command_requires_physical_readback: `true`
+- capture_command_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- capture_command_prestart_summary_matches_plan: `true`
+- capture_command_expected_plan: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- capture_command_expected_plan_matches_contract: `true`
+- capture_command_expected_plan_matches_plan_output: `true`
+- review_tool_path: `tools/review_wing_readonly_preflight_artifacts.py`
+- review_tool_available: `true`
+- review_command: `["python3", "tools/review_wing_readonly_preflight_artifacts.py", "--artifact-root", "artifacts/wing_readonly_preflight", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md", "--decision-template-output", "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"]`
+- review_command_writes_decision_template: `true`
+- review_decision_template_output: `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`
+- review_decision_template_output_matches_contract: `true`
+- review_exit_codes: `{"artifact_missing": 2, "candidate_ready": 0, "invalid_artifact": 3}`
+- review_manual_checklist_ids: `["confirm_artifact_paths", "confirm_operator_channel_scope", "confirm_operator_session_ready", "confirm_physical_readbacks", "confirm_event_log_readonly_sequence", "confirm_event_log_run_id_binding", "confirm_no_live_authority"]`
+- review_manual_checklist_complete: `true`
+- review_decision_template_required_fields: `["review_id", "artifact_source_id", "run_id", "artifact_captured_at", "artifact_root", "summary_path", "summary_sha256", "events_path", "events_sha256", "channels", "value_types", "operator_confirmed_channels", "operator_confirmed_session_ready", "readback_count", "physical_readback_count", "request_id_policy", "request_id_correlation_required", "event_log_run_id_matches_summary", "decision", "reviewed_by", "reviewed_at", "checklist_ids"]`
+- review_decision_template_contract_complete: `true`
+- review_decision_template_status: `operator_must_replace_placeholders_before_ledger_acceptance`
+- review_decision_template_status_matches_contract: `true`
+- handoff_packet_tool_path: `tools/build_wing_readonly_preflight_handoff_packet.py`
+- handoff_packet_tool_available: `true`
+- handoff_packet_command: `["python3", "tools/build_wing_readonly_preflight_handoff_packet.py", "--url", "ws://localhost:8765", "--channels", "3", "--value-types", "fader,gain,pan", "--artifact-root", "artifacts/wing_readonly_preflight", "--plan-output", "artifacts/wing_readonly_preflight_plan/latest_plan.json", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"]`
+- handoff_packet_output: `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md`
+- handoff_packet_output_matches_contract: `true`
+- handoff_packet_plan_output: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- handoff_packet_plan_output_matches_contract: `true`
+- handoff_packet_plan_output_matches_plan_command: `true`
+- handoff_packet_url: `ws://localhost:8765`
+- handoff_packet_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- handoff_packet_target_defaults_match_contract: `true`
+- handoff_packet_artifact_root: `artifacts/wing_readonly_preflight`
+- handoff_packet_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- handoff_packet_channels: `3`
+- handoff_packet_value_types: `fader,gain,pan`
+- handoff_packet_url_matches_capture: `true`
+- handoff_packet_artifact_root_matches_capture: `true`
+- handoff_packet_prestart_summary_matches_capture: `true`
+- handoff_packet_channel_matches_capture: `true`
+- handoff_packet_value_types_match_capture: `true`
+- blocked_by: `["operator_must_run_wing_readonly_preflight_runner"]`
+- violations: `[]`
+
+## WING Read-Only Preflight Review Decision Ledger
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- readiness_matrix_update_allowed_by_decision: `false`
+- readiness_closure_allowed_by_decision: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- ledger_status: `operator_review_required`
+- review_tool_path: `tools/review_wing_readonly_preflight_decisions.py`
+- review_tool_available: `true`
+- review_command: `["python3", "tools/review_wing_readonly_preflight_decisions.py", "--artifact-root", "artifacts/wing_readonly_preflight", "--decision-root", "artifacts/wing_readonly_preflight_review_decisions", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"]`
+- review_exit_codes: `{"accepted_decision_ready": 0, "candidate_rejected": 4, "decision_missing_or_invalid": 3, "preflight_candidate_missing": 2}`
+- preflight_evidence_status: `operator_preflight_required`
+- decision_search_roots: `["artifacts/wing_readonly_preflight_review_decisions"]`
+- review_candidate_count: `0`
+- decision_record_count: `0`
+- accepted_record_count: `0`
+- rejected_record_count: `0`
+- invalid_record_count: `0`
+- unreviewed_candidate_count: `0`
+- manual_readiness_update_candidate_available: `false`
+- accepted_source_ids: `[]`
+- accepted_candidate_prestart_contract_valid: `false`
+- accepted_candidate_prestart_source_ids: `[]`
+- accepted_candidate_prestart_contract_violations_by_source: `{}`
+- accepted_candidate_artifact_root_contract_valid: `false`
+- accepted_candidate_artifact_roots: `[]`
+- accepted_candidate_artifact_root_contract_violations_by_source: `{}`
+- rejected_source_ids: `[]`
+- invalid_record_ids: `[]`
+- invalid_records: `[]`
+- duplicate_source_ids: `[]`
+- conflicting_source_ids: `[]`
+- unreviewed_candidate_source_ids: `[]`
+- candidate_reviews: `[]`
+- blocked_by: `["operator_must_capture_valid_readonly_preflight_candidate_first"]`
+- violations: `[]`
+
+## Raw Mixer State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `raw_mixer_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `raw_mixer_state_cache`
+- remediation_action_id: `remediate_raw_mixer_state_cache`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- required_top_level_field_count: `10`
+- required_row_field_count: `5`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Raw Mixer State Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `raw_mixer_state_physical_readback.v1`
+- surface_id: `raw_mixer_state_cache`
+- remediation_action_id: `remediate_raw_mixer_state_cache`
+- required_contract_method_id: `raw_mixer_state_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/raw_mixer_state", "artifacts/raw_mixer_state_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_raw_mixer_state_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Channel Basic Controls Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `channel_basic_controls_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `channel_identity_and_basic_controls`
+- remediation_action_id: `remediate_channel_identity_and_basic_controls`
+- physical_readback_surface_id: `channel_identity_and_basic_controls`
+- physical_readback_action_id: `remediate_channel_identity_and_basic_controls`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "pan_phase_delay"]`
+- required_top_level_field_count: `10`
+- required_channel_field_count: `8`
+- required_identity_fields: `["source_name", "source_role", "input_source"]`
+- required_control_fields: `["fader_db", "trim_db", "mute", "pan"]`
+- required_coverage_flags: `["identity", "basic_controls", "cache_matches_physical_readback"]`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_channel_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "mute_write_events", "pan_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Channel Basic Controls Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `channel_basic_controls_physical_readback.v1`
+- surface_id: `channel_identity_and_basic_controls`
+- remediation_action_id: `remediate_channel_identity_and_basic_controls`
+- required_contract_method_id: `channel_basic_controls_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_channel_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "pan_phase_delay"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/channel_basic_controls", "artifacts/channel_basic_controls_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_channel_basic_controls_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Channel Processing Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `channel_processing_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `channel_eq_dynamics_gate`
+- remediation_action_id: `remediate_channel_eq_dynamics_gate`
+- physical_readback_surface_id: `channel_eq_dynamics_gate`
+- physical_readback_action_id: `remediate_channel_eq_dynamics_gate`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["eq", "compressor", "gate", "deessing", "frequency_separation", "cross_channel_unmasking"]`
+- required_top_level_field_count: `10`
+- required_channel_field_count: `10`
+- required_hpf_fields: `["enabled", "frequency_hz"]`
+- required_eq_fields: `["enabled", "bands"]`
+- required_eq_band_fields: `["band", "frequency_hz", "gain_db", "q"]`
+- required_compressor_fields: `["enabled", "model", "threshold_db", "ratio", "attack_ms", "release_ms", "makeup_db", "mix_pct", "detector", "gain_reduction_db"]`
+- required_gate_fields: `["enabled", "model", "threshold_db", "range_db", "attack_ms", "hold_ms", "release_ms", "accent", "ratio"]`
+- required_coverage_flags: `["hpf", "eq", "compressor", "gate", "cache_matches_physical_readback"]`
+- minimum_eq_band_count: `4`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_channel_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "eq_write_events", "compressor_write_events", "gate_write_events", "hpf_write_events", "reset_channel_processing_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Channel Processing Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `channel_processing_physical_readback.v1`
+- surface_id: `channel_eq_dynamics_gate`
+- remediation_action_id: `remediate_channel_eq_dynamics_gate`
+- required_contract_method_id: `channel_processing_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_channel_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["eq", "compressor", "gate", "deessing", "frequency_separation", "cross_channel_unmasking"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/channel_processing", "artifacts/channel_processing_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_channel_processing_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Bus Group Main DCA Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `bus_group_main_dca_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `bus_group_main_dca_state`
+- remediation_action_id: `remediate_bus_group_main_dca_state`
+- physical_readback_surface_id: `bus_group_main_dca_state`
+- physical_readback_action_id: `remediate_bus_group_main_dca_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "dca", "master_bus", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `14`
+- required_bus_field_count: `9`
+- required_main_field_count: `8`
+- required_dca_field_count: `8`
+- required_bus_control_fields: `["fader_db", "mute", "pan", "width", "mono"]`
+- required_main_control_fields: `["fader_db", "mute", "pan"]`
+- required_dca_control_fields: `["fader_db", "mute", "monitor"]`
+- required_bus_assignment_fields: `["dca_assignments", "main_send_on", "main_send_level_db", "main_send_pre"]`
+- required_dca_assignment_fields: `["member_channels", "member_buses"]`
+- required_metering_fields: `["lufs", "true_peak_dbtp", "headroom_db"]`
+- required_bus_coverage_flags: `["controls", "assignments", "metering", "cache_matches_physical_readback"]`
+- required_main_coverage_flags: `["controls", "metering", "cache_matches_physical_readback"]`
+- required_dca_coverage_flags: `["identity", "controls", "assignments", "cache_matches_physical_readback"]`
+- minimum_bus_count: `1`
+- minimum_main_count: `1`
+- minimum_dca_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_surface_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "bus_write_events", "group_write_events", "dca_write_events", "main_bus_write_events", "matrix_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Bus Group Main DCA Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `bus_group_main_dca_physical_readback.v1`
+- surface_id: `bus_group_main_dca_state`
+- remediation_action_id: `remediate_bus_group_main_dca_state`
+- required_contract_method_id: `bus_group_main_dca_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_bus_count: `0`
+- valid_main_count: `0`
+- valid_dca_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "dca", "master_bus", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/bus_group_main_dca", "artifacts/bus_group_main_dca_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_bus_group_main_dca_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Matrix State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `matrix_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `matrix_state`
+- remediation_action_id: `remediate_matrix_state`
+- physical_readback_surface_id: `matrix_state`
+- physical_readback_action_id: `remediate_matrix_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "fx_send_insert", "master_bus", "mix_balance", "routing", "performance_adaptation"]`
+- required_top_level_field_count: `10`
+- required_matrix_field_count: `11`
+- required_control_fields: `["fader_db", "mute", "pan"]`
+- required_eq_fields: `["enabled", "bands"]`
+- required_eq_band_fields: `["band", "frequency_hz", "gain_db", "q"]`
+- required_dynamics_fields: `["enabled", "model", "threshold_db", "ratio", "knee", "detector", "attack_ms", "release_ms", "makeup_db", "mix_pct", "gain_reduction_db"]`
+- required_insert_fields: `["pre_insert_on", "pre_insert_slot", "pre_insert_status", "post_insert_on", "post_insert_slot", "post_insert_status", "post_insert_mode", "post_insert_weight"]`
+- required_metering_fields: `["lufs", "true_peak_dbtp", "headroom_db"]`
+- required_coverage_flags: `["controls", "eq", "dynamics", "inserts", "metering", "cache_matches_physical_readback"]`
+- minimum_matrix_count: `1`
+- minimum_eq_band_count: `8`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_matrix_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "matrix_write_events", "matrix_send_write_events", "matrix_eq_write_events", "matrix_dynamics_write_events", "matrix_insert_write_events", "routing_write_events", "fx_send_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Matrix State Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `matrix_state_physical_readback.v1`
+- surface_id: `matrix_state`
+- remediation_action_id: `remediate_matrix_state`
+- required_contract_method_id: `matrix_state_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_matrix_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "fx_send_insert", "master_bus", "mix_balance", "routing", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/matrix_state", "artifacts/matrix_state_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_matrix_state_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## FX Slots Inserts Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `fx_slots_inserts_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `fx_slots_and_inserts`
+- remediation_action_id: `remediate_fx_slots_and_inserts`
+- physical_readback_surface_id: `fx_slots_and_inserts`
+- physical_readback_action_id: `remediate_fx_slots_and_inserts`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fx_send_insert", "routing", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `12`
+- required_fx_slot_field_count: `16`
+- required_fx_slot_fields: `["slot", "slot_number", "readback_status", "readback_source", "captured_at", "model", "on", "mix", "source", "mode", "assigned_channel", "assigned_position", "active", "parameters", "parameter_schema", "coverage"]`
+- required_parameter_fields: `["parameter_index", "value", "schema_status", "schema_family", "schema_source", "semantic_name", "unit", "safe_range"]`
+- required_parameter_safe_range_fields: `["min", "max"]`
+- required_parameter_schema_fields: `["status", "schema_family", "schema_source", "mapped_parameter_count", "generic_parameter_count", "cached_parameter_count", "physical_model_schema_verified", "live_write_authority"]`
+- required_fx_slot_coverage_flags: `["identity", "assignment", "parameters", "parameter_schema", "cache_matches_physical_readback"]`
+- required_insert_fields: `["target_type", "target", "position", "readback_status", "readback_source", "captured_at", "on", "slot", "status", "mode", "weight", "linked_fx_slot", "active", "insert_assignment_policy", "destructive_change_marker", "coverage"]`
+- required_insert_coverage_flags: `["assignment", "status", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready"]`
+- minimum_fx_slot_count: `1`
+- minimum_fx_parameter_count: `4`
+- minimum_insert_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- allowed_insert_target_types: `["channel", "bus", "main", "matrix"]`
+- allowed_insert_positions: `["pre", "post"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "fx_write_events", "fx_slot_write_events", "fx_parameter_write_events", "fx_send_write_events", "insert_write_events", "insert_assignment_write_events", "routing_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## FX Slots Inserts Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `fx_slots_inserts_physical_readback.v1`
+- surface_id: `fx_slots_and_inserts`
+- remediation_action_id: `remediate_fx_slots_and_inserts`
+- required_contract_method_id: `fx_slots_inserts_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_fx_slot_count: `0`
+- valid_insert_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fx_send_insert", "routing", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/fx_slots_and_inserts", "artifacts/fx_slots_inserts_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_fx_slots_inserts_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Routing Sends Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `routing_sends_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `routing_and_sends`
+- remediation_action_id: `remediate_routing_and_sends`
+- physical_readback_surface_id: `routing_and_sends`
+- physical_readback_action_id: `remediate_routing_and_sends`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["routing", "fx_send_insert", "bus_group_matrix", "scene_preset", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `18`
+- required_static_route_field_count: `13`
+- required_static_route_fields: `["start", "end", "role", "tap_point", "label_short", "label_full", "required", "wing_routing_hint", "used_by", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_bus_send_fields: `["channel", "send", "target_bus", "readback_status", "readback_source", "captured_at", "on", "level_db", "pre_on", "mode", "plink", "pan", "active", "destructive_change_marker", "coverage"]`
+- required_main_send_fields: `["channel", "main", "readback_status", "readback_source", "captured_at", "on", "level_db", "pre", "active", "destructive_change_marker", "coverage"]`
+- required_matrix_send_fields: `["channel", "send", "target_matrix", "readback_status", "readback_source", "captured_at", "on", "level_db", "active", "destructive_change_marker", "coverage"]`
+- required_output_route_fields: `["output_group", "output_number", "readback_status", "readback_source", "captured_at", "source_group", "source_channel", "destructive_change_marker", "coverage"]`
+- required_static_route_coverage_flags: `["identity", "static_config_match", "physical_route_mapping", "scoped_diff_marker"]`
+- required_send_coverage_flags: `["assignment", "level", "mode", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_output_route_coverage_flags: `["assignment", "source", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready"]`
+- minimum_static_dante_route_count: `1`
+- minimum_channel_bus_send_count: `1`
+- minimum_channel_main_send_count: `1`
+- minimum_channel_matrix_send_count: `1`
+- minimum_output_route_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "routing_write_events", "route_write_events", "send_write_events", "bus_send_write_events", "main_send_write_events", "matrix_send_write_events", "output_route_write_events", "dante_patch_write_events", "scene_recall_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Routing Sends Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `routing_sends_physical_readback.v1`
+- surface_id: `routing_and_sends`
+- remediation_action_id: `remediate_routing_and_sends`
+- required_contract_method_id: `routing_sends_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_static_dante_route_count: `0`
+- valid_channel_bus_send_count: `0`
+- valid_channel_main_send_count: `0`
+- valid_channel_matrix_send_count: `0`
+- valid_output_route_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["routing", "fx_send_insert", "bus_group_matrix", "scene_preset", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/routing_and_sends", "artifacts/routing_sends_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_routing_sends_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Snapshots Scenes Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- scene_load_allowed: `false`
+- scene_save_allowed: `false`
+- schema_id: `snapshots_scenes_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `snapshots_scenes`
+- remediation_action_id: `remediate_snapshots_scenes`
+- physical_readback_surface_id: `snapshots_scenes`
+- physical_readback_action_id: `remediate_snapshots_scenes`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- required_snapshot_fields: `["snapshot_index", "snapshot_name", "readback_status", "readback_source", "captured_at", "active", "scene_load_policy", "scene_save_policy", "destructive_change_marker", "destructive_persistence_marker", "scene_content_fingerprint", "scoped_diff_marker", "rollback_reference", "coverage"]`
+- required_coverage_flags: `["catalog_identity", "active_scene", "scene_content_fingerprint", "scoped_diff_marker", "rollback_reference", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "scene_load_allowed", "scene_save_allowed"]`
+- minimum_snapshot_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## Snapshots Scenes Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- scene_load_allowed: `false`
+- scene_save_allowed: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `snapshots_scenes_physical_readback.v1`
+- surface_id: `snapshots_scenes`
+- remediation_action_id: `remediate_snapshots_scenes`
+- required_contract_method_id: `snapshots_scenes_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_snapshot_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/snapshots_scenes", "artifacts/snapshots_scenes_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_snapshots_scenes_physical_readback_artifact"]`
+- intake_violations: `[]`
+- target_consistency: `true`
+- violations: `[]`
+
+## User Presets Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- preset_recall_allowed: `false`
+- preset_store_allowed: `false`
+- schema_id: `user_presets_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `user_presets`
+- remediation_action_id: `remediate_user_presets`
+- physical_readback_surface_id: `user_presets`
+- physical_readback_action_id: `remediate_user_presets`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- required_preset_fields: `["preset_index", "preset_name", "preset_scope", "target_type", "target_label", "readback_status", "readback_source", "captured_at", "preset_recall_policy", "preset_store_policy", "destructive_recall_marker", "destructive_store_marker", "preset_content_fingerprint", "scoped_diff_marker", "rollback_reference", "coverage"]`
+- required_coverage_flags: `["catalog_identity", "scope", "target", "preset_content_fingerprint", "scoped_diff_marker", "rollback_reference", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "preset_recall_allowed", "preset_store_allowed"]`
+- minimum_preset_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## User Presets Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- preset_recall_allowed: `false`
+- preset_store_allowed: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `user_presets_physical_readback.v1`
+- surface_id: `user_presets`
+- remediation_action_id: `remediate_user_presets`
+- required_contract_method_id: `user_presets_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_preset_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/user_presets", "artifacts/user_presets_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_user_presets_physical_readback_artifact"]`
+- intake_violations: `[]`
+- target_consistency: `true`
+- violations: `[]`
+
+## dLive State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- midi_send_allowed: `false`
+- tcp_send_allowed: `false`
+- dlive_write_allowed: `false`
+- schema_id: `dlive_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `dlive_state`
+- remediation_action_id: `remediate_dlive_state`
+- physical_readback_surface_id: `dlive_state`
+- physical_readback_action_id: `remediate_dlive_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "bus_group_matrix", "routing", "scene_preset", "mix_balance", "performance_adaptation"]`
+- required_channel_fields: `["channel", "cached_channel_name", "fader_raw_14bit", "fader_db", "mute", "raw_note_velocity", "midi_base_channel", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_midi_state_fields: `["midi_base_channel", "raw_state_key_count", "raw_note_event_count", "raw_cc_event_count", "raw_pitchbend_event_count", "tcp_session_status", "midi_transport_status", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_parity_fields: `["wing_surface_equivalent", "mapping_status", "channel_identity_parity", "fader_scale_parity", "mute_state_parity", "midi_velocity_parity", "unsupported_field_policy", "coverage"]`
+- required_coverage_flags: `["channel_identity", "fader_scale", "mute_state", "raw_midi_state", "midi_base_channel", "wing_parity_mapping", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "midi_send_allowed", "tcp_send_allowed", "dlive_write_allowed", "dlive_apply_allowed"]`
+- minimum_channel_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## dLive State Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- midi_send_allowed: `false`
+- tcp_send_allowed: `false`
+- dlive_write_allowed: `false`
+- dlive_apply_allowed: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `dlive_state_physical_readback.v1`
+- surface_id: `dlive_state`
+- remediation_action_id: `remediate_dlive_state`
+- required_contract_method_id: `dlive_state_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_channel_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "bus_group_matrix", "routing", "scene_preset", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/dlive_state", "artifacts/dlive_state_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_dlive_state_physical_readback_artifact"]`
+- intake_violations: `[]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Read Surface Physical Readback Artifact Review Queue
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_queue: `false`
+- fixture_closure_allowed_by_queue: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- queue_status: `operator_artifact_capture_required`
+- intake_surface_count: `10`
+- available_intake_count: `10`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- review_candidate_count: `0`
+- review_candidates_available: `false`
+- missing_artifact_surface_count: `10`
+- unsafe_authority_claim_count: `0`
+- candidate_source_id_missing_count: `0`
+- target_inconsistent_surface_count: `0`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- review_candidate_surface_ids: `[]`
+- invalid_surface_ids: `[]`
+- missing_artifact_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- unsafe_authority_surface_ids: `[]`
+- candidate_source_id_missing_surface_ids: `[]`
+- target_inconsistent_surface_ids: `[]`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "pan_phase_delay", "eq", "compressor", "gate", "deessing", "frequency_separation", "cross_channel_unmasking", "bus_group_matrix", "dca", "master_bus", "mix_balance", "performance_adaptation", "fx_send_insert", "routing", "scene_preset"]`
+- queue_item_method_ids: `["raw_mixer_state_physical_readback_artifact_intake", "channel_basic_controls_physical_readback_artifact_intake", "channel_processing_physical_readback_artifact_intake", "bus_group_main_dca_physical_readback_artifact_intake", "matrix_state_physical_readback_artifact_intake", "fx_slots_inserts_physical_readback_artifact_intake", "routing_sends_physical_readback_artifact_intake", "snapshots_scenes_physical_readback_artifact_intake", "user_presets_physical_readback_artifact_intake", "dlive_state_physical_readback_artifact_intake"]`
+- blocked_by: `["operator_must_capture_missing_physical_readback_artifacts"]`
+- violations: `[]`
+
+## Read Surface Physical Readback Fixture Acceptance Ledger
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_acceptance: `false`
+- fixture_closure_allowed_by_acceptance: `false`
+- live_widening_allowed: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- ledger_status: `operator_acceptance_required`
+- queue_status: `operator_artifact_capture_required`
+- review_candidate_count: `0`
+- acceptance_record_count: `0`
+- accepted_record_count: `0`
+- rejected_record_count: `0`
+- invalid_record_count: `0`
+- candidate_trace_missing_count: `0`
+- candidate_trace_mismatch_count: `0`
+- unreviewed_candidate_count: `0`
+- operator_acceptance_required: `true`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_surface_ids: `[]`
+- rejected_surface_ids: `[]`
+- invalid_record_ids: `[]`
+- unreviewed_candidate_surface_ids: `[]`
+- blocked_by: `["operator_must_capture_or_surface_valid_candidates_before_acceptance"]`
+- violations: `[]`
+
+## Read Surface Physical Readback Fixture Closure Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_plan: `false`
+- fixture_update_allowed_by_plan: `false`
+- fixture_closure_allowed_by_plan: `false`
+- live_widening_allowed: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- plan_status: `fixture_closure_not_ready`
+- ledger_status: `operator_acceptance_required`
+- review_candidate_count: `0`
+- acceptance_record_count: `0`
+- accepted_record_count: `0`
+- rejected_record_count: `0`
+- invalid_record_count: `0`
+- unreviewed_candidate_count: `0`
+- closure_candidate_count: `0`
+- manual_fixture_closure_candidate_available: `false`
+- manual_fixture_closure_required: `true`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- closure_candidate_surface_ids: `[]`
+- rejected_surface_ids: `[]`
+- invalid_record_ids: `[]`
+- unreviewed_candidate_surface_ids: `[]`
+- blocked_by: `["accepted_physical_readback_candidate_required_before_fixture_closure"]`
+- violations: `[]`
+
+## Failed Checks
+
+- `wing_readonly_preflight_plan`

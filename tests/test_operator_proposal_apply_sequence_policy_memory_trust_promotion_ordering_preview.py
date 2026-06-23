@@ -19,6 +19,33 @@ from backend.processing_registry import (
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+
+
+def _unsafe_sequence_context():
+    context = _sequence_context()
+    context.update(
+        {
+            "status": "fresh",
+            "read_only": False,
+            "live_write": True,
+            "apply_attempted": True,
+        }
+    )
+    return context
+
+
 def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
     return {
         "sequence_policy_gate_record_id": (
@@ -31,6 +58,7 @@ def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
         "policy_key": f"{proposal_id}/memory-write:{proposal_id}",
         "target_policy_state": "trusted_for_sequence_policy",
         "sequence_policy_gate_status": "trusted",
+        "current_sequence_review_freshness": _sequence_context(),
         "rollback_verified": True,
         "sequence_policy_eligible": True,
         "eligible_for_sequence_policy_consumer": True,
@@ -260,6 +288,9 @@ def test_sequence_policy_ordering_preview_recommends_order_without_mutation():
     assert ranked["ordering_preview_only"] is True
     assert ranked["policy_consumer_required_before_queue_mutation"] is True
     assert ranked["sequence_consumer_required_before_execution"] is True
+    assert ranked["current_sequence_review_freshness"]["status"] == "fresh"
+    assert ranked["current_sequence_review_freshness"]["read_only"] is True
+    assert ranked["current_sequence_review_freshness"]["live_write"] is False
     assert ranked["proposal_order_mutation"] is False
     assert ranked["queue_mutation"] is False
     assert ranked["model_mutation"] is False
@@ -278,6 +309,72 @@ def test_sequence_policy_ordering_preview_recommends_order_without_mutation():
     assert unranked["original_index"] == 0
     assert unranked["recommended_index"] == 1
     assert unranked["rank_source"] == "original_order"
+
+
+def test_sequence_policy_ordering_preview_rejects_missing_sequence_context():
+    proposals = _preview_proposals()
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=proposals,
+            sequence_policy_gate=_sequence_policy_gate(),
+        )
+    )
+    consumer["consumer_records"][0].pop("current_sequence_review_freshness")
+
+    preview = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview(
+            proposals=proposals,
+            policy_consumer=consumer,
+        )
+    )
+
+    assert (
+        preview["status"]
+        == "sequence_memory_trust_promotion_ordering_preview_replacement_required"
+    )
+    assert preview["summary"]["consumer_record_count"] == 0
+    assert preview["summary"]["ordered_preview_count"] == 0
+    assert preview["summary"]["queue_mutation"] is False
+    assert preview["summary"]["live_authority_granted"] is False
+    assert preview["ordered_proposals"] == []
+    assert (
+        "operator_sequence_policy_memory_trust_promotion_policy_consumer:"
+        "proposal-sequence-fader"
+    ) in preview["summary"]["invalid_record_ids"]
+
+
+def test_sequence_policy_ordering_preview_rejects_live_authority_sequence_context():
+    proposals = _preview_proposals()
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=proposals,
+            sequence_policy_gate=_sequence_policy_gate(),
+        )
+    )
+    consumer["consumer_records"][0][
+        "current_sequence_review_freshness"
+    ] = _unsafe_sequence_context()
+
+    preview = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview(
+            proposals=proposals,
+            policy_consumer=consumer,
+        )
+    )
+
+    assert (
+        preview["status"]
+        == "sequence_memory_trust_promotion_ordering_preview_replacement_required"
+    )
+    assert preview["summary"]["consumer_record_count"] == 0
+    assert preview["summary"]["ordered_preview_count"] == 0
+    assert preview["summary"]["queue_mutation"] is False
+    assert preview["summary"]["live_authority_granted"] is False
+    assert preview["ordered_proposals"] == []
+    assert (
+        "operator_sequence_policy_memory_trust_promotion_policy_consumer:"
+        "proposal-sequence-fader"
+    ) in preview["summary"]["invalid_record_ids"]
 
 
 def test_sequence_policy_ordering_preview_rejects_forged_consumer_authority():
@@ -318,6 +415,52 @@ def test_sequence_policy_ordering_preview_rejects_forged_consumer_authority():
         "operator_sequence_policy_memory_trust_promotion_policy_consumer:proposal-sequence-fader"
         in preview["summary"]["invalid_record_ids"]
     )
+
+
+def test_sequence_policy_ordering_preview_rejects_forged_consumer_identity():
+    proposals = _preview_proposals()
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=proposals,
+            sequence_policy_gate=_sequence_policy_gate(),
+        )
+    )
+    consumer["consumer_records"][0]["source_idempotency_key"] = (
+        "memory-write:proposal-other"
+    )
+    consumer["consumer_records"][0]["policy_key"] = (
+        "proposal-sequence-fader/memory-write:proposal-other"
+    )
+
+    preview = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview(
+            proposals=proposals,
+            policy_consumer=consumer,
+        )
+    )
+
+    assert (
+        preview["status"]
+        == "sequence_memory_trust_promotion_ordering_preview_replacement_required"
+    )
+    assert preview["summary"]["consumer_record_count"] == 0
+    assert preview["summary"]["ordered_preview_count"] == 0
+    assert preview["summary"]["proposal_order_mutation"] is False
+    assert preview["summary"]["queue_mutation"] is False
+    assert (
+        preview["summary"]["sequence_policy_change_allowed_by_ordering_preview"]
+        is False
+    )
+    assert (
+        preview["summary"]["sequence_execution_allowed_by_ordering_preview"]
+        is False
+    )
+    assert preview["summary"]["live_authority_granted"] is False
+    assert preview["ordered_proposals"] == []
+    assert (
+        "operator_sequence_policy_memory_trust_promotion_policy_consumer:"
+        "proposal-sequence-fader"
+    ) in preview["summary"]["invalid_record_ids"]
 
 
 def test_sequence_policy_ordering_preview_rejects_duplicate_consumer_records():

@@ -13,8 +13,8 @@ from backend.source_identity_replay_calibration import (
 )
 
 
-def _freshness(status="fresh"):
-    return {
+def _freshness(status="fresh", **overrides):
+    payload = {
         "status": status,
         "field_count": 6,
         "fresh_field_count": 6 if status == "fresh" else 4,
@@ -24,6 +24,8 @@ def _freshness(status="fresh"):
         "live_write": False,
         "queries_console": False,
     }
+    payload.update(overrides)
+    return payload
 
 
 def _event(
@@ -79,6 +81,7 @@ def test_accepted_replay_outcomes_create_downstream_trust_calibration():
     assert recommendation.evidence["replay_match_rate"] == 1.0
     assert recommendation.evidence["downstream_trust_requires_operator_acceptance"] is True
     assert recommendation.evidence["current_source_identity_replay_context_cache_freshness"] == "fresh"
+    assert recommendation.evidence["current_source_identity_replay_context_cache_no_live_authority"] is True
 
 
 def test_rejected_or_corrected_replay_outcomes_hold_downstream_trust():
@@ -168,6 +171,49 @@ def test_stale_replay_context_blocks_calibration_output():
     assert "source_identity_replay_context_cache_not_fresh" in result.metadata["blockers"]
 
 
+def test_live_authority_replay_context_blocks_calibration_output():
+    events = (_event("1"), _event("2"), _event("3"))
+    result = analyze_source_identity_replay_calibration(
+        events,
+        current_state_cache_freshness=_freshness(
+            read_only=False,
+            live_write=True,
+            queries_console=True,
+        ),
+    )
+
+    assert result.status == "analysis_only"
+    assert result.recommendations == ()
+    assert result.metadata["current_source_identity_replay_context_cache_no_live_authority"] is False
+    assert "source_identity_replay_context_cache_live_authority_present" in result.metadata["blockers"]
+    assert build_source_identity_replay_calibration_proposals(
+        events,
+        current_state_cache_freshness=_freshness(
+            read_only=False,
+            live_write=True,
+            queries_console=True,
+        ),
+    ) == ()
+
+
+def test_missing_replay_context_blocks_calibration_output():
+    events = (_event("1"), _event("2"), _event("3"))
+    result = analyze_source_identity_replay_calibration(
+        events,
+        current_state_cache_freshness=None,
+    )
+
+    assert result.status == "analysis_only"
+    assert result.recommendations == ()
+    assert result.metadata["current_state_cache_freshness_status"] == "not_provided"
+    assert result.metadata["current_state_cache_freshness"]["provided"] is False
+    assert "source_identity_replay_context_cache_not_fresh" in result.metadata["blockers"]
+    assert build_source_identity_replay_calibration_proposals(
+        events,
+        current_state_cache_freshness=None,
+    ) == ()
+
+
 def test_source_identity_replay_calibration_proposals_are_not_queueable_live_actions():
     proposals = build_source_identity_replay_calibration_proposals(
         (_event("1"), _event("2"), _event("3")),
@@ -188,6 +234,41 @@ def test_source_identity_replay_calibration_proposals_are_not_queueable_live_act
     assert proposal["evidence"]["queue_mutation"] is False
     assert proposal["evidence"]["model_mutation"] is False
     assert proposal["evidence"]["memory_mutation"] is False
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "source_identity_calibration"
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == "complete"
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    for required_field in correction["source_evidence"]["required_evidence_fields"]:
+        assert required_field in source_evidence
+    assert source_evidence["accepted_rejected_outcomes"] == {
+        "accepted_count": 3,
+        "corrected_away_count": 0,
+        "rejected_count": 0,
+        "dismissed_count": 0,
+        "outcome_count": 3,
+        "minimum_outcome_count": 3,
+    }
+    assert source_evidence["operator_acceptance"] == {
+        "accepted_count": 3,
+        "acceptance_rate": 1.0,
+        "operator_review_required": True,
+        "required_before_downstream_trust_write": True,
+    }
+    assert source_evidence["downstream_trust_state"] == {
+        "recommended_trust_state": "trusted_for_downstream_priority",
+        "write_allowed": False,
+        "requires_operator_acceptance": True,
+    }
 
     adapted = adapt_source_identity_replay_calibration_proposals(proposals)
     assert adapted[0]["adapter_id"] == "source_identity_replay_calibration"
@@ -201,6 +282,55 @@ def test_source_identity_replay_calibration_proposals_are_not_queueable_live_act
     assert adapted[0]["evidence"]["model_mutation"] is False
     assert adapted[0]["evidence"]["memory_mutation"] is False
     assert adapted[0]["evidence"]["downstream_priority_mutation"] is False
+    forged = {
+        **proposal,
+        "evidence": {
+            **proposal["evidence"],
+            "live_authority_granted": True,
+            "can_apply_live": True,
+            "queue_action": "queue_now",
+            "readback_required": False,
+            "nested_authority_claim": {
+                "apply_now": True,
+                "dispatch_supervised_apply": True,
+            },
+        },
+        "proposed_action": {
+            **proposal["proposed_action"],
+            "queue_action": "queue_now",
+            "apply_now": True,
+            "dispatch_supervised_apply": True,
+            "live_authority_granted": True,
+        },
+    }
+    forged_adapted = adapt_source_identity_replay_calibration_proposals([forged])[0]
+    assert forged_adapted["evidence"]["live_authority_granted"] is False
+    assert forged_adapted["evidence"]["can_apply_live"] is False
+    assert forged_adapted["evidence"]["queue_action"] == "not_queueable_until_promoted"
+    assert forged_adapted["evidence"]["readback_required"] is True
+    assert forged_adapted["evidence"]["nested_authority_claim"]["apply_now"] is False
+    assert forged_adapted["evidence"]["nested_authority_claim"][
+        "dispatch_supervised_apply"
+    ] is False
+    assert forged_adapted["proposed_action"]["queue_action"] == (
+        "not_queueable_until_promoted"
+    )
+    assert forged_adapted["proposed_action"]["apply_now"] is False
+    assert forged_adapted["proposed_action"]["dispatch_supervised_apply"] is False
+    assert forged_adapted["proposed_action"]["live_authority_granted"] is False
+    claims_by_path = {
+        claim["path"]: claim for claim in forged_adapted["raw_input_authority_claims"]
+    }
+    assert claims_by_path["evidence.live_authority_granted"]["requested_value"] is True
+    assert claims_by_path["evidence.queue_action"]["requested_value"] == "queue_now"
+    assert claims_by_path["evidence.readback_required"]["requested_value"] is False
+    assert claims_by_path["evidence.nested_authority_claim.apply_now"][
+        "requested_value"
+    ] is True
+    assert claims_by_path["proposed_action.apply_now"]["requested_value"] is True
+    assert forged_adapted["evidence"]["raw_input_authority_claims"] == forged_adapted[
+        "raw_input_authority_claims"
+    ]
 
 
 def test_source_identity_replay_calibration_registry_contract_and_goal_row():
@@ -227,6 +357,7 @@ def test_source_identity_replay_calibration_registry_contract_and_goal_row():
     assert contract["target_kind"] == "source_identity_replay_trust_state"
     assert "accepted_rejected_outcomes" in evidence
     assert "current_source_identity_replay_context_cache_freshness" in evidence
+    assert "current_source_identity_replay_context_cache_no_live_authority" in evidence
     assert "downstream_trust_state" in evidence
     assert contract["live_apply_allowed"] is False
 

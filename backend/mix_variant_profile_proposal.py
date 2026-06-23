@@ -17,9 +17,20 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 MIX_VARIANT_METHOD_ID = "mix_variant_profile_proposal"
 MIX_VARIANT_VERSION = "mix_variant_profile_proposal_v1"
+MIX_VARIANT_FOLLOWUP_PROPOSAL_METHODS = (
+    "bus_group_balance_proposal",
+    "fx_send_proposal",
+    "master_bus_optimization_proposal",
+    "scene_preset_management_proposal",
+)
 SUPPORTED_GENRES = {
     "pop_rock",
     "rock",
@@ -294,7 +305,14 @@ class MixVariantProfileRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        proposed_action = {
+            "action_type": self.action_type,
+            "genre": self.genre,
+            "task": self.task,
+            "target_profile": self.target_profile,
+            "followup_proposal_methods": list(MIX_VARIANT_FOLLOWUP_PROPOSAL_METHODS),
+        }
+        proposal = {
             "id": self.id,
             "method_id": MIX_VARIANT_METHOD_ID,
             "source": MIX_VARIANT_METHOD_ID,
@@ -313,18 +331,7 @@ class MixVariantProfileRecommendation:
                 "variant_profile_requires_operator_review",
                 *self.blockers,
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "genre": self.genre,
-                "task": self.task,
-                "target_profile": self.target_profile,
-                "followup_proposal_methods": [
-                    "bus_group_balance_proposal",
-                    "fx_send_proposal",
-                    "master_bus_optimization_proposal",
-                    "scene_preset_management_proposal",
-                ],
-            },
+            "proposed_action": proposed_action,
             "evidence": {
                 **self.evidence,
                 "live_write": False,
@@ -333,6 +340,14 @@ class MixVariantProfileRecommendation:
                 "rollback_required_before_promotion": True,
             },
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=MIX_VARIANT_METHOD_ID,
+            target=self.variant_id,
+            proposed_action=proposed_action,
+            blockers=proposal["blockers"],
+        )
+        return proposal
 
 
 def _profile_payload(profile: MixVariantTargetProfile) -> Dict[str, Any]:
@@ -513,8 +528,22 @@ def analyze_mix_variant_profile_need(
         "reference_id": analysis.reference_id,
         "reference_lufs": None if analysis.reference_lufs is None else round(_safe_float(analysis.reference_lufs), 2),
         "reference_metrics_available": bool(analysis.reference_metrics_available),
+        "reference_metrics": {
+            "available": bool(analysis.reference_metrics_available),
+            "reference_id": analysis.reference_id,
+            "reference_lufs": None if analysis.reference_lufs is None else round(_safe_float(analysis.reference_lufs), 2),
+            "reference_confidence": round(reference_confidence, 3),
+            "similarity_target": round(similarity_target, 3),
+        },
         "arrangement_context_available": bool(analysis.arrangement_context_available),
         "arrangement_roles": list(roles),
+        "arrangement_context": {
+            "available": bool(analysis.arrangement_context_available),
+            "roles": list(roles),
+            "detected_source_count": int(analysis.detected_source_count or 0),
+            "stem_count": int(analysis.stem_count or 0),
+            "arrangement_confidence": round(arrangement_confidence, 3),
+        },
         "detected_source_count": int(analysis.detected_source_count or 0),
         "stem_count": int(analysis.stem_count or 0),
         "operator_intent": operator_intent,
@@ -523,6 +552,11 @@ def analyze_mix_variant_profile_need(
         "current_integrated_lufs": round(current_lufs, 2),
         "current_true_peak_dbfs": round(true_peak, 2),
         "main_bus_headroom_db": round(headroom, 2),
+        "true_peak_headroom": {
+            "main_bus_headroom_db": round(headroom, 2),
+            "reserve_db": TRUE_PEAK_RESERVE_DB,
+            "current_true_peak_dbfs": round(true_peak, 2),
+        },
         "feedback_risk": round(feedback_risk, 3),
         "style_clone_requested": bool(analysis.style_clone_requested),
         "reference_similarity_target": round(similarity_target, 3),
@@ -533,8 +567,10 @@ def analyze_mix_variant_profile_need(
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_mix_variant_context_cache_freshness": current_state_freshness,
         "current_mix_variant_context_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
+        "followup_proposal_methods": list(MIX_VARIANT_FOLLOWUP_PROPOSAL_METHODS),
         "transport_free": True,
         "no_named_artist_style_clone": True,
         "ayaic_level_planes": True,

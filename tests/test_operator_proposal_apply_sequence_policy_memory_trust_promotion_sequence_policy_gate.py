@@ -89,6 +89,20 @@ def _sequence_context():
     }
 
 
+def _unsafe_sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+
 def _rollback_evidence():
     return {
         "status": "ready",
@@ -232,6 +246,7 @@ def _verification_record(audit_record):
         "decision": "verified",
         "verified_by": "operator",
         "verified_at": "2026-06-06T14:00:00Z",
+        "current_sequence_review_freshness": _sequence_context(),
         "rollback_verified": True,
         "read_only": True,
         "operator_review_required": True,
@@ -357,6 +372,9 @@ def test_sequence_memory_trust_promotion_sequence_policy_gate_records_eligible_p
     assert record["proposal_id"] == "memory-write-applied"
     assert record["policy_key"] == "memory-write-applied/memory-write:memory-write-applied"
     assert record["target_policy_state"] == "trusted_for_sequence_policy"
+    assert record["current_sequence_review_freshness"]["status"] == "fresh"
+    assert record["current_sequence_review_freshness"]["read_only"] is True
+    assert record["current_sequence_review_freshness"]["live_write"] is False
     assert record["rollback_verified"] is True
     assert record["sequence_policy_gate_status"] == "trusted"
     assert record["sequence_policy_gate_usable"] is True
@@ -374,6 +392,64 @@ def test_sequence_memory_trust_promotion_sequence_policy_gate_records_eligible_p
     assert record["can_import_to_queue"] is False
     assert record["can_apply_live"] is False
     assert "requested_change" not in gate
+
+
+def test_sequence_memory_trust_promotion_sequence_policy_gate_requires_fresh_context():
+    rollback = _rollback_verification()
+    missing_context = {
+        **rollback,
+        "verified_records": [
+            {
+                key: value
+                for key, value in rollback["verified_records"][0].items()
+                if key != "current_sequence_review_freshness"
+            }
+        ],
+    }
+
+    gate = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate(
+            rollback_verification=missing_context,
+        )
+    )
+
+    assert (
+        gate["status"]
+        == "sequence_memory_trust_promotion_sequence_policy_gate_replacement_required"
+    )
+    assert gate["summary"]["sequence_policy_gate_record_count"] == 0
+    assert gate["policy_records"] == []
+    assert (
+        "operator_sequence_memory_trust_promotion_rollback_verification:"
+        f"{rollback['verified_records'][0]['promotion_apply_audit_id']}"
+        in gate["summary"]["invalid_record_ids"]
+    )
+
+
+def test_sequence_memory_trust_promotion_sequence_policy_gate_rejects_live_authority_context():
+    rollback = _rollback_verification()
+    live_context = {
+        **rollback,
+        "verified_records": [
+            {
+                **rollback["verified_records"][0],
+                "current_sequence_review_freshness": _unsafe_sequence_context(),
+            }
+        ],
+    }
+
+    gate = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate(
+            rollback_verification=live_context,
+        )
+    )
+
+    assert (
+        gate["status"]
+        == "sequence_memory_trust_promotion_sequence_policy_gate_replacement_required"
+    )
+    assert gate["summary"]["sequence_policy_gate_record_count"] == 0
+    assert gate["policy_records"] == []
 
 
 def test_sequence_memory_trust_promotion_sequence_policy_gate_rejects_forged_authority():

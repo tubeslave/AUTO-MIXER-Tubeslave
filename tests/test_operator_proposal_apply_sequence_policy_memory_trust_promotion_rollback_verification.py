@@ -86,6 +86,20 @@ def _sequence_context():
     }
 
 
+def _unsafe_sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+
 def _rollback_evidence():
     return {
         "status": "ready",
@@ -229,6 +243,7 @@ def _verification_record(audit_record):
         "decision": "verified",
         "verified_by": "operator",
         "verified_at": "2026-06-06T14:00:00Z",
+        "current_sequence_review_freshness": _sequence_context(),
         "rollback_verified": True,
         "read_only": True,
         "operator_review_required": True,
@@ -373,6 +388,9 @@ def test_sequence_memory_trust_promotion_rollback_verification_records_verified_
     assert verified["policy_key"] == "memory-write-applied/memory-write:memory-write-applied"
     assert verified["target_policy_state"] == "trusted_for_sequence_policy"
     assert verified["rollback_target_policy_state"] == "not_trusted_for_sequence_policy"
+    assert verified["current_sequence_review_freshness"]["status"] == "fresh"
+    assert verified["current_sequence_review_freshness"]["read_only"] is True
+    assert verified["current_sequence_review_freshness"]["live_write"] is False
     assert verified["rollback_verified"] is True
     assert verified["usable_as_sequence_policy_gate_evidence"] is True
     assert verified["separate_sequence_policy_gate_required"] is True
@@ -384,6 +402,55 @@ def test_sequence_memory_trust_promotion_rollback_verification_records_verified_
     assert verified["can_import_to_queue"] is False
     assert verified["can_apply_live"] is False
     assert "requested_change" not in verification
+
+
+def test_sequence_memory_trust_promotion_rollback_verification_requires_fresh_context():
+    audit = _apply_audit()
+    record = _verification_record(audit["audit_records"][0])
+    record.pop("current_sequence_review_freshness")
+
+    verification = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification(
+            apply_audit=audit,
+            verification_records=[record],
+        )
+    )
+
+    assert (
+        verification["status"]
+        == "sequence_memory_trust_promotion_rollback_verification_replacement_required"
+    )
+    assert verification["summary"]["rollback_verified_record_count"] == 0
+    assert verification["summary"]["usable_as_sequence_policy_gate_evidence"] is False
+    assert verification["verified_records"] == []
+    assert "sequence-rollback-verification-1" in verification["summary"][
+        "invalid_record_ids"
+    ]
+
+
+def test_sequence_memory_trust_promotion_rollback_verification_rejects_live_authority_context():
+    audit = _apply_audit()
+    record = {
+        **_verification_record(audit["audit_records"][0]),
+        "current_sequence_review_freshness": _unsafe_sequence_context(),
+    }
+
+    verification = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification(
+            apply_audit=audit,
+            verification_records=[record],
+        )
+    )
+
+    assert (
+        verification["status"]
+        == "sequence_memory_trust_promotion_rollback_verification_replacement_required"
+    )
+    assert verification["summary"]["rollback_verified_record_count"] == 0
+    assert verification["verified_records"] == []
+    assert "sequence-rollback-verification-1" in verification["summary"][
+        "invalid_record_ids"
+    ]
 
 
 def test_sequence_memory_trust_promotion_rollback_verification_rejects_forged_authority():

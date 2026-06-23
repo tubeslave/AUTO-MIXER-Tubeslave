@@ -14,8 +14,10 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 try:
     from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+    from processing_proposal_adapters import build_operator_correction_payload
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+    from backend.processing_proposal_adapters import build_operator_correction_payload
 
 
 MUTE_METHOD_ID = "mute_management_proposal"
@@ -129,10 +131,97 @@ class MuteManagementRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def mute_safety_summary(self) -> Dict[str, Any]:
+        source_identity = dict(
+            self.evidence.get("source_identity_downstream_trust") or {}
+        )
+        return {
+            "summary_type": "mute_management_review",
+            "status": "passed" if not self.blockers else "blocked",
+            "channel_id": self.channel_id,
+            "channel_label": self.channel_label,
+            "source_role": self.source_role,
+            "source_family": self.source_family,
+            "action_type": self.action_type,
+            "current_muted": self.current_muted,
+            "current_mute_state": self.current_muted,
+            "proposed_muted": self.proposed_muted,
+            "mute_reason": self.mute_reason,
+            "active_signal": self.evidence.get("active_signal"),
+            "signal_activity": self.evidence.get("signal_activity"),
+            "idle_duration_sec": self.evidence.get("idle_duration_sec"),
+            "rms_dbfs": self.evidence.get("rms_dbfs"),
+            "peak_dbfs": self.evidence.get("peak_dbfs"),
+            "recent_signal_cycles": self.evidence.get("recent_signal_cycles"),
+            "operator_intent": self.evidence.get("operator_intent"),
+            "feedback_risk": self.evidence.get("feedback_risk"),
+            "dropout_risk": self.evidence.get("dropout_risk"),
+            "source_identity_trust_status": source_identity.get("status"),
+            "source_identity_usable_for_downstream": source_identity.get(
+                "usable_for_downstream"
+            ),
+            "manual_mute_authority_preserved": self.evidence.get(
+                "manual_mute_authority_preserved"
+            ),
+            "current_mute_cache_freshness": self.evidence.get(
+                "current_state_cache_freshness_status"
+            ),
+            "current_mute_cache_no_live_authority": self.evidence.get(
+                "current_mute_cache_no_live_authority"
+            ),
+            "rollback_value": self.evidence.get("rollback_value"),
+            "rollback_value_source": self.evidence.get("rollback_value_source"),
+            "rollback_mute_readback": self.evidence.get("rollback_mute_readback"),
+            "active_signal_guard": "required_before_apply",
+            "destructive_scope": "channel_mute_state_only",
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "operator_review_required": True,
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "live_apply_allowed": False,
+            "queue_import_allowed": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "can_authorize_live": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        mute_safety_summary = self.mute_safety_summary()
+        blockers = [
+            "unsupported_value_type:mute_state",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            *self.blockers,
+        ]
+        proposed_action = {
+            "action_type": self.action_type,
+            "channel": self.channel_id,
+            "current_muted": self.current_muted,
+            "current_mute_state": self.current_muted,
+            "proposed_muted": self.proposed_muted,
+            "mute_reason": self.mute_reason,
+            "signal_activity": self.evidence.get("signal_activity"),
+            "rollback_value": self.evidence.get("rollback_value"),
+            "rollback_mute_readback": self.evidence.get("rollback_mute_readback"),
+            "mute_safety_summary": mute_safety_summary,
+        }
+        evidence = {
+            **self.evidence,
+            "mute_safety_summary": mute_safety_summary,
+            "live_write": False,
+            "queue_mutation": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        proposal = {
             "id": self.id,
             "method_id": MUTE_METHOD_ID,
             "source": MUTE_METHOD_ID,
@@ -144,29 +233,27 @@ class MuteManagementRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:mute_state",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
-            ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "channel": self.channel_id,
-                "current_muted": self.current_muted,
-                "proposed_muted": self.proposed_muted,
-                "mute_reason": self.mute_reason,
-            },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
-            },
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=MUTE_METHOD_ID,
+            target=self.channel_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _is_idle(rms_dbfs: float, peak_dbfs: float, idle_duration_sec: float) -> bool:
@@ -353,6 +440,7 @@ def analyze_mute_management_need(
         "source_role": analysis.source_role,
         "source_family": family,
         "current_muted": current_muted,
+        "current_mute_state": current_muted,
         "auto_muted_by_system": auto_muted,
         "allow_auto_mute_candidate": allow_candidate,
         "rms_dbfs": round(rms, 2),
@@ -368,10 +456,28 @@ def analyze_mute_management_need(
         "operator_intent": operator_intent,
         "idle_signal": idle,
         "active_signal": active,
+        "signal_activity": {
+            "active_signal": active,
+            "idle_signal": idle,
+            "rms_dbfs": round(rms, 2),
+            "peak_dbfs": round(peak, 2),
+            "noise_floor_dbfs": round(noise_floor, 2),
+            "recent_signal_cycles": recent_signal_cycles,
+        },
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_mute_cache_freshness": current_state_freshness,
         "current_mute_cache_no_live_authority": current_state_no_authority,
+        "old_value_source": "read_only_current_mute_state_cache",
+        "rollback_value": current_muted,
+        "rollback_value_source": "current_mute_state_readback_required_before_promotion",
+        "rollback_mute_readback": {
+            "required_before_live_promotion": True,
+            "previous_mute_state": current_muted,
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+        },
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "manual_mute_authority_preserved": True,

@@ -45,6 +45,20 @@ def _promotion_apply_audit(executor_result_consumer):
     )
 
 
+def _sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+
+
 def _rollback_verification_record(audit_record):
     return {
         "rollback_verification_id": "queue-import-rollback-verification-1",
@@ -64,6 +78,7 @@ def _rollback_verification_record(audit_record):
         "decision": "verified",
         "verified_by": "operator",
         "verified_at": "2026-06-06T14:00:00Z",
+        "current_sequence_review_freshness": _sequence_context(),
         "rollback_verified": True,
         "read_only": True,
         "operator_review_required": True,
@@ -204,7 +219,17 @@ def test_promotion_apply_audit_result_consumer_emits_rollback_verification_reque
     )
     assert consumer["summary"]["expected_apply_audit_record_count"] == 1
     assert consumer["summary"]["apply_audit_record_count"] == 1
+    assert consumer["summary"]["promotion_acceptance_record_template_count"] == 1
+    assert consumer["summary"]["memory_trust_review_request_spec_count"] == 2
     assert consumer["summary"]["invalid_record_count"] == 0
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "fresh"
+    assert consumer["summary"]["promotion_acceptance_record_template_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert consumer["summary"]["memory_trust_review_request_spec_proposal_ids"] == [
+        "proposal-first",
+        "proposal-second",
+    ]
     assert consumer["summary"]["promotion_rollback_verification_request_available"] is True
     assert consumer["summary"]["promotion_rollback_verification_handler_invoked"] is False
     assert consumer["summary"]["promotion_rollback_verification_created"] is False
@@ -226,6 +251,26 @@ def test_promotion_apply_audit_result_consumer_emits_rollback_verification_reque
     assert request["runtime_memory_mutation"] is False
     assert request["live_authority_granted"] is False
     assert request["apply_audit"] == apply_audit
+    assert request["promotion_acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert request["promotion_acceptance_record_templates"][0]["idempotency_key"] == (
+        "seq-policy:proposal-first"
+    )
+    assert request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == executor_result_consumer["promotion_apply_audit_request"][
+        "promotion_acceptance_record_templates"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
+    assert request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == executor_result_consumer["promotion_apply_audit_request"][
+        "memory_trust_review_request_specs"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
 
     waiting_for_operator = (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification(
@@ -297,6 +342,16 @@ def test_promotion_apply_audit_result_consumer_rejects_forged_prior_consumer(
     executor_result_consumer = deepcopy(_promotion_executor_result_consumer(tmp_path))
     apply_audit = _promotion_apply_audit(executor_result_consumer)
     executor_result_consumer["summary"]["executor_apply_result_count"] = 2
+    executor_result_consumer["summary"][
+        "promotion_acceptance_record_template_count"
+    ] = 2
+    executor_result_consumer["summary"][
+        "promotion_acceptance_record_template_proposal_ids"
+    ] = ["proposal-second"]
+    executor_result_consumer["summary"]["memory_trust_review_request_spec_count"] = 1
+    executor_result_consumer["summary"][
+        "memory_trust_review_request_spec_proposal_ids"
+    ] = ["proposal-second"]
     executor_result_consumer["safety"]["live_authority_granted"] = True
 
     consumer = (
@@ -318,7 +373,163 @@ def test_promotion_apply_audit_result_consumer_rejects_forged_prior_consumer(
         "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_executor_apply_result_count_mismatch"
         in invalid
     )
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_promotion_acceptance_record_template_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_template_proposal_ids_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_memory_trust_review_request_spec_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
     assert "apply_audit" not in consumer["promotion_rollback_verification_request"]
+
+
+def test_promotion_apply_audit_result_consumer_rejects_missing_sequence_review_freshness(
+    tmp_path,
+):
+    executor_result_consumer = deepcopy(_promotion_executor_result_consumer(tmp_path))
+    apply_audit = _promotion_apply_audit(executor_result_consumer)
+    request = executor_result_consumer["promotion_apply_audit_request"]
+    for template in request["promotion_acceptance_record_templates"]:
+        template.pop("current_sequence_review_freshness", None)
+    request.pop("memory_trust_review_request_specs", None)
+    executor_result_consumer["summary"].pop("fresh_sequence_review_context_status", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer(
+            promotion_executor_result_consumer=executor_result_consumer,
+            promotion_apply_audit_result=apply_audit,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_rollback_verification_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "missing"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_freshness_not_fresh"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_request_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_memory_trust_review_request_spec_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_apply_audit_result_consumer_executor_result_consumer_summary_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert "proposal-first:current_sequence_review_freshness_missing" in invalid
+    assert "apply_audit" not in consumer["promotion_rollback_verification_request"]
+    assert (
+        "memory_trust_review_request_specs"
+        not in consumer["promotion_rollback_verification_request"]
+    )
+
+
+def test_promotion_apply_audit_result_consumer_rejects_live_sequence_review_freshness(
+    tmp_path,
+):
+    executor_result_consumer = deepcopy(_promotion_executor_result_consumer(tmp_path))
+    apply_audit = _promotion_apply_audit(executor_result_consumer)
+    live_freshness = {
+        "status": "fresh",
+        "read_only": False,
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    request = executor_result_consumer["promotion_apply_audit_request"]
+    request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+    request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer(
+            promotion_executor_result_consumer=executor_result_consumer,
+            promotion_apply_audit_result=apply_audit,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_rollback_verification_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "invalid"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in invalid
+    )
+    assert "proposal-first:current_sequence_review_freshness_live_write_not_false" in invalid
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
+    )
+    assert "apply_audit" not in consumer["promotion_rollback_verification_request"]
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_rollback_verification_request"]
+    )
+
+
+def test_promotion_apply_audit_result_consumer_rejects_forged_acceptance_template_identity(
+    tmp_path,
+):
+    executor_result_consumer = deepcopy(_promotion_executor_result_consumer(tmp_path))
+    apply_audit = _promotion_apply_audit(executor_result_consumer)
+    template = executor_result_consumer["promotion_apply_audit_request"][
+        "promotion_acceptance_record_templates"
+    ][0]
+    template["idempotency_key"] = "seq-policy:forged"
+    template["consumer_record_id"] = ""
+    template["source_memory_trust_review_request_spec_id"] = "forged-review-spec"
+    template["current_sequence_review_freshness"] = {
+        **template["current_sequence_review_freshness"],
+        "status": "stale",
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer(
+            promotion_executor_result_consumer=executor_result_consumer,
+            promotion_apply_audit_result=apply_audit,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_rollback_verification_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:idempotency_key_apply_result_mismatch" in invalid
+    assert "proposal-first:consumer_record_id_missing" in invalid
+    assert "proposal-first:source_memory_trust_review_request_spec_id_mismatch" in invalid
+    assert "proposal-first:current_sequence_review_freshness_request_spec_mismatch" in invalid
+    assert "apply_audit" not in consumer["promotion_rollback_verification_request"]
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_rollback_verification_request"]
+    )
 
 
 def test_promotion_apply_audit_result_consumer_is_registered_non_live():

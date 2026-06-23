@@ -16,9 +16,17 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 DEESSER_METHOD_ID = "deesser_vocal_sibilance"
 DEESSER_VERSION = "deesser_vocal_sibilance_v1"
+DEESSER_READ_REQUIRED_SOURCE = (
+    "cached_or_physical_dynamics_or_dynamic_eq_read_required_before_promotion"
+)
 EPSILON = 1e-12
 VOCAL_ROLE_TOKENS = ("vocal", "vox", "voice", "speech", "lead", "backing")
 SIBILANCE_BAND = (6000.0, 10000.0)
@@ -32,6 +40,64 @@ MAX_RATIO = 6.0
 MIN_MAX_GAIN_REDUCTION_DB = 1.0
 MAX_MAX_GAIN_REDUCTION_DB = 8.0
 DEESSER_MAKEUP_GAIN_DB = 0.0
+
+
+def _ordered_unique(values: Iterable[str]) -> Tuple[str, ...]:
+    ordered = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
+
+
+def _deesser_required_safety_checks() -> Dict[str, str]:
+    return {
+        "source_identity": "required_before_live_promotion",
+        "arrangement_role": "required_before_live_promotion",
+        "speech_intelligibility": "required_before_live_promotion",
+        "bounded_attenuation": "required_before_live_promotion",
+        "sibilance_persistence": "required_before_live_promotion",
+        "true_peak_headroom": "required_before_live_promotion",
+        "dynamic_eq_or_deesser_bypass_state": "required_before_live_promotion",
+    }
+
+
+def _deesser_rollback_expectation() -> Dict[str, Any]:
+    return {
+        "required_before_live_promotion": True,
+        "restore_previous_dynamics_or_dynamic_eq_values_after_readback": True,
+        "restore_previous_bypass_state_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+
+
+def _deesser_future_wing_readback_contract() -> Dict[str, Any]:
+    return {
+        "required": True,
+        "required_before_live_promotion": True,
+        "target_kind": "channel_deesser_or_dynamic_eq",
+        "old_value_source": DEESSER_READ_REQUIRED_SOURCE,
+        "readback_targets": [
+            "deesser_band",
+            "dynamic_eq_band",
+            "threshold",
+            "ratio",
+            "range",
+            "max_gain_reduction",
+            "bypass_state",
+        ],
+        "blocked_live_actions": [
+            "deesser_parameter_write",
+            "dynamic_eq_band_write",
+            "threshold_range_write",
+        ],
+        "requires_real_wing_proof": True,
+        "requires_operator_approval": True,
+        "requires_separate_non_fader_adr": True,
+    }
 
 
 def utc_now() -> str:
@@ -140,10 +206,151 @@ class DeesserRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def operator_safety_blockers(self) -> Tuple[str, ...]:
+        return _ordered_unique(
+            (
+                "deesser_live_apply_quarantined",
+                "unsupported_value_type:deesser",
+                "not_in_supervised_fader_gain_executor",
+                "real_wing_proof_required_before_live_apply",
+                "non_fader_live_expansion_requires_separate_adr",
+                "operator_approval_required_before_supervised_deesser_apply",
+                "hardware_readback_and_rollback_not_proven",
+                *self.blockers,
+            )
+        )
+
+    def deesser_safety_summary(self) -> Dict[str, Any]:
+        source_identity = dict(
+            self.evidence.get("source_identity_downstream_trust") or {}
+        )
+        return {
+            "status": "passed" if not self.blockers else "blocked",
+            "channel_id": self.channel_id,
+            "source_role": self.source_role,
+            "arrangement_role": self.evidence.get("arrangement_role"),
+            "arrangement_deesser_profile": self.evidence.get(
+                "arrangement_deesser_profile"
+            ),
+            "frequency_hz": self.frequency_hz,
+            "threshold_db": self.threshold_db,
+            "ratio": self.ratio,
+            "max_gain_reduction_db": self.max_gain_reduction_db,
+            "bounded_attenuation_only": self.evidence.get(
+                "bounded_attenuation_only"
+            ),
+            "makeup_gain_db": DEESSER_MAKEUP_GAIN_DB,
+            "boost_allowed": False,
+            "sibilance_ratio": self.evidence.get("sibilance_ratio"),
+            "sibilance_excess_db": self.evidence.get("sibilance_excess_db"),
+            "true_peak_headroom_db": self.evidence.get("true_peak_headroom_db"),
+            "current_dynamics_or_dynamic_eq_cache_freshness_status": (
+                self.evidence.get("current_state_cache_freshness_status")
+            ),
+            "current_dynamics_or_dynamic_eq_cache_no_live_authority": (
+                self.evidence.get(
+                    "current_dynamics_or_dynamic_eq_cache_no_live_authority"
+                )
+            ),
+            "arrangement_context_cache_freshness_status": self.evidence.get(
+                "arrangement_context_cache_freshness_status"
+            ),
+            "current_arrangement_context_cache_no_live_authority": (
+                self.evidence.get(
+                    "current_arrangement_context_cache_no_live_authority"
+                )
+            ),
+            "source_identity_trust_status": source_identity.get("status"),
+            "source_identity_usable_for_downstream": source_identity.get(
+                "usable_for_downstream"
+            ),
+            "sibilance_persistence": self.evidence.get("sibilance_persistence"),
+            "speech_intelligibility": self.evidence.get("speech_intelligibility"),
+            "quiet_words_tail_attack_preservation": self.evidence.get(
+                "quiet_words_tail_attack_preservation"
+            ),
+            "required_safety_checks": _deesser_required_safety_checks(),
+            "safety_blockers": list(self.operator_safety_blockers()),
+            "operator_explanation": (
+                "De-esser evidence is offline-only. Review the vocal identity, "
+                "arrangement role, sibilance persistence, bounded attenuation "
+                "and speech-intelligibility risk before any future WING "
+                "promotion."
+            ),
+            "rollback_expectation": _deesser_rollback_expectation(),
+            "future_wing_readback_contract": _deesser_future_wing_readback_contract(),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        deesser_safety_summary = self.deesser_safety_summary()
+        blockers = list(self.operator_safety_blockers())
+        proposed_action = {
+            "action_type": self.action_type,
+            "frequency_hz": self.frequency_hz,
+            "threshold_db": self.threshold_db,
+            "ratio": self.ratio,
+            "max_gain_reduction_db": self.max_gain_reduction_db,
+            "makeup_gain_db": DEESSER_MAKEUP_GAIN_DB,
+            "boost_allowed": False,
+            "required_safety_checks": deesser_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": deesser_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": deesser_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "deesser_safety_summary": deesser_safety_summary,
+        }
+        evidence = {
+            **self.evidence,
+            "deesser_safety_summary": deesser_safety_summary,
+            "required_safety_checks": deesser_safety_summary[
+                "required_safety_checks"
+            ],
+            "operator_explanation": deesser_safety_summary[
+                "operator_explanation"
+            ],
+            "rollback_expectation": deesser_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": deesser_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "old_value_source": DEESSER_READ_REQUIRED_SOURCE,
+            "rollback_value_source": DEESSER_READ_REQUIRED_SOURCE,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        proposal = {
             "id": self.id,
             "method_id": DEESSER_METHOD_ID,
             "source": DEESSER_METHOD_ID,
@@ -157,29 +364,48 @@ class DeesserRecommendation:
             "queue_action": "not_queueable_until_promoted",
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:deesser",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "live_write": False,
+            "queue_mutation": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "safety_blockers": deesser_safety_summary["safety_blockers"],
+            "operator_explanation": deesser_safety_summary[
+                "operator_explanation"
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "frequency_hz": self.frequency_hz,
-                "threshold_db": self.threshold_db,
-                "ratio": self.ratio,
-                "max_gain_reduction_db": self.max_gain_reduction_db,
-                "makeup_gain_db": DEESSER_MAKEUP_GAIN_DB,
-                "boost_allowed": False,
+            "required_safety_checks": deesser_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": deesser_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": deesser_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "proposed_action": proposed_action,
+            "deesser_safety_summary": deesser_safety_summary,
+            "old_value": {
+                "source": DEESSER_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
             },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
+            "rollback_value": {
+                "source": DEESSER_READ_REQUIRED_SOURCE,
+                "required_before_apply": True,
             },
+            "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=DEESSER_METHOD_ID,
+            target=self.channel_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _severity_from_score(score: float) -> str:
@@ -309,12 +535,19 @@ def analyze_deesser_need(
         "arrangement_deesser_profile": arrangement_profile,
         "sibilance_ratio": round(ratio, 3),
         "sibilance_excess_db": round(excess_db, 2),
+        "sibilance_persistence": {
+            "persistence_cycles": persistence,
+            "minimum_cycles_before_proposal": 2,
+            "status": "persistent" if persistence >= 2 else "single_cycle_review",
+        },
         "contribution_share": round(contribution, 3),
         "persistence_cycles": persistence,
         "peak_dbfs": round(_safe_float(analysis.peak_dbfs), 2),
         "true_peak_headroom_db": round(_safe_float(analysis.true_peak_headroom_db), 2),
+        "true_peak_headroom": round(_safe_float(analysis.true_peak_headroom_db), 2),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_dynamics_or_dynamic_eq_cache_freshness": current_state_freshness,
         "current_dynamics_or_dynamic_eq_cache_no_live_authority": (
             current_state_no_authority
         ),
@@ -322,11 +555,15 @@ def analyze_deesser_need(
             arrangement_context_freshness_status
         ),
         "arrangement_context_cache_freshness": arrangement_context_freshness,
+        "current_arrangement_context_cache_freshness": (
+            arrangement_context_freshness
+        ),
         "current_arrangement_context_cache_no_live_authority": (
             arrangement_context_no_authority
         ),
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
+        "vocal_source_role": analysis.source_role,
     }
 
     blockers = []
@@ -390,6 +627,25 @@ def analyze_deesser_need(
             "max_gain_reduction_db": round(max_gain_reduction_db, 1),
             "makeup_gain_db": DEESSER_MAKEUP_GAIN_DB,
             "boost_allowed": False,
+            "speech_intelligibility": {
+                "status": "operator_review_required_before_live_promotion",
+                "bounded_attenuation_only": True,
+                "boost_allowed": False,
+                "max_gain_reduction_db": round(max_gain_reduction_db, 1),
+                "arrangement_deesser_profile": arrangement_profile,
+            },
+            "quiet_words_tail_attack_preservation": {
+                "status": "operator_review_required_before_live_promotion",
+                "scope": "sibilance_band_attenuation_only",
+                "broadband_gate_or_expander": False,
+                "bounded_attenuation_only": True,
+                "boost_allowed": False,
+                "max_gain_reduction_db": round(max_gain_reduction_db, 1),
+                "speech_intelligibility_required": True,
+            },
+            "dynamic_eq_or_deesser_readback": DEESSER_READ_REQUIRED_SOURCE,
+            "rollback_dynamics_or_dynamic_eq_readback": DEESSER_READ_REQUIRED_SOURCE,
+            "bypass_state": "readback_required_before_live_promotion",
         }
     )
 

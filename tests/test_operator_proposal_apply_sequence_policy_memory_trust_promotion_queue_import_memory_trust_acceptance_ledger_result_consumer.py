@@ -173,6 +173,7 @@ def test_memory_trust_acceptance_ledger_result_consumer_emits_promotion_plan_req
     assert consumer["summary"]["policy_mutation"] is False
     assert consumer["summary"]["model_mutation"] is False
     assert consumer["summary"]["live_authority_granted"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "fresh"
     request = consumer["promotion_plan_request"]
     assert request["handler"] == (
         "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion"
@@ -183,6 +184,22 @@ def test_memory_trust_acceptance_ledger_result_consumer_emits_promotion_plan_req
     assert request["acceptance_ledger"]["status"] == (
         "operator_sequence_memory_trust_acceptance_records_available"
     )
+    assert request["acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert request["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == trust_review_consumer["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ]
+    assert request["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ]["status"] == "fresh"
+    assert request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == trust_review_consumer["acceptance_ledger_request"][
+        "memory_trust_review_request_specs"
+    ][0]["current_sequence_review_freshness"]
     assert request["execution_allowed_by_consumer"] is False
     assert request["policy_mutation"] is False
     assert request["live_authority_granted"] is False
@@ -292,6 +309,126 @@ def test_memory_trust_acceptance_ledger_result_consumer_rejects_forged_ledger(tm
     assert any(
         item.endswith(":execution_allowed_by_acceptance_not_false")
         for item in invalid
+    )
+    assert "acceptance_ledger" not in consumer["promotion_plan_request"]
+
+
+def test_memory_trust_acceptance_ledger_result_consumer_rejects_forged_template_identity(
+    tmp_path,
+):
+    trust_review_consumer = _trust_review_consumer(tmp_path)
+    ledger = _accepted_rejected_ledger(trust_review_consumer)
+    forged_consumer = deepcopy(trust_review_consumer)
+    forged_consumer["acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] = "forged-memory-write:proposal-first"
+    forged_consumer["acceptance_record_templates"][1]["consumer_record_id"] = ""
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer(
+            memory_trust_review_result_consumer=forged_consumer,
+            memory_trust_acceptance_ledger_result=ledger,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_plan_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:policy_key_identity_mismatch" in invalid
+    assert "proposal-second:consumer_record_id_missing" in invalid
+    assert "acceptance_ledger" not in consumer["promotion_plan_request"]
+
+
+def test_memory_trust_acceptance_ledger_result_consumer_rejects_missing_sequence_context(
+    tmp_path,
+):
+    trust_review_consumer = _trust_review_consumer(tmp_path)
+    ledger = _accepted_rejected_ledger(trust_review_consumer)
+    for template in trust_review_consumer["acceptance_record_templates"]:
+        template.pop("current_sequence_review_freshness", None)
+    for template in trust_review_consumer["acceptance_ledger_request"][
+        "acceptance_record_templates"
+    ]:
+        template.pop("current_sequence_review_freshness", None)
+    for spec in trust_review_consumer["acceptance_ledger_request"][
+        "memory_trust_review_request_specs"
+    ]:
+        spec.pop("current_sequence_review_freshness", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer(
+            memory_trust_review_result_consumer=trust_review_consumer,
+            memory_trust_acceptance_ledger_result=ledger,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_plan_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "missing"
+    assert (
+        "proposal-first:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert "acceptance_ledger" not in consumer["promotion_plan_request"]
+
+
+def test_memory_trust_acceptance_ledger_result_consumer_rejects_live_sequence_context(
+    tmp_path,
+):
+    trust_review_consumer = _trust_review_consumer(tmp_path)
+    ledger = _accepted_rejected_ledger(trust_review_consumer)
+    live_context = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    trust_review_consumer["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_context
+    trust_review_consumer["acceptance_ledger_request"]["acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_context
+    trust_review_consumer["acceptance_ledger_request"][
+        "memory_trust_review_request_specs"
+    ][0]["current_sequence_review_freshness"] = live_context
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer(
+            memory_trust_review_result_consumer=trust_review_consumer,
+            memory_trust_acceptance_ledger_result=ledger,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_plan_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in invalid
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_live_write_not_false"
+        in invalid
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
     )
     assert "acceptance_ledger" not in consumer["promotion_plan_request"]
 

@@ -146,6 +146,58 @@ REQUIRED_APPLY_RESULT_FALSE_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+REQUIRED_ACCEPTANCE_TEMPLATE_FIELDS = (
+    "promotion_acceptance_record_template_id",
+    "promotion_contract_record_id",
+    "promotion_candidate_id",
+    "proposal_id",
+    "learning_scope",
+    "value_type",
+    "idempotency_key",
+    "previous_policy_state",
+    "rollback_strategy",
+)
+REQUIRED_ACCEPTANCE_TEMPLATE_FALSE_FLAGS = (
+    "execution_allowed_by_acceptance",
+    "sequence_policy_promotion_allowed_by_acceptance",
+    "queue_mutation_allowed_by_acceptance",
+    "policy_mutation_allowed_by_acceptance",
+    "model_mutation_allowed_by_acceptance",
+    "runtime_memory_mutation_allowed_by_acceptance",
+    "live_authority_granted",
+    "full_autonomous_ready",
+    "can_import_to_queue",
+    "can_apply_live",
+)
+REQUIRED_SEQUENCE_REVIEW_FRESHNESS_FALSE_FLAGS = (
+    "live_write",
+    "apply_attempted",
+    "queries_console",
+    "queue_mutation",
+    "policy_mutation",
+)
+REQUIRED_ACCEPTANCE_TEMPLATE_IDENTITY_FIELDS = (
+    "source_acceptance_record_template_id",
+    "source_review_candidate_id",
+    "source_memory_record_id",
+    "source_memory_trust_review_request_spec_id",
+    "source_memory_index_request_spec_id",
+    "source_memory_writer_apply_request_spec_id",
+    "source_memory_writer_request_spec_id",
+    "source_memory_draft_request_spec_id",
+    "source_audit_policy_gate_request_spec_id",
+    "source_audit_request_spec_id",
+    "source_executor_request_spec_id",
+    "source_execution_gate_request_spec_id",
+    "source_dry_run_request_spec_id",
+    "source_sequence_plan_request_spec_id",
+    "source_preflight_request_spec_id",
+    "queue_ordering_plan_record_id",
+    "consumer_record_id",
+    "sequence_policy_gate_record_id",
+    "policy_key",
+    "source_idempotency_key",
+)
 
 
 def _utc_now() -> str:
@@ -176,6 +228,63 @@ def _summary_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
+
+
+def _current_sequence_review_freshness_violations(
+    proposal_id: str,
+    freshness: Mapping[str, Any],
+) -> Tuple[str, ...]:
+    if not freshness:
+        return (f"{proposal_id}:current_sequence_review_freshness_missing",)
+
+    violations = []
+    if freshness.get("status") != "fresh":
+        violations.append(f"{proposal_id}:current_sequence_review_freshness_not_fresh")
+    if freshness.get("read_only") is not True:
+        violations.append(
+            f"{proposal_id}:current_sequence_review_freshness_read_only_not_true"
+        )
+    for flag in REQUIRED_SEQUENCE_REVIEW_FRESHNESS_FALSE_FLAGS:
+        if freshness.get(flag) is not False:
+            violations.append(f"{proposal_id}:current_sequence_review_freshness_{flag}_not_false")
+    return tuple(violations)
+
+
+def _sequence_review_freshness_core(
+    payload: Mapping[str, Any],
+) -> Tuple[Tuple[str, Any], ...]:
+    return (
+        ("status", payload.get("status") if isinstance(payload.get("status"), str) else ""),
+        ("read_only", payload.get("read_only")),
+        *(
+            (flag, payload.get(flag))
+            for flag in REQUIRED_SEQUENCE_REVIEW_FRESHNESS_FALSE_FLAGS
+        ),
+    )
+
+
+def _source_sequence_review_freshness_status(
+    templates: Tuple[Mapping[str, Any], ...],
+) -> str:
+    if not templates:
+        return "missing"
+    invalid = False
+    missing = False
+    for index, template in enumerate(templates):
+        template_id = (
+            _string(template.get("promotion_acceptance_record_template_id"))
+            or f"promotion_acceptance_template:{index}"
+        )
+        proposal_id = _string(template.get("proposal_id")) or template_id
+        freshness = _mapping(template.get("current_sequence_review_freshness"))
+        violations = _current_sequence_review_freshness_violations(proposal_id, freshness)
+        if not freshness:
+            missing = True
+        elif violations:
+            invalid = True
+    if not missing and not invalid:
+        return "fresh"
+    return "invalid" if invalid else "missing"
 
 
 def _is_utc_timestamp(value: str) -> bool:
@@ -216,6 +325,18 @@ def _dry_run_records_from_request(
     return _record_list(executor_dry_run.get("dry_run_records"))
 
 
+def _acceptance_templates_from_request(
+    request: Mapping[str, Any],
+) -> Tuple[Mapping[str, Any], ...]:
+    return _record_list(request.get("promotion_acceptance_record_templates"))
+
+
+def _request_specs_from_request(
+    request: Mapping[str, Any],
+) -> Tuple[Mapping[str, Any], ...]:
+    return _record_list(request.get("memory_trust_review_request_specs"))
+
+
 def _dry_run_records_by_id(
     records: Tuple[Mapping[str, Any], ...],
 ) -> Dict[str, Mapping[str, Any]]:
@@ -224,6 +345,27 @@ def _dry_run_records_by_id(
         for record in records
         if isinstance(record.get("promotion_executor_dry_run_id"), str)
         and record.get("promotion_executor_dry_run_id")
+    }
+
+
+def _templates_by_contract_record_id(
+    templates: Tuple[Mapping[str, Any], ...],
+) -> Dict[str, Mapping[str, Any]]:
+    return {
+        str(template["promotion_contract_record_id"]): template
+        for template in templates
+        if isinstance(template.get("promotion_contract_record_id"), str)
+        and template.get("promotion_contract_record_id")
+    }
+
+
+def _request_specs_by_proposal_id(
+    request_specs: Tuple[Mapping[str, Any], ...],
+) -> Dict[str, Mapping[str, Any]]:
+    return {
+        str(spec["proposal_id"]): spec
+        for spec in request_specs
+        if isinstance(spec.get("proposal_id"), str) and spec.get("proposal_id")
     }
 
 
@@ -276,11 +418,19 @@ def _consumer_summary_violations(
     summary: Mapping[str, Any],
     *,
     dry_run_records: Tuple[Mapping[str, Any], ...],
+    promotion_acceptance_templates: Tuple[Mapping[str, Any], ...],
+    memory_trust_review_request_specs: Tuple[Mapping[str, Any], ...],
 ) -> Tuple[str, ...]:
     violations = []
     expected_counts = {
         "expected_executor_dry_run_record_count": len(dry_run_records),
         "executor_dry_run_record_count": len(dry_run_records),
+        "promotion_acceptance_record_template_count": len(
+            promotion_acceptance_templates
+        ),
+        "memory_trust_review_request_spec_count": len(
+            memory_trust_review_request_specs
+        ),
         "invalid_record_count": 0,
     }
     for key, expected in expected_counts.items():
@@ -291,6 +441,13 @@ def _consumer_summary_violations(
     if summary.get("promotion_executor_request_available") is not bool(dry_run_records):
         violations.append(
             "sequence_policy_promotion_executor_result_consumer_dry_run_consumer_request_available_mismatch"
+        )
+    if (
+        promotion_acceptance_templates
+        and summary.get("fresh_sequence_review_context_status") != "fresh"
+    ):
+        violations.append(
+            "sequence_policy_promotion_executor_result_consumer_dry_run_consumer_summary_freshness_not_fresh"
         )
     for flag in REQUIRED_CONSUMER_FALSE_FLAGS:
         if summary.get(flag) is not False:
@@ -317,10 +474,39 @@ def _consumer_summary_violations(
         violations.append(
             "sequence_policy_promotion_executor_result_consumer_dry_run_consumer_summary_idempotency_keys_mismatch"
         )
+    expected_template_proposal_ids = tuple(
+        str(template["proposal_id"])
+        for template in promotion_acceptance_templates
+        if isinstance(template.get("proposal_id"), str) and template.get("proposal_id")
+    )
+    if (
+        _string_list(summary.get("promotion_acceptance_record_template_proposal_ids"))
+        != expected_template_proposal_ids
+    ):
+        violations.append(
+            "sequence_policy_promotion_executor_result_consumer_dry_run_consumer_summary_template_proposal_ids_mismatch"
+        )
+    expected_request_spec_proposal_ids = tuple(
+        str(spec["proposal_id"])
+        for spec in memory_trust_review_request_specs
+        if isinstance(spec.get("proposal_id"), str) and spec.get("proposal_id")
+    )
+    if (
+        _string_list(summary.get("memory_trust_review_request_spec_proposal_ids"))
+        != expected_request_spec_proposal_ids
+    ):
+        violations.append(
+            "sequence_policy_promotion_executor_result_consumer_dry_run_consumer_summary_review_request_spec_proposal_ids_mismatch"
+        )
     return tuple(violations)
 
 
-def _consumer_request_violations(request: Mapping[str, Any]) -> Tuple[str, ...]:
+def _consumer_request_violations(
+    request: Mapping[str, Any],
+    *,
+    dry_run_records: Tuple[Mapping[str, Any], ...],
+    promotion_acceptance_templates: Tuple[Mapping[str, Any], ...],
+) -> Tuple[str, ...]:
     violations = []
     if (
         request.get("handler")
@@ -366,6 +552,105 @@ def _consumer_request_violations(request: Mapping[str, Any]) -> Tuple[str, ...]:
         violations.append(
             "sequence_policy_promotion_executor_result_consumer_request_dry_run_records_missing"
         )
+    dry_run_contract_ids = {
+        str(record["promotion_contract_record_id"])
+        for record in dry_run_records
+        if isinstance(record.get("promotion_contract_record_id"), str)
+        and record.get("promotion_contract_record_id")
+    }
+    template_contract_ids = {
+        str(template["promotion_contract_record_id"])
+        for template in promotion_acceptance_templates
+        if isinstance(template.get("promotion_contract_record_id"), str)
+        and template.get("promotion_contract_record_id")
+    }
+    if len(template_contract_ids) != len(promotion_acceptance_templates):
+        violations.append(
+            "sequence_policy_promotion_executor_result_consumer_request_acceptance_template_contract_ids_not_unique"
+        )
+    if dry_run_contract_ids and not dry_run_contract_ids.issubset(
+        template_contract_ids
+    ):
+        violations.append(
+            "sequence_policy_promotion_executor_result_consumer_request_acceptance_templates_missing_dry_run_record"
+        )
+    request_specs = _record_list(request.get("memory_trust_review_request_specs"))
+    request_spec_proposal_ids = {
+        str(spec["proposal_id"])
+        for spec in request_specs
+        if isinstance(spec.get("proposal_id"), str) and spec.get("proposal_id")
+    }
+    template_proposal_ids = {
+        str(template["proposal_id"])
+        for template in promotion_acceptance_templates
+        if isinstance(template.get("proposal_id"), str) and template.get("proposal_id")
+    }
+    if not template_proposal_ids.issubset(request_spec_proposal_ids):
+        violations.append(
+            "sequence_policy_promotion_executor_result_consumer_request_review_request_spec_proposal_ids_mismatch"
+        )
+    for index, spec in enumerate(request_specs):
+        spec_id = _string(spec.get("memory_trust_review_request_spec_id")) or (
+            f"memory_trust_review_request_spec:{index}"
+        )
+        proposal_id = _string(spec.get("proposal_id")) or spec_id
+        violations.extend(
+            _current_sequence_review_freshness_violations(
+                proposal_id,
+                _mapping(spec.get("current_sequence_review_freshness")),
+            )
+        )
+    return tuple(violations)
+
+
+def _acceptance_template_violations(
+    template: Mapping[str, Any],
+    *,
+    index: int,
+) -> Tuple[str, ...]:
+    template_id = (
+        _string(template.get("promotion_acceptance_record_template_id"))
+        or f"promotion_acceptance_template:{index}"
+    )
+    proposal_id = _string(template.get("proposal_id")) or template_id
+    violations = []
+    for field in REQUIRED_ACCEPTANCE_TEMPLATE_FIELDS:
+        if not _string(template.get(field)):
+            violations.append(f"{template_id}:{field}_missing")
+    for field in REQUIRED_ACCEPTANCE_TEMPLATE_IDENTITY_FIELDS:
+        if not _string(template.get(field)):
+            violations.append(f"{proposal_id}:{field}_missing")
+    if template.get("source_memory_index_available") is not True:
+        violations.append(f"{proposal_id}:source_memory_index_available_not_true")
+    if _summary_int(template.get("planned_queue_index")) is None:
+        violations.append(f"{proposal_id}:planned_queue_index_invalid")
+    if template.get("rank_source") != "sequence_policy_consumer":
+        violations.append(f"{proposal_id}:rank_source_mismatch")
+    violations.extend(
+        _current_sequence_review_freshness_violations(
+            proposal_id,
+            _mapping(template.get("current_sequence_review_freshness")),
+        )
+    )
+    source_idempotency_key = _string(template.get("source_idempotency_key"))
+    policy_key = _string(template.get("policy_key"))
+    if (
+        source_idempotency_key
+        and policy_key
+        and policy_key != f"{proposal_id}/{source_idempotency_key}"
+    ):
+        violations.append(f"{proposal_id}:policy_key_identity_mismatch")
+    if template.get("decision_options") != ["accepted", "rejected"]:
+        violations.append(f"{template_id}:decision_options_invalid")
+    if template.get("operator_must_choose_decision") is not True:
+        violations.append(f"{template_id}:operator_must_choose_decision_not_true")
+    if template.get("reviewed_by_required") is not True:
+        violations.append(f"{template_id}:reviewed_by_required_not_true")
+    if template.get("reviewed_at_utc_required") is not True:
+        violations.append(f"{template_id}:reviewed_at_utc_required_not_true")
+    for flag in REQUIRED_ACCEPTANCE_TEMPLATE_FALSE_FLAGS:
+        if template.get(flag) is not False:
+            violations.append(f"{template_id}:{flag}_not_false")
     return tuple(violations)
 
 
@@ -602,6 +887,59 @@ def _apply_result_identity_violations(
     return tuple(violations)
 
 
+def _dry_run_template_identity_violations(
+    dry_run_records: Tuple[Mapping[str, Any], ...],
+    promotion_acceptance_templates: Tuple[Mapping[str, Any], ...],
+    memory_trust_review_request_specs: Tuple[Mapping[str, Any], ...],
+) -> Tuple[str, ...]:
+    templates_by_contract_record_id = _templates_by_contract_record_id(
+        promotion_acceptance_templates
+    )
+    request_specs_by_proposal_id = _request_specs_by_proposal_id(
+        memory_trust_review_request_specs
+    )
+    violations = []
+    for dry_run_record in dry_run_records:
+        contract_id = _string(dry_run_record.get("promotion_contract_record_id"))
+        proposal_id = _string(dry_run_record.get("proposal_id")) or contract_id
+        template = _mapping(templates_by_contract_record_id.get(contract_id))
+        if not template:
+            violations.append(f"{proposal_id}:acceptance_template_missing")
+            continue
+        expected_pairs = {
+            "promotion_contract_record_id": dry_run_record.get(
+                "promotion_contract_record_id"
+            ),
+            "promotion_candidate_id": dry_run_record.get("promotion_candidate_id"),
+            "proposal_id": dry_run_record.get("proposal_id"),
+            "learning_scope": dry_run_record.get("learning_scope"),
+            "value_type": dry_run_record.get("value_type"),
+            "idempotency_key": dry_run_record.get("source_idempotency_key"),
+            "previous_policy_state": dry_run_record.get("previous_policy_state"),
+            "rollback_strategy": dry_run_record.get("rollback_strategy"),
+        }
+        for field, expected in expected_pairs.items():
+            if template.get(field) != expected:
+                violations.append(f"{proposal_id}:{field}_dry_run_mismatch")
+        request_spec = _mapping(request_specs_by_proposal_id.get(proposal_id))
+        if request_spec:
+            if template.get("source_memory_trust_review_request_spec_id") != request_spec.get(
+                "memory_trust_review_request_spec_id"
+            ):
+                violations.append(
+                    f"{proposal_id}:source_memory_trust_review_request_spec_id_mismatch"
+                )
+            if _sequence_review_freshness_core(
+                _mapping(template.get("current_sequence_review_freshness"))
+            ) != _sequence_review_freshness_core(
+                _mapping(request_spec.get("current_sequence_review_freshness"))
+            ):
+                violations.append(
+                    f"{proposal_id}:current_sequence_review_freshness_request_spec_mismatch"
+                )
+    return tuple(violations)
+
+
 def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer(
     *,
     promotion_executor_dry_run_result_consumer: Mapping[str, Any] | None = None,
@@ -613,6 +951,8 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     executor = _mapping(promotion_executor_result)
     request = _mapping(consumer.get("promotion_executor_request"))
     dry_run_records = _dry_run_records_from_request(request)
+    promotion_acceptance_templates = _acceptance_templates_from_request(request)
+    memory_trust_review_request_specs = _request_specs_from_request(request)
     apply_results = _record_list(executor.get("apply_results"))
     applied = executor.get("status") == REQUIRED_EXECUTOR_APPLIED_STATUS
     raw_invalid_record_ids = tuple(
@@ -622,8 +962,27 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
                 *_consumer_summary_violations(
                     _mapping(consumer.get("summary")),
                     dry_run_records=dry_run_records,
+                    promotion_acceptance_templates=promotion_acceptance_templates,
+                    memory_trust_review_request_specs=memory_trust_review_request_specs,
                 ),
-                *_consumer_request_violations(request),
+                *_consumer_request_violations(
+                    request,
+                    dry_run_records=dry_run_records,
+                    promotion_acceptance_templates=promotion_acceptance_templates,
+                ),
+                *(
+                    violation
+                    for index, template in enumerate(promotion_acceptance_templates)
+                    for violation in _acceptance_template_violations(
+                        template,
+                        index=index,
+                    )
+                ),
+                *_dry_run_template_identity_violations(
+                    dry_run_records,
+                    promotion_acceptance_templates,
+                    memory_trust_review_request_specs,
+                ),
                 *_executor_envelope_violations(executor),
                 *_executor_safety_apply_violations(executor, applied=applied),
                 *_executor_summary_violations(
@@ -717,6 +1076,12 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     }
     if request_available:
         apply_audit_request["promotion_executor"] = executor
+        apply_audit_request["promotion_acceptance_record_templates"] = list(
+            promotion_acceptance_templates
+        )
+        apply_audit_request["memory_trust_review_request_specs"] = list(
+            memory_trust_review_request_specs
+        )
 
     return {
         "type": (
@@ -759,7 +1124,16 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         "summary": {
             "expected_executor_apply_result_count": len(dry_run_records),
             "executor_apply_result_count": len(apply_results),
+            "promotion_acceptance_record_template_count": len(
+                promotion_acceptance_templates
+            ),
+            "memory_trust_review_request_spec_count": len(
+                memory_trust_review_request_specs
+            ),
             "invalid_record_count": len(invalid_record_ids),
+            "fresh_sequence_review_context_status": _source_sequence_review_freshness_status(
+                promotion_acceptance_templates
+            ),
             "target_policy_store": TARGET_POLICY_STORE,
             "promotion_executor_result_consumer_only": True,
             "promotion_apply_audit_request_template_only": True,
@@ -787,6 +1161,17 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
                 str(record["policy_key"])
                 for record in apply_results
                 if isinstance(record.get("policy_key"), str) and record.get("policy_key")
+            ],
+            "promotion_acceptance_record_template_proposal_ids": [
+                str(template["proposal_id"])
+                for template in promotion_acceptance_templates
+                if isinstance(template.get("proposal_id"), str)
+                and template.get("proposal_id")
+            ],
+            "memory_trust_review_request_spec_proposal_ids": [
+                str(spec["proposal_id"])
+                for spec in memory_trust_review_request_specs
+                if isinstance(spec.get("proposal_id"), str) and spec.get("proposal_id")
             ],
             "target_policy_paths": [
                 str(record["target_policy_path"])

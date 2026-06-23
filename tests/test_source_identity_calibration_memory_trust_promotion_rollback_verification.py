@@ -76,6 +76,17 @@ def _freshness():
     }
 
 
+def _unsafe_freshness():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "queries_console": True,
+    }
+
+
 def _rollback_evidence():
     return {
         "status": "ready",
@@ -196,6 +207,7 @@ def _verification_record(audit_record):
         "rollback_target_trust_state": audit_record["rollback_target_trust_state"],
         "rollback_strategy": audit_record["rollback_strategy"],
         "verification_evidence_status": "reviewed",
+        "current_state_cache_freshness": _freshness(),
         "decision": "verified",
         "verified_by": "operator",
         "verified_at": "2026-06-06T14:00:00Z",
@@ -325,6 +337,51 @@ def test_memory_trust_promotion_rollback_verification_records_verified_evidence(
     assert verified["can_import_to_queue"] is False
     assert verified["can_apply_live"] is False
     assert "requested_change" not in verification
+
+
+def test_memory_trust_promotion_rollback_verification_requires_freshness_evidence():
+    audit = _apply_audit()
+    record = _verification_record(audit["audit_records"][0])
+    record.pop("current_state_cache_freshness")
+
+    verification = (
+        build_source_identity_calibration_memory_trust_promotion_rollback_verification(
+            apply_audit=audit,
+            verification_records=[record],
+        )
+    )
+
+    assert (
+        verification["status"]
+        == "memory_trust_promotion_rollback_verification_replacement_required"
+    )
+    assert verification["summary"]["rollback_verified_record_count"] == 0
+    assert verification["summary"]["usable_as_downstream_priority_gate_evidence"] is False
+    assert verification["verified_records"] == []
+    assert "rollback-verification-1" in verification["summary"]["invalid_record_ids"]
+
+
+def test_memory_trust_promotion_rollback_verification_rejects_live_authority_freshness():
+    audit = _apply_audit()
+    record = {
+        **_verification_record(audit["audit_records"][0]),
+        "current_state_cache_freshness": _unsafe_freshness(),
+    }
+
+    verification = (
+        build_source_identity_calibration_memory_trust_promotion_rollback_verification(
+            apply_audit=audit,
+            verification_records=[record],
+        )
+    )
+
+    assert (
+        verification["status"]
+        == "memory_trust_promotion_rollback_verification_replacement_required"
+    )
+    assert verification["summary"]["rollback_verified_record_count"] == 0
+    assert verification["verified_records"] == []
+    assert "rollback-verification-1" in verification["summary"]["invalid_record_ids"]
 
 
 def test_memory_trust_promotion_rollback_verification_rejects_forged_authority():

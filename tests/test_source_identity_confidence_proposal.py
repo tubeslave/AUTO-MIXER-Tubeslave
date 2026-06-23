@@ -239,6 +239,32 @@ def test_source_identity_operator_proposals_and_adapter_are_not_queueable_live_a
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_source_identity_context_cache_no_live_authority"] is True
     assert proposal["evidence"]["operator_acceptance_required_before_promotion"] is True
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "source_identity"
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == "complete"
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    for required_field in correction["source_evidence"]["required_evidence_fields"]:
+        assert required_field in source_evidence
+    assert source_evidence["operator_acceptance"] == {
+        "operator_label_confirmed": False,
+        "operator_review_required": True,
+        "required_before_downstream_processing": True,
+    }
+    assert source_evidence["replay_outcome"] == {
+        "available": False,
+        "required_before_downstream_trust_promotion": True,
+        "source_identity_replay_calibration_required": True,
+    }
 
     adapted = adapt_source_identity_confidence_proposals(proposals)
     assert adapted[0]["adapter_id"] == "source_identity_confidence"
@@ -247,6 +273,55 @@ def test_source_identity_operator_proposals_and_adapter_are_not_queueable_live_a
     assert adapted[0]["queue_action"] == "preview_only_not_queued"
     assert "requested_change" not in adapted[0]
     assert adapted[0]["evidence"]["requested_change_allowed"] is False
+    forged = {
+        **proposal,
+        "evidence": {
+            **proposal["evidence"],
+            "live_authority_granted": True,
+            "can_apply_live": True,
+            "queue_action": "queue_now",
+            "readback_required": False,
+            "nested_authority_claim": {
+                "apply_now": True,
+                "dispatch_supervised_apply": True,
+            },
+        },
+        "proposed_action": {
+            **proposal["proposed_action"],
+            "queue_action": "queue_now",
+            "apply_now": True,
+            "dispatch_supervised_apply": True,
+            "live_authority_granted": True,
+        },
+    }
+    forged_adapted = adapt_source_identity_confidence_proposals([forged])[0]
+    assert forged_adapted["evidence"]["live_authority_granted"] is False
+    assert forged_adapted["evidence"]["can_apply_live"] is False
+    assert forged_adapted["evidence"]["queue_action"] == "not_queueable_until_promoted"
+    assert forged_adapted["evidence"]["readback_required"] is True
+    assert forged_adapted["evidence"]["nested_authority_claim"]["apply_now"] is False
+    assert forged_adapted["evidence"]["nested_authority_claim"][
+        "dispatch_supervised_apply"
+    ] is False
+    assert forged_adapted["proposed_action"]["queue_action"] == (
+        "not_queueable_until_promoted"
+    )
+    assert forged_adapted["proposed_action"]["apply_now"] is False
+    assert forged_adapted["proposed_action"]["dispatch_supervised_apply"] is False
+    assert forged_adapted["proposed_action"]["live_authority_granted"] is False
+    claims_by_path = {
+        claim["path"]: claim for claim in forged_adapted["raw_input_authority_claims"]
+    }
+    assert claims_by_path["evidence.live_authority_granted"]["requested_value"] is True
+    assert claims_by_path["evidence.queue_action"]["requested_value"] == "queue_now"
+    assert claims_by_path["evidence.readback_required"]["requested_value"] is False
+    assert claims_by_path["evidence.nested_authority_claim.apply_now"][
+        "requested_value"
+    ] is True
+    assert claims_by_path["proposed_action.apply_now"]["requested_value"] is True
+    assert forged_adapted["evidence"]["raw_input_authority_claims"] == forged_adapted[
+        "raw_input_authority_claims"
+    ]
 
 
 def test_source_identity_registry_contract_and_goal_row():
@@ -273,6 +348,7 @@ def test_source_identity_registry_contract_and_goal_row():
     assert "downstream_rejection_reasons" in evidence
     assert "current_source_identity_context_cache_no_live_authority" in evidence
     assert "operator_acceptance" in evidence
+    assert "replay_outcome" in evidence
     assert contract["live_apply_allowed"] is False
 
     assert row is not None

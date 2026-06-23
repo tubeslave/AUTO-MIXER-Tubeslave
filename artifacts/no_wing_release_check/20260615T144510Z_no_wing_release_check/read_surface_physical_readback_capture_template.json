@@ -1,0 +1,175 @@
+{
+  "accepted_as_physical_fixture_candidate": false,
+  "all_remaining_target_count": 10,
+  "blocked_by": [
+    "physical_readback_fixtures_incomplete",
+    "operator_must_capture_and_review_physical_readback_artifact",
+    "operator_must_replace_capture_template_placeholders",
+    "operator_must_validate_filled_artifact_with_required_contract",
+    "operator_must_review_artifact_before_fixture_acceptance"
+  ],
+  "capture_template_count": 1,
+  "capture_templates": [
+    {
+      "artifact_source_id": "<path-to-operator-captured-json>",
+      "blockers_to_clear": [
+        "Add per-surface timestamp fixtures so cached state cannot be mistaken for fresh physical proof.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "per_field_stale_cache_fixture_incomplete",
+        "physical_readback_fixture"
+      ],
+      "capture_scope": "<manual capture scope and show-state notes>",
+      "captured_at": "<UTC ISO timestamp, e.g. 2026-06-07T12:00:00Z>",
+      "captured_by": "<operator-name>",
+      "console_model": "<console model and firmware>",
+      "expected_artifacts": [
+        "Read DTO for all_cached_addresses with explicit coverage flags.",
+        "Fixture test proving raw_mixer_state_cache does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for raw_mixer_state_cache proving cached or queryable evidence matches console state.",
+        "Raw mixer-state physical readback artifact validated by raw_mixer_state_physical_readback_contract."
+      ],
+      "physical_readback_payload": "<replace with JSON payload that matches required_contract_method_id>",
+      "physical_readback_payload_template": {
+        "artifact_type": "raw_mixer_state_physical_readback",
+        "payload": {
+          "address_count": "<integer address_count>",
+          "captured_at": "<UTC ISO timestamp, e.g. 2026-06-07T12:00:00Z>",
+          "console_model": "<console model and firmware>",
+          "readback_rows": [
+            {
+              "address": "<operator-captured address>",
+              "captured_at": "<UTC ISO timestamp, e.g. 2026-06-07T12:00:00Z>",
+              "source": "<physical_readback|wing_physical_readback|dlive_physical_readback>",
+              "status": "<verified_from_physical_readback>",
+              "value": "<operator-captured value>"
+            }
+          ],
+          "remediation_action_id": "remediate_raw_mixer_state_cache",
+          "safety": {
+            "accepted_as_physical_fixture_candidate": false,
+            "full_autonomous_ready": false,
+            "live_authority_granted": false,
+            "live_widening_allowed": false,
+            "live_write": false,
+            "mutates_console_state": false,
+            "read_only": true
+          },
+          "schema_id": "raw_mixer_state_physical_readback.v1",
+          "source": "<physical_readback|wing_physical_readback|dlive_physical_readback>",
+          "surface_id": "raw_mixer_state_cache",
+          "type": "raw_mixer_state_physical_readback"
+        },
+        "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+        "required_field_sets": {
+          "required_false_safety_flags": [
+            "live_write",
+            "mutates_console_state",
+            "live_widening_allowed",
+            "full_autonomous_ready"
+          ],
+          "required_row_fields": [
+            "address",
+            "value",
+            "status",
+            "source",
+            "captured_at"
+          ]
+        },
+        "required_top_level_fields": [
+          "type",
+          "schema_id",
+          "surface_id",
+          "remediation_action_id",
+          "captured_at",
+          "source",
+          "console_model",
+          "address_count",
+          "readback_rows",
+          "safety"
+        ],
+        "schema_id": "raw_mixer_state_physical_readback.v1",
+        "template_status": "operator_must_fill_from_physical_readback"
+      },
+      "read_mode": "cached_state",
+      "remediation_action_id": "remediate_raw_mixer_state_cache",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "raw_mixer_state_physical_readback_contract",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "per_field_stale_cache_fixture_incomplete"
+      ],
+      "required_contract_method_id": "raw_mixer_state_physical_readback_contract",
+      "requires_connection": true,
+      "safety": {
+        "accepted_as_physical_fixture_candidate": false,
+        "executes_tests": false,
+        "execution_allowed_by_template": false,
+        "fixture_closure_allowed_by_template": false,
+        "full_autonomous_ready": false,
+        "live_authority_granted": false,
+        "live_widening_allowed": false,
+        "live_write": false,
+        "mutates_console_state": false,
+        "operator_required": true,
+        "queries_console": false,
+        "read_only": true
+      },
+      "source": "<physical_readback|wing_physical_readback|dlive_physical_readback>",
+      "surface_id": "raw_mixer_state_cache",
+      "target_console_surface": "all_cached_addresses",
+      "template_id": "pending-raw-mixer-state-cache-physical-readback"
+    }
+  ],
+  "commands": {
+    "focused_validation": [
+      "PYTHONPATH=backend",
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_read_surface_physical_readback_capture_template.py",
+      "tests/test_no_wing_release_check.py"
+    ]
+  },
+  "executes_tests": false,
+  "execution_allowed_by_template": false,
+  "fixture_closure_allowed_by_template": false,
+  "full_autonomous_ready": false,
+  "generated_at": "2026-06-15T14:45:14Z",
+  "include_all_targets": false,
+  "live_authority_granted": false,
+  "live_widening_allowed": false,
+  "live_write": false,
+  "mutates_console_state": false,
+  "operator_required": true,
+  "operator_sequence": [
+    "Confirm the selected surface and console/show state before capture.",
+    "Replace every placeholder with real operator-captured physical readback data.",
+    "Reject the capture path if it would send a mixer-control message or mutate console state.",
+    "Keep authority, execution, fixture-closure, and autonomous-readiness flags false.",
+    "Validate the filled artifact with the listed required contract before review queue intake.",
+    "Use the review queue and acceptance ledger before any separate fixture-closure decision."
+  ],
+  "queries_console": false,
+  "read_only": true,
+  "required_operator_edits": [
+    "artifact_source_id",
+    "captured_at",
+    "captured_by",
+    "source",
+    "console_model",
+    "capture_scope",
+    "physical_readback_payload",
+    "physical_readback_payload_template.payload"
+  ],
+  "selected_surface_id": "raw_mixer_state_cache",
+  "source_method_id": "read_surface_physical_readback_capture_plan",
+  "source_packet_status": "operator_capture_required",
+  "source_packet_type": "read_surface_physical_readback_capture_packet",
+  "status": "operator_capture_template_ready",
+  "type": "read_surface_physical_readback_artifact_capture_template"
+}

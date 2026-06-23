@@ -1,0 +1,66 @@
+{
+  "closure_candidates": [],
+  "commands": {
+    "focused_validation": [
+      "PYTHONPATH=backend",
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_read_surface_physical_readback_fixture_closure_plan.py",
+      "tests/test_no_wing_release_check.py"
+    ]
+  },
+  "generated_at": "2026-06-18T05:08:27Z",
+  "method_id": "read_surface_physical_readback_fixture_closure_plan",
+  "operator_sequence": [
+    "Confirm every physical readback candidate was reviewed by an operator.",
+    "Reject this plan if any acceptance record is invalid, ambiguous, or unreviewed.",
+    "Keep fixture_update_allowed_by_plan and fixture_closure_allowed_by_plan false.",
+    "Perform any fixture baseline update as a separate manual repository change.",
+    "Run the focused validation command before considering a separate closure decision."
+  ],
+  "safety": {
+    "executes_tests": false,
+    "execution_allowed_by_plan": false,
+    "fixture_closure_allowed_by_plan": false,
+    "fixture_update_allowed_by_plan": false,
+    "full_autonomous_ready": false,
+    "live_authority_granted": false,
+    "live_widening_allowed": false,
+    "live_write": false,
+    "mutates_console_state": false,
+    "operator_required": true,
+    "queries_console": false,
+    "read_only": true
+  },
+  "source_method_id": "read_surface_physical_readback_fixture_acceptance_ledger",
+  "status": "fixture_closure_not_ready",
+  "summary": {
+    "acceptance_record_count": 0,
+    "accepted_record_count": 0,
+    "blocked_by": [
+      "accepted_physical_readback_candidate_required_before_fixture_closure"
+    ],
+    "closure_candidate_count": 0,
+    "closure_candidate_surface_ids": [],
+    "fixture_closure_allowed_by_plan": false,
+    "fixture_update_allowed_by_plan": false,
+    "full_autonomous_ready": false,
+    "invalid_record_count": 0,
+    "invalid_record_ids": [],
+    "ledger_status": "operator_acceptance_required",
+    "live_authority_granted": false,
+    "manual_fixture_closure_candidate_available": false,
+    "manual_fixture_closure_required": true,
+    "next_global_step": "Operator needs accepted physical readback candidates first.",
+    "operator_review_required": true,
+    "physical_fixture_gap_remains": true,
+    "rejected_record_count": 0,
+    "rejected_surface_ids": [],
+    "review_candidate_count": 0,
+    "unreviewed_candidate_count": 0,
+    "unreviewed_candidate_surface_ids": []
+  },
+  "type": "read_surface_physical_readback_fixture_closure_plan"
+}

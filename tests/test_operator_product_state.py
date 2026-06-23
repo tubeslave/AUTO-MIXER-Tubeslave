@@ -5785,29 +5785,306 @@ def test_main_pipeline_preview_keeps_non_fader_gain_methods_blocked(server):
 def test_main_pipeline_preview_exposes_non_fader_gain_proposal_contracts(server):
     payload = build_main_pipeline_preview(server, total_channels=4)
     contracts = {item["method_id"]: item for item in payload["proposal_only_contracts"]}
+    required_operator_fields = (
+        "method_id",
+        "source",
+        "target",
+        "value_type",
+        "target_kind",
+        "old_value_source",
+        "objective_family",
+        "bounded_delta_unit",
+        "bounded_delta_policy",
+        "source_evidence",
+        "source_evidence_details",
+        "measured_or_audible_problem",
+        "proposed_correction",
+        "operator_evidence_packet",
+        "confidence",
+        "confidence_review",
+        "confidence_review_details",
+        "operator_proposal_review_gate",
+        "bounded_delta",
+        "bounded_delta_details",
+        "safety_blockers",
+        "effective_safety_blockers",
+        "safety_blocker_details",
+        "why_safe_details",
+        "why_blocked_details",
+        "headroom_feedback_true_peak_checks",
+        "headroom_feedback_true_peak_check_details",
+        "operator_safety_review_matrix",
+        "operator_readable_explanation",
+        "operator_explanation_packet",
+        "operator_next_action_details",
+        "operator_review_summary",
+        "operator_review_checklist",
+        "operator_review_checklist_details",
+        "operator_review_decision_options",
+        "operator_review_decision_option_details",
+        "operator_review_record_template",
+        "operator_review_record_field_details",
+        "rollback_expectation",
+        "rollback_readback_contract",
+        "rollback_readback_details",
+        "future_live_promotion_requirements",
+        "future_live_requirement_details",
+        "live_authority_boundary",
+        "future_wing_readback_contract",
+        "denial_reason",
+        "operator_next_step",
+    )
 
-    for method_id, value_type in {
-        "auto_eq": "eq",
-        "auto_compressor": "compressor",
-        "auto_gate_caig": "gate",
-        "auto_panner": "pan",
-        "phase_alignment": "phase_delay",
-        "auto_fx": "fx_send",
-        "routing_snapshot_reset_writes": "routing",
-    }.items():
+    expected_contracts = {
+        "lufs_gain_staging": ("gain_trim", "gain_trim"),
+        "auto_fader_v1": ("fader_balance", "fader_balance"),
+        "live_shared_mix": ("fader_balance", "fader_balance"),
+        "auto_eq": ("eq", "eq"),
+        "corrective_eq_proposal": ("eq", "eq"),
+        "cross_adaptive_eq": ("eq", "eq"),
+        "frequency_separation_proposal": ("frequency_split", "eq"),
+        "auto_compressor": ("compressor", "compressor_dynamics"),
+        "auto_compressor_cf": ("compressor", "compressor_dynamics"),
+        "compressor_dynamics_proposal": ("compressor", "compressor_dynamics"),
+        "auto_gate_caig": ("gate", "gate_expander"),
+        "context_aware_gate_agent": ("gate", "gate_expander"),
+        "deesser_vocal_sibilance": ("deesser", "gate_expander_deesser"),
+        "auto_fx": ("fx_send", "fx_sends"),
+        "fx_send_proposal": ("fx_send", "fx_sends"),
+        "fx_direct_apply": ("fx_parameter", "fx_sends"),
+        "auto_panner": ("pan", "pan_stereo"),
+        "pan_spatial_proposal": ("pan", "pan_stereo"),
+        "phase_alignment": ("phase_delay", "phase_alignment"),
+        "phase_aware_eq_guard": ("phase_eq_guard", "phase_alignment"),
+        "routing_management_proposal": ("routing", "routing_groups_scenes"),
+        "routing_snapshot_reset_writes": ("routing", "routing_groups_scenes"),
+        "scene_preset_management_proposal": ("scene_preset", "routing_groups_scenes"),
+        "mute_management_proposal": ("mute_state", "routing_groups_scenes"),
+        "master_bus_optimization_proposal": ("master_bus", "master_output"),
+    }
+
+    assert set(expected_contracts) <= set(contracts)
+
+    for method_id, (value_type, objective_family) in expected_contracts.items():
         contract = contracts[method_id]
+        proposal_contract = contract["proposal_contract"]
+        operator_contract = proposal_contract["operator_correction_contract"]
+        readback_contract = operator_contract["future_wing_readback_contract"]
+
         assert contract["adapter_id"] == "proposal_only_contracts"
         assert contract["queue_action"] == "not_queueable_until_promoted"
         assert contract["can_import_to_queue"] is False
         assert contract["can_apply_live"] is False
-        assert contract["proposal_contract"]["value_type"] == value_type
-        assert contract["proposal_contract"]["live_apply_allowed"] is False
-        assert contract["proposal_contract"]["readback_required"] is True
-        assert contract["proposal_contract"]["rollback_required"] is True
-        assert contract["proposal_contract"]["allowed_live_write_kinds"] == [
+        assert proposal_contract["value_type"] == value_type
+        assert proposal_contract["live_apply_allowed"] is False
+        assert proposal_contract["readback_required"] is True
+        assert proposal_contract["rollback_required"] is True
+        assert proposal_contract["operator_correction_required_fields"] == list(
+            required_operator_fields
+        )
+        for field in required_operator_fields:
+            assert field in proposal_contract["required_fields"]
+        assert proposal_contract["allowed_live_write_kinds"] == [
             "fader",
             "gain",
         ]
+        assert operator_contract["objective_family"] == objective_family
+        assert operator_contract["source_evidence_required"] is True
+        assert operator_contract["source_evidence_details_required"] is True
+        assert operator_contract["measured_or_audible_problem_required"] is True
+        assert operator_contract["proposed_correction_required"] is True
+        assert operator_contract["confidence_required"] is True
+        assert operator_contract["confidence_review_required"] is True
+        assert operator_contract["confidence_review_details_required"] is True
+        assert operator_contract["operator_proposal_review_gate_required"] is True
+        assert operator_contract["bounded_delta_required"] is True
+        assert operator_contract["bounded_delta_details_required"] is True
+        assert operator_contract["safety_blockers_required"] is True
+        assert operator_contract["headroom_feedback_true_peak_checks_required"] is True
+        assert (
+            operator_contract["headroom_feedback_true_peak_check_details_required"]
+            is True
+        )
+        assert operator_contract["operator_safety_review_matrix_required"] is True
+        assert operator_contract["operator_readable_explanation_required"] is True
+        assert operator_contract["operator_explanation_packet_required"] is True
+        assert operator_contract["operator_next_action_details_required"] is True
+        assert operator_contract["operator_evidence_packet_required"] is True
+        assert operator_contract["operator_review_summary_required"] is True
+        assert operator_contract["operator_review_checklist_required"] is True
+        assert operator_contract["operator_review_checklist_details_required"] is True
+        assert operator_contract[
+            "operator_review_decision_options_required"
+        ] is True
+        assert (
+            operator_contract["operator_review_decision_option_details_required"]
+            is True
+        )
+        assert operator_contract["operator_review_record_template_required"] is True
+        assert (
+            operator_contract["operator_review_record_field_details_required"]
+            is True
+        )
+        assert operator_contract["future_live_promotion_requirements_required"] is True
+        assert operator_contract["future_live_requirement_details_required"] is True
+        assert operator_contract["live_authority_boundary_required"] is True
+        assert operator_contract["rollback_readback_contract_required"] is True
+        assert operator_contract["rollback_readback_details_required"] is True
+        assert operator_contract["read_only_or_dry_run_only"] is True
+        assert operator_contract["live_apply_allowed"] is False
+        assert operator_contract["queue_import_allowed"] is False
+        authority_boundary = operator_contract["live_authority_boundary"]
+        assert authority_boundary["live_authority_granted"] is False
+        assert authority_boundary["full_autonomous_ready"] is False
+        assert authority_boundary["readiness_closure_allowed"] is False
+        assert authority_boundary["wing_proof_required"] is True
+        assert authority_boundary["hardware_proof_required"] is True
+        assert authority_boundary["allowed_current_live_write_kinds"] == [
+            "fader",
+            "gain",
+        ]
+        assert readback_contract["required_before_live_promotion"] is True
+        assert readback_contract["target_kind"] == proposal_contract["target_kind"]
+        assert readback_contract["old_value_source"] == proposal_contract["old_value_source"]
+        assert readback_contract["readback_targets"]
+        assert readback_contract["blocked_live_actions"]
+        assert authority_boundary["blocked_live_actions"] == readback_contract[
+            "blocked_live_actions"
+        ]
+        future_requirements_contract = operator_contract[
+            "future_live_promotion_requirements"
+        ]
+        assert future_requirements_contract["required_before_live_promotion"] is True
+        assert future_requirements_contract["read_only_or_dry_run_only"] is True
+        assert future_requirements_contract["live_authority_granted"] is False
+        assert future_requirements_contract["readiness_closure_allowed"] is False
+        assert future_requirements_contract["live_apply_allowed"] is False
+        assert future_requirements_contract["queue_import_allowed"] is False
+        assert future_requirements_contract["operator_approval_required"] is True
+        assert future_requirements_contract["hardware_proof_required"] is True
+        assert {
+            "real_wing_readonly_connection_artifact",
+            "physical_console_readback_for_old_and_proposed_values",
+            "operator_review_acceptance_record",
+            "rollback_readback_proof",
+            "emergency_stop_proof",
+            "connection_loss_timeout_fail_closed_proof",
+            "safety_kernel_trace_for_target_action",
+        } <= set(future_requirements_contract["required_proofs"])
+        evidence_packet_contract = operator_contract["operator_evidence_packet"]
+        assert evidence_packet_contract["packet_type"] == (
+            "offline_operator_correction_review"
+        )
+        assert evidence_packet_contract["read_only_or_dry_run_only"] is True
+        assert evidence_packet_contract["live_apply_allowed"] is False
+        assert evidence_packet_contract["queue_import_allowed"] is False
+        assert evidence_packet_contract["source_evidence_required"] is True
+        assert evidence_packet_contract["source_evidence_details_required"] is True
+        assert evidence_packet_contract["problem_statement_required"] is True
+        assert evidence_packet_contract["proposed_correction_required"] is True
+        assert evidence_packet_contract["confidence_required"] is True
+        assert evidence_packet_contract["confidence_review_required"] is True
+        assert (
+            evidence_packet_contract["confidence_review_details_required"] is True
+        )
+        assert evidence_packet_contract[
+            "operator_proposal_review_gate_required"
+        ] is True
+        assert evidence_packet_contract["bounded_delta_required"] is True
+        assert (
+            evidence_packet_contract["bounded_delta_details_required"] is True
+        )
+        assert evidence_packet_contract["safety_blockers_required"] is True
+        assert evidence_packet_contract["safety_checks_required"] is True
+        assert evidence_packet_contract[
+            "headroom_feedback_true_peak_checks_required"
+        ] is True
+        assert (
+            evidence_packet_contract[
+                "headroom_feedback_true_peak_check_details_required"
+            ]
+            is True
+        )
+        assert evidence_packet_contract[
+            "operator_safety_review_matrix_required"
+        ] is True
+        assert evidence_packet_contract[
+            "operator_readable_explanation_required"
+        ] is True
+        assert evidence_packet_contract[
+            "operator_explanation_packet_required"
+        ] is True
+        assert (
+            evidence_packet_contract["operator_next_action_details_required"]
+            is True
+        )
+        assert evidence_packet_contract["rollback_expectation_required"] is True
+        assert evidence_packet_contract["rollback_readback_contract_required"] is True
+        assert evidence_packet_contract["rollback_readback_details_required"] is True
+        assert evidence_packet_contract[
+            "future_live_promotion_requirements_required"
+        ] is True
+        assert (
+            evidence_packet_contract["future_live_requirement_details_required"]
+            is True
+        )
+        assert evidence_packet_contract[
+            "future_wing_readback_contract_required"
+        ] is True
+        assert evidence_packet_contract["live_authority_boundary_required"] is True
+        assert evidence_packet_contract["operator_review_required"] is True
+        assert evidence_packet_contract[
+            "operator_review_record_template_required"
+        ] is True
+        assert (
+            evidence_packet_contract["operator_review_record_field_details_required"]
+            is True
+        )
+        assert (
+            evidence_packet_contract["operator_review_checklist_details_required"]
+            is True
+        )
+        assert (
+            evidence_packet_contract[
+                "operator_review_decision_option_details_required"
+            ]
+            is True
+        )
+        review_record_contract = operator_contract["operator_review_record_template"]
+        assert review_record_contract["record_type"] == (
+            "offline_operator_correction_review_record"
+        )
+        assert review_record_contract["read_only_or_dry_run_only"] is True
+        assert review_record_contract["live_apply_allowed"] is False
+        assert review_record_contract["queue_import_allowed"] is False
+        assert review_record_contract["can_authorize_live"] is False
+        assert review_record_contract["can_close_readiness"] is False
+        assert review_record_contract["operator_review_required"] is True
+        assert review_record_contract[
+            "future_live_promotion_requires_real_wing_proof"
+        ] is True
+        assert set(review_record_contract["allowed_decisions"]) == {
+            "request_more_evidence",
+            "accept_as_offline_proposal",
+            "reject_proposal",
+            "defer_until_real_wing_proof",
+        }
+        review_checklist = operator_contract["operator_review_checklist"]
+        assert "do_not_queue_or_apply_live" in review_checklist
+        assert (
+            "capture_real_wing_readback_and_rollback_proof_before_live_promotion"
+            in review_checklist
+        )
+        review_options = operator_contract["operator_review_decision_options"]
+        assert {
+            "request_more_evidence",
+            "accept_as_offline_proposal",
+            "reject_proposal",
+            "defer_until_real_wing_proof",
+        } <= {option["decision"] for option in review_options}
+        for option in review_options:
+            assert option["live_apply_allowed"] is False
+            assert option["queue_import_allowed"] is False
         assert f"unsupported_value_type:{value_type}" in contract["blockers"]
         assert "requested_change" not in contract
 
@@ -5916,6 +6193,50 @@ def test_main_pipeline_preview_exposes_source_identity_replay_calibration_review
     assert writer["summary"]["runtime_memory_mutation"] is False
     assert writer["summary"]["downstream_priority_mutation"] is False
     assert queue["summary"]["pending_count"] == 0
+
+
+def test_main_pipeline_preview_blocks_source_identity_replay_without_fresh_context(
+    server,
+):
+    server.source_identity_replay_events = [
+        {
+            "event_id": f"lead:{index}",
+            "source_id": f"ch{index}",
+            "predicted_source_type": "lead_vocal",
+            "predicted_confidence": 0.86 + index * 0.01,
+            "operator_decision": "accepted",
+            "accepted_source_type": "lead_vocal",
+            "replay_matched": True,
+            "downstream_family": "arrangement_role",
+            "evidence_packet_id": f"packet:{index}",
+            "session_id": "show:source-id",
+        }
+        for index in range(1, 4)
+    ]
+
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    source_identity_replay = payload["source_identity_replay_calibration"]
+
+    assert payload["summary"]["source_identity_replay_event_count"] == 3
+    assert payload["summary"]["source_identity_replay_calibration_proposal_count"] == 0
+    assert source_identity_replay["available"] is False
+    assert source_identity_replay["status"] == "analysis_only"
+    assert source_identity_replay["metadata"]["calibration_candidate_count"] == 0
+    assert (
+        source_identity_replay["metadata"]["current_state_cache_freshness_status"]
+        == "not_provided"
+    )
+    assert (
+        "source_identity_replay_context_cache_not_fresh"
+        in source_identity_replay["metadata"]["blockers"]
+    )
+    assert source_identity_replay["metadata"]["live_write"] is False
+    assert source_identity_replay["metadata"]["queue_mutation"] is False
+    assert [
+        proposal
+        for proposal in payload["proposals"]
+        if proposal["adapter_id"] == "source_identity_replay_calibration"
+    ] == []
 
 
 def test_main_pipeline_preview_exposes_source_identity_acceptance_ledger_records(
@@ -6101,6 +6422,60 @@ def test_main_pipeline_preview_exposes_source_identity_memory_index_records(serv
     assert contract["status"] == "memory_trust_promotion_contract_not_ready"
     assert contract["summary"]["contract_record_count"] == 0
     assert queue["summary"]["pending_count"] == 0
+
+
+def test_main_pipeline_preview_blocks_sequence_policy_memory_without_fresh_context(server):
+    server.operator_proposal_apply_sequence_policy_memory_text = "\n".join(
+        [
+            "# Project Memory",
+            "",
+            "---",
+            "",
+            "### Supervised sequence policy memory",
+            "",
+            (
+                "- Draft ID: "
+                "`operator-sequence-policy-memory:memory-write-applied:"
+                "memory-write:memory-write-applied`"
+            ),
+            "- Proposal ID: `memory-write-applied`",
+            "- Learning scope: `supervised_fader_gain_sequence_execution`",
+            "- Value type: `fader`",
+            "- Channel: `2`",
+            "- Effective value: `-8.5`",
+            "- Idempotency key: `memory-write:memory-write-applied`",
+            "- Readback status: `verified_from_cache`",
+            "- Proof status: `verified`",
+            "- Runtime authority: no live, queue, model, or policy mutation",
+            "",
+            "Supervised fader/gain sequence execution was verified.",
+            "",
+        ]
+    )
+
+    payload = build_main_pipeline_preview(server, total_channels=4)
+    index = payload["operator_proposal_apply_sequence_policy_memory_index"]
+    review = payload["operator_proposal_apply_sequence_policy_memory_trust_review"]
+    ledger = payload[
+        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
+    ]
+
+    assert index["status"] == "append_only_sequence_memory_index_available"
+    assert index["summary"]["memory_record_count"] == 1
+    assert review["status"] == "sequence_memory_trust_review_not_ready"
+    assert review["summary"]["memory_record_count"] == 1
+    assert review["summary"]["trust_review_candidate_count"] == 0
+    assert review["summary"]["current_sequence_review_freshness_status"] == "not_provided"
+    assert "fresh_sequence_review_context_required_before_trust_review" in review[
+        "summary"
+    ]["blocked_by"]
+    assert review["summary"]["execution_allowed_by_review"] is False
+    assert review["summary"]["policy_mutation"] is False
+    assert review["summary"]["runtime_memory_mutation"] is False
+    assert ledger["summary"]["trust_review_candidate_count"] == 0
+    assert payload["summary"][
+        "operator_proposal_apply_sequence_policy_memory_trust_review_candidate_count"
+    ] == 0
 
 
 def test_main_pipeline_preview_exposes_sequence_policy_memory_index_records(server):
@@ -11617,8 +11992,17 @@ def test_operator_analysis_records_shadow_gain_ride_traces_without_queue_mutatio
     assert report["shadow_gain_ride_trace_count"] == 1
     assert report["shadow_gain_rides"][0]["live_apply_allowed"] is False
     assert queue["summary"]["pending_count"] == 0
-    assert traces["traces"][-1]["action_type"] == "gain_ride_shadow"
-    assert traces["traces"][-1]["proof_status"] == "shadow_only"
+    trace = traces["traces"][-1]
+    assert trace["action_type"] == "gain_ride_shadow"
+    assert trace["proof_status"] == "shadow_only"
+    assert trace["queue_action"] == "not_queueable_until_promoted"
+    assert trace["can_apply_live"] is False
+    assert trace["can_import_to_queue"] is False
+    assert trace["live_write"] is False
+    assert trace["queue_mutation"] is False
+    assert trace["mutates_mixer"] is False
+    assert trace["metadata"]["queue_action"] == "not_queueable_until_promoted"
+    assert trace["metadata"]["queue_mutation"] is False
 
 
 def test_operator_analysis_creates_applyable_proposal_when_fader_cache_exists(server):
@@ -12170,6 +12554,17 @@ def _sequence_policy_queue_import_fixture():
                 ),
                 "target_policy_state": "trusted_for_sequence_policy",
                 "sequence_policy_gate_status": "trusted",
+                "current_sequence_review_freshness": {
+                    "status": "fresh",
+                    "field_count": 4,
+                    "fresh_field_count": 4,
+                    "read_only": True,
+                    "live_write": False,
+                    "apply_attempted": False,
+                    "queries_console": False,
+                    "queue_mutation": False,
+                    "policy_mutation": False,
+                },
                 "rollback_verified": True,
                 "sequence_policy_eligible": True,
                 "eligible_for_sequence_policy_consumer": True,
@@ -12212,6 +12607,163 @@ def _sequence_policy_queue_import_fixture():
             ordering_preview=ordering_preview,
         )
     )
+
+
+@pytest.mark.asyncio
+async def test_sequence_policy_consumer_handler_requires_identity_match(server):
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate import (
+        OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_SEQUENCE_POLICY_GATE_METHOD_ID,
+    )
+
+    server.send_to_client = AsyncMock()
+    sequence_policy_gate = {
+        "type": (
+            "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
+        ),
+        "generated_at": "2026-06-06T15:55:00Z",
+        "method_id": (
+            OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_SEQUENCE_POLICY_GATE_METHOD_ID
+        ),
+        "status": "verified_sequence_memory_trust_promotion_policy_records_available",
+        "safety": {
+            "read_only": True,
+            "policy_gate_only": True,
+            "live_write": False,
+            "apply_attempted": False,
+            "mutates_console_state": False,
+            "queries_console": False,
+            "queue_mutation": False,
+            "model_mutation": False,
+            "runtime_memory_mutation": False,
+            "sequence_policy_trust_store_mutation": False,
+            "proposal_state_mutation": False,
+            "sequence_execution_allowed_by_gate": False,
+            "sequence_policy_change_allowed_by_gate": False,
+            "live_widening_allowed": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+        },
+        "summary": {
+            "sequence_policy_gate_record_count": 1,
+            "eligible_record_count": 1,
+            "invalid_record_count": 0,
+            "sequence_policy_eligible": True,
+            "policy_gate_only": True,
+            "queue_mutation": False,
+            "model_mutation": False,
+            "runtime_memory_mutation": False,
+            "sequence_policy_trust_store_mutation": False,
+            "proposal_state_mutation": False,
+            "sequence_execution_allowed_by_gate": False,
+            "sequence_policy_change_allowed_by_gate": False,
+            "live_write": False,
+            "live_authority_granted": False,
+            "full_autonomous_ready": False,
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "eligible_policy_keys": [
+                "proposal-sequence-fader/memory-write:proposal-sequence-fader"
+            ],
+            "invalid_record_ids": [],
+        },
+        "policy_records": [
+            {
+                "sequence_policy_gate_record_id": (
+                    "operator_sequence_memory_trust_promotion_sequence_policy_gate:"
+                    "apply-audit-1"
+                ),
+                "proposal_id": "proposal-sequence-fader",
+                "learning_scope": "supervised_fader_gain_sequence_execution",
+                "value_type": "fader",
+                "source_idempotency_key": (
+                    "memory-write:proposal-sequence-fader"
+                ),
+                "policy_key": (
+                    "proposal-sequence-fader/memory-write:proposal-sequence-fader"
+                ),
+                "target_policy_state": "trusted_for_sequence_policy",
+                "sequence_policy_gate_status": "trusted",
+                "current_sequence_review_freshness": {
+                    "status": "fresh",
+                    "field_count": 4,
+                    "fresh_field_count": 4,
+                    "read_only": True,
+                    "live_write": False,
+                    "apply_attempted": False,
+                    "queries_console": False,
+                    "queue_mutation": False,
+                    "policy_mutation": False,
+                },
+                "rollback_verified": True,
+                "sequence_policy_eligible": True,
+                "eligible_for_sequence_policy_consumer": True,
+                "policy_gate_only": True,
+                "sequence_policy_consumer_required": True,
+                "read_only": True,
+                "live_write": False,
+                "apply_attempted": False,
+                "mutates_console_state": False,
+                "queries_console": False,
+                "queue_mutation": False,
+                "model_mutation": False,
+                "runtime_memory_mutation": False,
+                "sequence_policy_trust_store_mutation": False,
+                "proposal_state_mutation": False,
+                "sequence_execution_allowed_by_gate": False,
+                "sequence_policy_change_allowed_by_gate": False,
+                "live_widening_allowed": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+                "can_import_to_queue": False,
+                "can_apply_live": False,
+            }
+        ],
+    }
+
+    await server._dispatch[
+        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
+    ](
+        object(),
+        {
+            "promotion_sequence_policy_gate_result": sequence_policy_gate,
+            "proposals": [
+                {
+                    "proposal_id": "proposal-unrelated-fader",
+                    "method_id": "safe_gain",
+                    "kind": "gain_trim_down",
+                    "target": "ch/03",
+                    "severity": "critical",
+                    "confidence": 1.0,
+                    "learning_scope": "supervised_fader_gain_sequence_execution",
+                    "value_type": "fader",
+                }
+            ],
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["type"] == (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
+    )
+    assert payload["handler"] == (
+        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
+    )
+    assert payload["status"] == (
+        "sequence_memory_trust_promotion_policy_consumer_not_ready"
+    )
+    assert payload["summary"]["input_proposal_count"] == 1
+    assert payload["summary"]["eligible_sequence_policy_gate_record_count"] == 1
+    assert payload["summary"]["consumer_record_count"] == 0
+    assert payload["summary"]["unmatched_eligible_policy_count"] == 1
+    assert "matching_preview_proposals_required_for_sequence_policy_consumer" in (
+        payload["summary"]["blocked_by"]
+    )
+    assert payload["summary"]["proposal_order_mutation"] is False
+    assert payload["summary"]["queue_mutation"] is False
+    assert payload["summary"]["sequence_policy_change_allowed_by_consumer"] is False
+    assert payload["summary"]["sequence_execution_allowed_by_consumer"] is False
+    assert payload["summary"]["live_authority_granted"] is False
+    assert payload["consumer_records"] == []
 
 
 @pytest.mark.asyncio
@@ -15038,6 +15590,7 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
             "decision": "verified",
             "verified_by": "operator",
             "verified_at": "2026-06-06T14:00:00Z",
+            "current_sequence_review_freshness": fresh_sequence_review_context,
             "rollback_verified": True,
             "read_only": True,
             "operator_review_required": True,
@@ -18783,6 +19336,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
             "decision": "verified",
             "verified_by": "operator",
             "verified_at": "2026-06-06T15:00:00Z",
+            "current_sequence_review_freshness": fresh_sequence_review_context,
             "rollback_verified": True,
             "read_only": True,
             "operator_review_required": True,
@@ -19585,6 +20139,9 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
         ]["operator_ack"]
         is False
     )
+
+    # Isolate the memory-promotion queue import from the earlier direct branch.
+    server.operator_proposal_queue = server.operator_proposal_queue.__class__()
 
     queue_importer_request = dict(
         promotion_memory_queue_ordering_plan_result_consumer_payload[

@@ -24,6 +24,20 @@ def _fresh(fields=4):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["live_write"] is False
+    assert payload["queue_mutation"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["can_import_to_queue"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["mutates_mixer"] is False
+
+
 def test_pan_proposal_module_is_transport_free():
     source = Path("backend/pan_spatial_proposal.py").read_text()
 
@@ -72,13 +86,58 @@ def test_center_anchor_can_create_proposal_only_pan_recommendation():
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 4
     assert recommendation.evidence["current_pan_cache_no_live_authority"] is True
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
+    summary = recommendation.pan_spatial_safety_summary()
+    assert summary["status"] == "passed"
+    assert summary["source_family"] == "lead_vocal"
+    assert summary["decision_source"] == "center_anchor_or_low_frequency"
+    assert summary["bounded_pan_delta"]["status"] == "passed"
+    assert summary["mono_phase_safety_status"] == "not_required_for_center_or_noop"
+    assert summary["phase_required_for_non_center_pan"] is False
+    assert summary["current_pan_cache_freshness_status"] == "fresh"
+    assert summary["current_pan_cache_no_live_authority"] is True
+    assert summary["rollback_pan_readback"]["status"] == (
+        "required_before_live_promotion"
+    )
+    assert summary["required_safety_checks"] == {
+        "source_identity": "required_before_live_promotion",
+        "current_pan_readback": "required_before_live_promotion",
+        "bounded_pan_delta": "required_before_live_promotion",
+        "stereo_pair_or_stage_context": "required_before_live_promotion",
+        "mono_compatibility": "required_before_live_promotion",
+        "phase_correlation": "required_before_live_promotion",
+        "mono_phase_safety": "required_before_live_promotion",
+    }
+    assert summary["rollback_expectation"] == {
+        "required_before_live_promotion": True,
+        "restore_previous_pan_value_after_physical_readback": True,
+        "restore_previous_stereo_pair_link_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+    readback = summary["future_wing_readback_contract"]
+    assert readback["target_kind"] == "channel_pan"
+    assert readback["old_value_source"] == PAN_READ_REQUIRED_SOURCE
+    assert readback["required_before_live_promotion"] is True
+    assert readback["requires_real_wing_proof"] is True
+    assert readback["requires_operator_approval"] is True
+    assert readback["requires_separate_non_fader_adr"] is True
+    assert "pan_parameter_write" in readback["blocked_live_actions"]
+    assert "stereo_pair_link_write" in readback["blocked_live_actions"]
+    assert "non_fader_live_expansion_requires_separate_adr" in summary[
+        "safety_blockers"
+    ]
+    assert summary["readback_required_before_promotion"] is True
+    assert summary["rollback_required_before_promotion"] is True
+    assert summary["live_write"] is False
+    assert summary["queue_mutation"] is False
+    _assert_top_level_denial(summary)
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "pan_spatial_proposal"
-    assert proposal["can_import_to_queue"] is False
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
     assert "requested_change" not in proposal
     assert "unsupported_value_type:pan" in proposal["blockers"]
+    assert "pan_spatial_live_apply_quarantined" in proposal["blockers"]
+    assert "non_fader_live_expansion_requires_separate_adr" in proposal["blockers"]
     assert proposal["old_value"]["source"] == PAN_READ_REQUIRED_SOURCE
     assert proposal["rollback_value"]["source"] == PAN_READ_REQUIRED_SOURCE
     assert proposal["evidence"]["live_write"] is False
@@ -86,6 +145,81 @@ def test_center_anchor_can_create_proposal_only_pan_recommendation():
     assert proposal["evidence"]["mono_phase_safety"]["status"] == "not_required_for_center_or_noop"
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["current_pan_cache_no_live_authority"] is True
+    assert proposal["pan_spatial_safety_summary"] == summary
+    assert proposal["proposed_action"]["pan_spatial_safety_summary"] == summary
+    assert proposal["evidence"]["pan_spatial_safety_summary"] == summary
+    assert proposal["safety_blockers"] == summary["safety_blockers"]
+    assert proposal["required_safety_checks"] == summary["required_safety_checks"]
+    assert proposal["rollback_expectation"] == summary["rollback_expectation"]
+    assert proposal["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
+    assert proposal["proposed_action"]["bounded_pan_delta"] == summary[
+        "bounded_pan_delta"
+    ]
+    assert proposal["proposed_action"]["rollback_pan_readback"] == summary[
+        "rollback_pan_readback"
+    ]
+    assert proposal["evidence"]["rollback_pan_readback"] == summary[
+        "rollback_pan_readback"
+    ]
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "pan_stereo"
+    assert correction["bounded_delta"]["delta_db"] == recommendation.delta_pan_percent
+    assert correction["bounded_delta"]["parameter_deltas"]["delta_pan_percent"] == (
+        recommendation.delta_pan_percent
+    )
+    assert correction["future_wing_readback_contract"]["target_kind"] == "channel_pan"
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == (
+        "complete"
+    )
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert "mono_compatibility" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_pan_cache_no_live_authority"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    evidence_checks = correction["headroom_feedback_true_peak_checks"][
+        "evidence_checks"
+    ]
+    for key in (
+        "source_role",
+        "stage_position",
+        "phase_correlation",
+        "mono_phase_safety",
+        "bounded_pan_delta",
+        "current_pan",
+        "current_pan_cache_freshness",
+        "current_pan_cache_no_live_authority",
+        "mono_phase_check_no_live_authority",
+        "source_identity_downstream_trust",
+        "old_value_source",
+        "rollback_pan_readback",
+    ):
+        assert evidence_checks[key] == source_evidence[key]
+    assert source_evidence["mono_phase_safety"]["status"] == (
+        "not_required_for_center_or_noop"
+    )
+    assert source_evidence["bounded_pan_delta"]["status"] == "passed"
+    assert source_evidence["rollback_pan_readback"]["status"] == (
+        "required_before_live_promotion"
+    )
+    assert source_evidence["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
+    assert source_evidence["current_pan_cache_no_live_authority"] is True
 
 
 def test_stereo_pair_side_can_create_spatial_pan_proposal():
@@ -149,7 +283,15 @@ def test_high_mono_risk_blocks_non_center_pan_proposal():
         recommendation.evidence["mono_phase_safety"]["max_mono_compatibility_risk"]
         == HIGH_MONO_RISK
     )
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.pan_spatial_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["mono_phase_safety_status"] == "blocked"
+    assert summary["mono_compatibility_risk"] == 0.9
+    assert "mono_compatibility_risk_high" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["pan_spatial_safety_summary"] == summary
     assert build_pan_proposals([analysis]) == ()
 
 
@@ -222,7 +364,14 @@ def test_stale_current_pan_state_blocks_proposal_only_recommendation():
         "pan_percent",
         "stereo_link",
     ]
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.pan_spatial_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_pan_cache_freshness_status"] == "stale"
+    assert "pan_current_state_cache_not_fresh" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["pan_spatial_safety_summary"] == summary
 
 
 def test_live_authority_current_pan_state_blocks_proposal_only_recommendation():
@@ -251,7 +400,13 @@ def test_live_authority_current_pan_state_blocks_proposal_only_recommendation():
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
     assert recommendation.evidence["current_pan_cache_no_live_authority"] is False
     assert recommendation.evidence["current_pan_cache_freshness"]["live_write"] is True
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.pan_spatial_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_pan_cache_no_live_authority"] is False
+    assert "pan_current_state_cache_live_authority_present" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
     assert build_pan_proposals([analysis]) == ()
 
 
@@ -286,7 +441,13 @@ def test_live_authority_mono_phase_context_blocks_non_center_pan_proposal():
     assert recommendation.evidence["mono_phase_check_freshness_status"] == "fresh"
     assert recommendation.evidence["mono_phase_check_no_live_authority"] is False
     assert recommendation.evidence["mono_phase_check_freshness"]["queries_console"] is True
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.pan_spatial_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["mono_phase_check_no_live_authority"] is False
+    assert "pan_mono_phase_check_live_authority_present" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
     assert build_pan_proposals([analysis]) == ()
 
 
@@ -344,7 +505,14 @@ def test_source_identity_hold_blocks_downstream_pan_proposal():
     assert trust["usable_for_downstream"] is False
     assert trust["evidence"]["queue_mutation"] is False
     assert trust["evidence"]["model_mutation"] is False
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.pan_spatial_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["source_identity_usable_for_downstream"] is False
+    assert "source_identity_not_trusted_for_downstream" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["pan_spatial_safety_summary"] == summary
 
 
 def test_stale_source_identity_replay_context_blocks_downstream_pan_proposal():
@@ -386,7 +554,14 @@ def test_stale_source_identity_replay_context_blocks_downstream_pan_proposal():
         "accepted_labels",
         "replay_outcomes",
     ]
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.pan_spatial_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["source_identity_usable_for_downstream"] is False
+    assert "source_identity_replay_context_not_fresh" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["pan_spatial_safety_summary"] == summary
 
 
 def test_non_anchor_source_without_spatial_context_is_analysis_only():

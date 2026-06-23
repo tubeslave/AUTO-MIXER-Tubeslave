@@ -104,6 +104,8 @@ def test_complete_evidence_packet_creates_proposal_only_recommendation():
     assert proposal["kind"] == "decision_evidence_packet"
     assert proposal["can_import_to_queue"] is False
     assert proposal["can_apply_live"] is False
+    assert proposal["queue_import_allowed"] is False
+    assert proposal["live_apply_allowed"] is False
     assert "requested_change" not in proposal
     assert "requested_changes" not in proposal
     assert "unsupported_value_type:decision_evidence_packet" in proposal["blockers"]
@@ -113,6 +115,31 @@ def test_complete_evidence_packet_creates_proposal_only_recommendation():
     assert proposal["evidence"]["rollback_required_before_promotion"] is True
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["current_decision_evidence_context_cache_no_live_authority"] is True
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "decision_evidence_packet"
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == "complete"
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    for required_field in correction["source_evidence"]["required_evidence_fields"]:
+        assert required_field in source_evidence
+    assert source_evidence["audio_analysis"]["available"] is True
+    assert source_evidence["readback_state"] == {
+        "available": True,
+        "required_before_live_promotion": True,
+    }
+    assert source_evidence["rollback_plan"] == {
+        "available": True,
+        "required_for_console_affecting_family": True,
+    }
 
 
 def test_missing_critical_evidence_blocks_packet():

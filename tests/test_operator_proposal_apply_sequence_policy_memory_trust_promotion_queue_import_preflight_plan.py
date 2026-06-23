@@ -38,6 +38,18 @@ def _imported_action(
                 "consumer_record_id": f"consumer:{proposal_id}",
                 "sequence_policy_gate_record_id": f"gate:{proposal_id}",
                 "policy_key": f"{proposal_id}/memory-write:{proposal_id}",
+                "source_idempotency_key": f"memory-write:{proposal_id}",
+                "current_sequence_review_freshness": {
+                    "status": "fresh",
+                    "field_count": 4,
+                    "fresh_field_count": 4,
+                    "read_only": True,
+                    "live_write": False,
+                    "apply_attempted": False,
+                    "queries_console": False,
+                    "queue_mutation": False,
+                    "policy_mutation": False,
+                },
                 "planned_queue_index": index,
                 "rank_source": rank_source,
                 "recommended_sequence_policy_bucket": "trusted_sequence_policy",
@@ -181,6 +193,11 @@ def test_sequence_policy_queue_import_preflight_plan_orders_applyable_imports():
     first = plan["preflight_request_specs"][0]
     assert first["proposal_id"] == "proposal-first"
     assert first["planned_preflight_index"] == 0
+    assert first["policy_key"] == "proposal-first/memory-write:proposal-first"
+    assert first["source_idempotency_key"] == "memory-write:proposal-first"
+    assert first["current_sequence_review_freshness"] == actions[3]["raw"][
+        "sequence_policy_queue_import"
+    ]["current_sequence_review_freshness"]
     assert first["planned_queue_index"] == 0
     assert first["idempotency_key"] == "seq-import:proposal-first"
     assert first["operator_approval_required_for_preflight_ready"] is True
@@ -214,6 +231,144 @@ def test_sequence_policy_queue_import_preflight_plan_rejects_forged_metadata():
         in plan["summary"]["invalid_record_ids"]
     )
     assert plan["batch_preflight_request"]["proposal_ids"] == []
+
+
+def test_sequence_policy_queue_import_preflight_plan_rejects_missing_sequence_context():
+    action = _imported_action("missing-context", index=0)
+    action["raw"]["sequence_policy_queue_import"].pop(
+        "current_sequence_review_freshness"
+    )
+
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+            pending_actions=[action],
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_import_preflight_plan_replacement_required"
+    )
+    assert plan["summary"]["preflight_candidate_count"] == 0
+    assert plan["summary"]["batch_preflight_request_available"] is False
+    assert (
+        "missing-context:current_sequence_review_freshness_missing"
+        in plan["summary"]["invalid_record_ids"]
+    )
+    assert plan["batch_preflight_request"]["proposal_ids"] == []
+    assert plan["preflight_request_specs"] == []
+
+
+def test_sequence_policy_queue_import_preflight_plan_rejects_live_sequence_context():
+    action = _imported_action("live-context", index=0)
+    action["raw"]["sequence_policy_queue_import"][
+        "current_sequence_review_freshness"
+    ] = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+            pending_actions=[action],
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_import_preflight_plan_replacement_required"
+    )
+    assert plan["summary"]["preflight_candidate_count"] == 0
+    assert plan["summary"]["batch_preflight_request_available"] is False
+    assert (
+        "live-context:current_sequence_review_freshness_read_only_not_true"
+        in plan["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "live-context:current_sequence_review_freshness_live_write_not_false"
+        in plan["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "live-context:current_sequence_review_freshness_apply_attempted_not_false"
+        in plan["summary"]["invalid_record_ids"]
+    )
+    assert plan["batch_preflight_request"]["proposal_ids"] == []
+    assert plan["preflight_request_specs"] == []
+
+
+def test_sequence_policy_queue_import_preflight_plan_rejects_forged_identity():
+    missing_source = _imported_action("missing-source-id", index=0)
+    missing_source["raw"]["sequence_policy_queue_import"].pop(
+        "source_idempotency_key"
+    )
+    forged_policy = _imported_action("forged-policy", index=1)
+    forged_policy["raw"]["sequence_policy_queue_import"]["policy_key"] = (
+        "forged-policy/memory-write:other-proposal"
+    )
+
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+            pending_actions=[missing_source, forged_policy],
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_import_preflight_plan_replacement_required"
+    )
+    assert plan["summary"]["preflight_candidate_count"] == 0
+    assert plan["summary"]["batch_preflight_request_available"] is False
+    assert (
+        "missing-source-id:source_idempotency_key_missing"
+        in plan["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "forged-policy:policy_key_identity_mismatch"
+        in plan["summary"]["invalid_record_ids"]
+    )
+    assert plan["batch_preflight_request"]["proposal_ids"] == []
+    assert plan["preflight_request_specs"] == []
+
+
+def test_sequence_policy_queue_import_preflight_plan_keeps_unranked_applyable_import_analysis_only():
+    unranked = _imported_action(
+        "unranked-applyable",
+        index=1,
+        can_apply=True,
+        rank_source="original_order",
+    )
+    metadata = unranked["raw"]["sequence_policy_queue_import"]
+    metadata.pop("consumer_record_id")
+    metadata.pop("sequence_policy_gate_record_id")
+    metadata.pop("policy_key")
+    metadata.pop("source_idempotency_key")
+
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
+            pending_actions=[
+                _imported_action("trusted-applyable", index=0),
+                unranked,
+            ],
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_import_preflight_plan_available"
+    )
+    assert plan["summary"]["invalid_record_count"] == 0
+    assert plan["summary"]["preflight_candidate_proposal_ids"] == [
+        "trusted-applyable"
+    ]
+    assert plan["summary"]["analysis_only_proposal_ids"] == ["unranked-applyable"]
+    assert plan["batch_preflight_request"]["proposal_ids"] == ["trusted-applyable"]
 
 
 def test_sequence_policy_queue_import_preflight_plan_rejects_ambiguous_import_order():

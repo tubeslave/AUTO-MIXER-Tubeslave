@@ -24,6 +24,18 @@ def _freshness(status="fresh"):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["can_import_to_queue"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["mutates_mixer"] is False
+
+
 def _sources():
     return (
         FrequencySeparationSource(
@@ -63,6 +75,7 @@ def test_frequency_separation_emits_fresh_context_lane_proposal():
     assert result.status == "proposal_only"
     assert result.metadata["proposal_only"] is True
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
     assert result.metadata["current_state_cache_freshness_status"] == "fresh"
     assert result.metadata["current_frequency_context_cache_no_live_authority"] is True
     assert result.recommendations
@@ -95,6 +108,7 @@ def test_stale_frequency_context_blocks_frequency_separation_proposals():
     assert result.metadata["current_state_cache_freshness_status"] == "stale"
     assert "frequency_separation_context_cache_not_fresh" in result.metadata["blockers"]
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_live_authority_frequency_context_blocks_frequency_separation_proposals():
@@ -119,6 +133,7 @@ def test_live_authority_frequency_context_blocks_frequency_separation_proposals(
     assert result.metadata["current_state_cache_freshness_status"] == "fresh"
     assert result.metadata["current_frequency_context_cache_no_live_authority"] is False
     assert result.metadata["current_state_cache_freshness"]["live_write"] is True
+    _assert_top_level_denial(result.metadata)
     assert "frequency_separation_context_cache_live_authority_present" in result.metadata[
         "blockers"
     ]
@@ -140,6 +155,7 @@ def test_missing_frequency_context_blocks_frequency_separation_proposals():
     assert result.metadata["current_state_cache_freshness_status"] == "not_provided"
     assert result.metadata["current_state_cache_freshness"]["provided"] is False
     assert "frequency_separation_context_cache_not_fresh" in result.metadata["blockers"]
+    _assert_top_level_denial(result.metadata)
     assert build_frequency_separation_proposals(_sources()) == ()
 
 
@@ -178,6 +194,7 @@ def test_blocked_source_identity_blocks_frequency_separation_proposals():
     assert blocked["usable_for_downstream"] is False
     assert blocked["evidence"]["memory_mutation"] is False
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_stale_source_identity_replay_context_blocks_frequency_separation():
@@ -209,6 +226,7 @@ def test_stale_source_identity_replay_context_blocks_frequency_separation():
     assert result.recommendations == ()
     assert "source_identity_replay_context_not_fresh" in result.metadata["blockers"]
     assert result.metadata["source_identity_blocked_sources"][0]["source_id"] == "lead_vox"
+    _assert_top_level_denial(result.metadata)
 
 
 def test_frequency_separation_operator_proposals_are_not_queueable_live_actions():
@@ -222,13 +240,68 @@ def test_frequency_separation_operator_proposals_are_not_queueable_live_actions(
 
     assert proposal["method_id"] == "frequency_separation_proposal"
     assert proposal["kind"] == "frequency_split"
-    assert proposal["can_import_to_queue"] is False
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
     assert "unsupported_value_type:frequency_split" in proposal["blockers"]
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_frequency_context_cache_no_live_authority"] is True
     assert proposal["evidence"]["readback_required_before_promotion"] is True
     assert proposal["evidence"]["rollback_required_before_promotion"] is True
+    summary = proposal["evidence"]["frequency_lane_safety_summary"]
+    assert summary == proposal["proposed_action"]["frequency_lane_safety_summary"]
+    assert summary["summary_type"] == "frequency_lane_separation_review"
+    assert summary["target_source_id"] == "gtr_l"
+    assert summary["protected_source_id"] == "lead_vox"
+    assert summary["band"] == "high_mid"
+    assert summary["bounded_subtractive_delta"] is True
+    assert summary["current_frequency_context_cache_no_live_authority"] is True
+    assert summary["feedback_safety"] == "required_before_apply"
+    assert summary["true_peak_headroom"] == "required_before_apply"
+    _assert_top_level_denial(summary)
+    assert summary["can_authorize_live"] is False
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "eq"
+    assert correction["bounded_delta"]["delta_db"] == round(
+        proposal["proposed_action"]["suggested_eq_delta_db"], 1
+    )
+    assert correction["bounded_delta"]["parameter_deltas"]["band"] == "high_mid"
+    assert correction["bounded_delta"]["parameter_deltas"]["center_hz"] == 3000.0
+    assert correction["future_wing_readback_contract"]["target_kind"] == "source_stem_frequency_lane"
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_frequency_context_cache_no_live_authority"
+    ] is True
+    completeness = correction["source_evidence"]["evidence_completeness"]
+    assert completeness["status"] == "complete"
+    assert completeness["missing"] == []
+    assert correction["operator_proposal_review_gate"]["evidence_gate_status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["frequency_lane_safety_summary"] == summary
+    assert source_evidence["current_frequency_context_cache_no_live_authority"] is True
+    assert source_evidence["source_identity_downstream_trust"]["target_source"][
+        "source_id"
+    ] == "gtr_l"
+    assert source_evidence["source_identity_downstream_trust"]["protected_source"][
+        "source_id"
+    ] == "lead_vox"
+    assert source_evidence["rollback_eq_band_readback"] == {
+        "target_source_id": "gtr_l",
+        "protected_source_id": "lead_vox",
+        "stem_id": "band",
+        "band": "high_mid",
+        "center_hz": 3000.0,
+        "suggested_eq_delta_db": proposal["proposed_action"][
+            "suggested_eq_delta_db"
+        ],
+        "source": READ_REQUIRED_SOURCE,
+        "required_before_live_promotion": True,
+        "live_write": False,
+    }
+    assert source_evidence["readback_required_before_promotion"] is True
+    assert source_evidence["rollback_required_before_promotion"] is True
 
 
 def test_frequency_separation_registry_contract_and_goal_row():

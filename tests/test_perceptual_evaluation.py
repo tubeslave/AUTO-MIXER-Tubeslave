@@ -74,6 +74,22 @@ def test_mert_backend_absence_falls_back_to_lightweight():
     assert evaluator.extract_embedding(_sine(), 48000).size > 0
 
 
+def test_test_runtime_forces_mert_fallback_offline():
+    assert os.environ.get("HF_HUB_OFFLINE") == "1"
+    assert os.environ.get("TRANSFORMERS_OFFLINE") == "1"
+
+    evaluator = PerceptualEvaluator(
+        {
+            "enabled": True,
+            "backend": "mert",
+            "model_name": "missing-local/mert-model",
+            "log_scores": False,
+        }
+    )
+
+    assert evaluator.backend.name == "lightweight"
+
+
 def test_mert_backend_strict_mode_raises_when_unavailable():
     try:
         PerceptualEvaluator(

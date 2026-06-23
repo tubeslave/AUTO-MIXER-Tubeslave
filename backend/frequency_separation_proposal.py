@@ -14,8 +14,10 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
 try:
     from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+    from processing_proposal_adapters import build_operator_correction_payload
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+    from backend.processing_proposal_adapters import build_operator_correction_payload
 
 
 FREQUENCY_SEPARATION_METHOD_ID = "frequency_separation_proposal"
@@ -202,10 +204,97 @@ class FrequencySeparationRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def frequency_lane_safety_summary(self) -> Dict[str, Any]:
+        source_stem_contribution = dict(
+            self.evidence.get("source_stem_contribution") or {}
+        )
+        lane_conflict_pair = dict(self.evidence.get("lane_conflict_pair") or {})
+        band_energy_db = dict(self.evidence.get("band_energy_db") or {})
+        role_lane_affinity = dict(self.evidence.get("role_lane_affinity") or {})
+        return {
+            "summary_type": "frequency_lane_separation_review",
+            "status": "passed" if not self.blockers else "blocked",
+            "target_source_id": self.target_source_id,
+            "protected_source_id": self.protected_source_id,
+            "stem_id": self.stem_id,
+            "band": self.band,
+            "center_hz": self.center_hz,
+            "target_role": self.target_role,
+            "protected_role": self.protected_role,
+            "suggested_eq_delta_db": self.suggested_eq_delta_db,
+            "bounded_subtractive_delta": self.evidence.get(
+                "bounded_subtractive_delta"
+            ),
+            "source_stem_contribution": source_stem_contribution,
+            "lane_conflict_pair": lane_conflict_pair,
+            "band_energy_db": band_energy_db,
+            "role_lane_affinity": role_lane_affinity,
+            "current_frequency_context_cache_freshness": self.evidence.get(
+                "current_frequency_context_cache_freshness"
+            ),
+            "current_frequency_context_cache_no_live_authority": self.evidence.get(
+                "current_frequency_context_cache_no_live_authority"
+            ),
+            "sum_bus_check": self.evidence.get("sum_bus_check"),
+            "feedback_safety": "required_before_apply",
+            "true_peak_headroom": "required_before_apply",
+            "eq_band_readback": self.evidence.get("eq_band_readback"),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "operator_review_required": True,
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "live_apply_allowed": False,
+            "queue_import_allowed": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "can_authorize_live": False,
+            "mutates_mixer": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        frequency_lane_safety_summary = self.frequency_lane_safety_summary()
+        blockers = [
+            "unsupported_value_type:frequency_split",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            *self.blockers,
+        ]
+        proposed_action = {
+            "action_type": self.action_type,
+            "target_source_id": self.target_source_id,
+            "protected_source_id": self.protected_source_id,
+            "stem_id": self.stem_id,
+            "band": self.band,
+            "center_hz": self.center_hz,
+            "suggested_eq_delta_db": self.suggested_eq_delta_db,
+            "frequency_lane_safety_summary": frequency_lane_safety_summary,
+        }
+        evidence = {
+            **self.evidence,
+            "frequency_lane_safety_summary": frequency_lane_safety_summary,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        proposal = {
             "id": self.id,
             "method_id": FREQUENCY_SEPARATION_METHOD_ID,
             "source": FREQUENCY_SEPARATION_METHOD_ID,
@@ -218,29 +307,24 @@ class FrequencySeparationRecommendation:
             "queue_action": "not_queueable_until_promoted",
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:frequency_split",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
-            ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "target_source_id": self.target_source_id,
-                "protected_source_id": self.protected_source_id,
-                "stem_id": self.stem_id,
-                "band": self.band,
-                "center_hz": self.center_hz,
-                "suggested_eq_delta_db": self.suggested_eq_delta_db,
-            },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
-            },
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=FREQUENCY_SEPARATION_METHOD_ID,
+            target=self.target_source_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 @dataclass(frozen=True)
@@ -325,6 +409,10 @@ def _candidate_recommendation(
     suggested_cut = -round(_clip(0.8 + 2.2 * overlap_strength, 0.8, MAX_SUPPORT_CUT_DB), 1)
     target_role = _role_for(target.source_type, target.arrangement_role)
     protected_role = _role_for(protected.source_type, protected.arrangement_role)
+    source_identity_trust = {
+        "target_source": _source_identity_gate(target).to_dict(),
+        "protected_source": _source_identity_gate(protected).to_dict(),
+    }
     severity = "medium" if confidence >= 0.72 or abs(suggested_cut) >= 2.2 else "low"
     stem_id = target.stem_id or protected.stem_id or "unknown"
     reason = (
@@ -381,6 +469,18 @@ def _candidate_recommendation(
             "current_frequency_context_cache_no_live_authority": current_state_no_authority,
             "sum_bus_check": "required_before_apply",
             "eq_band_readback": "required_before_apply",
+            "source_identity_downstream_trust": source_identity_trust,
+            "rollback_eq_band_readback": {
+                "target_source_id": target.source_id,
+                "protected_source_id": protected.source_id,
+                "stem_id": stem_id,
+                "band": band,
+                "center_hz": BAND_CENTERS_HZ[band],
+                "suggested_eq_delta_db": suggested_cut,
+                "source": READ_REQUIRED_SOURCE,
+                "required_before_live_promotion": True,
+                "live_write": False,
+            },
             "old_value_source": READ_REQUIRED_SOURCE,
             "rollback_value_source": READ_REQUIRED_SOURCE,
         },
@@ -405,6 +505,14 @@ def analyze_frequency_separation_need(
         "proposal_only": True,
         "live_write_allowed": False,
         "can_import_to_queue": False,
+        "can_apply_live": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "queue_action": "not_queueable_until_promoted",
+        "mutates_mixer": False,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
         "current_frequency_context_cache_no_live_authority": current_state_no_authority,

@@ -177,6 +177,16 @@ def test_promotion_ordering_preview_result_consumer_emits_queue_ordering_plan_re
     assert consumer["summary"]["expected_policy_ranked_record_count"] == 1
     assert consumer["summary"]["ordered_preview_record_count"] == 1
     assert consumer["summary"]["policy_ranked_preview_record_count"] == 1
+    assert consumer["summary"]["promotion_acceptance_record_template_count"] == 1
+    assert consumer["summary"]["memory_trust_review_request_spec_count"] == 2
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "fresh"
+    assert consumer["summary"]["promotion_acceptance_record_template_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert consumer["summary"]["memory_trust_review_request_spec_proposal_ids"] == [
+        "proposal-first",
+        "proposal-second",
+    ]
     assert consumer["summary"]["invalid_record_count"] == 0
     assert consumer["summary"]["promotion_queue_ordering_plan_request_available"] is True
     assert consumer["summary"]["promotion_queue_ordering_plan_handler_invoked"] is False
@@ -201,6 +211,26 @@ def test_promotion_ordering_preview_result_consumer_emits_queue_ordering_plan_re
     assert request["runtime_memory_mutation"] is False
     assert request["live_authority_granted"] is False
     assert request["ordering_preview"] == ordering_preview
+    assert request["promotion_acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert request["promotion_acceptance_record_templates"][0]["idempotency_key"] == (
+        "seq-policy:proposal-first"
+    )
+    assert request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == policy_consumer_result_consumer["promotion_ordering_preview_request"][
+        "promotion_acceptance_record_templates"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
+    assert request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == policy_consumer_result_consumer["promotion_ordering_preview_request"][
+        "memory_trust_review_request_specs"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
 
     plan = (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan(
@@ -251,6 +281,168 @@ def test_promotion_ordering_preview_result_consumer_rejects_forged_ordering_prev
     assert "ordering_preview" not in consumer["promotion_queue_ordering_plan_request"]
 
 
+def test_promotion_ordering_preview_result_consumer_rejects_forged_identity(
+    tmp_path,
+):
+    policy_consumer_result_consumer, ordering_preview = _ordering_preview_ready(tmp_path)
+    forged = deepcopy(ordering_preview)
+    forged["ordered_proposals"][0]["source_idempotency_key"] = (
+        "memory-write:unrelated-proposal"
+    )
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer(
+            promotion_policy_consumer_result_consumer=policy_consumer_result_consumer,
+            promotion_ordering_preview_result=forged,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_queue_ordering_plan_request_available"] is False
+    assert consumer["summary"]["queue_mutation"] is False
+    assert consumer["summary"]["proposal_order_mutation"] is False
+    assert consumer["summary"]["live_authority_granted"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert ordering_preview["ordered_proposals"][0]["ordering_preview_record_id"] in invalid
+    assert "ordering_preview" not in consumer["promotion_queue_ordering_plan_request"]
+
+
+def test_promotion_ordering_preview_result_consumer_rejects_forged_acceptance_template_identity(
+    tmp_path,
+):
+    policy_consumer_result_consumer, ordering_preview = _ordering_preview_ready(tmp_path)
+    forged_prior = deepcopy(policy_consumer_result_consumer)
+    template = forged_prior["promotion_ordering_preview_request"][
+        "promotion_acceptance_record_templates"
+    ][0]
+    template["idempotency_key"] = "seq-policy:forged"
+    template["consumer_record_id"] = ""
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer(
+            promotion_policy_consumer_result_consumer=forged_prior,
+            promotion_ordering_preview_result=ordering_preview,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_queue_ordering_plan_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:idempotency_key_ordering_row_mismatch" in invalid
+    assert "proposal-first:consumer_record_id_missing" in invalid
+    assert "ordering_preview" not in consumer["promotion_queue_ordering_plan_request"]
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_queue_ordering_plan_request"]
+    )
+
+
+def test_promotion_ordering_preview_result_consumer_rejects_missing_sequence_review_freshness(
+    tmp_path,
+):
+    policy_consumer_result_consumer, ordering_preview = _ordering_preview_ready(tmp_path)
+    forged_prior = deepcopy(policy_consumer_result_consumer)
+    request = forged_prior["promotion_ordering_preview_request"]
+    for template in request["promotion_acceptance_record_templates"]:
+        template.pop("current_sequence_review_freshness", None)
+    request.pop("memory_trust_review_request_specs", None)
+    forged_prior["summary"].pop("fresh_sequence_review_context_status", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer(
+            promotion_policy_consumer_result_consumer=forged_prior,
+            promotion_ordering_preview_result=ordering_preview,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_queue_ordering_plan_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "missing"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "ordering_preview_result_consumer_prior_summary_freshness_not_fresh"
+        in invalid
+    )
+    assert (
+        "ordering_preview_result_consumer_prior_request_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert "proposal-first:current_sequence_review_freshness_missing" in invalid
+    assert "ordering_preview" not in consumer["promotion_queue_ordering_plan_request"]
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_queue_ordering_plan_request"]
+    )
+    assert (
+        "memory_trust_review_request_specs"
+        not in consumer["promotion_queue_ordering_plan_request"]
+    )
+
+
+def test_promotion_ordering_preview_result_consumer_rejects_live_sequence_review_freshness(
+    tmp_path,
+):
+    policy_consumer_result_consumer, ordering_preview = _ordering_preview_ready(tmp_path)
+    forged_prior = deepcopy(policy_consumer_result_consumer)
+    live_freshness = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    request = forged_prior["promotion_ordering_preview_request"]
+    request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+    request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer(
+            promotion_policy_consumer_result_consumer=forged_prior,
+            promotion_ordering_preview_result=ordering_preview,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_queue_ordering_plan_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "invalid"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:current_sequence_review_freshness_read_only_not_true" in invalid
+    assert "proposal-first:current_sequence_review_freshness_live_write_not_false" in invalid
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_ordering_row_mismatch"
+        in invalid
+    )
+    assert "ordering_preview" not in consumer["promotion_queue_ordering_plan_request"]
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_queue_ordering_plan_request"]
+    )
+    assert (
+        "memory_trust_review_request_specs"
+        not in consumer["promotion_queue_ordering_plan_request"]
+    )
+
+
 def test_promotion_ordering_preview_result_consumer_rejects_forged_prior_consumer(
     tmp_path,
 ):
@@ -258,6 +450,10 @@ def test_promotion_ordering_preview_result_consumer_rejects_forged_prior_consume
     forged = deepcopy(policy_consumer_result_consumer)
     forged["safety"]["live_authority_granted"] = True
     forged["summary"]["policy_consumer_record_count"] = 2
+    forged["summary"]["promotion_acceptance_record_template_count"] = 2
+    forged["summary"][
+        "promotion_acceptance_record_template_proposal_ids"
+    ] = ["proposal-second"]
 
     consumer = (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer(
@@ -276,6 +472,14 @@ def test_promotion_ordering_preview_result_consumer_rejects_forged_prior_consume
     )
     assert (
         "ordering_preview_result_consumer_prior_summary_policy_consumer_record_count_mismatch"
+        in invalid
+    )
+    assert (
+        "ordering_preview_result_consumer_prior_summary_promotion_acceptance_record_template_count_mismatch"
+        in invalid
+    )
+    assert (
+        "ordering_preview_result_consumer_prior_summary_template_proposal_ids_mismatch"
         in invalid
     )
     assert "ordering_preview" not in consumer["promotion_queue_ordering_plan_request"]

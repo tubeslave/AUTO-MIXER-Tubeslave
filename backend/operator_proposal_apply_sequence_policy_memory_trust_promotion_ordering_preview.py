@@ -116,12 +116,53 @@ def _is_utc_timestamp(value: str) -> bool:
     return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(prefix: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{prefix}_current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{prefix}_current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(f"{prefix}_current_sequence_review_freshness_read_only_not_true")
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{prefix}_current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
+
+
 def _proposal_id(proposal: Mapping[str, Any], index: int) -> str:
     for key in ("id", "proposal_id", "action_id"):
         value = _string(proposal.get(key))
         if value:
             return value
     return f"proposal:{index}"
+
+
+def _proposal_identity_tokens(proposal: Mapping[str, Any]) -> Tuple[str, ...]:
+    tokens = []
+    for payload in (
+        proposal,
+        _mapping(proposal.get("proposed_action")),
+        _mapping(proposal.get("evidence")),
+        _mapping(proposal.get("raw")),
+    ):
+        for key in ("idempotency_key", "source_idempotency_key", "policy_key"):
+            token = _string(payload.get(key))
+            if token:
+                tokens.append(token)
+    return tuple(dict.fromkeys(tokens))
 
 
 def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
@@ -247,6 +288,7 @@ def _consumer_record_violations(
         "proposal_id",
         "sequence_policy_gate_record_id",
         "policy_key",
+        "source_idempotency_key",
         "recommended_sequence_policy_bucket",
     )
     for field in required_fields:
@@ -255,8 +297,31 @@ def _consumer_record_violations(
     original_index = _summary_int(record.get("proposal_original_index"))
     if original_index is None or original_index >= len(proposals):
         violations.append("sequence_policy_ordering_preview_record_original_index_invalid")
-    elif _proposal_id(proposals[original_index], original_index) != record.get("proposal_id"):
-        violations.append("sequence_policy_ordering_preview_record_proposal_link_mismatch")
+    else:
+        proposal = proposals[original_index]
+        proposal_id = _string(record.get("proposal_id"))
+        source_idempotency_key = _string(record.get("source_idempotency_key"))
+        policy_key = _string(record.get("policy_key"))
+        if _proposal_id(proposal, original_index) != proposal_id:
+            violations.append(
+                "sequence_policy_ordering_preview_record_proposal_link_mismatch"
+            )
+        if (
+            proposal_id
+            and source_idempotency_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(
+                "sequence_policy_ordering_preview_record_policy_key_identity_mismatch"
+            )
+        proposal_identity_tokens = _proposal_identity_tokens(proposal)
+        if proposal_identity_tokens and (
+            source_idempotency_key not in proposal_identity_tokens
+            and policy_key not in proposal_identity_tokens
+        ):
+            violations.append(
+                "sequence_policy_ordering_preview_record_proposal_identity_mismatch"
+            )
     for field in ("base_policy_score", "adjusted_policy_score"):
         score = _safe_float(record.get(field))
         if score is None or score < 0.0 or score > 1.0:
@@ -269,6 +334,12 @@ def _consumer_record_violations(
         violations.append("sequence_policy_ordering_preview_record_read_only_not_true")
     if record.get("policy_evidence_only") is not True:
         violations.append("sequence_policy_ordering_preview_record_evidence_only_not_true")
+    violations.extend(
+        _context_violations(
+            "sequence_policy_ordering_preview_record",
+            _mapping(record.get("current_sequence_review_freshness")),
+        )
+    )
     for flag in REQUIRED_POLICY_CONSUMER_RECORD_FALSE_FLAGS:
         if record.get(flag) is not False:
             violations.append(f"sequence_policy_ordering_preview_record_{flag}_not_false")
@@ -336,8 +407,12 @@ def _ordered_preview_records(
                     "sequence_policy_gate_record_id"
                 ),
                 "policy_key": consumer_record.get("policy_key"),
+                "source_idempotency_key": consumer_record.get("source_idempotency_key"),
                 "recommended_sequence_policy_bucket": consumer_record.get(
                     "recommended_sequence_policy_bucket"
+                ),
+                "current_sequence_review_freshness": consumer_record.get(
+                    "current_sequence_review_freshness"
                 ),
                 "read_only": True,
                 "ordering_preview_only": True,
@@ -384,6 +459,7 @@ def _ordered_preview_records(
                 "consumer_record_id": None,
                 "sequence_policy_gate_record_id": None,
                 "policy_key": None,
+                "source_idempotency_key": None,
                 "recommended_sequence_policy_bucket": "unranked_original_order",
                 "read_only": True,
                 "ordering_preview_only": True,

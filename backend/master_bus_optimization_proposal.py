@@ -12,6 +12,11 @@ from datetime import datetime, timezone
 import math
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 MASTER_BUS_METHOD_ID = "master_bus_optimization_proposal"
 MASTER_BUS_VERSION = "master_bus_optimization_proposal_v1"
@@ -22,6 +27,71 @@ MASTER_STATIC_UP_GAIN_CAP_DB = 1.0
 MASTER_STATIC_DOWN_GAIN_CAP_DB = 3.0
 MASTER_TRUE_PEAK_RESERVE_DB = 0.5
 REFERENCE_FEED_ROLE_TOKENS = ("reference", "measurement", "capture", "analysis")
+
+
+def _ordered_unique(values: Iterable[str]) -> Tuple[str, ...]:
+    ordered = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
+
+
+def _master_bus_required_safety_checks() -> Dict[str, str]:
+    return {
+        "integrated_lufs": "required_before_live_promotion",
+        "true_peak_headroom": "required_before_live_promotion",
+        "crest_factor": "required_before_live_promotion",
+        "loudness_range": "required_before_live_promotion",
+        "spectral_tilt": "required_before_live_promotion",
+        "reference_profile": "required_before_live_promotion",
+        "limiter_or_dynamics_proof": "required_before_live_promotion",
+        "pa_feed_readback": "required_before_live_promotion",
+        "pa_feed_safety": "required_before_live_promotion",
+        "pa_feed_cache_freshness": "required_before_live_promotion",
+        "pa_feed_cache_no_live_authority": "required_before_live_promotion",
+        "reference_feed_exclusion": "required_before_live_promotion",
+        "current_main_bus_processing_cache_freshness": "required_before_live_promotion",
+        "current_main_bus_processing_cache_no_live_authority": "required_before_live_promotion",
+        "rollback_master_processing_readback": "required_before_live_promotion",
+        "rollback_pa_feed_matrix_readback": "required_before_live_promotion",
+    }
+
+
+def _master_bus_rollback_expectation() -> Dict[str, Any]:
+    return {
+        "required_before_live_promotion": True,
+        "restore_previous_master_processing_after_physical_readback": True,
+        "restore_previous_limiter_or_dynamics_state_after_physical_readback": True,
+        "restore_previous_pa_feed_matrix_state_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+
+
+def _master_bus_future_wing_readback_contract() -> Dict[str, Any]:
+    return {
+        "required": True,
+        "required_before_live_promotion": True,
+        "target_kind": "main_bus_processing",
+        "old_value_source": "cached_or_physical_main_bus_processing_read_required_before_promotion",
+        "readback_targets": [
+            "main_bus_processing",
+            "limiter",
+            "matrix_or_pa_feed",
+            "reference_feed",
+        ],
+        "blocked_live_actions": [
+            "master_bus_processing_write",
+            "main_limiter_write",
+            "matrix_pa_feed_write",
+        ],
+        "requires_real_wing_proof": True,
+        "requires_operator_approval": True,
+        "requires_separate_non_fader_adr": True,
+    }
 
 
 @dataclass(frozen=True)
@@ -143,10 +213,174 @@ class MasterBusRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def operator_safety_blockers(self) -> Tuple[str, ...]:
+        return _ordered_unique(
+            (
+                "master_bus_live_apply_quarantined",
+                "unsupported_value_type:master_bus",
+                "not_in_supervised_fader_gain_executor",
+                "real_wing_proof_required_before_live_apply",
+                "non_fader_live_expansion_requires_separate_adr",
+                "operator_approval_required_before_supervised_master_bus_apply",
+                "hardware_readback_and_rollback_not_proven",
+                "pa_feed_safety_required_before_master_output_apply",
+                "main_bus_processing_read_only_until_promoted",
+                *self.blockers,
+            )
+        )
+
+    def master_bus_safety_summary(self) -> Dict[str, Any]:
+        return {
+            "status": "passed" if not self.blockers else "blocked",
+            "bus_id": self.bus_id,
+            "target_profile": self.target_profile,
+            "reference_profile": self.evidence.get("reference_profile"),
+            "current_integrated_lufs": self.current_integrated_lufs,
+            "target_integrated_lufs": self.target_integrated_lufs,
+            "suggested_trim_db": self.suggested_trim_db,
+            "current_true_peak_dbfs": self.current_true_peak_dbfs,
+            "max_true_peak_dbfs": self.max_true_peak_dbfs,
+            "true_peak_headroom_db": self.true_peak_headroom_db,
+            "loudness_range": self.evidence.get("loudness_range"),
+            "limiter_ceiling_dbfs": self.limiter_ceiling_dbfs,
+            "broad_eq_tilt_db": self.broad_eq_tilt_db,
+            "low_shelf_db": self.low_shelf_db,
+            "high_shelf_db": self.high_shelf_db,
+            "target_gain_reduction_db": self.target_gain_reduction_db,
+            "limiter_or_dynamics_proof": self.evidence.get(
+                "limiter_or_dynamics_proof"
+            ),
+            "output_feed_role": self.evidence.get("output_feed_role"),
+            "pa_feed_readback_available": self.evidence.get(
+                "pa_feed_readback_available"
+            ),
+            "pa_feed_readback": self.evidence.get("pa_feed_readback"),
+            "pa_feed_safe_for_master_change": self.evidence.get(
+                "pa_feed_safe_for_master_change"
+            ),
+            "pa_feed_safety": self.evidence.get("pa_feed_safety"),
+            "pa_feed_cache_freshness_status": self.evidence.get(
+                "pa_feed_cache_freshness_status"
+            ),
+            "pa_feed_cache_no_live_authority": self.evidence.get(
+                "pa_feed_cache_no_live_authority"
+            ),
+            "is_reference_feed": self.evidence.get("is_reference_feed"),
+            "reference_feed_exclusion": self.evidence.get(
+                "reference_feed_exclusion"
+            ),
+            "current_main_bus_processing_cache_freshness_status": self.evidence.get(
+                "current_state_cache_freshness_status"
+            ),
+            "current_main_bus_processing_cache_freshness": self.evidence.get(
+                "current_main_bus_processing_cache_freshness"
+            ),
+            "current_main_bus_processing_cache_no_live_authority": self.evidence.get(
+                "current_main_bus_processing_cache_no_live_authority"
+            ),
+            "rollback_master_processing_readback": self.evidence.get(
+                "rollback_master_processing_readback"
+            ),
+            "rollback_pa_feed_matrix_readback": self.evidence.get(
+                "rollback_pa_feed_matrix_readback"
+            ),
+            "required_safety_checks": _master_bus_required_safety_checks(),
+            "safety_blockers": list(self.operator_safety_blockers()),
+            "operator_explanation": (
+                "Master/Output evidence is offline-only. Review integrated "
+                "loudness, true-peak headroom, crest factor, loudness range, "
+                "reference profile, PA-feed safety and rollback/readback "
+                "requirements before any future WING promotion."
+            ),
+            "rollback_expectation": _master_bus_rollback_expectation(),
+            "future_wing_readback_contract": _master_bus_future_wing_readback_contract(),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        master_bus_safety_summary = self.master_bus_safety_summary()
+        blockers = list(self.operator_safety_blockers())
+        proposed_action = {
+            "action_type": self.action_type,
+            "target_integrated_lufs": self.target_integrated_lufs,
+            "max_true_peak_dbfs": self.max_true_peak_dbfs,
+            "suggested_trim_db": self.suggested_trim_db,
+            "limiter_ceiling_dbfs": self.limiter_ceiling_dbfs,
+            "broad_eq_tilt_db": self.broad_eq_tilt_db,
+            "low_shelf_db": self.low_shelf_db,
+            "high_shelf_db": self.high_shelf_db,
+            "bus_compression_ratio": self.bus_compression_ratio,
+            "bus_compression_threshold_db": self.bus_compression_threshold_db,
+            "target_gain_reduction_db": self.target_gain_reduction_db,
+            "reference_profile": master_bus_safety_summary["reference_profile"],
+            "loudness_range": master_bus_safety_summary["loudness_range"],
+            "pa_feed_readback": master_bus_safety_summary["pa_feed_readback"],
+            "pa_feed_safety": master_bus_safety_summary["pa_feed_safety"],
+            "reference_feed_exclusion": master_bus_safety_summary[
+                "reference_feed_exclusion"
+            ],
+            "required_safety_checks": master_bus_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": master_bus_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": master_bus_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "master_bus_safety_summary": master_bus_safety_summary,
+        }
+        evidence = {
+            **self.evidence,
+            "master_bus_safety_summary": master_bus_safety_summary,
+            "required_safety_checks": master_bus_safety_summary[
+                "required_safety_checks"
+            ],
+            "operator_explanation": master_bus_safety_summary[
+                "operator_explanation"
+            ],
+            "rollback_expectation": master_bus_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": master_bus_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "old_value_source": (
+                "cached_or_physical_main_bus_processing_read_required_before_promotion"
+            ),
+            "rollback_value_source": (
+                "cached_or_physical_main_bus_processing_read_required_before_promotion"
+            ),
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        proposal = {
             "id": self.id,
             "method_id": MASTER_BUS_METHOD_ID,
             "source": MASTER_BUS_METHOD_ID,
@@ -157,35 +391,42 @@ class MasterBusRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:master_bus",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "safety_blockers": master_bus_safety_summary["safety_blockers"],
+            "operator_explanation": master_bus_safety_summary[
+                "operator_explanation"
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "target_integrated_lufs": self.target_integrated_lufs,
-                "max_true_peak_dbfs": self.max_true_peak_dbfs,
-                "suggested_trim_db": self.suggested_trim_db,
-                "limiter_ceiling_dbfs": self.limiter_ceiling_dbfs,
-                "broad_eq_tilt_db": self.broad_eq_tilt_db,
-                "low_shelf_db": self.low_shelf_db,
-                "high_shelf_db": self.high_shelf_db,
-                "bus_compression_ratio": self.bus_compression_ratio,
-                "bus_compression_threshold_db": self.bus_compression_threshold_db,
-                "target_gain_reduction_db": self.target_gain_reduction_db,
-            },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
-            },
+            "required_safety_checks": master_bus_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": master_bus_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": master_bus_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "proposed_action": proposed_action,
+            "master_bus_safety_summary": master_bus_safety_summary,
+            "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=MASTER_BUS_METHOD_ID,
+            target=self.bus_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _severity(
@@ -338,11 +579,103 @@ def analyze_master_bus_need(
     pa_feed_freshness_status = str(pa_feed_freshness.get("status") or "unknown")
     pa_feed_no_authority = _freshness_is_no_authority(pa_feed_freshness)
     output_feed_role = str(analysis.output_feed_role or "unknown").strip().lower() or "unknown"
+    is_reference_feed = _is_reference_feed(analysis)
+    loudness_range = {
+        "status": "within_target" if _safe_float(analysis.lra_db) <= profile.max_lra_db else "exceeds_target",
+        "lra_db": round(_safe_float(analysis.lra_db), 2),
+        "max_lra_db": profile.max_lra_db,
+        "read_only": True,
+        "live_write": False,
+    }
+    reference_profile = {
+        "status": "available",
+        "profile_id": profile.id,
+        "target_integrated_lufs": profile.target_integrated_lufs,
+        "max_true_peak_dbfs": profile.max_true_peak_dbfs,
+        "target_crest_factor_db": profile.target_crest_factor_db,
+        "max_lra_db": profile.max_lra_db,
+        "reference_lufs": analysis.reference_lufs,
+        "read_only": True,
+        "live_write": False,
+    }
+    pa_feed_readback = {
+        "status": (
+            "available" if analysis.pa_feed_readback_available else "missing"
+        ),
+        "required_before_live_promotion": True,
+        "output_feed_role": output_feed_role,
+        "output_feed_label": str(analysis.output_feed_label or ""),
+        "cache_freshness_status": pa_feed_freshness_status,
+        "cache_no_live_authority": pa_feed_no_authority,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    pa_feed_safety = {
+        "status": (
+            "passed"
+            if (
+                analysis.pa_feed_readback_available
+                and analysis.pa_feed_safe_for_master_change
+                and pa_feed_freshness_status == "fresh"
+                and pa_feed_no_authority
+                and not is_reference_feed
+            )
+            else "blocked"
+        ),
+        "pa_feed_readback_available": bool(analysis.pa_feed_readback_available),
+        "pa_feed_readback": pa_feed_readback,
+        "pa_feed_safe_for_master_change": bool(analysis.pa_feed_safe_for_master_change),
+        "pa_feed_cache_freshness_status": pa_feed_freshness_status,
+        "pa_feed_cache_no_live_authority": pa_feed_no_authority,
+        "output_feed_role": output_feed_role,
+        "output_feed_label": str(analysis.output_feed_label or ""),
+        "is_reference_feed": bool(is_reference_feed),
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    reference_feed_exclusion = {
+        "status": "passed" if not is_reference_feed else "blocked",
+        "is_reference_feed": bool(is_reference_feed),
+        "output_feed_role": output_feed_role,
+        "output_feed_label": str(analysis.output_feed_label or ""),
+        "reference_role_tokens": list(REFERENCE_FEED_ROLE_TOKENS),
+        "read_only": True,
+        "live_write": False,
+    }
+    rollback_master_processing_readback = {
+        "status": "required_before_live_promotion",
+        "target_kind": "main_bus_processing",
+        "bus_id": str(analysis.bus_id or "main_lr"),
+        "old_value_source": (
+            "cached_or_physical_main_bus_processing_read_required_before_promotion"
+        ),
+        "current_state_cache_freshness_status": current_state_freshness_status,
+        "current_state_cache_no_live_authority": current_state_no_authority,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    rollback_pa_feed_matrix_readback = {
+        "status": "required_before_live_promotion",
+        "target_kind": "matrix_or_pa_feed",
+        "output_feed_role": output_feed_role,
+        "output_feed_label": str(analysis.output_feed_label or ""),
+        "old_value_source": "cached_or_physical_pa_feed_matrix_read_required_before_promotion",
+        "pa_feed_readback_available": bool(analysis.pa_feed_readback_available),
+        "pa_feed_cache_freshness_status": pa_feed_freshness_status,
+        "pa_feed_cache_no_live_authority": pa_feed_no_authority,
+        "reference_feed_excluded": not is_reference_feed,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
 
     blockers = []
     if integrated_lufs <= -70.0 or true_peak <= -90.0:
         blockers.append("master_signal_below_analysis_floor")
-    if _is_reference_feed(analysis):
+    if is_reference_feed:
         blockers.append("master_reference_feed_excluded")
     if not analysis.pa_feed_readback_available:
         blockers.append("pa_feed_readback_missing")
@@ -417,15 +750,23 @@ def analyze_master_bus_need(
         "output_feed_role": output_feed_role,
         "output_feed_label": str(analysis.output_feed_label or ""),
         "pa_feed_readback_available": bool(analysis.pa_feed_readback_available),
+        "pa_feed_readback": pa_feed_readback,
         "pa_feed_safe_for_master_change": bool(analysis.pa_feed_safe_for_master_change),
+        "pa_feed_safety": pa_feed_safety,
         "pa_feed_cache_freshness_status": pa_feed_freshness_status,
         "pa_feed_cache_freshness": pa_feed_freshness,
         "pa_feed_cache_no_live_authority": pa_feed_no_authority,
-        "is_reference_feed": bool(_is_reference_feed(analysis)),
+        "is_reference_feed": bool(is_reference_feed),
+        "reference_feed_exclusion": reference_feed_exclusion,
+        "rollback_master_processing_readback": rollback_master_processing_readback,
+        "rollback_pa_feed_matrix_readback": rollback_pa_feed_matrix_readback,
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_main_bus_processing_cache_freshness": current_state_freshness,
         "current_main_bus_processing_cache_no_live_authority": current_state_no_authority,
+        "loudness_range": loudness_range,
+        "reference_profile": reference_profile,
         "transport_free": True,
         "lufs_only_loudness_up_is_not_listening_master": True,
     }

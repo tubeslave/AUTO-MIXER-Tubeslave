@@ -19,7 +19,15 @@ from enum import Enum
 from scipy.signal import savgol_filter, find_peaks
 from scipy.interpolate import interp1d
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 logger = logging.getLogger(__name__)
+
+AUTO_EQ_METHOD_ID = "auto_eq"
+EQ_READ_REQUIRED_SOURCE = "cached_or_physical_eq_band_read_required_before_promotion"
 
 
 # ============================================================================
@@ -127,12 +135,78 @@ def _build_eq_reset_calls(channel: int) -> List[Dict[str, Any]]:
     return calls
 
 
+def _eq_fail_closed_contract_evidence(
+    action: Dict[str, Any],
+    blocked_calls: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    corrections = action.get("corrections") if isinstance(action, dict) else None
+    correction_items = corrections if isinstance(corrections, list) else []
+    candidate_frequencies = [
+        item.get("frequency")
+        for item in correction_items
+        if isinstance(item, dict) and item.get("frequency") is not None
+    ]
+    candidate_gains = [
+        float(item.get("gain"))
+        for item in correction_items
+        if isinstance(item, dict) and item.get("gain") is not None
+    ]
+    eq_calls = [
+        call
+        for call in blocked_calls
+        if str(call.get("cmd") or "").startswith("set_eq") or "/eq/" in str(call.get("path") or "")
+    ]
+    max_abs_gain = max((abs(gain) for gain in candidate_gains), default=0.0)
+    return {
+        "frequency_match": {
+            "status": "readback_required_before_live_promotion",
+            "candidate_frequencies_hz": candidate_frequencies,
+            "eq_command_count": len(eq_calls),
+        },
+        "cut_or_bounded_boost": {
+            "status": "operator_review_required_before_live_promotion",
+            "max_abs_gain_db": round(max_abs_gain, 2),
+            "contains_boost": any(gain > 0.0 for gain in candidate_gains),
+            "contains_cut": any(gain < 0.0 for gain in candidate_gains),
+            "bounded_preview_only": True,
+        },
+        "feedback_notch_preserved": "readback_required_before_live_promotion",
+        "manual_band_preserved": "readback_required_before_live_promotion",
+        "true_peak_headroom": "required_before_live_promotion",
+        "eq_band_readback": {
+            "status": "required_before_live_promotion",
+            "readback_targets": ["eq_on", "band_id", "band_frequency", "band_gain", "band_q", "filter_type"],
+            "blocked_call_count": len(eq_calls),
+            "old_value_source": EQ_READ_REQUIRED_SOURCE,
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+        },
+        "current_eq_context_cache_freshness": {
+            "status": "readback_required_before_live_promotion",
+            "source": EQ_READ_REQUIRED_SOURCE,
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        },
+        "current_eq_context_cache_no_live_authority": True,
+        "rollback_eq_band_readback": {
+            "status": "required_before_live_promotion",
+            "rollback_targets": ["eq_on", "band_id", "band_frequency", "band_gain", "band_q", "filter_type"],
+            "old_value_source": EQ_READ_REQUIRED_SOURCE,
+            "blocked_call_count": len(eq_calls),
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+        },
+    }
+
+
 def _store_blocked_eq_result(
     owner,
     reason: str,
     blocked_calls: List[Dict[str, Any]],
     *,
     channel: Optional[int] = None,
+    proposed_action: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     owner.last_write_attempted = bool(blocked_calls)
     owner.last_write_blocked = bool(blocked_calls)
@@ -146,13 +220,97 @@ def _store_blocked_eq_result(
         "blocked_call_count": len(blocked_calls),
         "reason": reason,
         "write_policy": owner.write_policy,
+        "live_write": False,
+        "queue_mutation": False,
         "live_write_allowed": owner.live_write_allowed,
         "can_apply_live": False,
+        "can_import_to_queue": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "queue_action": "not_queueable_until_promoted",
         "mixer_client_present": owner.mixer_client is not None,
         "mutates_mixer": False,
     }
     if channel is not None:
         result["channel"] = channel
+    blockers = [
+        "unsupported_value_type:eq",
+        "not_in_supervised_fader_gain_executor",
+        "hardware_readback_and_rollback_not_proven",
+        reason,
+    ]
+    if not blocked_calls:
+        blockers.append("missing_eq_apply_or_reset_calls")
+    action = proposed_action or {
+        "action_type": reason,
+        "channel": channel,
+        "blocked_calls": list(blocked_calls),
+        "blocked_call_count": len(blocked_calls),
+    }
+    contract_evidence = _eq_fail_closed_contract_evidence(action, blocked_calls)
+    action = {
+        **action,
+        **contract_evidence,
+    }
+    proposal = {
+        "id": f"{AUTO_EQ_METHOD_ID}:{channel or 'unknown'}:{reason}",
+        "method_id": AUTO_EQ_METHOD_ID,
+        "source": AUTO_EQ_METHOD_ID,
+        "title": f"Ch {channel or '?'}: AutoEQ blocked proposal evidence",
+        "reason": (
+            "AutoEQ generated blocked EQ write evidence. It is operator review "
+            "only until EQ-band readback, feedback/manual-band safety and "
+            "rollback proof exist."
+        ),
+        "target": channel,
+        "kind": "eq",
+        "severity": "medium" if blocked_calls else "low",
+        "confidence": None,
+        "queue_action": result["queue_action"],
+        "live_write": False,
+        "queue_mutation": False,
+        "can_import_to_queue": False,
+        "can_apply_live": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "mutates_mixer": False,
+        "blockers": blockers,
+        "proposed_action": action,
+            "evidence": {
+                "blocked_calls": list(blocked_calls),
+                "blocked_call_count": len(blocked_calls),
+                "write_policy": owner.write_policy,
+                "old_value_source": EQ_READ_REQUIRED_SOURCE,
+                "rollback_value_source": EQ_READ_REQUIRED_SOURCE,
+                **contract_evidence,
+                "live_write": False,
+                "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        },
+    }
+    result["operator_correction"] = build_operator_correction_payload(
+        proposal=proposal,
+        method_id=AUTO_EQ_METHOD_ID,
+        target=channel,
+        proposed_action=action,
+        blockers=blockers,
+    )
     owner.last_apply_result = result
     if blocked_calls:
         logger.warning(
@@ -2600,17 +2758,38 @@ class AutoEQController:
         corrections = corrections or self.current_corrections
         if not corrections:
             logger.debug("No corrections to apply (signal may be too quiet or already matches target)")
-            return _store_blocked_eq_result(self, "no_auto_eq_corrections", [], channel=self.current_channel)
+            return _store_blocked_eq_result(
+                self,
+                "no_auto_eq_corrections",
+                [],
+                channel=self.current_channel,
+                proposed_action={
+                    "action_type": "auto_eq_analysis_only_no_corrections",
+                    "channel": self.current_channel,
+                    "status": "blocked_no_eq_corrections",
+                },
+            )
 
         mixer_bands = self.corrector.map_to_mixer_bands(corrections)
         blocked_calls = _build_eq_apply_calls(self.current_channel, mixer_bands)
+        correction_payload = [correction.to_dict() for correction in corrections]
+        max_gain_delta = max((correction.gain for correction in corrections), key=abs)
         result = _store_blocked_eq_result(
             self,
             "auto_eq_direct_apply_quarantined",
             blocked_calls,
             channel=self.current_channel,
+            proposed_action={
+                "action_type": "auto_eq_apply_blocked",
+                "channel": self.current_channel,
+                "suggested_eq_delta_db": round(max_gain_delta, 2),
+                "corrections": correction_payload,
+                "mixer_bands": mixer_bands,
+                "blocked_calls": list(blocked_calls),
+                "blocked_call_count": len(blocked_calls),
+            },
         )
-        result["corrections"] = [correction.to_dict() for correction in corrections]
+        result["corrections"] = correction_payload
         logger.info(
             "EQ corrections for channel %s kept as blocked evidence",
             self.current_channel,
@@ -2635,6 +2814,12 @@ class AutoEQController:
             "auto_eq_reset_quarantined",
             blocked_calls,
             channel=ch,
+            proposed_action={
+                "action_type": "auto_eq_reset_blocked",
+                "channel": ch,
+                "blocked_calls": list(blocked_calls),
+                "blocked_call_count": len(blocked_calls),
+            },
         )
         logger.info("EQ reset for channel %s kept as blocked evidence", ch)
         self._notify_status('blocked', f'EQ reset blocked for channel {ch}')
@@ -3080,17 +3265,38 @@ class MultiChannelAutoEQController:
         corrections = self.active_channels[channel].get('corrections', [])
         if not corrections:
             logger.debug(f"No corrections to apply for channel {channel} (signal may be too quiet or already matches target)")
-            return _store_blocked_eq_result(self, "no_auto_eq_corrections", [], channel=channel)
+            return _store_blocked_eq_result(
+                self,
+                "no_auto_eq_corrections",
+                [],
+                channel=channel,
+                proposed_action={
+                    "action_type": "auto_eq_analysis_only_no_corrections",
+                    "channel": channel,
+                    "status": "blocked_no_eq_corrections",
+                },
+            )
 
         mixer_bands = self.corrector.map_to_mixer_bands(corrections)
         blocked_calls = _build_eq_apply_calls(channel, mixer_bands)
+        correction_payload = [correction.to_dict() for correction in corrections]
+        max_gain_delta = max((correction.gain for correction in corrections), key=abs)
         result = _store_blocked_eq_result(
             self,
             "auto_eq_direct_apply_quarantined",
             blocked_calls,
             channel=channel,
+            proposed_action={
+                "action_type": "auto_eq_apply_blocked",
+                "channel": channel,
+                "suggested_eq_delta_db": round(max_gain_delta, 2),
+                "corrections": correction_payload,
+                "mixer_bands": mixer_bands,
+                "blocked_calls": list(blocked_calls),
+                "blocked_call_count": len(blocked_calls),
+            },
         )
-        result["corrections"] = [correction.to_dict() for correction in corrections]
+        result["corrections"] = correction_payload
         logger.info("EQ corrections for channel %s kept as blocked evidence", channel)
         return result
     

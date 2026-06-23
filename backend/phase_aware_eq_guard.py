@@ -14,10 +14,36 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 MIN_FLOAT = 1e-12
 DEFAULT_LOW_FREQ_RANGE_HZ = (35.0, 180.0)
 DEFAULT_MAX_DELAY_MS = 10.0
+PHASE_AWARE_EQ_GUARD_METHOD_ID = "phase_aware_eq_guard"
+PHASE_AWARE_EQ_GUARD_VERSION = "automixer_phase_aware_eq_guard_v1"
+PHASE_GUARD_READ_REQUIRED_SOURCE = (
+    "fresh_multichannel_phase_audio_context_required_before_promotion"
+)
+
+
+def _proposal_denial_fields() -> Dict[str, Any]:
+    return {
+        "queue_action": "not_queueable_until_promoted",
+        "can_import_to_queue": False,
+        "can_apply_live": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "live_write": False,
+        "queue_mutation": False,
+        "mutates_mixer": False,
+    }
 
 
 class GroupEnableMode(str, Enum):
@@ -289,6 +315,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def _base_metadata(
     config: PhaseAwareEQGuardConfig,
     *,
@@ -297,14 +331,17 @@ def _base_metadata(
     group_gain_source: str = "unavailable",
 ) -> Dict[str, Any]:
     freshness = _freshness_payload(config.current_state_cache_freshness)
+    no_authority = _freshness_is_no_authority(freshness)
     return {
         "live_write_allowed": False,
+        **_proposal_denial_fields(),
         "transport_free": True,
         "candidate_count": int(candidate_count),
         "channel_count": int(channel_count),
         "group_gain_source": group_gain_source,
         "current_state_cache_freshness_status": str(freshness.get("status") or "unknown"),
         "current_state_cache_freshness": freshness,
+        "current_phase_audio_context_cache_no_live_authority": no_authority,
         "pi_surface_coverage": {
             "group": True,
             "group_enable_mode": True,
@@ -383,9 +420,56 @@ def _overall_policy(policies: Sequence[EQActionPolicy]) -> EQActionPolicy:
     return EQActionPolicy.PHASE_UNRELIABLE
 
 
+def _phase_eq_guard_safety_summary(
+    measurement: PhasePairMeasurement,
+    config: PhaseAwareEQGuardConfig,
+    *,
+    current_state_freshness_status: str,
+    current_state_no_authority: bool,
+) -> Dict[str, Any]:
+    return {
+        "summary_type": "phase_aware_eq_guard_review",
+        "status": "candidate_review_required",
+        "group_id": config.group_id,
+        "phase_mode": config.group_enable_mode.value,
+        "anchor_channel": measurement.anchor_channel,
+        "candidate_channel": measurement.candidate_channel,
+        "delay_ms": measurement.delay_ms,
+        "polarity_candidate": measurement.polarity_candidate,
+        "broadband_coherence": measurement.broadband_coherence,
+        "low_freq_coherence": measurement.low_freq_coherence,
+        "low_freq_sum_loss_db": measurement.low_freq_sum_loss_db,
+        "phase_confidence": measurement.phase_confidence,
+        "candidate_weight": measurement.candidate_weight,
+        "candidate_bleed_ratio": measurement.candidate_bleed_ratio,
+        "low_freq_focus": config.low_freq_focus,
+        "eq_action_policy": measurement.eq_action_policy.value,
+        "eq_hold_policy": "hold_aggressive_eq_until_phase_review",
+        "current_phase_audio_context_cache_freshness": (
+            current_state_freshness_status
+        ),
+        "current_phase_audio_context_cache_no_live_authority": (
+            current_state_no_authority
+        ),
+        "group_phase_measurements": "present",
+        "gcc_phat_confidence": measurement.phase_confidence,
+        "sum_bus_check": "required_before_apply",
+        "readback_required_before_promotion": True,
+        "rollback_required_before_promotion": True,
+        "operator_review_required": True,
+        "live_write": False,
+        "queue_mutation": False,
+        **_proposal_denial_fields(),
+        "can_authorize_live": False,
+    }
+
+
 def _suggested_action(
     measurement: PhasePairMeasurement,
     config: PhaseAwareEQGuardConfig,
+    *,
+    current_state_freshness_status: str,
+    current_state_no_authority: bool,
 ) -> Optional[Dict[str, Any]]:
     if measurement.eq_action_policy != EQActionPolicy.PHASE_CANDIDATE:
         return None
@@ -397,7 +481,13 @@ def _suggested_action(
     if not actions and measurement.low_freq_sum_loss_db >= config.low_freq_loss_threshold_db:
         actions.append("low_freq_phase_review")
 
-    return {
+    safety_summary = _phase_eq_guard_safety_summary(
+        measurement,
+        config,
+        current_state_freshness_status=current_state_freshness_status,
+        current_state_no_authority=current_state_no_authority,
+    )
+    proposed_action = {
         "action_type": "phase_alignment_candidate",
         "dry_run": True,
         "anchor_channel": measurement.anchor_channel,
@@ -409,7 +499,76 @@ def _suggested_action(
         "low_freq_focus": config.low_freq_focus,
         "confidence": measurement.phase_confidence,
         "reason": measurement.reason,
+        "phase_eq_guard_safety_summary": safety_summary,
     }
+    evidence = {
+        "current_phase_audio_context_cache_freshness": (
+            current_state_freshness_status
+        ),
+        "current_phase_audio_context_cache_no_live_authority": (
+            current_state_no_authority
+        ),
+        "group_phase_measurements": {
+            "anchor_channel": measurement.anchor_channel,
+            "candidate_channel": measurement.candidate_channel,
+            "broadband_coherence": measurement.broadband_coherence,
+            "low_freq_coherence": measurement.low_freq_coherence,
+            "delay_ms": measurement.delay_ms,
+            "polarity_candidate": measurement.polarity_candidate,
+        },
+        "gcc_phat_confidence": measurement.phase_confidence,
+        "low_frequency_sum_loss": measurement.low_freq_sum_loss_db,
+        "bleed_risk": measurement.candidate_bleed_ratio,
+        "eq_hold_policy": "hold_aggressive_eq_until_phase_review",
+        "phase_eq_guard_safety_summary": safety_summary,
+        **_proposal_denial_fields(),
+        "readback_required_before_promotion": True,
+        "rollback_required_before_promotion": True,
+    }
+    blockers = [
+        "unsupported_value_type:phase_eq_guard",
+        "not_in_supervised_fader_gain_executor",
+        "hardware_readback_and_rollback_not_proven",
+    ]
+    proposal = {
+        "id": (
+            f"{PHASE_AWARE_EQ_GUARD_METHOD_ID}:"
+            f"{measurement.anchor_channel}:{measurement.candidate_channel}"
+        ),
+        "method_id": PHASE_AWARE_EQ_GUARD_METHOD_ID,
+        "source": PHASE_AWARE_EQ_GUARD_METHOD_ID,
+        "title": (
+            f"Ch {measurement.candidate_channel}: phase guard before EQ proposal"
+        ),
+        "reason": measurement.reason,
+        "target": measurement.candidate_channel,
+        "kind": "phase_eq_guard",
+        "severity": "medium",
+        "confidence": round(max(0.0, min(1.0, measurement.phase_confidence)), 3),
+        **_proposal_denial_fields(),
+        "blockers": blockers,
+        "proposed_action": proposed_action,
+        "evidence": evidence,
+    }
+    action = {
+        **proposed_action,
+        "value_type": "phase_eq_guard",
+        "target_kind": "group_phase_before_eq_policy",
+        "live_write_allowed": False,
+        **_proposal_denial_fields(),
+        "evidence": evidence,
+    }
+    action["operator_correction"] = build_operator_correction_payload(
+        proposal=proposal,
+        method_id=PHASE_AWARE_EQ_GUARD_METHOD_ID,
+        target=measurement.candidate_channel,
+        proposed_action=proposed_action,
+        blockers=blockers,
+        value_type="phase_eq_guard",
+        target_kind="group_phase_before_eq_policy",
+        old_value_source=PHASE_GUARD_READ_REQUIRED_SOURCE,
+    )
+    return action
 
 
 def analyze_phase_aware_eq_guard(
@@ -421,6 +580,7 @@ def analyze_phase_aware_eq_guard(
     logic_latency_ms = float(config.lookahead_buffer_ms) if config.report_latency else 0.0
     current_state_freshness = _freshness_payload(config.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     if not config.global_enabled or config.group_enable_mode == GroupEnableMode.GROUP_OFF:
         return PhaseAwareEQGuardResult(
             method_id="automixer_phase_aware_eq_guard_v1",
@@ -443,7 +603,7 @@ def analyze_phase_aware_eq_guard(
         )
 
     usable = _filter_channels(channels, config)
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         metadata = _base_metadata(config, channel_count=len(usable))
         metadata["blockers"] = ("phase_aware_eq_context_cache_not_fresh",)
         return PhaseAwareEQGuardResult(
@@ -463,6 +623,32 @@ def analyze_phase_aware_eq_guard(
             pair_measurements=(),
             suggested_actions=(),
             warnings=("phase context cache is not fresh; collect fresh phase evidence before EQ proposals",),
+            metadata=metadata,
+        )
+
+    if not current_state_no_authority:
+        metadata = _base_metadata(config, channel_count=len(usable))
+        metadata["blockers"] = ("phase_aware_eq_context_cache_live_authority_present",)
+        return PhaseAwareEQGuardResult(
+            method_id="automixer_phase_aware_eq_guard_v1",
+            group_id=config.group_id,
+            group_enable_mode=config.group_enable_mode,
+            global_enabled=config.global_enabled,
+            low_freq_focus=config.low_freq_focus,
+            dry_run=True,
+            sample_rate=config.sample_rate,
+            lookahead_buffer_ms=config.lookahead_buffer_ms,
+            report_latency=config.report_latency,
+            logic_latency_ms=logic_latency_ms,
+            anchor_channel=usable[0].channel_id if usable else None,
+            group_gain_db=_group_gain_db(usable),
+            eq_action_policy=EQActionPolicy.PHASE_UNRELIABLE,
+            pair_measurements=(),
+            suggested_actions=(),
+            warnings=(
+                "phase context cache has live authority; collect read-only phase "
+                "audio evidence before EQ proposals",
+            ),
             metadata=metadata,
         )
 
@@ -528,7 +714,12 @@ def analyze_phase_aware_eq_guard(
             reason=reason,
         )
         measurements.append(measurement)
-        action = _suggested_action(measurement, config)
+        action = _suggested_action(
+            measurement,
+            config,
+            current_state_freshness_status=current_state_freshness_status,
+            current_state_no_authority=current_state_no_authority,
+        )
         if action:
             suggested_actions.append(action)
 

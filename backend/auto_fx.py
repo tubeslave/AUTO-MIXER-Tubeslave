@@ -10,6 +10,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
+
+AUTO_FX_METHOD_ID = "auto_fx"
+FX_READ_REQUIRED_SOURCE = "cached_or_physical_fx_read_required_before_promotion"
+
 
 @dataclass(frozen=True)
 class FXBusDecision:
@@ -59,6 +68,7 @@ class AutoFXPlanner:
         self.vocal_priority = bool(vocal_priority)
         self.live_write_allowed = False
         self.write_policy = "proposal_only_quarantined"
+        self.last_apply_result: dict[str, Any] = {}
 
     def create_plan(self, channels: dict[int, str]) -> FXPlan:
         buses = self._default_buses()
@@ -88,18 +98,185 @@ class AutoFXPlanner:
         """
         blocked_calls = self._build_apply_calls(plan)
         reason = "fx_direct_apply_quarantined" if mixer_client else "no_mixer_client"
-        return {
+        send_levels = [send.send_db for send in plan.sends]
+        return_levels = [bus.return_level_db for bus in plan.buses]
+        loudest_send_db = max(send_levels) if send_levels else None
+        loudest_return_db = max(return_levels) if return_levels else None
+        all_sends_post_fader = all(send.post_fader for send in plan.sends)
+        send_level_limit = {
+            "status": "passed"
+            if send_levels and all(-36.0 <= send_db <= -12.0 for send_db in send_levels)
+            else "blocked",
+            "min_send_db": min(send_levels) if send_levels else None,
+            "max_send_db": loudest_send_db,
+            "allowed_min_send_db": -36.0,
+            "allowed_max_send_db": -12.0,
+            "post_fader_sends_only": all_sends_post_fader,
+            "source": "legacy_auto_fx_plan_blocked_calls",
+        }
+        return_level_safety = {
+            "status": "passed"
+            if loudest_return_db is not None and loudest_return_db <= -3.0
+            else "blocked",
+            "loudest_return_db": loudest_return_db,
+            "max_return_level_db": -3.0,
+            "source": "legacy_auto_fx_plan_blocked_calls",
+            "physical_return_readback_required_before_live_promotion": True,
+        }
+        fx_return_headroom = {
+            "status": "blocked_until_physical_return_readback",
+            "planned_loudest_return_db": loudest_return_db,
+            "min_return_headroom_db": 3.0,
+            "return_level_safety_status": return_level_safety["status"],
+            "source": FX_READ_REQUIRED_SOURCE,
+            "required_before_live_promotion": True,
+        }
+        dry_wet_bounds = {
+            "fx_mix_percent": 100.0,
+            "post_fader_sends_only": all_sends_post_fader,
+            "loudest_send_db": loudest_send_db,
+            "loudest_return_db": loudest_return_db,
+            "send_level_limit_status": send_level_limit["status"],
+            "return_level_safety_status": return_level_safety["status"],
+        }
+        current_fx_parameter_schema_hints = {
+            "status": "required_before_live_promotion",
+            "source": FX_READ_REQUIRED_SOURCE,
+            "planned_fx_slots": {
+                bus.fx_slot: {"model": bus.model, "fx_type": bus.fx_type}
+                for bus in plan.buses
+            },
+            "requires_physical_schema_readback": True,
+            "live_write_authority": False,
+        }
+        rollback_fx_readback = {
+            "status": "required_before_live_promotion",
+            "source": FX_READ_REQUIRED_SOURCE,
+            "send_level_readback_required": True,
+            "return_level_readback_required": True,
+            "fx_parameter_readback_required": True,
+            "monitor_send_readback_required": True,
+        }
+        source_identity_downstream_trust = {
+            "status": "legacy_multi_source_unverified",
+            "trusted_for_downstream": False,
+            "source_roles": sorted({send.instrument for send in plan.sends}),
+            "operator_review_required": True,
+        }
+        blockers = [
+            "unsupported_value_type:fx_send",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            "fx_return_and_send_readback_not_proven",
+            "monitor_safety_not_proven",
+            "feedback_intelligibility_not_proven",
+            reason,
+        ]
+        proposed_action = {
+            "action_type": "auto_fx_apply_blocked",
+            "bus_count": len(plan.buses),
+            "send_count": len(plan.sends),
+            "target_send_db": loudest_send_db,
+            "return_level_db": loudest_return_db,
+            "send_level_db": loudest_send_db,
+            "hpf_hz": min((bus.hpf_hz for bus in plan.buses), default=None),
+            "lpf_hz": max((bus.lpf_hz for bus in plan.buses), default=None),
+            "send_level_limit": send_level_limit,
+            "fx_return_headroom": fx_return_headroom,
+            "return_level_safety": return_level_safety,
+            "dry_wet_bounds": dry_wet_bounds,
+            "rollback_fx_readback": rollback_fx_readback,
+            "blocked_write_count": len(blocked_calls),
+        }
+        result = {
             "applied": False,
             "blocked": bool(blocked_calls),
             "calls": [],
             "blocked_calls": blocked_calls,
+            "blocked_call_count": len(blocked_calls),
             "reason": reason,
             "write_policy": self.write_policy,
             "live_write_allowed": self.live_write_allowed,
+            "live_write": False,
+            "queue_mutation": False,
             "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
             "mixer_client_present": mixer_client is not None,
             "mutates_mixer": False,
         }
+        proposal = {
+            "id": f"{AUTO_FX_METHOD_ID}:plan:{reason}",
+            "method_id": AUTO_FX_METHOD_ID,
+            "source": AUTO_FX_METHOD_ID,
+            "title": "AutoFX blocked apply evidence",
+            "reason": (
+                "AutoFX generated blocked FX/send write evidence. It is "
+                "operator review only until FX send/return readback, monitor "
+                "safety, feedback/intelligibility checks and rollback proof exist."
+            ),
+            "target": "fx_plan",
+            "kind": "fx_send",
+            "severity": "medium" if blocked_calls else "low",
+            "confidence": 0.4,
+            "queue_action": result["queue_action"],
+            "live_write": False,
+            "queue_mutation": False,
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "evidence": {
+                "blocked_calls": blocked_calls,
+                "blocked_call_count": len(blocked_calls),
+                "write_policy": self.write_policy,
+                "old_value_source": FX_READ_REQUIRED_SOURCE,
+                "rollback_value_source": FX_READ_REQUIRED_SOURCE,
+                "live_write": False,
+                "queue_mutation": False,
+                "can_apply_live": False,
+                "can_import_to_queue": False,
+                "queue_import_allowed": False,
+                "live_apply_allowed": False,
+                "read_only_or_dry_run_only": True,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+                "queue_action": "not_queueable_until_promoted",
+                "mutates_mixer": False,
+                "readback_required_before_promotion": True,
+                "rollback_required_before_promotion": True,
+                "return_level_db": loudest_return_db,
+                "send_level_limit": send_level_limit,
+                "fx_return_headroom": fx_return_headroom,
+                "return_level_safety": return_level_safety,
+                "dry_wet_bounds": dry_wet_bounds,
+                "current_fx_send_return_cache_freshness": "not_provided",
+                "current_fx_send_return_cache_no_live_authority": True,
+                "current_fx_parameter_schema_hints": current_fx_parameter_schema_hints,
+                "fx_parameter_schema_no_live_authority": True,
+                "current_fx_parameter_schema_no_live_authority": True,
+                "source_role": "multi_source_fx_plan",
+                "source_identity_downstream_trust": source_identity_downstream_trust,
+                "rollback_fx_readback": rollback_fx_readback,
+                "monitor_safety": "not_measured_in_legacy_auto_fx_apply_path",
+                "feedback_risk": "not_measured_in_legacy_auto_fx_apply_path",
+                "intelligibility_risk": "not_measured_in_legacy_auto_fx_apply_path",
+            },
+        }
+        result["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=AUTO_FX_METHOD_ID,
+            target="fx_plan",
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        self.last_apply_result = result
+        return result
 
     def _build_apply_calls(self, plan: FXPlan) -> list[dict[str, Any]]:
         """Build the would-be FX write plan as blocked, reviewable evidence."""

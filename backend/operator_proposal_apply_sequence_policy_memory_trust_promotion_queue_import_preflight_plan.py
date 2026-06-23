@@ -58,6 +58,34 @@ def _summary_int(value: Any) -> int | None:
     return value
 
 
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(proposal_id: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{proposal_id}:current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{proposal_id}:current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(
+            f"{proposal_id}:current_sequence_review_freshness_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{proposal_id}:current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
+
+
 def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
     counts: Dict[str, int] = {}
     for value in values:
@@ -112,13 +140,40 @@ def _metadata_violations(
 ) -> Tuple[str, ...]:
     metadata = _metadata(action)
     proposal_id = _action_id(action, index)
+    rank_source = metadata.get("rank_source")
     violations = []
     if not metadata:
         violations.append(f"{proposal_id}:sequence_policy_queue_import_metadata_missing")
         return tuple(violations)
     if _summary_int(metadata.get("planned_queue_index")) is None:
         violations.append(f"{proposal_id}:planned_queue_index_invalid")
-    if metadata.get("rank_source") not in ALLOWED_RANK_SOURCES:
+    for field in ("queue_ordering_plan_record_id",):
+        if not _string(metadata.get(field)):
+            violations.append(f"{proposal_id}:{field}_missing")
+    if rank_source == "sequence_policy_consumer":
+        for field in (
+            "consumer_record_id",
+            "sequence_policy_gate_record_id",
+            "policy_key",
+            "source_idempotency_key",
+        ):
+            if not _string(metadata.get(field)):
+                violations.append(f"{proposal_id}:{field}_missing")
+        violations.extend(
+            _context_violations(
+                proposal_id,
+                _mapping(metadata.get("current_sequence_review_freshness")),
+            )
+        )
+    source_idempotency_key = _string(metadata.get("source_idempotency_key"))
+    policy_key = _string(metadata.get("policy_key"))
+    if (
+        source_idempotency_key
+        and policy_key
+        and policy_key != f"{proposal_id}/{source_idempotency_key}"
+    ):
+        violations.append(f"{proposal_id}:policy_key_identity_mismatch")
+    if rank_source not in ALLOWED_RANK_SOURCES:
         violations.append(f"{proposal_id}:rank_source_unknown")
     if metadata.get("operator_ack_required_before_queue_import") is not True:
         violations.append(f"{proposal_id}:queue_import_ack_required_not_true")
@@ -148,6 +203,10 @@ def _ordered_imported_actions(
             key=lambda action: int(_metadata(action).get("planned_queue_index") or 0),
         )
     )
+
+
+def _is_trusted_sequence_policy_candidate(action: Mapping[str, Any]) -> bool:
+    return _metadata(action).get("rank_source") == "sequence_policy_consumer"
 
 
 def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan(
@@ -193,15 +252,22 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     candidate_actions = tuple(
         action
         for action in imported_actions
-        if action.get("can_apply") is True and action.get("status", "pending") == "pending"
+        if action.get("can_apply") is True
+        and action.get("status", "pending") == "pending"
+        and _is_trusted_sequence_policy_candidate(action)
     )
     analysis_only_actions = tuple(
-        action for action in imported_actions if action.get("can_apply") is not True
+        action
+        for action in imported_actions
+        if action.get("can_apply") is not True
+        or not _is_trusted_sequence_policy_candidate(action)
     )
     non_pending_actions = tuple(
         action
         for action in imported_actions
-        if action.get("can_apply") is True and action.get("status", "pending") != "pending"
+        if action.get("can_apply") is True
+        and action.get("status", "pending") != "pending"
+        and _is_trusted_sequence_policy_candidate(action)
     )
     selected_actions = candidate_actions[:bounded_limit] if not invalid_record_ids else ()
     selected_ids = tuple(
@@ -227,6 +293,18 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             ),
             "proposal_id": proposal_id,
             "planned_preflight_index": index,
+            "queue_ordering_plan_record_id": _metadata(action).get(
+                "queue_ordering_plan_record_id"
+            ),
+            "consumer_record_id": _metadata(action).get("consumer_record_id"),
+            "sequence_policy_gate_record_id": _metadata(action).get(
+                "sequence_policy_gate_record_id"
+            ),
+            "policy_key": _metadata(action).get("policy_key"),
+            "source_idempotency_key": _metadata(action).get("source_idempotency_key"),
+            "current_sequence_review_freshness": _metadata(action).get(
+                "current_sequence_review_freshness"
+            ),
             "planned_queue_index": _metadata(action).get("planned_queue_index"),
             "rank_source": _metadata(action).get("rank_source"),
             "idempotency_key": f"{prefix}:{proposal_id}",

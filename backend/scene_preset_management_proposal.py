@@ -12,6 +12,11 @@ from datetime import datetime, timezone
 import math
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 SCENE_PRESET_METHOD_ID = "scene_preset_management_proposal"
 SCENE_PRESET_VERSION = "scene_preset_management_proposal_v1"
@@ -47,6 +52,72 @@ MAX_DESTRUCTIVE_SCOPE_SCORE = 0.35
 MAX_AFFECTED_CHANNELS = 2
 MAX_AFFECTED_BUSES = 1
 MAX_AFFECTED_FX_SLOTS = 1
+
+
+def _ordered_unique(values: Iterable[str]) -> Tuple[str, ...]:
+    ordered = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
+
+
+def _scene_preset_required_safety_checks() -> Dict[str, str]:
+    return {
+        "current_console_state_readback": "required_before_live_promotion",
+        "current_scene_preset_cache_freshness": "required_before_live_promotion",
+        "current_scene_preset_cache_no_live_authority": "required_before_live_promotion",
+        "snapshots_scenes_snapshot_cache_freshness": "required_before_live_promotion",
+        "user_presets_snapshot_cache_freshness": "required_before_live_promotion",
+        "target_preview": "required_before_live_promotion",
+        "scoped_diff": "required_before_live_promotion",
+        "read_only_scoped_diff_evidence": "required_before_live_promotion",
+        "rollback_snapshot": "required_before_live_promotion",
+        "read_only_rollback_evidence": "required_before_live_promotion",
+        "operator_intent": "required_before_live_promotion",
+        "active_performance_guard": "required_before_live_promotion",
+        "destructive_scope_check": "required_before_live_promotion",
+        "active_signal_guard": "required_before_live_promotion",
+    }
+
+
+def _scene_preset_rollback_expectation() -> Dict[str, Any]:
+    return {
+        "required_before_live_promotion": True,
+        "operator_reviewed_full_state_snapshot_required": True,
+        "restore_previous_scene_or_preset_state_after_physical_readback": True,
+        "restore_previous_channel_strip_state_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+
+
+def _scene_preset_future_wing_readback_contract() -> Dict[str, Any]:
+    return {
+        "required": True,
+        "required_before_live_promotion": True,
+        "target_kind": "scoped_scene_or_user_preset",
+        "old_value_source": "cached_or_physical_full_state_read_required_before_promotion",
+        "readback_targets": [
+            "active_scene_state",
+            "scene_or_snapshot_inventory",
+            "user_preset_inventory",
+            "target_preview",
+            "scoped_diff",
+            "rollback_snapshot",
+        ],
+        "blocked_live_actions": [
+            "scene_state_restore_write",
+            "scene_state_store_write",
+            "preset_state_restore_write",
+            "preset_state_store_write",
+        ],
+        "requires_real_wing_proof": True,
+        "requires_operator_approval": True,
+        "requires_separate_non_fader_adr": True,
+    }
 
 
 def utc_now() -> str:
@@ -186,10 +257,209 @@ class ScenePresetManagementRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def operator_safety_blockers(self) -> Tuple[str, ...]:
+        return _ordered_unique(
+            (
+                "scene_preset_live_apply_quarantined",
+                "unsupported_value_type:scene_preset",
+                "not_in_supervised_fader_gain_executor",
+                "real_wing_proof_required_before_live_apply",
+                "non_fader_live_expansion_requires_separate_adr",
+                "operator_approval_required_before_supervised_scene_preset_apply",
+                "broad_console_state_write_not_proven",
+                "full_state_snapshot_read_only_until_promoted",
+                *self.blockers,
+            )
+        )
+
+    def scene_preset_safety_summary(self) -> Dict[str, Any]:
+        scoped_diff = dict(self.evidence.get("scoped_diff_evidence") or {})
+        rollback = dict(self.evidence.get("rollback_evidence") or {})
+        return {
+            "status": "passed" if not self.blockers else "blocked",
+            "artifact_id": self.artifact_id,
+            "artifact_name": self.artifact_name,
+            "artifact_type": self.artifact_type,
+            "action_type": self.action_type,
+            "target_scope": self.target_scope,
+            "active_scene_id": self.active_scene_id,
+            "current_state_readback_available": self.evidence.get(
+                "current_state_readback_available"
+            ),
+            "current_console_state_readback": self.evidence.get(
+                "current_console_state_readback"
+            ),
+            "snapshots_scenes_snapshot_cache_freshness": self.evidence.get(
+                "snapshots_scenes_snapshot_cache_freshness"
+            ),
+            "user_presets_snapshot_cache_freshness": self.evidence.get(
+                "user_presets_snapshot_cache_freshness"
+            ),
+            "target_preview_available": self.evidence.get(
+                "target_preview_available"
+            ),
+            "target_preview": self.evidence.get("target_preview"),
+            "scoped_diff_available": self.evidence.get("scoped_diff_available"),
+            "scoped_diff": self.evidence.get("scoped_diff"),
+            "read_only_scoped_diff_evidence": self.evidence.get(
+                "read_only_scoped_diff_evidence"
+            ),
+            "rollback_snapshot_available": self.evidence.get(
+                "rollback_snapshot_available"
+            ),
+            "rollback_snapshot_id": self.evidence.get("rollback_snapshot_id"),
+            "rollback_snapshot": self.evidence.get("rollback_snapshot"),
+            "read_only_rollback_evidence": self.evidence.get(
+                "read_only_rollback_evidence"
+            ),
+            "operator_intent": self.evidence.get("operator_intent"),
+            "change_window": self.evidence.get("change_window"),
+            "active_performance": self.evidence.get("active_performance"),
+            "active_performance_guard": self.evidence.get(
+                "active_performance_guard"
+            ),
+            "affected_channel_count": self.evidence.get("affected_channel_count"),
+            "affected_bus_count": self.evidence.get("affected_bus_count"),
+            "affected_fx_slot_count": self.evidence.get(
+                "affected_fx_slot_count"
+            ),
+            "estimated_changed_parameter_count": self.evidence.get(
+                "estimated_changed_parameter_count"
+            ),
+            "destructive_scope_score": self.evidence.get(
+                "destructive_scope_score"
+            ),
+            "destructive_scope_check": self.evidence.get(
+                "destructive_scope_check"
+            ),
+            "active_signal_guard": self.evidence.get("active_signal_guard"),
+            "current_scene_preset_cache_freshness_status": self.evidence.get(
+                "current_state_cache_freshness_status"
+            ),
+            "current_scene_preset_cache_no_live_authority": self.evidence.get(
+                "current_scene_preset_cache_no_live_authority"
+            ),
+            "scoped_diff_read_only": scoped_diff.get("read_only"),
+            "scoped_diff_live_write": scoped_diff.get("live_write"),
+            "scoped_diff_queries_console": scoped_diff.get("queries_console"),
+            "scoped_diff_mutates_console_state": scoped_diff.get(
+                "mutates_console_state"
+            ),
+            "rollback_read_only": rollback.get("read_only"),
+            "rollback_live_write": rollback.get("live_write"),
+            "rollback_queries_console": rollback.get("queries_console"),
+            "rollback_mutates_console_state": rollback.get(
+                "mutates_console_state"
+            ),
+            "required_safety_checks": _scene_preset_required_safety_checks(),
+            "safety_blockers": list(self.operator_safety_blockers()),
+            "operator_explanation": (
+                "Scene/Preset evidence is read-only. Review the current "
+                "console state readback, snapshot/preset cache freshness, "
+                "target preview, scoped diff, active-signal guard and rollback "
+                "snapshot before any future WING promotion."
+            ),
+            "rollback_expectation": _scene_preset_rollback_expectation(),
+            "future_wing_readback_contract": _scene_preset_future_wing_readback_contract(),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        scene_preset_safety_summary = self.scene_preset_safety_summary()
+        blockers = list(self.operator_safety_blockers())
+        proposed_action = {
+            "action_type": self.action_type,
+            "artifact_id": self.artifact_id,
+            "artifact_name": self.artifact_name,
+            "artifact_type": self.artifact_type,
+            "target_scope": self.target_scope,
+            "active_scene_id": self.active_scene_id,
+            "active_scene_name": self.active_scene_name,
+            "current_console_state_readback": scene_preset_safety_summary[
+                "current_console_state_readback"
+            ],
+            "target_preview": scene_preset_safety_summary["target_preview"],
+            "scoped_diff": scene_preset_safety_summary["scoped_diff"],
+            "read_only_scoped_diff_evidence": scene_preset_safety_summary[
+                "read_only_scoped_diff_evidence"
+            ],
+            "rollback_snapshot": scene_preset_safety_summary[
+                "rollback_snapshot"
+            ],
+            "read_only_rollback_evidence": scene_preset_safety_summary[
+                "read_only_rollback_evidence"
+            ],
+            "active_performance_guard": scene_preset_safety_summary[
+                "active_performance_guard"
+            ],
+            "destructive_scope_check": scene_preset_safety_summary[
+                "destructive_scope_check"
+            ],
+            "active_signal_guard": scene_preset_safety_summary[
+                "active_signal_guard"
+            ],
+            "required_safety_checks": scene_preset_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": scene_preset_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": scene_preset_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "scene_preset_safety_summary": scene_preset_safety_summary,
+        }
+        evidence = {
+            **self.evidence,
+            "scene_preset_safety_summary": scene_preset_safety_summary,
+            "required_safety_checks": scene_preset_safety_summary[
+                "required_safety_checks"
+            ],
+            "operator_explanation": scene_preset_safety_summary[
+                "operator_explanation"
+            ],
+            "rollback_expectation": scene_preset_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": scene_preset_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "old_value_source": (
+                "cached_or_physical_full_state_read_required_before_promotion"
+            ),
+            "rollback_value_source": (
+                "cached_or_physical_full_state_read_required_before_promotion"
+            ),
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        proposal = {
             "id": self.id,
             "method_id": SCENE_PRESET_METHOD_ID,
             "source": SCENE_PRESET_METHOD_ID,
@@ -200,31 +470,42 @@ class ScenePresetManagementRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:scene_preset",
-                "not_in_supervised_fader_gain_executor",
-                "broad_console_state_write_not_proven",
-                *self.blockers,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "safety_blockers": scene_preset_safety_summary["safety_blockers"],
+            "operator_explanation": scene_preset_safety_summary[
+                "operator_explanation"
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "artifact_id": self.artifact_id,
-                "artifact_name": self.artifact_name,
-                "artifact_type": self.artifact_type,
-                "target_scope": self.target_scope,
-                "active_scene_id": self.active_scene_id,
-                "active_scene_name": self.active_scene_name,
-            },
-            "evidence": {
-                **self.evidence,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
-            },
+            "required_safety_checks": scene_preset_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": scene_preset_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": scene_preset_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "proposed_action": proposed_action,
+            "scene_preset_safety_summary": scene_preset_safety_summary,
+            "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=SCENE_PRESET_METHOD_ID,
+            target=self.artifact_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _severity(blockers: Iterable[str], destructive_scope_score: float, affected_total: int) -> str:
@@ -532,6 +813,169 @@ def analyze_scene_preset_management_need(
     affected_total = affected_channels + affected_buses + affected_fx
     destructive_scope = max(destructive_scope, _clip01(scoped_diff.get("destructive_scope_score")))
 
+    current_console_state_readback = {
+        "status": "available" if analysis.current_state_readback_available else "missing",
+        "available": bool(analysis.current_state_readback_available),
+        "active_scene_id": current_scene_id,
+        "active_scene_name": current_scene_name,
+        "current_scene_preset_cache_freshness_status": current_state_freshness_status,
+        "read_only": current_state_freshness.get("read_only") is True,
+        "live_write": bool(current_state_freshness.get("live_write", False)),
+        "queries_console": bool(current_state_freshness.get("queries_console", False)),
+    }
+    snapshots_scenes_snapshot_cache_freshness = (
+        {
+            **current_state_freshness,
+            "status": current_state_freshness_status,
+            "artifact_type": artifact_type,
+            "applies_to_artifact_type": True,
+        }
+        if artifact_type in {"scene", "snapshot"}
+        else {
+            "status": "not_required_for_artifact_type",
+            "artifact_type": artifact_type,
+            "applies_to_artifact_type": False,
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        }
+    )
+    user_presets_snapshot_cache_freshness = (
+        {
+            **current_state_freshness,
+            "status": current_state_freshness_status,
+            "artifact_type": artifact_type,
+            "applies_to_artifact_type": True,
+        }
+        if artifact_type in {"user_preset", "channel_preset", "fx_preset"}
+        else {
+            "status": "not_required_for_artifact_type",
+            "artifact_type": artifact_type,
+            "applies_to_artifact_type": False,
+            "read_only": True,
+            "live_write": False,
+            "queries_console": False,
+        }
+    )
+    target_preview = {
+        "status": "available" if target_preview_available else "missing",
+        "available": target_preview_available,
+        "artifact_id": artifact_id,
+        "artifact_name": artifact_name,
+        "target_scope": target_scope,
+        "target_label": target_label,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+        "mutates_console_state": False,
+    }
+    scoped_diff_alias = {
+        **scoped_diff,
+        "status": "available" if scoped_diff_available else "missing",
+        "available": scoped_diff_available,
+        "artifact_id": artifact_id,
+        "target_scope": target_scope,
+        "affected_channel_count": affected_channels,
+        "affected_bus_count": affected_buses,
+        "affected_fx_slot_count": affected_fx,
+        "estimated_changed_parameter_count": changed_parameters,
+        "destructive_scope_score": round(destructive_scope, 3),
+        "read_only": scoped_diff.get("read_only") is not False,
+        "live_write": bool(scoped_diff.get("live_write", False)),
+        "queries_console": bool(scoped_diff.get("queries_console", False)),
+        "mutates_console_state": bool(scoped_diff.get("mutates_console_state", False)),
+    }
+    scoped_diff_read_only = (
+        scoped_diff_alias["read_only"] is True
+        and scoped_diff_alias["live_write"] is False
+        and scoped_diff_alias["queries_console"] is False
+        and scoped_diff_alias["mutates_console_state"] is False
+    )
+    read_only_scoped_diff_evidence = {
+        "status": (
+            "passed"
+            if scoped_diff_available and scoped_diff_read_only
+            else "blocked"
+            if scoped_diff_available
+            else "missing"
+        ),
+        "scoped_diff_available": scoped_diff_available,
+        "read_only": scoped_diff_alias["read_only"],
+        "live_write": scoped_diff_alias["live_write"],
+        "queries_console": scoped_diff_alias["queries_console"],
+        "mutates_console_state": scoped_diff_alias["mutates_console_state"],
+    }
+    rollback_snapshot = {
+        **rollback,
+        "status": "available" if rollback_snapshot_available else "missing",
+        "available": rollback_snapshot_available,
+        "rollback_snapshot_id": rollback_snapshot_id,
+        "artifact_id": artifact_id,
+        "target_scope": target_scope,
+        "read_only": rollback.get("read_only") is not False,
+        "live_write": bool(rollback.get("live_write", False)),
+        "queries_console": bool(rollback.get("queries_console", False)),
+        "mutates_console_state": bool(rollback.get("mutates_console_state", False)),
+    }
+    rollback_read_only = (
+        rollback_snapshot["read_only"] is True
+        and rollback_snapshot["live_write"] is False
+        and rollback_snapshot["queries_console"] is False
+        and rollback_snapshot["mutates_console_state"] is False
+    )
+    read_only_rollback_evidence = {
+        "status": (
+            "passed"
+            if rollback_snapshot_available and rollback_read_only
+            else "blocked"
+            if rollback_snapshot_available
+            else "missing"
+        ),
+        "rollback_snapshot_available": rollback_snapshot_available,
+        "rollback_snapshot_id": rollback_snapshot_id,
+        "read_only": rollback_snapshot["read_only"],
+        "live_write": rollback_snapshot["live_write"],
+        "queries_console": rollback_snapshot["queries_console"],
+        "mutates_console_state": rollback_snapshot["mutates_console_state"],
+    }
+    active_performance_guard = {
+        "status": (
+            "passed"
+            if not analysis.active_performance and window in SAFE_SCENE_PRESET_WINDOWS
+            else "blocked"
+        ),
+        "active_performance": bool(analysis.active_performance),
+        "change_window": window,
+        "safe_windows": sorted(SAFE_SCENE_PRESET_WINDOWS),
+    }
+    destructive_scope_passed = (
+        destructive_scope <= MAX_DESTRUCTIVE_SCOPE_SCORE
+        and affected_channels <= MAX_AFFECTED_CHANNELS
+        and affected_buses <= MAX_AFFECTED_BUSES
+        and affected_fx <= MAX_AFFECTED_FX_SLOTS
+    )
+    destructive_scope_check = {
+        "status": "passed" if destructive_scope_passed else "blocked",
+        "destructive_scope_score": round(destructive_scope, 3),
+        "max_destructive_scope_score": MAX_DESTRUCTIVE_SCOPE_SCORE,
+        "affected_channel_count": affected_channels,
+        "affected_bus_count": affected_buses,
+        "affected_fx_slot_count": affected_fx,
+        "max_affected_channel_count": MAX_AFFECTED_CHANNELS,
+        "max_affected_bus_count": MAX_AFFECTED_BUSES,
+        "max_affected_fx_slot_count": MAX_AFFECTED_FX_SLOTS,
+    }
+    active_signal_guard = {
+        "status": (
+            "passed"
+            if current_signal < ACTIVE_SIGNAL_DBFS and not analysis.affected_sources_active
+            else "blocked"
+        ),
+        "current_mix_signal_dbfs": round(current_signal, 2),
+        "active_signal_threshold_dbfs": ACTIVE_SIGNAL_DBFS,
+        "affected_sources_active": bool(analysis.affected_sources_active),
+    }
+
     blockers = []
     if not artifact_id and not artifact_name:
         blockers.append("scene_preset_target_missing")
@@ -655,7 +1099,19 @@ def analyze_scene_preset_management_need(
         "persistence_cycles": persistence,
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_scene_preset_cache_freshness": current_state_freshness,
         "current_scene_preset_cache_no_live_authority": current_state_no_authority,
+        "current_console_state_readback": current_console_state_readback,
+        "snapshots_scenes_snapshot_cache_freshness": snapshots_scenes_snapshot_cache_freshness,
+        "user_presets_snapshot_cache_freshness": user_presets_snapshot_cache_freshness,
+        "target_preview": target_preview,
+        "scoped_diff": scoped_diff_alias,
+        "read_only_scoped_diff_evidence": read_only_scoped_diff_evidence,
+        "rollback_snapshot": rollback_snapshot,
+        "read_only_rollback_evidence": read_only_rollback_evidence,
+        "active_performance_guard": active_performance_guard,
+        "destructive_scope_check": destructive_scope_check,
+        "active_signal_guard": active_signal_guard,
         "scoped_diff_evidence": scoped_diff,
         "rollback_evidence": rollback,
         "transport_free": True,

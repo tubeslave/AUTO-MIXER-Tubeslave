@@ -17,6 +17,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 ARRANGEMENT_ROLE_METHOD_ID = "arrangement_role_proposal"
 ARRANGEMENT_ROLE_VERSION = "arrangement_role_proposal_v1"
@@ -222,7 +227,15 @@ class ArrangementRoleRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        proposed_action = {
+            "action_type": self.action_type,
+            "source_id": self.source_id,
+            "source_type": self.source_type,
+            "current_arrangement_role": self.current_arrangement_role,
+            "proposed_arrangement_role": self.proposed_arrangement_role,
+            "section_label": self.section_label,
+        }
+        proposal = {
             "id": self.id,
             "method_id": ARRANGEMENT_ROLE_METHOD_ID,
             "source": ARRANGEMENT_ROLE_METHOD_ID,
@@ -241,14 +254,7 @@ class ArrangementRoleRecommendation:
                 "role_learning_requires_operator_acceptance",
                 *self.blockers,
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "source_id": self.source_id,
-                "source_type": self.source_type,
-                "current_arrangement_role": self.current_arrangement_role,
-                "proposed_arrangement_role": self.proposed_arrangement_role,
-                "section_label": self.section_label,
-            },
+            "proposed_action": proposed_action,
             "evidence": {
                 **self.evidence,
                 "live_write": False,
@@ -257,6 +263,14 @@ class ArrangementRoleRecommendation:
                 "rollback_required_before_promotion": False,
             },
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=ARRANGEMENT_ROLE_METHOD_ID,
+            target=self.source_id,
+            proposed_action=proposed_action,
+            blockers=proposal["blockers"],
+        )
+        return proposal
 
 
 def _severity(blockers: Iterable[str], proposed_role: str, masking_impact_score: float) -> str:
@@ -402,12 +416,43 @@ def analyze_arrangement_role_need(
         "source": ARRANGEMENT_ROLE_VERSION,
         "section_label": analysis.section_label,
         "arrangement_context_available": bool(analysis.arrangement_context_available),
+        "arrangement_context": {
+            "available": bool(analysis.arrangement_context_available),
+            "section_label": analysis.section_label,
+            "context_confidence": round(context_confidence, 3),
+        },
         "inter_channel_context_available": bool(analysis.inter_channel_context_available),
+        "inter_channel_context": {
+            "available": bool(analysis.inter_channel_context_available),
+            "competing_role_count": competing_roles,
+            "recent_role_switches": role_switches,
+        },
         "reference_role_available": bool(analysis.reference_role_available),
+        "reference_role": {
+            "available": bool(analysis.reference_role_available),
+            "current_role": current_role,
+            "proposed_role": proposed_role,
+        },
         "accepted_history_available": bool(analysis.accepted_history_available),
+        "accepted_history": {
+            "available": bool(analysis.accepted_history_available),
+            "role_persistence_cycles": persistence,
+            "operator_review_enabled": bool(analysis.operator_review_enabled),
+        },
         "activity_persistence_cycles": persistence,
+        "role_persistence": {
+            "cycles": persistence,
+            "minimum_cycles": MIN_PERSISTENCE_CYCLES,
+            "persistent": persistence >= MIN_PERSISTENCE_CYCLES,
+        },
         "competing_role_count": competing_roles,
         "recent_role_switches": role_switches,
+        "role_ambiguity": {
+            "competing_role_count": competing_roles,
+            "max_competing_role_count": MAX_COMPETING_ROLE_COUNT,
+            "recent_role_switches": role_switches,
+            "max_recent_role_switches": MAX_RECENT_ROLE_SWITCHES,
+        },
         "source_type_confidence": round(source_type_confidence, 3),
         "role_confidence": round(role_confidence, 3),
         "context_confidence": round(context_confidence, 3),
@@ -417,9 +462,14 @@ def analyze_arrangement_role_need(
         "harmonic_support_score": round(_clip01(analysis.harmonic_support_score), 3),
         "texture_score": round(_clip01(analysis.texture_score), 3),
         "masking_impact_score": round(masking_impact, 3),
+        "masking_impact": {
+            "score": round(masking_impact, 3),
+            "requires_downstream_unmasking_review": masking_impact >= 0.5,
+        },
         "operator_review_enabled": bool(analysis.operator_review_enabled),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_arrangement_role_context_cache_freshness": current_state_freshness,
         "current_arrangement_role_context_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,

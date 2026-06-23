@@ -104,6 +104,43 @@ REQUIRED_REVIEW_FALSE_SUMMARY_FLAGS = (
     "live_authority_granted",
     "full_autonomous_ready",
 )
+REQUIRED_MEMORY_TRUST_REVIEW_REQUEST_SPEC_FALSE_FLAGS = (
+    "memory_trust_review_handler_invoked",
+    "memory_trust_review_created",
+    "execution_allowed_by_consumer",
+    "live_write",
+    "apply_attempted",
+    "queue_mutation",
+    "proposal_status_mutation",
+    "idempotency_reserved",
+    "manual_console_write_called",
+    "policy_mutation",
+    "memory_mutation",
+    "memory_file_mutation",
+    "runtime_memory_mutation",
+    "model_mutation",
+    "live_authority_granted",
+    "full_autonomous_ready",
+    "can_apply_live",
+)
+REQUIRED_MEMORY_TRUST_REVIEW_REQUEST_SPEC_IDENTITY_FIELDS = (
+    "source_memory_index_request_spec_id",
+    "source_memory_writer_apply_request_spec_id",
+    "source_memory_writer_request_spec_id",
+    "source_memory_draft_request_spec_id",
+    "source_audit_policy_gate_request_spec_id",
+    "source_audit_request_spec_id",
+    "source_executor_request_spec_id",
+    "source_execution_gate_request_spec_id",
+    "source_dry_run_request_spec_id",
+    "source_sequence_plan_request_spec_id",
+    "source_preflight_request_spec_id",
+    "queue_ordering_plan_record_id",
+    "consumer_record_id",
+    "sequence_policy_gate_record_id",
+    "policy_key",
+    "source_idempotency_key",
+)
 
 
 def _utc_now() -> str:
@@ -134,6 +171,34 @@ def _summary_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
+
+
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(proposal_id: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{proposal_id}:current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{proposal_id}:current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(
+            f"{proposal_id}:current_sequence_review_freshness_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{proposal_id}:current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
 
 
 def _consumer_envelope_violations(consumer: Mapping[str, Any]) -> Tuple[str, ...]:
@@ -236,6 +301,78 @@ def _consumer_request_violations(request: Mapping[str, Any]) -> Tuple[str, ...]:
         violations.append("sequence_policy_memory_trust_review_result_consumer_request_memory_index_not_available")
     if _mapping(request.get("current_sequence_review_freshness")).get("status") != "fresh":
         violations.append("sequence_policy_memory_trust_review_result_consumer_request_freshness_not_fresh")
+    return tuple(violations)
+
+
+def _memory_trust_review_request_specs_violations(
+    specs: Tuple[Mapping[str, Any], ...],
+    *,
+    expected_ids: Tuple[str, ...],
+) -> Tuple[str, ...]:
+    violations = []
+    if len(specs) != len(expected_ids):
+        violations.append(
+            "sequence_policy_memory_trust_review_result_consumer_request_specs_count_mismatch"
+        )
+    spec_ids = tuple(_string(spec.get("proposal_id")) for spec in specs)
+    if spec_ids != expected_ids:
+        violations.append(
+            "sequence_policy_memory_trust_review_result_consumer_request_specs_proposal_ids_mismatch"
+        )
+    for index, spec in enumerate(specs):
+        proposal_id = _string(spec.get("proposal_id")) or f"memory_trust_review_request_spec:{index}"
+        spec_id = _string(spec.get("memory_trust_review_request_spec_id"))
+        expected_spec_id = (
+            f"{OPERATOR_PROPOSAL_APPLY_SEQUENCE_POLICY_MEMORY_TRUST_PROMOTION_QUEUE_IMPORT_MEMORY_INDEX_RESULT_CONSUMER_METHOD_ID}:{proposal_id}"
+        )
+        if spec_id != expected_spec_id:
+            violations.append(
+                f"{proposal_id}:memory_trust_review_request_spec_id_mismatch"
+            )
+        if not _string(spec.get("draft_id")):
+            violations.append(f"{proposal_id}:draft_id_missing")
+        if not _string(spec.get("memory_record_id")):
+            violations.append(f"{proposal_id}:memory_record_id_missing")
+        if spec.get("planned_trust_review_index") != index:
+            violations.append(f"{proposal_id}:planned_trust_review_index_mismatch")
+        if spec.get("target_memory_path") != REQUIRED_TARGET_MEMORY_PATH:
+            violations.append(f"{proposal_id}:target_memory_path_mismatch")
+        if spec.get("memory_trust_review_handler") != "review_operator_proposal_apply_sequence_policy_memory_trust":
+            violations.append(f"{proposal_id}:memory_trust_review_handler_mismatch")
+        if spec.get("read_only") is not True:
+            violations.append(f"{proposal_id}:read_only_not_true")
+        if spec.get("memory_index_result_consumer_only") is not True:
+            violations.append(f"{proposal_id}:memory_index_result_consumer_only_not_true")
+        if spec.get("memory_trust_review_request_template_only") is not True:
+            violations.append(
+                f"{proposal_id}:memory_trust_review_request_template_only_not_true"
+            )
+        if spec.get("source_memory_index_available") is not True:
+            violations.append(f"{proposal_id}:source_memory_index_available_not_true")
+        if _summary_int(spec.get("planned_queue_index")) is None:
+            violations.append(f"{proposal_id}:planned_queue_index_invalid")
+        if spec.get("rank_source") != "sequence_policy_consumer":
+            violations.append(f"{proposal_id}:rank_source_mismatch")
+        for field in REQUIRED_MEMORY_TRUST_REVIEW_REQUEST_SPEC_IDENTITY_FIELDS:
+            if not _string(spec.get(field)):
+                violations.append(f"{proposal_id}:{field}_missing")
+        violations.extend(
+            _context_violations(
+                proposal_id,
+                _mapping(spec.get("current_sequence_review_freshness")),
+            )
+        )
+        source_idempotency_key = _string(spec.get("source_idempotency_key"))
+        policy_key = _string(spec.get("policy_key"))
+        if (
+            source_idempotency_key
+            and policy_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(f"{proposal_id}:policy_key_identity_mismatch")
+        for flag in REQUIRED_MEMORY_TRUST_REVIEW_REQUEST_SPEC_FALSE_FLAGS:
+            if spec.get(flag) is not False:
+                violations.append(f"{proposal_id}:{flag}_not_false")
     return tuple(violations)
 
 
@@ -359,6 +496,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     consumer_summary = _mapping(consumer.get("summary"))
     expected_ids = _string_list(consumer_summary.get("memory_index_record_proposal_ids"))
     specs = _record_list(consumer.get("memory_trust_review_request_specs"))
+    memory_trust_review_request_specs_by_proposal_id = {
+        _string(spec.get("proposal_id")): spec
+        for spec in specs
+        if _string(spec.get("proposal_id"))
+    }
     candidates = _record_list(review.get("trust_review_candidates"))
     candidate_violations = tuple(
         violation
@@ -374,6 +516,10 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             (
                 *_consumer_envelope_violations(consumer),
                 *_consumer_summary_violations(consumer_summary, expected_ids=expected_ids),
+                *_memory_trust_review_request_specs_violations(
+                    specs,
+                    expected_ids=expected_ids,
+                ),
                 *(
                     ("sequence_policy_memory_trust_review_result_consumer_index_consumer_status_not_available",)
                     if consumer.get("status") != REQUIRED_INDEX_RESULT_CONSUMER_AVAILABLE_STATUS
@@ -431,6 +577,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         status
         == "sequence_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_request_available"
     )
+    selected_memory_trust_review_request_specs = tuple(
+        memory_trust_review_request_specs_by_proposal_id.get(proposal_id, {})
+        for proposal_id in expected_ids
+        if request_available
+    )
     acceptance_templates = tuple(
         {
             "acceptance_record_template_id": (
@@ -442,6 +593,53 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "learning_scope": candidate.get("learning_scope"),
             "value_type": candidate.get("value_type"),
             "idempotency_key": candidate.get("idempotency_key"),
+            "source_memory_trust_review_request_spec_id": _string(
+                spec.get("memory_trust_review_request_spec_id")
+            ),
+            "source_memory_index_request_spec_id": _string(
+                spec.get("source_memory_index_request_spec_id")
+            ),
+            "source_memory_writer_apply_request_spec_id": _string(
+                spec.get("source_memory_writer_apply_request_spec_id")
+            ),
+            "source_memory_writer_request_spec_id": _string(
+                spec.get("source_memory_writer_request_spec_id")
+            ),
+            "source_memory_draft_request_spec_id": _string(
+                spec.get("source_memory_draft_request_spec_id")
+            ),
+            "source_audit_policy_gate_request_spec_id": _string(
+                spec.get("source_audit_policy_gate_request_spec_id")
+            ),
+            "source_audit_request_spec_id": _string(
+                spec.get("source_audit_request_spec_id")
+            ),
+            "source_executor_request_spec_id": _string(
+                spec.get("source_executor_request_spec_id")
+            ),
+            "source_execution_gate_request_spec_id": _string(
+                spec.get("source_execution_gate_request_spec_id")
+            ),
+            "source_dry_run_request_spec_id": _string(
+                spec.get("source_dry_run_request_spec_id")
+            ),
+            "source_sequence_plan_request_spec_id": _string(
+                spec.get("source_sequence_plan_request_spec_id")
+            ),
+            "source_preflight_request_spec_id": _string(
+                spec.get("source_preflight_request_spec_id")
+            ),
+            "queue_ordering_plan_record_id": spec.get("queue_ordering_plan_record_id"),
+            "consumer_record_id": spec.get("consumer_record_id"),
+            "sequence_policy_gate_record_id": spec.get("sequence_policy_gate_record_id"),
+            "policy_key": spec.get("policy_key"),
+            "source_idempotency_key": spec.get("source_idempotency_key"),
+            "current_sequence_review_freshness": spec.get(
+                "current_sequence_review_freshness"
+            ),
+            "planned_queue_index": spec.get("planned_queue_index"),
+            "rank_source": spec.get("rank_source"),
+            "source_memory_index_available": True,
             "decision_options": ["accepted", "rejected"],
             "operator_must_choose_decision": True,
             "reviewed_by_required": True,
@@ -457,7 +655,10 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "can_import_to_queue": False,
             "can_apply_live": False,
         }
-        for candidate in (candidates if request_available else ())
+        for candidate, spec in zip(
+            candidates if request_available else (),
+            selected_memory_trust_review_request_specs if request_available else (),
+        )
     )
     acceptance_ledger_request: Dict[str, Any] = {
         "handler": "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance",
@@ -488,6 +689,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     }
     if request_available:
         acceptance_ledger_request["memory_trust_review"] = review
+        acceptance_ledger_request["memory_trust_review_request_specs"] = list(
+            selected_memory_trust_review_request_specs
+        )
 
     return {
         "type": (
@@ -530,6 +734,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         "summary": {
             "expected_trust_review_candidate_count": len(expected_ids),
             "trust_review_candidate_count": len(candidates),
+            "memory_trust_review_request_spec_count": len(specs),
             "invalid_record_count": len(invalid_record_ids),
             "memory_trust_review_result_consumer_only": True,
             "acceptance_ledger_request_template_only": True,
@@ -554,6 +759,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "full_autonomous_ready": False,
             "can_apply_live": False,
             "trust_review_candidate_proposal_ids": list(expected_ids),
+            "memory_trust_review_request_spec_proposal_ids": [
+                spec.get("proposal_id") for spec in specs
+            ],
             "invalid_record_ids": list(invalid_record_ids),
             "blocked_by": list(blocked_by),
             "next_global_step": (

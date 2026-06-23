@@ -146,6 +146,36 @@ def _is_utc_timestamp(value: str) -> bool:
     return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return str(payload.get("status") or "missing").strip().lower() or "missing"
+
+
+def _context_violations(payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return ("sequence_memory_trust_promotion_policy_gate_record_context_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(
+            "sequence_memory_trust_promotion_policy_gate_record_context_not_fresh"
+        )
+    if payload.get("read_only") is not True:
+        violations.append(
+            "sequence_memory_trust_promotion_policy_gate_record_context_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"sequence_memory_trust_promotion_policy_gate_record_context_{flag}_not_false"
+            )
+    return tuple(violations)
+
+
 def _target_policy_path(policy_key: str) -> str:
     return f"{TARGET_POLICY_STORE}/{policy_key}/trust_state"
 
@@ -345,6 +375,7 @@ def _verified_record_violations(record: Mapping[str, Any]) -> Tuple[str, ...]:
         violations.append(
             "sequence_memory_trust_promotion_policy_gate_record_policy_evidence_not_true"
         )
+    violations.extend(_context_violations(_mapping(record.get("current_sequence_review_freshness"))))
     for flag in REQUIRED_VERIFIED_RECORD_FALSE_FLAGS:
         if record.get(flag) is not False:
             violations.append(
@@ -391,6 +422,9 @@ def _policy_gate_record(record: Mapping[str, Any]) -> Dict[str, Any]:
         "rollback_target_policy_state": record.get("rollback_target_policy_state"),
         "rollback_strategy": record.get("rollback_strategy"),
         "verification_evidence_status": record.get("verification_evidence_status"),
+        "current_sequence_review_freshness": record.get(
+            "current_sequence_review_freshness"
+        ),
         "rollback_verified": True,
         "sequence_policy_gate_status": (
             "trusted" if eligible else "held_for_operator_review"

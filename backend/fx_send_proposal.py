@@ -17,6 +17,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 FX_METHOD_ID = "fx_send_proposal"
 FX_VERSION = "fx_send_proposal_v1"
@@ -51,6 +56,66 @@ ROLE_TOKENS = (
     ("playback", ("playback", "track", "stem", "loop")),
     ("master", ("master", "main", "reference")),
 )
+
+
+def _ordered_unique(values: Iterable[str]) -> Tuple[str, ...]:
+    ordered = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
+
+
+def _fx_required_safety_checks() -> Dict[str, str]:
+    return {
+        "source_identity": "required_before_live_promotion",
+        "send_level_limit": "required_before_live_promotion",
+        "fx_return_headroom": "required_before_live_promotion",
+        "return_level_safety": "required_before_live_promotion",
+        "feedback_risk": "required_before_live_promotion",
+        "intelligibility_risk": "required_before_live_promotion",
+        "monitor_safety": "required_before_live_promotion",
+        "dry_wet_bounds": "required_before_live_promotion",
+        "fx_parameter_schema": "required_before_live_promotion",
+    }
+
+
+def _fx_rollback_expectation() -> Dict[str, Any]:
+    return {
+        "required_before_live_promotion": True,
+        "restore_previous_send_level_after_physical_readback": True,
+        "restore_previous_fx_return_level_after_physical_readback": True,
+        "restore_previous_fx_slot_parameters_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+
+
+def _fx_future_wing_readback_contract() -> Dict[str, Any]:
+    return {
+        "required": True,
+        "required_before_live_promotion": True,
+        "target_kind": "send_or_fx_parameter",
+        "old_value_source": FX_READ_REQUIRED_SOURCE,
+        "readback_targets": [
+            "send_level",
+            "fx_return_level",
+            "fx_slot_parameters",
+            "monitor_send",
+            "rollback_send_level",
+            "rollback_fx_return_level",
+        ],
+        "blocked_live_actions": [
+            "fx_send_level_write",
+            "fx_parameter_write",
+            "monitor_send_write",
+        ],
+        "requires_real_wing_proof": True,
+        "requires_operator_approval": True,
+        "requires_separate_non_fader_adr": True,
+    }
 
 
 @dataclass(frozen=True)
@@ -201,19 +266,178 @@ class FXSendRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def operator_safety_blockers(self) -> Tuple[str, ...]:
+        return _ordered_unique(
+            (
+                "fx_send_live_apply_quarantined",
+                "unsupported_value_type:fx_send",
+                "not_in_supervised_fader_gain_executor",
+                "real_wing_proof_required_before_live_apply",
+                "non_fader_live_expansion_requires_separate_adr",
+                "operator_approval_required_before_supervised_fx_apply",
+                "hardware_readback_and_rollback_not_proven",
+                *self.blockers,
+            )
+        )
+
+    def fx_send_safety_summary(self) -> Dict[str, Any]:
+        return_level_safety = dict(self.evidence.get("return_level_safety") or {})
+        monitor_safety = dict(self.evidence.get("monitor_safety") or {})
+        parameter_schema = dict(
+            self.evidence.get("current_fx_parameter_schema") or {}
+        )
+        source_identity = dict(
+            self.evidence.get("source_identity_downstream_trust") or {}
+        )
+        return {
+            "status": "passed" if not self.blockers else "blocked",
+            "channel_id": self.channel_id,
+            "source_family": self.source_family,
+            "fx_type": self.fx_type,
+            "bus_name": self.bus_name,
+            "current_send_db": self.current_send_db,
+            "target_send_db": self.target_send_db,
+            "delta_send_db": self.delta_send_db,
+            "return_level_db": self.return_level_db,
+            "return_headroom_db": self.evidence.get("return_headroom_db"),
+            "send_level_limit": self.evidence.get("send_level_limit"),
+            "send_level_limit_status": (
+                dict(self.evidence.get("send_level_limit") or {}).get("status")
+            ),
+            "fx_return_headroom": self.evidence.get("fx_return_headroom"),
+            "fx_return_headroom_status": (
+                dict(self.evidence.get("fx_return_headroom") or {}).get("status")
+            ),
+            "return_level_safety_status": return_level_safety.get("status"),
+            "feedback_risk": self.evidence.get("feedback_risk"),
+            "intelligibility_risk": self.evidence.get("intelligibility_risk"),
+            "monitor_safety_status": monitor_safety.get("status"),
+            "monitor_send_exposure": monitor_safety.get("monitor_send_exposure"),
+            "monitor_safety_risk": monitor_safety.get("monitor_safety_risk"),
+            "dry_wet_bounds": self.evidence.get("dry_wet_bounds"),
+            "dry_wet_bounds_status": (
+                dict(self.evidence.get("dry_wet_bounds") or {}).get("status")
+            ),
+            "post_fader_send_required_before_promotion": self.evidence.get(
+                "post_fader_send_required_before_promotion"
+            ),
+            "current_fx_send_return_cache_freshness_status": self.evidence.get(
+                "current_state_cache_freshness_status"
+            ),
+            "current_fx_send_return_cache_no_live_authority": self.evidence.get(
+                "current_fx_send_return_cache_no_live_authority"
+            ),
+            "current_fx_parameter_schema_status": self.evidence.get(
+                "current_fx_parameter_schema_status"
+            ),
+            "current_fx_parameter_schema_family": parameter_schema.get(
+                "schema_family"
+            ),
+            "expected_fx_schema_family": self.evidence.get(
+                "expected_fx_schema_family"
+            ),
+            "fx_parameter_schema_no_live_authority": self.evidence.get(
+                "fx_parameter_schema_no_live_authority"
+            ),
+            "source_identity_trust_status": source_identity.get("status"),
+            "source_identity_usable_for_downstream": source_identity.get(
+                "usable_for_downstream"
+            ),
+            "rollback_fx_readback": self.evidence.get("rollback_fx_readback"),
+            "required_safety_checks": _fx_required_safety_checks(),
+            "safety_blockers": list(self.operator_safety_blockers()),
+            "operator_explanation": (
+                "FX send evidence is offline-only. Review source identity, "
+                "send bounds, FX return headroom, monitor exposure, feedback "
+                "and intelligibility risk before any future WING promotion."
+            ),
+            "rollback_expectation": _fx_rollback_expectation(),
+            "future_wing_readback_contract": _fx_future_wing_readback_contract(),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
+        fx_send_safety_summary = self.fx_send_safety_summary()
+        blockers = list(self.operator_safety_blockers())
+        proposed_action = {
+            "action_type": self.action_type,
+            "fx_type": self.fx_type,
+            "bus_name": self.bus_name,
+            "current_send_db": self.current_send_db,
+            "target_send_db": self.target_send_db,
+            "delta_send_db": self.delta_send_db,
+            "return_level_db": self.return_level_db,
+            "hpf_hz": self.hpf_hz,
+            "lpf_hz": self.lpf_hz,
+            "predelay_ms": self.predelay_ms,
+            "decay_s": self.decay_s,
+            "delay_ms": self.delay_ms,
+            "ducking_db": self.ducking_db,
+            "send_level_limit": fx_send_safety_summary["send_level_limit"],
+            "fx_return_headroom": fx_send_safety_summary["fx_return_headroom"],
+            "dry_wet_bounds": fx_send_safety_summary["dry_wet_bounds"],
+            "rollback_fx_readback": fx_send_safety_summary["rollback_fx_readback"],
+            "required_safety_checks": fx_send_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": fx_send_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": fx_send_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "fx_send_safety_summary": fx_send_safety_summary,
+        }
         evidence = {
             **self.evidence,
+            "fx_send_safety_summary": fx_send_safety_summary,
+            "current_fx_parameter_schema_hints": self.evidence.get(
+                "current_fx_parameter_schema"
+            ),
+            "required_safety_checks": fx_send_safety_summary[
+                "required_safety_checks"
+            ],
+            "operator_explanation": fx_send_safety_summary[
+                "operator_explanation"
+            ],
+            "rollback_expectation": fx_send_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": fx_send_safety_summary[
+                "future_wing_readback_contract"
+            ],
             "old_value_source": FX_READ_REQUIRED_SOURCE,
             "rollback_value_source": FX_READ_REQUIRED_SOURCE,
             "live_write": False,
             "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
             "readback_required_before_promotion": True,
             "rollback_required_before_promotion": True,
         }
-        return {
+        proposal = {
             "id": self.id,
             "method_id": FX_METHOD_ID,
             "source": FX_METHOD_ID,
@@ -225,29 +449,32 @@ class FXSendRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:fx_send",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "safety_blockers": fx_send_safety_summary["safety_blockers"],
+            "operator_explanation": fx_send_safety_summary[
+                "operator_explanation"
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "fx_type": self.fx_type,
-                "bus_name": self.bus_name,
-                "current_send_db": self.current_send_db,
-                "target_send_db": self.target_send_db,
-                "delta_send_db": self.delta_send_db,
-                "return_level_db": self.return_level_db,
-                "hpf_hz": self.hpf_hz,
-                "lpf_hz": self.lpf_hz,
-                "predelay_ms": self.predelay_ms,
-                "decay_s": self.decay_s,
-                "delay_ms": self.delay_ms,
-                "ducking_db": self.ducking_db,
-            },
+            "required_safety_checks": fx_send_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": fx_send_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": fx_send_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "proposed_action": proposed_action,
+            "fx_send_safety_summary": fx_send_safety_summary,
             "old_value": {
                 "source": FX_READ_REQUIRED_SOURCE,
                 "required_before_apply": True,
@@ -258,6 +485,14 @@ class FXSendRecommendation:
             },
             "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=FX_METHOD_ID,
+            target=self.channel_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _severity(
@@ -567,6 +802,22 @@ def analyze_fx_send_need(
         "max_return_level_db": MAX_RETURN_LEVEL_DB,
         "min_return_headroom_db": MIN_RETURN_HEADROOM_DB,
     }
+    send_level_limit = {
+        "status": "passed" if MIN_SEND_DB <= target <= MAX_SEND_DB else "blocked",
+        "target_send_db": target,
+        "current_send_db": current,
+        "delta_send_db": delta,
+        "min_send_db": MIN_SEND_DB,
+        "max_send_db": MAX_SEND_DB,
+        "post_fader_send_required": True,
+    }
+    fx_return_headroom = {
+        "status": return_level_safety["status"],
+        "return_headroom_db": round(headroom, 2),
+        "target_return_level_db": return_level_safety["target_return_level_db"],
+        "min_return_headroom_db": MIN_RETURN_HEADROOM_DB,
+        "max_return_level_db": MAX_RETURN_LEVEL_DB,
+    }
     monitor_safety = {
         "status": "blocked"
         if "fx_monitor_safety_context_not_fresh" in blockers
@@ -576,6 +827,29 @@ def analyze_fx_send_need(
         "monitor_safety_risk": round(monitor_safety_risk, 3),
         "monitor_safety_freshness_status": monitor_safety_freshness_status,
         "post_fader_send_required": True,
+    }
+    dry_wet_bounds = {
+        "status": "passed"
+        if send_level_limit["status"] == "passed"
+        and return_level_safety["status"] == "passed"
+        and monitor_safety["status"] == "passed"
+        else "blocked",
+        "post_fader_sends_only": True,
+        "target_send_db": target,
+        "target_return_level_db": return_level_safety["target_return_level_db"],
+        "hpf_hz": round(preset.hpf_hz, 1),
+        "lpf_hz": round(preset.lpf_hz, 1),
+        "ducking_db": round(preset.ducking_db if analysis.vocal_priority else 0.0, 1),
+        "fx_mix_percent": 100.0,
+    }
+    rollback_fx_readback = {
+        "status": "required_before_live_promotion",
+        "source": FX_READ_REQUIRED_SOURCE,
+        "required": True,
+        "send_level_readback_required": True,
+        "return_level_readback_required": True,
+        "fx_slot_parameter_readback_required": True,
+        "manual_operator_rollback_required_if_promoted": True,
     }
 
     evidence = {
@@ -594,7 +868,10 @@ def analyze_fx_send_need(
         "monitor_safety_freshness_status": monitor_safety_freshness_status,
         "monitor_safety_freshness": monitor_safety_freshness,
         "monitor_safety": monitor_safety,
+        "send_level_limit": send_level_limit,
+        "fx_return_headroom": fx_return_headroom,
         "return_level_safety": return_level_safety,
+        "dry_wet_bounds": dry_wet_bounds,
         "source_confidence": round(source_confidence, 3),
         "persistence_cycles": persistence,
         "current_send_db": current,
@@ -606,6 +883,7 @@ def analyze_fx_send_need(
         "current_fx_send_return_cache_no_live_authority": current_state_no_authority,
         "current_fx_parameter_schema_status": fx_parameter_schema_status,
         "current_fx_parameter_schema": fx_parameter_schema,
+        "current_fx_parameter_schema_hints": fx_parameter_schema,
         "fx_parameter_schema_no_live_authority": (
             fx_parameter_schema.get("live_write_authority") is False
         ),
@@ -613,6 +891,7 @@ def analyze_fx_send_need(
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "old_value_source": FX_READ_REQUIRED_SOURCE,
         "rollback_value_source": FX_READ_REQUIRED_SOURCE,
+        "rollback_fx_readback": rollback_fx_readback,
         "readback_required_before_promotion": True,
         "rollback_required_before_promotion": True,
         "transport_free": True,

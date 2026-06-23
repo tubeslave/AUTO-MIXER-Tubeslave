@@ -1,6 +1,11 @@
 from pathlib import Path
 
-from auto_eq import AutoEQController, EQBand, MultiChannelAutoEQController
+from auto_eq import (
+    AutoEQController,
+    EQ_READ_REQUIRED_SOURCE,
+    EQBand,
+    MultiChannelAutoEQController,
+)
 
 
 class FakeEQMixer:
@@ -23,6 +28,30 @@ class FakeEQMixer:
 
     def send(self, *args, **kwargs):
         self.calls.append(("send", args, kwargs))
+
+
+def _assert_top_level_denial(result):
+    assert result["can_apply_live"] is False
+    assert result["can_import_to_queue"] is False
+    assert result["queue_import_allowed"] is False
+    assert result["live_apply_allowed"] is False
+    assert result["read_only_or_dry_run_only"] is True
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+    assert result["queue_action"] == "not_queueable_until_promoted"
+    assert result["live_write"] is False
+    assert result["queue_mutation"] is False
+    assert result["mutates_mixer"] is False
+
+
+def _assert_complete_evidence_gate(correction):
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == (
+        "complete"
+    )
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
 
 
 def _corrections():
@@ -48,9 +77,8 @@ def test_auto_eq_apply_to_mixer_is_fail_closed_evidence():
     assert result["reason"] == "auto_eq_direct_apply_quarantined"
     assert result["write_policy"] == "proposal_only_quarantined"
     assert result["live_write_allowed"] is False
-    assert result["can_apply_live"] is False
+    _assert_top_level_denial(result)
     assert result["mixer_client_present"] is True
-    assert result["mutates_mixer"] is False
     assert mixer.calls == []
     assert controller.applied_corrections_history == []
     assert status["last_write_attempted"] is True
@@ -61,6 +89,83 @@ def test_auto_eq_apply_to_mixer_is_fail_closed_evidence():
     assert any(call["cmd"] == "set_eq_low_shelf" for call in result["blocked_calls"])
     assert any(call["cmd"] == "set_eq_band" for call in result["blocked_calls"])
     assert any(call["cmd"] == "set_eq_high_shelf" for call in result["blocked_calls"])
+    correction = result["operator_correction"]
+    assert correction["objective_family"] == "eq"
+    assert correction["future_wing_readback_contract"]["target_kind"] == "channel_eq_band"
+    assert correction["bounded_delta"]["action_type"] == "auto_eq_apply_blocked"
+    assert correction["bounded_delta"]["delta_db"] == -3.0
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    _assert_complete_evidence_gate(correction)
+    assert "hardware_readback_and_rollback_not_proven" in correction["safety_blockers"]
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["old_value_source"] == EQ_READ_REQUIRED_SOURCE
+    assert source_evidence["rollback_value_source"] == EQ_READ_REQUIRED_SOURCE
+    assert source_evidence["frequency_match"]["status"] == (
+        "readback_required_before_live_promotion"
+    )
+    assert source_evidence["cut_or_bounded_boost"]["bounded_preview_only"] is True
+    assert source_evidence["feedback_notch_preserved"] == (
+        "readback_required_before_live_promotion"
+    )
+    assert source_evidence["manual_band_preserved"] == (
+        "readback_required_before_live_promotion"
+    )
+    assert source_evidence["true_peak_headroom"] == "required_before_live_promotion"
+    assert source_evidence["eq_band_readback"] == {
+        "status": "required_before_live_promotion",
+        "readback_targets": [
+            "eq_on",
+            "band_id",
+            "band_frequency",
+            "band_gain",
+            "band_q",
+            "filter_type",
+        ],
+        "blocked_call_count": len(result["blocked_calls"]),
+        "old_value_source": EQ_READ_REQUIRED_SOURCE,
+        "read_only_or_dry_run_only": True,
+        "live_write": False,
+    }
+    assert source_evidence["current_eq_context_cache_freshness"] == {
+        "status": "readback_required_before_live_promotion",
+        "source": EQ_READ_REQUIRED_SOURCE,
+        "read_only": True,
+        "live_write": False,
+        "queries_console": False,
+    }
+    assert source_evidence["current_eq_context_cache_no_live_authority"] is True
+    assert source_evidence["rollback_eq_band_readback"] == {
+        "status": "required_before_live_promotion",
+        "rollback_targets": [
+            "eq_on",
+            "band_id",
+            "band_frequency",
+            "band_gain",
+            "band_q",
+            "filter_type",
+        ],
+        "old_value_source": EQ_READ_REQUIRED_SOURCE,
+        "blocked_call_count": len(result["blocked_calls"]),
+        "read_only_or_dry_run_only": True,
+        "live_write": False,
+    }
+    evidence_checks = correction["headroom_feedback_true_peak_checks"][
+        "evidence_checks"
+    ]
+    for key in (
+        "frequency_match",
+        "cut_or_bounded_boost",
+        "feedback_notch_preserved",
+        "manual_band_preserved",
+        "true_peak_headroom",
+        "eq_band_readback",
+        "current_eq_context_cache_freshness",
+        "current_eq_context_cache_no_live_authority",
+        "rollback_eq_band_readback",
+    ):
+        assert evidence_checks[key] == source_evidence[key]
 
 
 def test_auto_eq_reset_is_fail_closed_and_preserves_corrections():
@@ -75,10 +180,29 @@ def test_auto_eq_reset_is_fail_closed_and_preserves_corrections():
     assert result["blocked"] is True
     assert result["calls"] == []
     assert result["reason"] == "auto_eq_reset_quarantined"
-    assert result["mutates_mixer"] is False
+    _assert_top_level_denial(result)
     assert result["blocked_call_count"] == 7
     assert mixer.calls == []
     assert controller.current_corrections
+    correction = result["operator_correction"]
+    assert correction["objective_family"] == "eq"
+    assert correction["bounded_delta"]["action_type"] == "auto_eq_reset_blocked"
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    _assert_complete_evidence_gate(correction)
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["blocked_call_count"] == result["blocked_call_count"]
+    assert source_evidence["feedback_notch_preserved"] == (
+        "readback_required_before_live_promotion"
+    )
+    assert source_evidence["manual_band_preserved"] == (
+        "readback_required_before_live_promotion"
+    )
+    assert source_evidence["current_eq_context_cache_no_live_authority"] is True
+    assert source_evidence["rollback_eq_band_readback"]["status"] == (
+        "required_before_live_promotion"
+    )
     assert {
         "cmd": "send",
         "path": "/ch/4/eq/2g",
@@ -108,10 +232,26 @@ def test_multi_channel_auto_eq_apply_is_fail_closed_evidence():
     assert result["applied"] is False
     assert result["blocked"] is True
     assert result["reason"] == "auto_eq_direct_apply_quarantined"
-    assert result["mutates_mixer"] is False
+    _assert_top_level_denial(result)
     assert mixer.calls == []
     assert status["last_write_attempted"] is True
     assert status["last_blocked_call_count"] == len(result["blocked_calls"])
+    correction = result["operator_correction"]
+    assert correction["objective_family"] == "eq"
+    assert correction["bounded_delta"]["action_type"] == "auto_eq_apply_blocked"
+    assert correction["bounded_delta"]["target"] == 7
+    assert correction["live_apply_allowed"] is False
+    _assert_complete_evidence_gate(correction)
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["blocked_call_count"] == result["blocked_call_count"]
+    assert source_evidence["frequency_match"]["eq_command_count"] == len(
+        result["blocked_calls"]
+    )
+    assert source_evidence["current_eq_context_cache_no_live_authority"] is True
+    assert source_evidence["rollback_eq_band_readback"]["blocked_call_count"] == len(
+        result["blocked_calls"]
+    )
 
 
 def test_auto_eq_module_has_no_direct_mixer_eq_writes():

@@ -181,6 +181,36 @@ def _is_utc_timestamp(value: str) -> bool:
     return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return str(payload.get("status") or "missing").strip().lower() or "missing"
+
+
+def _context_violations(payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return ("sequence_memory_trust_promotion_rollback_verification_record_context_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(
+            "sequence_memory_trust_promotion_rollback_verification_record_context_not_fresh"
+        )
+    if payload.get("read_only") is not True:
+        violations.append(
+            "sequence_memory_trust_promotion_rollback_verification_record_context_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"sequence_memory_trust_promotion_rollback_verification_record_context_{flag}_not_false"
+            )
+    return tuple(violations)
+
+
 def _record_id(record: Mapping[str, Any], index: int) -> str:
     explicit = _string(record.get("promotion_apply_audit_id"))
     if explicit:
@@ -476,6 +506,7 @@ def _verification_record_violations(
         violations.append(
             "sequence_memory_trust_promotion_rollback_verification_record_separate_policy_gate_not_true"
         )
+    violations.extend(_context_violations(_mapping(record.get("current_sequence_review_freshness"))))
     for flag in REQUIRED_VERIFICATION_FALSE_FLAGS:
         if record.get(flag) is not False:
             violations.append(
@@ -535,6 +566,9 @@ def _verified_record(record: Mapping[str, Any]) -> Dict[str, Any]:
         "rollback_target_policy_state": record.get("rollback_target_policy_state"),
         "rollback_strategy": record.get("rollback_strategy"),
         "verification_evidence_status": record.get("verification_evidence_status"),
+        "current_sequence_review_freshness": record.get(
+            "current_sequence_review_freshness"
+        ),
         "decision": "verified",
         "verified_by": record.get("verified_by"),
         "verified_at": record.get("verified_at"),

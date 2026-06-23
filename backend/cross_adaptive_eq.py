@@ -29,8 +29,10 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 try:
     from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+    from processing_proposal_adapters import build_operator_correction_payload
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
+    from backend.processing_proposal_adapters import build_operator_correction_payload
 
 
 METHOD_ID = "cross_adaptive_eq"
@@ -61,6 +63,22 @@ SOURCE_ROLE_PRIORITY_HINTS = {
     "fx_return": 5,
 }
 NON_PROCESSING_ARRANGEMENT_ROLES = {"reference", "utility", "talkback"}
+
+
+def _proposal_denial_fields() -> Dict[str, Any]:
+    return {
+        "queue_action": "not_queueable_until_promoted",
+        "can_import_to_queue": False,
+        "can_apply_live": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "live_write": False,
+        "queue_mutation": False,
+        "mutates_mixer": False,
+    }
 
 
 @dataclass
@@ -504,7 +522,7 @@ class CrossAdaptiveEQ:
             "method_id": METHOD_ID,
             "proposal_only": True,
             "live_write_allowed": False,
-            "can_import_to_queue": False,
+            **_proposal_denial_fields(),
             "current_state_cache_freshness_status": freshness_status,
             "current_state_cache_freshness": current_state_freshness,
             "current_masking_context_cache_no_live_authority": current_state_no_authority,
@@ -698,7 +716,77 @@ class CrossAdaptiveEQ:
             "masked_channel": dict(masked_arrangement) if masked_arrangement else None,
             "masker_channel": dict(masker_arrangement) if masker_arrangement else None,
         }
-        return {
+        safety_summary = {
+            "summary_type": "cross_adaptive_eq_unmasking_review",
+            "status": "passed" if bounded else "blocked",
+            "channel_id": int(adjustment.channel_id),
+            "paired_channel_id": adjustment.paired_channel_id,
+            "role": adjustment.role,
+            "band": adjustment.band,
+            "frequency_hz": round(float(adjustment.frequency_hz), 3),
+            "gain_db": round(gain_db, 3),
+            "q_factor": round(float(adjustment.q_factor), 3),
+            "bounded_gain_delta": bounded,
+            "gain_limit_db": round(float(gain_limit), 3),
+            "masking_pair": {
+                "masked_channel_id": adjustment.masked_channel_id,
+                "masker_channel_id": adjustment.masker_channel_id,
+            },
+            "linked_cut_boost_pair": adjustment.paired_channel_id is not None,
+            "current_masking_context_cache_freshness": freshness_status,
+            "current_masking_context_cache_no_live_authority": current_state_no_authority,
+            "current_arrangement_context_cache_freshness": (
+                arrangement_freshness_status
+            ),
+            "current_arrangement_context_cache_no_live_authority": (
+                arrangement_no_authority
+            ),
+            "source_identity_downstream_trust": source_identity_trust,
+            "arrangement_priority_context": arrangement_priority_context,
+            "manual_eq_band_review": "required_before_apply",
+            "phase_risk_review": "required_before_apply",
+            "feedback_safety": "required_before_apply",
+            "true_peak_headroom": "required_before_apply",
+            "sum_bus_check": "required_before_apply",
+            "eq_band_readback": "required_before_apply",
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "operator_review_required": True,
+            **_proposal_denial_fields(),
+            "can_authorize_live": False,
+        }
+        safety_evidence = {
+            "masking_pair": True,
+            "linked_cut_boost_pair": adjustment.paired_channel_id is not None,
+            "frequency_match": True,
+            "bounded_gain_delta": bounded,
+            "current_masking_context_cache_freshness": freshness_status,
+            "current_masking_context_cache_no_live_authority": current_state_no_authority,
+            "current_arrangement_context_cache_freshness": (
+                arrangement_freshness_status
+            ),
+            "current_arrangement_context_cache_no_live_authority": (
+                arrangement_no_authority
+            ),
+            "source_identity_downstream_trust": source_identity_trust,
+            "arrangement_priority_context": arrangement_priority_context,
+            "cross_adaptive_eq_safety_summary": safety_summary,
+            "sum_bus_check": "required_before_apply",
+            "eq_band_readback": "required_before_apply",
+            "rollback_eq_band_readback": {
+                "channel_id": int(adjustment.channel_id),
+                "paired_channel_id": adjustment.paired_channel_id,
+                "band": adjustment.band,
+                "frequency_hz": round(float(adjustment.frequency_hz), 3),
+                "gain_db": round(gain_db, 3),
+                "q_factor": round(float(adjustment.q_factor), 3),
+                "source": READ_REQUIRED_SOURCE,
+                "required_before_live_promotion": True,
+                "live_write": False,
+            },
+            **_proposal_denial_fields(),
+        }
+        action = {
             "action_type": "cross_channel_unmasking_eq_candidate",
             "method_id": METHOD_ID,
             "value_type": "eq",
@@ -727,27 +815,49 @@ class CrossAdaptiveEQ:
                 "source": READ_REQUIRED_SOURCE,
                 "required_before_apply": True,
             },
-            "safety_evidence": {
-                "masking_pair": True,
-                "linked_cut_boost_pair": adjustment.paired_channel_id is not None,
-                "frequency_match": True,
-                "bounded_gain_delta": bounded,
-                "current_masking_context_cache_freshness": freshness_status,
-                "current_masking_context_cache_no_live_authority": current_state_no_authority,
-                "current_arrangement_context_cache_freshness": (
-                    arrangement_freshness_status
-                ),
-                "current_arrangement_context_cache_no_live_authority": (
-                    arrangement_no_authority
-                ),
-                "source_identity_downstream_trust": source_identity_trust,
-                "arrangement_priority_context": arrangement_priority_context,
-                "sum_bus_check": "required_before_apply",
-                "eq_band_readback": "required_before_apply",
-            },
+            "safety_evidence": safety_evidence,
+            "cross_adaptive_eq_safety_summary": safety_summary,
             "required_approval": "operator_supervised",
             "readback_required": True,
             "rollback_required": True,
             "live_write_allowed": False,
-            "can_import_to_queue": False,
+            **_proposal_denial_fields(),
         }
+        action_for_contract = dict(action)
+        proposal = {
+            "id": (
+                f"{METHOD_ID}:{adjustment.channel_id}:"
+                f"{adjustment.band}:{adjustment.role}"
+            ),
+            "method_id": METHOD_ID,
+            "source": METHOD_ID,
+            "title": f"Ch {adjustment.channel_id}: linked masking EQ proposal",
+            "reason": (
+                "Cross-channel masking evidence suggests a bounded linked EQ "
+                "move; physical EQ-band readback and rollback proof are required "
+                "before any live promotion."
+            ),
+            "target": int(adjustment.channel_id),
+            "kind": "eq",
+            "severity": "medium" if gain_db > 0.0 else "low",
+            "confidence": round(
+                max(0.0, min(1.0, float(adjustment.overlap_strength))),
+                3,
+            ),
+            **_proposal_denial_fields(),
+            "blockers": [
+                "unsupported_value_type:eq",
+                "not_in_supervised_fader_gain_executor",
+                "hardware_readback_and_rollback_not_proven",
+            ],
+            "proposed_action": action_for_contract,
+            "evidence": safety_evidence,
+        }
+        action["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=METHOD_ID,
+            target=int(adjustment.channel_id),
+            proposed_action=action_for_contract,
+            blockers=proposal["blockers"],
+        )
+        return action

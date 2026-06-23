@@ -12,6 +12,11 @@ from datetime import datetime, timezone
 import math
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Tuple
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 SOURCE_IDENTITY_METHOD_ID = "source_identity_confidence_proposal"
 SOURCE_IDENTITY_VERSION = "source_identity_confidence_proposal_v1"
@@ -250,7 +255,18 @@ class SourceIdentityRecommendation:
             *self.review_reasons,
             *self.downstream_rejection_reasons,
         ]
-        return {
+        proposed_action = {
+            "action_type": self.action_type,
+            "source_id": self.source_id,
+            "channel_id": self.channel_id,
+            "channel_label": self.channel_label,
+            "proposed_source_type": self.proposed_source_type,
+            "classifier_confidence": self.confidence,
+            "review_reasons": list(self.review_reasons),
+            "downstream_priority_multiplier": self.downstream_priority_multiplier,
+            "downstream_rejection_reasons": list(self.downstream_rejection_reasons),
+        }
+        proposal = {
             "id": self.id,
             "method_id": SOURCE_IDENTITY_METHOD_ID,
             "source": SOURCE_IDENTITY_METHOD_ID,
@@ -265,17 +281,7 @@ class SourceIdentityRecommendation:
             "can_import_to_queue": False,
             "can_apply_live": False,
             "blockers": sorted(set(blockers)),
-            "proposed_action": {
-                "action_type": self.action_type,
-                "source_id": self.source_id,
-                "channel_id": self.channel_id,
-                "channel_label": self.channel_label,
-                "proposed_source_type": self.proposed_source_type,
-                "classifier_confidence": self.confidence,
-                "review_reasons": list(self.review_reasons),
-                "downstream_priority_multiplier": self.downstream_priority_multiplier,
-                "downstream_rejection_reasons": list(self.downstream_rejection_reasons),
-            },
+            "proposed_action": proposed_action,
             "evidence": {
                 **self.evidence,
                 "live_write": False,
@@ -285,6 +291,14 @@ class SourceIdentityRecommendation:
                 "rollback_required_before_promotion": False,
             },
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=SOURCE_IDENTITY_METHOD_ID,
+            target=self.source_id,
+            proposed_action=proposed_action,
+            blockers=proposal["blockers"],
+        )
+        return proposal
 
 
 @dataclass(frozen=True)
@@ -434,8 +448,18 @@ def _recommendation_for_observation(
         "signal_present": bool(observation.signal_present),
         "activity_confidence": round(_clip01(observation.activity_confidence), 3),
         "operator_label_confirmed": bool(observation.operator_label_confirmed),
+        "operator_acceptance": {
+            "operator_label_confirmed": bool(observation.operator_label_confirmed),
+            "operator_review_required": True,
+            "required_before_downstream_processing": True,
+        },
         "downstream_target_families": list(observation.downstream_target_families),
         "downstream_rejection_reasons": list(downstream_reasons),
+        "replay_outcome": {
+            "available": False,
+            "required_before_downstream_trust_promotion": True,
+            "source_identity_replay_calibration_required": True,
+        },
         "current_source_identity_context_cache_freshness": current_state_freshness.get("status"),
         "current_source_identity_context_cache_no_live_authority": current_state_no_authority,
         "current_state_cache_freshness": current_state_freshness,

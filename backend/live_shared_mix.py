@@ -24,12 +24,44 @@ from autofoh_safety import ChannelEQMove, ChannelFaderMove, HighPassAdjust, Mast
 try:
     from cross_adaptive_eq import CrossAdaptiveEQ
 except Exception:
-    CrossAdaptiveEQ = None
+    try:
+        from backend.cross_adaptive_eq import CrossAdaptiveEQ
+    except Exception:
+        CrossAdaptiveEQ = None
+
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except Exception:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
 
 
 ANALYSIS_WINDOW_SEC = 8.0
 COMPENSATION_DB_PER_OCTAVE = 4.5
 EPS = 1e-12
+METHOD_ID = "live_shared_mix"
+READ_REQUIRED_FADER_SOURCE = (
+    "cached_or_physical_channel_fader_and_stem_sum_read_required_before_promotion"
+)
+READ_REQUIRED_EQ_SOURCE = "cached_or_physical_eq_band_read_required_before_promotion"
+READ_REQUIRED_HPF_SOURCE = "cached_or_physical_hpf_read_required_before_promotion"
+READ_REQUIRED_MAIN_SOURCE = "cached_or_physical_main_fader_read_required_before_promotion"
+
+
+def _proposal_denial_fields() -> Dict[str, Any]:
+    return {
+        "queue_action": "not_queueable_until_promoted",
+        "can_import_to_queue": False,
+        "can_apply_live": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "live_write": False,
+        "queue_mutation": False,
+        "mutates_mixer": False,
+    }
+
 
 BAND_SPECS: Dict[str, Tuple[float, float]] = {
     "50_100": (50.0, 100.0),
@@ -121,6 +153,137 @@ class LiveSharedMixChannel:
 class LiveSharedMixPlan:
     actions: List[Any] = field(default_factory=list)
     report: Dict[str, Any] = field(default_factory=dict)
+
+
+def _ayaic_target_plane_for_role(role: str) -> Optional[float]:
+    normalized = str(role or "").strip().lower()
+    if normalized == "lead_vocal":
+        return -22.0
+    if normalized in {"kick", "bass", "snare", "toms", "guitars"}:
+        return -25.0
+    if normalized == "bgv":
+        return -27.0
+    if normalized in {"playback", "overheads_room", "hi_hat", "ride"}:
+        return -30.0
+    if normalized == "fx_return":
+        return -35.0
+    return None
+
+
+def _live_shared_mix_safety_summary(
+    *,
+    value_type: str,
+    target_kind: str,
+    proposed_action: Dict[str, Any],
+    evidence: Dict[str, Any],
+    confidence: float,
+    severity: str,
+) -> Dict[str, Any]:
+    return {
+        "summary_type": "live_shared_mix_review",
+        "status": "proposal_only",
+        "value_type": value_type,
+        "target_kind": target_kind,
+        "target": (
+            proposed_action.get("target")
+            or proposed_action.get("channel_id")
+            or proposed_action.get("main_id")
+        ),
+        "action_type": proposed_action.get("action_type"),
+        "confidence": round(max(0.0, min(1.0, float(confidence))), 3),
+        "severity": severity,
+        "delta_db": proposed_action.get("delta_db"),
+        "ayaic_level_plane": evidence.get("ayaic_level_plane"),
+        "fader_ceiling": evidence.get("fader_ceiling"),
+        "bounded_fader_delta": evidence.get("bounded_fader_delta"),
+        "bounded_gain_delta": evidence.get("bounded_gain_delta"),
+        "true_peak_headroom": evidence.get("true_peak_headroom"),
+        "feedback_risk": evidence.get("feedback_risk"),
+        "feedback_safety": evidence.get("feedback_safety"),
+        "readback_required_before_promotion": True,
+        "rollback_required_before_promotion": True,
+        "operator_review_required": True,
+        **_proposal_denial_fields(),
+        "can_authorize_live": False,
+    }
+
+
+def _apply_top_level_authority_denial(action: Any) -> Any:
+    action.can_apply_live = False
+    action.can_import_to_queue = False
+    action.queue_import_allowed = False
+    action.live_apply_allowed = False
+    action.read_only_or_dry_run_only = True
+    action.live_authority_granted = False
+    action.readiness_closure_allowed = False
+    action.queue_action = "not_queueable_until_promoted"
+    action.live_write = False
+    action.queue_mutation = False
+    action.mutates_mixer = False
+    return action
+
+
+def _attach_operator_correction(
+    action: Any,
+    *,
+    value_type: str,
+    target_kind: str,
+    old_value_source: str,
+    proposed_action: Dict[str, Any],
+    evidence: Dict[str, Any],
+    blockers: List[str],
+    confidence: float,
+    severity: str,
+    title: str,
+    reason: str,
+) -> Any:
+    safety_summary = _live_shared_mix_safety_summary(
+        value_type=value_type,
+        target_kind=target_kind,
+        proposed_action=proposed_action,
+        evidence=evidence,
+        confidence=confidence,
+        severity=severity,
+    )
+    proposed_action = {
+        **proposed_action,
+        "live_shared_mix_safety_summary": safety_summary,
+    }
+    evidence = {
+        **evidence,
+        "live_shared_mix_safety_summary": safety_summary,
+        **_proposal_denial_fields(),
+    }
+    proposal = {
+        "id": f"{METHOD_ID}:{action.action_type}:{proposed_action.get('target') or proposed_action.get('channel_id') or proposed_action.get('main_id')}",
+        "method_id": METHOD_ID,
+        "source": METHOD_ID,
+        "title": title,
+        "reason": reason,
+        "target": (
+            proposed_action.get("target")
+            or proposed_action.get("channel_id")
+            or proposed_action.get("main_id")
+        ),
+        "kind": value_type,
+        "severity": severity,
+        "confidence": round(max(0.0, min(1.0, float(confidence))), 3),
+        **_proposal_denial_fields(),
+        "blockers": blockers,
+        "proposed_action": proposed_action,
+        "evidence": evidence,
+    }
+    action.operator_correction = build_operator_correction_payload(
+        proposal=proposal,
+        method_id=METHOD_ID,
+        target=proposal["target"],
+        proposed_action=proposed_action,
+        blockers=blockers,
+        value_type=value_type,
+        target_kind=target_kind,
+        old_value_source=old_value_source,
+    )
+    return _apply_top_level_authority_denial(action)
 
 
 def _amp_to_db(value: float) -> float:
@@ -356,6 +519,49 @@ def _append_eq_delta(
         q=float(q),
         reason=reason,
     )
+    _attach_operator_correction(
+        action,
+        value_type="eq",
+        target_kind="channel_eq_band",
+        old_value_source=READ_REQUIRED_EQ_SOURCE,
+        proposed_action={
+            "action_type": action.action_type,
+            "channel_id": channel.channel_id,
+            "channel": channel.channel_id,
+            "band": band,
+            "filter_type": "bell",
+            "frequency_hz": round(float(freq_hz), 3),
+            "current_value": {"band_gain_db": round(current, 2)},
+            "proposed_value": {
+                "band_gain_db": target,
+                "frequency_hz": round(float(freq_hz), 3),
+                "q": round(float(q), 3),
+            },
+            "delta_db": round(delta, 2),
+            "gain_db": target,
+            "q": round(float(q), 3),
+        },
+        evidence={
+            "source_or_stem_contributor": channel.role,
+            "frequency_match": True,
+            "bounded_gain_delta": abs(delta) <= 1.0,
+            "feedback_safety": "required_before_apply",
+            "true_peak_headroom": "required_before_apply",
+            "eq_band_readback": "required_before_apply",
+            "rollback_eq_band_readback": "required_before_apply",
+            "live_write": False,
+            "queue_mutation": False,
+        },
+        blockers=[
+            "unsupported_value_type:eq",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+        ],
+        confidence=0.74,
+        severity="medium" if delta > 0.0 else "low",
+        title=f"{channel.name}: shared-mix EQ proposal",
+        reason=reason,
+    )
     actions.append(action)
     decisions.append(_decision(channel, "eq", reason, target_db=target, freq_hz=freq_hz, q=q))
 
@@ -374,18 +580,60 @@ def _append_fader_delta(
     delta = float(np.clip(delta_db, -1.0, 1.0))
     if abs(delta) < config.min_action_db:
         return
-    target = max(-144.0, min(0.0, channel.fader_db + delta))
-    if abs(target - channel.fader_db) < config.min_action_db:
+    current = float(channel.fader_db)
+    target = max(-144.0, min(0.0, current + delta))
+    actual_delta = target - current
+    if abs(actual_delta) < config.min_action_db:
         return
     channel.fader_db = target
     action = ChannelFaderMove(
         channel_id=channel.channel_id,
         target_db=round(target, 2),
+        delta_db=round(actual_delta, 2),
         is_lead=channel.role == "lead_vocal",
         reason=reason,
     )
+    target_plane = _ayaic_target_plane_for_role(channel.role)
+    _attach_operator_correction(
+        action,
+        value_type="fader_balance",
+        target_kind="shared_mix_channel_or_stem_balance",
+        old_value_source=READ_REQUIRED_FADER_SOURCE,
+        proposed_action={
+            "action_type": action.action_type,
+            "channel_id": channel.channel_id,
+            "channel": channel.channel_id,
+            "current_fader_db": round(current, 2),
+            "target_fader_db": round(target, 2),
+            "delta_db": round(actual_delta, 2),
+            "target_plane_lufs": target_plane,
+        },
+        evidence={
+            "source_or_stem_contributor": channel.role,
+            "ayaic_level_plane": {
+                "target_lufs": target_plane,
+                "source": "Ayaic Mix Monolith default source/stem plane",
+            },
+            "bounded_fader_delta": abs(actual_delta) <= 1.0,
+            "fader_ceiling": "target_clamped_at_0_dbfs",
+            "true_peak_headroom": "required_before_apply",
+            "feedback_risk": "required_before_apply",
+            "rollback_fader_readback": "required_before_apply",
+            "live_write": False,
+            "queue_mutation": False,
+        },
+        blockers=[
+            "unsupported_value_type:fader_balance",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+        ],
+        confidence=0.76,
+        severity="medium",
+        title=f"{channel.name}: shared-mix fader proposal",
+        reason=reason,
+    )
     actions.append(action)
-    decisions.append(_decision(channel, "fader", reason, target_db=target, delta_db=delta))
+    decisions.append(_decision(channel, "fader", reason, target_db=target, delta_db=actual_delta))
 
 
 def _append_hpf_if_higher(
@@ -405,6 +653,40 @@ def _append_hpf_if_higher(
         channel_id=channel.channel_id,
         freq_hz=float(freq_hz),
         enabled=True,
+        reason=reason,
+    )
+    _attach_operator_correction(
+        action,
+        value_type="eq",
+        target_kind="channel_hpf",
+        old_value_source=READ_REQUIRED_HPF_SOURCE,
+        proposed_action={
+            "action_type": action.action_type,
+            "channel_id": channel.channel_id,
+            "channel": channel.channel_id,
+            "filter_type": "high_pass",
+            "current_value": {"hpf_hz": round(float(channel.current_hpf_hz), 2)},
+            "proposed_value": {"hpf_hz": round(float(freq_hz), 2), "enabled": True},
+            "hpf_hz": round(float(freq_hz), 2),
+        },
+        evidence={
+            "source_or_stem_contributor": channel.role,
+            "frequency_match": True,
+            "feedback_safety": "required_before_apply",
+            "true_peak_headroom": "required_before_apply",
+            "eq_band_readback": "required_before_apply",
+            "rollback_eq_band_readback": "required_before_apply",
+            "live_write": False,
+            "queue_mutation": False,
+        },
+        blockers=[
+            "unsupported_value_type:eq",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+        ],
+        confidence=0.72,
+        severity="low",
+        title=f"{channel.name}: shared-mix HPF proposal",
         reason=reason,
     )
     channel.current_hpf_hz = float(freq_hz)
@@ -794,13 +1076,45 @@ def _append_master_action(
         return
     cut = min(float(config.master_max_cut_db), excess)
     target = min(0.0, float(master_current_fader_db) - cut)
-    actions.append(
-        MasterFaderMove(
-            main_id=1,
-            target_db=round(target, 2),
-            reason="Master reference peak exceeds live ceiling; reduce Main 1 only",
-        )
+    action = MasterFaderMove(
+        main_id=1,
+        target_db=round(target, 2),
+        reason="Master reference peak exceeds live ceiling; reduce Main 1 only",
     )
+    _attach_operator_correction(
+        action,
+        value_type="master_bus",
+        target_kind="main_bus_fader",
+        old_value_source=READ_REQUIRED_MAIN_SOURCE,
+        proposed_action={
+            "action_type": action.action_type,
+            "main_id": 1,
+            "target": "main_1",
+            "current_fader_db": round(float(master_current_fader_db), 2),
+            "target_fader_db": round(float(target), 2),
+            "delta_db": round(float(target - float(master_current_fader_db)), 2),
+            "suggested_trim_db": round(-float(cut), 2),
+            "max_true_peak_dbfs": round(float(peak_db), 2),
+        },
+        evidence={
+            "true_peak_headroom": round(float(config.master_peak_ceiling_db - peak_db), 2),
+            "pa_feed_safe_for_master_change": "requires_operator_confirmation",
+            "pa_feed_cache_no_live_authority": True,
+            "is_reference_feed": False,
+            "live_write": False,
+            "queue_mutation": False,
+        },
+        blockers=[
+            "unsupported_value_type:master_bus",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+        ],
+        confidence=0.82,
+        severity="high",
+        title="Main 1: shared-mix master fader proposal",
+        reason=action.reason,
+    )
+    actions.append(action)
     report["master"].update({
         "action": "master_fader_cut",
         "current_fader_db": round(float(master_current_fader_db), 2),

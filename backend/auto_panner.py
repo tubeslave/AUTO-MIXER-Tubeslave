@@ -33,7 +33,15 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 logger = logging.getLogger(__name__)
+
+AUTO_PANNER_METHOD_ID = "auto_panner"
+PAN_READ_REQUIRED_SOURCE = "cached_or_physical_pan_read_required_before_promotion"
 
 # Maximum panning (0-100 scale).  No hard panning per [49].
 MAX_PAN_PERCENT = 80.0
@@ -92,6 +100,7 @@ class AutoPanner:
         self.band_accumulator: Dict[int, Dict[str, int]] = {}
         self.live_write_allowed = False
         self.write_policy = "proposal_only_quarantined"
+        self.last_apply_result: Dict[str, Any] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -254,18 +263,161 @@ class AutoPanner:
             reason = "pan_direct_apply_quarantined"
         else:
             reason = "no_mixer_client"
-        return {
+        pan_values = [call["pan_percent"] for call in blocked_calls]
+        max_abs_pan = max((abs(float(value)) for value in pan_values), default=0.0)
+        has_non_center_pan = any(abs(float(value)) > 0.0 for value in pan_values)
+        stereo_pair = {
+            "status": "not_verified_in_legacy_auto_panner_apply_path",
+            "source": "legacy_auto_panner_plan_blocked_calls",
+            "channel_count": len(blocked_calls),
+            "stereo_pair_link_readback_required_before_live_promotion": True,
+            "proposes_stereo_pair_link_write": False,
+        }
+        operator_context = {
+            "status": "operator_review_required_before_live_promotion",
+            "source": "legacy_auto_panner_plan_blocked_calls",
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "requires_real_wing_proof": True,
+            "requires_operator_approval": True,
+        }
+        mono_compatibility = {
+            "status": "readback_required_before_live_promotion"
+            if has_non_center_pan
+            else "not_required_for_center_only_plan",
+            "source": "legacy_auto_panner_plan_blocked_calls",
+            "max_abs_pan_percent": round(max_abs_pan, 1),
+            "mono_phase_check_required_before_live_promotion": has_non_center_pan,
+        }
+        bounded_pan_delta = {
+            "status": "passed",
+            "max_abs_pan_percent": round(max_abs_pan, 1),
+            "max_allowed_abs_pan_percent": self.max_pan,
+            "transition_ms": self.transition_ms,
+            "source": "legacy_auto_panner_plan_blocked_calls",
+        }
+        rollback_pan_readback = {
+            "status": "required_before_live_promotion",
+            "source": PAN_READ_REQUIRED_SOURCE,
+            "required": True,
+            "channel_pan_readback_required": True,
+            "stereo_pair_link_readback_required": True,
+            "manual_operator_rollback_required_if_promoted": True,
+        }
+        blockers = [
+            "unsupported_value_type:pan",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            "pan_readback_not_proven",
+            "mono_phase_check_not_proven",
+            "source_identity_not_verified",
+            reason,
+        ]
+        if not blocked_calls:
+            blockers.append("missing_pan_decisions")
+        proposed_action = {
+            "action_type": "auto_panner_apply_blocked",
+            "pan_percent": round(max_abs_pan, 1),
+            "delta_pan_percent": round(max_abs_pan, 1),
+            "blocked_write_count": len(blocked_calls),
+            "pan_decisions": blocked_calls,
+            "bounded_pan_delta": bounded_pan_delta,
+            "stereo_pair": stereo_pair,
+            "mono_compatibility": mono_compatibility,
+            "operator_context": operator_context,
+            "rollback_pan_readback": rollback_pan_readback,
+        }
+        result = {
             "applied": False,
             "blocked": bool(blocked_calls),
             "calls": [],
             "blocked_calls": blocked_calls,
+            "blocked_call_count": len(blocked_calls),
             "reason": reason,
             "write_policy": self.write_policy,
             "live_write_allowed": self.live_write_allowed,
+            "live_write": False,
+            "queue_mutation": False,
             "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
             "mixer_client_present": mixer_client is not None,
             "mutates_mixer": False,
         }
+        proposal = {
+            "id": f"{AUTO_PANNER_METHOD_ID}:plan:{reason}",
+            "method_id": AUTO_PANNER_METHOD_ID,
+            "source": AUTO_PANNER_METHOD_ID,
+            "title": "AutoPanner blocked apply evidence",
+            "reason": (
+                "AutoPanner generated blocked pan write evidence. It is "
+                "operator review only until current-pan readback, mono/phase "
+                "safety, source identity and rollback proof exist."
+            ),
+            "target": "pan_plan",
+            "kind": "pan",
+            "severity": "medium" if blocked_calls else "low",
+            "confidence": 0.4,
+            "queue_action": result["queue_action"],
+            "live_write": False,
+            "queue_mutation": False,
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "evidence": {
+                "blocked_calls": blocked_calls,
+                "blocked_call_count": len(blocked_calls),
+                "write_policy": self.write_policy,
+                "old_value_source": PAN_READ_REQUIRED_SOURCE,
+                "rollback_value_source": PAN_READ_REQUIRED_SOURCE,
+                "live_write": False,
+                "queue_mutation": False,
+                "can_apply_live": False,
+                "can_import_to_queue": False,
+                "queue_import_allowed": False,
+                "live_apply_allowed": False,
+                "read_only_or_dry_run_only": True,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+                "queue_action": "not_queueable_until_promoted",
+                "mutates_mixer": False,
+                "readback_required_before_promotion": True,
+                "rollback_required_before_promotion": True,
+                "current_pan_cache_freshness": "not_provided",
+                "current_pan_cache_no_live_authority": True,
+                "mono_phase_check_no_live_authority": True,
+                "stereo_pair": stereo_pair,
+                "operator_context": operator_context,
+                "bounded_pan_delta": bounded_pan_delta,
+                "rollback_pan_readback": rollback_pan_readback,
+                "mono_compatibility": mono_compatibility,
+                "mono_compatibility_risk": "not_measured_in_legacy_auto_panner_apply_path",
+                "mono_phase_safety": {
+                    "status": "readback_required_before_live_promotion",
+                    "reason": "legacy_auto_panner_apply_has_no_mono_phase_measurement",
+                },
+                "source_identity_downstream_trust": {
+                    "status": "legacy_unverified",
+                    "trusted_for_downstream": False,
+                },
+            },
+        }
+        result["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=AUTO_PANNER_METHOD_ID,
+            target="pan_plan",
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        self.last_apply_result = result
+        return result
 
     def _build_apply_calls(
         self,

@@ -74,6 +74,32 @@ REQUIRED_RESULT_FALSE_FLAGS = (
     "idempotency_reserved",
     "manual_console_write_called",
 )
+REQUIRED_PREFLIGHT_SPEC_FALSE_FLAGS = (
+    "live_write",
+    "apply_attempted",
+    "queue_mutation",
+    "proposal_status_mutation",
+    "idempotency_reserved",
+    "manual_console_write_called",
+    "sequence_plan_created",
+    "sequence_execution_allowed_by_preflight_plan",
+    "live_authority_granted",
+    "full_autonomous_ready",
+    "can_apply_live",
+)
+REQUIRED_PREFLIGHT_SPEC_TRUE_FLAGS = (
+    "operator_approval_required_for_preflight_ready",
+    "sequence_consumer_required_before_execution",
+    "batch_preflight_only",
+    "read_only",
+)
+REQUIRED_PREFLIGHT_SPEC_IDENTITY_FIELDS = (
+    "queue_ordering_plan_record_id",
+    "consumer_record_id",
+    "sequence_policy_gate_record_id",
+    "policy_key",
+    "source_idempotency_key",
+)
 
 
 def _utc_now() -> str:
@@ -104,6 +130,34 @@ def _summary_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
+
+
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(proposal_id: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{proposal_id}:current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{proposal_id}:current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(
+            f"{proposal_id}:current_sequence_review_freshness_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{proposal_id}:current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
 
 
 def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
@@ -310,6 +364,53 @@ def _preflight_result_violations(
     return tuple(violations)
 
 
+def _preflight_specs_violations(
+    specs: Tuple[Mapping[str, Any], ...],
+    *,
+    planned_ids: Tuple[str, ...],
+    prefix: str,
+) -> Tuple[str, ...]:
+    violations = []
+    spec_ids = tuple(_string(spec.get("proposal_id")) for spec in specs)
+    if spec_ids != planned_ids:
+        violations.append("sequence_policy_preflight_result_consumer_specs_candidate_ids_mismatch")
+    for index, spec in enumerate(specs):
+        proposal_id = _string(spec.get("proposal_id")) or f"preflight_spec:{index}"
+        record_id = _string(spec.get("preflight_request_spec_id")) or proposal_id
+        if spec.get("planned_preflight_index") != index:
+            violations.append(f"{record_id}:planned_preflight_index_mismatch")
+        if spec.get("idempotency_key") != f"{prefix}:{proposal_id}":
+            violations.append(f"{record_id}:idempotency_key_mismatch")
+        if _summary_int(spec.get("planned_queue_index")) is None:
+            violations.append(f"{proposal_id}:planned_queue_index_invalid")
+        if spec.get("rank_source") != "sequence_policy_consumer":
+            violations.append(f"{proposal_id}:rank_source_mismatch")
+        for field in REQUIRED_PREFLIGHT_SPEC_IDENTITY_FIELDS:
+            if not _string(spec.get(field)):
+                violations.append(f"{proposal_id}:{field}_missing")
+        violations.extend(
+            _context_violations(
+                proposal_id,
+                _mapping(spec.get("current_sequence_review_freshness")),
+            )
+        )
+        source_idempotency_key = _string(spec.get("source_idempotency_key"))
+        policy_key = _string(spec.get("policy_key"))
+        if (
+            source_idempotency_key
+            and policy_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(f"{proposal_id}:policy_key_identity_mismatch")
+        for flag in REQUIRED_PREFLIGHT_SPEC_TRUE_FLAGS:
+            if spec.get(flag) is not True:
+                violations.append(f"{record_id}:{flag}_not_true")
+        for flag in REQUIRED_PREFLIGHT_SPEC_FALSE_FLAGS:
+            if spec.get(flag) is not False:
+                violations.append(f"{record_id}:{flag}_not_false")
+    return tuple(violations)
+
+
 def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_result_consumer(
     *,
     queue_import_preflight_plan: Mapping[str, Any] | None = None,
@@ -324,6 +425,12 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     prefix = _string(plan_request.get("idempotency_key_prefix")) or _string(
         _mapping(plan.get("summary")).get("idempotency_key_prefix")
     )
+    preflight_specs = _record_list(plan.get("preflight_request_specs"))
+    preflight_specs_by_proposal_id = {
+        _string(spec.get("proposal_id")): spec
+        for spec in preflight_specs
+        if _string(spec.get("proposal_id"))
+    }
     results = _record_list(batch.get("preflight_results"))
     result_ids = tuple(
         _preflight_result_id(result, index) for index, result in enumerate(results)
@@ -353,6 +460,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
                 *_plan_envelope_violations(plan),
                 *_plan_status_violations(plan, planned_ids=planned_ids),
                 *_plan_summary_violations(_mapping(plan.get("summary")), planned_ids=planned_ids),
+                *_preflight_specs_violations(
+                    preflight_specs,
+                    planned_ids=planned_ids,
+                    prefix=prefix,
+                ),
                 *_batch_envelope_violations(batch),
                 *_batch_summary_violations(
                     _mapping(batch.get("summary")),
@@ -405,6 +517,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         == "sequence_memory_trust_promotion_queue_import_sequence_plan_request_available"
     )
     selected_results = results if request_available else ()
+    selected_preflight_specs = tuple(
+        preflight_specs_by_proposal_id.get(proposal_id, {})
+        for proposal_id in ready_ids
+        if request_available
+    )
     sequence_plan_request_specs = tuple(
         {
             "sequence_plan_request_spec_id": (
@@ -413,6 +530,35 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "proposal_id": proposal_id,
             "planned_sequence_index": index,
             "source_preflight_index": index,
+            "source_preflight_request_spec_id": _string(
+                preflight_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "preflight_request_spec_id"
+                )
+            ),
+            "queue_ordering_plan_record_id": preflight_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("queue_ordering_plan_record_id"),
+            "consumer_record_id": preflight_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("consumer_record_id"),
+            "sequence_policy_gate_record_id": preflight_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("sequence_policy_gate_record_id"),
+            "policy_key": preflight_specs_by_proposal_id.get(proposal_id, {}).get(
+                "policy_key"
+            ),
+            "source_idempotency_key": preflight_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("source_idempotency_key"),
+            "current_sequence_review_freshness": preflight_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("current_sequence_review_freshness"),
+            "planned_queue_index": preflight_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("planned_queue_index"),
+            "rank_source": preflight_specs_by_proposal_id.get(proposal_id, {}).get(
+                "rank_source"
+            ),
             "idempotency_key": f"{prefix}:{proposal_id}",
             "read_only": True,
             "preflight_result_consumer_only": True,
@@ -430,7 +576,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "full_autonomous_ready": False,
             "can_apply_live": False,
         }
-        for index, proposal_id in enumerate(ready_ids)
+        for index, proposal_id in enumerate(ready_ids if request_available else ())
     )
 
     return {
@@ -468,6 +614,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         },
         "summary": {
             "planned_preflight_candidate_count": len(planned_ids),
+            "preflight_request_spec_count": len(preflight_specs),
             "batch_preflight_result_count": len(results),
             "ready_preflight_result_count": len(ready_ids),
             "blocked_preflight_result_count": len(blocked_ids),
@@ -488,6 +635,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "full_autonomous_ready": False,
             "can_apply_live": False,
             "planned_preflight_candidate_proposal_ids": list(planned_ids),
+            "preflight_request_spec_proposal_ids": [
+                spec.get("proposal_id") for spec in preflight_specs
+            ],
             "batch_preflight_result_proposal_ids": list(result_ids),
             "ready_preflight_result_proposal_ids": list(ready_ids),
             "blocked_preflight_result_proposal_ids": list(blocked_ids),
@@ -510,6 +660,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         "sequence_plan_request": {
             "handler": "plan_operator_proposal_apply_sequence",
             "preflight_results": list(selected_results),
+            "preflight_request_specs": list(selected_preflight_specs),
             "read_only_template": True,
             "live_write": False,
             "apply_attempted": False,

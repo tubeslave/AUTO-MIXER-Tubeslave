@@ -7,20 +7,33 @@ import numpy as np
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+_OFFLINE_MODEL_ENV_DEFAULTS = {
+    'HF_HUB_OFFLINE': '1',
+    'TRANSFORMERS_OFFLINE': '1',
+    'HF_DATASETS_OFFLINE': '1',
+    'HF_HUB_DISABLE_TELEMETRY': '1',
+}
+
+for _key, _value in _OFFLINE_MODEL_ENV_DEFAULTS.items():
+    os.environ.setdefault(_key, _value)
+
 
 @pytest.fixture(autouse=True)
 def isolate_automixer_env():
     """Keep AUTOMIXER_* overrides from leaking between tests."""
-    keys = [
+    automixer_keys = [
         'AUTOMIXER_MIXER_IP',
         'AUTOMIXER_MIXER_PORT',
         'AUTOMIXER_WS_PORT',
         'AUTOMIXER_MODEL_FALLBACKS',
     ]
-    original = {key: os.environ.get(key) for key in keys}
+    env_keys = [*automixer_keys, *_OFFLINE_MODEL_ENV_DEFAULTS.keys()]
+    original = {key: os.environ.get(key) for key in env_keys}
 
-    for key in keys:
+    for key in automixer_keys:
         os.environ.pop(key, None)
+    for key, value in _OFFLINE_MODEL_ENV_DEFAULTS.items():
+        os.environ[key] = value
 
     try:
         yield

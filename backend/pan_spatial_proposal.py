@@ -17,6 +17,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 PAN_METHOD_ID = "pan_spatial_proposal"
 PAN_VERSION = "pan_spatial_proposal_v1"
@@ -46,6 +51,61 @@ ROLE_TOKENS = (
     ("playback", ("playback", "track", "stem", "loop")),
     ("master", ("master", "main", "reference")),
 )
+
+
+def _ordered_unique(values: Iterable[str]) -> Tuple[str, ...]:
+    ordered = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
+
+
+def _pan_required_safety_checks() -> Dict[str, str]:
+    return {
+        "source_identity": "required_before_live_promotion",
+        "current_pan_readback": "required_before_live_promotion",
+        "bounded_pan_delta": "required_before_live_promotion",
+        "stereo_pair_or_stage_context": "required_before_live_promotion",
+        "mono_compatibility": "required_before_live_promotion",
+        "phase_correlation": "required_before_live_promotion",
+        "mono_phase_safety": "required_before_live_promotion",
+    }
+
+
+def _pan_rollback_expectation() -> Dict[str, Any]:
+    return {
+        "required_before_live_promotion": True,
+        "restore_previous_pan_value_after_physical_readback": True,
+        "restore_previous_stereo_pair_link_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+
+
+def _pan_future_wing_readback_contract() -> Dict[str, Any]:
+    return {
+        "required": True,
+        "required_before_live_promotion": True,
+        "target_kind": "channel_pan",
+        "old_value_source": PAN_READ_REQUIRED_SOURCE,
+        "readback_targets": [
+            "channel_pan",
+            "stereo_pair_link",
+            "mono_phase_check",
+            "rollback_pan",
+        ],
+        "blocked_live_actions": [
+            "pan_parameter_write",
+            "stereo_width_write",
+            "stereo_pair_link_write",
+        ],
+        "requires_real_wing_proof": True,
+        "requires_operator_approval": True,
+        "requires_separate_non_fader_adr": True,
+    }
 
 
 def utc_now() -> str:
@@ -158,19 +218,142 @@ class PanRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def operator_safety_blockers(self) -> Tuple[str, ...]:
+        return _ordered_unique(
+            (
+                "pan_spatial_live_apply_quarantined",
+                "unsupported_value_type:pan",
+                "not_in_supervised_fader_gain_executor",
+                "real_wing_proof_required_before_live_apply",
+                "non_fader_live_expansion_requires_separate_adr",
+                "operator_approval_required_before_supervised_pan_apply",
+                "hardware_readback_and_rollback_not_proven",
+                *self.blockers,
+            )
+        )
+
+    def pan_spatial_safety_summary(self) -> Dict[str, Any]:
+        mono_phase_safety = dict(self.evidence.get("mono_phase_safety") or {})
+        source_identity = dict(
+            self.evidence.get("source_identity_downstream_trust") or {}
+        )
+        return {
+            "status": "passed" if not self.blockers else "blocked",
+            "channel_id": self.channel_id,
+            "source_family": self.source_family,
+            "current_pan_percent": self.current_pan_percent,
+            "target_pan_percent": self.target_pan_percent,
+            "delta_pan_percent": self.delta_pan_percent,
+            "decision_source": self.evidence.get("decision_source"),
+            "bounded_pan_delta": self.evidence.get("bounded_pan_delta"),
+            "mono_compatibility_risk": self.evidence.get(
+                "mono_compatibility_risk"
+            ),
+            "mono_phase_safety_status": mono_phase_safety.get("status"),
+            "phase_required_for_non_center_pan": mono_phase_safety.get(
+                "required_for_non_center_pan"
+            ),
+            "phase_correlation": self.evidence.get("phase_correlation"),
+            "mono_sum_delta_db": self.evidence.get("mono_sum_delta_db"),
+            "current_pan_cache_freshness_status": self.evidence.get(
+                "current_state_cache_freshness_status"
+            ),
+            "current_pan_cache_no_live_authority": self.evidence.get(
+                "current_pan_cache_no_live_authority"
+            ),
+            "mono_phase_check_freshness_status": self.evidence.get(
+                "mono_phase_check_freshness_status"
+            ),
+            "mono_phase_check_no_live_authority": self.evidence.get(
+                "mono_phase_check_no_live_authority"
+            ),
+            "source_identity_trust_status": source_identity.get("status"),
+            "source_identity_usable_for_downstream": source_identity.get(
+                "usable_for_downstream"
+            ),
+            "rollback_pan_readback": self.evidence.get("rollback_pan_readback"),
+            "required_safety_checks": _pan_required_safety_checks(),
+            "safety_blockers": list(self.operator_safety_blockers()),
+            "operator_explanation": (
+                "Pan/Stereo evidence is offline-only. Review source identity, "
+                "current-pan readback, stereo/stage context, bounded pan delta "
+                "and mono/phase safety before any future WING promotion."
+            ),
+            "rollback_expectation": _pan_rollback_expectation(),
+            "future_wing_readback_contract": _pan_future_wing_readback_contract(),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
+        pan_spatial_safety_summary = self.pan_spatial_safety_summary()
+        blockers = list(self.operator_safety_blockers())
+        proposed_action = {
+            "action_type": self.action_type,
+            "current_pan_percent": self.current_pan_percent,
+            "target_pan_percent": self.target_pan_percent,
+            "delta_pan_percent": self.delta_pan_percent,
+            "bounded_pan_delta": pan_spatial_safety_summary["bounded_pan_delta"],
+            "rollback_pan_readback": pan_spatial_safety_summary[
+                "rollback_pan_readback"
+            ],
+            "required_safety_checks": pan_spatial_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": pan_spatial_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": pan_spatial_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "pan_spatial_safety_summary": pan_spatial_safety_summary,
+        }
         evidence = {
             **self.evidence,
+            "pan_spatial_safety_summary": pan_spatial_safety_summary,
+            "required_safety_checks": pan_spatial_safety_summary[
+                "required_safety_checks"
+            ],
+            "operator_explanation": pan_spatial_safety_summary[
+                "operator_explanation"
+            ],
+            "rollback_expectation": pan_spatial_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": pan_spatial_safety_summary[
+                "future_wing_readback_contract"
+            ],
             "old_value_source": PAN_READ_REQUIRED_SOURCE,
             "rollback_value_source": PAN_READ_REQUIRED_SOURCE,
             "live_write": False,
             "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
             "readback_required_before_promotion": True,
             "rollback_required_before_promotion": True,
         }
-        return {
+        proposal = {
             "id": self.id,
             "method_id": PAN_METHOD_ID,
             "source": PAN_METHOD_ID,
@@ -182,20 +365,32 @@ class PanRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:pan",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "safety_blockers": pan_spatial_safety_summary["safety_blockers"],
+            "operator_explanation": pan_spatial_safety_summary[
+                "operator_explanation"
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "current_pan_percent": self.current_pan_percent,
-                "target_pan_percent": self.target_pan_percent,
-                "delta_pan_percent": self.delta_pan_percent,
-            },
+            "required_safety_checks": pan_spatial_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": pan_spatial_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": pan_spatial_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "proposed_action": proposed_action,
+            "pan_spatial_safety_summary": pan_spatial_safety_summary,
             "old_value": {
                 "source": PAN_READ_REQUIRED_SOURCE,
                 "required_before_apply": True,
@@ -206,6 +401,14 @@ class PanRecommendation:
             },
             "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=PAN_METHOD_ID,
+            target=self.channel_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _severity_from_delta(delta: float, blockers: Iterable[str] = ()) -> str:
@@ -374,6 +577,22 @@ def analyze_pan_need(
         + 0.15 * min(persistence / 3.0, 1.0)
         + 0.10 * contribution
     )
+    bounded_pan_delta = {
+        "status": "passed" if abs(target) <= MAX_PAN_PERCENT else "blocked",
+        "current_pan_percent": current,
+        "target_pan_percent": target,
+        "delta_pan_percent": delta,
+        "max_abs_pan_percent": MAX_PAN_PERCENT,
+        "min_actionable_delta_percent": MIN_PAN_DELTA_PERCENT,
+    }
+    rollback_pan_readback = {
+        "status": "required_before_live_promotion",
+        "source": PAN_READ_REQUIRED_SOURCE,
+        "required": True,
+        "channel_pan_readback_required": True,
+        "stereo_pair_link_readback_required": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
 
     evidence = {
         "source": PAN_VERSION,
@@ -405,6 +624,8 @@ def analyze_pan_need(
         "current_pan_percent": current,
         "target_pan_percent": target,
         "delta_pan_percent": delta,
+        "current_pan": current,
+        "bounded_pan_delta": bounded_pan_delta,
         "current_pan_cache_freshness": current_state_freshness,
         "current_pan_cache_no_live_authority": current_state_no_authority,
         "current_state_cache_freshness_status": current_state_freshness_status,
@@ -413,6 +634,7 @@ def analyze_pan_need(
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "old_value_source": PAN_READ_REQUIRED_SOURCE,
         "rollback_value_source": PAN_READ_REQUIRED_SOURCE,
+        "rollback_pan_readback": rollback_pan_readback,
         "readback_required_before_promotion": True,
         "rollback_required_before_promotion": True,
         "transport_free": True,

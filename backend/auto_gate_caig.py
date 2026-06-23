@@ -22,7 +22,15 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 logger = logging.getLogger(__name__)
+
+AUTO_GATE_CAIG_METHOD_ID = "auto_gate_caig"
+GATE_READ_REQUIRED_SOURCE = "cached_or_physical_gate_read_required_before_promotion"
 
 
 class GateState(Enum):
@@ -562,6 +570,7 @@ class AutoGateController:
         self.last_write_attempted = False
         self.last_write_blocked = False
         self.last_write_count = 0
+        self.last_apply_result: Dict[str, Any] = {}
         
         # Components
         self.extractor = FeatureExtractor(sample_rate)
@@ -647,6 +656,7 @@ class AutoGateController:
         self.last_write_attempted = False
         self.last_write_blocked = False
         self.last_write_count = 0
+        self.last_apply_result = {}
 
         # Step 1: Extract features
         features = {}
@@ -701,13 +711,188 @@ class AutoGateController:
             self._send_osc(decisions)
         
         return decisions
+
+    def _blocked_gate_result(
+        self,
+        reason: str,
+        decisions: Dict[int, GateDecision],
+    ) -> Dict[str, Any]:
+        """Build operator-facing evidence for quarantined legacy gate writes."""
+
+        sorted_decisions = [
+            decisions[ch]
+            for ch in sorted(decisions)
+        ]
+        first = sorted_decisions[0] if sorted_decisions else None
+        channel = first.channel_id if first is not None else None
+        channel_label = channel if channel is not None else "unknown"
+        settings = (
+            self.settings.get(channel, GateSettings())
+            if channel is not None
+            else GateSettings()
+        )
+        source_role = (
+            self.instruments.get(channel, "unknown")
+            if channel is not None
+            else "unknown"
+        )
+        blocked_calls = [
+            {
+                "cmd": "set_channel_gate",
+                "channel": decision.channel_id,
+                "gain_db": round(float(decision.gain_db), 2),
+                "state": decision.state.value,
+                "semantic": "legacy_caig_gate_gain_write",
+            }
+            for decision in sorted_decisions
+        ]
+        self.last_write_attempted = bool(blocked_calls)
+        self.last_write_blocked = bool(blocked_calls)
+        self.last_write_count = 0
+        confidence = 0.0
+        confidence_basis = (
+            "legacy_caig_write_path_quarantined_without_fresh_readonly_gate_context"
+        )
+        result = {
+            "applied": False,
+            "blocked": bool(blocked_calls),
+            "calls": [],
+            "blocked_calls": blocked_calls,
+            "blocked_call_count": len(blocked_calls),
+            "reason": reason,
+            "write_policy": self.write_policy,
+            "live_write_allowed": self.live_write_allowed,
+            "confidence": confidence,
+            "confidence_basis": confidence_basis,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+        }
+        if channel is not None:
+            result["channel"] = channel
+        blockers = [
+            "unsupported_value_type:gate",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            reason,
+        ]
+        if not blocked_calls:
+            blockers.append("missing_gate_decisions")
+        proposed_action = {
+            "action_type": "auto_gate_caig_write_blocked",
+            "channel_id": channel,
+            "blocked_write_count": len(blocked_calls),
+            "params": {
+                "threshold_db": round(float(settings.threshold_db), 2),
+                "range_db": round(float(settings.range_db), 2),
+                "attack_ms": round(float(settings.attack_ms), 2),
+                "hold_ms": round(float(settings.hold_ms), 2),
+                "release_ms": round(float(settings.release_ms), 2),
+                "hysteresis_db": round(float(settings.hysteresis_db), 2),
+            },
+            "dry_run_decisions": blocked_calls,
+        }
+        proposal = {
+            "id": f"{AUTO_GATE_CAIG_METHOD_ID}:{channel_label}:{reason}",
+            "method_id": AUTO_GATE_CAIG_METHOD_ID,
+            "source": AUTO_GATE_CAIG_METHOD_ID,
+            "title": f"Ch {channel_label}: CAIG gate blocked proposal evidence",
+            "reason": (
+                "CAIG generated blocked gate write evidence. It is operator "
+                "review only until gate readback, chatter/tail safety and "
+                "rollback proof exist."
+            ),
+            "target": channel,
+            "kind": "gate",
+            "severity": "medium" if blocked_calls else "low",
+            "confidence": confidence,
+            "confidence_basis": confidence_basis,
+            "queue_action": result["queue_action"],
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "live_write": False,
+            "queue_mutation": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "evidence": {
+                "blocked_calls": blocked_calls,
+                "blocked_call_count": len(blocked_calls),
+                "write_policy": self.write_policy,
+                "confidence": confidence,
+                "confidence_basis": confidence_basis,
+                "old_value_source": GATE_READ_REQUIRED_SOURCE,
+                "rollback_value_source": GATE_READ_REQUIRED_SOURCE,
+                "rollback_gate_readback": GATE_READ_REQUIRED_SOURCE,
+                "live_write": False,
+                "queue_mutation": False,
+                "can_apply_live": False,
+                "can_import_to_queue": False,
+                "queue_import_allowed": False,
+                "live_apply_allowed": False,
+                "read_only_or_dry_run_only": True,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+                "queue_action": "not_queueable_until_promoted",
+                "mutates_mixer": False,
+                "readback_required_before_promotion": True,
+                "rollback_required_before_promotion": True,
+                "noise_floor": "not_measured_in_legacy_caig_write_path",
+                "hysteresis": settings.hysteresis_db,
+                "source_role": source_role,
+                "bleed_risk": "not_measured_in_legacy_caig_write_path",
+                "source_identity_downstream_trust": {
+                    "status": "legacy_unverified",
+                    "trusted_for_downstream": False,
+                },
+                "current_gate_bleed_context_cache_freshness": "not_provided",
+                "current_gate_bleed_context_cache_no_live_authority": True,
+                "chatter_guard": {
+                    "status": "readback_required_before_live_promotion",
+                    "hysteresis_db": settings.hysteresis_db,
+                    "attack_ms": settings.attack_ms,
+                    "hold_ms": settings.hold_ms,
+                    "release_ms": settings.release_ms,
+                },
+                "quiet_words_tail_attack_preservation": {
+                    "status": "readback_required_before_live_promotion",
+                    "tail_risk": "not_measured_in_legacy_caig_write_path",
+                    "attack_ms": settings.attack_ms,
+                    "hold_ms": settings.hold_ms,
+                    "release_ms": settings.release_ms,
+                    "legacy_gate_write_quarantined": True,
+                },
+                "tail_risk": "not_measured_in_legacy_caig_write_path",
+            },
+        }
+        result["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=AUTO_GATE_CAIG_METHOD_ID,
+            target=channel,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        self.last_apply_result = result
+        return result
     
     def _send_osc(self, decisions: Dict[int, GateDecision]):
         """Quarantine legacy gate writes and keep decisions as dry-run output."""
 
-        self.last_write_attempted = bool(decisions)
-        self.last_write_blocked = bool(decisions)
-        self.last_write_count = 0
+        self._blocked_gate_result("auto_gate_caig_direct_apply_quarantined", decisions)
         if decisions:
             logger.warning(
                 "CAIG gate live writes are quarantined; %s decisions kept as dry-run proposals",
@@ -729,6 +914,7 @@ class AutoGateController:
             'last_write_attempted': self.last_write_attempted,
             'last_write_blocked': self.last_write_blocked,
             'last_write_count': self.last_write_count,
+            'last_apply_result': dict(self.last_apply_result),
         }
 
 

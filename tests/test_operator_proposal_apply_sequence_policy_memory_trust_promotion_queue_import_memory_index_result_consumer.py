@@ -207,6 +207,12 @@ def test_memory_index_result_consumer_emits_trust_review_request_for_available_i
     assert request["source_memory_index_available"] is True
     assert request["memory_index"]["status"] == "append_only_sequence_memory_index_available"
     assert request["current_sequence_review_freshness"]["status"] == "fresh"
+    assert request["memory_index_request_specs"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert request["memory_index_request_specs"][0][
+        "current_sequence_review_freshness"
+    ]["status"] == "fresh"
     assert request["memory_file_mutation"] is False
     assert request["runtime_memory_mutation"] is False
     assert request["policy_mutation"] is False
@@ -217,9 +223,136 @@ def test_memory_index_result_consumer_emits_trust_review_request_for_available_i
     )
     assert first["planned_trust_review_index"] == 0
     assert first["source_memory_index_available"] is True
+    assert first["source_memory_index_request_spec_id"].endswith(":proposal-first")
+    assert first["source_memory_writer_apply_request_spec_id"].endswith(":proposal-first")
+    assert first["source_memory_writer_request_spec_id"].endswith(":proposal-first")
+    assert first["source_memory_draft_request_spec_id"].endswith(":proposal-first")
+    assert first["source_audit_policy_gate_request_spec_id"].endswith(":proposal-first")
+    assert first["source_audit_request_spec_id"].endswith(":proposal-first")
+    assert first["source_executor_request_spec_id"].endswith(":proposal-first")
+    assert first["source_execution_gate_request_spec_id"].endswith(":proposal-first")
+    assert first["source_dry_run_request_spec_id"].endswith(":proposal-first")
+    assert first["source_sequence_plan_request_spec_id"].endswith(":proposal-first")
+    assert first["source_preflight_request_spec_id"].endswith(":proposal-first")
+    assert first["queue_ordering_plan_record_id"] == "plan:proposal-first"
+    assert first["consumer_record_id"] == "consumer:proposal-first"
+    assert first["sequence_policy_gate_record_id"] == "gate:proposal-first"
+    assert first["policy_key"] == "proposal-first/memory-write:proposal-first"
+    assert first["source_idempotency_key"] == "memory-write:proposal-first"
+    assert first["current_sequence_review_freshness"] == apply_consumer[
+        "memory_index_request_specs"
+    ][0]["current_sequence_review_freshness"]
+    assert first["rank_source"] == "sequence_policy_consumer"
     assert first["memory_trust_review_handler_invoked"] is False
     assert first["memory_file_mutation"] is False
     assert first["live_authority_granted"] is False
+
+
+def test_memory_index_result_consumer_rejects_forged_index_request_identity(tmp_path):
+    apply_consumer = _memory_writer_apply_result_consumer()
+    forged_consumer = deepcopy(apply_consumer)
+    forged_consumer["memory_index_request_specs"][0][
+        "source_idempotency_key"
+    ] = "forged-memory-write:proposal-first"
+    forged_consumer["memory_index_request_specs"][1]["consumer_record_id"] = ""
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer(
+            memory_writer_apply_result_consumer=forged_consumer,
+            memory_index_result=_memory_index(apply_consumer, root=tmp_path),
+            current_sequence_review_freshness=_freshness(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_index_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["memory_trust_review_request_available"] is False
+    assert (
+        "proposal-first:policy_key_identity_mismatch"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:consumer_record_id_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["memory_trust_review_request_specs"] == []
+
+
+def test_memory_index_result_consumer_rejects_missing_sequence_context(tmp_path):
+    apply_consumer = _memory_writer_apply_result_consumer()
+    memory_index = _memory_index(apply_consumer, root=tmp_path)
+    for spec in apply_consumer["memory_index_request_specs"]:
+        spec.pop("current_sequence_review_freshness", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer(
+            memory_writer_apply_result_consumer=apply_consumer,
+            memory_index_result=memory_index,
+            current_sequence_review_freshness=_freshness(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_index_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["memory_trust_review_request_available"] is False
+    assert (
+        "proposal-first:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["memory_trust_review_request_specs"] == []
+
+
+def test_memory_index_result_consumer_rejects_live_sequence_context(tmp_path):
+    apply_consumer = _memory_writer_apply_result_consumer()
+    memory_index = _memory_index(apply_consumer, root=tmp_path)
+    apply_consumer["memory_index_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer(
+            memory_writer_apply_result_consumer=apply_consumer,
+            memory_index_result=memory_index,
+            current_sequence_review_freshness=_freshness(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_memory_index_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["memory_trust_review_request_available"] is False
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_live_write_not_false"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["memory_trust_review_request_specs"] == []
 
 
 def test_memory_index_result_consumer_rejects_forged_index_result(tmp_path):

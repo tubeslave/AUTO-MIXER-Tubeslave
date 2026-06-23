@@ -18,6 +18,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 LONG_TERM_MEMORY_METHOD_ID = "long_term_memory_learning_proposal"
 LONG_TERM_MEMORY_VERSION = "long_term_memory_learning_proposal_v1"
@@ -195,7 +200,15 @@ class LongTermMemoryLearningRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style memory proposal without live-apply fields."""
 
-        return {
+        proposed_action = {
+            "action_type": self.action_type,
+            "learning_id": self.learning_id,
+            "scope_id": self.scope_id,
+            "scope_kind": self.scope_kind,
+            "proposed_action_family": self.proposed_action_family,
+            "learning_record_state": "operator_review_required",
+        }
+        proposal = {
             "id": self.id,
             "method_id": LONG_TERM_MEMORY_METHOD_ID,
             "source": LONG_TERM_MEMORY_METHOD_ID,
@@ -214,14 +227,7 @@ class LongTermMemoryLearningRecommendation:
                 "memory_learning_requires_replay_and_operator_acceptance",
                 *self.blockers,
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "learning_id": self.learning_id,
-                "scope_id": self.scope_id,
-                "scope_kind": self.scope_kind,
-                "proposed_action_family": self.proposed_action_family,
-                "learning_record_state": "operator_review_required",
-            },
+            "proposed_action": proposed_action,
             "evidence": {
                 **self.evidence,
                 "live_write": False,
@@ -232,6 +238,14 @@ class LongTermMemoryLearningRecommendation:
                 "rollback_required_before_promotion": False,
             },
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=LONG_TERM_MEMORY_METHOD_ID,
+            target=self.scope_id,
+            proposed_action=proposed_action,
+            blockers=proposal["blockers"],
+        )
+        return proposal
 
 
 def _severity(blockers: Iterable[str], active_performance: bool) -> str:
@@ -285,6 +299,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 def analyze_long_term_memory_learning_need(
     analysis: LongTermMemoryLearningInput,
     *,
@@ -313,6 +335,7 @@ def analyze_long_term_memory_learning_need(
     operator_intent = str(analysis.operator_intent or "").strip().lower()
     current_state_freshness = _freshness_payload(analysis.current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     source_identity_trust = evaluate_source_identity_downstream_trust(
         source_id=str(analysis.scope_id),
         source_type=str(action_family),
@@ -357,8 +380,10 @@ def analyze_long_term_memory_learning_need(
         blockers.append("auto_apply_not_supported")
     if analysis.active_performance:
         blockers.append("active_performance_learning_write_blocked")
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blockers.append("long_term_memory_context_cache_not_fresh")
+    if current_state_freshness_status == "fresh" and not current_state_no_authority:
+        blockers.append("memory_learning_context_cache_live_authority_present")
     blockers.extend(source_identity_trust.blockers)
 
     evidence_volume_score = min(verified_or_offline / 6.0, 1.0)
@@ -396,27 +421,83 @@ def analyze_long_term_memory_learning_need(
         "manual_review_required": bool(analysis.manual_review_required),
         "source_session_count": source_sessions,
         "telemetry_session_count": telemetry_sessions,
+        "telemetry_sessions": {
+            "count": telemetry_sessions,
+            "minimum_count": MIN_TELEMETRY_SESSION_COUNT,
+        },
         "verified_decision_count": verified,
+        "verified_decisions": {
+            "count": verified,
+            "minimum_verified_or_offline_count": MIN_VERIFIED_OR_OFFLINE_EVIDENCE,
+        },
         "offline_replay_count": offline,
+        "offline_replay_runs": {
+            "count": offline,
+            "minimum_verified_or_offline_count": MIN_VERIFIED_OR_OFFLINE_EVIDENCE,
+        },
         "verified_or_offline_evidence_count": verified_or_offline,
         "accepted_decision_count": accepted,
         "rejected_decision_count": rejected,
         "outcome_label_count": outcome_labels,
+        "accepted_rejected_outcomes": {
+            "accepted_count": accepted,
+            "rejected_count": rejected,
+            "outcome_label_count": outcome_labels,
+            "minimum_outcome_label_count": MIN_OUTCOME_LABEL_COUNT,
+        },
         "evidence_packet_count": evidence_packets,
+        "decision_evidence_packets": {
+            "count": evidence_packets,
+            "minimum_count": MIN_EVIDENCE_PACKET_COUNT,
+        },
         "engineer_action_count": engineer_actions,
+        "engineer_actions": {
+            "count": engineer_actions,
+            "operator_acceptance_required_before_memory_write": True,
+        },
         "reference_comparison_count": references,
+        "reference_comparisons": {
+            "count": references,
+            "available": references > 0,
+        },
         "genre_context_count": genre_contexts,
+        "genre_context": {
+            "count": genre_contexts,
+            "available": genre_contexts > 0,
+        },
         "arrangement_context_count": arrangement_contexts,
+        "arrangement_context": {
+            "count": arrangement_contexts,
+            "available": arrangement_contexts > 0,
+        },
         "replay_correlation_score": round(replay_correlation, 3),
+        "replay_correlation": {
+            "score": round(replay_correlation, 3),
+            "minimum_score": MIN_REPLAY_CORRELATION,
+        },
         "outcome_consistency_score": round(outcome_consistency, 3),
+        "outcome_consistency": {
+            "score": round(outcome_consistency, 3),
+            "minimum_score": MIN_OUTCOME_CONSISTENCY,
+        },
         "safety_regression_count": safety_regressions,
+        "safety_regressions": {
+            "count": safety_regressions,
+            "maximum_allowed": MAX_SAFETY_REGRESSION_COUNT,
+        },
         "conflicting_outcome_count": conflicts,
         "recent_manual_override_count": manual_overrides,
+        "manual_overrides": {
+            "recent_count": manual_overrides,
+            "maximum_burst": MAX_MANUAL_OVERRIDE_BURST,
+        },
         "latency_budget_met": bool(analysis.latency_budget_met),
         "auto_apply_requested": bool(analysis.auto_apply_requested),
         "active_performance": bool(analysis.active_performance),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_memory_learning_context_cache_freshness": current_state_freshness,
+        "current_memory_learning_context_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,
         "long_term_memory_learning": True,

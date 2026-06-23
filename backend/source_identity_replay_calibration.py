@@ -12,6 +12,11 @@ from datetime import datetime, timezone
 import math
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 SOURCE_IDENTITY_REPLAY_METHOD_ID = "source_identity_replay_calibration"
 SOURCE_IDENTITY_REPLAY_VERSION = "source_identity_replay_calibration_v1"
@@ -118,6 +123,14 @@ def _freshness_payload(payload: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return normalized
 
 
+def _freshness_is_no_authority(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("read_only") is True
+        and payload.get("live_write") is False
+        and payload.get("queries_console") is False
+    )
+
+
 @dataclass(frozen=True)
 class SourceIdentityReplayEvent:
     event_id: str
@@ -156,7 +169,13 @@ class SourceIdentityCalibrationRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style calibration proposal without live apply."""
 
-        return {
+        proposed_action = {
+            "action_type": self.action_type,
+            "source_type": self.source_type,
+            "recommended_trust_state": self.recommended_trust_state,
+            "calibration_state": "operator_review_required",
+        }
+        proposal = {
             "id": self.id,
             "method_id": SOURCE_IDENTITY_REPLAY_METHOD_ID,
             "source": SOURCE_IDENTITY_REPLAY_METHOD_ID,
@@ -175,12 +194,7 @@ class SourceIdentityCalibrationRecommendation:
                 "calibration_requires_operator_review",
                 *self.blockers,
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "source_type": self.source_type,
-                "recommended_trust_state": self.recommended_trust_state,
-                "calibration_state": "operator_review_required",
-            },
+            "proposed_action": proposed_action,
             "evidence": {
                 **self.evidence,
                 "live_write": False,
@@ -190,6 +204,14 @@ class SourceIdentityCalibrationRecommendation:
                 "operator_acceptance_required_before_calibration_write": True,
             },
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=SOURCE_IDENTITY_REPLAY_METHOD_ID,
+            target=self.source_type,
+            proposed_action=proposed_action,
+            blockers=proposal["blockers"],
+        )
+        return proposal
 
 
 @dataclass(frozen=True)
@@ -330,7 +352,29 @@ def _recommendation_from_summary(
         "min_replay_match_rate": MIN_REPLAY_MATCH_RATE,
         "min_average_confidence": MIN_AVERAGE_CONFIDENCE,
         "recommended_trust_state": trust_state,
+        "accepted_rejected_outcomes": {
+            "accepted_count": summary["accepted_count"],
+            "corrected_away_count": summary["corrected_away_count"],
+            "rejected_count": summary["rejected_count"],
+            "dismissed_count": summary["dismissed_count"],
+            "outcome_count": total,
+            "minimum_outcome_count": MIN_OUTCOME_COUNT,
+        },
+        "operator_acceptance": {
+            "accepted_count": summary["accepted_count"],
+            "acceptance_rate": acceptance_rate,
+            "operator_review_required": True,
+            "required_before_downstream_trust_write": True,
+        },
+        "downstream_trust_state": {
+            "recommended_trust_state": trust_state,
+            "write_allowed": False,
+            "requires_operator_acceptance": True,
+        },
         "current_source_identity_replay_context_cache_freshness": current_state_freshness.get("status"),
+        "current_source_identity_replay_context_cache_no_live_authority": _freshness_is_no_authority(
+            current_state_freshness
+        ),
         "current_state_cache_freshness": current_state_freshness,
         "transport_free": True,
         "model_mutation": False,
@@ -359,6 +403,7 @@ def analyze_source_identity_replay_calibration(
 ) -> SourceIdentityReplayCalibrationResult:
     current_state_freshness = _freshness_payload(current_state_cache_freshness)
     current_state_freshness_status = str(current_state_freshness.get("status") or "unknown")
+    current_state_no_authority = _freshness_is_no_authority(current_state_freshness)
     event_tuple = tuple(events)
     metadata = {
         "proposal_only": True,
@@ -369,11 +414,12 @@ def analyze_source_identity_replay_calibration(
         "operator_review_enabled": bool(operator_review_enabled),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_source_identity_replay_context_cache_no_live_authority": current_state_no_authority,
         "event_count": len(event_tuple),
         "blockers": (),
     }
 
-    if current_state_freshness_status not in {"fresh", "not_provided"}:
+    if current_state_freshness_status != "fresh":
         blocker = "source_identity_replay_context_cache_not_fresh"
         metadata["blockers"] = (blocker,)
         metadata["calibration_candidate_count"] = 0
@@ -383,6 +429,22 @@ def analyze_source_identity_replay_calibration(
             status="analysis_only",
             recommendations=(),
             warnings=("source identity replay context cache is not fresh; calibration blocked",),
+            metadata=metadata,
+        )
+
+    if not current_state_no_authority:
+        blocker = "source_identity_replay_context_cache_live_authority_present"
+        metadata["blockers"] = (blocker,)
+        metadata["calibration_candidate_count"] = 0
+        return SourceIdentityReplayCalibrationResult(
+            method_id=SOURCE_IDENTITY_REPLAY_METHOD_ID,
+            version=SOURCE_IDENTITY_REPLAY_VERSION,
+            status="analysis_only",
+            recommendations=(),
+            warnings=(
+                "source identity replay context cache has live authority; "
+                "collect read-only replay evidence before calibration",
+            ),
             metadata=metadata,
         )
 

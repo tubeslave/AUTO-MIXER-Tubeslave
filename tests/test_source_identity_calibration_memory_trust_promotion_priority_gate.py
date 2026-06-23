@@ -199,6 +199,7 @@ def _verification_record(audit_record):
         "rollback_target_trust_state": audit_record["rollback_target_trust_state"],
         "rollback_strategy": audit_record["rollback_strategy"],
         "verification_evidence_status": "reviewed",
+        "current_state_cache_freshness": _freshness(),
         "decision": "verified",
         "verified_by": "operator",
         "verified_at": "2026-06-06T14:00:00Z",
@@ -295,6 +296,18 @@ def test_memory_trust_promotion_priority_gate_records_eligible_policy_evidence()
     assert record["rollback_verified"] is True
     assert record["source_identity_downstream_gate_status"] == "trusted"
     assert record["source_identity_downstream_gate_usable"] is True
+    assert (
+        record["source_identity_downstream_gate_evidence"][
+            "current_source_identity_replay_context_cache_freshness"
+        ]
+        == "fresh"
+    )
+    assert (
+        record["source_identity_downstream_gate_evidence"][
+            "current_source_identity_replay_context_cache_no_live_authority"
+        ]
+        is True
+    )
     assert record["downstream_priority_eligible"] is True
     assert record["eligible_for_downstream_priority_policy"] is True
     assert record["policy_gate_only"] is True
@@ -308,6 +321,49 @@ def test_memory_trust_promotion_priority_gate_records_eligible_policy_evidence()
     assert record["can_import_to_queue"] is False
     assert record["can_apply_live"] is False
     assert "requested_change" not in gate
+
+
+def test_memory_trust_promotion_priority_gate_blocks_live_authority_replay_context():
+    rollback = _rollback_verification()
+    live_authority = {
+        **rollback,
+        "verified_records": [
+            {
+                **rollback["verified_records"][0],
+                "current_state_cache_freshness": {
+                    "status": "fresh",
+                    "field_count": 4,
+                    "fresh_field_count": 4,
+                    "read_only": False,
+                    "live_write": True,
+                    "queries_console": True,
+                },
+            }
+        ],
+    }
+
+    gate = build_source_identity_calibration_memory_trust_promotion_priority_gate(
+        rollback_verification=live_authority,
+    )
+
+    assert gate["status"] == "memory_trust_promotion_priority_gate_not_ready"
+    assert gate["summary"]["priority_gate_record_count"] == 1
+    assert gate["summary"]["eligible_record_count"] == 0
+    assert gate["summary"]["ineligible_record_count"] == 1
+
+    record = gate["priority_records"][0]
+    assert record["source_identity_downstream_gate_status"] == "trusted"
+    assert record["source_identity_downstream_gate_usable"] is False
+    assert record["downstream_priority_eligible"] is False
+    assert "source_identity_replay_context_live_authority_present" in (
+        record["source_identity_downstream_gate_blockers"]
+    )
+    assert (
+        record["source_identity_downstream_gate_evidence"][
+            "current_source_identity_replay_context_cache_no_live_authority"
+        ]
+        is False
+    )
 
 
 def test_memory_trust_promotion_priority_gate_rejects_forged_authority():

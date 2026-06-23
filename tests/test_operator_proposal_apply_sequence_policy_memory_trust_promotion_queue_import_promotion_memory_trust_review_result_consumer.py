@@ -131,7 +131,21 @@ def test_promotion_memory_trust_review_result_consumer_emits_acceptance_request(
         "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_request_available"
     )
     assert consumer["summary"]["expected_trust_review_candidate_count"] == 1
+    assert consumer["summary"]["source_promotion_acceptance_record_template_count"] == 1
+    assert consumer["summary"]["memory_trust_review_request_spec_count"] == 2
+    assert consumer["summary"]["source_sequence_review_context_status"] == "fresh"
     assert consumer["summary"]["trust_review_candidate_count"] == 1
+    assert consumer["summary"]["promotion_acceptance_record_template_count"] == 1
+    assert consumer["summary"]["promotion_acceptance_record_template_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert consumer["summary"]["source_promotion_acceptance_record_template_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert consumer["summary"]["memory_trust_review_request_spec_proposal_ids"] == [
+        "proposal-first",
+        "proposal-second",
+    ]
     assert consumer["summary"]["invalid_record_count"] == 0
     assert (
         consumer["summary"]["promotion_acceptance_ledger_request_available"]
@@ -168,6 +182,20 @@ def test_promotion_memory_trust_review_result_consumer_emits_acceptance_request(
     assert request["promotion_memory_trust_review_result_consumer"][
         "trust_review_candidate_proposal_ids"
     ] == ["proposal-first"]
+    assert request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == index_consumer["promotion_memory_trust_review_request"][
+        "promotion_acceptance_record_templates"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
+    assert request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == index_consumer["promotion_memory_trust_review_request"][
+        "memory_trust_review_request_specs"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
 
     template = consumer["promotion_acceptance_record_templates"][0]
     assert template["proposal_id"] == "proposal-first"
@@ -270,6 +298,184 @@ def test_promotion_memory_trust_review_result_consumer_rejects_forged_prior(
     assert any(
         item.endswith(":sequence_policy_trust_store_mutation_not_false")
         for item in invalid
+    )
+
+
+def test_promotion_memory_trust_review_result_consumer_rejects_forged_prior_summary_ids(
+    tmp_path,
+):
+    index_consumer = _promotion_memory_index_result_consumer_ready(tmp_path)
+    forged_prior = deepcopy(index_consumer)
+    forged_prior["summary"]["memory_index_record_proposal_ids"] = [
+        "proposal-second"
+    ]
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer(
+            promotion_memory_index_result_consumer=forged_prior,
+            promotion_memory_trust_review_result=_memory_trust_review(index_consumer),
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer_replacement_required"
+    )
+    assert (
+        consumer["summary"]["promotion_acceptance_ledger_request_available"]
+        is False
+    )
+    assert consumer["summary"]["expected_trust_review_candidate_count"] == 1
+    assert consumer["summary"]["trust_review_candidate_proposal_ids"] == []
+    assert consumer["promotion_acceptance_record_templates"] == []
+    assert "memory_trust_review" not in consumer["promotion_acceptance_ledger_request"]
+    assert (
+        "promotion_memory_trust_review_result_consumer_prior_summary_proposal_ids_mismatch"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+
+
+def test_promotion_memory_trust_review_result_consumer_rejects_missing_source_freshness(
+    tmp_path,
+):
+    index_consumer = deepcopy(_promotion_memory_index_result_consumer_ready(tmp_path))
+    trust_review = _memory_trust_review(index_consumer)
+    request = index_consumer["promotion_memory_trust_review_request"]
+    for template in request["promotion_acceptance_record_templates"]:
+        template.pop("current_sequence_review_freshness", None)
+    request.pop("memory_trust_review_request_specs", None)
+    index_consumer["summary"].pop("source_sequence_review_context_status", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer(
+            promotion_memory_index_result_consumer=index_consumer,
+            promotion_memory_trust_review_result=trust_review,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer_replacement_required"
+    )
+    assert (
+        consumer["summary"]["promotion_acceptance_ledger_request_available"]
+        is False
+    )
+    assert consumer["summary"]["source_sequence_review_context_status"] == "missing"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "promotion_memory_trust_review_result_consumer_prior_summary_source_freshness_not_fresh"
+        in invalid
+    )
+    assert (
+        "promotion_memory_trust_review_result_consumer_prior_summary_review_request_spec_count_mismatch"
+        in invalid
+    )
+    assert (
+        "promotion_memory_trust_review_result_consumer_prior_summary_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert (
+        "promotion_memory_trust_review_result_consumer_prior_request_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert "proposal-first_current_sequence_review_freshness_missing" in invalid
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_acceptance_ledger_request"]
+    )
+    assert (
+        "memory_trust_review_request_specs"
+        not in consumer["promotion_acceptance_ledger_request"]
+    )
+
+
+def test_promotion_memory_trust_review_result_consumer_rejects_live_source_freshness(
+    tmp_path,
+):
+    index_consumer = deepcopy(_promotion_memory_index_result_consumer_ready(tmp_path))
+    trust_review = _memory_trust_review(index_consumer)
+    live_freshness = {
+        "status": "fresh",
+        "read_only": False,
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    request = index_consumer["promotion_memory_trust_review_request"]
+    request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+    request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer(
+            promotion_memory_index_result_consumer=index_consumer,
+            promotion_memory_trust_review_result=trust_review,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer_replacement_required"
+    )
+    assert (
+        consumer["summary"]["promotion_acceptance_ledger_request_available"]
+        is False
+    )
+    assert consumer["summary"]["source_sequence_review_context_status"] == "invalid"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first_current_sequence_review_freshness_read_only_not_true" in invalid
+    assert "proposal-first_current_sequence_review_freshness_live_write_not_false" in invalid
+    assert (
+        "proposal-first_current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
+    )
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_acceptance_ledger_request"]
+    )
+
+
+def test_promotion_memory_trust_review_result_consumer_rejects_forged_source_template_identity(
+    tmp_path,
+):
+    index_consumer = deepcopy(_promotion_memory_index_result_consumer_ready(tmp_path))
+    trust_review = _memory_trust_review(index_consumer)
+    template = index_consumer["promotion_memory_trust_review_request"][
+        "promotion_acceptance_record_templates"
+    ][0]
+    template["consumer_record_id"] = ""
+    template["source_memory_trust_review_request_spec_id"] = "forged-review-spec"
+    template["current_sequence_review_freshness"] = {
+        **template["current_sequence_review_freshness"],
+        "status": "stale",
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer(
+            promotion_memory_index_result_consumer=index_consumer,
+            promotion_memory_trust_review_result=trust_review,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer_replacement_required"
+    )
+    assert (
+        consumer["summary"]["promotion_acceptance_ledger_request_available"]
+        is False
+    )
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:consumer_record_id_missing" in invalid
+    assert "proposal-first:source_memory_trust_review_request_spec_id_mismatch" in invalid
+    assert "proposal-first:current_sequence_review_freshness_request_spec_mismatch" in invalid
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_acceptance_ledger_request"]
     )
 
 

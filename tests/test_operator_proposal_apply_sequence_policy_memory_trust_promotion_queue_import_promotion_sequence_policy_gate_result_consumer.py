@@ -177,6 +177,16 @@ def test_promotion_sequence_policy_gate_result_consumer_emits_policy_consumer_re
     )
     assert consumer["summary"]["expected_sequence_policy_gate_record_count"] == 1
     assert consumer["summary"]["sequence_policy_gate_record_count"] == 1
+    assert consumer["summary"]["promotion_acceptance_record_template_count"] == 1
+    assert consumer["summary"]["memory_trust_review_request_spec_count"] == 2
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "fresh"
+    assert consumer["summary"]["promotion_acceptance_record_template_proposal_ids"] == [
+        "proposal-first"
+    ]
+    assert consumer["summary"]["memory_trust_review_request_spec_proposal_ids"] == [
+        "proposal-first",
+        "proposal-second",
+    ]
     assert consumer["summary"]["invalid_record_count"] == 0
     assert consumer["summary"]["promotion_policy_consumer_request_available"] is True
     assert consumer["summary"]["promotion_policy_consumer_handler_invoked"] is False
@@ -201,6 +211,32 @@ def test_promotion_sequence_policy_gate_result_consumer_emits_policy_consumer_re
     assert request["runtime_memory_mutation"] is False
     assert request["live_authority_granted"] is False
     assert request["sequence_policy_gate"] == gate
+    assert request["sequence_policy_gate"]["policy_records"][0][
+        "current_sequence_review_freshness"
+    ]["status"] == "fresh"
+    assert request["sequence_policy_gate"]["policy_records"][0][
+        "current_sequence_review_freshness"
+    ]["read_only"] is True
+    assert request["promotion_acceptance_record_templates"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert request["promotion_acceptance_record_templates"][0]["idempotency_key"] == (
+        "seq-policy:proposal-first"
+    )
+    assert request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] == rollback_result_consumer["promotion_sequence_policy_gate_request"][
+        "promotion_acceptance_record_templates"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
+    assert request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] == rollback_result_consumer["promotion_sequence_policy_gate_request"][
+        "memory_trust_review_request_specs"
+    ][0][
+        "current_sequence_review_freshness"
+    ]
 
     policy_record = gate["policy_records"][0]
     policy_consumer = (
@@ -220,6 +256,75 @@ def test_promotion_sequence_policy_gate_result_consumer_emits_policy_consumer_re
     assert policy_consumer["summary"]["live_authority_granted"] is False
     assert policy_consumer["consumer_records"][0]["can_import_to_queue"] is False
     assert policy_consumer["consumer_records"][0]["can_apply_live"] is False
+
+
+def test_promotion_sequence_policy_gate_result_consumer_rejects_missing_context(
+    tmp_path,
+):
+    rollback_result_consumer = _promotion_rollback_verification_result_consumer(tmp_path)
+    forged = deepcopy(_sequence_policy_gate_ready(rollback_result_consumer))
+    forged["policy_records"][0].pop("current_sequence_review_freshness")
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer(
+            promotion_rollback_verification_result_consumer=rollback_result_consumer,
+            promotion_sequence_policy_gate_result=forged,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_policy_consumer_request_available"] is False
+    assert any(
+        item.endswith(":current_sequence_review_freshness_missing")
+        for item in consumer["summary"]["invalid_record_ids"]
+    )
+    assert "sequence_policy_gate" not in consumer["promotion_policy_consumer_request"]
+
+
+def test_promotion_sequence_policy_gate_result_consumer_rejects_live_authority_context(
+    tmp_path,
+):
+    rollback_result_consumer = _promotion_rollback_verification_result_consumer(tmp_path)
+    forged = deepcopy(_sequence_policy_gate_ready(rollback_result_consumer))
+    forged["policy_records"][0]["current_sequence_review_freshness"] = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer(
+            promotion_rollback_verification_result_consumer=rollback_result_consumer,
+            promotion_sequence_policy_gate_result=forged,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_policy_consumer_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert any(
+        item.endswith(":current_sequence_review_freshness_mismatch")
+        for item in invalid
+    )
+    assert any(
+        item.endswith(":current_sequence_review_freshness_read_only_not_true")
+        for item in invalid
+    )
+    assert any(
+        item.endswith(":current_sequence_review_freshness_live_write_not_false")
+        for item in invalid
+    )
+    assert "sequence_policy_gate" not in consumer["promotion_policy_consumer_request"]
 
 
 def test_promotion_sequence_policy_gate_result_consumer_rejects_forged_gate(
@@ -257,6 +362,163 @@ def test_promotion_sequence_policy_gate_result_consumer_rejects_forged_gate(
     assert "sequence_policy_gate" not in consumer["promotion_policy_consumer_request"]
 
 
+def test_promotion_sequence_policy_gate_result_consumer_rejects_missing_sequence_review_freshness(
+    tmp_path,
+):
+    rollback_result_consumer = deepcopy(
+        _promotion_rollback_verification_result_consumer(tmp_path)
+    )
+    gate = _sequence_policy_gate_ready(rollback_result_consumer)
+    request = rollback_result_consumer["promotion_sequence_policy_gate_request"]
+    for template in request["promotion_acceptance_record_templates"]:
+        template.pop("current_sequence_review_freshness", None)
+    request.pop("memory_trust_review_request_specs", None)
+    rollback_result_consumer["summary"].pop(
+        "fresh_sequence_review_context_status",
+        None,
+    )
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer(
+            promotion_rollback_verification_result_consumer=rollback_result_consumer,
+            promotion_sequence_policy_gate_result=gate,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_policy_consumer_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "missing"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_freshness_not_fresh"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_request_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_memory_trust_review_request_spec_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_review_request_spec_proposal_ids_mismatch"
+        in invalid
+    )
+    assert "proposal-first:current_sequence_review_freshness_missing" in invalid
+    assert "sequence_policy_gate" not in consumer["promotion_policy_consumer_request"]
+    assert (
+        "memory_trust_review_request_specs"
+        not in consumer["promotion_policy_consumer_request"]
+    )
+
+
+def test_promotion_sequence_policy_gate_result_consumer_rejects_live_sequence_review_freshness(
+    tmp_path,
+):
+    rollback_result_consumer = deepcopy(
+        _promotion_rollback_verification_result_consumer(tmp_path)
+    )
+    gate = _sequence_policy_gate_ready(rollback_result_consumer)
+    live_freshness = {
+        "status": "fresh",
+        "read_only": False,
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+    request = rollback_result_consumer["promotion_sequence_policy_gate_request"]
+    request["promotion_acceptance_record_templates"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+    request["memory_trust_review_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = live_freshness
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer(
+            promotion_rollback_verification_result_consumer=rollback_result_consumer,
+            promotion_sequence_policy_gate_result=gate,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_policy_consumer_request_available"] is False
+    assert consumer["summary"]["fresh_sequence_review_context_status"] == "invalid"
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in invalid
+    )
+    assert "proposal-first:current_sequence_review_freshness_live_write_not_false" in invalid
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in invalid
+    )
+    assert "sequence_policy_gate" not in consumer["promotion_policy_consumer_request"]
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_policy_consumer_request"]
+    )
+
+
+def test_promotion_sequence_policy_gate_result_consumer_rejects_forged_acceptance_template_identity(
+    tmp_path,
+):
+    rollback_result_consumer = deepcopy(
+        _promotion_rollback_verification_result_consumer(tmp_path)
+    )
+    gate = _sequence_policy_gate_ready(rollback_result_consumer)
+    template = rollback_result_consumer["promotion_sequence_policy_gate_request"][
+        "promotion_acceptance_record_templates"
+    ][0]
+    template["idempotency_key"] = "seq-policy:forged"
+    template["consumer_record_id"] = ""
+    template["source_memory_trust_review_request_spec_id"] = "forged-review-spec"
+    template["current_sequence_review_freshness"] = {
+        **template["current_sequence_review_freshness"],
+        "status": "stale",
+    }
+    gate["policy_records"][0]["current_sequence_review_freshness"] = {
+        **gate["policy_records"][0]["current_sequence_review_freshness"],
+        "status": "stale",
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer(
+            promotion_rollback_verification_result_consumer=rollback_result_consumer,
+            promotion_sequence_policy_gate_result=gate,
+        )
+    )
+
+    assert consumer["status"] == (
+        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["promotion_policy_consumer_request_available"] is False
+    invalid = consumer["summary"]["invalid_record_ids"]
+    assert "proposal-first:idempotency_key_gate_record_mismatch" in invalid
+    assert "proposal-first:consumer_record_id_missing" in invalid
+    assert "proposal-first:source_memory_trust_review_request_spec_id_mismatch" in invalid
+    assert "proposal-first:current_sequence_review_freshness_request_spec_mismatch" in invalid
+    assert (
+        "proposal-first:policy_record_current_sequence_review_freshness_request_spec_mismatch"
+        in invalid
+    )
+    assert "sequence_policy_gate" not in consumer["promotion_policy_consumer_request"]
+    assert (
+        "promotion_acceptance_record_templates"
+        not in consumer["promotion_policy_consumer_request"]
+    )
+
+
 def test_promotion_sequence_policy_gate_result_consumer_rejects_forged_prior_consumer(
     tmp_path,
 ):
@@ -265,6 +527,16 @@ def test_promotion_sequence_policy_gate_result_consumer_rejects_forged_prior_con
     )
     gate = _sequence_policy_gate_ready(rollback_result_consumer)
     rollback_result_consumer["summary"]["rollback_verified_record_count"] = 2
+    rollback_result_consumer["summary"][
+        "promotion_acceptance_record_template_count"
+    ] = 2
+    rollback_result_consumer["summary"][
+        "promotion_acceptance_record_template_proposal_ids"
+    ] = ["proposal-second"]
+    rollback_result_consumer["summary"]["memory_trust_review_request_spec_count"] = 1
+    rollback_result_consumer["summary"][
+        "memory_trust_review_request_spec_proposal_ids"
+    ] = ["proposal-second"]
     rollback_result_consumer["safety"]["live_authority_granted"] = True
 
     consumer = (
@@ -284,6 +556,22 @@ def test_promotion_sequence_policy_gate_result_consumer_rejects_forged_prior_con
     )
     assert (
         "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_rollback_verified_record_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_promotion_acceptance_record_template_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_template_proposal_ids_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_memory_trust_review_request_spec_count_mismatch"
+        in invalid
+    )
+    assert (
+        "sequence_policy_promotion_gate_result_consumer_rollback_result_consumer_summary_review_request_spec_proposal_ids_mismatch"
         in invalid
     )
     assert "sequence_policy_gate" not in consumer["promotion_policy_consumer_request"]

@@ -16,6 +16,18 @@ def _freshness(status="fresh"):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["can_import_to_queue"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["mutates_mixer"] is False
+
+
 def _identity(
     source_id,
     source_type,
@@ -70,12 +82,17 @@ def test_cross_adaptive_eq_emits_linked_proposal_actions_with_rollback_evidence(
     assert result.method_id == "cross_adaptive_eq"
     assert result.metadata["proposal_only"] is True
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
     assert result.metadata["current_state_cache_freshness_status"] == "fresh"
     assert result.metadata["current_masking_context_cache_no_live_authority"] is True
     assert result.metadata["current_arrangement_context_cache_no_live_authority"] is True
     assert result.metadata["source_identity_downstream_trust"][0]["status"] == "legacy_unverified"
     assert len(result.adjustments) == 2
     assert len(result.suggested_actions) == 2
+    for action in result.suggested_actions:
+        assert action["live_write_allowed"] is False
+        _assert_top_level_denial(action)
+        _assert_top_level_denial(action["cross_adaptive_eq_safety_summary"])
 
     cut = next(item for item in result.adjustments if item.role == "masker_cut")
     boost = next(item for item in result.adjustments if item.role == "masked_source_boost")
@@ -94,10 +111,70 @@ def test_cross_adaptive_eq_emits_linked_proposal_actions_with_rollback_evidence(
     assert cut_action["action_type"] == "cross_channel_unmasking_eq_candidate"
     assert cut_action["target_kind"] == "masking_eq_band"
     assert cut_action["live_write_allowed"] is False
-    assert cut_action["can_import_to_queue"] is False
+    _assert_top_level_denial(cut_action)
     assert cut_action["old_value"]["source"] == READ_REQUIRED_SOURCE
     assert cut_action["rollback_value"]["source"] == READ_REQUIRED_SOURCE
     assert cut_action["rollback_required"] is True
+    summary = evidence["cross_adaptive_eq_safety_summary"]
+    assert summary == cut_action["cross_adaptive_eq_safety_summary"]
+    assert summary["summary_type"] == "cross_adaptive_eq_unmasking_review"
+    assert summary["channel_id"] == 2
+    assert summary["paired_channel_id"] == 1
+    assert summary["band"] == "mid"
+    assert summary["bounded_gain_delta"] is True
+    assert summary["manual_eq_band_review"] == "required_before_apply"
+    assert summary["phase_risk_review"] == "required_before_apply"
+    assert summary["feedback_safety"] == "required_before_apply"
+    assert summary["true_peak_headroom"] == "required_before_apply"
+    assert summary["current_masking_context_cache_no_live_authority"] is True
+    assert summary["current_arrangement_context_cache_no_live_authority"] is True
+    _assert_top_level_denial(summary)
+    assert summary["can_authorize_live"] is False
+    correction = cut_action["operator_correction"]
+    assert correction["objective_family"] == "eq"
+    assert correction["bounded_delta"]["delta_db"] == round(cut_action["gain_db"], 1)
+    assert correction["bounded_delta"]["target"] == cut_action["channel_id"]
+    assert correction["bounded_delta"]["old_value"] == cut_action["old_value"]
+    assert correction["bounded_delta"]["proposed_value"] == cut_action["proposed_value"]
+    assert correction["bounded_delta"]["parameter_deltas"]["q_factor"] == cut_action["q_factor"]
+    assert correction["bounded_delta"]["parameter_deltas"]["band"] == "mid"
+    assert correction["future_wing_readback_contract"]["target_kind"] == "masking_eq_band"
+    assert correction["future_wing_readback_contract"]["old_value_source"] == READ_REQUIRED_SOURCE
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["safety_blockers"] == [
+        "unsupported_value_type:eq",
+        "not_in_supervised_fader_gain_executor",
+        "hardware_readback_and_rollback_not_proven",
+    ]
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_masking_context_cache_no_live_authority"
+    ] is True
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "linked_cut_boost_pair"
+    ] is True
+    completeness = correction["source_evidence"]["evidence_completeness"]
+    assert completeness["status"] == "complete"
+    assert completeness["missing"] == []
+    assert correction["operator_proposal_review_gate"]["evidence_gate_status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["cross_adaptive_eq_safety_summary"] == summary
+    assert source_evidence["rollback_eq_band_readback"] == {
+        "channel_id": 2,
+        "paired_channel_id": 1,
+        "band": "mid",
+        "frequency_hz": cut_action["frequency_hz"],
+        "gain_db": cut_action["gain_db"],
+        "q_factor": cut_action["q_factor"],
+        "source": READ_REQUIRED_SOURCE,
+        "required_before_live_promotion": True,
+        "live_write": False,
+    }
+    assert source_evidence["current_masking_context_cache_no_live_authority"] is True
+    assert source_evidence["current_arrangement_context_cache_no_live_authority"] is True
     assert evidence["masking_pair"] is True
     assert evidence["linked_cut_boost_pair"] is True
     assert evidence["bounded_gain_delta"] is True
@@ -165,6 +242,7 @@ def test_stale_masking_context_blocks_unmasking_proposals():
     assert result.metadata["current_state_cache_freshness_status"] == "stale"
     assert "cross_adaptive_eq_context_cache_not_fresh" in result.metadata["blockers"]
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_missing_masking_context_blocks_unmasking_proposals():
@@ -184,6 +262,7 @@ def test_missing_masking_context_blocks_unmasking_proposals():
     assert result.metadata["current_state_cache_freshness"]["provided"] is False
     assert "cross_adaptive_eq_context_cache_not_fresh" in result.metadata["blockers"]
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_live_authority_masking_context_blocks_unmasking_proposals():
@@ -217,6 +296,7 @@ def test_live_authority_masking_context_blocks_unmasking_proposals():
         "blockers"
     ]
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_stale_arrangement_context_blocks_unmasking_proposals():
@@ -239,6 +319,7 @@ def test_stale_arrangement_context_blocks_unmasking_proposals():
     assert result.metadata["arrangement_context_cache_freshness_status"] == "stale"
     assert "cross_adaptive_eq_arrangement_context_cache_not_fresh" in result.metadata["blockers"]
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_live_authority_arrangement_context_blocks_unmasking_proposals():
@@ -273,6 +354,7 @@ def test_live_authority_arrangement_context_blocks_unmasking_proposals():
         in result.metadata["blockers"]
     )
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_missing_arrangement_freshness_blocks_unmasking_proposals():
@@ -292,6 +374,7 @@ def test_missing_arrangement_freshness_blocks_unmasking_proposals():
     assert result.metadata["arrangement_context_cache_freshness"]["provided"] is False
     assert "cross_adaptive_eq_arrangement_context_cache_not_fresh" in result.metadata["blockers"]
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_missing_arrangement_context_blocks_unmasking_proposals():
@@ -310,6 +393,7 @@ def test_missing_arrangement_context_blocks_unmasking_proposals():
     assert "cross_adaptive_eq_arrangement_context_missing_for_channel" in result.metadata["blockers"]
     assert result.metadata["arrangement_context_blocked_channel_count"] == 2
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_low_confidence_arrangement_context_blocks_unmasking_proposals():
@@ -334,6 +418,7 @@ def test_low_confidence_arrangement_context_blocks_unmasking_proposals():
     assert blocked["channel_id"] == 1
     assert blocked["usable_for_unmasking_priority"] is False
     assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_held_source_identity_blocks_unmasking_proposals():
@@ -365,7 +450,7 @@ def test_held_source_identity_blocks_unmasking_proposals():
     assert blocked["evidence"]["model_mutation"] is False
     assert blocked["evidence"]["memory_mutation"] is False
     assert result.metadata["live_write_allowed"] is False
-    assert result.metadata["can_import_to_queue"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_stale_source_identity_replay_context_blocks_unmasking_proposals():
@@ -392,6 +477,8 @@ def test_stale_source_identity_replay_context_blocks_unmasking_proposals():
     assert blocked["status"] == "trusted"
     assert blocked["usable_for_downstream"] is False
     assert blocked["evidence"]["current_source_identity_replay_context_cache_freshness"] == "stale"
+    assert result.metadata["live_write_allowed"] is False
+    _assert_top_level_denial(result.metadata)
 
 
 def test_legacy_cross_adaptive_calculate_corrections_still_returns_adjustments():

@@ -25,9 +25,19 @@ from compressor_profiles import (
     get_profile_for_context, ProfileSelector, ProfileLibrary,
     Genre, Style, TaskType, ProfileContext
 )
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 from signal_analysis import SignalFeatureExtractor, ChannelSignalFeatures
 
 logger = logging.getLogger(__name__)
+
+AUTO_COMPRESSOR_METHOD_ID = "auto_compressor"
+DYNAMICS_READ_REQUIRED_SOURCE = (
+    "cached_or_physical_dynamics_read_required_before_promotion"
+)
 
 # Smooth transition: duration and update rate
 TRANSITION_DURATION_SEC = 0.8
@@ -39,6 +49,36 @@ GR_LOW_DB = 1.0
 GR_SEVERE_DB = 15.0  # Severe over-compression threshold
 AUTO_CORRECTION_COOLDOWN_SEC = 3.0  # Reduced cooldown for faster response
 MAX_CORRECTIONS_IN_ROW = 5  # Increased to allow more corrections
+
+
+def _compressor_fail_closed_contract_evidence(
+    action: Dict[str, Any],
+) -> Dict[str, Any]:
+    makeup_gain = action.get("makeup_gain_db")
+    target_gain_reduction_db = action.get("target_gain_reduction_db")
+    return {
+        "gain_reduction_estimate": {
+            "status": "required_before_live_promotion",
+            "meter_readback_required": True,
+            "target_gain_reduction_db": target_gain_reduction_db,
+        },
+        "target_gain_reduction_db": target_gain_reduction_db,
+        "requested_makeup_gain_db": makeup_gain,
+        "makeup_headroom": {
+            "status": "required_before_live_promotion",
+            "makeup_gain_db": makeup_gain,
+            "true_peak_headroom_required": True,
+        },
+        "true_peak_headroom": "required_before_live_promotion",
+        "current_dynamics_cache_freshness": {
+            "status": "required_before_live_promotion",
+            "source": DYNAMICS_READ_REQUIRED_SOURCE,
+        },
+        "current_dynamics_cache_no_live_authority": True,
+        "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+        "rollback_dynamics_readback": DYNAMICS_READ_REQUIRED_SOURCE,
+        "bypass_state": "readback_required_before_live_promotion",
+    }
 
 
 def _ease_out(t: float) -> float:
@@ -255,6 +295,7 @@ class AutoCompressorController:
         blocked_calls: List[Dict[str, Any]],
         *,
         channel: Optional[int] = None,
+        proposed_action: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         self.last_write_attempted = bool(blocked_calls)
         self.last_write_blocked = bool(blocked_calls)
@@ -270,11 +311,95 @@ class AutoCompressorController:
             "write_policy": self.write_policy,
             "live_write_allowed": self.live_write_allowed,
             "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "mixer_client_present": self.mixer_client is not None,
             "mutates_mixer": False,
         }
         if channel is not None:
             result["channel"] = channel
+        blockers = [
+            "unsupported_value_type:compressor",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            reason,
+        ]
+        if not blocked_calls:
+            blockers.append("missing_compressor_apply_calls")
+        action = proposed_action or {
+            "action_type": reason,
+            "channel": channel,
+            "blocked_calls": list(blocked_calls),
+            "blocked_call_count": len(blocked_calls),
+        }
+        contract_evidence = _compressor_fail_closed_contract_evidence(action)
+        action = {
+            **action,
+            **contract_evidence,
+        }
+        proposal = {
+            "id": f"{AUTO_COMPRESSOR_METHOD_ID}:{channel or 'unknown'}:{reason}",
+            "method_id": AUTO_COMPRESSOR_METHOD_ID,
+            "source": AUTO_COMPRESSOR_METHOD_ID,
+            "title": f"Ch {channel or '?'}: compressor blocked proposal evidence",
+            "reason": (
+                "AutoCompressor generated blocked dynamics write evidence. It is "
+                "operator review only until dynamics readback, makeup/headroom "
+                "safety and rollback proof exist."
+            ),
+            "target": channel,
+            "kind": "compressor",
+            "severity": "medium" if blocked_calls else "low",
+            "confidence": None,
+            "queue_action": result["queue_action"],
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "live_write": False,
+            "queue_mutation": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "proposed_action": action,
+            "evidence": {
+                "blocked_calls": list(blocked_calls),
+                "blocked_call_count": len(blocked_calls),
+                "write_policy": self.write_policy,
+                "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+                "rollback_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+                **contract_evidence,
+                "live_write": False,
+                "queue_mutation": False,
+                "can_apply_live": False,
+                "can_import_to_queue": False,
+                "queue_import_allowed": False,
+                "live_apply_allowed": False,
+                "read_only_or_dry_run_only": True,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+                "queue_action": "not_queueable_until_promoted",
+                "mutates_mixer": False,
+                "readback_required_before_promotion": True,
+                "rollback_required_before_promotion": True,
+            },
+        }
+        result["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=AUTO_COMPRESSOR_METHOD_ID,
+            target=channel,
+            proposed_action=action,
+            blockers=blockers,
+        )
         self.last_apply_result = result
         if blocked_calls:
             logger.warning(
@@ -316,8 +441,14 @@ class AutoCompressorController:
         blocked_calls: List[Dict[str, Any]],
         *,
         channel: Optional[int] = None,
+        proposed_action: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        result = self._blocked_compressor_result(reason, blocked_calls, channel=channel)
+        result = self._blocked_compressor_result(
+            reason,
+            blocked_calls,
+            channel=channel,
+            proposed_action=proposed_action,
+        )
         self._send_status(
             {
                 "compressor_apply_blocked": True,
@@ -334,6 +465,12 @@ class AutoCompressorController:
             "auto_compressor_direct_apply_quarantined",
             [self._compressor_on_call(mixer_ch, on, semantic)],
             channel=mixer_ch,
+            proposed_action={
+                "action_type": "auto_compressor_on_toggle_blocked",
+                "channel": mixer_ch,
+                "compressor_on": int(on),
+                "semantic": semantic,
+            },
         )
 
     def _apply_compressor_smooth(
@@ -389,6 +526,18 @@ class AutoCompressorController:
             "auto_compressor_direct_apply_quarantined",
             blocked_calls,
             channel=mixer_ch,
+            proposed_action={
+                "action_type": "auto_compressor_apply_blocked",
+                "channel": mixer_ch,
+                "threshold_db": float(thr1),
+                "ratio": ratio_wing1,
+                "attack_ms": float(att1),
+                "release_ms": float(rel1),
+                "knee_db": float(knee1),
+                "makeup_gain_db": float(gain1),
+                "blocked_calls": list(blocked_calls),
+                "blocked_call_count": len(blocked_calls),
+            },
         )
         result["planned_params"] = planned
         result["transition_duration_sec"] = duration_sec

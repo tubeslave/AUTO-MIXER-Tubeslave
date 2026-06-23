@@ -74,6 +74,27 @@ REQUIRED_SEQUENCE_PLAN_FALSE_FLAGS = (
     "queries_console",
     "live_widening_allowed",
 )
+REQUIRED_SEQUENCE_REQUEST_SPEC_FALSE_FLAGS = (
+    "sequence_plan_created",
+    "sequence_execution_allowed_by_consumer",
+    "live_write",
+    "apply_attempted",
+    "queue_mutation",
+    "proposal_status_mutation",
+    "idempotency_reserved",
+    "manual_console_write_called",
+    "live_authority_granted",
+    "full_autonomous_ready",
+    "can_apply_live",
+)
+REQUIRED_SEQUENCE_REQUEST_SPEC_IDENTITY_FIELDS = (
+    "source_preflight_request_spec_id",
+    "queue_ordering_plan_record_id",
+    "consumer_record_id",
+    "sequence_policy_gate_record_id",
+    "policy_key",
+    "source_idempotency_key",
+)
 
 
 def _utc_now() -> str:
@@ -104,6 +125,34 @@ def _summary_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
+
+
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return _string(payload.get("status"))
+
+
+def _context_violations(proposal_id: str, payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return (f"{proposal_id}:current_sequence_review_freshness_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append(f"{proposal_id}:current_sequence_review_freshness_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append(
+            f"{proposal_id}:current_sequence_review_freshness_read_only_not_true"
+        )
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"{proposal_id}:current_sequence_review_freshness_{flag}_not_false"
+            )
+    return tuple(violations)
 
 
 def _duplicate_values(values: Tuple[str, ...]) -> Tuple[str, ...]:
@@ -324,6 +373,64 @@ def _sequence_step_violations(
     return tuple(violations)
 
 
+def _sequence_request_specs_violations(
+    specs: Tuple[Mapping[str, Any], ...],
+    *,
+    expected_ids: Tuple[str, ...],
+    prefix: str,
+) -> Tuple[str, ...]:
+    violations = []
+    spec_ids = tuple(_string(spec.get("proposal_id")) for spec in specs)
+    if spec_ids != expected_ids:
+        violations.append(
+            "sequence_policy_sequence_plan_result_consumer_request_specs_candidate_ids_mismatch"
+        )
+    for index, spec in enumerate(specs):
+        proposal_id = _string(spec.get("proposal_id")) or f"sequence_request_spec:{index}"
+        record_id = _string(spec.get("sequence_plan_request_spec_id")) or proposal_id
+        if spec.get("planned_sequence_index") != index:
+            violations.append(f"{record_id}:planned_sequence_index_mismatch")
+        if spec.get("source_preflight_index") != index:
+            violations.append(f"{record_id}:source_preflight_index_mismatch")
+        if spec.get("idempotency_key") != f"{prefix}:{proposal_id}":
+            violations.append(f"{record_id}:idempotency_key_mismatch")
+        if spec.get("sequence_plan_handler") != "plan_operator_proposal_apply_sequence":
+            violations.append(f"{record_id}:sequence_plan_handler_mismatch")
+        if spec.get("read_only") is not True:
+            violations.append(f"{record_id}:read_only_not_true")
+        if spec.get("preflight_result_consumer_only") is not True:
+            violations.append(f"{record_id}:preflight_result_consumer_only_not_true")
+        if spec.get("operator_sequence_plan_step_required_before_dry_run") is not True:
+            violations.append(
+                f"{record_id}:operator_sequence_plan_step_required_before_dry_run_not_true"
+            )
+        if _summary_int(spec.get("planned_queue_index")) is None:
+            violations.append(f"{proposal_id}:planned_queue_index_invalid")
+        if spec.get("rank_source") != "sequence_policy_consumer":
+            violations.append(f"{proposal_id}:rank_source_mismatch")
+        for field in REQUIRED_SEQUENCE_REQUEST_SPEC_IDENTITY_FIELDS:
+            if not _string(spec.get(field)):
+                violations.append(f"{proposal_id}:{field}_missing")
+        violations.extend(
+            _context_violations(
+                proposal_id,
+                _mapping(spec.get("current_sequence_review_freshness")),
+            )
+        )
+        source_idempotency_key = _string(spec.get("source_idempotency_key"))
+        policy_key = _string(spec.get("policy_key"))
+        if (
+            source_idempotency_key
+            and policy_key
+            and policy_key != f"{proposal_id}/{source_idempotency_key}"
+        ):
+            violations.append(f"{proposal_id}:policy_key_identity_mismatch")
+        for flag in REQUIRED_SEQUENCE_REQUEST_SPEC_FALSE_FLAGS:
+            if spec.get(flag) is not False:
+                violations.append(f"{record_id}:{flag}_not_false")
+    return tuple(violations)
+
+
 def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer(
     *,
     preflight_result_consumer: Mapping[str, Any] | None = None,
@@ -336,6 +443,12 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
     consumer_summary = _mapping(consumer.get("summary"))
     expected_ids = _string_list(consumer_summary.get("ready_preflight_result_proposal_ids"))
     prefix = _string(consumer_summary.get("idempotency_key_prefix"))
+    sequence_request_specs = _record_list(consumer.get("sequence_plan_request_specs"))
+    sequence_request_specs_by_proposal_id = {
+        _string(spec.get("proposal_id")): spec
+        for spec in sequence_request_specs
+        if _string(spec.get("proposal_id"))
+    }
     steps = _record_list(plan.get("planned_apply_sequence"))
     blocked_results = _record_list(plan.get("blocked_results"))
     step_ids = tuple(_step_id(step, index) for index, step in enumerate(steps))
@@ -354,6 +467,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             (
                 *_consumer_envelope_violations(consumer),
                 *_consumer_summary_violations(consumer_summary, expected_ids=expected_ids),
+                *_sequence_request_specs_violations(
+                    sequence_request_specs,
+                    expected_ids=expected_ids,
+                    prefix=prefix,
+                ),
                 *(
                     ("sequence_policy_sequence_plan_result_consumer_preflight_consumer_status_not_available",)
                     if consumer.get("status")
@@ -427,6 +545,11 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         status == "sequence_memory_trust_promotion_queue_import_dry_run_request_available"
     )
     selected_plan = plan if request_available else {}
+    selected_sequence_request_specs = tuple(
+        sequence_request_specs_by_proposal_id.get(proposal_id, {})
+        for proposal_id in step_ids
+        if request_available
+    )
     dry_run_specs = tuple(
         {
             "dry_run_request_spec_id": (
@@ -435,6 +558,40 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "proposal_id": proposal_id,
             "planned_dry_run_index": index,
             "source_sequence_plan_index": index,
+            "source_sequence_plan_request_spec_id": _string(
+                sequence_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "sequence_plan_request_spec_id"
+                )
+            ),
+            "source_preflight_request_spec_id": _string(
+                sequence_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                    "source_preflight_request_spec_id"
+                )
+            ),
+            "queue_ordering_plan_record_id": sequence_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("queue_ordering_plan_record_id"),
+            "consumer_record_id": sequence_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("consumer_record_id"),
+            "sequence_policy_gate_record_id": sequence_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("sequence_policy_gate_record_id"),
+            "policy_key": sequence_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                "policy_key"
+            ),
+            "source_idempotency_key": sequence_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("source_idempotency_key"),
+            "current_sequence_review_freshness": sequence_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("current_sequence_review_freshness"),
+            "planned_queue_index": sequence_request_specs_by_proposal_id.get(
+                proposal_id, {}
+            ).get("planned_queue_index"),
+            "rank_source": sequence_request_specs_by_proposal_id.get(proposal_id, {}).get(
+                "rank_source"
+            ),
             "idempotency_key": f"{prefix}:{proposal_id}",
             "read_only": True,
             "sequence_plan_result_consumer_only": True,
@@ -490,6 +647,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         },
         "summary": {
             "expected_sequence_plan_step_count": len(expected_ids),
+            "sequence_plan_request_spec_count": len(sequence_request_specs),
             "sequence_plan_step_count": len(steps),
             "blocked_sequence_plan_step_count": len(blocked_results),
             "invalid_record_count": len(invalid_record_ids),
@@ -509,6 +667,9 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
             "full_autonomous_ready": False,
             "can_apply_live": False,
             "expected_sequence_plan_proposal_ids": list(expected_ids),
+            "sequence_plan_request_spec_proposal_ids": [
+                spec.get("proposal_id") for spec in sequence_request_specs
+            ],
             "sequence_plan_step_proposal_ids": list(step_ids),
             "blocked_sequence_plan_proposal_ids": [
                 item.get("proposal_id")
@@ -534,6 +695,7 @@ def build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_i
         "dry_run_request": {
             "handler": "dry_run_operator_proposal_apply_sequence",
             "sequence_plan": selected_plan,
+            "sequence_plan_request_specs": list(selected_sequence_request_specs),
             "read_only_template": True,
             "live_write": False,
             "apply_attempted": False,

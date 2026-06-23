@@ -1,0 +1,584 @@
+{
+  "blocked_by": [
+    "physical_readback_fixtures_incomplete",
+    "operator_must_capture_and_review_physical_readback_artifact"
+  ],
+  "capture_step_count": 1,
+  "commands": {
+    "focused_validation": [
+      "PYTHONPATH=backend",
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_read_surface_physical_readback_capture_plan.py",
+      "tests/test_no_wing_release_check.py"
+    ]
+  },
+  "executes_tests": false,
+  "execution_allowed_by_packet": false,
+  "full_autonomous_ready": false,
+  "generated_at": "2026-06-18T06:01:48Z",
+  "live_authority_granted": false,
+  "live_widening_allowed": false,
+  "live_write": false,
+  "mutates_console_state": false,
+  "next_physical_readback_action_id": "remediate_raw_mixer_state_cache",
+  "next_physical_readback_surface_id": "raw_mixer_state_cache",
+  "operator_required": true,
+  "operator_sequence": [
+    "Confirm the intended console, show state, and read-only capture scope.",
+    "Use operator-approved read-only tooling outside this packet to capture the physical readback artifact.",
+    "Reject the artifact if the capture path would transmit a mixer-control command.",
+    "Validate the artifact against the required physical readback contract.",
+    "Review the artifact manually before changing fixture baselines or autonomy readiness."
+  ],
+  "physical_fixture_missing_surface_ids": [
+    "raw_mixer_state_cache",
+    "channel_identity_and_basic_controls",
+    "channel_eq_dynamics_gate",
+    "bus_group_main_dca_state",
+    "matrix_state",
+    "fx_slots_and_inserts",
+    "routing_and_sends",
+    "snapshots_scenes",
+    "user_presets",
+    "dlive_state"
+  ],
+  "physical_gap_surface_count": 10,
+  "queries_console": false,
+  "read_only": true,
+  "remaining_capture_target_count": 10,
+  "remaining_capture_targets": [
+    {
+      "blockers_to_clear": [
+        "Add per-surface timestamp fixtures so cached state cannot be mistaken for fresh physical proof.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "per_field_stale_cache_fixture_incomplete",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "raw_mixer_state_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for all_cached_addresses with explicit coverage flags.",
+        "Fixture test proving raw_mixer_state_cache does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for raw_mixer_state_cache proving cached or queryable evidence matches console state.",
+        "Raw mixer-state physical readback artifact validated by raw_mixer_state_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": true,
+      "queries_console": false,
+      "read_mode": "cached_state",
+      "remediation_action_id": "remediate_raw_mixer_state_cache",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "raw_mixer_state_physical_readback_contract",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "per_field_stale_cache_fixture_incomplete"
+      ],
+      "requires_connection": true,
+      "surface_id": "raw_mixer_state_cache",
+      "target_console_surface": "all_cached_addresses"
+    },
+    {
+      "blockers_to_clear": [
+        "Color/icon, HPF, EQ, physical source-patch readback, and fixture snapshots are not fully normalized into one channel read contract.",
+        "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "per_field_stale_cache_fixture_incomplete",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "channel_basic_controls_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for channels with explicit coverage flags.",
+        "Fixture test proving channel_identity_and_basic_controls does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for channel_identity_and_basic_controls proving cached or queryable evidence matches console state.",
+        "Channel identity/basic-control physical readback artifact validated by channel_basic_controls_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "product_snapshot",
+      "remediation_action_id": "remediate_channel_identity_and_basic_controls",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "channel_basic_controls_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "per_field_stale_cache_fixture_incomplete"
+      ],
+      "requires_connection": true,
+      "surface_id": "channel_identity_and_basic_controls",
+      "target_console_surface": "channels"
+    },
+    {
+      "blockers_to_clear": [
+        "Physical query fixtures, de-esser/dynamic-EQ readback, and WING/dLive parity remain incomplete.",
+        "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "osc_query_fixture_missing",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_query_readback_fixture",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "channel_processing_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for channels.processing with explicit coverage flags.",
+        "Fixture test proving channel_eq_dynamics_gate does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for channel_eq_dynamics_gate proving cached or queryable evidence matches console state.",
+        "Channel HPF/EQ/dynamics/gate physical readback artifact validated by channel_processing_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "osc_read_query",
+      "remediation_action_id": "remediate_channel_eq_dynamics_gate",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "channel_processing_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_query_readback_fixture",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "osc_query_fixture_missing"
+      ],
+      "requires_connection": true,
+      "surface_id": "channel_eq_dynamics_gate",
+      "target_console_surface": "channels.processing"
+    },
+    {
+      "blockers_to_clear": [
+        "Physical query fixtures, full group membership, matrix sends, WING/dLive parity, and bus/main/DCA safety review remain incomplete.",
+        "Add physical-query fixture snapshots, full group membership proof, matrix-send evidence, WING/dLive parity mapping, and safety review before bus/DCA/group balance proposals become live candidates.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "osc_query_fixture_missing",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_query_readback_fixture",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "bus_group_main_dca_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for buses_groups_main_dca with explicit coverage flags.",
+        "Fixture test proving bus_group_main_dca_state does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for bus_group_main_dca_state proving cached or queryable evidence matches console state.",
+        "Bus/group/main/DCA physical readback artifact validated by bus_group_main_dca_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "osc_read_query",
+      "remediation_action_id": "remediate_bus_group_main_dca_state",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "bus_group_main_dca_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_query_readback_fixture",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "osc_query_fixture_missing"
+      ],
+      "requires_connection": true,
+      "surface_id": "bus_group_main_dca_state",
+      "target_console_surface": "buses_groups_main_dca"
+    },
+    {
+      "blockers_to_clear": [
+        "Physical query fixtures, WING/dLive parity, route diff proof, and matrix safety review remain incomplete.",
+        "Add physical-query matrix fixtures, route diff proof, WING/dLive parity mapping, and matrix safety review before master/matrix optimization claims.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "matrix_state_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for matrices with explicit coverage flags.",
+        "Fixture test proving matrix_state does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for matrix_state proving cached or queryable evidence matches console state.",
+        "Matrix-state physical readback artifact validated by matrix_state_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "cached_state",
+      "remediation_action_id": "remediate_matrix_state",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "matrix_state_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven"
+      ],
+      "requires_connection": true,
+      "surface_id": "matrix_state",
+      "target_console_surface": "matrices"
+    },
+    {
+      "blockers_to_clear": [
+        "Physical query fixtures, complete model-specific FX parameter schemas, scoped insert diffing, and FX safety review are incomplete.",
+        "Expand FX-model parameter schemas, add physical fixture snapshots, scoped insert diff artifacts, and FX safety review before FX proposals become live candidates.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "fx_slots_inserts_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for fx_inserts with explicit coverage flags.",
+        "Fixture test proving fx_slots_and_inserts does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for fx_slots_and_inserts proving cached or queryable evidence matches console state.",
+        "FX slots/inserts physical readback artifact validated by fx_slots_inserts_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "product_snapshot",
+      "remediation_action_id": "remediate_fx_slots_and_inserts",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "fx_slots_inserts_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven"
+      ],
+      "requires_connection": true,
+      "surface_id": "fx_slots_and_inserts",
+      "target_console_surface": "fx_inserts"
+    },
+    {
+      "blockers_to_clear": [
+        "Physical query fixtures, complete route/send diffing, and destructive-change review gates are incomplete.",
+        "Add physical-query fixtures and route/send diff schema before any routing or send proposal can become queueable.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "route_send_diff_fixture_missing",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "destructive_change_diff_marker",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "routing_sends_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for routing_sends with explicit coverage flags.",
+        "Fixture test proving routing_and_sends does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for routing_and_sends proving cached or queryable evidence matches console state.",
+        "Routing/sends physical readback artifact validated by routing_sends_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "static_config",
+      "remediation_action_id": "remediate_routing_and_sends",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "routing_sends_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "destructive_change_diff_marker",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "route_send_diff_fixture_missing"
+      ],
+      "requires_connection": true,
+      "surface_id": "routing_and_sends",
+      "target_console_surface": "routing_sends"
+    },
+    {
+      "blockers_to_clear": [
+        "Scene contents, restore diff, and rollback proof are not read-only audited before load/save operations.",
+        "Keep scene apply blocked; add read-only scene diff artifacts, rollback evidence, and physical fixtures before any automation.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "scoped_diff_fixture_missing",
+        "rollback_diff_fixture_missing",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "destructive_change_diff_marker",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "snapshots_scenes_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for snapshots_scenes with explicit coverage flags.",
+        "Fixture test proving snapshots_scenes does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for snapshots_scenes proving cached or queryable evidence matches console state.",
+        "Snapshots/scenes physical readback artifact validated by snapshots_scenes_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "product_snapshot",
+      "remediation_action_id": "remediate_snapshots_scenes",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "snapshots_scenes_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "destructive_change_diff_marker",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "scoped_diff_fixture_missing",
+        "rollback_diff_fixture_missing"
+      ],
+      "requires_connection": true,
+      "surface_id": "snapshots_scenes",
+      "target_console_surface": "snapshots_scenes"
+    },
+    {
+      "blockers_to_clear": [
+        "Physical preset enumeration, preset parameter contents, scoped diff, and rollback proof are incomplete.",
+        "Add physical-query fixtures and preset diff artifacts before any preset recall/store proposal can become queueable.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "scoped_diff_fixture_missing",
+        "rollback_diff_fixture_missing",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "destructive_change_diff_marker",
+        "enumeration_contract",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "user_presets_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for presets with explicit coverage flags.",
+        "Fixture test proving user_presets does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for user_presets proving cached or queryable evidence matches console state.",
+        "User presets physical readback artifact validated by user_presets_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "product_snapshot",
+      "remediation_action_id": "remediate_user_presets",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "user_presets_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "destructive_change_diff_marker",
+        "enumeration_contract",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "scoped_diff_fixture_missing",
+        "rollback_diff_fixture_missing"
+      ],
+      "requires_connection": false,
+      "surface_id": "user_presets",
+      "target_console_surface": "presets"
+    },
+    {
+      "blockers_to_clear": [
+        "dLive EQ/dynamics/routing/scenes/FX read coverage, physical fixtures, per-field freshness fixtures, and WING parity mapping remain incomplete.",
+        "Add dLive parity fixture snapshots and normalized EQ/dynamics/routing read contracts before claiming console parity.",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "dlive_wing_parity_mapping_missing",
+        "per_field_stale_cache_fixture_incomplete",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "dlive_wing_parity_mapping",
+        "physical_readback_fixture"
+      ],
+      "contract_method_id": "dlive_state_physical_readback_contract",
+      "execution_allowed_by_target": false,
+      "expected_artifacts": [
+        "Read DTO for dlive with explicit coverage flags.",
+        "Fixture test proving dlive_state does not mutate console state.",
+        "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+        "Updated read surface inventory row with remaining blockers.",
+        "Physical readback fixture for dlive_state proving cached or queryable evidence matches console state.",
+        "dLive state and WING parity physical readback artifact validated by dlive_state_physical_readback_contract."
+      ],
+      "live_write": false,
+      "mutates_console_state": false,
+      "next_physical_readback_target": false,
+      "queries_console": false,
+      "read_mode": "product_snapshot",
+      "remediation_action_id": "remediate_dlive_state",
+      "required_artifact_contracts": [
+        "physical_readback_fixture",
+        "dlive_state_physical_readback_contract",
+        "product_layer_read_dto",
+        "coverage_completeness_flags",
+        "stale_cache_or_query_source_metadata",
+        "fixture_or_snapshot_test",
+        "dlive_wing_parity_mapping",
+        "physical_readback_fixture_missing",
+        "hardware_parity_unproven",
+        "dlive_wing_parity_mapping_missing",
+        "per_field_stale_cache_fixture_incomplete"
+      ],
+      "requires_connection": true,
+      "surface_id": "dlive_state",
+      "target_console_surface": "dlive"
+    }
+  ],
+  "required_artifact_contracts": [
+    "physical_readback_fixture",
+    "raw_mixer_state_physical_readback_contract",
+    "physical_readback_fixture_missing",
+    "hardware_parity_unproven",
+    "per_field_stale_cache_fixture_incomplete"
+  ],
+  "source_method_id": "read_surface_physical_readback_capture_plan",
+  "source_plan_status": "operator_capture_required",
+  "status": "operator_capture_required",
+  "step": {
+    "abort_conditions": [
+      "The capture path would transmit a mixer-control command.",
+      "The source is cached, synthetic, simulated, or unavailable instead of physical readback.",
+      "The artifact omits required false safety flags or mutation-evidence fields.",
+      "The operator cannot confirm the intended console, show, or capture scope."
+    ],
+    "blockers_to_clear": [
+      "Add per-surface timestamp fixtures so cached state cannot be mistaken for fresh physical proof.",
+      "physical_readback_fixture_missing",
+      "hardware_parity_unproven",
+      "per_field_stale_cache_fixture_incomplete",
+      "physical_readback_fixture"
+    ],
+    "capture_instructions": [
+      "Capture physical readback evidence for raw_mixer_state_cache.",
+      "Validate the artifact with raw_mixer_state_physical_readback_contract.",
+      "Attach the resulting artifact to the next no-WING release-check or proof review bundle.",
+      "Review the artifact manually before closing the fixture gap or changing any autonomy ceiling."
+    ],
+    "contract_method_id": "raw_mixer_state_physical_readback_contract",
+    "entrypoints": [
+      "get_state",
+      "handle_get_state"
+    ],
+    "executes_tests": false,
+    "execution_allowed_by_plan": false,
+    "expected_artifacts": [
+      "Read DTO for all_cached_addresses with explicit coverage flags.",
+      "Fixture test proving raw_mixer_state_cache does not mutate console state.",
+      "Read source metadata distinguishing cache, physical query, static config, and unavailable fields.",
+      "Updated read surface inventory row with remaining blockers.",
+      "Physical readback fixture for raw_mixer_state_cache proving cached or queryable evidence matches console state.",
+      "Raw mixer-state physical readback artifact validated by raw_mixer_state_physical_readback_contract."
+    ],
+    "forbidden_actions": [
+      "do not apply fader, gain, trim, pan, mute, EQ, dynamics, gate, routing, DCA, matrix, FX, scene, or preset changes",
+      "do not transmit OSC, MIDI, TCP, or websocket mixer-control messages",
+      "do not recall, store, load, save, or overwrite scenes, snapshots, shows, or user presets",
+      "do not mark cached state as physical proof",
+      "do not change safety rows, operator mode, promotion readiness, or live-write policy from this plan"
+    ],
+    "id": "capture_raw_mixer_state_cache_physical_readback",
+    "live_write": false,
+    "mutates_console_state": false,
+    "operator_required": true,
+    "prerequisites": [
+      "Operator explicitly chooses the target console and capture tooling outside this module.",
+      "The capture tool is configured for readback only and cannot apply mixer changes.",
+      "The console/show state is known, backed up, and safe to observe.",
+      "The artifact path, timestamp, source, and operator approval are recorded before review."
+    ],
+    "queries_console": false,
+    "read_mode": "cached_state",
+    "remediation_action_id": "remediate_raw_mixer_state_cache",
+    "required_artifact_contracts": [
+      "physical_readback_fixture",
+      "raw_mixer_state_physical_readback_contract",
+      "physical_readback_fixture_missing",
+      "hardware_parity_unproven",
+      "per_field_stale_cache_fixture_incomplete"
+    ],
+    "requires_connection": true,
+    "source_paths": [
+      "backend/wing_client.py",
+      "backend/dlive_client.py",
+      "backend/handlers/mixer_handlers.py"
+    ],
+    "surface_id": "raw_mixer_state_cache",
+    "target_console_surface": "all_cached_addresses"
+  },
+  "target_action_consistency": true,
+  "type": "read_surface_physical_readback_capture_packet"
+}

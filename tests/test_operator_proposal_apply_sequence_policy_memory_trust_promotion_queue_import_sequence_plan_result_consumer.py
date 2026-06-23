@@ -37,6 +37,18 @@ def _imported_action(proposal_id, *, index):
                 "consumer_record_id": f"consumer:{proposal_id}",
                 "sequence_policy_gate_record_id": f"gate:{proposal_id}",
                 "policy_key": f"{proposal_id}/memory-write:{proposal_id}",
+                "source_idempotency_key": f"memory-write:{proposal_id}",
+                "current_sequence_review_freshness": {
+                    "status": "fresh",
+                    "field_count": 4,
+                    "fresh_field_count": 4,
+                    "read_only": True,
+                    "live_write": False,
+                    "apply_attempted": False,
+                    "queries_console": False,
+                    "queue_mutation": False,
+                    "policy_mutation": False,
+                },
                 "planned_queue_index": index,
                 "rank_source": "sequence_policy_consumer",
                 "recommended_sequence_policy_bucket": "trusted_sequence_policy",
@@ -367,10 +379,27 @@ def test_sequence_plan_result_consumer_emits_dry_run_request_for_ready_plan():
     first = consumer["dry_run_request_specs"][0]
     assert first["proposal_id"] == "proposal-first"
     assert first["planned_dry_run_index"] == 0
+    assert first["source_sequence_plan_request_spec_id"].endswith(":proposal-first")
+    assert first["source_preflight_request_spec_id"].endswith(":proposal-first")
+    assert first["queue_ordering_plan_record_id"] == "plan:proposal-first"
+    assert first["consumer_record_id"] == "consumer:proposal-first"
+    assert first["sequence_policy_gate_record_id"] == "gate:proposal-first"
+    assert first["policy_key"] == "proposal-first/memory-write:proposal-first"
+    assert first["source_idempotency_key"] == "memory-write:proposal-first"
+    assert first["current_sequence_review_freshness"] == _preflight_result_consumer()[
+        "sequence_plan_request_specs"
+    ][0]["current_sequence_review_freshness"]
+    assert first["rank_source"] == "sequence_policy_consumer"
     assert first["idempotency_key"] == "seq-plan:proposal-first"
     assert first["dry_run_handler"] == "dry_run_operator_proposal_apply_sequence"
     assert first["dry_run_invoked"] is False
     assert first["live_authority_granted"] is False
+    assert consumer["dry_run_request"]["sequence_plan_request_specs"][0][
+        "source_idempotency_key"
+    ] == "memory-write:proposal-first"
+    assert consumer["dry_run_request"]["sequence_plan_request_specs"][0][
+        "current_sequence_review_freshness"
+    ]["status"] == "fresh"
 
 
 def test_sequence_plan_result_consumer_blocks_when_sequence_plan_has_blocked_rows():
@@ -433,6 +462,115 @@ def test_sequence_plan_result_consumer_rejects_forged_step_authority():
     )
     assert consumer["dry_run_request"]["sequence_plan"] == {}
     assert consumer["summary"]["live_write"] is False
+
+
+def test_sequence_plan_result_consumer_rejects_forged_sequence_request_identity():
+    preflight_consumer = _preflight_result_consumer()
+    preflight_consumer["sequence_plan_request_specs"][0][
+        "source_idempotency_key"
+    ] = "forged-memory-write:proposal-first"
+    preflight_consumer["sequence_plan_request_specs"][1][
+        "sequence_policy_gate_record_id"
+    ] = ""
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer(
+            preflight_result_consumer=preflight_consumer,
+            sequence_plan_result=_sequence_plan(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_sequence_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["dry_run_request_available"] is False
+    assert (
+        "proposal-first:policy_key_identity_mismatch"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:sequence_policy_gate_record_id_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["dry_run_request"]["sequence_plan"] == {}
+    assert consumer["dry_run_request"]["sequence_plan_request_specs"] == []
+    assert consumer["dry_run_request_specs"] == []
+
+
+def test_sequence_plan_result_consumer_rejects_missing_sequence_context():
+    preflight_consumer = _preflight_result_consumer()
+    for spec in preflight_consumer["sequence_plan_request_specs"]:
+        spec.pop("current_sequence_review_freshness", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer(
+            preflight_result_consumer=preflight_consumer,
+            sequence_plan_result=_sequence_plan(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_sequence_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["dry_run_request_available"] is False
+    assert (
+        "proposal-first:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["dry_run_request"]["sequence_plan"] == {}
+    assert consumer["dry_run_request"]["sequence_plan_request_specs"] == []
+    assert consumer["dry_run_request_specs"] == []
+
+
+def test_sequence_plan_result_consumer_rejects_live_sequence_context():
+    preflight_consumer = _preflight_result_consumer()
+    preflight_consumer["sequence_plan_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_sequence_plan_result_consumer(
+            preflight_result_consumer=preflight_consumer,
+            sequence_plan_result=_sequence_plan(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_sequence_plan_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["dry_run_request_available"] is False
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_live_write_not_false"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["dry_run_request"]["sequence_plan"] == {}
+    assert consumer["dry_run_request"]["sequence_plan_request_specs"] == []
+    assert consumer["dry_run_request_specs"] == []
 
 
 def test_sequence_plan_result_consumer_is_registered_non_live():

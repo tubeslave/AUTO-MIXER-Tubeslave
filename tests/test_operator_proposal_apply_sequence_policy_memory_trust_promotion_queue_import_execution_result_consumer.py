@@ -210,9 +210,10 @@ def test_execution_result_consumer_not_ready_without_inputs():
 
 
 def test_execution_result_consumer_emits_audit_request_for_applied_rows():
+    prior_consumer = _execution_gate_result_consumer()
     consumer = (
         build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer(
-            execution_gate_result_consumer=_execution_gate_result_consumer(),
+            execution_gate_result_consumer=prior_consumer,
             execution_result=_execution_payload(),
         )
     )
@@ -242,10 +243,30 @@ def test_execution_result_consumer_emits_audit_request_for_applied_rows():
     first = consumer["audit_request_specs"][0]
     assert first["proposal_id"] == "proposal-first"
     assert first["planned_audit_index"] == 0
+    assert first["source_executor_request_spec_id"].endswith(":proposal-first")
+    assert first["source_execution_gate_request_spec_id"].endswith(":proposal-first")
+    assert first["source_dry_run_request_spec_id"].endswith(":proposal-first")
+    assert first["source_sequence_plan_request_spec_id"].endswith(":proposal-first")
+    assert first["source_preflight_request_spec_id"].endswith(":proposal-first")
+    assert first["queue_ordering_plan_record_id"] == "plan:proposal-first"
+    assert first["consumer_record_id"] == "consumer:proposal-first"
+    assert first["sequence_policy_gate_record_id"] == "gate:proposal-first"
+    assert first["policy_key"] == "proposal-first/memory-write:proposal-first"
+    assert first["source_idempotency_key"] == "memory-write:proposal-first"
+    assert first["current_sequence_review_freshness"] == prior_consumer[
+        "executor_request_specs"
+    ][0]["current_sequence_review_freshness"]
+    assert first["rank_source"] == "sequence_policy_consumer"
     assert first["idempotency_key"] == "seq-audit:proposal-first"
     assert first["audit_handler"] == "audit_operator_proposal_apply_sequence_execution"
     assert first["audit_handler_invoked"] is False
     assert first["live_authority_granted"] is False
+    assert consumer["audit_request"]["execution_result_payload"][
+        "executor_request_specs"
+    ][0]["source_idempotency_key"] == "memory-write:proposal-first"
+    assert consumer["audit_request"]["execution_result_payload"][
+        "executor_request_specs"
+    ][0]["current_sequence_review_freshness"]["status"] == "fresh"
 
 
 def test_execution_result_consumer_blocks_when_executor_has_blocked_rows():
@@ -312,6 +333,110 @@ def test_execution_result_consumer_rejects_forged_execution_result():
     )
     assert consumer["audit_request"]["execution_result_payload"] == {}
     assert consumer["summary"]["live_write"] is False
+
+
+def test_execution_result_consumer_rejects_forged_executor_request_identity():
+    prior_consumer = _execution_gate_result_consumer()
+    prior_consumer["executor_request_specs"][0][
+        "source_idempotency_key"
+    ] = "forged-memory-write:proposal-first"
+    prior_consumer["executor_request_specs"][1]["consumer_record_id"] = ""
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer(
+            execution_gate_result_consumer=prior_consumer,
+            execution_result=_execution_payload(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_execution_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["audit_request_available"] is False
+    assert (
+        "proposal-first:policy_key_identity_mismatch"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:consumer_record_id_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["audit_request"]["execution_result_payload"] == {}
+    assert consumer["audit_request_specs"] == []
+
+
+def test_execution_result_consumer_rejects_missing_sequence_context():
+    prior_consumer = _execution_gate_result_consumer()
+    for spec in prior_consumer["executor_request_specs"]:
+        spec.pop("current_sequence_review_freshness", None)
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer(
+            execution_gate_result_consumer=prior_consumer,
+            execution_result=_execution_payload(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_execution_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["audit_request_available"] is False
+    assert (
+        "proposal-first:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-second:current_sequence_review_freshness_missing"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["audit_request"]["execution_result_payload"] == {}
+    assert consumer["audit_request_specs"] == []
+
+
+def test_execution_result_consumer_rejects_live_sequence_context():
+    prior_consumer = _execution_gate_result_consumer()
+    prior_consumer["executor_request_specs"][0][
+        "current_sequence_review_freshness"
+    ] = {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer(
+            execution_gate_result_consumer=prior_consumer,
+            execution_result=_execution_payload(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_queue_import_execution_result_consumer_replacement_required"
+    )
+    assert consumer["summary"]["audit_request_available"] is False
+    assert (
+        "proposal-first:current_sequence_review_freshness_read_only_not_true"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_live_write_not_false"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert (
+        "proposal-first:current_sequence_review_freshness_apply_attempted_not_false"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+    assert consumer["audit_request"]["execution_result_payload"] == {}
+    assert consumer["audit_request_specs"] == []
 
 
 def test_execution_result_consumer_is_registered_non_live():

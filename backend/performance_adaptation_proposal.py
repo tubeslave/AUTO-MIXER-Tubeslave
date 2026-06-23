@@ -18,6 +18,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 PERFORMANCE_ADAPTATION_METHOD_ID = "performance_adaptation_proposal"
 PERFORMANCE_ADAPTATION_VERSION = "performance_adaptation_proposal_v1"
@@ -174,7 +179,23 @@ class PerformanceAdaptationRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        proposed_action = {
+            "action_type": self.action_type,
+            "target_id": self.target_id,
+            "target_kind": self.target_kind,
+            "source_role": self.source_role,
+            "reference_level_lufs": self.reference_level_lufs,
+            "current_level_lufs": self.current_level_lufs,
+            "level_drift_db": self.level_drift_db,
+            "suggested_delta_db": self.suggested_delta_db,
+            "target_fader_db": self.target_fader_db,
+            "followup_proposal_methods": [
+                "bus_group_balance_proposal",
+                "lufs_gain_staging",
+                "master_bus_optimization_proposal",
+            ],
+        }
+        proposal = {
             "id": self.id,
             "method_id": PERFORMANCE_ADAPTATION_METHOD_ID,
             "source": PERFORMANCE_ADAPTATION_METHOD_ID,
@@ -193,22 +214,7 @@ class PerformanceAdaptationRecommendation:
                 "adaptation_requires_replay_and_hardware_proof",
                 *self.blockers,
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "target_id": self.target_id,
-                "target_kind": self.target_kind,
-                "source_role": self.source_role,
-                "reference_level_lufs": self.reference_level_lufs,
-                "current_level_lufs": self.current_level_lufs,
-                "level_drift_db": self.level_drift_db,
-                "suggested_delta_db": self.suggested_delta_db,
-                "target_fader_db": self.target_fader_db,
-                "followup_proposal_methods": [
-                    "bus_group_balance_proposal",
-                    "lufs_gain_staging",
-                    "master_bus_optimization_proposal",
-                ],
-            },
+            "proposed_action": proposed_action,
             "evidence": {
                 **self.evidence,
                 "live_write": False,
@@ -217,6 +223,14 @@ class PerformanceAdaptationRecommendation:
                 "rollback_required_before_promotion": True,
             },
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=PERFORMANCE_ADAPTATION_METHOD_ID,
+            target=self.target_id,
+            proposed_action=proposed_action,
+            blockers=proposal["blockers"],
+        )
+        return proposal
 
 
 def _severity(blockers: Iterable[str], level_drift_db: float, active_performance: bool) -> str:
@@ -402,21 +416,67 @@ def analyze_performance_adaptation_need(
         "manual_override_active": bool(analysis.manual_override_active),
         "auto_apply_requested": bool(analysis.auto_apply_requested),
         "baseline_level_lufs": None if baseline is None else round(baseline, 2),
+        "baseline_level": (
+            None
+            if baseline is None
+            else {
+                "value_lufs": round(baseline, 2),
+                "available": bool(analysis.baseline_available),
+            }
+        ),
         "target_plane_lufs": None if analysis.target_plane_lufs is None else round(_safe_float(analysis.target_plane_lufs), 2),
         "short_term_lufs": round(short_term, 2),
+        "current_level_readback": {
+            "value_lufs": round(current_level, 2),
+            "available": bool(analysis.current_readback_available),
+        },
         "current_true_peak_dbfs": round(_safe_float(analysis.true_peak_dbfs, -120.0), 2),
         "main_bus_headroom_db": round(headroom, 2),
+        "true_peak_headroom": {
+            "main_bus_headroom_db": round(headroom, 2),
+            "reserve_db": TRUE_PEAK_RESERVE_DB,
+            "current_true_peak_dbfs": round(_safe_float(analysis.true_peak_dbfs, -120.0), 2),
+        },
         "feedback_risk": round(feedback_risk, 3),
         "bleed_risk": round(bleed_risk, 3),
         "cooldown_elapsed_sec": round(cooldown, 2),
+        "cooldown": {
+            "elapsed_sec": round(cooldown, 2),
+            "minimum_sec": MIN_COOLDOWN_SEC,
+            "elapsed": cooldown >= MIN_COOLDOWN_SEC,
+        },
         "latency_budget_ms": round(latency_budget, 2),
         "latency_budget_met": bool(analysis.latency_budget_met),
+        "latency_budget": {
+            "budget_ms": round(latency_budget, 2),
+            "met": bool(analysis.latency_budget_met),
+        },
         "persistence_cycles": persistence,
+        "trend_persistence": {
+            "persistence_cycles": persistence,
+            "minimum_cycles": MIN_PERSISTENCE_CYCLES,
+            "trend_confidence": round(trend_confidence, 3),
+        },
+        "level_drift": {
+            "drift_db": drift,
+            "minimum_db": MIN_DRIFT_DB,
+            "reference_level_lufs": round(reference_level, 2),
+            "current_level_lufs": round(current_level, 2),
+        },
+        "manual_override_guard": {
+            "manual_override_active": bool(analysis.manual_override_active),
+            "operator_intent": operator_intent,
+        },
+        "rollback_state": {
+            "available": bool(analysis.rollback_available),
+            "required_before_live_promotion": True,
+        },
         "source_confidence": round(source_confidence, 3),
         "trend_confidence": round(trend_confidence, 3),
         "safety_confidence": round(safety_confidence, 3),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_performance_context_cache_freshness": current_state_freshness,
         "current_performance_context_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "rate_limited": True,

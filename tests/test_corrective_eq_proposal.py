@@ -23,6 +23,20 @@ def _fresh(fields=6):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["live_write"] is False
+    assert payload["queue_mutation"] is False
+    assert payload["can_import_to_queue"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["mutates_mixer"] is False
+
+
 def _lead_vocal_eq(**overrides):
     payload = {
         "channel_id": 5,
@@ -86,22 +100,89 @@ def test_safe_cut_creates_non_queueable_corrective_eq_proposal():
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
         "legacy_unverified"
     )
+    summary = recommendation.eq_band_protection_summary()
+    assert summary["status"] == "passed"
+    assert summary["band_identity_status"] == "passed"
+    assert summary["protected_band_policy_status"] == "passed"
+    assert summary["bounded_gain_status"] == "passed"
+    assert summary["feedback_notch_band_protected"] is True
+    assert summary["manual_eq_band_protected"] is True
+    assert summary["current_eq_context_cache_no_live_authority"] is True
+    assert summary["current_phase_audio_context_cache_no_live_authority"] is True
+    assert summary["readback_required_before_promotion"] is True
+    assert summary["rollback_required_before_promotion"] is True
+    assert summary["live_write"] is False
+    assert summary["queue_mutation"] is False
+    _assert_top_level_denial(summary)
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "corrective_eq_proposal"
     assert proposal["kind"] == "eq"
-    assert proposal["can_import_to_queue"] is False
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
     assert "requested_change" not in proposal
     assert "unsupported_value_type:eq" in proposal["blockers"]
     assert proposal["old_value"]["source"] == EQ_READ_REQUIRED_SOURCE
     assert proposal["rollback_value"]["source"] == EQ_READ_REQUIRED_SOURCE
     assert proposal["proposed_action"]["band_id"] == 2
+    assert proposal["eq_band_protection_summary"] == summary
+    assert proposal["proposed_action"]["eq_band_protection_summary"] == summary
+    assert proposal["evidence"]["eq_band_protection_summary"] == summary
     assert proposal["evidence"]["old_value_source"] == EQ_READ_REQUIRED_SOURCE
     assert proposal["evidence"]["rollback_required_before_promotion"] is True
+    assert proposal["evidence"]["rollback_eq_band_readback"] == {
+        "channel_id": 5,
+        "band_id": 2,
+        "filter_type": recommendation.filter_type,
+        "frequency_hz": recommendation.evidence["band_identity"][
+            "current_band_frequency_hz"
+        ],
+        "gain_db": recommendation.evidence["bounded_gain_delta"][
+            "current_gain_db"
+        ],
+        "q": recommendation.evidence["band_identity"]["current_band_q"],
+        "source": EQ_READ_REQUIRED_SOURCE,
+        "required_before_live_promotion": True,
+        "live_write": False,
+    }
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_eq_context_cache_no_live_authority"] is True
     assert proposal["evidence"]["current_phase_audio_context_cache_no_live_authority"] is True
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "eq"
+    completeness = correction["source_evidence"]["evidence_completeness"]
+    assert completeness["status"] == "complete"
+    assert completeness["missing"] == []
+    assert correction["operator_proposal_review_gate"]["evidence_gate_status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["bounded_delta"]["delta_db"] == recommendation.proposed_gain_db
+    assert correction["bounded_delta"]["parameter_deltas"]["gain_db"] == (
+        recommendation.proposed_gain_db
+    )
+    assert correction["bounded_delta"]["parameter_deltas"]["frequency_hz"] == (
+        recommendation.target_frequency_hz
+    )
+    assert correction["future_wing_readback_contract"]["target_kind"] == "channel_eq_band"
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert "manual_band" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_eq_context_cache_no_live_authority"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["eq_band_protection_summary"] == summary
+    assert source_evidence["rollback_eq_band_readback"] == proposal["evidence"][
+        "rollback_eq_band_readback"
+    ]
+    assert source_evidence["current_eq_context_cache_no_live_authority"] is True
+    assert source_evidence["current_phase_audio_context_cache_no_live_authority"] is True
 
 
 def test_corrective_eq_blocks_feedback_notch_and_manual_band_overwrite():
@@ -114,9 +195,16 @@ def test_corrective_eq_blocks_feedback_notch_and_manual_band_overwrite():
     assert "feedback_notch_band_preserved" in feedback.blockers
     assert feedback.severity == "high"
     assert feedback.evidence["protected_band_policy"]["status"] == "blocked"
+    assert feedback.eq_band_protection_summary()["status"] == "blocked"
+    assert (
+        feedback.eq_band_protection_summary()["feedback_notch_band_protected"]
+        is False
+    )
     assert manual.status == "analysis_only"
     assert "manual_eq_band_preserved" in manual.blockers
     assert manual.evidence["protected_band_policy"]["status"] == "blocked"
+    assert manual.eq_band_protection_summary()["status"] == "blocked"
+    assert manual.eq_band_protection_summary()["manual_eq_band_protected"] is False
 
 
 def test_corrective_eq_blocks_unsafe_boost_and_missing_headroom():
@@ -175,7 +263,12 @@ def test_corrective_eq_blocks_live_authority_current_eq_context():
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
     assert recommendation.evidence["current_eq_context_cache_no_live_authority"] is False
     assert recommendation.evidence["current_eq_context_cache_freshness"]["live_write"] is True
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.eq_band_protection_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_eq_context_cache_no_live_authority"] is False
+    assert "eq_current_state_cache_live_authority_present" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    _assert_top_level_denial(recommendation.to_operator_proposal())
     assert build_corrective_eq_proposals([analysis]) == ()
 
 
@@ -200,7 +293,8 @@ def test_corrective_eq_blocks_live_authority_phase_context():
         recommendation.evidence["current_phase_audio_context_cache_freshness"]["queries_console"]
         is True
     )
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    _assert_top_level_denial(recommendation.eq_band_protection_summary())
+    _assert_top_level_denial(recommendation.to_operator_proposal())
     assert build_corrective_eq_proposals([analysis]) == ()
 
 
@@ -223,7 +317,8 @@ def test_corrective_eq_blocks_unsupported_filter_type():
     ]
 
     proposal = recommendation.to_operator_proposal()
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(recommendation.eq_band_protection_summary())
+    _assert_top_level_denial(proposal)
     assert "unsupported_eq_filter_type" in proposal["blockers"]
     assert proposal["proposed_action"]["filter_type"] == "unsupported"
 
@@ -238,7 +333,8 @@ def test_build_corrective_eq_proposals_filters_to_proposal_only_items():
 
     assert len(proposals) == 1
     assert proposals[0]["channel"] == 5
-    assert proposals[0]["can_apply_live"] is False
+    _assert_top_level_denial(proposals[0])
+    _assert_top_level_denial(proposals[0]["eq_band_protection_summary"])
 
 
 def test_corrective_eq_helpers_and_registration():

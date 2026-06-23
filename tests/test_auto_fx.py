@@ -29,6 +29,20 @@ class FakeMixer:
         self.calls.append(("set_channel_send", channel, bus, level, on, mode))
 
 
+def _assert_top_level_denial(result):
+    assert result["live_write"] is False
+    assert result["queue_mutation"] is False
+    assert result["can_apply_live"] is False
+    assert result["can_import_to_queue"] is False
+    assert result["queue_import_allowed"] is False
+    assert result["live_apply_allowed"] is False
+    assert result["read_only_or_dry_run_only"] is True
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+    assert result["queue_action"] == "not_queueable_until_promoted"
+    assert result["mutates_mixer"] is False
+
+
 def test_auto_fx_plan_contains_spatial_buses_and_priority_sends():
     planner = AutoFXPlanner(tempo_bpm=120.0)
     plan = planner.create_plan({
@@ -85,9 +99,8 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
     assert result["reason"] == "fx_direct_apply_quarantined"
     assert result["write_policy"] == "proposal_only_quarantined"
     assert result["live_write_allowed"] is False
-    assert result["can_apply_live"] is False
+    _assert_top_level_denial(result)
     assert result["mixer_client_present"] is True
-    assert result["mutates_mixer"] is False
     assert mixer.calls == []
 
     blocked = result["blocked_calls"]
@@ -109,6 +122,141 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
         "on": 1,
         "mode": "POST",
     } in blocked
+    correction = result["operator_correction"]
+    assert correction["objective_family"] == "fx_sends"
+    assert correction["future_wing_readback_contract"]["target_kind"] == "send_or_fx_parameter"
+    assert correction["bounded_delta"]["action_type"] == "auto_fx_apply_blocked"
+    assert correction["bounded_delta"]["parameter_deltas"]["target_send_db"] == -17.0
+    assert correction["bounded_delta"]["parameter_deltas"]["return_level_db"] == -0.5
+    assert correction["bounded_delta"]["parameter_deltas"]["send_level_db"] == -17.0
+    assert correction["confidence"] == 0.4
+    assert correction["confidence_review"]["status"] == (
+        "low_confidence_operator_review_required"
+    )
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == (
+        "complete"
+    )
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert {
+        "current_fx_send_return_cache_freshness",
+        "current_fx_send_return_cache_no_live_authority",
+        "current_fx_parameter_schema_hints",
+        "fx_parameter_schema_no_live_authority",
+        "source_identity_downstream_trust",
+        "old_value_source",
+        "rollback_fx_readback",
+    } <= set(correction["source_evidence"]["required_evidence_fields"])
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["operator_proposal_review_gate"]["evidence_gate_status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert "monitor_safety" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_fx_send_return_cache_no_live_authority"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["send_level_limit"] == {
+        "status": "passed",
+        "min_send_db": -24.0,
+        "max_send_db": -17.0,
+        "allowed_min_send_db": -36.0,
+        "allowed_max_send_db": -12.0,
+        "post_fader_sends_only": True,
+        "source": "legacy_auto_fx_plan_blocked_calls",
+    }
+    assert source_evidence["fx_return_headroom"] == {
+        "status": "blocked_until_physical_return_readback",
+        "planned_loudest_return_db": -0.5,
+        "min_return_headroom_db": 3.0,
+        "return_level_safety_status": "blocked",
+        "source": "cached_or_physical_fx_read_required_before_promotion",
+        "required_before_live_promotion": True,
+    }
+    assert source_evidence["return_level_safety"] == {
+        "status": "blocked",
+        "loudest_return_db": -0.5,
+        "max_return_level_db": -3.0,
+        "source": "legacy_auto_fx_plan_blocked_calls",
+        "physical_return_readback_required_before_live_promotion": True,
+    }
+    assert source_evidence["dry_wet_bounds"] == {
+        "fx_mix_percent": 100.0,
+        "post_fader_sends_only": True,
+        "loudest_send_db": -17.0,
+        "loudest_return_db": -0.5,
+        "send_level_limit_status": "passed",
+        "return_level_safety_status": "blocked",
+    }
+    evidence_checks = correction["headroom_feedback_true_peak_checks"][
+        "evidence_checks"
+    ]
+    for key in (
+        "send_level_limit",
+        "fx_return_headroom",
+        "return_level_safety",
+        "dry_wet_bounds",
+        "monitor_safety",
+        "feedback_risk",
+        "intelligibility_risk",
+        "old_value_source",
+        "current_fx_send_return_cache_freshness",
+        "current_fx_send_return_cache_no_live_authority",
+        "fx_parameter_schema_no_live_authority",
+        "current_fx_parameter_schema_no_live_authority",
+        "current_fx_parameter_schema_hints",
+        "source_identity_downstream_trust",
+        "rollback_fx_readback",
+    ):
+        assert evidence_checks[key] == source_evidence[key]
+    assert source_evidence["monitor_safety"] == "not_measured_in_legacy_auto_fx_apply_path"
+    assert source_evidence["feedback_risk"] == "not_measured_in_legacy_auto_fx_apply_path"
+    assert source_evidence["intelligibility_risk"] == "not_measured_in_legacy_auto_fx_apply_path"
+    assert source_evidence["old_value_source"] == (
+        "cached_or_physical_fx_read_required_before_promotion"
+    )
+    assert source_evidence["rollback_value_source"] == (
+        "cached_or_physical_fx_read_required_before_promotion"
+    )
+    assert source_evidence["current_fx_send_return_cache_freshness"] == "not_provided"
+    assert source_evidence["current_fx_send_return_cache_no_live_authority"] is True
+    assert source_evidence["fx_parameter_schema_no_live_authority"] is True
+    assert source_evidence["current_fx_parameter_schema_no_live_authority"] is True
+    assert source_evidence["current_fx_parameter_schema_hints"] == {
+        "status": "required_before_live_promotion",
+        "source": "cached_or_physical_fx_read_required_before_promotion",
+        "planned_fx_slots": {
+            "FX1": {"model": "PLATE", "fx_type": "reverb"},
+            "FX2": {"model": "ROOM", "fx_type": "reverb"},
+            "FX3": {"model": "STEREO_DELAY", "fx_type": "delay"},
+            "FX4": {"model": "CHORUS", "fx_type": "chorus"},
+        },
+        "requires_physical_schema_readback": True,
+        "live_write_authority": False,
+    }
+    assert source_evidence["source_identity_downstream_trust"] == {
+        "status": "legacy_multi_source_unverified",
+        "trusted_for_downstream": False,
+        "source_roles": ["lead_vocal", "snare"],
+        "operator_review_required": True,
+    }
+    assert source_evidence["rollback_fx_readback"] == {
+        "status": "required_before_live_promotion",
+        "source": "cached_or_physical_fx_read_required_before_promotion",
+        "send_level_readback_required": True,
+        "return_level_readback_required": True,
+        "fx_parameter_readback_required": True,
+        "monitor_send_readback_required": True,
+    }
+    assert "fx_return_and_send_readback_not_proven" in correction["safety_blockers"]
+    assert planner.last_apply_result is result
 
 
 def test_apply_to_mixer_without_mixer_still_reports_no_mutation():
@@ -122,5 +270,8 @@ def test_apply_to_mixer_without_mixer_still_reports_no_mutation():
     assert result["blocked"] is True
     assert result["reason"] == "no_mixer_client"
     assert result["mixer_client_present"] is False
-    assert result["mutates_mixer"] is False
+    _assert_top_level_denial(result)
     assert result["blocked_calls"]
+    assert result["operator_correction"]["objective_family"] == "fx_sends"
+    assert result["operator_correction"]["live_apply_allowed"] is False
+    assert result["operator_correction"]["queue_import_allowed"] is False

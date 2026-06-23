@@ -65,9 +65,9 @@ test.describe('Automixer frontend prototype', () => {
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toBeVisible();
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Current console snapshot');
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Snapshot required');
-    await page.getByRole('button', { name: 'Request Supervised Apply' }).click();
-    await expect(page.getByText('T-101 marked Applied. No mixer write sent.')).toBeVisible();
-    await expect(leadVocalRow).toContainText('Applied');
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('UI-only simulation');
+    await expect(page.getByRole('button', { name: 'Apply Blocked' })).toBeDisabled();
+    await expect(leadVocalRow).toContainText('Pending');
 
     await page.goto('/#/channels');
     const kickInRow = page.locator('.am-table-row').filter({ hasText: 'Kick In' });
@@ -1359,7 +1359,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await page.getByRole('button', { name: 'Start Offline' }).click();
     await expect(page.getByText('Offline replay requested. Live writes remain disabled.').first()).toBeVisible();
     await expect(page.getByText('fixture-replay-started').first()).toBeVisible();
-    await expect(page.getByText('3 rows').first()).toBeVisible();
+    const replayEngine = page.locator('main section').filter({ hasText: 'Replay Engine / Evidence' });
+    await expect(replayEngine).toContainText('3 rows');
     await page.locator('.am-table-row').filter({ hasText: 'Backend SafeGain trim move' }).getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend Lead Vox');
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend supervised gate');

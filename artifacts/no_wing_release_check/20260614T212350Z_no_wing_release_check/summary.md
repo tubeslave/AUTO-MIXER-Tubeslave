@@ -1,0 +1,1683 @@
+# No-WING Release Check
+
+- generated_at: `2026-06-14T21:23:50Z`
+- status: `passed`
+- connection_policy: `no_hardware_no_network_no_live_writes`
+- live_write: `false`
+- artifact_manifest_summary_surface_required: `true`
+- artifact_manifest_summary_surface_required_fields: `["artifact_manifest_contract_id", "artifact_manifest_contract_required", "artifact_manifest_contract_fields", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_available", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_required", "artifact_manifest_contract_cross_surface_required_surfaces", "artifact_manifest_contract_cross_surface_required_fields", "artifact_manifest_contract_cross_surface_expected_match", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted", "artifact_manifest_required", "artifact_manifest_path", "artifact_manifest_required_artifact_count", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted"]`
+- artifact_manifest_summary_surface_missing_fields: `[]`
+- artifact_manifest_summary_surface_required_field_lines: `["artifact_manifest_summary_surface_required", "artifact_manifest_summary_surface_required_fields", "artifact_manifest_summary_surface_missing_fields", "artifact_manifest_summary_surface_required_field_lines", "artifact_manifest_summary_surface_missing_field_lines", "artifact_manifest_summary_surface_field_lines_rendered", "artifact_manifest_contract_id", "artifact_manifest_contract_required", "artifact_manifest_contract_fields", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_available", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_required", "artifact_manifest_contract_cross_surface_required_surfaces", "artifact_manifest_contract_cross_surface_required_fields", "artifact_manifest_contract_cross_surface_expected_match", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted", "artifact_manifest_required", "artifact_manifest_path", "artifact_manifest_required_artifact_count", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted"]`
+- artifact_manifest_summary_surface_missing_field_lines: `[]`
+- artifact_manifest_summary_surface_field_lines_rendered: `true`
+- artifact_manifest_contract_id: `no_wing_release_check_artifact_manifest_contract.v1`
+- artifact_manifest_contract_required: `true`
+- artifact_manifest_contract_fields: `["artifact_manifest_path", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted", "live_write", "mutates_console_state", "queries_console"]`
+- artifact_manifest_contract_sha256: `896bfcabe15fd49bce5ecd9f3a1f7dea662bd38ba60d3ed3c2d94e2b90eda8d7`
+- artifact_manifest_contract_sha256_available: `true`
+- artifact_manifest_contract_sha256_matches_expected: `true`
+- artifact_manifest_contract_cross_surface_required: `true`
+- artifact_manifest_contract_cross_surface_required_surfaces: `["summary.json", "summary.md", "artifact-manifest.json"]`
+- artifact_manifest_contract_cross_surface_required_fields: `["artifact_manifest_contract_id", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_matches_expected"]`
+- artifact_manifest_contract_cross_surface_expected_match: `true`
+- artifact_manifest_contract_cross_surface_readiness_closure_allowed: `false`
+- artifact_manifest_contract_cross_surface_live_authority_granted: `false`
+- artifact_manifest_required: `true`
+- artifact_manifest_path: `artifact-manifest.json`
+- artifact_manifest_required_artifact_count: `2`
+- artifact_manifest_required_artifact_ids: `["summary_json", "summary_md"]`
+- artifact_manifest_required_artifact_paths: `["summary.json", "summary.md"]`
+- artifact_manifest_required_artifact_sha256_fields: `["artifact_manifest_summary_json_sha256", "artifact_manifest_summary_md_sha256"]`
+- artifact_manifest_readiness_closure_allowed: `false`
+- artifact_manifest_live_authority_granted: `false`
+
+## Checks
+
+- `backend_port_free`: `passed`
+- `write_surface_static_scan`: `passed`
+- `read_surface_fixture_evidence`: `passed`
+- `read_surface_fixture_evidence_schema`: `passed`
+- `read_surface_remediation_plan_schema`: `passed`
+- `read_surface_physical_readback_capture_plan_schema`: `passed`
+- `wing_readonly_preflight_evidence_schema`: `passed`
+- `wing_readonly_preflight_review_decision_ledger_schema`: `passed`
+- `raw_mixer_state_physical_readback_contract_schema`: `passed`
+- `raw_mixer_state_physical_readback_artifact_intake_schema`: `passed`
+- `channel_basic_controls_physical_readback_contract_schema`: `passed`
+- `channel_basic_controls_physical_readback_artifact_intake_schema`: `passed`
+- `channel_processing_physical_readback_contract_schema`: `passed`
+- `channel_processing_physical_readback_artifact_intake_schema`: `passed`
+- `bus_group_main_dca_physical_readback_contract_schema`: `passed`
+- `bus_group_main_dca_physical_readback_artifact_intake_schema`: `passed`
+- `matrix_state_physical_readback_contract_schema`: `passed`
+- `matrix_state_physical_readback_artifact_intake_schema`: `passed`
+- `fx_slots_inserts_physical_readback_contract_schema`: `passed`
+- `fx_slots_inserts_physical_readback_artifact_intake_schema`: `passed`
+- `routing_sends_physical_readback_contract_schema`: `passed`
+- `routing_sends_physical_readback_artifact_intake_schema`: `passed`
+- `snapshots_scenes_physical_readback_contract_schema`: `passed`
+- `snapshots_scenes_physical_readback_artifact_intake_schema`: `passed`
+- `user_presets_physical_readback_contract_schema`: `passed`
+- `user_presets_physical_readback_artifact_intake_schema`: `passed`
+- `dlive_state_physical_readback_contract_schema`: `passed`
+- `dlive_state_physical_readback_artifact_intake_schema`: `passed`
+- `read_surface_physical_readback_artifact_review_queue_schema`: `passed`
+- `read_surface_physical_readback_fixture_acceptance_ledger_schema`: `passed`
+- `read_surface_physical_readback_fixture_closure_plan_schema`: `passed`
+- `backend_pytest`: `passed`
+- `offline_operator_validation_harness`: `passed`
+- `wing_readonly_preflight_plan`: `passed`
+- `wing_readonly_preflight_plan_artifact_schema`: `passed`
+- `read_surface_physical_readback_capture_packet`: `passed`
+- `read_surface_physical_readback_capture_packet_artifact_schema`: `passed`
+- `read_surface_physical_readback_capture_template`: `passed`
+- `read_surface_physical_readback_capture_template_artifact_schema`: `passed`
+- `read_surface_physical_readback_artifact_review_queue`: `passed`
+- `read_surface_physical_readback_artifact_review_queue_artifact_schema`: `passed`
+- `read_surface_physical_readback_acceptance_template`: `passed`
+- `read_surface_physical_readback_acceptance_template_artifact_schema`: `passed`
+- `read_surface_physical_readback_fixture_closure_plan`: `passed`
+- `read_surface_physical_readback_fixture_closure_plan_artifact_schema`: `passed`
+- `wing_readonly_preflight_handoff_packet`: `passed`
+- `wing_readonly_preflight_handoff_packet_artifact_schema`: `passed`
+- `gain_dry_run_proof`: `passed`
+- `supervised_proof_artifact_report`: `passed`
+- `supervised_proof_report_gain_dry_run_schema`: `passed`
+- `autonomy_evidence_overlay_schema`: `passed`
+- `next_wing_proof_plan_schema`: `passed`
+- `wing_operator_proposal_runner_physical_readback_policy`: `passed`
+- `supervised_proof_evaluator_physical_readback_policy`: `passed`
+- `supervised_proof_report_gap_rollup_schema`: `passed`
+- `memory_lint`: `passed`
+- `diff_check`: `passed`
+
+## Autonomy Gap Rollup
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- full_autonomous_ready: `false`
+- full_auto_gap_bucket_counts: `{"autonomy_mode": 22, "capability": 2, "evidence_requirement": 31, "proof": 78, "read_surface": 14, "safety": 16, "write_surface": 19}`
+- evidence_requirement_ids_by_action_family: `{"bus_group_matrix": ["bus_group_assignment_cache_freshness", "bus_group_fader_readback", "matrix_send_readback", "main_bus_true_peak_headroom", "bus_group_physical_fixture", "hardware_readback_and_rollback_proof"], "gain": ["physical_pre_read", "bounded_gain_down_apply", "apply_readback", "rollback_readback", "emergency_stop_block", "unsafe_gain_up_followup_blocked", "gain_up_operator_authored_opt_in"], "mute": ["current_mute_cache_freshness", "mute_owner_intent_evidence", "signal_return_or_idle_window_evidence", "manual_mute_authority_review", "mute_physical_fixture", "hardware_readback_rollback_and_emergency_proof"], "routing": ["current_route_cache_freshness", "route_diff_evidence", "source_identity_downstream_trust", "routing_physical_fixture", "hardware_readback_and_rollback_proof"], "scene_preset": ["current_scene_preset_cache_freshness", "snapshots_scenes_snapshot_cache_freshness", "user_presets_snapshot_cache_freshness", "read_only_scoped_diff_evidence", "read_only_rollback_evidence", "scene_preset_physical_fixture", "hardware_readback_and_rollback_proof"]}`
+- next_required_evidence_by_action_family: `{"bus_group_matrix": ["Add bus/group/matrix safety review with true-peak headroom, assignment/fader readback, rollback, fake-mixer, real-WING, and emergency-stop proof before any supervised candidate.", "Keep direct imports behind supervised gates and include any new transport client in this inventory.", "Add physical-query fixture snapshots, full group membership proof, matrix-send evidence, WING/dLive parity mapping, and safety review before bus/DCA/group balance proposals become live candidates.", "Add physical-query matrix fixtures, route diff proof, WING/dLive parity mapping, and matrix safety review before master/matrix optimization claims."], "compressor": ["Split recommendation code from executor code and add fail-closed tests before any promotion.", "Route blocked compressor evidence to operator review before any supervised dynamics promotion.", "Use compressor proposal adapter and require dynamics readback, makeup/headroom and rollback proof before any live apply.", "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."], "eq": ["Keep EQ in offline/proposal mode until filter package audit and fake-mixer proof are complete.", "Route blocked EQ evidence to operator review before any supervised EQ promotion.", "Use EQ proposal DTOs and require filter audit, feedback safety, readback and rollback proof before any live apply.", "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."], "fader": ["Repeat controlled WING proof across representative channels with connection-loss and emergency-stop reset evidence.", "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.", "Continue feeding proposal evidence and rollback values into the queue.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "fx_send_insert": ["Add offline FX plan evaluation before any operator-facing proposal.", "Keep direct FX sends quarantined; route useful FX behavior into explainable FX plans with physical proof requirements.", "Expand FX-model parameter schemas, add physical fixture snapshots, scoped insert diff artifacts, and FX safety review before FX proposals become live candidates.", "Add physical-query fixtures and route/send diff schema before any routing or send proposal can become queueable."], "gain": ["One small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and blocked unsafe follow-up.", "Keep as the only live executor; do not add EQ/dynamics/routing/FX here without separate proof.", "Continue feeding proposal evidence and rollback values into the queue.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "gate": ["Feed real telemetry/replay sessions into bleed metrics; keep live gate writes blocked.", "Connect real telemetry and offline bleed fixtures, but keep gate apply blocked.", "Keep direct gate sends quarantined; route all gate/HPF/send outputs to proposal-only contracts with physical proof requirements.", "Add physical-query fixture snapshots and parity evidence before promoting EQ/dynamics/gate proposals."], "mute": ["Add fresh mute-state intent, owner, signal-return, physical readback, rollback, fake-mixer, real-WING, and emergency-stop proof before any supervised mute candidate.", "Keep direct imports behind supervised gates and include any new transport client in this inventory.", "Convert commands into operator proposal intents and blocked reasons.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "pan_phase_delay": ["Define read-only stage-position DTO and proposal schema before fake-mixer proof.", "Keep stage-position and pan/phase outputs as evidence until separate hardware readback and rollback proof.", "Extend channel identity and source-patch fixtures with physical readback parity before promoting channel-control or routing proposals."], "routing": ["Keep manual-only runbooks; no automated promotion without separate ADR.", "Keep manual scripts lab-only or migrate to explicit operator runbooks with preview diffs.", "Add physical-query fixtures and route/send diff schema before any routing or send proposal can become queueable."], "scene_preset": ["Keep manual-only runbooks; no automated promotion without separate ADR.", "Keep manual scripts lab-only or migrate to explicit operator runbooks with preview diffs.", "Keep scene apply blocked; add read-only scene diff artifacts, rollback evidence, and physical fixtures before any automation.", "Add physical-query fixtures and preset diff artifacts before any preset recall/store proposal can become queueable."]}`
+- supervised_current_live_write_kinds: `["fader", "gain", "pan"]`
+- supervised_current_live_write_surfaces: `["preamp", "trim", "fader", "pan"]`
+- policy_supervised_live_write_kinds: `["fader", "gain", "pan"]`
+- policy_supervised_live_write_surfaces: `["preamp", "trim", "fader", "pan"]`
+- unexpected_supervised_live_write_surfaces: `[]`
+- violations: `[]`
+
+## Autonomy Evidence Overlay
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- live_widening_allowed: `false`
+- automatic_safety_update_allowed: `false`
+- full_autonomous_ready: `false`
+- operator_required: `true`
+- overlay_status: `dry_run_only`
+- row_count: `3`
+- status_counts: `{"dry_run_only": 1, "manual_safety_review_candidate": 0, "no_current_evidence": 2, "remediation_required": 0}`
+- dry_run_only_target_ids: `["gain_trim_supervised_promotion"]`
+- manual_safety_review_candidate_target_ids: `[]`
+- violations: `[]`
+
+## Supervised Gain Dry-Run Proof
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- promotion_allowed: `false`
+- autonomous_ready: `false`
+- gain_dry_run_row_count: `1`
+- dry_run_ready_proof_ids: `["20260614T212354Z_gain_proof_dry_run_ch1"]`
+- violations: `[]`
+
+## Read Surface Fixture Evidence
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- full_autonomous_ready: `false`
+- snapshot_status: `fixture_evidence_incomplete`
+- surface_count: `10`
+- surface_with_fixture_count: `10`
+- declared_fixture_path_count: `20`
+- declared_test_name_count: `55`
+- physical_gap_surface_count: `10`
+- summary_recomputed_from_rows: `true`
+- fixture_declaration_validation: `true`
+- contract_gap_consistency_enforced: `true`
+- status_counts: `{"fixture_evidence_present": 0, "missing_fixture_evidence": 0, "partial_fixture_evidence": 10}`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- violations: `[]`
+
+## Read Surface Remediation Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- plan_status: `read_remediation_required`
+- action_count: `10`
+- incomplete_surface_count: `10`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- next_physical_readback_target_action_ids: `["remediate_raw_mixer_state_cache"]`
+- target_action_consistency: `true`
+- violations: `[]`
+
+## Read Surface Physical Readback Capture Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_plan: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- plan_status: `operator_capture_required`
+- capture_step_count: `1`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- target_action_consistency: `true`
+- required_artifact_contracts: `["physical_readback_fixture", "raw_mixer_state_physical_readback_contract", "physical_readback_fixture_missing", "hardware_parity_unproven", "per_field_stale_cache_fixture_incomplete"]`
+- blocked_by: `["physical_readback_fixtures_incomplete", "operator_must_capture_and_review_physical_readback_artifact"]`
+- step_surface_id: `raw_mixer_state_cache`
+- step_remediation_action_id: `remediate_raw_mixer_state_cache`
+- violations: `[]`
+
+## Read Surface Physical Readback Capture Packet Artifact
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_packet: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- packet_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/read_surface_physical_readback_capture_packet.json`
+- packet_status: `operator_capture_required`
+- source_plan_status: `operator_capture_required`
+- capture_step_count: `1`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- remaining_capture_target_count: `10`
+- remaining_capture_target_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- remaining_capture_target_action_ids: `["remediate_raw_mixer_state_cache", "remediate_channel_identity_and_basic_controls", "remediate_channel_eq_dynamics_gate", "remediate_bus_group_main_dca_state", "remediate_matrix_state", "remediate_fx_slots_and_inserts", "remediate_routing_and_sends", "remediate_snapshots_scenes", "remediate_user_presets", "remediate_dlive_state"]`
+- remaining_capture_target_contract_ids: `["raw_mixer_state_physical_readback_contract", "channel_basic_controls_physical_readback_contract", "channel_processing_physical_readback_contract", "bus_group_main_dca_physical_readback_contract", "matrix_state_physical_readback_contract", "fx_slots_inserts_physical_readback_contract", "routing_sends_physical_readback_contract", "snapshots_scenes_physical_readback_contract", "user_presets_physical_readback_contract", "dlive_state_physical_readback_contract"]`
+- remaining_capture_target_forbidden_flags: `[]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- target_action_consistency: `true`
+- required_artifact_contracts: `["physical_readback_fixture", "raw_mixer_state_physical_readback_contract", "physical_readback_fixture_missing", "hardware_parity_unproven", "per_field_stale_cache_fixture_incomplete"]`
+- blocked_by: `["physical_readback_fixtures_incomplete", "operator_must_capture_and_review_physical_readback_artifact"]`
+- step_surface_id: `raw_mixer_state_cache`
+- step_target_console_surface: `all_cached_addresses`
+- step_read_mode: `cached_state`
+- step_contract_method_id: `raw_mixer_state_physical_readback_contract`
+- step_forbidden_actions: `["do not apply fader, gain, trim, pan, mute, EQ, dynamics, gate, routing, DCA, matrix, FX, scene, or preset changes", "do not transmit OSC, MIDI, TCP, or websocket mixer-control messages", "do not recall, store, load, save, or overwrite scenes, snapshots, shows, or user presets", "do not mark cached state as physical proof", "do not change safety rows, operator mode, promotion readiness, or live-write policy from this plan"]`
+- focused_validation: `["PYTHONPATH=backend", "python3", "-m", "pytest", "-q", "tests/test_read_surface_physical_readback_capture_plan.py", "tests/test_no_wing_release_check.py"]`
+- violations: `[]`
+
+## Read Surface Physical Readback Capture Template Artifact
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_template: `false`
+- accepted_as_physical_fixture_candidate: `false`
+- fixture_closure_allowed_by_template: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- template_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/read_surface_physical_readback_capture_template.json`
+- template_status: `operator_capture_template_ready`
+- source_packet_status: `operator_capture_required`
+- selected_surface_id: `raw_mixer_state_cache`
+- include_all_targets: `false`
+- all_remaining_target_count: `10`
+- capture_template_count: `1`
+- capture_template_surface_ids: `["raw_mixer_state_cache"]`
+- capture_template_contract_ids: `["raw_mixer_state_physical_readback_contract"]`
+- payload_template_contract_ids: `["raw_mixer_state_physical_readback_contract"]`
+- payload_template_artifact_types: `["raw_mixer_state_physical_readback"]`
+- payload_template_schema_ids: `["raw_mixer_state_physical_readback.v1"]`
+- payload_template_field_counts: `[10]`
+- required_operator_edits: `["artifact_source_id", "captured_at", "captured_by", "source", "console_model", "capture_scope", "physical_readback_payload", "physical_readback_payload_template.payload"]`
+- blocked_by: `["physical_readback_fixtures_incomplete", "operator_must_capture_and_review_physical_readback_artifact", "operator_must_replace_capture_template_placeholders", "operator_must_validate_filled_artifact_with_required_contract", "operator_must_review_artifact_before_fixture_acceptance"]`
+- record_unsafe_flags: `[]`
+- focused_validation: `["PYTHONPATH=backend", "python3", "-m", "pytest", "-q", "tests/test_read_surface_physical_readback_capture_template.py", "tests/test_no_wing_release_check.py"]`
+- violations: `[]`
+
+## WING Read-Only Preflight Evidence
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- readiness_closure_allowed_by_evidence: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- evidence_status: `operator_preflight_required`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- readiness_update_candidate_available: `false`
+- mvp_blocker_matrix_ids: `["wing_readonly_connection_proof", "physical_console_readback_proof", "operator_visible_evidence_report", "readiness_matrix_update_based_on_real_proof"]`
+- mvp_blockers_closed_by_evidence: `[]`
+- latest_valid_candidate_run_id: `None`
+- artifact_operator_next_steps: `[]`
+- capture_tool_path: `tools/wing_readonly_preflight_runner.py`
+- capture_tool_available: `true`
+- plan_command: `["python3", "tools/wing_readonly_preflight_runner.py", "--url", "ws://localhost:8765", "--channels", "3", "--operator-confirm-channels", "3", "--operator-confirm-session-ready", "--value-types", "fader,gain,pan", "--require-physical-readback", "--artifact-root", "artifacts/wing_readonly_preflight", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--plan-only", "--plan-output", "artifacts/wing_readonly_preflight_plan/latest_plan.json"]`
+- plan_command_uses_plan_only: `true`
+- expected_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- runner_argparse_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- runner_argparse_target_defaults_match_contract: `true`
+- expected_supported_value_types: `["fader", "gain", "pan"]`
+- runner_supported_value_types: `["fader", "gain", "pan"]`
+- expected_proof_runner: `wing_readonly_preflight_runner`
+- runner_proof_runner: `wing_readonly_preflight_runner`
+- evidence_proof_runner: `wing_readonly_preflight_runner`
+- runner_proof_runner_match_contract: `true`
+- evidence_proof_runner_match_contract: `true`
+- expected_run_summary_status: `passed`
+- expected_run_summary_reason: `wing_readonly_preflight_passed`
+- runner_run_summary_status: `passed`
+- runner_run_summary_reason: `wing_readonly_preflight_passed`
+- evidence_expected_run_summary_status: `passed`
+- evidence_expected_run_summary_reason: `wing_readonly_preflight_passed`
+- runner_run_summary_status_match_contract: `true`
+- runner_run_summary_reason_match_contract: `true`
+- evidence_run_summary_status_match_contract: `true`
+- evidence_run_summary_reason_match_contract: `true`
+- evidence_allowed_value_types: `["fader", "gain", "pan"]`
+- runner_supported_value_types_match_contract: `true`
+- evidence_allowed_value_types_match_contract: `true`
+- expected_physical_readback_statuses: `["verified_from_physical_readback"]`
+- expected_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- runner_physical_readback_statuses: `["verified_from_physical_readback"]`
+- runner_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- runner_physical_readback_statuses_match_contract: `true`
+- runner_physical_readback_sources_match_contract: `true`
+- evidence_physical_readback_statuses: `["verified_from_physical_readback"]`
+- evidence_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- evidence_physical_readback_statuses_match_contract: `true`
+- evidence_physical_readback_sources_match_contract: `true`
+- plan_command_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- plan_command_target_defaults_match_contract: `true`
+- plan_command_output: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- plan_command_output_matches_contract: `true`
+- plan_command_channels: `3`
+- plan_command_operator_confirmed_channels: `3`
+- plan_command_value_types: `fader,gain,pan`
+- plan_command_artifact_root: `artifacts/wing_readonly_preflight`
+- plan_command_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- plan_command_matches_capture: `true`
+- prestart_backend_port_check_required: `true`
+- prestart_backend_port_check_must_pass_before_starting_backend: `true`
+- prestart_backend_port_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+- prestart_backend_port_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
+- capture_command_template: `["python3", "tools/wing_readonly_preflight_runner.py", "--url", "ws://localhost:8765", "--channels", "3", "--operator-confirm-channels", "3", "--operator-confirm-session-ready", "--value-types", "fader,gain,pan", "--require-physical-readback", "--artifact-root", "artifacts/wing_readonly_preflight", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--expected-plan", "artifacts/wing_readonly_preflight_plan/latest_plan.json"]`
+- capture_command_url: `ws://localhost:8765`
+- capture_command_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- capture_command_target_defaults_match_contract: `true`
+- capture_command_channels: `3`
+- capture_command_operator_confirmed_channels: `3`
+- capture_command_requires_operator_channel_confirmation: `true`
+- capture_command_operator_confirmation_matches_channels: `true`
+- capture_command_requires_physical_readback: `true`
+- capture_command_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- capture_command_prestart_summary_matches_plan: `true`
+- capture_command_expected_plan: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- capture_command_expected_plan_matches_contract: `true`
+- capture_command_expected_plan_matches_plan_output: `true`
+- review_tool_path: `tools/review_wing_readonly_preflight_artifacts.py`
+- review_tool_available: `true`
+- review_command: `["python3", "tools/review_wing_readonly_preflight_artifacts.py", "--artifact-root", "artifacts/wing_readonly_preflight", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md", "--decision-template-output", "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"]`
+- review_command_writes_decision_template: `true`
+- review_decision_template_output: `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`
+- review_decision_template_output_matches_contract: `true`
+- review_exit_codes: `{"artifact_missing": 2, "candidate_ready": 0, "invalid_artifact": 3}`
+- review_manual_checklist_ids: `["confirm_artifact_paths", "confirm_operator_channel_scope", "confirm_operator_session_ready", "confirm_physical_readbacks", "confirm_event_log_readonly_sequence", "confirm_event_log_run_id_binding", "confirm_no_live_authority"]`
+- review_manual_checklist_complete: `true`
+- review_decision_template_required_fields: `["review_id", "artifact_source_id", "run_id", "artifact_captured_at", "artifact_root", "summary_path", "summary_sha256", "events_path", "events_sha256", "channels", "value_types", "operator_confirmed_channels", "operator_confirmed_session_ready", "readback_count", "physical_readback_count", "request_id_policy", "request_id_correlation_required", "event_log_run_id_matches_summary", "decision", "reviewed_by", "reviewed_at", "checklist_ids"]`
+- review_decision_template_contract_complete: `true`
+- review_decision_template_status: `operator_must_replace_placeholders_before_ledger_acceptance`
+- review_decision_template_status_matches_contract: `true`
+- handoff_packet_tool_path: `tools/build_wing_readonly_preflight_handoff_packet.py`
+- handoff_packet_tool_available: `true`
+- handoff_packet_command: `["python3", "tools/build_wing_readonly_preflight_handoff_packet.py", "--url", "ws://localhost:8765", "--channels", "3", "--value-types", "fader,gain,pan", "--artifact-root", "artifacts/wing_readonly_preflight", "--plan-output", "artifacts/wing_readonly_preflight_plan/latest_plan.json", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"]`
+- handoff_packet_output: `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md`
+- handoff_packet_output_matches_contract: `true`
+- handoff_packet_plan_output: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- handoff_packet_plan_output_matches_contract: `true`
+- handoff_packet_plan_output_matches_plan_command: `true`
+- handoff_packet_url: `ws://localhost:8765`
+- handoff_packet_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- handoff_packet_target_defaults_match_contract: `true`
+- handoff_packet_artifact_root: `artifacts/wing_readonly_preflight`
+- handoff_packet_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- handoff_packet_channels: `3`
+- handoff_packet_value_types: `fader,gain,pan`
+- handoff_packet_url_matches_capture: `true`
+- handoff_packet_artifact_root_matches_capture: `true`
+- handoff_packet_prestart_summary_matches_capture: `true`
+- handoff_packet_channel_matches_capture: `true`
+- handoff_packet_value_types_match_capture: `true`
+- blocked_by: `["operator_must_run_wing_readonly_preflight_runner"]`
+- violations: `[]`
+
+## WING Read-Only Preflight Plan Artifact
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- contacts_backend: `false`
+- queries_console: `false`
+- operator_required: `true`
+- expected_plan_required_for_real_run: `true`
+- physical_preflight_requires_existing_backend_connection: `true`
+- backend_port_prestart_check_required: `true`
+- backend_port_prestart_check_must_pass_before_starting_backend: `true`
+- backend_port_prestart_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+- backend_port_prestart_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
+- backend_port_prestart_summary_required: `true`
+- backend_port_prestart_summary_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/backend_port_prestart/summary.json`
+- backend_port_prestart_summary_sha256: `0f0b30825e13eac050c9bab251cc60af4269c9f543a2d093e51b48b9a2148a2c`
+- backend_port_prestart_summary_type: `no_wing_release_check`
+- backend_port_prestart_summary_status: `passed`
+- backend_port_prestart_summary_connection_policy: `no_hardware_no_network_no_live_writes`
+- backend_port_prestart_summary_live_write: `false`
+- backend_port_prestart_summary_contacts_backend: `false`
+- backend_port_prestart_summary_queries_console: `false`
+- backend_port_prestart_summary_executes_tests: `false`
+- backend_port_prestart_check_status: `passed`
+- safe_to_stop_listener_by_gate: `false`
+- live_authority_granted: `false`
+- backend_port_prestart_gate_execution_allowed: `false`
+- backend_port_prestart_gate_readiness_closure_allowed: `false`
+- backend_port_prestart_gate_live_authority_granted: `false`
+- manual_review_required_before_readiness_update: `true`
+- operator_session_confirmation_required: `true`
+- operator_confirmed_session_ready: `true`
+- execution_allowed_by_plan: `false`
+- live_authority_granted: `false`
+- plan_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/wing_readonly_preflight_plan.json`
+- plan_status: `ready_for_operator_review`
+- plan_output: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/wing_readonly_preflight_plan.json`
+- proof_artifact_schema: `wing_readonly_preflight.v1`
+- proof_runner: `wing_readonly_preflight_runner`
+- selected_mvp_blocker: `WING read-only connection proof`
+- selected_mvp_blocker_status: `tooling_ready_waits_real_wing`
+- channels: `[3]`
+- operator_confirmed_channels: `[3]`
+- value_types: `["fader", "gain", "pan"]`
+- request_count: `5`
+- expected_request_count: `5`
+- request_sequence_matches_expected: `true`
+- request_sequence: `[{"type": "get_operator_mode"}, {"type": "get_state"}, {"address": "/ch/3/fdr", "channel": 3, "request_id": "wing-readonly-preflight:ch3:fader", "type": "query_mixer_parameter", "value_type": "fader"}, {"address": "/ch/3/in/set/trim", "channel": 3, "request_id": "wing-readonly-preflight:ch3:gain", "type": "query_mixer_parameter", "value_type": "gain"}, {"address": "/ch/3/pan", "channel": 3, "request_id": "wing-readonly-preflight:ch3:pan", "type": "query_mixer_parameter", "value_type": "pan"}]`
+- expected_artifacts: `["artifacts/wing_readonly_preflight/<run_id>/summary.json", "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"]`
+- allowed_request_types: `["get_operator_mode", "get_state", "query_mixer_parameter"]`
+- request_id_policy: `required_for_every_query_mixer_parameter_response`
+- forbidden_request_types: `["apply_operator_proposal", "connect_mixer", "connect_wing", "create_operator_proposal", "disconnect_mixer", "disconnect_wing", "emergency_stop", "load_snap", "mute", "reset", "rollback_last_manual_write", "route_output", "save_snap", "set_channel_trim", "set_compressor", "set_eq", "set_fader", "set_fx_mix", "set_fx_model", "set_fx_on", "set_fx_parameter", "set_gain", "set_input_trim", "set_insert", "set_operator_mode", "set_preamp_gain", "set_preamp_trim", "set_trim", "unmute"]`
+- fail_closed_conditions: `["backend_not_in_wing_mode", "event_log_wing_mode_not_proven", "transport_timeout_or_connection_loss", "ws_handshake_rejected", "operator_channel_confirmation_mismatch", "operator_session_confirmation_missing", "physical_readback_missing", "readback_identity_mismatch", "readback_request_id_mismatch", "expected_plan_missing_or_mismatch", "prestart_summary_missing_or_invalid", "prestart_summary_sha256_mismatch", "stale_backend_port_prestart_detail_contract", "existing_backend_connection_boundary_missing", "forbidden_request_type_sent", "unexpected_response_type", "event_log_run_id_mismatch", "event_log_missing_or_invalid", "manual_review_decision_missing_or_invalid"]`
+- post_run_review_commands: `["python3 tools/review_wing_readonly_preflight_artifacts.py --artifact-root artifacts/wing_readonly_preflight --output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md --decision-template-output artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json", "python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions --output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"]`
+- violations: `[]`
+
+## WING Read-Only Preflight Handoff Packet Artifact
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- expected_plan_required_for_real_run: `true`
+- physical_preflight_requires_existing_backend_connection: `true`
+- backend_port_prestart_check_required: `true`
+- backend_port_prestart_check_must_pass_before_starting_backend: `true`
+- backend_port_prestart_summary_required: `true`
+- backend_port_prestart_summary_path_placeholder: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/backend_port_prestart/summary.json`
+- plan_backend_port_prestart_summary_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/backend_port_prestart/summary.json`
+- backend_port_prestart_summary_sha256: `0f0b30825e13eac050c9bab251cc60af4269c9f543a2d093e51b48b9a2148a2c`
+- backend_port_prestart_summary_sha256_available: `true`
+- backend_port_prestart_summary_sha256_available_matches_digest: `true`
+- plan_backend_port_prestart_summary_sha256: `0f0b30825e13eac050c9bab251cc60af4269c9f543a2d093e51b48b9a2148a2c`
+- backend_port_prestart_summary_sha256_matches_plan: `true`
+- backend_port_prestart_summary_type: `no_wing_release_check`
+- plan_backend_port_prestart_summary_type: `no_wing_release_check`
+- backend_port_prestart_summary_type_matches_plan: `true`
+- backend_port_prestart_summary_status: `passed`
+- plan_backend_port_prestart_summary_status: `passed`
+- backend_port_prestart_summary_status_matches_plan: `true`
+- backend_port_prestart_summary_connection_policy: `no_hardware_no_network_no_live_writes`
+- plan_backend_port_prestart_summary_connection_policy: `no_hardware_no_network_no_live_writes`
+- backend_port_prestart_summary_connection_policy_matches_plan: `true`
+- backend_port_prestart_summary_live_write: `false`
+- plan_backend_port_prestart_summary_live_write: `false`
+- backend_port_prestart_summary_live_write_matches_plan: `true`
+- backend_port_prestart_summary_contacts_backend: `false`
+- plan_backend_port_prestart_summary_contacts_backend: `false`
+- backend_port_prestart_summary_contacts_backend_matches_plan: `true`
+- backend_port_prestart_summary_queries_console: `false`
+- plan_backend_port_prestart_summary_queries_console: `false`
+- backend_port_prestart_summary_queries_console_matches_plan: `true`
+- backend_port_prestart_summary_executes_tests: `false`
+- plan_backend_port_prestart_summary_executes_tests: `false`
+- backend_port_prestart_summary_executes_tests_matches_plan: `true`
+- backend_port_prestart_check_status: `passed`
+- plan_backend_port_prestart_check_status: `passed`
+- backend_port_prestart_check_status_matches_plan: `true`
+- safe_to_stop_listener_by_gate: `false`
+- live_authority_granted: `false`
+- backend_port_prestart_gate_execution_allowed: `false`
+- backend_port_prestart_gate_readiness_closure_allowed: `false`
+- backend_port_prestart_gate_live_authority_granted: `false`
+- plan_safe_to_stop_listener_by_gate: `false`
+- plan_live_authority_granted: `false`
+- plan_backend_port_prestart_gate_execution_allowed: `false`
+- plan_backend_port_prestart_gate_readiness_closure_allowed: `false`
+- plan_backend_port_prestart_gate_live_authority_granted: `false`
+- declared_safe_to_stop_listener_by_gate_matches_plan: `true`
+- declared_live_authority_granted_matches_plan: `true`
+- declared_backend_port_prestart_gate_execution_allowed_matches_plan: `true`
+- declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: `true`
+- declared_backend_port_prestart_gate_live_authority_granted_matches_plan: `true`
+- safe_to_stop_listener_by_gate_matches_plan: `true`
+- live_authority_granted_matches_plan: `true`
+- backend_port_prestart_gate_execution_allowed_matches_plan: `true`
+- backend_port_prestart_gate_readiness_closure_allowed_matches_plan: `true`
+- backend_port_prestart_gate_live_authority_granted_matches_plan: `true`
+- manual_review_required_before_readiness_update: `true`
+- execution_allowed_by_packet: `false`
+- readiness_matrix_update_allowed_by_packet: `false`
+- readiness_closure_allowed_by_packet: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- next_manual_artifact_required: `real wing_readonly_preflight.v1 summary.json`
+- packet_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/wing_readonly_preflight_handoff_packet.json`
+- packet_status: `operator_hardware_step_required`
+- plan_artifact_status: `passed`
+- plan_artifact_violations: `[]`
+- plan_output: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/wing_readonly_preflight_plan.json`
+- proof_artifact_schema: `wing_readonly_preflight.v1`
+- plan_proof_artifact_schema: `wing_readonly_preflight.v1`
+- proof_artifact_schema_matches_plan: `true`
+- proof_runner: `wing_readonly_preflight_runner`
+- plan_proof_runner: `wing_readonly_preflight_runner`
+- proof_runner_matches_plan: `true`
+- selected_mvp_blocker: `WING read-only connection proof`
+- plan_selected_mvp_blocker: `WING read-only connection proof`
+- selected_mvp_blocker_matches_plan: `true`
+- selected_mvp_blocker_status: `tooling_ready_waits_real_wing`
+- plan_selected_mvp_blocker_status: `tooling_ready_waits_real_wing`
+- selected_mvp_blocker_status_matches_plan: `true`
+- allowed_request_types: `["get_operator_mode", "get_state", "query_mixer_parameter"]`
+- plan_allowed_request_types: `["get_operator_mode", "get_state", "query_mixer_parameter"]`
+- allowed_request_types_match_plan: `true`
+- request_id_policy: `required_for_every_query_mixer_parameter_response`
+- plan_request_id_policy: `required_for_every_query_mixer_parameter_response`
+- request_id_policy_matches_plan: `true`
+- expected_response_types_by_request_type: `{"get_operator_mode": ["operator_mode_status"], "get_state": ["state_update"], "query_mixer_parameter": ["mixer_parameter_value", "mixer_parameter_read_blocked"]}`
+- plan_expected_response_types_by_request_type: `{"get_operator_mode": ["operator_mode_status"], "get_state": ["state_update"], "query_mixer_parameter": ["mixer_parameter_value", "mixer_parameter_read_blocked"]}`
+- response_type_mapping_matches_plan: `true`
+- request_count: `5`
+- request_sequence: `[{"type": "get_operator_mode"}, {"type": "get_state"}, {"address": "/ch/3/fdr", "channel": 3, "request_id": "wing-readonly-preflight:ch3:fader", "type": "query_mixer_parameter", "value_type": "fader"}, {"address": "/ch/3/in/set/trim", "channel": 3, "request_id": "wing-readonly-preflight:ch3:gain", "type": "query_mixer_parameter", "value_type": "gain"}, {"address": "/ch/3/pan", "channel": 3, "request_id": "wing-readonly-preflight:ch3:pan", "type": "query_mixer_parameter", "value_type": "pan"}]`
+- plan_request_sequence: `[{"type": "get_operator_mode"}, {"type": "get_state"}, {"address": "/ch/3/fdr", "channel": 3, "request_id": "wing-readonly-preflight:ch3:fader", "type": "query_mixer_parameter", "value_type": "fader"}, {"address": "/ch/3/in/set/trim", "channel": 3, "request_id": "wing-readonly-preflight:ch3:gain", "type": "query_mixer_parameter", "value_type": "gain"}, {"address": "/ch/3/pan", "channel": 3, "request_id": "wing-readonly-preflight:ch3:pan", "type": "query_mixer_parameter", "value_type": "pan"}]`
+- request_sequence_matches_plan: `true`
+- request_sequence_matches_expected: `true`
+- fail_closed_conditions: `["backend_not_in_wing_mode", "event_log_wing_mode_not_proven", "transport_timeout_or_connection_loss", "ws_handshake_rejected", "operator_channel_confirmation_mismatch", "operator_session_confirmation_missing", "physical_readback_missing", "readback_identity_mismatch", "readback_request_id_mismatch", "expected_plan_missing_or_mismatch", "prestart_summary_missing_or_invalid", "prestart_summary_sha256_mismatch", "stale_backend_port_prestart_detail_contract", "existing_backend_connection_boundary_missing", "forbidden_request_type_sent", "unexpected_response_type", "event_log_run_id_mismatch", "event_log_missing_or_invalid", "manual_review_decision_missing_or_invalid"]`
+- plan_fail_closed_conditions: `["backend_not_in_wing_mode", "event_log_wing_mode_not_proven", "transport_timeout_or_connection_loss", "ws_handshake_rejected", "operator_channel_confirmation_mismatch", "operator_session_confirmation_missing", "physical_readback_missing", "readback_identity_mismatch", "readback_request_id_mismatch", "expected_plan_missing_or_mismatch", "prestart_summary_missing_or_invalid", "prestart_summary_sha256_mismatch", "stale_backend_port_prestart_detail_contract", "existing_backend_connection_boundary_missing", "forbidden_request_type_sent", "unexpected_response_type", "event_log_run_id_mismatch", "event_log_missing_or_invalid", "manual_review_decision_missing_or_invalid"]`
+- fail_closed_conditions_match_plan: `true`
+- expected_artifacts: `["artifacts/wing_readonly_preflight/<run_id>/summary.json", "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"]`
+- expected_artifact_globs: `["artifacts/wing_readonly_preflight/<run_id>/summary.json", "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"]`
+- plan_expected_artifacts: `["artifacts/wing_readonly_preflight/<run_id>/summary.json", "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"]`
+- expected_artifacts_match_plan: `true`
+- expected_run_artifact_glob: `artifacts/wing_readonly_preflight/<run_id>/summary.json`
+- expected_event_log_glob: `artifacts/wing_readonly_preflight/<run_id>/events.jsonl`
+- summary_glob_matches_plan: `true`
+- event_log_glob_matches_plan: `true`
+- command_names: `["capture_readonly_preflight", "focused_validation", "prestart_backend_port_check", "preview_readonly_request_plan", "review_artifact_and_write_pending_decision_template", "review_edited_decision_json"]`
+- preview_command_uses_plan_only: `true`
+- preview_command_prestart_summary: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/backend_port_prestart/summary.json`
+- preview_command_prestart_summary_matches_plan: `true`
+- preview_command_artifact_root: `artifacts/wing_readonly_preflight`
+- preview_command_artifact_root_matches_packet: `true`
+- preview_command_plan_output: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/wing_readonly_preflight_plan.json`
+- preview_command_plan_output_matches_packet: `true`
+- capture_command_requires_physical_readback: `true`
+- capture_command_prestart_summary: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/backend_port_prestart/summary.json`
+- capture_command_prestart_summary_matches_plan: `true`
+- capture_command_artifact_root: `artifacts/wing_readonly_preflight`
+- capture_command_artifact_root_matches_packet: `true`
+- capture_command_expected_plan: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/wing_readonly_preflight_plan.json`
+- capture_command_expected_plan_matches_packet: `true`
+- prestart_backend_port_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+- backend_port_prestart_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+- backend_port_prestart_check_operator_sequence_step_index: `0`
+- backend_port_prestart_check_must_be_first_operator_step: `true`
+- backend_port_prestart_check_operator_sequence_step: `Before starting the intended backend/WING session, run prestart_backend_port_check and resolve only confirmed unexpected listeners.`
+- backend_port_prestart_check_operator_sequence_step_is_first: `true`
+- backend_connection_confirmation_step_index: `2`
+- expected_backend_connection_confirmation_step_index: `2`
+- operator_sequence_has_backend_connection_confirmation: `true`
+- operator_sequence_backend_connection_confirmation_step: `Confirm existing backend connection is the intended WING Rack and ready for read-only inspection.`
+- operator_sequence_backend_connection_confirmation_step_index: `2`
+- operator_sequence_backend_connection_confirmation_before_capture: `true`
+- operator_sequence_capture_readonly_preflight_step_index: `4`
+- backend_port_prestart_gate: `{"grants_live_authority": false, "must_pass_before_backend_wing_session": true, "operator_sequence_step": "Before starting the intended backend/WING session, run prestart_backend_port_check and resolve only confirmed unexpected listeners.", "operator_sequence_step_index": 0, "operator_sequence_step_must_be_first": true, "required": true, "required_markers": ["Before starting the intended backend/WING session", "prestart_backend_port_check", "unexpected listeners"], "runs_command": "prestart_backend_port_check"}`
+- expected_backend_port_prestart_gate: `{"required": true, "operator_sequence_step_index": 0, "operator_sequence_step_must_be_first": true, "operator_sequence_step": "Before starting the intended backend/WING session, run prestart_backend_port_check and resolve only confirmed unexpected listeners.", "required_markers": ["Before starting the intended backend/WING session", "prestart_backend_port_check", "unexpected listeners"], "runs_command": "prestart_backend_port_check", "must_pass_before_backend_wing_session": true, "grants_live_authority": false}`
+- backend_port_prestart_gate_matches_expected: `true`
+- declared_backend_port_prestart_gate_matches_expected: `true`
+- backend_port_prestart_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
+- review_command_writes_decision_template: `true`
+- review_decision_template_output: `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`
+- review_decision_template_output_matches_contract: `true`
+- review_decision_template_output_contract_flag: `true`
+- review_command_decision_template_output: `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`
+- review_command_decision_template_output_matches_packet: `true`
+- review_output: `Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md`
+- review_output_matches_contract: `true`
+- review_output_contract_flag: `true`
+- review_command_output: `Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md`
+- review_command_output_matches_packet: `true`
+- review_command_artifact_root: `artifacts/wing_readonly_preflight`
+- review_command_artifact_root_matches_packet: `true`
+- decision_review_output: `Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md`
+- decision_review_output_matches_contract: `true`
+- decision_review_output_contract_flag: `true`
+- decision_review_command_output: `Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md`
+- decision_review_command_output_matches_packet: `true`
+- decision_review_command_artifact_root: `artifacts/wing_readonly_preflight`
+- decision_review_command_artifact_root_matches_packet: `true`
+- decision_review_command_decision_root: `artifacts/wing_readonly_preflight_review_decisions`
+- decision_review_command_decision_root_matches_packet: `true`
+- blockers_not_closed_by_packet: `["wing_readonly_connection_proof", "physical_console_readback_proof", "supervised_fader_write_proof", "supervised_gain_down_trim_proof", "readiness_matrix_update_based_on_real_proof"]`
+- mvp_blocker_anchor_matches_current_first_open: `true`
+- mvp_blocker_anchor_sha256: `4d479cd0d96d315879dae3f057212361319137f5991a212c47d422cab86e1980`
+- expected_mvp_blocker_anchor_sha256: `4d479cd0d96d315879dae3f057212361319137f5991a212c47d422cab86e1980`
+- mvp_blocker_anchor_sha256_matches_current_first_open: `true`
+- mvp_blocker_anchor: `{"blocker_table": ".ai/project-layer/wing_mvp_blockers.md", "packet_does_not_close_blocker": true, "selected_action": "Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `operator_sequence_count: 10`, `expected_operator_sequence_count: 10`, `operator_sequence_count_matches_contract: true`, `operator_sequence_sha256`, `actual_operator_sequence_sha256`, `operator_sequence_sha256_matches_actual: true`, `expected_operator_sequence_sha256`, `actual_expected_operator_sequence_sha256`, `operator_sequence_matches_contract: true`, `operator_sequence_sha256_matches_contract: true`, `declared_expected_operator_sequence_sha256_matches_contract: true`, `declared_operator_sequence_matches_contract_flag: true`, `declared_operator_sequence_matches_contract_flag_matches_actual: true`, `declared_operator_sequence_sha256_matches_contract_flag: true`, `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`, `declared_operator_sequence_count: 10`, `declared_expected_operator_sequence_count: 10`, `declared_operator_sequence_count_contract_flag: true`, `declared_operator_sequence_count_matches_actual: true`, `declared_operator_sequence_count_matches_contract: true`, `declared_expected_operator_sequence_count_matches_contract: true`, `declared_operator_sequence_count_contract_flag_matches_declared_count: true`, `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false`, `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`, `backend_port_prestart_gate.operator_sequence_step_index: 0`, `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`, `backend_port_prestart_gate.runs_command: prestart_backend_port_check`, `backend_port_prestart_gate.required_markers` exactly listing `Before starting the intended backend/WING session`, `prestart_backend_port_check`, and `unexpected listeners`, the failed busy-port no-WING summary and no-WING handoff summary must both show `backend_port_prestart_check_command` exactly matching `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`, `backend_port_prestart_check_required: true`, `backend_port_prestart_check_must_pass_before_starting_backend: true`, `backend_port_prestart_gate_execution_allowed: false`, `backend_port_prestart_gate_readiness_closure_allowed: false`, `backend_port_prestart_gate_live_authority_granted: false`, and `backend_port_prestart_check_failure_detail_fields` exactly listing `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`, `preflight_blocked_until_listener_confirmed`, `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`, `listener_confirmation_template_status`, `listener_confirmation_template_path`, `listener_confirmation_template_acceptance_status`, `listener_confirmation_template_safe_to_stop_listener_by_gate`, `listener_confirmation_template_live_authority_granted`, `listener_confirmation_template_accepted_by_template`, `listener_confirmation_template_operator_placeholder_fields`, `listener_confirmation_template_execution_allowed_by_template`, `listener_confirmation_template_readiness_closure_allowed_by_template`, `listener_confirmation_template_required_edits`, `backend_port_prestart_gate_execution_allowed`, `backend_port_prestart_gate_readiness_closure_allowed`, `backend_port_prestart_gate_live_authority_granted`, `fail_closed_reason`, and `operator_next_step`; if a backend listener is already present, the failed no-WING summary must expose `listener_confirmation_template_path`, `listener_confirmation_template_status: pending_operator_edit`, `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and `listener_confirmation_template_live_authority_granted: false`, `listener_confirmation_template_accepted_by_template: false`, `listener_confirmation_template_operator_placeholder_fields` listing `operator_reviewed_at` and `operator_name`, `listener_confirmation_template_execution_allowed_by_template: false`, `listener_confirmation_template_readiness_closure_allowed_by_template: false`, `listener_confirmation_template_required_edits` including `set template_status to operator_reviewed_and_edited if using the generated template` and `set accepted_by_template to true if using the generated template`, and any template-derived accepted confirmation must replace `REPLACE_WITH_*` operator placeholders, set `template_status: operator_reviewed_and_edited`, and set `accepted_by_template: true`, `manual_review_required_before_readiness_update: true`, `readiness_matrix_update_allowed_by_packet: false`, `readiness_closure_allowed_by_packet: false`, `read_only: true`, `live_write: false`, `mutates_console_state: false`, `queries_console: false`, `executes_tests: false`, `operator_required: true`, `expected_plan_required_for_real_run: true`, `physical_preflight_requires_existing_backend_connection: true`, `backend_connection_confirmation_step_index: 2`, `operator_sequence_has_backend_connection_confirmation: true`, `operator_sequence_backend_connection_confirmation_step_index: 2`, `operator_sequence_backend_connection_confirmation_before_capture: true`, `operator_sequence_backend_connection_confirmation_step` including `existing backend connection`, `intended WING Rack`, and `read-only inspection`, `operator_sequence_capture_readonly_preflight_step_index: 4`, `backend_port_prestart_check_required: true`, `backend_port_prestart_check_must_pass_before_starting_backend: true`, `backend_port_prestart_gate_execution_allowed: false`, `backend_port_prestart_gate_readiness_closure_allowed: false`, `backend_port_prestart_gate_live_authority_granted: false`, `backend_port_prestart_summary_required: true`, `backend_port_prestart_summary_type: no_wing_release_check`, `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`, `backend_port_prestart_summary_path_placeholder` pointing to the passed no-WING prestart `summary.json`, `backend_port_prestart_summary_sha256_matches_plan: true`, `backend_port_prestart_summary_sha256_available: true`, `backend_port_prestart_summary_sha256_available_matches_digest: true`, `preview_command_prestart_summary` matching that path, `preview_command_prestart_summary_matches_plan: true`, `capture_command_prestart_summary` matching that path, `capture_command_prestart_summary_matches_plan: true`, `execution_allowed_by_packet: false`, `live_authority_granted: false`, `full_autonomous_ready: false`, `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`, `expected_artifacts` exactly matching `expected_artifact_globs` and `plan_expected_artifacts`, `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`, `event_log_glob_matches_plan: true`, `preview_command_artifact_root_matches_packet: true`, `preview_command_plan_output_matches_packet: true`, `capture_command_artifact_root_matches_packet: true`, `capture_command_expected_plan_matches_packet: true`, `review_command_artifact_root_matches_packet: true`, `decision_review_command_artifact_root_matches_packet: true`, `decision_review_command_decision_root_matches_packet: true`, `backend_port_prestart_check_operator_sequence_step_index: 0`, `backend_port_prestart_check_operator_sequence_step` including `prestart_backend_port_check` and `unexpected listeners`, `backend_port_prestart_check_must_be_first_operator_step: true`, `backend_port_prestart_check_operator_sequence_step_is_first: true`, `mvp_blocker_anchor` matching the current first open blocker row, `mvp_blocker_anchor_matches_current_first_open: true`, `mvp_blocker_anchor_sha256_matches_current_first_open: true`, `mvp_blocker_anchor.packet_does_not_close_blocker: true`, `operator_sequence_has_mvp_blocker_anchor_digest_review: true`, `mvp_blocker_anchor_digest_review_step_index: 8`, `expected_mvp_blocker_anchor_digest_review_step_index: 8`, `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`, `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`, `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`, `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`, `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`, `operator_sequence_mvp_blocker_anchor_digest_review_step` including `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and `current first open blocker`, `operator_sequence_has_supervised_prestart_gate: true`, `operator_sequence_supervised_prestart_gate_is_final: true`, `operator_sequence_supervised_prestart_gate_step_index: 9`, `expected_operator_sequence_supervised_prestart_gate_step_index: 9`, `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`, `operator_sequence_supervised_prestart_gate_step` including `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`, `required_supervised_prestart_gate_markers` exactly listing `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`, `supervised_prestart_gate` exactly matching `expected_supervised_prestart_gate`, `supervised_prestart_gate.grants_live_authority: false`, `supervised_prestart_gate.operator_sequence_step_index: 9`, `supervised_prestart_gate.operator_sequence_step_must_be_final: true`, `supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready`, `supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`, and `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`; accepted review source ids must also have a valid accepted-candidate prestart trace, the no-WING handoff packet must expose `required_supervised_proof_plan_summary_fields` and `required_supervised_proof_plan_summary_fields_match_contract: true`, `required_supervised_proof_plan_summary_fields` must include `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`, `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`, `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`, `readonly_preflight_review_decision_candidate_artifact_roots`, `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`, `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`, and the no-WING proof plan summary must expose those canonical helper fields, `required_supervised_proof_plan_summary_fields`, and `missing_required_supervised_proof_plan_summary_fields` computed from the canonical helpers; `next_wing_proof_plan_schema` must fail closed with `next_wing_proof_plan_required_summary_fields_missing` when any required summary field is absent; the canonical helper fields must be computed with `expected_artifacts`, `expected_summary_artifact`, `expected_events_artifact`, `summary_path_matches_expected_artifact: true`, `events_path_matches_expected_artifact: true`, and a bound no-WING prestart `summary.json` path and SHA256 showing `backend_port_prestart_summary_required: true`, `backend_port_prestart_summary_type: no_wing_release_check`, `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`, `backend_port_prestart_summary_status: passed`, `backend_port_prestart_summary_live_write: false`, `backend_port_prestart_summary_contacts_backend: false`, `backend_port_prestart_summary_queries_console: false`, `backend_port_prestart_summary_executes_tests: false`, and `backend_port_prestart_check_status: passed`, `safe_to_stop_listener_by_gate_matches_plan: true`, `live_authority_granted_matches_plan: true`, `backend_port_prestart_gate_execution_allowed_matches_plan: true`, `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`, and `backend_port_prestart_gate_live_authority_granted_matches_plan: true`, otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` or `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof` in the proof plan blockers.", "selected_blocker": "WING read-only connection proof", "selected_blocker_status": "tooling_ready_waits_real_wing", "selected_evidence_file_count": 160, "selected_evidence_files": ["tools/wing_readonly_preflight_runner.py", "tools/review_wing_readonly_preflight_artifacts.py", "tools/review_wing_readonly_preflight_decisions.py", "tools/build_wing_readonly_preflight_handoff_packet.py", "backend/wing_readonly_preflight_review_decision.py", "backend/supervised_wing_proof_plan.py", "backend/wing_readonly_preflight_contract.py", "tools/no_wing_release_check.py", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_RUNNER_20260606.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVIDENCE_20260606.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVENT_LOG_CROSSCHECK_20260606.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_EVENT_LOG_RUN_ID_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_EVENT_LOG_RUN_ID_FAIL_CLOSED_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_CHECKLIST_RUN_ID_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_RUN_ID_VERDICT_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_REQUEST_ID_CORRELATION_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_SCOPE_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_RELEASE_GATE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OPERATOR_CONFIRMATION_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_SESSION_CONFIRMATION_GATE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_SESSION_READY_REVIEW_CHECKLIST_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_ARTIFACT_HASH_BINDING_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_MANUAL_REVIEW_CHECKLIST_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_PACKET_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_GATED_PROOF_PLAN_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_FORBIDDEN_REQUEST_COVERAGE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_TRANSPORT_TIMEOUT_ARTIFACT_20260607.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_ARTIFACT_CONTRACT_CONSTANTS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_READY_GATE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_BOOL_RENDERING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SKIP_SELF_REPORTS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_GATE_MATCH_VERDICTS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_PRESTART_SUMMARY_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CARDINALITY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_ANCHOR_DIGEST_REVIEW_STEP_INDEX_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_ANCHOR_DIGEST_REVIEW_INDEX_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_OPERATOR_SEQUENCE_COUNT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_SHA256_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_PRESTART_DIAGNOSTICS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_COMMAND_DIRECTOR_SOURCE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_TYPE_CURRENT_COMMAND_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_TYPE_BLOCKER_ROW_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_POLICY_RAILS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_POLICY_BLOCKER_ROW_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READINESS_PRESTART_SUMMARY_POLICY_BRIDGE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READINESS_PRESTART_SUMMARY_CONTRACT_VERDICT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PORT_LOCAL_SOCKET_TEST_HELPER_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_TEMPLATE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_EDIT_GATE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_PENDING_SUMMARY_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_AUTHORITY_SUMMARY_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_FAILURE_DETAIL_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_COMMAND_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_GATE_AUTHORITY_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_FAIL_CLOSED_CONDITION_SYNC_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_FAIL_CLOSED_CONTRACT_SOURCE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_GATE_CONTRACT_SOURCE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_CONTRACT_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_NEXT_ACTION_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_REAL_ARTIFACT_EXPECTED_ARTIFACTS_BINDING_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_EXPECTED_ARTIFACTS_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_SUPERVISED_GATE_EXPECTED_ARTIFACT_MARKER_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_CONNECTION_CONFIRMATION_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_COMMAND_ARTIFACT_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_COMMAND_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_PRESTART_COMMAND_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_COMMAND_TEXT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_BACKEND_NOAUTHORITY_DETAIL_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_ACCEPTANCE_STATUS_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_PATH_FAILURE_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PRESTART_VIOLATIONS_MAP_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_CANONICAL_PRESTART_HELPER_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PREFLIGHT_COMMAND_BINDINGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_OPERATOR_CONFIRMATION_BINDINGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_CANONICAL_PRESTART_DIAGNOSTICS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PROOF_PLAN_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_AUTOLOOP_PROOF_PLAN_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_COMMAND_PROOF_PLAN_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_COMMAND_SELECTED_ACTION_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DIRECTOR_ACTION_COVERAGE_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DIRECTOR_ACTION_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_DIRECTOR_ACTION_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_DIRECTOR_DIGEST_RENDERED_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_DIRECTOR_SELF_CHECK_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SUPERVISED_SUMMARY_FIELD_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_MATCH_REPORTS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_INDEX_SYNC_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_FRONTEND_ARTIFACT_PRESERVATION_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_FRONTEND_BIND_ENVIRONMENT_BLOCKED_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_RUNNER_ENVIRONMENT_BLOCKED_PRESTART_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_ACTUAL_METADATA_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_REQUIRED_FALSE_DETAIL_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_MATCH_FLAG_RELEASE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_REQUIRED_FALSE_DETAIL_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_DECLARED_DENIAL_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_RUNNER_PRESTART_DETAIL_LIST_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_PRESTART_DETAIL_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CANDIDATE_PRESTART_REQUIRED_FALSE_TRACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_REQUIRED_FALSE_PLAN_MATCH_TRACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_PLAN_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_HANDOFF_PLAN_FIELD_MISSING_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_PRESTART_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_PLAN_PRESTART_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_RUNTIME_ARTIFACT_ROOT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_ARTIFACT_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_ARTIFACT_ROOT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_ARTIFACT_ROOT_REPORT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_ARTIFACT_ROOT_CONTRACT_SURFACE_20260615.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_ARTIFACT_ROOT_TRACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PROOF_PLAN_ARTIFACT_ROOT_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_REQUIRED_SUMMARY_FIELD_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_PROOF_PLAN_REQUIRED_FIELD_SUMMARY_EMBED_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_PROOF_PLAN_REQUIRED_FIELD_MARKDOWN_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_MARKDOWN_SUMMARY_SURFACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_OPERATOR_MARKDOWN_SUMMARY_SELF_CHECK_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_OPERATOR_MARKDOWN_SUMMARY_SHA_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_OPERATOR_MARKDOWN_SUMMARY_SHA_MATCH_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SIDECAR_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_REQUIRED_SET_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SHA_AVAILABILITY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SUMMARY_SURFACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SUMMARY_SURFACE_SELF_CHECK_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_CONTRACT_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_CROSS_SURFACE_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PRESTART_VIOLATIONS_STEP_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_BOOLEAN_NUMERIC_SCOPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_STRICT_INTEGER_SCOPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_COUNT_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_STRICT_SCOPE_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_VALUE_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_ARTIFACT_SHA_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_EXPECTED_ARTIFACT_PATH_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_PATH_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_ARTIFACT_ROOT_PATH_SCOPE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_ARTIFACT_ROOT_PARENT_TRAVERSAL_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_ARTIFACT_ROOT_CANONICAL_ROOT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_LEDGER_ARTIFACT_ROOT_CONTRACT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_REVIEW_DECISION_LEDGER_ARTIFACT_ROOT_SUMMARY_SURFACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_STRICT_SCOPE_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROGRESS_DIRECTOR_EVIDENCE_SUMMARY_20260614.md"]}`
+- expected_mvp_blocker_anchor: `{"blocker_table": ".ai/project-layer/wing_mvp_blockers.md", "selected_blocker": "WING read-only connection proof", "selected_blocker_status": "tooling_ready_waits_real_wing", "selected_action": "Run `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then run `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `operator_sequence_count: 10`, `expected_operator_sequence_count: 10`, `operator_sequence_count_matches_contract: true`, `operator_sequence_sha256`, `actual_operator_sequence_sha256`, `operator_sequence_sha256_matches_actual: true`, `expected_operator_sequence_sha256`, `actual_expected_operator_sequence_sha256`, `operator_sequence_matches_contract: true`, `operator_sequence_sha256_matches_contract: true`, `declared_expected_operator_sequence_sha256_matches_contract: true`, `declared_operator_sequence_matches_contract_flag: true`, `declared_operator_sequence_matches_contract_flag_matches_actual: true`, `declared_operator_sequence_sha256_matches_contract_flag: true`, `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`, `declared_operator_sequence_count: 10`, `declared_expected_operator_sequence_count: 10`, `declared_operator_sequence_count_contract_flag: true`, `declared_operator_sequence_count_matches_actual: true`, `declared_operator_sequence_count_matches_contract: true`, `declared_expected_operator_sequence_count_matches_contract: true`, `declared_operator_sequence_count_contract_flag_matches_declared_count: true`, `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false`, `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`, `backend_port_prestart_gate.operator_sequence_step_index: 0`, `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`, `backend_port_prestart_gate.runs_command: prestart_backend_port_check`, `backend_port_prestart_gate.required_markers` exactly listing `Before starting the intended backend/WING session`, `prestart_backend_port_check`, and `unexpected listeners`, the failed busy-port no-WING summary and no-WING handoff summary must both show `backend_port_prestart_check_command` exactly matching `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`, `backend_port_prestart_check_required: true`, `backend_port_prestart_check_must_pass_before_starting_backend: true`, `backend_port_prestart_gate_execution_allowed: false`, `backend_port_prestart_gate_readiness_closure_allowed: false`, `backend_port_prestart_gate_live_authority_granted: false`, and `backend_port_prestart_check_failure_detail_fields` exactly listing `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`, `preflight_blocked_until_listener_confirmed`, `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`, `listener_confirmation_template_status`, `listener_confirmation_template_path`, `listener_confirmation_template_acceptance_status`, `listener_confirmation_template_safe_to_stop_listener_by_gate`, `listener_confirmation_template_live_authority_granted`, `listener_confirmation_template_accepted_by_template`, `listener_confirmation_template_operator_placeholder_fields`, `listener_confirmation_template_execution_allowed_by_template`, `listener_confirmation_template_readiness_closure_allowed_by_template`, `listener_confirmation_template_required_edits`, `backend_port_prestart_gate_execution_allowed`, `backend_port_prestart_gate_readiness_closure_allowed`, `backend_port_prestart_gate_live_authority_granted`, `fail_closed_reason`, and `operator_next_step`; if a backend listener is already present, the failed no-WING summary must expose `listener_confirmation_template_path`, `listener_confirmation_template_status: pending_operator_edit`, `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and `listener_confirmation_template_live_authority_granted: false`, `listener_confirmation_template_accepted_by_template: false`, `listener_confirmation_template_operator_placeholder_fields` listing `operator_reviewed_at` and `operator_name`, `listener_confirmation_template_execution_allowed_by_template: false`, `listener_confirmation_template_readiness_closure_allowed_by_template: false`, `listener_confirmation_template_required_edits` including `set template_status to operator_reviewed_and_edited if using the generated template` and `set accepted_by_template to true if using the generated template`, and any template-derived accepted confirmation must replace `REPLACE_WITH_*` operator placeholders, set `template_status: operator_reviewed_and_edited`, and set `accepted_by_template: true`, `manual_review_required_before_readiness_update: true`, `readiness_matrix_update_allowed_by_packet: false`, `readiness_closure_allowed_by_packet: false`, `read_only: true`, `live_write: false`, `mutates_console_state: false`, `queries_console: false`, `executes_tests: false`, `operator_required: true`, `expected_plan_required_for_real_run: true`, `physical_preflight_requires_existing_backend_connection: true`, `backend_connection_confirmation_step_index: 2`, `operator_sequence_has_backend_connection_confirmation: true`, `operator_sequence_backend_connection_confirmation_step_index: 2`, `operator_sequence_backend_connection_confirmation_before_capture: true`, `operator_sequence_backend_connection_confirmation_step` including `existing backend connection`, `intended WING Rack`, and `read-only inspection`, `operator_sequence_capture_readonly_preflight_step_index: 4`, `backend_port_prestart_check_required: true`, `backend_port_prestart_check_must_pass_before_starting_backend: true`, `backend_port_prestart_gate_execution_allowed: false`, `backend_port_prestart_gate_readiness_closure_allowed: false`, `backend_port_prestart_gate_live_authority_granted: false`, `backend_port_prestart_summary_required: true`, `backend_port_prestart_summary_type: no_wing_release_check`, `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`, `backend_port_prestart_summary_path_placeholder` pointing to the passed no-WING prestart `summary.json`, `backend_port_prestart_summary_sha256_matches_plan: true`, `backend_port_prestart_summary_sha256_available: true`, `backend_port_prestart_summary_sha256_available_matches_digest: true`, `preview_command_prestart_summary` matching that path, `preview_command_prestart_summary_matches_plan: true`, `capture_command_prestart_summary` matching that path, `capture_command_prestart_summary_matches_plan: true`, `execution_allowed_by_packet: false`, `live_authority_granted: false`, `full_autonomous_ready: false`, `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`, `expected_artifacts` exactly matching `expected_artifact_globs` and `plan_expected_artifacts`, `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`, `event_log_glob_matches_plan: true`, `preview_command_artifact_root_matches_packet: true`, `preview_command_plan_output_matches_packet: true`, `capture_command_artifact_root_matches_packet: true`, `capture_command_expected_plan_matches_packet: true`, `review_command_artifact_root_matches_packet: true`, `decision_review_command_artifact_root_matches_packet: true`, `decision_review_command_decision_root_matches_packet: true`, `backend_port_prestart_check_operator_sequence_step_index: 0`, `backend_port_prestart_check_operator_sequence_step` including `prestart_backend_port_check` and `unexpected listeners`, `backend_port_prestart_check_must_be_first_operator_step: true`, `backend_port_prestart_check_operator_sequence_step_is_first: true`, `mvp_blocker_anchor` matching the current first open blocker row, `mvp_blocker_anchor_matches_current_first_open: true`, `mvp_blocker_anchor_sha256_matches_current_first_open: true`, `mvp_blocker_anchor.packet_does_not_close_blocker: true`, `operator_sequence_has_mvp_blocker_anchor_digest_review: true`, `mvp_blocker_anchor_digest_review_step_index: 8`, `expected_mvp_blocker_anchor_digest_review_step_index: 8`, `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`, `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`, `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`, `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`, `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`, `operator_sequence_mvp_blocker_anchor_digest_review_step` including `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and `current first open blocker`, `operator_sequence_has_supervised_prestart_gate: true`, `operator_sequence_supervised_prestart_gate_is_final: true`, `operator_sequence_supervised_prestart_gate_step_index: 9`, `expected_operator_sequence_supervised_prestart_gate_step_index: 9`, `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`, `operator_sequence_supervised_prestart_gate_step` including `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`, `required_supervised_prestart_gate_markers` exactly listing `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`, `supervised_prestart_gate` exactly matching `expected_supervised_prestart_gate`, `supervised_prestart_gate.grants_live_authority: false`, `supervised_prestart_gate.operator_sequence_step_index: 9`, `supervised_prestart_gate.operator_sequence_step_must_be_final: true`, `supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready`, `supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`, and `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`; accepted review source ids must also have a valid accepted-candidate prestart trace, the no-WING handoff packet must expose `required_supervised_proof_plan_summary_fields` and `required_supervised_proof_plan_summary_fields_match_contract: true`, `required_supervised_proof_plan_summary_fields` must include `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`, `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`, `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`, `readonly_preflight_review_decision_candidate_artifact_roots`, `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`, `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`, and the no-WING proof plan summary must expose those canonical helper fields, `required_supervised_proof_plan_summary_fields`, and `missing_required_supervised_proof_plan_summary_fields` computed from the canonical helpers; `next_wing_proof_plan_schema` must fail closed with `next_wing_proof_plan_required_summary_fields_missing` when any required summary field is absent; the canonical helper fields must be computed with `expected_artifacts`, `expected_summary_artifact`, `expected_events_artifact`, `summary_path_matches_expected_artifact: true`, `events_path_matches_expected_artifact: true`, and a bound no-WING prestart `summary.json` path and SHA256 showing `backend_port_prestart_summary_required: true`, `backend_port_prestart_summary_type: no_wing_release_check`, `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`, `backend_port_prestart_summary_status: passed`, `backend_port_prestart_summary_live_write: false`, `backend_port_prestart_summary_contacts_backend: false`, `backend_port_prestart_summary_queries_console: false`, `backend_port_prestart_summary_executes_tests: false`, and `backend_port_prestart_check_status: passed`, `safe_to_stop_listener_by_gate_matches_plan: true`, `live_authority_granted_matches_plan: true`, `backend_port_prestart_gate_execution_allowed_matches_plan: true`, `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`, and `backend_port_prestart_gate_live_authority_granted_matches_plan: true`, otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` or `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof` in the proof plan blockers.", "selected_evidence_file_count": 160, "selected_evidence_files": ["tools/wing_readonly_preflight_runner.py", "tools/review_wing_readonly_preflight_artifacts.py", "tools/review_wing_readonly_preflight_decisions.py", "tools/build_wing_readonly_preflight_handoff_packet.py", "backend/wing_readonly_preflight_review_decision.py", "backend/supervised_wing_proof_plan.py", "backend/wing_readonly_preflight_contract.py", "tools/no_wing_release_check.py", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_RUNNER_20260606.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVIDENCE_20260606.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_EVENT_LOG_CROSSCHECK_20260606.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_EVENT_LOG_RUN_ID_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_EVENT_LOG_RUN_ID_FAIL_CLOSED_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_CHECKLIST_RUN_ID_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_RUN_ID_VERDICT_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_REQUEST_ID_CORRELATION_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_SCOPE_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_RELEASE_GATE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_OPERATOR_CONFIRMATION_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_SESSION_CONFIRMATION_GATE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_SESSION_READY_REVIEW_CHECKLIST_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_ARTIFACT_HASH_BINDING_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_MANUAL_REVIEW_CHECKLIST_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_PACKET_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_DECISION_GATED_PROOF_PLAN_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_HANDOFF_FORBIDDEN_REQUEST_COVERAGE_20260607.md", "Docs/reports/AUTOMIXER_WING_READONLY_PREFLIGHT_TRANSPORT_TIMEOUT_ARTIFACT_20260607.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_ARTIFACT_CONTRACT_CONSTANTS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_READY_GATE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_PRESTART_BOOL_RENDERING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DIRECTION_GUARD_SKIP_SELF_REPORTS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_SHA_AVAILABILITY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_GATE_MATCH_VERDICTS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_PRESTART_SUMMARY_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CARDINALITY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_ANCHOR_DIGEST_REVIEW_STEP_INDEX_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_ANCHOR_DIGEST_REVIEW_INDEX_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_OPERATOR_SEQUENCE_COUNT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_SHA256_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_OPERATOR_SEQUENCE_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_PRESTART_DIAGNOSTICS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_COMMAND_DIRECTOR_SOURCE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_TYPE_CURRENT_COMMAND_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_TYPE_BLOCKER_ROW_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_POLICY_RAILS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_POLICY_BLOCKER_ROW_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READINESS_PRESTART_SUMMARY_POLICY_BRIDGE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READINESS_PRESTART_SUMMARY_CONTRACT_VERDICT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_LISTENER_PROBE_ERROR_FIELD_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PORT_LOCAL_SOCKET_TEST_HELPER_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_QUICK_BUSY_PORT_FAIL_CLOSED_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_ARTIFACT_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_CONFIRMATION_TEMPLATE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_EDIT_GATE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_PENDING_SUMMARY_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_LISTENER_TEMPLATE_AUTHORITY_SUMMARY_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_FAILURE_DETAIL_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_TEMPLATE_REVIEW_FIELDS_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_DETAIL_FIELDS_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_COMMAND_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_REQUIRED_FLAGS_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_BUSY_PORT_PRESTART_GATE_AUTHORITY_SUMMARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_PRESTART_SUMMARY_BINDING_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_PLACEHOLDER_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_SUMMARY_CONTACT_BOUNDARY_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_FAIL_CLOSED_CONDITION_SYNC_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_FAIL_CLOSED_CONTRACT_SOURCE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_GATE_CONTRACT_SOURCE_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_CONTRACT_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_EXPECTED_ARTIFACTS_NEXT_ACTION_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_REAL_ARTIFACT_EXPECTED_ARTIFACTS_BINDING_20260613.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_EXPECTED_ARTIFACTS_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_SUPERVISED_GATE_EXPECTED_ARTIFACT_MARKER_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_CONNECTION_CONFIRMATION_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_COMMAND_ARTIFACT_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_COMMAND_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_BACKEND_PRESTART_COMMAND_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_BACKEND_PRESTART_COMMAND_TEXT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_BACKEND_NOAUTHORITY_DETAIL_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_ACCEPTANCE_STATUS_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_LISTENER_TEMPLATE_PATH_FAILURE_FIELD_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_FLAG_SUMMARY_TRUTH_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SAFETY_FLAG_SUMMARY_TRUTH_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PRESTART_VIOLATIONS_MAP_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_CANONICAL_PRESTART_HELPER_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PREFLIGHT_COMMAND_BINDINGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_OPERATOR_CONFIRMATION_BINDINGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_CANONICAL_PRESTART_DIAGNOSTICS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PROOF_PLAN_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_AUTOLOOP_PROOF_PLAN_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_COMMAND_PROOF_PLAN_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_FIRST_COMMAND_SELECTED_ACTION_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DIRECTOR_ACTION_COVERAGE_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DIRECTOR_ACTION_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_DIRECTOR_ACTION_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_DIRECTOR_DIGEST_RENDERED_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DECLARED_DIRECTOR_SELF_CHECK_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_SUPERVISED_SUMMARY_FIELD_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_LATEST_MATCH_REPORTS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_EVIDENCE_INDEX_SYNC_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_FRONTEND_ARTIFACT_PRESERVATION_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_FRONTEND_BIND_ENVIRONMENT_BLOCKED_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_RUNNER_ENVIRONMENT_BLOCKED_PRESTART_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_SUMMARY_ACTUAL_METADATA_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_REQUIRED_FALSE_DETAIL_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_DENIAL_MATCH_FLAG_RELEASE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_REQUIRED_FALSE_DETAIL_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_DECLARED_DENIAL_MATCH_FLAGS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_RUNNER_PRESTART_DETAIL_LIST_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_PRESTART_DETAIL_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CANDIDATE_PRESTART_REQUIRED_FALSE_TRACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PRESTART_REQUIRED_FALSE_PLAN_MATCH_TRACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PRESTART_PLAN_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_HANDOFF_PLAN_FIELD_MISSING_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_PRESTART_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_PLAN_PRESTART_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_READONLY_RUNTIME_ARTIFACT_ROOT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_ARTIFACT_SHA_FORMAT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_ARTIFACT_ROOT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_ARTIFACT_ROOT_REPORT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_DECISION_REVIEW_ARTIFACT_ROOT_CONTRACT_SURFACE_20260615.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_ARTIFACT_ROOT_TRACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_HANDOFF_PROOF_PLAN_ARTIFACT_ROOT_SUMMARY_FIELDS_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_REQUIRED_SUMMARY_FIELD_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_PROOF_PLAN_REQUIRED_FIELD_SUMMARY_EMBED_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_PROOF_PLAN_REQUIRED_FIELD_MARKDOWN_SUMMARY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_CURRENT_COMMAND_MARKDOWN_SUMMARY_SURFACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_OPERATOR_MARKDOWN_SUMMARY_SELF_CHECK_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_OPERATOR_MARKDOWN_SUMMARY_SHA_BINDING_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_OPERATOR_MARKDOWN_SUMMARY_SHA_MATCH_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SIDECAR_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_REQUIRED_SET_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SHA_AVAILABILITY_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SUMMARY_SURFACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_SUMMARY_SURFACE_SELF_CHECK_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_CONTRACT_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_ARTIFACT_MANIFEST_CROSS_SURFACE_DIGEST_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROOF_PLAN_PRESTART_VIOLATIONS_STEP_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_BOOLEAN_NUMERIC_SCOPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_EVIDENCE_STRICT_INTEGER_SCOPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_COUNT_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_STRICT_SCOPE_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_VALUE_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_ARTIFACT_SHA_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_TEMPLATE_EXPECTED_ARTIFACT_PATH_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_EXPECTED_ARTIFACT_PATH_CONTRACT_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_ARTIFACT_ROOT_PATH_SCOPE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_ARTIFACT_ROOT_PARENT_TRAVERSAL_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_ACCEPTED_CANDIDATE_ARTIFACT_ROOT_CANONICAL_ROOT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_LEDGER_ARTIFACT_ROOT_CONTRACT_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_NOWING_REVIEW_DECISION_LEDGER_ARTIFACT_ROOT_SUMMARY_SURFACE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_REVIEW_DECISION_STRICT_SCOPE_TYPE_GATE_20260614.md", "Docs/reports/AUTOMIXER_WING_MVP_PROGRESS_DIRECTOR_EVIDENCE_SUMMARY_20260614.md"], "packet_does_not_close_blocker": true}`
+- project_director_selected_action_source: `Current First Command`
+- expected_project_director_selected_action_source: `Current First Command`
+- project_director_selected_action_source_matches_current_directive: `true`
+- project_director_selected_action_sha256: `3bdb3ce148bfff1dd70fc67a3f75c5df4596d03ea8162e932ded152f2773a70b`
+- actual_project_director_selected_action_sha256: `3bdb3ce148bfff1dd70fc67a3f75c5df4596d03ea8162e932ded152f2773a70b`
+- expected_project_director_selected_action_sha256: `3bdb3ce148bfff1dd70fc67a3f75c5df4596d03ea8162e932ded152f2773a70b`
+- project_director_selected_action_sha256_available: `true`
+- project_director_selected_action_sha256_available_matches_digest: `true`
+- project_director_selected_action_sha256_matches_anchor: `true`
+- project_director_selected_action_sha256_matches_text: `true`
+- project_director_selected_action_sha256_matches_current_directive: `true`
+- project_director_selected_action_anchor_matches_current_directive: `true`
+- project_director_current_first_command_baseline_coverage_required: `true`
+- project_director_current_first_command_baseline_coverage_passed: `true`
+- project_director_current_first_command_baseline_coverage_marker_count: `169`
+- project_director_current_first_command_baseline_missing_markers: `[]`
+- project_director_selected_action_anchor: `{"anchor_schema": "project_director_selected_action.v1", "blocker_table": ".ai/project-layer/wing_mvp_blockers.md", "current_first_command_baseline_coverage_marker_count": 169, "current_first_command_baseline_coverage_passed": true, "current_first_command_baseline_coverage_required": true, "current_first_command_baseline_missing_markers": [], "current_first_command_present": true, "packet_does_not_close_blocker": true, "selected_action": "Use `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then use `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `operator_sequence_count: 10`; it must also show `expected_operator_sequence_count: 10`; it must also show `operator_sequence_count_matches_contract: true`; it must also show `operator_sequence_sha256`; it must also show `actual_operator_sequence_sha256`; it must also show `operator_sequence_sha256_matches_actual: true`; it must also show `expected_operator_sequence_sha256`; it must also show `actual_expected_operator_sequence_sha256`; it must also show `operator_sequence_matches_contract: true`; it must also show `operator_sequence_sha256_matches_contract: true`; it must also show `declared_expected_operator_sequence_sha256_matches_contract: true`; it must also show `declared_operator_sequence_matches_contract_flag: true`; it must also show `declared_operator_sequence_matches_contract_flag_matches_actual: true`; it must also show `declared_operator_sequence_sha256_matches_contract_flag: true`; it must also show `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`; it must also show `declared_operator_sequence_count: 10`; it must also show `declared_expected_operator_sequence_count: 10`; it must also show `declared_operator_sequence_count_contract_flag: true`; it must also show `declared_operator_sequence_count_matches_actual: true`; it must also show `declared_operator_sequence_count_matches_contract: true`; it must also show `declared_expected_operator_sequence_count_matches_contract: true`; it must also show `declared_operator_sequence_count_contract_flag_matches_declared_count: true`; it must also show `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false` and `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`; it must also show `backend_port_prestart_gate_matches_expected: true`; it must also show `declared_backend_port_prestart_gate_matches_expected: true`; it must also show `backend_port_prestart_gate.operator_sequence_step_index: 0`; it must also show `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`; it must also show `backend_port_prestart_gate.runs_command: prestart_backend_port_check`; it must also show `backend_port_prestart_gate.required_markers` exactly listing `Before starting the intended backend/WING session`, `prestart_backend_port_check`, and `unexpected listeners`; the failed busy-port no-WING summary and no-WING handoff summary must both show `backend_port_prestart_check_command` exactly matching `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`; the same summaries must also show `backend_port_prestart_check_command_text` exactly matching `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`; the same summaries must also show `backend_port_prestart_check_required: true` and `backend_port_prestart_check_must_pass_before_starting_backend: true`; the same summaries must also show `backend_port_prestart_gate_execution_allowed: false`, `backend_port_prestart_gate_readiness_closure_allowed: false`, and `backend_port_prestart_gate_live_authority_granted: false`; the same summaries must also show `backend_port_prestart_check_failure_detail_fields` exactly listing `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`, `preflight_blocked_until_listener_confirmed`, `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`, `listener_confirmation_template_status`, `listener_confirmation_template_path`, `listener_confirmation_template_acceptance_status`, `listener_confirmation_template_safe_to_stop_listener_by_gate`, `listener_confirmation_template_live_authority_granted`, `listener_confirmation_template_accepted_by_template`, `listener_confirmation_template_operator_placeholder_fields`, `listener_confirmation_template_execution_allowed_by_template`, `listener_confirmation_template_readiness_closure_allowed_by_template`, `listener_confirmation_template_required_edits`, `backend_port_prestart_gate_execution_allowed`, `backend_port_prestart_gate_readiness_closure_allowed`, `backend_port_prestart_gate_live_authority_granted`, `fail_closed_reason`, and `operator_next_step`; if no-WING quick reports `environment_blocked_checks`, the no-WING summary must also expose `environment_blocked_check_details` with `local_dev_server_bind_denied`, `127.0.0.1:3000`, log paths, and `operator_next_step`, and the gate remains failed until rerun in an environment that can bind the frontend dev server; if a backend listener is already present, the failed no-WING summary must expose `listener_confirmation_template_path`, `listener_confirmation_template_status: pending_operator_edit`, `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and `listener_confirmation_template_live_authority_granted: false`; it must also show `listener_confirmation_template_accepted_by_template: false`; it must also show `listener_confirmation_template_operator_placeholder_fields` listing `operator_reviewed_at` and `operator_name`; it must also show `listener_confirmation_template_execution_allowed_by_template: false`; it must also show `listener_confirmation_template_readiness_closure_allowed_by_template: false`; the generated template required edits must include `set template_status to operator_reviewed_and_edited if using the generated template` and `set accepted_by_template to true if using the generated template`, and any template-derived accepted confirmation must replace `REPLACE_WITH_*` operator placeholders, set `template_status: operator_reviewed_and_edited`, and set `accepted_by_template: true`; it must also show `manual_review_required_before_readiness_update: true`; it must also show `readiness_matrix_update_allowed_by_packet: false`; it must also show `readiness_closure_allowed_by_packet: false`; it must also show `read_only: true`; it must also show `live_write: false`; it must also show `mutates_console_state: false`; it must also show `queries_console: false`; it must also show `executes_tests: false`; it must also show `operator_required: true`; it must also show `expected_plan_required_for_real_run: true`; it must also show `physical_preflight_requires_existing_backend_connection: true`; it must also show `backend_connection_confirmation_step_index: 2`; it must also show `operator_sequence_has_backend_connection_confirmation: true`; it must also show `operator_sequence_backend_connection_confirmation_step_index: 2`; it must also show `operator_sequence_backend_connection_confirmation_before_capture: true`; the `operator_sequence_backend_connection_confirmation_step` must include `existing backend connection`, `intended WING Rack`, and `read-only inspection`; it must also show `operator_sequence_capture_readonly_preflight_step_index: 4`; the no-WING handoff summary must also show the same `backend_port_prestart_check_required: true` and `backend_port_prestart_check_must_pass_before_starting_backend: true`; it must also show `backend_port_prestart_summary_required: true`; it must also show `backend_port_prestart_summary_path_placeholder` pointing to the passed no-WING prestart `summary.json`; it must also show `backend_port_prestart_summary_sha256_matches_plan: true`; it must also show `backend_port_prestart_summary_sha256_available: true`; it must also show `backend_port_prestart_summary_sha256_available_matches_digest: true`; it must also show `preview_command_prestart_summary` matching that path; it must also show `preview_command_prestart_summary_matches_plan: true`; it must also show `capture_command_prestart_summary` matching that path; it must also show `capture_command_prestart_summary_matches_plan: true`; the no-WING handoff summary must also show `backend_port_prestart_summary_type_matches_plan: true`; it must also show `backend_port_prestart_summary_status_matches_plan: true`; it must also show `backend_port_prestart_summary_connection_policy_matches_plan: true`; it must also show `backend_port_prestart_summary_live_write_matches_plan: true`; it must also show `backend_port_prestart_summary_contacts_backend_matches_plan: true`; it must also show `backend_port_prestart_summary_queries_console_matches_plan: true`; it must also show `backend_port_prestart_summary_executes_tests_matches_plan: true`; it must also show `plan_safe_to_stop_listener_by_gate: false`; it must also show `plan_live_authority_granted: false`; it must also show `plan_backend_port_prestart_gate_execution_allowed: false`; it must also show `plan_backend_port_prestart_gate_readiness_closure_allowed: false`; it must also show `plan_backend_port_prestart_gate_live_authority_granted: false`; it must also show `backend_port_prestart_check_status_matches_plan: true`; it must also show `safe_to_stop_listener_by_gate_matches_plan: true`; it must also show `live_authority_granted_matches_plan: true`; it must also show `backend_port_prestart_gate_execution_allowed_matches_plan: true`; it must also show `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`; it must also show `backend_port_prestart_gate_live_authority_granted_matches_plan: true`; it must also show `declared_safe_to_stop_listener_by_gate_matches_plan: true`; it must also show `declared_live_authority_granted_matches_plan: true`; it must also show `declared_backend_port_prestart_gate_execution_allowed_matches_plan: true`; it must also show `declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`; it must also show `declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true`; it must also show `execution_allowed_by_packet: false`; it must also show `live_authority_granted: false`; it must also show `full_autonomous_ready: false`; it must also show `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`; it must also show `expected_artifacts` exactly matching `expected_artifact_globs` and `plan_expected_artifacts`; it must also show `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`, and `event_log_glob_matches_plan: true`; it must also show `preview_command_artifact_root_matches_packet: true`; it must also show `preview_command_plan_output_matches_packet: true`; it must also show `capture_command_artifact_root_matches_packet: true`; it must also show `capture_command_expected_plan_matches_packet: true`; it must also show `review_command_artifact_root_matches_packet: true`; it must also show `decision_review_command_artifact_root_matches_packet: true`; it must also show `decision_review_command_decision_root_matches_packet: true`; it must also show `backend_port_prestart_check_operator_sequence_step_index: 0`; it must also show `backend_port_prestart_check_operator_sequence_step` including `prestart_backend_port_check` and `unexpected listeners`; it must also show `backend_port_prestart_check_must_be_first_operator_step: true`; it must also show `backend_port_prestart_check_operator_sequence_step_is_first: true`; it must also show `mvp_blocker_anchor` matching the current first open blocker row and `mvp_blocker_anchor_matches_current_first_open: true`; the no-WING handoff summary must also show `mvp_blocker_anchor_sha256_matches_current_first_open: true`; the no-WING handoff summary must also show `mvp_blocker_anchor.packet_does_not_close_blocker: true`; the no-WING handoff summary must also show `project_director_selected_action_anchor`, `expected_project_director_selected_action_anchor`, `project_director_selected_action_anchor_matches_current_directive: true`, `project_director_selected_action_source: Current First Command`, `expected_project_director_selected_action_source: Current First Command`, `project_director_selected_action_source_matches_current_directive: true`, `project_director_selected_action_sha256`, `actual_project_director_selected_action_sha256`, `expected_project_director_selected_action_sha256`, `project_director_selected_action_sha256_available: true`, `project_director_selected_action_sha256_available_matches_digest: true`, `project_director_selected_action_sha256_matches_anchor: true`, `project_director_selected_action_sha256_matches_text: true`, `project_director_selected_action_sha256_matches_current_directive: true`, `project_director_current_first_command_baseline_coverage_required: true`, `project_director_current_first_command_baseline_coverage_passed: true`, `project_director_current_first_command_baseline_coverage_marker_count`, and `project_director_current_first_command_baseline_missing_markers: []`; the no-WING handoff summary must also show `operator_sequence_has_mvp_blocker_anchor_digest_review: true`; the no-WING handoff summary must also show `mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `expected_mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`; it must also show `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`; the no-WING handoff summary must also show `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`; the digest review `operator_sequence_mvp_blocker_anchor_digest_review_step` must include `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and `current first open blocker`; the no-WING handoff summary must also show `operator_sequence_has_supervised_prestart_gate: true`; the no-WING handoff summary must also show `operator_sequence_supervised_prestart_gate_is_final: true`; the no-WING handoff summary must also show `operator_sequence_supervised_prestart_gate_step_index: 9`; the no-WING handoff summary must also show `expected_operator_sequence_supervised_prestart_gate_step_index: 9`; the no-WING handoff summary must also show `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`; the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`; the no-WING handoff summary must also show `required_supervised_prestart_gate_markers` exactly listing `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`; the no-WING handoff summary must show `supervised_prestart_gate` exactly matching `expected_supervised_prestart_gate`; the no-WING handoff summary must also show `supervised_prestart_gate_matches_expected: true`; the no-WING handoff summary must also show `declared_supervised_prestart_gate_matches_expected: true`; the no-WING handoff summary must also show `supervised_prestart_gate.grants_live_authority: false`; the no-WING handoff summary must also show `supervised_prestart_gate.operator_sequence_step_index: 9`; the no-WING handoff summary must also show `supervised_prestart_gate.operator_sequence_step_must_be_final: true`; the no-WING handoff summary must also show `supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready`; the no-WING handoff summary must also show `supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`; the no-WING handoff summary must also show `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`; the no-WING handoff summary must also show `required_supervised_proof_plan_summary_fields`, `expected_required_supervised_proof_plan_summary_fields`, and `required_supervised_proof_plan_summary_fields_match_contract: true`; `required_supervised_proof_plan_summary_fields` must include `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`, `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`, `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`, `readonly_preflight_review_decision_candidate_artifact_roots`, `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`, `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`; the operator-readable no-WING `summary.md` proof plan section must render those canonical helper fields; the no-WING proof plan summary must also show `operator_markdown_summary_required: true`, `operator_markdown_summary_field_lines_rendered: true`, and `operator_markdown_summary_missing_field_lines: []`; the no-WING proof plan summary must also bind the operator markdown artifact with `operator_markdown_summary_artifact: summary.md`, `operator_markdown_summary_sha256`, and `operator_markdown_summary_sha256_available: true`, and it must verify that binding with `operator_markdown_summary_actual_sha256` and `operator_markdown_summary_sha256_matches_actual: true`; the no-WING `summary.json` and operator-readable `summary.md` must expose the manifest summary surface with `artifact_manifest_summary_surface_required: true`, `artifact_manifest_summary_surface_missing_fields: []`, `artifact_manifest_summary_surface_required_field_lines`, `artifact_manifest_summary_surface_missing_field_lines: []`, `artifact_manifest_summary_surface_field_lines_rendered: true`, and `artifact_manifest_contract_id`, `artifact_manifest_contract_required: true`, `artifact_manifest_contract_fields`, `artifact_manifest_contract_sha256`, `artifact_manifest_contract_sha256_available: true`, `artifact_manifest_contract_sha256_matches_expected: true`, `artifact_manifest_contract_cross_surface_required: true`, `artifact_manifest_contract_cross_surface_required_surfaces`, `artifact_manifest_contract_cross_surface_required_fields`, `artifact_manifest_contract_cross_surface_expected_match: true`, `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`, `artifact_manifest_contract_cross_surface_live_authority_granted: false`, and `artifact_manifest_required_artifact_sha256_fields`; the no-WING run artifact bundle must also write `artifact-manifest.json` with `artifact_manifest_contract_id`, `artifact_manifest_contract_required: true`, `artifact_manifest_contract_fields`, `artifact_manifest_contract_sha256`, `artifact_manifest_contract_sha256_available: true`, `artifact_manifest_contract_sha256_matches_expected: true`, `artifact_manifest_contract_cross_surface_required: true`, `artifact_manifest_contract_cross_surface_required_surfaces`, `artifact_manifest_contract_cross_surface_required_fields`, `artifact_manifest_contract_cross_surface_expected_match: true`, `artifact_manifest_contract_cross_surface_match: true`, `artifact_manifest_summary_json_contract_sha256_matches_manifest: true`, `artifact_manifest_summary_md_contract_sha256_matches_manifest: true`, `artifact_manifest_contract_cross_surface_mismatches: []`, `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`, `artifact_manifest_contract_cross_surface_live_authority_granted: false`, `artifact_manifest_path: artifact-manifest.json`, `artifact_manifest_artifact_count: 2`, `artifact_manifest_required_artifact_count: 2`, `artifact_manifest_artifact_count_matches_required: true`, `artifact_manifest_required_artifact_ids`, `artifact_manifest_artifact_ids`, `artifact_manifest_required_artifacts_present: true`, `artifact_manifest_required_artifact_paths`, `artifact_manifest_artifact_paths`, `artifact_manifest_required_artifact_paths_present: true`, `artifact_manifest_required_artifact_sha256_available: true`, `artifact_manifest_summary_json_sha256`, `artifact_manifest_summary_json_sha256_available: true`, `artifact_manifest_summary_md_sha256`, `artifact_manifest_summary_md_sha256_available: true`, `artifact_manifest_readiness_closure_allowed: false`, and `artifact_manifest_live_authority_granted: false`; the no-WING proof plan summary must also expose those canonical helper fields, `required_supervised_proof_plan_summary_fields`, and `missing_required_supervised_proof_plan_summary_fields`; and `next_wing_proof_plan_schema` must fail closed with `next_wing_proof_plan_required_summary_fields_missing` when any required summary field is absent; accepted review source ids must also have a valid accepted-candidate prestart trace with `expected_artifacts`, `expected_summary_artifact`, `expected_events_artifact`, `summary_path_matches_expected_artifact: true`, and `events_path_matches_expected_artifact: true`; otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers. Accepted review source ids must also have a valid accepted-candidate `artifact_root` trace; otherwise keep `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof` in the proof plan blockers, and no-WING validation must fail with `next_wing_proof_plan_steps_with_candidate_artifact_root_violations` if physical proof steps are still present. The recomputed `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source` map must also stay `{}`; no-WING validation must fail with `next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations` if that expected map is non-empty while physical proof steps are still present. The accepted-candidate prestart trace must also bind to a passed no-WING prestart `summary.json` by path and SHA256, with `backend_port_prestart_summary_required: true`, `backend_port_prestart_summary_type: no_wing_release_check`, `backend_port_prestart_summary_status: passed`, `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`, `backend_port_prestart_summary_live_write: false`, `backend_port_prestart_summary_contacts_backend: false`, `backend_port_prestart_summary_queries_console: false`, `backend_port_prestart_summary_executes_tests: false`, and `backend_port_prestart_check_status: passed`. The decision-review ledger/report must expose `accepted_candidate_prestart_contract_violations_by_source`, and the supervised proof plan summary must expose `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`. Both maps must be `{}` before supervised proof steps are planned; a non-empty map must trigger `next_wing_proof_plan_steps_with_candidate_prestart_violations` if physical proof steps are still present, and keeps `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in force. The recomputed `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source` map must also stay `{}`; if it is non-empty while physical proof steps are present, no-WING validation must fail with `next_wing_proof_plan_steps_with_expected_candidate_prestart_violations`.", "selected_action_sha256": "3bdb3ce148bfff1dd70fc67a3f75c5df4596d03ea8162e932ded152f2773a70b", "selected_action_source": "Current First Command", "selected_blocker": "WING read-only connection proof", "selected_blocker_status": "tooling_ready_waits_real_wing"}`
+- expected_project_director_selected_action_anchor: `{"anchor_schema": "project_director_selected_action.v1", "blocker_table": ".ai/project-layer/wing_mvp_blockers.md", "selected_blocker": "WING read-only connection proof", "selected_blocker_status": "tooling_ready_waits_real_wing", "selected_action": "Use `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick` before starting the intended backend/WING session, then use `Docs/runbooks/WING_READONLY_PREFLIGHT.md`. Before any supervised proof, the no-WING handoff summary must show `operator_sequence_count: 10`; it must also show `expected_operator_sequence_count: 10`; it must also show `operator_sequence_count_matches_contract: true`; it must also show `operator_sequence_sha256`; it must also show `actual_operator_sequence_sha256`; it must also show `operator_sequence_sha256_matches_actual: true`; it must also show `expected_operator_sequence_sha256`; it must also show `actual_expected_operator_sequence_sha256`; it must also show `operator_sequence_matches_contract: true`; it must also show `operator_sequence_sha256_matches_contract: true`; it must also show `declared_expected_operator_sequence_sha256_matches_contract: true`; it must also show `declared_operator_sequence_matches_contract_flag: true`; it must also show `declared_operator_sequence_matches_contract_flag_matches_actual: true`; it must also show `declared_operator_sequence_sha256_matches_contract_flag: true`; it must also show `declared_operator_sequence_sha256_matches_contract_flag_matches_actual: true`; it must also show `declared_operator_sequence_count: 10`; it must also show `declared_expected_operator_sequence_count: 10`; it must also show `declared_operator_sequence_count_contract_flag: true`; it must also show `declared_operator_sequence_count_matches_actual: true`; it must also show `declared_operator_sequence_count_matches_contract: true`; it must also show `declared_expected_operator_sequence_count_matches_contract: true`; it must also show `declared_operator_sequence_count_contract_flag_matches_declared_count: true`; it must also show `backend_port_prestart_gate` exactly matching `expected_backend_port_prestart_gate`, with `backend_port_prestart_gate.grants_live_authority: false` and `backend_port_prestart_gate.must_pass_before_backend_wing_session: true`; it must also show `backend_port_prestart_gate_matches_expected: true`; it must also show `declared_backend_port_prestart_gate_matches_expected: true`; it must also show `backend_port_prestart_gate.operator_sequence_step_index: 0`; it must also show `backend_port_prestart_gate.operator_sequence_step_must_be_first: true`; it must also show `backend_port_prestart_gate.runs_command: prestart_backend_port_check`; it must also show `backend_port_prestart_gate.required_markers` exactly listing `Before starting the intended backend/WING session`, `prestart_backend_port_check`, and `unexpected listeners`; the failed busy-port no-WING summary and no-WING handoff summary must both show `backend_port_prestart_check_command` exactly matching `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`; the same summaries must also show `backend_port_prestart_check_command_text` exactly matching `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`; the same summaries must also show `backend_port_prestart_check_required: true` and `backend_port_prestart_check_must_pass_before_starting_backend: true`; the same summaries must also show `backend_port_prestart_gate_execution_allowed: false`, `backend_port_prestart_gate_readiness_closure_allowed: false`, and `backend_port_prestart_gate_live_authority_granted: false`; the same summaries must also show `backend_port_prestart_check_failure_detail_fields` exactly listing `listener_processes`, `listener_process_error`, `listener_confirmation_checklist`, `preflight_blocked_until_listener_confirmed`, `intended_backend_confirmation_required`, `safe_to_stop_listener_by_gate`, `listener_confirmation_template_status`, `listener_confirmation_template_path`, `listener_confirmation_template_acceptance_status`, `listener_confirmation_template_safe_to_stop_listener_by_gate`, `listener_confirmation_template_live_authority_granted`, `listener_confirmation_template_accepted_by_template`, `listener_confirmation_template_operator_placeholder_fields`, `listener_confirmation_template_execution_allowed_by_template`, `listener_confirmation_template_readiness_closure_allowed_by_template`, `listener_confirmation_template_required_edits`, `backend_port_prestart_gate_execution_allowed`, `backend_port_prestart_gate_readiness_closure_allowed`, `backend_port_prestart_gate_live_authority_granted`, `fail_closed_reason`, and `operator_next_step`; if no-WING quick reports `environment_blocked_checks`, the no-WING summary must also expose `environment_blocked_check_details` with `local_dev_server_bind_denied`, `127.0.0.1:3000`, log paths, and `operator_next_step`, and the gate remains failed until rerun in an environment that can bind the frontend dev server; if a backend listener is already present, the failed no-WING summary must expose `listener_confirmation_template_path`, `listener_confirmation_template_status: pending_operator_edit`, `listener_confirmation_template_safe_to_stop_listener_by_gate: false`, and `listener_confirmation_template_live_authority_granted: false`; it must also show `listener_confirmation_template_accepted_by_template: false`; it must also show `listener_confirmation_template_operator_placeholder_fields` listing `operator_reviewed_at` and `operator_name`; it must also show `listener_confirmation_template_execution_allowed_by_template: false`; it must also show `listener_confirmation_template_readiness_closure_allowed_by_template: false`; the generated template required edits must include `set template_status to operator_reviewed_and_edited if using the generated template` and `set accepted_by_template to true if using the generated template`, and any template-derived accepted confirmation must replace `REPLACE_WITH_*` operator placeholders, set `template_status: operator_reviewed_and_edited`, and set `accepted_by_template: true`; it must also show `manual_review_required_before_readiness_update: true`; it must also show `readiness_matrix_update_allowed_by_packet: false`; it must also show `readiness_closure_allowed_by_packet: false`; it must also show `read_only: true`; it must also show `live_write: false`; it must also show `mutates_console_state: false`; it must also show `queries_console: false`; it must also show `executes_tests: false`; it must also show `operator_required: true`; it must also show `expected_plan_required_for_real_run: true`; it must also show `physical_preflight_requires_existing_backend_connection: true`; it must also show `backend_connection_confirmation_step_index: 2`; it must also show `operator_sequence_has_backend_connection_confirmation: true`; it must also show `operator_sequence_backend_connection_confirmation_step_index: 2`; it must also show `operator_sequence_backend_connection_confirmation_before_capture: true`; the `operator_sequence_backend_connection_confirmation_step` must include `existing backend connection`, `intended WING Rack`, and `read-only inspection`; it must also show `operator_sequence_capture_readonly_preflight_step_index: 4`; the no-WING handoff summary must also show the same `backend_port_prestart_check_required: true` and `backend_port_prestart_check_must_pass_before_starting_backend: true`; it must also show `backend_port_prestart_summary_required: true`; it must also show `backend_port_prestart_summary_path_placeholder` pointing to the passed no-WING prestart `summary.json`; it must also show `backend_port_prestart_summary_sha256_matches_plan: true`; it must also show `backend_port_prestart_summary_sha256_available: true`; it must also show `backend_port_prestart_summary_sha256_available_matches_digest: true`; it must also show `preview_command_prestart_summary` matching that path; it must also show `preview_command_prestart_summary_matches_plan: true`; it must also show `capture_command_prestart_summary` matching that path; it must also show `capture_command_prestart_summary_matches_plan: true`; the no-WING handoff summary must also show `backend_port_prestart_summary_type_matches_plan: true`; it must also show `backend_port_prestart_summary_status_matches_plan: true`; it must also show `backend_port_prestart_summary_connection_policy_matches_plan: true`; it must also show `backend_port_prestart_summary_live_write_matches_plan: true`; it must also show `backend_port_prestart_summary_contacts_backend_matches_plan: true`; it must also show `backend_port_prestart_summary_queries_console_matches_plan: true`; it must also show `backend_port_prestart_summary_executes_tests_matches_plan: true`; it must also show `plan_safe_to_stop_listener_by_gate: false`; it must also show `plan_live_authority_granted: false`; it must also show `plan_backend_port_prestart_gate_execution_allowed: false`; it must also show `plan_backend_port_prestart_gate_readiness_closure_allowed: false`; it must also show `plan_backend_port_prestart_gate_live_authority_granted: false`; it must also show `backend_port_prestart_check_status_matches_plan: true`; it must also show `safe_to_stop_listener_by_gate_matches_plan: true`; it must also show `live_authority_granted_matches_plan: true`; it must also show `backend_port_prestart_gate_execution_allowed_matches_plan: true`; it must also show `backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`; it must also show `backend_port_prestart_gate_live_authority_granted_matches_plan: true`; it must also show `declared_safe_to_stop_listener_by_gate_matches_plan: true`; it must also show `declared_live_authority_granted_matches_plan: true`; it must also show `declared_backend_port_prestart_gate_execution_allowed_matches_plan: true`; it must also show `declared_backend_port_prestart_gate_readiness_closure_allowed_matches_plan: true`; it must also show `declared_backend_port_prestart_gate_live_authority_granted_matches_plan: true`; it must also show `execution_allowed_by_packet: false`; it must also show `live_authority_granted: false`; it must also show `full_autonomous_ready: false`; it must also show `next_manual_artifact_required: real wing_readonly_preflight.v1 summary.json`; it must also show `expected_artifacts` exactly matching `expected_artifact_globs` and `plan_expected_artifacts`; it must also show `expected_artifacts_match_plan: true`, `summary_glob_matches_plan: true`, and `event_log_glob_matches_plan: true`; it must also show `preview_command_artifact_root_matches_packet: true`; it must also show `preview_command_plan_output_matches_packet: true`; it must also show `capture_command_artifact_root_matches_packet: true`; it must also show `capture_command_expected_plan_matches_packet: true`; it must also show `review_command_artifact_root_matches_packet: true`; it must also show `decision_review_command_artifact_root_matches_packet: true`; it must also show `decision_review_command_decision_root_matches_packet: true`; it must also show `backend_port_prestart_check_operator_sequence_step_index: 0`; it must also show `backend_port_prestart_check_operator_sequence_step` including `prestart_backend_port_check` and `unexpected listeners`; it must also show `backend_port_prestart_check_must_be_first_operator_step: true`; it must also show `backend_port_prestart_check_operator_sequence_step_is_first: true`; it must also show `mvp_blocker_anchor` matching the current first open blocker row and `mvp_blocker_anchor_matches_current_first_open: true`; the no-WING handoff summary must also show `mvp_blocker_anchor_sha256_matches_current_first_open: true`; the no-WING handoff summary must also show `mvp_blocker_anchor.packet_does_not_close_blocker: true`; the no-WING handoff summary must also show `project_director_selected_action_anchor`, `expected_project_director_selected_action_anchor`, `project_director_selected_action_anchor_matches_current_directive: true`, `project_director_selected_action_source: Current First Command`, `expected_project_director_selected_action_source: Current First Command`, `project_director_selected_action_source_matches_current_directive: true`, `project_director_selected_action_sha256`, `actual_project_director_selected_action_sha256`, `expected_project_director_selected_action_sha256`, `project_director_selected_action_sha256_available: true`, `project_director_selected_action_sha256_available_matches_digest: true`, `project_director_selected_action_sha256_matches_anchor: true`, `project_director_selected_action_sha256_matches_text: true`, `project_director_selected_action_sha256_matches_current_directive: true`, `project_director_current_first_command_baseline_coverage_required: true`, `project_director_current_first_command_baseline_coverage_passed: true`, `project_director_current_first_command_baseline_coverage_marker_count`, and `project_director_current_first_command_baseline_missing_markers: []`; the no-WING handoff summary must also show `operator_sequence_has_mvp_blocker_anchor_digest_review: true`; the no-WING handoff summary must also show `mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `expected_mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `mvp_blocker_anchor_digest_review_step_index_matches_contract: true`; it must also show `mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: true`; the no-WING handoff summary must also show `operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: 8`; it must also show `operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: true`; the digest review `operator_sequence_mvp_blocker_anchor_digest_review_step` must include `mvp_blocker_anchor`, `mvp_blocker_anchor_sha256`, and `current first open blocker`; the no-WING handoff summary must also show `operator_sequence_has_supervised_prestart_gate: true`; the no-WING handoff summary must also show `operator_sequence_supervised_prestart_gate_is_final: true`; the no-WING handoff summary must also show `operator_sequence_supervised_prestart_gate_step_index: 9`; the no-WING handoff summary must also show `expected_operator_sequence_supervised_prestart_gate_step_index: 9`; the no-WING handoff summary must also show `operator_sequence_supervised_prestart_gate_step_index_matches_contract: true`; the final `operator_sequence_supervised_prestart_gate_step` must include `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`; the no-WING handoff summary must also show `required_supervised_prestart_gate_markers` exactly listing `accepted_decision_ready`, `valid accepted-candidate prestart trace`, `expected-artifact-bound accepted source id`, and `WING_SUPERVISED_FADER_GAIN_PROOF`; the no-WING handoff summary must show `supervised_prestart_gate` exactly matching `expected_supervised_prestart_gate`; the no-WING handoff summary must also show `supervised_prestart_gate_matches_expected: true`; the no-WING handoff summary must also show `declared_supervised_prestart_gate_matches_expected: true`; the no-WING handoff summary must also show `supervised_prestart_gate.grants_live_authority: false`; the no-WING handoff summary must also show `supervised_prestart_gate.operator_sequence_step_index: 9`; the no-WING handoff summary must also show `supervised_prestart_gate.operator_sequence_step_must_be_final: true`; the no-WING handoff summary must also show `supervised_prestart_gate.requires_operator_decision_status: accepted_decision_ready`; the no-WING handoff summary must also show `supervised_prestart_gate.unlocks_runbook: Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md`; the no-WING handoff summary must also show `supervised_prestart_gate.requires_accepted_candidate_prestart_trace: true`; the no-WING handoff summary must also show `required_supervised_proof_plan_summary_fields`, `expected_required_supervised_proof_plan_summary_fields`, and `required_supervised_proof_plan_summary_fields_match_contract: true`; `required_supervised_proof_plan_summary_fields` must include `readonly_preflight_review_decision_expected_candidate_prestart_source_ids`, `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source`, `readonly_preflight_review_decision_candidate_artifact_root_contract_valid`, `readonly_preflight_review_decision_candidate_artifact_roots`, `readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source`, `readonly_preflight_review_decision_expected_candidate_artifact_roots`, and `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source`; the operator-readable no-WING `summary.md` proof plan section must render those canonical helper fields; the no-WING proof plan summary must also show `operator_markdown_summary_required: true`, `operator_markdown_summary_field_lines_rendered: true`, and `operator_markdown_summary_missing_field_lines: []`; the no-WING proof plan summary must also bind the operator markdown artifact with `operator_markdown_summary_artifact: summary.md`, `operator_markdown_summary_sha256`, and `operator_markdown_summary_sha256_available: true`, and it must verify that binding with `operator_markdown_summary_actual_sha256` and `operator_markdown_summary_sha256_matches_actual: true`; the no-WING `summary.json` and operator-readable `summary.md` must expose the manifest summary surface with `artifact_manifest_summary_surface_required: true`, `artifact_manifest_summary_surface_missing_fields: []`, `artifact_manifest_summary_surface_required_field_lines`, `artifact_manifest_summary_surface_missing_field_lines: []`, `artifact_manifest_summary_surface_field_lines_rendered: true`, and `artifact_manifest_contract_id`, `artifact_manifest_contract_required: true`, `artifact_manifest_contract_fields`, `artifact_manifest_contract_sha256`, `artifact_manifest_contract_sha256_available: true`, `artifact_manifest_contract_sha256_matches_expected: true`, `artifact_manifest_contract_cross_surface_required: true`, `artifact_manifest_contract_cross_surface_required_surfaces`, `artifact_manifest_contract_cross_surface_required_fields`, `artifact_manifest_contract_cross_surface_expected_match: true`, `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`, `artifact_manifest_contract_cross_surface_live_authority_granted: false`, and `artifact_manifest_required_artifact_sha256_fields`; the no-WING run artifact bundle must also write `artifact-manifest.json` with `artifact_manifest_contract_id`, `artifact_manifest_contract_required: true`, `artifact_manifest_contract_fields`, `artifact_manifest_contract_sha256`, `artifact_manifest_contract_sha256_available: true`, `artifact_manifest_contract_sha256_matches_expected: true`, `artifact_manifest_contract_cross_surface_required: true`, `artifact_manifest_contract_cross_surface_required_surfaces`, `artifact_manifest_contract_cross_surface_required_fields`, `artifact_manifest_contract_cross_surface_expected_match: true`, `artifact_manifest_contract_cross_surface_match: true`, `artifact_manifest_summary_json_contract_sha256_matches_manifest: true`, `artifact_manifest_summary_md_contract_sha256_matches_manifest: true`, `artifact_manifest_contract_cross_surface_mismatches: []`, `artifact_manifest_contract_cross_surface_readiness_closure_allowed: false`, `artifact_manifest_contract_cross_surface_live_authority_granted: false`, `artifact_manifest_path: artifact-manifest.json`, `artifact_manifest_artifact_count: 2`, `artifact_manifest_required_artifact_count: 2`, `artifact_manifest_artifact_count_matches_required: true`, `artifact_manifest_required_artifact_ids`, `artifact_manifest_artifact_ids`, `artifact_manifest_required_artifacts_present: true`, `artifact_manifest_required_artifact_paths`, `artifact_manifest_artifact_paths`, `artifact_manifest_required_artifact_paths_present: true`, `artifact_manifest_required_artifact_sha256_available: true`, `artifact_manifest_summary_json_sha256`, `artifact_manifest_summary_json_sha256_available: true`, `artifact_manifest_summary_md_sha256`, `artifact_manifest_summary_md_sha256_available: true`, `artifact_manifest_readiness_closure_allowed: false`, and `artifact_manifest_live_authority_granted: false`; the no-WING proof plan summary must also expose those canonical helper fields, `required_supervised_proof_plan_summary_fields`, and `missing_required_supervised_proof_plan_summary_fields`; and `next_wing_proof_plan_schema` must fail closed with `next_wing_proof_plan_required_summary_fields_missing` when any required summary field is absent; accepted review source ids must also have a valid accepted-candidate prestart trace with `expected_artifacts`, `expected_summary_artifact`, `expected_events_artifact`, `summary_path_matches_expected_artifact: true`, and `events_path_matches_expected_artifact: true`; otherwise keep `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in the proof plan blockers. Accepted review source ids must also have a valid accepted-candidate `artifact_root` trace; otherwise keep `accepted_readonly_preflight_candidate_artifact_root_required_before_supervised_proof` in the proof plan blockers, and no-WING validation must fail with `next_wing_proof_plan_steps_with_candidate_artifact_root_violations` if physical proof steps are still present. The recomputed `readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source` map must also stay `{}`; no-WING validation must fail with `next_wing_proof_plan_steps_with_expected_candidate_artifact_root_violations` if that expected map is non-empty while physical proof steps are still present. The accepted-candidate prestart trace must also bind to a passed no-WING prestart `summary.json` by path and SHA256, with `backend_port_prestart_summary_required: true`, `backend_port_prestart_summary_type: no_wing_release_check`, `backend_port_prestart_summary_status: passed`, `backend_port_prestart_summary_connection_policy: no_hardware_no_network_no_live_writes`, `backend_port_prestart_summary_live_write: false`, `backend_port_prestart_summary_contacts_backend: false`, `backend_port_prestart_summary_queries_console: false`, `backend_port_prestart_summary_executes_tests: false`, and `backend_port_prestart_check_status: passed`. The decision-review ledger/report must expose `accepted_candidate_prestart_contract_violations_by_source`, and the supervised proof plan summary must expose `readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source`. Both maps must be `{}` before supervised proof steps are planned; a non-empty map must trigger `next_wing_proof_plan_steps_with_candidate_prestart_violations` if physical proof steps are still present, and keeps `accepted_readonly_preflight_candidate_prestart_contract_required_before_supervised_proof` in force. The recomputed `readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source` map must also stay `{}`; if it is non-empty while physical proof steps are present, no-WING validation must fail with `next_wing_proof_plan_steps_with_expected_candidate_prestart_violations`.", "selected_action_source": "Current First Command", "selected_action_sha256": "3bdb3ce148bfff1dd70fc67a3f75c5df4596d03ea8162e932ded152f2773a70b", "current_first_command_present": true, "current_first_command_baseline_coverage_required": true, "current_first_command_baseline_coverage_passed": true, "current_first_command_baseline_coverage_marker_count": 169, "current_first_command_baseline_missing_markers": [], "packet_does_not_close_blocker": true}`
+- operator_sequence_count: `10`
+- expected_operator_sequence_count: `10`
+- operator_sequence_count_matches_contract: `true`
+- operator_sequence_sha256: `99e574cddb02b198eb8eb09e511221292347504db2e4b89a7dd18b63c09c6e6b`
+- actual_operator_sequence_sha256: `99e574cddb02b198eb8eb09e511221292347504db2e4b89a7dd18b63c09c6e6b`
+- expected_operator_sequence_sha256: `99e574cddb02b198eb8eb09e511221292347504db2e4b89a7dd18b63c09c6e6b`
+- actual_expected_operator_sequence_sha256: `99e574cddb02b198eb8eb09e511221292347504db2e4b89a7dd18b63c09c6e6b`
+- operator_sequence_sha256_matches_actual: `true`
+- operator_sequence_matches_contract: `true`
+- operator_sequence_sha256_matches_contract: `true`
+- declared_expected_operator_sequence_sha256_matches_contract: `true`
+- declared_operator_sequence_matches_contract_flag: `true`
+- declared_operator_sequence_matches_contract_flag_matches_actual: `true`
+- declared_operator_sequence_sha256_matches_contract_flag: `true`
+- declared_operator_sequence_sha256_matches_contract_flag_matches_actual: `true`
+- declared_operator_sequence_count: `10`
+- declared_expected_operator_sequence_count: `10`
+- declared_operator_sequence_count_contract_flag: `true`
+- declared_operator_sequence_count_matches_actual: `true`
+- declared_operator_sequence_count_matches_contract: `true`
+- declared_expected_operator_sequence_count_matches_contract: `true`
+- declared_operator_sequence_count_contract_flag_matches_declared_count: `true`
+- mvp_blocker_anchor_digest_review_step_index: `8`
+- expected_mvp_blocker_anchor_digest_review_step_index: `8`
+- mvp_blocker_anchor_digest_review_step_index_matches_contract: `true`
+- mvp_blocker_anchor_digest_review_step_index_matches_operator_sequence: `true`
+- operator_sequence_has_mvp_blocker_anchor_digest_review: `true`
+- operator_sequence_mvp_blocker_anchor_digest_review_step: `Confirm mvp_blocker_anchor and mvp_blocker_anchor_sha256 match the current first open blocker before supervised proof planning.`
+- operator_sequence_mvp_blocker_anchor_digest_review_step_index: `8`
+- expected_operator_sequence_mvp_blocker_anchor_digest_review_step_index: `8`
+- operator_sequence_mvp_blocker_anchor_digest_review_step_index_matches_contract: `true`
+- operator_sequence_has_supervised_prestart_gate: `true`
+- operator_sequence_supervised_prestart_gate_step: `Only after accepted_decision_ready, a valid accepted-candidate prestart trace, and expected-artifact-bound accepted source id, move to WING_SUPERVISED_FADER_GAIN_PROOF.`
+- operator_sequence_supervised_prestart_gate_step_index: `9`
+- expected_operator_sequence_supervised_prestart_gate_step_index: `9`
+- operator_sequence_supervised_prestart_gate_step_index_matches_contract: `true`
+- operator_sequence_supervised_prestart_gate_is_final: `true`
+- required_supervised_prestart_gate_markers: `["accepted_decision_ready", "valid accepted-candidate prestart trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"]`
+- required_supervised_proof_plan_summary_fields: `["readonly_preflight_review_decision_candidate_prestart_contract_valid", "readonly_preflight_review_decision_candidate_prestart_source_ids", "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source", "readonly_preflight_review_decision_expected_candidate_prestart_source_ids", "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source", "readonly_preflight_review_decision_candidate_artifact_root_contract_valid", "readonly_preflight_review_decision_candidate_artifact_roots", "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source", "readonly_preflight_review_decision_expected_candidate_artifact_roots", "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"]`
+- expected_required_supervised_proof_plan_summary_fields: `["readonly_preflight_review_decision_candidate_prestart_contract_valid", "readonly_preflight_review_decision_candidate_prestart_source_ids", "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source", "readonly_preflight_review_decision_expected_candidate_prestart_source_ids", "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source", "readonly_preflight_review_decision_candidate_artifact_root_contract_valid", "readonly_preflight_review_decision_candidate_artifact_roots", "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source", "readonly_preflight_review_decision_expected_candidate_artifact_roots", "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"]`
+- required_supervised_proof_plan_summary_fields_match_contract: `true`
+- supervised_prestart_gate: `{"grants_live_authority": false, "operator_sequence_step": "Only after accepted_decision_ready, a valid accepted-candidate prestart trace, and expected-artifact-bound accepted source id, move to WING_SUPERVISED_FADER_GAIN_PROOF.", "operator_sequence_step_index": 9, "operator_sequence_step_must_be_final": true, "required": true, "required_markers": ["accepted_decision_ready", "valid accepted-candidate prestart trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"], "requires_accepted_candidate_prestart_trace": true, "requires_operator_decision_status": "accepted_decision_ready", "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md"}`
+- expected_supervised_prestart_gate: `{"required": true, "operator_sequence_step_index": 9, "operator_sequence_step_must_be_final": true, "operator_sequence_step": "Only after accepted_decision_ready, a valid accepted-candidate prestart trace, and expected-artifact-bound accepted source id, move to WING_SUPERVISED_FADER_GAIN_PROOF.", "required_markers": ["accepted_decision_ready", "valid accepted-candidate prestart trace", "expected-artifact-bound accepted source id", "WING_SUPERVISED_FADER_GAIN_PROOF"], "unlocks_runbook": "Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md", "grants_live_authority": false, "requires_operator_decision_status": "accepted_decision_ready", "requires_accepted_candidate_prestart_trace": true}`
+- supervised_prestart_gate_matches_expected: `true`
+- declared_supervised_prestart_gate_matches_expected: `true`
+- violations: `[]`
+
+## WING Read-Only Preflight Review Decision Ledger
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- readiness_matrix_update_allowed_by_decision: `false`
+- readiness_closure_allowed_by_decision: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- ledger_status: `operator_review_required`
+- review_tool_path: `tools/review_wing_readonly_preflight_decisions.py`
+- review_tool_available: `true`
+- review_command: `["python3", "tools/review_wing_readonly_preflight_decisions.py", "--artifact-root", "artifacts/wing_readonly_preflight", "--decision-root", "artifacts/wing_readonly_preflight_review_decisions", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"]`
+- review_exit_codes: `{"accepted_decision_ready": 0, "candidate_rejected": 4, "decision_missing_or_invalid": 3, "preflight_candidate_missing": 2}`
+- preflight_evidence_status: `operator_preflight_required`
+- decision_search_roots: `["artifacts/wing_readonly_preflight_review_decisions"]`
+- review_candidate_count: `0`
+- decision_record_count: `0`
+- accepted_record_count: `0`
+- rejected_record_count: `0`
+- invalid_record_count: `0`
+- unreviewed_candidate_count: `0`
+- manual_readiness_update_candidate_available: `false`
+- accepted_source_ids: `[]`
+- accepted_candidate_prestart_contract_valid: `false`
+- accepted_candidate_prestart_source_ids: `[]`
+- accepted_candidate_prestart_contract_violations_by_source: `{}`
+- accepted_candidate_artifact_root_contract_valid: `false`
+- accepted_candidate_artifact_roots: `[]`
+- accepted_candidate_artifact_root_contract_violations_by_source: `{}`
+- rejected_source_ids: `[]`
+- invalid_record_ids: `[]`
+- duplicate_source_ids: `[]`
+- conflicting_source_ids: `[]`
+- unreviewed_candidate_source_ids: `[]`
+- candidate_reviews: `[]`
+- blocked_by: `["operator_must_capture_valid_readonly_preflight_candidate_first"]`
+- violations: `[]`
+
+## Raw Mixer State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `raw_mixer_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `raw_mixer_state_cache`
+- remediation_action_id: `remediate_raw_mixer_state_cache`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- required_top_level_field_count: `10`
+- required_row_field_count: `5`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Raw Mixer State Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `raw_mixer_state_physical_readback.v1`
+- surface_id: `raw_mixer_state_cache`
+- remediation_action_id: `remediate_raw_mixer_state_cache`
+- required_contract_method_id: `raw_mixer_state_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/raw_mixer_state", "artifacts/raw_mixer_state_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_raw_mixer_state_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Channel Basic Controls Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `channel_basic_controls_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `channel_identity_and_basic_controls`
+- remediation_action_id: `remediate_channel_identity_and_basic_controls`
+- physical_readback_surface_id: `channel_identity_and_basic_controls`
+- physical_readback_action_id: `remediate_channel_identity_and_basic_controls`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "pan_phase_delay"]`
+- required_top_level_field_count: `10`
+- required_channel_field_count: `8`
+- required_identity_fields: `["source_name", "source_role", "input_source"]`
+- required_control_fields: `["fader_db", "trim_db", "mute", "pan"]`
+- required_coverage_flags: `["identity", "basic_controls", "cache_matches_physical_readback"]`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_channel_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "mute_write_events", "pan_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Channel Basic Controls Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `channel_basic_controls_physical_readback.v1`
+- surface_id: `channel_identity_and_basic_controls`
+- remediation_action_id: `remediate_channel_identity_and_basic_controls`
+- required_contract_method_id: `channel_basic_controls_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_channel_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "pan_phase_delay"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/channel_basic_controls", "artifacts/channel_basic_controls_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_channel_basic_controls_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Channel Processing Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `channel_processing_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `channel_eq_dynamics_gate`
+- remediation_action_id: `remediate_channel_eq_dynamics_gate`
+- physical_readback_surface_id: `channel_eq_dynamics_gate`
+- physical_readback_action_id: `remediate_channel_eq_dynamics_gate`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["eq", "compressor", "gate", "deessing", "frequency_separation", "cross_channel_unmasking"]`
+- required_top_level_field_count: `10`
+- required_channel_field_count: `10`
+- required_hpf_fields: `["enabled", "frequency_hz"]`
+- required_eq_fields: `["enabled", "bands"]`
+- required_eq_band_fields: `["band", "frequency_hz", "gain_db", "q"]`
+- required_compressor_fields: `["enabled", "model", "threshold_db", "ratio", "attack_ms", "release_ms", "makeup_db", "mix_pct", "detector", "gain_reduction_db"]`
+- required_gate_fields: `["enabled", "model", "threshold_db", "range_db", "attack_ms", "hold_ms", "release_ms", "accent", "ratio"]`
+- required_coverage_flags: `["hpf", "eq", "compressor", "gate", "cache_matches_physical_readback"]`
+- minimum_eq_band_count: `4`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_channel_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "eq_write_events", "compressor_write_events", "gate_write_events", "hpf_write_events", "reset_channel_processing_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Channel Processing Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `channel_processing_physical_readback.v1`
+- surface_id: `channel_eq_dynamics_gate`
+- remediation_action_id: `remediate_channel_eq_dynamics_gate`
+- required_contract_method_id: `channel_processing_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_channel_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["eq", "compressor", "gate", "deessing", "frequency_separation", "cross_channel_unmasking"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/channel_processing", "artifacts/channel_processing_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_channel_processing_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Bus Group Main DCA Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `bus_group_main_dca_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `bus_group_main_dca_state`
+- remediation_action_id: `remediate_bus_group_main_dca_state`
+- physical_readback_surface_id: `bus_group_main_dca_state`
+- physical_readback_action_id: `remediate_bus_group_main_dca_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "dca", "master_bus", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `14`
+- required_bus_field_count: `9`
+- required_main_field_count: `8`
+- required_dca_field_count: `8`
+- required_bus_control_fields: `["fader_db", "mute", "pan", "width", "mono"]`
+- required_main_control_fields: `["fader_db", "mute", "pan"]`
+- required_dca_control_fields: `["fader_db", "mute", "monitor"]`
+- required_bus_assignment_fields: `["dca_assignments", "main_send_on", "main_send_level_db", "main_send_pre"]`
+- required_dca_assignment_fields: `["member_channels", "member_buses"]`
+- required_metering_fields: `["lufs", "true_peak_dbtp", "headroom_db"]`
+- required_bus_coverage_flags: `["controls", "assignments", "metering", "cache_matches_physical_readback"]`
+- required_main_coverage_flags: `["controls", "metering", "cache_matches_physical_readback"]`
+- required_dca_coverage_flags: `["identity", "controls", "assignments", "cache_matches_physical_readback"]`
+- minimum_bus_count: `1`
+- minimum_main_count: `1`
+- minimum_dca_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_surface_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "bus_write_events", "group_write_events", "dca_write_events", "main_bus_write_events", "matrix_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Bus Group Main DCA Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `bus_group_main_dca_physical_readback.v1`
+- surface_id: `bus_group_main_dca_state`
+- remediation_action_id: `remediate_bus_group_main_dca_state`
+- required_contract_method_id: `bus_group_main_dca_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_bus_count: `0`
+- valid_main_count: `0`
+- valid_dca_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "dca", "master_bus", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/bus_group_main_dca", "artifacts/bus_group_main_dca_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_bus_group_main_dca_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Matrix State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `matrix_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `matrix_state`
+- remediation_action_id: `remediate_matrix_state`
+- physical_readback_surface_id: `matrix_state`
+- physical_readback_action_id: `remediate_matrix_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "fx_send_insert", "master_bus", "mix_balance", "routing", "performance_adaptation"]`
+- required_top_level_field_count: `10`
+- required_matrix_field_count: `11`
+- required_control_fields: `["fader_db", "mute", "pan"]`
+- required_eq_fields: `["enabled", "bands"]`
+- required_eq_band_fields: `["band", "frequency_hz", "gain_db", "q"]`
+- required_dynamics_fields: `["enabled", "model", "threshold_db", "ratio", "knee", "detector", "attack_ms", "release_ms", "makeup_db", "mix_pct", "gain_reduction_db"]`
+- required_insert_fields: `["pre_insert_on", "pre_insert_slot", "pre_insert_status", "post_insert_on", "post_insert_slot", "post_insert_status", "post_insert_mode", "post_insert_weight"]`
+- required_metering_fields: `["lufs", "true_peak_dbtp", "headroom_db"]`
+- required_coverage_flags: `["controls", "eq", "dynamics", "inserts", "metering", "cache_matches_physical_readback"]`
+- minimum_matrix_count: `1`
+- minimum_eq_band_count: `8`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_matrix_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "matrix_write_events", "matrix_send_write_events", "matrix_eq_write_events", "matrix_dynamics_write_events", "matrix_insert_write_events", "routing_write_events", "fx_send_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Matrix State Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `matrix_state_physical_readback.v1`
+- surface_id: `matrix_state`
+- remediation_action_id: `remediate_matrix_state`
+- required_contract_method_id: `matrix_state_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_matrix_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["bus_group_matrix", "fx_send_insert", "master_bus", "mix_balance", "routing", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/matrix_state", "artifacts/matrix_state_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_matrix_state_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## FX Slots Inserts Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `fx_slots_inserts_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `fx_slots_and_inserts`
+- remediation_action_id: `remediate_fx_slots_and_inserts`
+- physical_readback_surface_id: `fx_slots_and_inserts`
+- physical_readback_action_id: `remediate_fx_slots_and_inserts`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fx_send_insert", "routing", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `12`
+- required_fx_slot_field_count: `16`
+- required_fx_slot_fields: `["slot", "slot_number", "readback_status", "readback_source", "captured_at", "model", "on", "mix", "source", "mode", "assigned_channel", "assigned_position", "active", "parameters", "parameter_schema", "coverage"]`
+- required_parameter_fields: `["parameter_index", "value", "schema_status", "schema_family", "schema_source", "semantic_name", "unit", "safe_range"]`
+- required_parameter_safe_range_fields: `["min", "max"]`
+- required_parameter_schema_fields: `["status", "schema_family", "schema_source", "mapped_parameter_count", "generic_parameter_count", "cached_parameter_count", "physical_model_schema_verified", "live_write_authority"]`
+- required_fx_slot_coverage_flags: `["identity", "assignment", "parameters", "parameter_schema", "cache_matches_physical_readback"]`
+- required_insert_fields: `["target_type", "target", "position", "readback_status", "readback_source", "captured_at", "on", "slot", "status", "mode", "weight", "linked_fx_slot", "active", "insert_assignment_policy", "destructive_change_marker", "coverage"]`
+- required_insert_coverage_flags: `["assignment", "status", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready"]`
+- minimum_fx_slot_count: `1`
+- minimum_fx_parameter_count: `4`
+- minimum_insert_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- allowed_insert_target_types: `["channel", "bus", "main", "matrix"]`
+- allowed_insert_positions: `["pre", "post"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "fx_write_events", "fx_slot_write_events", "fx_parameter_write_events", "fx_send_write_events", "insert_write_events", "insert_assignment_write_events", "routing_write_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## FX Slots Inserts Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `fx_slots_inserts_physical_readback.v1`
+- surface_id: `fx_slots_and_inserts`
+- remediation_action_id: `remediate_fx_slots_and_inserts`
+- required_contract_method_id: `fx_slots_inserts_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_fx_slot_count: `0`
+- valid_insert_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fx_send_insert", "routing", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/fx_slots_and_inserts", "artifacts/fx_slots_inserts_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_fx_slots_inserts_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Routing Sends Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- schema_id: `routing_sends_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `routing_and_sends`
+- remediation_action_id: `remediate_routing_and_sends`
+- physical_readback_surface_id: `routing_and_sends`
+- physical_readback_action_id: `remediate_routing_and_sends`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- artifact_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_as_physical_fixture_candidate: `false`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["routing", "fx_send_insert", "bus_group_matrix", "scene_preset", "mix_balance", "performance_adaptation"]`
+- required_top_level_field_count: `18`
+- required_static_route_field_count: `13`
+- required_static_route_fields: `["start", "end", "role", "tap_point", "label_short", "label_full", "required", "wing_routing_hint", "used_by", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_bus_send_fields: `["channel", "send", "target_bus", "readback_status", "readback_source", "captured_at", "on", "level_db", "pre_on", "mode", "plink", "pan", "active", "destructive_change_marker", "coverage"]`
+- required_main_send_fields: `["channel", "main", "readback_status", "readback_source", "captured_at", "on", "level_db", "pre", "active", "destructive_change_marker", "coverage"]`
+- required_matrix_send_fields: `["channel", "send", "target_matrix", "readback_status", "readback_source", "captured_at", "on", "level_db", "active", "destructive_change_marker", "coverage"]`
+- required_output_route_fields: `["output_group", "output_number", "readback_status", "readback_source", "captured_at", "source_group", "source_channel", "destructive_change_marker", "coverage"]`
+- required_static_route_coverage_flags: `["identity", "static_config_match", "physical_route_mapping", "scoped_diff_marker"]`
+- required_send_coverage_flags: `["assignment", "level", "mode", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_output_route_coverage_flags: `["assignment", "source", "scoped_diff_marker", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready"]`
+- minimum_static_dante_route_count: `1`
+- minimum_channel_bus_send_count: `1`
+- minimum_channel_main_send_count: `1`
+- minimum_channel_matrix_send_count: `1`
+- minimum_output_route_count: `1`
+- allowed_sources: `["physical_readback", "wing_physical_readback", "dlive_physical_readback"]`
+- accepted_row_statuses: `["verified_from_physical_readback"]`
+- forbidden_mutation_evidence_fields: `["write_events", "manual_write_events", "apply_result", "rollback_result", "proposal_apply_result", "routing_write_events", "route_write_events", "send_write_events", "bus_send_write_events", "main_send_write_events", "matrix_send_write_events", "output_route_write_events", "dante_patch_write_events", "scene_recall_events"]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Routing Sends Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `routing_sends_physical_readback.v1`
+- surface_id: `routing_and_sends`
+- remediation_action_id: `remediate_routing_and_sends`
+- required_contract_method_id: `routing_sends_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_static_dante_route_count: `0`
+- valid_channel_bus_send_count: `0`
+- valid_channel_main_send_count: `0`
+- valid_channel_matrix_send_count: `0`
+- valid_output_route_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["routing", "fx_send_insert", "bus_group_matrix", "scene_preset", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/routing_and_sends", "artifacts/routing_sends_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_routing_sends_physical_readback_artifact"]`
+- intake_violations: `[]`
+- violations: `[]`
+
+## Snapshots Scenes Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- scene_load_allowed: `false`
+- scene_save_allowed: `false`
+- schema_id: `snapshots_scenes_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `snapshots_scenes`
+- remediation_action_id: `remediate_snapshots_scenes`
+- physical_readback_surface_id: `snapshots_scenes`
+- physical_readback_action_id: `remediate_snapshots_scenes`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- required_snapshot_fields: `["snapshot_index", "snapshot_name", "readback_status", "readback_source", "captured_at", "active", "scene_load_policy", "scene_save_policy", "destructive_change_marker", "destructive_persistence_marker", "scene_content_fingerprint", "scoped_diff_marker", "rollback_reference", "coverage"]`
+- required_coverage_flags: `["catalog_identity", "active_scene", "scene_content_fingerprint", "scoped_diff_marker", "rollback_reference", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "scene_load_allowed", "scene_save_allowed"]`
+- minimum_snapshot_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## Snapshots Scenes Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- scene_load_allowed: `false`
+- scene_save_allowed: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `snapshots_scenes_physical_readback.v1`
+- surface_id: `snapshots_scenes`
+- remediation_action_id: `remediate_snapshots_scenes`
+- required_contract_method_id: `snapshots_scenes_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_snapshot_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/snapshots_scenes", "artifacts/snapshots_scenes_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_snapshots_scenes_physical_readback_artifact"]`
+- intake_violations: `[]`
+- target_consistency: `true`
+- violations: `[]`
+
+## User Presets Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- preset_recall_allowed: `false`
+- preset_store_allowed: `false`
+- schema_id: `user_presets_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `user_presets`
+- remediation_action_id: `remediate_user_presets`
+- physical_readback_surface_id: `user_presets`
+- physical_readback_action_id: `remediate_user_presets`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- required_preset_fields: `["preset_index", "preset_name", "preset_scope", "target_type", "target_label", "readback_status", "readback_source", "captured_at", "preset_recall_policy", "preset_store_policy", "destructive_recall_marker", "destructive_store_marker", "preset_content_fingerprint", "scoped_diff_marker", "rollback_reference", "coverage"]`
+- required_coverage_flags: `["catalog_identity", "scope", "target", "preset_content_fingerprint", "scoped_diff_marker", "rollback_reference", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "preset_recall_allowed", "preset_store_allowed"]`
+- minimum_preset_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## User Presets Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- preset_recall_allowed: `false`
+- preset_store_allowed: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `user_presets_physical_readback.v1`
+- surface_id: `user_presets`
+- remediation_action_id: `remediate_user_presets`
+- required_contract_method_id: `user_presets_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_preset_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["scene_preset", "routing", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/user_presets", "artifacts/user_presets_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_user_presets_physical_readback_artifact"]`
+- intake_violations: `[]`
+- target_consistency: `true`
+- violations: `[]`
+
+## dLive State Physical Readback Contract
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- midi_send_allowed: `false`
+- tcp_send_allowed: `false`
+- dlive_write_allowed: `false`
+- schema_id: `dlive_state_physical_readback.v1`
+- contract_status: `contract_ready_physical_fixture_missing`
+- surface_id: `dlive_state`
+- remediation_action_id: `remediate_dlive_state`
+- physical_readback_surface_id: `dlive_state`
+- physical_readback_action_id: `remediate_dlive_state`
+- fixture_physical_gap_declared: `true`
+- remediation_physical_gap_declared: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "bus_group_matrix", "routing", "scene_preset", "mix_balance", "performance_adaptation"]`
+- required_channel_fields: `["channel", "cached_channel_name", "fader_raw_14bit", "fader_db", "mute", "raw_note_velocity", "midi_base_channel", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_midi_state_fields: `["midi_base_channel", "raw_state_key_count", "raw_note_event_count", "raw_cc_event_count", "raw_pitchbend_event_count", "tcp_session_status", "midi_transport_status", "readback_status", "readback_source", "captured_at", "coverage"]`
+- required_parity_fields: `["wing_surface_equivalent", "mapping_status", "channel_identity_parity", "fader_scale_parity", "mute_state_parity", "midi_velocity_parity", "unsupported_field_policy", "coverage"]`
+- required_coverage_flags: `["channel_identity", "fader_scale", "mute_state", "raw_midi_state", "midi_base_channel", "wing_parity_mapping", "cache_matches_physical_readback"]`
+- required_false_safety_flags: `["live_write", "mutates_console_state", "live_widening_allowed", "full_autonomous_ready", "midi_send_allowed", "tcp_send_allowed", "dlive_write_allowed", "dlive_apply_allowed"]`
+- minimum_channel_count: `1`
+- target_consistency: `true`
+- violations: `[]`
+
+## dLive State Physical Readback Artifact Intake
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_intake: `false`
+- fixture_closure_allowed_by_intake: `false`
+- midi_send_allowed: `false`
+- tcp_send_allowed: `false`
+- dlive_write_allowed: `false`
+- dlive_apply_allowed: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- intake_status: `operator_artifact_missing`
+- schema_id: `dlive_state_physical_readback.v1`
+- surface_id: `dlive_state`
+- remediation_action_id: `remediate_dlive_state`
+- required_contract_method_id: `dlive_state_physical_readback_contract`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- valid_channel_count: `0`
+- accepted_as_physical_fixture_candidate: `false`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "bus_group_matrix", "routing", "scene_preset", "mix_balance", "performance_adaptation"]`
+- artifact_search_roots: `["artifacts/read_surface_physical_readback/dlive_state", "artifacts/dlive_state_physical_readback"]`
+- artifact_source_ids: `[]`
+- blocked_by: `["operator_must_capture_dlive_state_physical_readback_artifact"]`
+- intake_violations: `[]`
+- target_consistency: `true`
+- violations: `[]`
+
+## Read Surface Physical Readback Artifact Review Queue
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_queue: `false`
+- fixture_closure_allowed_by_queue: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- queue_status: `operator_artifact_capture_required`
+- intake_surface_count: `10`
+- available_intake_count: `10`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- review_candidate_count: `0`
+- review_candidates_available: `false`
+- missing_artifact_surface_count: `10`
+- unsafe_authority_claim_count: `0`
+- candidate_source_id_missing_count: `0`
+- target_inconsistent_surface_count: `0`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- live_authority_granted: `false`
+- review_candidate_surface_ids: `[]`
+- invalid_surface_ids: `[]`
+- missing_artifact_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- unsafe_authority_surface_ids: `[]`
+- candidate_source_id_missing_surface_ids: `[]`
+- target_inconsistent_surface_ids: `[]`
+- promotion_families_requiring_surface: `["fader", "gain", "mute", "pan_phase_delay", "eq", "compressor", "gate", "deessing", "frequency_separation", "cross_channel_unmasking", "bus_group_matrix", "dca", "master_bus", "mix_balance", "performance_adaptation", "fx_send_insert", "routing", "scene_preset"]`
+- queue_item_method_ids: `["raw_mixer_state_physical_readback_artifact_intake", "channel_basic_controls_physical_readback_artifact_intake", "channel_processing_physical_readback_artifact_intake", "bus_group_main_dca_physical_readback_artifact_intake", "matrix_state_physical_readback_artifact_intake", "fx_slots_inserts_physical_readback_artifact_intake", "routing_sends_physical_readback_artifact_intake", "snapshots_scenes_physical_readback_artifact_intake", "user_presets_physical_readback_artifact_intake", "dlive_state_physical_readback_artifact_intake"]`
+- blocked_by: `["operator_must_capture_missing_physical_readback_artifacts"]`
+- violations: `[]`
+
+## Read Surface Physical Readback Artifact Review Queue Artifact
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_queue: `false`
+- fixture_closure_allowed_by_queue: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- queue_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/read_surface_physical_readback_artifact_review_queue.json`
+- queue_status: `operator_artifact_capture_required`
+- intake_surface_count: `10`
+- available_intake_count: `10`
+- artifact_count: `0`
+- valid_candidate_count: `0`
+- invalid_candidate_count: `0`
+- review_candidate_count: `0`
+- review_candidates_available: `false`
+- missing_artifact_surface_count: `10`
+- unsafe_authority_claim_count: `0`
+- candidate_source_id_missing_count: `0`
+- target_inconsistent_surface_count: `0`
+- physical_fixture_gap_remains: `true`
+- review_candidate_surface_ids: `[]`
+- missing_artifact_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- candidate_source_id_missing_surface_ids: `[]`
+- queue_item_method_ids: `[]`
+- blocked_by: `["operator_must_capture_missing_physical_readback_artifacts"]`
+- focused_validation: `["PYTHONPATH=backend", "python3", "-m", "pytest", "-q", "tests/test_read_surface_physical_readback_artifact_review_queue.py", "tests/test_no_wing_release_check.py"]`
+- violations: `[]`
+
+## Read Surface Physical Readback Acceptance Template Artifact
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_template: `false`
+- fixture_closure_allowed_by_template: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- template_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/read_surface_physical_readback_acceptance_template.json`
+- template_status: `operator_candidate_missing`
+- source_queue_status: `operator_artifact_capture_required`
+- review_candidate_count: `0`
+- template_record_count: `0`
+- candidate_trace_count: `0`
+- required_operator_edits: `["decision", "reviewed_by", "reviewed_at", "review_notes"]`
+- operator_sequence_count: `6`
+- blocked_by: `["operator_must_capture_missing_physical_readback_artifacts"]`
+- record_unsafe_flags: `[]`
+- violations: `[]`
+
+## Read Surface Physical Readback Fixture Acceptance Ledger
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_acceptance: `false`
+- fixture_closure_allowed_by_acceptance: `false`
+- live_widening_allowed: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- ledger_status: `operator_acceptance_required`
+- queue_status: `operator_artifact_capture_required`
+- review_candidate_count: `0`
+- acceptance_record_count: `0`
+- accepted_record_count: `0`
+- rejected_record_count: `0`
+- invalid_record_count: `0`
+- candidate_trace_missing_count: `0`
+- candidate_trace_mismatch_count: `0`
+- unreviewed_candidate_count: `0`
+- operator_acceptance_required: `true`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- accepted_surface_ids: `[]`
+- rejected_surface_ids: `[]`
+- invalid_record_ids: `[]`
+- unreviewed_candidate_surface_ids: `[]`
+- blocked_by: `["operator_must_capture_or_surface_valid_candidates_before_acceptance"]`
+- violations: `[]`
+
+## Read Surface Physical Readback Fixture Closure Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_plan: `false`
+- fixture_update_allowed_by_plan: `false`
+- fixture_closure_allowed_by_plan: `false`
+- live_widening_allowed: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- plan_status: `fixture_closure_not_ready`
+- ledger_status: `operator_acceptance_required`
+- review_candidate_count: `0`
+- acceptance_record_count: `0`
+- accepted_record_count: `0`
+- rejected_record_count: `0`
+- invalid_record_count: `0`
+- unreviewed_candidate_count: `0`
+- closure_candidate_count: `0`
+- manual_fixture_closure_candidate_available: `false`
+- manual_fixture_closure_required: `true`
+- operator_review_required: `true`
+- physical_fixture_gap_remains: `true`
+- closure_candidate_surface_ids: `[]`
+- rejected_surface_ids: `[]`
+- invalid_record_ids: `[]`
+- unreviewed_candidate_surface_ids: `[]`
+- blocked_by: `["accepted_physical_readback_candidate_required_before_fixture_closure"]`
+- violations: `[]`
+
+## Read Surface Physical Readback Fixture Closure Plan Artifact
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_plan: `false`
+- fixture_update_allowed_by_plan: `false`
+- fixture_closure_allowed_by_plan: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- plan_path: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/no_wing_release_check/20260614T212350Z_no_wing_release_check/read_surface_physical_readback_fixture_closure_plan.json`
+- plan_status: `fixture_closure_not_ready`
+- ledger_status: `operator_acceptance_required`
+- acceptance_record_count: `0`
+- accepted_record_count: `0`
+- invalid_record_count: `0`
+- unreviewed_candidate_count: `0`
+- closure_candidate_count: `0`
+- manual_fixture_closure_candidate_available: `false`
+- physical_fixture_gap_remains: `true`
+- closure_candidate_surface_ids: `[]`
+- blocked_by: `["accepted_physical_readback_candidate_required_before_fixture_closure"]`
+- next_global_step: `Operator needs accepted physical readback candidates first.`
+- focused_validation: `["PYTHONPATH=backend", "python3", "-m", "pytest", "-q", "tests/test_read_surface_physical_readback_fixture_closure_plan.py", "tests/test_no_wing_release_check.py"]`
+- violations: `[]`
+
+## Next WING Proof Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- execution_allowed_by_plan: `false`
+- operator_required: `true`
+- full_autonomous_ready: `false`
+- plan_status: `blocked_by_readonly_preflight`
+- step_count: `0`
+- planned_value_types: `[]`
+- planned_channels: `[]`
+- readonly_preflight_required: `true`
+- readonly_preflight_candidate_available: `false`
+- readonly_preflight_evidence_status: `operator_preflight_required`
+- readonly_preflight_blocked_by: `["operator_must_run_wing_readonly_preflight_runner"]`
+- readonly_preflight_prestart_check_required: `true`
+- readonly_preflight_prestart_check_must_pass_before_starting_backend: `true`
+- readonly_preflight_prestart_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+- readonly_preflight_prestart_check_command_text: `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
+- readonly_preflight_prestart_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
+- readonly_preflight_step_count: `1`
+- readonly_preflight_expected_plan_required_for_real_run: `true`
+- readonly_preflight_prestart_summary_required: `true`
+- readonly_preflight_command_channels: `3`
+- readonly_preflight_command_operator_confirm_channels: `3`
+- readonly_preflight_command_operator_confirm_session_ready: `true`
+- readonly_preflight_command_value_types: `fader,gain,pan`
+- readonly_preflight_command_expected_plan: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- readonly_preflight_command_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- readonly_preflight_review_decision_required: `true`
+- readonly_preflight_review_decision_accepted: `false`
+- readonly_preflight_review_decision_status: `operator_review_required`
+- readonly_preflight_review_decision_blocked_by: `["operator_must_capture_valid_readonly_preflight_candidate_first"]`
+- readonly_preflight_review_decision_accepted_record_count: `0`
+- readonly_preflight_review_decision_accepted_source_ids: `[]`
+- readonly_preflight_review_decision_candidate_prestart_contract_valid: `false`
+- readonly_preflight_review_decision_candidate_prestart_source_ids: `[]`
+- readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source: `{}`
+- readonly_preflight_review_decision_expected_candidate_prestart_source_ids: `[]`
+- readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source: `{}`
+- readonly_preflight_review_decision_candidate_artifact_root_contract_valid: `false`
+- readonly_preflight_review_decision_candidate_artifact_roots: `[]`
+- readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source: `{}`
+- readonly_preflight_review_decision_expected_candidate_artifact_roots: `[]`
+- readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source: `{}`
+- readonly_preflight_review_decision_rejected_source_ids: `[]`
+- readonly_preflight_review_decision_invalid_record_count: `0`
+- readonly_preflight_review_decision_invalid_record_ids: `[]`
+- readonly_preflight_review_decision_duplicate_source_ids: `[]`
+- readonly_preflight_review_decision_conflicting_source_ids: `[]`
+- readonly_preflight_review_decision_unreviewed_candidate_count: `0`
+- required_supervised_proof_plan_summary_fields: `["readonly_preflight_review_decision_candidate_prestart_contract_valid", "readonly_preflight_review_decision_candidate_prestart_source_ids", "readonly_preflight_review_decision_candidate_prestart_contract_violations_by_source", "readonly_preflight_review_decision_expected_candidate_prestart_source_ids", "readonly_preflight_review_decision_expected_candidate_prestart_contract_violations_by_source", "readonly_preflight_review_decision_candidate_artifact_root_contract_valid", "readonly_preflight_review_decision_candidate_artifact_roots", "readonly_preflight_review_decision_candidate_artifact_root_contract_violations_by_source", "readonly_preflight_review_decision_expected_candidate_artifact_roots", "readonly_preflight_review_decision_expected_candidate_artifact_root_contract_violations_by_source"]`
+- missing_required_supervised_proof_plan_summary_fields: `[]`
+- operator_markdown_summary_required: `true`
+- operator_markdown_summary_section: `## Next WING Proof Plan`
+- operator_markdown_summary_required_field_lines: `["required_supervised_proof_plan_summary_fields", "missing_required_supervised_proof_plan_summary_fields"]`
+- operator_markdown_summary_field_lines_rendered: `true`
+- operator_markdown_summary_missing_field_lines: `[]`
+- global_blockers: `["readonly_preflight_candidate_required_before_supervised_proof", "operator_must_run_wing_readonly_preflight_runner"]`
+- violations: `[]`

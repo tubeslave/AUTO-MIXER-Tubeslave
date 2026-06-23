@@ -21,7 +21,33 @@ from collections import deque
 from scipy import signal
 from scipy.signal import hilbert, coherence, find_peaks
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 logger = logging.getLogger(__name__)
+
+PHASE_ALIGNMENT_METHOD_ID = "phase_alignment"
+PHASE_READ_REQUIRED_SOURCE = (
+    "cached_or_physical_delay_polarity_read_required_before_promotion"
+)
+
+
+def _proposal_denial_fields() -> Dict[str, Any]:
+    return {
+        "queue_action": "not_queueable_until_promoted",
+        "can_import_to_queue": False,
+        "can_apply_live": False,
+        "queue_import_allowed": False,
+        "live_apply_allowed": False,
+        "read_only_or_dry_run_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "live_write": False,
+        "queue_mutation": False,
+        "mutates_mixer": False,
+    }
 
 
 class PhaseAlignmentAnalyzer:
@@ -947,11 +973,122 @@ class PhaseAlignmentController:
             )
         return calls
 
+    def _phase_operator_action(
+        self,
+        reason: str,
+        blocked_calls: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        channels = sorted(
+            {
+                int(call["channel"])
+                for call in blocked_calls
+                if call.get("channel") is not None
+            }
+        )
+        delay_values = [
+            float(call["delay_ms"])
+            for call in blocked_calls
+            if call.get("delay_ms") is not None
+        ]
+        if not delay_values:
+            delay_values = [
+                float(call["value"])
+                for call in blocked_calls
+                if call.get("semantic") == "reset_delay_value"
+                and call.get("value") is not None
+            ]
+        measured_delay_values = [
+            float(call["measured_delay_ms"])
+            for call in blocked_calls
+            if call.get("measured_delay_ms") is not None
+        ]
+        phase_values = [
+            int(call["phase_invert"])
+            for call in blocked_calls
+            if call.get("phase_invert") is not None
+        ]
+        coherence_values = [
+            float(call["coherence"])
+            for call in blocked_calls
+            if call.get("coherence") is not None
+        ]
+        delay_ms = (
+            round(max(delay_values, key=lambda value: abs(value)), 3)
+            if delay_values
+            else None
+        )
+        measured_delay_ms = (
+            round(max(measured_delay_values, key=lambda value: abs(value)), 3)
+            if measured_delay_values
+            else None
+        )
+        gcc_confidence = (
+            round(max(coherence_values), 3) if coherence_values else None
+        )
+        action = {
+            "action_type": reason,
+            "target": channels[0] if len(channels) == 1 else "phase_alignment",
+            "target_channels": channels,
+            "blocked_calls": list(blocked_calls),
+            "blocked_call_count": len(blocked_calls),
+            "delay_ms": delay_ms,
+            "measured_delay_ms": measured_delay_ms,
+            "phase_invert": max(phase_values) if phase_values else None,
+            "correlation_delta": gcc_confidence,
+            "gcc_phat_confidence": gcc_confidence,
+            "polarity_readback": PHASE_READ_REQUIRED_SOURCE,
+            "delay_readback": PHASE_READ_REQUIRED_SOURCE,
+        }
+        return {key: value for key, value in action.items() if value is not None}
+
     def _blocked_phase_result(self, reason: str, blocked_calls: List[Dict[str, Any]]) -> Dict[str, Any]:
         self.last_write_attempted = bool(blocked_calls)
         self.last_write_blocked = bool(blocked_calls)
         self.last_write_count = 0
         self.last_blocked_calls = list(blocked_calls)
+        proposed_action = self._phase_operator_action(reason, blocked_calls)
+        target = proposed_action.get("target", "phase_alignment")
+        phase_safety = {
+            "status": (
+                "readback_required_before_live_promotion"
+                if blocked_calls
+                else "analysis_only_no_phase_delay_change"
+            ),
+            "correlation_delta": proposed_action.get("correlation_delta"),
+            "gcc_phat_confidence": proposed_action.get("gcc_phat_confidence"),
+            "polarity_readback": PHASE_READ_REQUIRED_SOURCE,
+            "delay_readback": PHASE_READ_REQUIRED_SOURCE,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            **_proposal_denial_fields(),
+        }
+        blockers = [
+            "unsupported_value_type:phase_delay",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            "delay_polarity_readback_not_proven",
+            reason,
+        ]
+        if not blocked_calls:
+            blockers.append("missing_phase_delay_apply_calls")
+        evidence = {
+            "blocked_calls": list(blocked_calls),
+            "blocked_call_count": len(blocked_calls),
+            "write_policy": self.write_policy,
+            "old_value_source": PHASE_READ_REQUIRED_SOURCE,
+            "rollback_value_source": PHASE_READ_REQUIRED_SOURCE,
+            **_proposal_denial_fields(),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "correlation_delta": proposed_action.get("correlation_delta"),
+            "gcc_phat_confidence": proposed_action.get("gcc_phat_confidence"),
+            "phase_correlation": proposed_action.get("gcc_phat_confidence"),
+            "polarity_readback": PHASE_READ_REQUIRED_SOURCE,
+            "delay_readback": PHASE_READ_REQUIRED_SOURCE,
+            "phase_safety": phase_safety,
+            "sum_bus_check": "required_before_live_promotion",
+            "current_phase_audio_context_cache_no_live_authority": True,
+        }
         result = {
             "applied": False,
             "blocked": bool(blocked_calls),
@@ -961,10 +1098,36 @@ class PhaseAlignmentController:
             "reason": reason,
             "write_policy": self.write_policy,
             "live_write_allowed": self.live_write_allowed,
-            "can_apply_live": False,
+            **_proposal_denial_fields(),
             "mixer_client_present": self.mixer_client is not None,
-            "mutates_mixer": False,
+            "phase_alignment_safety_summary": phase_safety,
         }
+        proposal = {
+            "id": f"{PHASE_ALIGNMENT_METHOD_ID}:{target}:{reason}",
+            "method_id": PHASE_ALIGNMENT_METHOD_ID,
+            "source": PHASE_ALIGNMENT_METHOD_ID,
+            "title": f"{target}: phase/delay blocked proposal evidence",
+            "reason": (
+                "PhaseAlignment generated blocked delay/polarity write evidence. "
+                "It is operator review only until delay/polarity readback, sum-bus "
+                "phase safety and rollback proof exist."
+            ),
+            "target": target,
+            "kind": "phase_delay",
+            "severity": "medium" if blocked_calls else "low",
+            "confidence": proposed_action.get("gcc_phat_confidence"),
+            **_proposal_denial_fields(),
+            "blockers": blockers,
+            "proposed_action": proposed_action,
+            "evidence": evidence,
+        }
+        result["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=PHASE_ALIGNMENT_METHOD_ID,
+            target=target,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
         self.last_apply_result = result
         if blocked_calls:
             logger.warning(

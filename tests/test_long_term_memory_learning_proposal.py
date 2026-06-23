@@ -81,6 +81,7 @@ def test_complete_learning_evidence_creates_proposal_only_recommendation():
     assert recommendation.evidence["transport_free"] is True
     assert recommendation.evidence["long_term_memory_learning"] is True
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_memory_learning_context_cache_no_live_authority"] is True
     assert recommendation.evidence["current_state_cache_freshness"]["fresh_field_count"] == 8
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == (
         "legacy_unverified"
@@ -91,6 +92,8 @@ def test_complete_learning_evidence_creates_proposal_only_recommendation():
     assert proposal["kind"] == "long_term_memory_learning"
     assert proposal["can_import_to_queue"] is False
     assert proposal["can_apply_live"] is False
+    assert proposal["queue_import_allowed"] is False
+    assert proposal["live_apply_allowed"] is False
     assert "requested_change" not in proposal
     assert "requested_changes" not in proposal
     assert "unsupported_value_type:long_term_memory_learning" in proposal["blockers"]
@@ -99,6 +102,35 @@ def test_complete_learning_evidence_creates_proposal_only_recommendation():
     assert proposal["evidence"]["memory_mutation"] is False
     assert proposal["evidence"]["operator_acceptance_required_before_memory_write"] is True
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
+    assert proposal["evidence"]["current_memory_learning_context_cache_no_live_authority"] is True
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "long_term_memory_learning"
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == "complete"
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    for required_field in correction["source_evidence"]["required_evidence_fields"]:
+        assert required_field in source_evidence
+    assert source_evidence["verified_decisions"]["count"] == 3
+    assert source_evidence["offline_replay_runs"]["count"] == 2
+    assert source_evidence["accepted_rejected_outcomes"] == {
+        "accepted_count": 4,
+        "rejected_count": 1,
+        "outcome_label_count": 5,
+        "minimum_outcome_label_count": 2,
+    }
+    assert source_evidence["safety_regressions"] == {
+        "count": 0,
+        "maximum_allowed": 0,
+    }
 
 
 def test_insufficient_evidence_blocks_learning_proposal():
@@ -185,6 +217,42 @@ def test_stale_memory_learning_context_blocks_learning_proposal():
         "accepted_rejected_outcomes",
     ]
     assert recommendation.to_operator_proposal()["can_apply_live"] is False
+
+
+def test_live_authority_memory_learning_context_blocks_learning_proposal():
+    analysis = _complete_input(
+        current_state_cache_freshness={
+            "status": "fresh",
+            "field_count": 8,
+            "fresh_field_count": 8,
+            "read_only": False,
+            "live_write": True,
+            "queries_console": True,
+        }
+    )
+    recommendation = analyze_long_term_memory_learning_need(analysis)
+
+    assert recommendation.status == "analysis_only"
+    assert "memory_learning_context_cache_live_authority_present" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
+    assert recommendation.evidence["current_memory_learning_context_cache_no_live_authority"] is False
+    assert recommendation.evidence["current_state_cache_freshness"]["live_write"] is True
+    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    assert build_long_term_memory_learning_proposals([analysis]) == ()
+
+
+def test_missing_memory_learning_context_blocks_learning_proposal():
+    recommendation = analyze_long_term_memory_learning_need(
+        _complete_input(current_state_cache_freshness=None)
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert "long_term_memory_context_cache_not_fresh" in recommendation.blockers
+    assert recommendation.evidence["current_state_cache_freshness_status"] == "not_provided"
+    assert recommendation.evidence["current_state_cache_freshness"]["provided"] is False
+    assert build_long_term_memory_learning_proposals(
+        [_complete_input(current_state_cache_freshness=None)]
+    ) == ()
 
 
 def test_source_identity_hold_blocks_memory_learning_proposal():
@@ -333,6 +401,12 @@ def test_long_term_memory_learning_proposal_is_registered_as_goal_capability():
     assert (
         "current_memory_learning_context_cache_freshness"
         in contracts["long_term_memory_learning_proposal"]["proposal_contract"]["safety_evidence_required"]
+    )
+    assert (
+        "current_memory_learning_context_cache_no_live_authority"
+        in contracts["long_term_memory_learning_proposal"]["proposal_contract"][
+            "safety_evidence_required"
+        ]
     )
     assert (
         "source_identity_downstream_trust"

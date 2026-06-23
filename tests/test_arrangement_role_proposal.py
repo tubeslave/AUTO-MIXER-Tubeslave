@@ -80,6 +80,8 @@ def test_lead_vocal_creates_proposal_only_arrangement_role_recommendation():
     assert proposal["kind"] == "arrangement_role"
     assert proposal["can_import_to_queue"] is False
     assert proposal["can_apply_live"] is False
+    assert proposal["queue_import_allowed"] is False
+    assert proposal["live_apply_allowed"] is False
     assert "requested_change" not in proposal
     assert "requested_changes" not in proposal
     assert "unsupported_value_type:arrangement_role" in proposal["blockers"]
@@ -87,6 +89,30 @@ def test_lead_vocal_creates_proposal_only_arrangement_role_recommendation():
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["current_arrangement_role_context_cache_no_live_authority"] is True
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "arrangement_role"
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == "complete"
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    for required_field in correction["source_evidence"]["required_evidence_fields"]:
+        assert required_field in source_evidence
+    assert source_evidence["arrangement_context"]["section_label"] == "verse"
+    assert source_evidence["role_persistence"]["persistent"] is True
+    assert source_evidence["role_ambiguity"] == {
+        "competing_role_count": 0,
+        "max_competing_role_count": 1,
+        "recent_role_switches": 0,
+        "max_recent_role_switches": 1,
+    }
 
 
 def test_ambiguous_or_switching_role_is_analysis_only():

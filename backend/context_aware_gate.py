@@ -27,6 +27,11 @@ try:
 except ImportError:  # pragma: no cover - direct PYTHONPATH=backend compatibility
     from source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from .processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - direct PYTHONPATH=backend compatibility
+    from processing_proposal_adapters import build_operator_correction_payload
+
 
 CONTEXT_AWARE_GATE_VERSION = "context_aware_gate_v1"
 GATE_READ_REQUIRED_SOURCE = "cached_or_physical_gate_read_required_before_promotion"
@@ -405,13 +410,73 @@ class ContextGateRecommendation:
         payload["idempotency_key"] = payload["idempotency_key"] or context_gate_idempotency_key(payload)
         return payload
 
+    def gate_safety_summary(self) -> Dict[str, Any]:
+        params = dict(self.suggested_params)
+        chatter_guard = dict(self.evidence.get("chatter_guard") or {})
+        quiet_words_tail_attack = dict(
+            self.evidence.get("quiet_words_tail_attack_preservation") or {}
+        )
+        source_identity = dict(
+            self.evidence.get("source_identity_downstream_trust") or {}
+        )
+        return {
+            "summary_type": "context_aware_gate_review",
+            "status": self.safety_status,
+            "channel_id": self.channel_id,
+            "action_type": self.action_type,
+            "threshold_db": params.get("threshold_db"),
+            "range_db": params.get("range_db"),
+            "attack_ms": params.get("attack_ms"),
+            "hold_ms": params.get("hold_ms"),
+            "release_ms": params.get("release_ms"),
+            "hysteresis_db": params.get("hysteresis_db"),
+            "false_open_risk": self.evidence.get("false_open_risk"),
+            "false_close_risk": self.evidence.get("false_close_risk"),
+            "tail_risk": self.evidence.get("tail_risk"),
+            "chatter_risk": self.evidence.get("chatter_risk"),
+            "quiet_words_tail_attack_preservation": quiet_words_tail_attack,
+            "quiet_words_tail_attack_status": quiet_words_tail_attack.get("status"),
+            "chatter_guard_status": (
+                "passed" if chatter_guard.get("hard_gate_allowed") else "blocked"
+            ),
+            "hard_gate_allowed": chatter_guard.get("hard_gate_allowed"),
+            "source_identity_trust_status": source_identity.get("status"),
+            "source_identity_usable_for_downstream": source_identity.get(
+                "usable_for_downstream"
+            ),
+            "current_gate_bleed_context_cache_freshness": self.evidence.get(
+                "current_gate_bleed_context_cache_freshness",
+                self.evidence.get("current_state_cache_freshness_status"),
+            ),
+            "current_gate_bleed_context_cache_no_live_authority": self.evidence.get(
+                "current_gate_bleed_context_cache_no_live_authority"
+            ),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "operator_review_required": True,
+            "read_only_or_dry_run_only": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "live_apply_allowed": False,
+            "queue_import_allowed": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "can_authorize_live": False,
+            "mutates_mixer": False,
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer proposal without queue or live-apply authority."""
 
         payload = self.to_dict()
         params = dict(self.suggested_params)
+        gate_safety_summary = self.gate_safety_summary()
         evidence = {
             **self.evidence,
+            "bleed_telemetry": self.evidence.get("telemetry", {}),
             "current_gate_bleed_context_cache_freshness": self.evidence.get(
                 "current_gate_bleed_context_cache_freshness",
                 self.evidence.get("current_state_cache_freshness_status", "unknown"),
@@ -422,15 +487,50 @@ class ContextGateRecommendation:
             ),
             "old_value_source": GATE_READ_REQUIRED_SOURCE,
             "rollback_value_source": GATE_READ_REQUIRED_SOURCE,
+            "rollback_gate_readback": {
+                "channel_id": self.channel_id,
+                "mode": params.get("mode"),
+                "threshold_db": params.get("threshold_db"),
+                "range_db": params.get("range_db"),
+                "attack_ms": params.get("attack_ms"),
+                "hold_ms": params.get("hold_ms"),
+                "release_ms": params.get("release_ms"),
+                "hysteresis_db": params.get("hysteresis_db"),
+                "source": GATE_READ_REQUIRED_SOURCE,
+                "required_before_live_promotion": True,
+                "live_write": False,
+            },
+            "gate_safety_summary": gate_safety_summary,
             "live_write": False,
             "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
             "readback_required_before_promotion": True,
             "rollback_required_before_promotion": True,
         }
         evidence_blockers = self.evidence.get("blockers", ())
         if isinstance(evidence_blockers, str):
             evidence_blockers = (evidence_blockers,)
-        return {
+        blockers = [
+            "unsupported_value_type:gate",
+            "not_in_supervised_fader_gain_executor",
+            "hardware_readback_and_rollback_not_proven",
+            *tuple(evidence_blockers),
+        ]
+        proposed_action = {
+            "action_type": self.action_type,
+            "channel_id": self.channel_id,
+            "params": params,
+            "gate_safety_summary": gate_safety_summary,
+        }
+        proposal = {
             "id": payload["idempotency_key"],
             "method_id": "context_aware_gate_agent",
             "source": "context_aware_gate_agent",
@@ -444,17 +544,16 @@ class ContextGateRecommendation:
             "queue_action": "not_queueable_until_promoted",
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:gate",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *tuple(evidence_blockers),
-            ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "channel_id": self.channel_id,
-                "params": params,
-            },
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "live_write": False,
+            "queue_mutation": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "proposed_action": proposed_action,
             "old_value": {
                 "source": GATE_READ_REQUIRED_SOURCE,
                 "required_before_apply": True,
@@ -465,6 +564,14 @@ class ContextGateRecommendation:
             },
             "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id="context_aware_gate_agent",
+            target=self.channel_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
     def to_decision_trace(self, *, mode: str = "dry_run") -> Dict[str, Any]:
         payload = self.to_dict()
@@ -640,6 +747,15 @@ class ContextAwareGateAgent:
                 "false_close_risk": telemetry.false_close_risk,
                 "chatter_risk": telemetry.chatter_risk,
                 "tail_risk": telemetry.tail_risk,
+                "quiet_words_tail_attack_preservation": {
+                    "status": "operator_review_required_before_live_promotion",
+                    "tail_risk": telemetry.tail_risk,
+                    "false_close_risk": telemetry.false_close_risk,
+                    "attack_ms": params.get("attack_ms"),
+                    "hold_ms": params.get("hold_ms"),
+                    "release_ms": params.get("release_ms"),
+                    "hard_gate_allowed": chatter_guard.get("hard_gate_allowed"),
+                },
                 "chatter_guard": chatter_guard,
                 "hysteresis": params.get("hysteresis_db"),
                 "old_value_source": GATE_READ_REQUIRED_SOURCE,

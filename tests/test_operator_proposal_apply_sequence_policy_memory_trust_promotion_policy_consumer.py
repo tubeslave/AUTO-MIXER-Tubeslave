@@ -15,6 +15,34 @@ from backend.processing_registry import (
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+
+
+def _unsafe_sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": False,
+        "live_write": True,
+        "apply_attempted": True,
+        "queries_console": True,
+        "queue_mutation": True,
+        "policy_mutation": True,
+    }
+
+
 def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
     return {
         "sequence_policy_gate_record_id": (
@@ -27,6 +55,7 @@ def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
         "policy_key": f"{proposal_id}/memory-write:{proposal_id}",
         "target_policy_state": "trusted_for_sequence_policy",
         "sequence_policy_gate_status": "trusted",
+        "current_sequence_review_freshness": _sequence_context(),
         "rollback_verified": True,
         "sequence_policy_eligible": True,
         "eligible_for_sequence_policy_consumer": True,
@@ -235,6 +264,9 @@ def test_sequence_policy_consumer_projects_records_read_only():
         == "proposal-sequence-fader/memory-write:proposal-sequence-fader"
     )
     assert record["recommended_sequence_policy_bucket"] == "trusted_sequence_memory"
+    assert record["current_sequence_review_freshness"]["status"] == "fresh"
+    assert record["current_sequence_review_freshness"]["read_only"] is True
+    assert record["current_sequence_review_freshness"]["live_write"] is False
     assert record["adjusted_policy_score"] > record["base_policy_score"]
     assert record["policy_consumer_required_before_ordering"] is True
     assert record["read_only"] is True
@@ -255,6 +287,121 @@ def test_sequence_policy_consumer_projects_records_read_only():
     assert record["full_autonomous_ready"] is False
     assert record["can_import_to_queue"] is False
     assert record["can_apply_live"] is False
+
+
+def test_sequence_policy_consumer_requires_proposal_identity_match():
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=[
+                {
+                    "proposal_id": "proposal-unrelated-fader",
+                    "method_id": "safe_gain",
+                    "kind": "gain_trim_down",
+                    "target": "ch/03",
+                    "severity": "critical",
+                    "confidence": 1.0,
+                    "learning_scope": "supervised_fader_gain_sequence_execution",
+                    "value_type": "fader",
+                }
+            ],
+            sequence_policy_gate=_sequence_policy_gate(),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_policy_consumer_not_ready"
+    )
+    assert consumer["summary"]["input_proposal_count"] == 1
+    assert consumer["summary"]["eligible_sequence_policy_gate_record_count"] == 1
+    assert consumer["summary"]["consumer_record_count"] == 0
+    assert consumer["summary"]["unmatched_eligible_policy_count"] == 1
+    assert consumer["summary"]["unmatched_eligible_policy_keys"] == [
+        "proposal-sequence-fader/memory-write:proposal-sequence-fader"
+    ]
+    assert "matching_preview_proposals_required_for_sequence_policy_consumer" in (
+        consumer["summary"]["blocked_by"]
+    )
+    assert consumer["summary"]["proposal_order_mutation"] is False
+    assert consumer["summary"]["queue_mutation"] is False
+    assert (
+        consumer["summary"]["sequence_policy_change_allowed_by_consumer"]
+        is False
+    )
+    assert (
+        consumer["summary"]["sequence_execution_allowed_by_consumer"]
+        is False
+    )
+    assert consumer["summary"]["live_authority_granted"] is False
+    assert consumer["consumer_records"] == []
+
+
+def test_sequence_policy_consumer_requires_fresh_context():
+    gate_record = _eligible_gate_record()
+    gate_record.pop("current_sequence_review_freshness")
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=[
+                {
+                    "proposal_id": "proposal-sequence-fader",
+                    "method_id": "safe_gain",
+                    "kind": "gain_trim_down",
+                    "target": "ch/02",
+                    "severity": "high",
+                    "confidence": 0.82,
+                    "evidence": {
+                        "idempotency_key": "memory-write:proposal-sequence-fader",
+                    },
+                }
+            ],
+            sequence_policy_gate=_sequence_policy_gate([gate_record]),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_policy_consumer_replacement_required"
+    )
+    assert consumer["summary"]["consumer_record_count"] == 0
+    assert consumer["consumer_records"] == []
+    assert (
+        "operator_sequence_memory_trust_promotion_sequence_policy_gate:apply-audit-1"
+        in consumer["summary"]["invalid_record_ids"]
+    )
+
+
+def test_sequence_policy_consumer_rejects_live_authority_context():
+    gate_record = {
+        **_eligible_gate_record(),
+        "current_sequence_review_freshness": _unsafe_sequence_context(),
+    }
+
+    consumer = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer(
+            proposals=[
+                {
+                    "proposal_id": "proposal-sequence-fader",
+                    "method_id": "safe_gain",
+                    "kind": "gain_trim_down",
+                    "target": "ch/02",
+                    "severity": "high",
+                    "confidence": 0.82,
+                    "evidence": {
+                        "idempotency_key": "memory-write:proposal-sequence-fader",
+                    },
+                }
+            ],
+            sequence_policy_gate=_sequence_policy_gate([gate_record]),
+        )
+    )
+
+    assert (
+        consumer["status"]
+        == "sequence_memory_trust_promotion_policy_consumer_replacement_required"
+    )
+    assert consumer["summary"]["consumer_record_count"] == 0
+    assert consumer["consumer_records"] == []
 
 
 def test_sequence_policy_consumer_rejects_forged_gate_authority():

@@ -151,6 +151,22 @@ def test_sequence_memory_trust_review_requires_fresh_review_context():
     ]["blocked_by"]
 
 
+def test_sequence_memory_trust_review_requires_provided_review_context():
+    review = build_operator_proposal_apply_sequence_policy_memory_trust_review(
+        memory_index=_memory_index(),
+    )
+
+    assert review["status"] == "sequence_memory_trust_review_not_ready"
+    assert review["summary"]["trust_review_candidate_count"] == 0
+    assert review["summary"]["current_sequence_review_freshness_status"] == "not_provided"
+    assert "fresh_sequence_review_context_required_before_trust_review" in review[
+        "summary"
+    ]["blocked_by"]
+    assert review["summary"]["execution_allowed_by_review"] is False
+    assert review["summary"]["policy_mutation"] is False
+    assert review["summary"]["runtime_memory_mutation"] is False
+
+
 def test_sequence_memory_trust_review_rejects_unsafe_index_envelope_and_records():
     index = _memory_index()
     forged = {

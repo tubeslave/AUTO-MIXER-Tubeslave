@@ -7,7 +7,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
-from autofoh_safety import ChannelEQMove, MasterFaderMove
+from autofoh_safety import ChannelEQMove, ChannelFaderMove, MasterFaderMove
 from live_shared_mix import (
     LiveSharedMixChannel,
     LiveSharedMixConfig,
@@ -18,6 +18,48 @@ from live_shared_mix import (
 def _sine(freq_hz: float, amp: float, seconds: float = 2.0, sample_rate: int = 48000):
     t = np.arange(int(seconds * sample_rate), dtype=np.float32) / float(sample_rate)
     return (amp * np.sin(2.0 * np.pi * freq_hz * t)).astype(np.float32)
+
+
+def _assert_action_top_level_denial(action):
+    assert action.can_apply_live is False
+    assert action.can_import_to_queue is False
+    assert action.queue_import_allowed is False
+    assert action.live_apply_allowed is False
+    assert action.read_only_or_dry_run_only is True
+    assert action.live_authority_granted is False
+    assert action.readiness_closure_allowed is False
+    assert action.queue_action == "not_queueable_until_promoted"
+    assert action.live_write is False
+    assert action.queue_mutation is False
+    assert action.mutates_mixer is False
+
+
+def _assert_payload_top_level_denial(payload):
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["can_import_to_queue"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["live_write"] is False
+    assert payload["queue_mutation"] is False
+    assert payload["mutates_mixer"] is False
+
+
+def _assert_correction_authority_denial(correction):
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    boundary = correction["live_authority_boundary"]
+    assert boundary["live_authority_granted"] is False
+    assert boundary["full_autonomous_ready"] is False
+    assert boundary["readiness_closure_allowed"] is False
+    assert boundary["wing_proof_required"] is True
+    assert boundary["hardware_proof_required"] is True
+    assert boundary["live_apply_allowed"] is False
+    assert boundary["queue_import_allowed"] is False
 
 
 def _channel(channel_id, name, role, audio, *, fader_db=-6.0, auto=True, priority=0.8):
@@ -71,6 +113,87 @@ def test_lead_masking_cuts_competing_music_channel():
     ]
     assert guitar_eq
     assert guitar_eq[0].gain_db < 0.0
+    _assert_action_top_level_denial(guitar_eq[0])
+    correction = guitar_eq[0].operator_correction
+    assert correction["objective_family"] == "eq"
+    assert correction["future_wing_readback_contract"]["target_kind"] == "channel_eq_band"
+    assert correction["bounded_delta"]["delta_db"] == -1.0
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_payload_top_level_denial(source_evidence)
+    summary = source_evidence["live_shared_mix_safety_summary"]
+    assert summary["summary_type"] == "live_shared_mix_review"
+    assert summary["value_type"] == "eq"
+    assert summary["target_kind"] == "channel_eq_band"
+    assert summary["target"] == 2
+    assert summary["bounded_gain_delta"] is True
+    assert summary["feedback_safety"] == "required_before_apply"
+    assert summary["true_peak_headroom"] == "required_before_apply"
+    _assert_payload_top_level_denial(summary)
+    assert summary["can_authorize_live"] is False
+    _assert_correction_authority_denial(correction)
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "bounded_gain_delta"
+    ] is True
+
+
+def test_lead_layer_fader_support_has_operator_correction_contract():
+    config = LiveSharedMixConfig(
+        analysis_window_sec=1.0,
+        max_actions_per_pass=8,
+        mirror_eq_enabled=False,
+    )
+    channels = [
+        _channel(1, "LEAD VOX", "lead_vocal", _sine(2200.0, 0.45)),
+        _channel(2, "LEAD DBL", "lead_vocal", _sine(2200.0, 0.04)),
+    ]
+
+    plan = build_live_shared_mix_plan(channels, 48000, config=config)
+
+    fader_moves = [
+        action
+        for action in plan.actions
+        if isinstance(action, ChannelFaderMove) and action.channel_id == 2
+    ]
+    assert fader_moves
+    move = fader_moves[0]
+    _assert_action_top_level_denial(move)
+    correction = move.operator_correction
+    assert move.delta_db > 0.0
+    assert correction["objective_family"] == "fader_balance"
+    assert correction["future_wing_readback_contract"]["target_kind"] == (
+        "shared_mix_channel_or_stem_balance"
+    )
+    assert correction["bounded_delta"]["delta_db"] == round(move.delta_db, 1)
+    assert correction["bounded_delta"]["parameter_deltas"]["target_plane_lufs"] == -22.0
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_payload_top_level_denial(source_evidence)
+    summary = source_evidence["live_shared_mix_safety_summary"]
+    assert summary["summary_type"] == "live_shared_mix_review"
+    assert summary["value_type"] == "fader_balance"
+    assert summary["target_kind"] == "shared_mix_channel_or_stem_balance"
+    assert summary["target"] == 2
+    assert summary["ayaic_level_plane"]["target_lufs"] == -22.0
+    assert summary["fader_ceiling"] == "target_clamped_at_0_dbfs"
+    assert summary["bounded_fader_delta"] is True
+    _assert_payload_top_level_denial(summary)
+    assert summary["can_authorize_live"] is False
+    _assert_correction_authority_denial(correction)
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "ayaic_level_plane"
+    ]["target_lufs"] == -22.0
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "source_or_stem_contributor"
+    ] == "lead_vocal"
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "bounded_fader_delta"
+    ] is True
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "rollback_fader_readback"
+    ] == "required_before_apply"
 
 
 def test_master_reference_overload_plans_main_cut_only():
@@ -96,6 +219,22 @@ def test_master_reference_overload_plans_main_cut_only():
     master_actions = [action for action in plan.actions if isinstance(action, MasterFaderMove)]
     assert len(master_actions) == 1
     assert master_actions[0].target_db == -3.0
+    _assert_action_top_level_denial(master_actions[0])
+    correction = master_actions[0].operator_correction
+    assert correction["objective_family"] == "master_output"
+    assert correction["future_wing_readback_contract"]["target_kind"] == "main_bus_fader"
+    assert correction["bounded_delta"]["delta_db"] == -1.0
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_payload_top_level_denial(source_evidence)
+    summary = source_evidence["live_shared_mix_safety_summary"]
+    _assert_payload_top_level_denial(summary)
+    assert summary["can_authorize_live"] is False
+    _assert_correction_authority_denial(correction)
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "pa_feed_safe_for_master_change"
+    ] == "requires_operator_confirmation"
     assert plan.report["master"]["action"] == "master_fader_cut"
 
 

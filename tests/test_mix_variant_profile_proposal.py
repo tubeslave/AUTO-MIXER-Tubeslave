@@ -95,6 +95,8 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
     assert proposal["kind"] == "mix_variant_profile"
     assert proposal["can_import_to_queue"] is False
     assert proposal["can_apply_live"] is False
+    assert proposal["queue_import_allowed"] is False
+    assert proposal["live_apply_allowed"] is False
     assert "requested_change" not in proposal
     assert "requested_changes" not in proposal
     assert "unsupported_value_type:mix_variant_profile" in proposal["blockers"]
@@ -102,6 +104,33 @@ def test_live_pop_rock_variant_creates_proposal_only_profile():
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["current_mix_variant_context_cache_no_live_authority"] is True
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "mix_variant_profile"
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == "complete"
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    for required_field in correction["source_evidence"]["required_evidence_fields"]:
+        assert required_field in source_evidence
+    assert source_evidence["arrangement_context"]["roles"] == [
+        "lead_vocal",
+        "drums",
+        "bass",
+        "guitar",
+        "keys",
+    ]
+    assert source_evidence["reference_metrics"]["available"] is True
+    assert "scene_preset_management_proposal" in source_evidence[
+        "followup_proposal_methods"
+    ]
 
 
 def test_style_clone_and_active_performance_block_mix_variant():

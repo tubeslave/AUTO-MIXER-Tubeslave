@@ -18,6 +18,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 DECISION_EVIDENCE_METHOD_ID = "decision_evidence_packet_proposal"
 DECISION_EVIDENCE_VERSION = "decision_evidence_packet_proposal_v1"
@@ -211,7 +216,17 @@ class DecisionEvidenceRecommendation:
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style evidence packet without live-apply fields."""
 
-        return {
+        proposed_action = {
+            "action_type": self.action_type,
+            "decision_id": self.decision_id,
+            "target_id": self.target_id,
+            "decision_kind": self.decision_kind,
+            "proposed_action_family": self.proposed_action_family,
+            "evidence_family_count": self.evidence_family_count,
+            "missing_evidence_families": list(self.missing_evidence_families),
+            "low_confidence_families": list(self.low_confidence_families),
+        }
+        proposal = {
             "id": self.id,
             "method_id": DECISION_EVIDENCE_METHOD_ID,
             "source": DECISION_EVIDENCE_METHOD_ID,
@@ -230,16 +245,7 @@ class DecisionEvidenceRecommendation:
                 "evidence_packet_requires_operator_review",
                 *self.blockers,
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "decision_id": self.decision_id,
-                "target_id": self.target_id,
-                "decision_kind": self.decision_kind,
-                "proposed_action_family": self.proposed_action_family,
-                "evidence_family_count": self.evidence_family_count,
-                "missing_evidence_families": list(self.missing_evidence_families),
-                "low_confidence_families": list(self.low_confidence_families),
-            },
+            "proposed_action": proposed_action,
             "evidence": {
                 **self.evidence,
                 "live_write": False,
@@ -249,6 +255,14 @@ class DecisionEvidenceRecommendation:
                 in CONSOLE_AFFECTING_FAMILIES,
             },
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=DECISION_EVIDENCE_METHOD_ID,
+            target=self.target_id,
+            proposed_action=proposed_action,
+            blockers=proposal["blockers"],
+        )
+        return proposal
 
 
 def _family_status(analysis: DecisionEvidenceAnalysisInput) -> Tuple[Dict[str, Dict[str, Any]], Tuple[str, ...], Tuple[str, ...]]:
@@ -437,14 +451,35 @@ def analyze_decision_evidence_packet_need(
         "operator_intent": operator_intent,
         "operator_review_enabled": bool(analysis.operator_review_enabled),
         "family_status": family_status,
+        "audio_analysis": family_status["audio_analysis"],
+        "psychoacoustic_model": family_status["psychoacoustic_model"],
+        "statistical_model": family_status["statistical_model"],
+        "project_history": family_status["project_history"],
+        "reference_comparison": family_status["reference_comparison"],
+        "previous_decision_outcomes": family_status["previous_decision_outcomes"],
+        "inter_channel_context": family_status["inter_channel_context"],
+        "arrangement_context": family_status["arrangement_context"],
+        "genre_context": family_status["genre_context"],
         "available_evidence_family_count": available_count,
         "required_evidence_family_count": MIN_REQUIRED_FAMILY_COUNT,
         "critical_evidence_families": list(CRITICAL_EVIDENCE_FAMILIES),
         "average_family_confidence": round(average_family_confidence, 3),
         "coverage_score": round(coverage_score, 3),
         "current_state_readback_available": bool(analysis.current_state_readback_available),
+        "readback_state": {
+            "available": bool(analysis.current_state_readback_available),
+            "required_before_live_promotion": True,
+        },
         "rollback_plan_available": bool(analysis.rollback_plan_available),
+        "rollback_plan": {
+            "available": bool(analysis.rollback_plan_available),
+            "required_for_console_affecting_family": bool(console_affecting),
+        },
         "true_peak_headroom_db": round(headroom, 2),
+        "true_peak_headroom": {
+            "headroom_db": round(headroom, 2),
+            "minimum_db": MIN_TRUE_PEAK_HEADROOM_DB,
+        },
         "feedback_risk": round(feedback_risk, 3),
         "latency_budget_ms": round(latency_budget, 2),
         "latency_budget_met": bool(analysis.latency_budget_met),
@@ -456,6 +491,7 @@ def analyze_decision_evidence_packet_need(
         "console_affecting_family": bool(console_affecting),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_decision_evidence_context_cache_freshness": current_state_freshness,
         "current_decision_evidence_context_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
         "transport_free": True,

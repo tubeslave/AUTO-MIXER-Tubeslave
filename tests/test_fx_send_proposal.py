@@ -37,6 +37,20 @@ def _schema(family="reverb"):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["live_write"] is False
+    assert payload["queue_mutation"] is False
+    assert payload["can_apply_live"] is False
+    assert payload["can_import_to_queue"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["mutates_mixer"] is False
+
+
 def test_fx_send_proposal_module_is_transport_free():
     source = Path("backend/fx_send_proposal.py").read_text()
 
@@ -94,13 +108,70 @@ def test_lead_vocal_creates_proposal_only_fx_send_recommendation():
     assert recommendation.evidence["current_fx_send_return_cache_freshness"]["status"] == "fresh"
     assert recommendation.evidence["current_fx_send_return_cache_no_live_authority"] is True
     assert recommendation.evidence["source_identity_downstream_trust"]["status"] == "legacy_unverified"
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "passed"
+    assert summary["fx_type"] == "reverb"
+    assert summary["return_level_safety_status"] == "passed"
+    assert summary["send_level_limit"]["status"] == "passed"
+    assert summary["send_level_limit_status"] == "passed"
+    assert summary["fx_return_headroom"]["status"] == "passed"
+    assert summary["fx_return_headroom_status"] == "passed"
+    assert summary["dry_wet_bounds"]["status"] == "passed"
+    assert summary["dry_wet_bounds_status"] == "passed"
+    assert summary["rollback_fx_readback"]["status"] == (
+        "required_before_live_promotion"
+    )
+    assert summary["monitor_safety_status"] == "passed"
+    assert summary["post_fader_send_required_before_promotion"] is True
+    assert summary["current_fx_send_return_cache_freshness_status"] == "fresh"
+    assert summary["current_fx_send_return_cache_no_live_authority"] is True
+    assert summary["current_fx_parameter_schema_status"] == "mapped"
+    assert summary["current_fx_parameter_schema_family"] == "reverb"
+    assert summary["expected_fx_schema_family"] == "reverb"
+    assert summary["fx_parameter_schema_no_live_authority"] is True
+    assert summary["required_safety_checks"] == {
+        "source_identity": "required_before_live_promotion",
+        "send_level_limit": "required_before_live_promotion",
+        "fx_return_headroom": "required_before_live_promotion",
+        "return_level_safety": "required_before_live_promotion",
+        "feedback_risk": "required_before_live_promotion",
+        "intelligibility_risk": "required_before_live_promotion",
+        "monitor_safety": "required_before_live_promotion",
+        "dry_wet_bounds": "required_before_live_promotion",
+        "fx_parameter_schema": "required_before_live_promotion",
+    }
+    assert summary["rollback_expectation"] == {
+        "required_before_live_promotion": True,
+        "restore_previous_send_level_after_physical_readback": True,
+        "restore_previous_fx_return_level_after_physical_readback": True,
+        "restore_previous_fx_slot_parameters_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+    readback = summary["future_wing_readback_contract"]
+    assert readback["target_kind"] == "send_or_fx_parameter"
+    assert readback["required_before_live_promotion"] is True
+    assert readback["old_value_source"] == FX_READ_REQUIRED_SOURCE
+    assert readback["requires_real_wing_proof"] is True
+    assert readback["requires_operator_approval"] is True
+    assert readback["requires_separate_non_fader_adr"] is True
+    assert "fx_send_level_write" in readback["blocked_live_actions"]
+    assert "monitor_send_write" in readback["blocked_live_actions"]
+    assert "non_fader_live_expansion_requires_separate_adr" in summary[
+        "safety_blockers"
+    ]
+    assert summary["readback_required_before_promotion"] is True
+    assert summary["rollback_required_before_promotion"] is True
+    assert summary["live_write"] is False
+    assert summary["queue_mutation"] is False
+    _assert_top_level_denial(summary)
 
     proposal = recommendation.to_operator_proposal()
     assert proposal["method_id"] == "fx_send_proposal"
-    assert proposal["can_import_to_queue"] is False
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
     assert "requested_change" not in proposal
     assert "unsupported_value_type:fx_send" in proposal["blockers"]
+    assert "fx_send_live_apply_quarantined" in proposal["blockers"]
+    assert "non_fader_live_expansion_requires_separate_adr" in proposal["blockers"]
     assert proposal["old_value"]["source"] == FX_READ_REQUIRED_SOURCE
     assert proposal["rollback_value"]["source"] == FX_READ_REQUIRED_SOURCE
     assert proposal["evidence"]["live_write"] is False
@@ -111,6 +182,98 @@ def test_lead_vocal_creates_proposal_only_fx_send_recommendation():
     assert proposal["evidence"]["current_state_cache_freshness_status"] == "fresh"
     assert proposal["evidence"]["current_fx_send_return_cache_no_live_authority"] is True
     assert proposal["evidence"]["current_fx_parameter_schema_status"] == "mapped"
+    assert proposal["fx_send_safety_summary"] == summary
+    assert proposal["proposed_action"]["fx_send_safety_summary"] == summary
+    assert proposal["evidence"]["fx_send_safety_summary"] == summary
+    assert proposal["safety_blockers"] == summary["safety_blockers"]
+    assert proposal["required_safety_checks"] == summary["required_safety_checks"]
+    assert proposal["rollback_expectation"] == summary["rollback_expectation"]
+    assert proposal["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
+    assert proposal["proposed_action"]["send_level_limit"] == summary[
+        "send_level_limit"
+    ]
+    assert proposal["proposed_action"]["fx_return_headroom"] == summary[
+        "fx_return_headroom"
+    ]
+    assert proposal["proposed_action"]["dry_wet_bounds"] == summary[
+        "dry_wet_bounds"
+    ]
+    assert proposal["proposed_action"]["rollback_fx_readback"] == summary[
+        "rollback_fx_readback"
+    ]
+    assert proposal["evidence"]["current_fx_parameter_schema_hints"] == (
+        recommendation.evidence["current_fx_parameter_schema"]
+    )
+    assert proposal["evidence"]["rollback_fx_readback"] == summary[
+        "rollback_fx_readback"
+    ]
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "fx_sends"
+    assert correction["bounded_delta"]["delta_db"] == recommendation.delta_send_db
+    assert correction["bounded_delta"]["parameter_deltas"]["delta_send_db"] == (
+        recommendation.delta_send_db
+    )
+    assert correction["bounded_delta"]["parameter_deltas"]["return_level_db"] == (
+        recommendation.return_level_db
+    )
+    assert correction["future_wing_readback_contract"]["target_kind"] == (
+        "send_or_fx_parameter"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == (
+        "complete"
+    )
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert "monitor_safety" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_fx_send_return_cache_no_live_authority"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    evidence_checks = correction["headroom_feedback_true_peak_checks"][
+        "evidence_checks"
+    ]
+    for key in (
+        "source_role",
+        "send_level_limit",
+        "fx_return_headroom",
+        "return_level_safety",
+        "feedback_risk",
+        "intelligibility_risk",
+        "monitor_safety",
+        "dry_wet_bounds",
+        "current_fx_send_return_cache_freshness",
+        "current_fx_send_return_cache_no_live_authority",
+        "current_fx_parameter_schema_hints",
+        "fx_parameter_schema_no_live_authority",
+        "source_identity_downstream_trust",
+        "old_value_source",
+        "rollback_fx_readback",
+    ):
+        assert evidence_checks[key] == source_evidence[key]
+    assert source_evidence["monitor_safety"]["status"] == "passed"
+    assert source_evidence["return_level_safety"]["status"] == "passed"
+    assert source_evidence["send_level_limit"]["status"] == "passed"
+    assert source_evidence["fx_return_headroom"]["status"] == "passed"
+    assert source_evidence["dry_wet_bounds"]["status"] == "passed"
+    assert source_evidence["rollback_fx_readback"]["status"] == (
+        "required_before_live_promotion"
+    )
+    assert source_evidence["future_wing_readback_contract"] == summary[
+        "future_wing_readback_contract"
+    ]
 
 
 def test_fx_send_can_derive_schema_evidence_from_fx_inserts_snapshot():
@@ -201,7 +364,13 @@ def test_requested_tempo_delay_uses_tempo_and_remains_non_applyable():
     assert recommendation.status == "proposal_only"
     assert recommendation.fx_type == "delay"
     assert recommendation.delay_ms == 450.0
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "passed"
+    assert summary["fx_type"] == "delay"
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["fx_send_safety_summary"] == summary
 
 
 def test_dry_anchor_source_is_analysis_only():
@@ -321,7 +490,14 @@ def test_stale_current_fx_state_blocks_proposal_only_recommendation():
         "return_level_db",
         "fx_slot_type",
     ]
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_fx_send_return_cache_freshness_status"] == "stale"
+    assert "fx_current_state_cache_not_fresh" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["fx_send_safety_summary"] == summary
 
 
 def test_live_authority_current_fx_state_blocks_proposal_only_recommendation():
@@ -354,7 +530,13 @@ def test_live_authority_current_fx_state_blocks_proposal_only_recommendation():
     assert recommendation.evidence["current_state_cache_freshness_status"] == "fresh"
     assert recommendation.evidence["current_fx_send_return_cache_no_live_authority"] is False
     assert recommendation.evidence["current_fx_send_return_cache_freshness"]["live_write"] is True
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_fx_send_return_cache_no_live_authority"] is False
+    assert "fx_current_state_cache_live_authority_present" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
     assert build_fx_send_proposals([analysis]) == ()
 
 
@@ -437,7 +619,15 @@ def test_generic_fx_parameter_schema_blocks_fx_send_proposal():
     assert recommendation.severity == "medium"
     assert recommendation.evidence["current_fx_parameter_schema_status"] == "partial"
     assert recommendation.evidence["current_fx_parameter_schema"]["generic_parameter_count"] == 1
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_fx_parameter_schema_status"] == "partial"
+    assert summary["fx_parameter_schema_no_live_authority"] is True
+    assert "fx_parameter_schema_not_mapped" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["fx_send_safety_summary"] == summary
 
 
 def test_generic_fx_inserts_snapshot_schema_blocks_fx_send_proposal():
@@ -499,7 +689,15 @@ def test_generic_fx_inserts_snapshot_schema_blocks_fx_send_proposal():
     assert recommendation.evidence["current_fx_parameter_schema_status"] == "partial"
     assert recommendation.evidence["current_fx_parameter_schema"]["generic_parameter_count"] == 1
     assert recommendation.evidence["current_fx_parameter_schema"]["snapshot_cache_freshness_status"] == "fresh"
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["current_fx_parameter_schema_status"] == "partial"
+    assert summary["fx_parameter_schema_no_live_authority"] is True
+    assert "fx_parameter_schema_not_mapped" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["fx_send_safety_summary"] == summary
 
 
 def test_mismatched_fx_parameter_schema_family_blocks_fx_send_proposal():
@@ -571,8 +769,14 @@ def test_fx_parameter_schema_with_live_authority_blocks_fx_send_proposal():
         is True
     )
     assert recommendation.evidence["fx_parameter_schema_no_live_authority"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["fx_parameter_schema_no_live_authority"] is False
+    assert "fx_parameter_schema_live_authority_present" in summary["blockers"]
+    _assert_top_level_denial(summary)
     proposal = recommendation.to_operator_proposal()
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
+    assert proposal["fx_send_safety_summary"] == summary
     assert "fx_parameter_schema_live_authority_present" in proposal["blockers"]
 
 
@@ -613,7 +817,14 @@ def test_source_identity_hold_blocks_downstream_fx_send_proposal():
     assert trust["usable_for_downstream"] is False
     assert trust["evidence"]["queue_mutation"] is False
     assert trust["evidence"]["model_mutation"] is False
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["source_identity_usable_for_downstream"] is False
+    assert "source_identity_not_trusted_for_downstream" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["fx_send_safety_summary"] == summary
 
 
 def test_stale_source_identity_replay_context_blocks_downstream_fx_send_proposal():
@@ -657,7 +868,14 @@ def test_stale_source_identity_replay_context_blocks_downstream_fx_send_proposal
         "accepted_labels",
         "replay_outcomes",
     ]
-    assert recommendation.to_operator_proposal()["can_apply_live"] is False
+    summary = recommendation.fx_send_safety_summary()
+    assert summary["status"] == "blocked"
+    assert summary["source_identity_usable_for_downstream"] is False
+    assert "source_identity_replay_context_not_fresh" in summary["blockers"]
+    _assert_top_level_denial(summary)
+    proposal = recommendation.to_operator_proposal()
+    _assert_top_level_denial(proposal)
+    assert proposal["fx_send_safety_summary"] == summary
 
 
 def test_fx_helpers_classify_roles_and_tempo_notes():

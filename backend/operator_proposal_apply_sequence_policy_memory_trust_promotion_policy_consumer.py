@@ -149,6 +149,32 @@ def _is_utc_timestamp(value: str) -> bool:
     return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
+def _context_status(payload: Mapping[str, Any]) -> str:
+    return str(payload.get("status") or "missing").strip().lower() or "missing"
+
+
+def _context_violations(payload: Mapping[str, Any]) -> Tuple[str, ...]:
+    if not payload:
+        return ("sequence_policy_consumer_gate_record_context_missing",)
+    violations = []
+    if _context_status(payload) != "fresh":
+        violations.append("sequence_policy_consumer_gate_record_context_not_fresh")
+    if payload.get("read_only") is not True:
+        violations.append("sequence_policy_consumer_gate_record_context_read_only_not_true")
+    for flag in (
+        "live_write",
+        "apply_attempted",
+        "queries_console",
+        "queue_mutation",
+        "policy_mutation",
+    ):
+        if payload.get(flag) is not False:
+            violations.append(
+                f"sequence_policy_consumer_gate_record_context_{flag}_not_false"
+            )
+    return tuple(violations)
+
+
 def _gate_record_id(record: Mapping[str, Any], index: int) -> str:
     explicit = _string(record.get("sequence_policy_gate_record_id"))
     if explicit:
@@ -293,6 +319,7 @@ def _policy_gate_record_violations(record: Mapping[str, Any]) -> Tuple[str, ...]
         violations.append("sequence_policy_consumer_gate_record_consumer_required_not_true")
     if record.get("read_only") is not True:
         violations.append("sequence_policy_consumer_gate_record_read_only_not_true")
+    violations.extend(_context_violations(_mapping(record.get("current_sequence_review_freshness"))))
     for flag in REQUIRED_POLICY_GATE_RECORD_FALSE_FLAGS:
         if record.get(flag) is not False:
             violations.append(f"sequence_policy_consumer_gate_record_{flag}_not_false")
@@ -398,8 +425,6 @@ def _eligible_lookup_keyed(
             "proposal_id",
             "source_idempotency_key",
             "policy_key",
-            "learning_scope",
-            "value_type",
         ):
             token = _string(record.get(key))
             if token:
@@ -453,6 +478,9 @@ def _consumer_records(
                 "target_policy_state": gate_record.get("target_policy_state"),
                 "sequence_policy_gate_status": gate_record.get(
                     "sequence_policy_gate_status"
+                ),
+                "current_sequence_review_freshness": gate_record.get(
+                    "current_sequence_review_freshness"
                 ),
                 "base_policy_score": base_score,
                 "sequence_policy_adjustment": sequence_policy_adjustment,

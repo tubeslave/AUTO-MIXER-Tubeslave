@@ -1076,6 +1076,141 @@ class TestWingDeploymentWriteBoundary:
         return json.loads(raw)
 
     @staticmethod
+    def _assert_quarantined_operator_correction(payload, method_id, blocked_actions):
+        correction = payload["operator_correction"]
+        assert correction["source_evidence"]["method_id"] == method_id
+        assert correction["read_only_or_dry_run_only"] is True
+        assert correction["live_apply_allowed"] is False
+        assert correction["queue_import_allowed"] is False
+        assert correction["proposed_correction"]["surface"] == payload["surface"]
+        assert correction["future_wing_readback_contract"]["required_before_live_promotion"] is True
+        assert correction["future_wing_readback_contract"]["blocked_live_actions"] == blocked_actions
+
+    @staticmethod
+    def _quarantined_operator_expectation(surface):
+        return {
+            "start_realtime_correction": (
+                "lufs_gain_staging",
+                ["preamp_gain_write", "input_trim_write", "gain_up_without_operator_opt_in"],
+            ),
+            "reset_trim": (
+                "lufs_gain_staging",
+                ["preamp_gain_write", "input_trim_write", "gain_up_without_operator_opt_in"],
+            ),
+            "start_realtime_fader": (
+                "auto_fader_v1",
+                ["unsupervised_fader_write", "fader_above_zero_dbfs"],
+            ),
+            "apply_auto_balance": (
+                "auto_fader_v1",
+                ["unsupervised_fader_write", "fader_above_zero_dbfs"],
+            ),
+            "set_eq": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "apply_eq_correction": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "reset_eq": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "reset_all_eq": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "apply_channel_correction": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "apply_all_corrections": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "set_compressor": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "start_auto_compressor": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "start_auto_compressor_soundcheck": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "start_auto_compressor_live": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "set_auto_compressor_profile": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "set_auto_compressor_manual": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "set_pan": ("auto_panner", ["pan_write", "stereo_width_write"]),
+            "apply_phase_corrections": (
+                "phase_alignment",
+                ["delay_write", "polarity_write"],
+            ),
+            "reset_phase_delay": (
+                "phase_alignment",
+                ["delay_write", "polarity_write"],
+            ),
+            "set_insert": (
+                "fx_direct_apply",
+                ["fx_parameter_write", "insert_bypass_write", "fx_rack_write"],
+            ),
+            "set_fx_model": (
+                "fx_direct_apply",
+                ["fx_parameter_write", "insert_bypass_write", "fx_rack_write"],
+            ),
+            "set_fx_on": (
+                "fx_direct_apply",
+                ["fx_parameter_write", "insert_bypass_write", "fx_rack_write"],
+            ),
+            "set_fx_mix": (
+                "fx_direct_apply",
+                ["fx_parameter_write", "insert_bypass_write", "fx_rack_write"],
+            ),
+            "set_fx_parameter": (
+                "fx_direct_apply",
+                ["fx_parameter_write", "insert_bypass_write", "fx_rack_write"],
+            ),
+            "voice_command:set_fader": (
+                "auto_fader_v1",
+                ["unsupervised_fader_write", "fader_above_zero_dbfs"],
+            ),
+            "voice_command:set_gain": (
+                "lufs_gain_staging",
+                ["preamp_gain_write", "input_trim_write", "gain_up_without_operator_opt_in"],
+            ),
+            "voice_command:set_pan": ("auto_panner", ["pan_write", "stereo_width_write"]),
+            "voice_command:load_snap": (
+                "scene_preset_management_proposal",
+                ["scene_load", "scene_save", "preset_load", "preset_save"],
+            ),
+            "voice_command:mute_channel": (
+                "mute_management_proposal",
+                ["mute_write", "unmute_write", "mute_group_write"],
+            ),
+            "voice_command:volume_up": (
+                "auto_fader_v1",
+                ["unsupervised_fader_write", "fader_above_zero_dbfs"],
+            ),
+            "voice_command:volume_down": (
+                "auto_fader_v1",
+                ["unsupervised_fader_write", "fader_above_zero_dbfs"],
+            ),
+            "voice_command:eq_on": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "voice_command:eq_band_up": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "voice_command:eq_band_down": ("auto_eq", ["eq_band_write", "eq_on_write"]),
+            "voice_command:compressor_on": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "voice_command:compressor_threshold": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "voice_command:compressor_gain_up": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+            "voice_command:compressor_gain_down": (
+                "auto_compressor",
+                ["compressor_write", "makeup_gain_write"],
+            ),
+        }.get(surface)
+
+    @staticmethod
     def _sequence_execution_payload(value_type, allowed_live_write_kinds=None):
         allowed_live_write_kinds = allowed_live_write_kinds or ["fader", "gain", "pan"]
         return {
@@ -1645,6 +1780,10 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "reset_trim"
+        self._assert_quarantined_operator_correction(
+            payload,
+            *self._quarantined_operator_expectation("reset_trim"),
+        )
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.send.assert_not_called()
 
@@ -1662,6 +1801,11 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "load_snap"
+        self._assert_quarantined_operator_correction(
+            payload,
+            "scene_preset_management_proposal",
+            ["scene_load", "scene_save", "preset_load", "preset_save"],
+        )
         server.mixer_client.load_snap.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1678,6 +1822,11 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "save_snap"
+        self._assert_quarantined_operator_correction(
+            payload,
+            "scene_preset_management_proposal",
+            ["scene_load", "scene_save", "preset_load", "preset_save"],
+        )
         server.mixer_client.save_snap.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1717,6 +1866,10 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "apply_eq_correction"
+        self._assert_quarantined_operator_correction(
+            payload,
+            *self._quarantined_operator_expectation("apply_eq_correction"),
+        )
         controller.apply_to_mixer.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1803,6 +1956,11 @@ class TestWingDeploymentWriteBoundary:
         assert payload["surface"] == "set_mute"
         assert payload["value_type"] == "mute"
         assert payload["requested_value"] is True
+        self._assert_quarantined_operator_correction(
+            payload,
+            "mute_management_proposal",
+            ["mute_write", "unmute_write", "mute_group_write"],
+        )
         server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1913,6 +2071,10 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "set_pan"
+        self._assert_quarantined_operator_correction(
+            payload,
+            *self._quarantined_operator_expectation("set_pan"),
+        )
         server.mixer_client.set_channel_pan.assert_not_called()
 
     @pytest.mark.asyncio
@@ -3114,6 +3276,10 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "set_eq"
+        self._assert_quarantined_operator_correction(
+            payload,
+            *self._quarantined_operator_expectation("set_eq"),
+        )
         server.mixer_client.set_eq_band.assert_not_called()
 
     @pytest.mark.asyncio
@@ -3133,6 +3299,10 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "set_compressor"
+        self._assert_quarantined_operator_correction(
+            payload,
+            *self._quarantined_operator_expectation("set_compressor"),
+        )
         server.mixer_client.set_compressor.assert_not_called()
 
     @pytest.mark.asyncio
@@ -3201,6 +3371,11 @@ class TestWingDeploymentWriteBoundary:
         assert result["status"] == "blocked"
         assert result["reason"] == "deployment_write_surface_quarantined"
         assert result["surface"] == surface
+        self._assert_quarantined_operator_correction(
+            result,
+            "routing_management_proposal",
+            ["routing_write", "bus_assignment_write", "matrix_write"],
+        )
         getattr(server.mixer_client, method_name).assert_not_called()
 
     @pytest.mark.asyncio
@@ -3265,6 +3440,10 @@ class TestWingDeploymentWriteBoundary:
         assert result["status"] == "blocked"
         assert result["reason"] == "deployment_write_surface_quarantined"
         assert result["surface"] == surface
+        self._assert_quarantined_operator_correction(
+            result,
+            *self._quarantined_operator_expectation(surface),
+        )
         getattr(server.mixer_client, method_name).assert_not_called()
 
     @pytest.mark.asyncio
@@ -3339,6 +3518,9 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == surface
+        expectation = self._quarantined_operator_expectation(surface)
+        if expectation:
+            self._assert_quarantined_operator_correction(payload, *expectation)
         server.mixer_client.send.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
@@ -3346,6 +3528,58 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_compressor.assert_not_called()
         server.mixer_client.set_channel_phase_invert.assert_not_called()
         server.mixer_client.set_channel_delay.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("surface", "result_type", "target_bus", "controller_method"),
+        [
+            (
+                "apply_system_measurement",
+                "system_measurement_apply_result",
+                "master",
+                "apply_corrections",
+            ),
+            (
+                "reset_system_measurement",
+                "system_measurement_reset_result",
+                "matrix",
+                "reset_corrections",
+            ),
+        ],
+    )
+    async def test_system_measurement_master_output_writes_are_quarantined_with_operator_contract(
+        self,
+        dummy_wing_server,
+        surface,
+        result_type,
+        target_bus,
+        controller_method,
+    ):
+        server = dummy_wing_server
+        server.system_measurement_controller = MagicMock()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        if surface == "apply_system_measurement":
+            await server.apply_system_measurement(websocket, target_bus=target_bus, target_id=1)
+        elif surface == "reset_system_measurement":
+            await server.reset_system_measurement(websocket, target_bus=target_bus, target_id=1)
+        else:
+            raise AssertionError(f"Unhandled surface {surface}")
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == result_type
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "deployment_write_surface_quarantined"
+        assert payload["surface"] == surface
+        assert payload["request"] == {"target_bus": target_bus, "target_id": 1}
+        self._assert_quarantined_operator_correction(
+            payload,
+            "master_bus_optimization_proposal",
+            ["master_bus_write", "limiter_write", "matrix_pa_feed_write"],
+        )
+        getattr(server.system_measurement_controller, controller_method).assert_not_called()
+        server.mixer_client.send.assert_not_called()
 
     def test_auto_compressor_reset_helper_is_fail_closed_evidence(self, dummy_wing_server):
         server = dummy_wing_server
@@ -3405,6 +3639,11 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "restore_snapshot"
+        self._assert_quarantined_operator_correction(
+            payload,
+            "scene_preset_management_proposal",
+            ["scene_load", "scene_save", "preset_load", "preset_save"],
+        )
         restore_helper.assert_not_called()
 
     @pytest.mark.asyncio
@@ -3420,6 +3659,10 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "blocked"
         assert payload["reason"] == "deployment_write_surface_quarantined"
         assert payload["surface"] == "start_realtime_correction"
+        self._assert_quarantined_operator_correction(
+            payload,
+            *self._quarantined_operator_expectation("start_realtime_correction"),
+        )
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.send.assert_not_called()
 
@@ -3464,6 +3707,11 @@ class TestWingDeploymentWriteBoundary:
         assert payload["surface"] == f"voice_command:{command['type']}"
         assert payload["manual_write_supervision"]["deployment_write_boundary_active"] is True
         assert payload["artifact_path"].startswith(str(tmp_path))
+        self._assert_quarantined_operator_correction(
+            payload,
+            *self._quarantined_operator_expectation(payload["surface"]),
+        )
+        assert payload["operator_correction"]["proposed_correction"]["request"] == command
         getattr(server.mixer_client, method_name).assert_not_called()
 
     @pytest.mark.asyncio

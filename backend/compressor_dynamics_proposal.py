@@ -17,6 +17,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.source_identity_downstream_gate import evaluate_source_identity_downstream_trust
 
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
+
 
 COMPRESSOR_METHOD_ID = "compressor_dynamics_proposal"
 COMPRESSOR_VERSION = "compressor_dynamics_proposal_v1"
@@ -32,6 +37,66 @@ MAX_RELEASE_MS = 1200.0
 MAX_MAKEUP_DB = 3.0
 TRUE_PEAK_MAKEUP_RESERVE_DB = 1.0
 HIGH_FEEDBACK_RISK = 0.45
+
+
+def _ordered_unique(values: Iterable[str]) -> Tuple[str, ...]:
+    ordered = []
+    seen = set()
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return tuple(ordered)
+
+
+def _dynamics_required_safety_checks() -> Dict[str, str]:
+    return {
+        "source_identity": "required_before_live_promotion",
+        "gain_reduction_review": "required_before_live_promotion",
+        "attack_release_bounds": "required_before_live_promotion",
+        "makeup_gain_headroom": "required_before_live_promotion",
+        "true_peak_headroom": "required_before_live_promotion",
+        "feedback_risk": "required_before_live_promotion",
+        "bypass_state_readback": "required_before_live_promotion",
+    }
+
+
+def _dynamics_rollback_expectation() -> Dict[str, Any]:
+    return {
+        "required_before_live_promotion": True,
+        "restore_previous_dynamics_values_after_physical_readback": True,
+        "restore_previous_bypass_state_after_physical_readback": True,
+        "manual_operator_rollback_required_if_promoted": True,
+    }
+
+
+def _dynamics_future_wing_readback_contract() -> Dict[str, Any]:
+    return {
+        "required": True,
+        "required_before_live_promotion": True,
+        "target_kind": "channel_dynamics",
+        "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+        "readback_targets": [
+            "dyn_on",
+            "threshold",
+            "ratio",
+            "attack",
+            "release",
+            "makeup_gain",
+            "gain_reduction_meter",
+            "bypass_state",
+        ],
+        "blocked_live_actions": [
+            "compressor_enable_write",
+            "compressor_parameter_write",
+            "compressor_write",
+            "makeup_gain_write",
+        ],
+        "requires_real_wing_proof": True,
+        "requires_operator_approval": True,
+        "requires_separate_non_fader_adr": True,
+    }
 
 
 @dataclass(frozen=True)
@@ -157,10 +222,149 @@ class CompressorRecommendation:
         payload["blockers"] = list(self.blockers)
         return payload
 
+    def operator_safety_blockers(self) -> Tuple[str, ...]:
+        return _ordered_unique(
+            (
+                "compressor_dynamics_live_apply_quarantined",
+                "unsupported_value_type:compressor",
+                "not_in_supervised_fader_gain_executor",
+                "real_wing_proof_required_before_live_apply",
+                "non_fader_live_expansion_requires_separate_adr",
+                "operator_approval_required_before_supervised_dynamics_apply",
+                "hardware_readback_and_rollback_not_proven",
+                *self.blockers,
+            )
+        )
+
+    def dynamics_safety_summary(self) -> Dict[str, Any]:
+        feedback_safety = dict(self.evidence.get("feedback_safety") or {})
+        source_identity = dict(
+            self.evidence.get("source_identity_downstream_trust") or {}
+        )
+        return {
+            "status": "passed" if not self.blockers else "blocked",
+            "channel_id": self.channel_id,
+            "source_family": self.source_family,
+            "threshold_db": self.threshold_db,
+            "ratio": self.ratio,
+            "attack_ms": self.attack_ms,
+            "release_ms": self.release_ms,
+            "knee_db": self.knee_db,
+            "makeup_gain_db": self.makeup_gain_db,
+            "requested_makeup_gain_db": self.evidence.get(
+                "requested_makeup_gain_db"
+            ),
+            "target_gain_reduction_db": self.target_gain_reduction_db,
+            "existing_gain_reduction_db": self.evidence.get(
+                "existing_gain_reduction_db"
+            ),
+            "makeup_gain_is_bounded_by_headroom": self.evidence.get(
+                "makeup_gain_is_bounded_by_headroom"
+            ),
+            "makeup_gain_headroom_reserve_db": self.evidence.get(
+                "makeup_gain_headroom_reserve_db"
+            ),
+            "true_peak_headroom_db": self.evidence.get("true_peak_headroom_db"),
+            "feedback_safety_status": feedback_safety.get("status"),
+            "feedback_risk": feedback_safety.get("feedback_risk"),
+            "feedback_blocks_makeup_gain": feedback_safety.get(
+                "blocks_makeup_gain"
+            ),
+            "current_dynamics_cache_freshness_status": self.evidence.get(
+                "current_state_cache_freshness_status"
+            ),
+            "current_dynamics_cache_no_live_authority": self.evidence.get(
+                "current_dynamics_cache_no_live_authority"
+            ),
+            "source_identity_trust_status": source_identity.get("status"),
+            "source_identity_usable_for_downstream": source_identity.get(
+                "usable_for_downstream"
+            ),
+            "required_safety_checks": _dynamics_required_safety_checks(),
+            "safety_blockers": list(self.operator_safety_blockers()),
+            "operator_explanation": (
+                "Compressor/Dynamics evidence is offline-only. Review the "
+                "crest factor, LRA, gain-reduction estimate, true-peak "
+                "headroom, feedback risk and source identity before any future "
+                "WING promotion."
+            ),
+            "rollback_expectation": _dynamics_rollback_expectation(),
+            "future_wing_readback_contract": (
+                _dynamics_future_wing_readback_contract()
+            ),
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "blockers": list(self.blockers),
+        }
+
     def to_operator_proposal(self) -> Dict[str, Any]:
         """Return a Product Layer style proposal without live-apply fields."""
 
-        return {
+        dynamics_safety_summary = self.dynamics_safety_summary()
+        blockers = list(self.operator_safety_blockers())
+        proposed_action = {
+            "action_type": self.action_type,
+            "threshold_db": self.threshold_db,
+            "ratio": self.ratio,
+            "attack_ms": self.attack_ms,
+            "release_ms": self.release_ms,
+            "knee_db": self.knee_db,
+            "makeup_gain_db": self.makeup_gain_db,
+            "target_gain_reduction_db": self.target_gain_reduction_db,
+            "required_safety_checks": dynamics_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": dynamics_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": dynamics_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "dynamics_safety_summary": dynamics_safety_summary,
+        }
+        evidence = {
+            **self.evidence,
+            "dynamics_safety_summary": dynamics_safety_summary,
+            "required_safety_checks": dynamics_safety_summary[
+                "required_safety_checks"
+            ],
+            "operator_explanation": dynamics_safety_summary[
+                "operator_explanation"
+            ],
+            "rollback_expectation": dynamics_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": dynamics_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+            "rollback_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        proposal = {
             "id": self.id,
             "method_id": COMPRESSOR_METHOD_ID,
             "source": COMPRESSOR_METHOD_ID,
@@ -172,24 +376,32 @@ class CompressorRecommendation:
             "severity": self.severity,
             "confidence": self.confidence,
             "queue_action": "not_queueable_until_promoted",
+            "live_write": False,
+            "queue_mutation": False,
             "can_import_to_queue": False,
             "can_apply_live": False,
-            "blockers": [
-                "unsupported_value_type:compressor",
-                "not_in_supervised_fader_gain_executor",
-                "hardware_readback_and_rollback_not_proven",
-                *self.blockers,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "safety_blockers": dynamics_safety_summary["safety_blockers"],
+            "operator_explanation": dynamics_safety_summary[
+                "operator_explanation"
             ],
-            "proposed_action": {
-                "action_type": self.action_type,
-                "threshold_db": self.threshold_db,
-                "ratio": self.ratio,
-                "attack_ms": self.attack_ms,
-                "release_ms": self.release_ms,
-                "knee_db": self.knee_db,
-                "makeup_gain_db": self.makeup_gain_db,
-                "target_gain_reduction_db": self.target_gain_reduction_db,
-            },
+            "required_safety_checks": dynamics_safety_summary[
+                "required_safety_checks"
+            ],
+            "rollback_expectation": dynamics_safety_summary[
+                "rollback_expectation"
+            ],
+            "future_wing_readback_contract": dynamics_safety_summary[
+                "future_wing_readback_contract"
+            ],
+            "proposed_action": proposed_action,
+            "dynamics_safety_summary": dynamics_safety_summary,
             "old_value": {
                 "source": DYNAMICS_READ_REQUIRED_SOURCE,
                 "required_before_apply": True,
@@ -198,16 +410,16 @@ class CompressorRecommendation:
                 "source": DYNAMICS_READ_REQUIRED_SOURCE,
                 "required_before_apply": True,
             },
-            "evidence": {
-                **self.evidence,
-                "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
-                "rollback_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
-                "live_write": False,
-                "queue_mutation": False,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
-            },
+            "evidence": evidence,
         }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=COMPRESSOR_METHOD_ID,
+            target=self.channel_id,
+            proposed_action=proposed_action,
+            blockers=blockers,
+        )
+        return proposal
 
 
 def _severity_from_score(score: float, blockers: Iterable[str] = ()) -> str:
@@ -366,25 +578,43 @@ def analyze_compressor_need(
         "peak_dbfs": round(peak_dbfs, 2),
         "lufs_short": round(_safe_float(analysis.lufs_short, -120.0), 2),
         "true_peak_headroom_db": round(headroom, 2),
+        "true_peak_headroom": round(headroom, 2),
         "feedback_risk": round(feedback_risk, 3),
         "feedback_safety": feedback_safety,
         "existing_gain_reduction_db": round(existing_gr, 2),
+        "gain_reduction_estimate": {
+            "existing_gain_reduction_db": round(existing_gr, 2),
+            "target_gain_reduction_db": round(target_gr, 1),
+            "status": "operator_review_required_before_live_promotion",
+        },
         "contribution_share": round(contribution, 3),
         "persistence_cycles": persistence,
         "transient_density": round(transient_density, 3),
         "loudness_stability": round(stability, 3),
         "current_state_cache_freshness_status": current_state_freshness_status,
         "current_state_cache_freshness": current_state_freshness,
+        "current_dynamics_cache_freshness": current_state_freshness,
         "current_dynamics_cache_no_live_authority": current_state_no_authority,
         "source_identity_downstream_trust": source_identity_trust.to_dict(),
+        "crest_factor": round(crest_factor, 2),
         "target_crest_factor_db": preset.target_crest_factor_db,
         "crest_factor_trigger_db": preset.crest_factor_trigger_db,
+        "loudness_range": round(lra_db, 2),
         "lra_trigger_db": preset.lra_trigger_db,
         "old_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
         "rollback_value_source": DYNAMICS_READ_REQUIRED_SOURCE,
+        "rollback_dynamics_readback": DYNAMICS_READ_REQUIRED_SOURCE,
+        "bypass_state": "readback_required_before_live_promotion",
         "transport_free": True,
         "makeup_gain_is_bounded_by_headroom": True,
         "makeup_gain_headroom_reserve_db": TRUE_PEAK_MAKEUP_RESERVE_DB,
+        "bounded_makeup_headroom": {
+            "requested_makeup_gain_db": round(requested_makeup, 1),
+            "makeup_gain_db": round(makeup, 1),
+            "true_peak_headroom_db": round(headroom, 2),
+            "reserve_db": TRUE_PEAK_MAKEUP_RESERVE_DB,
+            "bounded": True,
+        },
         "requested_makeup_gain_db": round(requested_makeup, 1),
         "makeup_gain_feedback_limited": feedback_blocks_makeup,
     }

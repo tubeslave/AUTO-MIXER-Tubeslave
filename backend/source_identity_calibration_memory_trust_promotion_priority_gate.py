@@ -324,6 +324,7 @@ def _priority_gate_record(record: Mapping[str, Any]) -> Dict[str, Any]:
         trust_state=record.get("target_trust_state"),
         trust_confidence=1.0,
         replay_outcome_count=1,
+        current_state_cache_freshness=record.get("current_state_cache_freshness"),
     )
     eligible = decision.usable_for_downstream and decision.status == "trusted"
     return {

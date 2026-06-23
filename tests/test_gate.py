@@ -17,6 +17,7 @@ from auto_gate_caig import (
     GateDecision,
     GateFeatures,
     GateSettings,
+    GATE_READ_REQUIRED_SOURCE,
     FeatureExtractor,
     AdaptiveThreshold,
     InstrumentGroup,
@@ -121,6 +122,20 @@ class FakeGateMixerClient:
         self.calls.append((channel_id, gain_db))
 
 
+def _assert_top_level_denial(result):
+    assert result["can_apply_live"] is False
+    assert result["can_import_to_queue"] is False
+    assert result["queue_import_allowed"] is False
+    assert result["live_apply_allowed"] is False
+    assert result["read_only_or_dry_run_only"] is True
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+    assert result["queue_action"] == "not_queueable_until_promoted"
+    assert result["live_write"] is False
+    assert result["queue_mutation"] is False
+    assert result["mutates_mixer"] is False
+
+
 class TestAutoGateControllerWritePolicy:
     """Tests that legacy CAIG mixer-client paths stay fail-closed."""
 
@@ -153,6 +168,82 @@ class TestAutoGateControllerWritePolicy:
         assert status["last_write_attempted"] is True
         assert status["last_write_blocked"] is True
         assert status["last_write_count"] == 0
+        result = status["last_apply_result"]
+        assert result["applied"] is False
+        assert result["blocked"] is True
+        assert result["reason"] == "auto_gate_caig_direct_apply_quarantined"
+        assert result["confidence"] == 0.0
+        assert result["confidence_basis"] == (
+            "legacy_caig_write_path_quarantined_without_fresh_readonly_gate_context"
+        )
+        _assert_top_level_denial(result)
+        assert result["blocked_call_count"] == 1
+        assert result["blocked_calls"][0]["cmd"] == "set_channel_gate"
+        correction = result["operator_correction"]
+        assert correction["objective_family"] == "gate_expander"
+        assert correction["future_wing_readback_contract"]["target_kind"] == "channel_gate"
+        assert correction["bounded_delta"]["action_type"] == "auto_gate_caig_write_blocked"
+        assert correction["bounded_delta"]["delta_db"] == -80.0
+        assert correction["bounded_delta"]["parameter_deltas"]["range_db"] == -80.0
+        assert correction["bounded_delta"]["parameter_deltas"]["hysteresis_db"] == 3.0
+        assert correction["bounded_delta"]["parameter_deltas"]["attack_ms"] == 0.05
+        assert correction["live_apply_allowed"] is False
+        assert correction["queue_import_allowed"] is False
+        assert "chatter_guard" in correction["headroom_feedback_true_peak_checks"][
+            "required_checks"
+        ]
+        assert "tails_and_attack" in correction["headroom_feedback_true_peak_checks"][
+            "required_checks"
+        ]
+        assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+            "current_gate_bleed_context_cache_no_live_authority"
+        ] is True
+        source_evidence = correction["source_evidence"]["evidence"]
+        _assert_top_level_denial(source_evidence)
+        assert source_evidence["confidence"] == 0.0
+        assert source_evidence["confidence_basis"] == result["confidence_basis"]
+        assert source_evidence["old_value_source"] == GATE_READ_REQUIRED_SOURCE
+        assert source_evidence["rollback_value_source"] == GATE_READ_REQUIRED_SOURCE
+        assert source_evidence["rollback_gate_readback"] == GATE_READ_REQUIRED_SOURCE
+        assert source_evidence["noise_floor"] == (
+            "not_measured_in_legacy_caig_write_path"
+        )
+        assert source_evidence["bleed_risk"] == (
+            "not_measured_in_legacy_caig_write_path"
+        )
+        assert source_evidence["quiet_words_tail_attack_preservation"][
+            "legacy_gate_write_quarantined"
+        ] is True
+        evidence_checks = correction["headroom_feedback_true_peak_checks"][
+            "evidence_checks"
+        ]
+        for key in (
+            "noise_floor",
+            "source_role",
+            "bleed_risk",
+            "current_gate_bleed_context_cache_freshness",
+            "current_gate_bleed_context_cache_no_live_authority",
+            "source_identity_downstream_trust",
+            "old_value_source",
+            "rollback_gate_readback",
+            "chatter_guard",
+            "hysteresis",
+            "tail_risk",
+            "quiet_words_tail_attack_preservation",
+        ):
+            assert evidence_checks[key] == source_evidence[key]
+        completeness = correction["source_evidence"]["evidence_completeness"]
+        assert completeness["status"] == "complete"
+        assert completeness["missing"] == []
+        assert correction["operator_proposal_review_gate"][
+            "evidence_gate_status"
+        ] == "required_evidence_complete_operator_review_still_required"
+        assert source_evidence["queue_import_allowed"] is False
+        assert source_evidence["live_apply_allowed"] is False
+        assert source_evidence["read_only_or_dry_run_only"] is True
+        assert "hardware_readback_and_rollback_not_proven" in correction[
+            "safety_blockers"
+        ]
 
     def test_direct_send_osc_call_is_quarantined(self):
         mixer = FakeGateMixerClient()
@@ -174,6 +265,16 @@ class TestAutoGateControllerWritePolicy:
         assert status["last_write_attempted"] is True
         assert status["last_write_blocked"] is True
         assert status["last_write_count"] == 0
+        result = status["last_apply_result"]
+        assert result["blocked"] is True
+        assert result["blocked_call_count"] == 1
+        _assert_top_level_denial(result)
+        assert result["operator_correction"]["objective_family"] == "gate_expander"
+        assert result["operator_correction"]["read_only_or_dry_run_only"] is True
+        assert result["operator_correction"]["live_apply_allowed"] is False
+        assert result["operator_correction"]["source_evidence"]["evidence"][
+            "rollback_gate_readback"
+        ] == GATE_READ_REQUIRED_SOURCE
 
 
 class TestFeatureExtraction:

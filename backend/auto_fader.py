@@ -32,8 +32,17 @@ from dataclasses import dataclass, field
 
 # Import LUFS components from existing module
 from lufs_gain_staging import LUFSMeter, TruePeakMeter, KWeightingFilter, AGCEnvelope
+try:
+    from processing_proposal_adapters import build_operator_correction_payload
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.processing_proposal_adapters import build_operator_correction_payload
 
 logger = logging.getLogger(__name__)
+
+AUTO_FADER_METHOD_ID = "auto_fader_v1"
+AUTO_FADER_READ_REQUIRED_SOURCE = (
+    "cached_or_physical_channel_fader_read_required_before_promotion"
+)
 
 class BalanceMode(Enum):
     """Режимы работы Auto Fader"""
@@ -1068,6 +1077,8 @@ class AutoFaderController:
         # Формат: {audio_ch: {'correction': float, 'integrated_lufs': float, 
         #           'target_lufs': float, 'locked': bool}}
         self.auto_balance_result: Dict[int, Any] = {}
+        self.last_auto_balance_apply_result: Optional[Dict[str, Any]] = None
+        self.last_realtime_fader_apply_result: Optional[Dict[str, Any]] = None
         
         self.auto_balance_pass = 0  # Номер текущего прохода (0 = не было, 1 = первый, 2 = второй)
         
@@ -1714,8 +1725,12 @@ class AutoFaderController:
                     max_fader = state.initial_fader_db + self.fader_range_db
                     target_fader_db = np.clip(target_fader_db, min_fader, max_fader)
                     
-                    # Также ограничиваем абсолютными пределами микшера
-                    target_fader_db = np.clip(target_fader_db, -60.0, 10.0)
+                    # Также ограничиваем абсолютными safety-пределами контроллера.
+                    target_fader_db = np.clip(
+                        target_fader_db,
+                        self.fader_floor_db,
+                        self.fader_ceiling_db,
+                    )
                     
                     # Применяем envelope для плавности
                     if audio_ch in self.envelopes:
@@ -1764,28 +1779,33 @@ class AutoFaderController:
                         'baseline_peak': float(state.baseline_peak)
                     }
                 
-                # Применяем обновления фейдеров (пропуск при freeze)
-                if fader_updates and self.mixer_client and not self.automation_frozen:
+                # Realtime fader changes stay as proposal-only evidence until
+                # real WING readback, rollback, and operator approval exist.
+                if fader_updates and not self.automation_frozen:
                     now = time.time()
                     for ch in list(self.channel_freeze_until.keys()):
                         if self.channel_freeze_until[ch] <= now:
                             del self.channel_freeze_until[ch]
-                    for mixer_ch, new_fader_db in fader_updates.items():
-                        if mixer_ch in self.channel_freeze_until and self.channel_freeze_until[mixer_ch] > time.time():
-                            continue
-                        try:
-                            if iteration % 50 == 0:
-                                logger.info(f"Setting fader: mixer_ch={mixer_ch}, dB={new_fader_db:.2f}")
-                            
-                            self.mixer_client.set_channel_fader(mixer_ch, new_fader_db)
-                            
-                            # Обновляем состояние для всех каналов с этим mixer_channel
-                            for audio_ch, state in self.channels.items():
-                                if state.mixer_channel == mixer_ch:
-                                    state.current_fader = new_fader_db
-                                
-                        except Exception as e:
-                            logger.error(f"Error setting fader for channel {mixer_ch}: {e}", exc_info=True)
+                    proposal_updates = {
+                        mixer_ch: new_fader_db
+                        for mixer_ch, new_fader_db in fader_updates.items()
+                        if not (
+                            mixer_ch in self.channel_freeze_until
+                            and self.channel_freeze_until[mixer_ch] > time.time()
+                        )
+                    }
+                    if proposal_updates:
+                        self.last_realtime_fader_apply_result = (
+                            self._realtime_fader_apply_denial(
+                                proposal_updates,
+                                levels_update,
+                                reason="auto_fader_v1_realtime_fader_apply_quarantined",
+                            )
+                        )
+                        logger.warning(
+                            "Realtime fader writes quarantined; %s moves kept as proposal evidence",
+                            self.last_realtime_fader_apply_result["blocked_call_count"],
+                        )
                 
                 # Отправляем обновление
                 if levels_update and self.on_levels_updated:
@@ -2175,104 +2195,411 @@ class AutoFaderController:
                 'result': result_dict
             })
     
-    def apply_auto_balance(self, **kwargs) -> bool:
-        """
-        Применение вычисленного Auto Balance к микшеру.
-        
-        Применяет точные коррекции по LUFS к фейдерам.
-        """
-        if not self.auto_balance_result:
-            logger.error("No auto balance result to apply")
-            return False
-        
-        if not self.mixer_client or not self.mixer_client.is_connected:
-            logger.error("Mixer not connected")
-            return False
-        
-        logger.info(f"Applying auto balance (pass {self.auto_balance_pass})...")
-        
-        applied_count = 0
-        applied_details = {}
-        
+    def _read_current_fader_for_proposal(self, state: ChannelFaderState) -> Tuple[float, str]:
+        current_db_value = None
+        if self.mixer_client and getattr(self.mixer_client, "is_connected", False):
+            try:
+                current_db_value = self.mixer_client.get_channel_fader(state.mixer_channel)
+            except Exception as exc:
+                logger.warning(
+                    "Channel %s: could not read fader for proposal evidence: %s",
+                    state.mixer_channel,
+                    exc,
+                )
+
+        if current_db_value is not None:
+            try:
+                current_db = float(current_db_value)
+                if current_db >= -100:
+                    return current_db, AUTO_FADER_READ_REQUIRED_SOURCE
+            except (TypeError, ValueError):
+                pass
+
+        if state.current_fader != 0.0 and abs(state.current_fader) < 100:
+            return float(state.current_fader), (
+                "cached_channel_fader_state_requires_physical_readback_before_promotion"
+            )
+        return 0.0, (
+            "default_channel_fader_zero_requires_physical_readback_before_promotion"
+        )
+
+    def _fader_balance_proposal(
+        self,
+        *,
+        reason: str,
+        audio_ch: int,
+        state: ChannelFaderState,
+        current_db: float,
+        target_db: float,
+        old_value_source: str,
+        semantic: str,
+        evidence_overrides: Optional[Dict[str, Any]] = None,
+        blocker_context: Optional[List[str]] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        bounded_delta_db = round(float(target_db) - float(current_db), 2)
+        evidence_overrides = evidence_overrides or {}
+        level_plane_summary = evidence_overrides.get("ayaic_level_plane", {
+            "ayaic_level_plane": False,
+            "status": "realtime_fader_rider_requires_offline_level_plane_review",
+            "read_only_or_dry_run_only": True,
+            "live_apply_allowed": False,
+            "queue_import_allowed": False,
+            "rollback_required_before_promotion": True,
+        })
+        action = {
+            "action_type": reason,
+            "channel": int(state.mixer_channel),
+            "audio_channel": int(audio_ch),
+            "target": int(state.mixer_channel),
+            "current_fader_db": float(current_db),
+            "target_fader_db": float(target_db),
+            "delta_db": float(bounded_delta_db),
+            "target_plane_lufs": evidence_overrides.get("target_plane_lufs"),
+            "integrated_lufs": evidence_overrides.get("integrated_lufs"),
+            "fader_ceiling_db": float(self.fader_ceiling_db),
+            "balance_method": evidence_overrides.get("balance_method"),
+            "instrument_key": evidence_overrides.get("instrument_key"),
+            "level_plane_group": evidence_overrides.get("level_plane_group"),
+        }
+        action = {key: value for key, value in action.items() if value is not None}
+        blocked_call = {
+            "cmd": "set_channel_fader",
+            "channel": int(state.mixer_channel),
+            "value_db": float(target_db),
+            "current_db": float(current_db),
+            "delta_db": float(bounded_delta_db),
+            "semantic": semantic,
+            "audio_channel": int(audio_ch),
+        }
+        blockers = [
+            "auto_fader_v1_direct_apply_quarantined",
+            "real_wing_proof_required_before_live_apply",
+            "operator_approval_required_before_supervised_fader_apply",
+            "hardware_readback_and_rollback_not_proven",
+        ] + list(blocker_context or [])
+        evidence = {
+            "blocked_call": blocked_call,
+            "current_fader_readback": {
+                "value_db": float(current_db),
+                "source": old_value_source,
+                "physical_readback_required_before_live_promotion": True,
+            },
+            "ayaic_level_plane": level_plane_summary,
+            "bounded_fader_delta": float(bounded_delta_db),
+            "true_peak_headroom": evidence_overrides.get(
+                "true_peak_headroom",
+                "required_before_apply",
+            ),
+            "feedback_risk": evidence_overrides.get(
+                "feedback_risk",
+                "required_before_apply",
+            ),
+            "fader_ceiling": float(self.fader_ceiling_db),
+            "rollback_fader_readback": {
+                "value_db": float(current_db),
+                "source": old_value_source,
+                "required_before_live_promotion": True,
+            },
+            "old_value_source": old_value_source,
+            "live_write": False,
+            "queue_mutation": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mutates_mixer": False,
+            "readback_required_before_promotion": True,
+            "rollback_required_before_promotion": True,
+        }
+        evidence.update({
+            key: value
+            for key, value in evidence_overrides.items()
+            if key not in {"ayaic_level_plane"}
+        })
+        proposal = {
+            "id": f"{AUTO_FADER_METHOD_ID}:ch{state.mixer_channel}:{semantic}",
+            "method_id": AUTO_FADER_METHOD_ID,
+            "source": AUTO_FADER_METHOD_ID,
+            "title": f"Ch {state.mixer_channel}: fader balance proposal",
+            "reason": (
+                "Auto Fader computed a bounded fader move from analysis evidence. "
+                "Direct apply is quarantined until real WING readback, rollback "
+                "and operator approval exist."
+            ),
+            "target": int(state.mixer_channel),
+            "kind": "fader_balance",
+            "severity": "medium" if bounded_delta_db > 0 else "low",
+            "confidence": evidence_overrides.get("confidence", 0.72),
+            "live_write": False,
+            "queue_mutation": False,
+            "queue_action": "not_queueable_until_promoted",
+            "can_import_to_queue": False,
+            "can_apply_live": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "mutates_mixer": False,
+            "blockers": blockers,
+            "proposed_action": action,
+            "evidence": evidence,
+        }
+        proposal["operator_correction"] = build_operator_correction_payload(
+            proposal=proposal,
+            method_id=AUTO_FADER_METHOD_ID,
+            target=int(state.mixer_channel),
+            proposed_action=action,
+            blockers=blockers,
+        )
+        return blocked_call, proposal
+
+    def _blocked_fader_result(
+        self,
+        *,
+        reason: str,
+        blocked_calls: List[Dict[str, Any]],
+        proposals: List[Dict[str, Any]],
+        preserved_field: str,
+    ) -> Dict[str, Any]:
+        return {
+            "applied": False,
+            "blocked": True,
+            "calls": [],
+            "blocked_calls": blocked_calls,
+            "blocked_call_count": len(blocked_calls),
+            "reason": reason,
+            "write_policy": "proposal_only_quarantined",
+            "live_write": False,
+            "queue_mutation": False,
+            "live_write_allowed": False,
+            "can_apply_live": False,
+            "can_import_to_queue": False,
+            "queue_import_allowed": False,
+            "live_apply_allowed": False,
+            "read_only_or_dry_run_only": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "queue_action": "not_queueable_until_promoted",
+            "mixer_client_present": self.mixer_client is not None,
+            "mutates_mixer": False,
+            "proposal_count": len(proposals),
+            "proposals": proposals,
+            "operator_corrections": [
+                proposal["operator_correction"] for proposal in proposals
+            ],
+            "operator_correction": (
+                proposals[0]["operator_correction"] if proposals else None
+            ),
+            preserved_field: True,
+        }
+
+    def _realtime_fader_apply_denial(
+        self,
+        fader_updates: Dict[int, float],
+        levels_update: Dict[int, Dict[str, Any]],
+        *,
+        reason: str,
+    ) -> Dict[str, Any]:
+        blocked_calls: List[Dict[str, Any]] = []
+        proposals: List[Dict[str, Any]] = []
+
+        for mixer_ch, target_db in fader_updates.items():
+            matching = [
+                (audio_ch, state)
+                for audio_ch, state in self.channels.items()
+                if state.mixer_channel == mixer_ch
+            ]
+            if not matching:
+                continue
+
+            audio_ch, state = matching[0]
+            current_db, old_value_source = self._read_current_fader_for_proposal(state)
+            metrics = levels_update.get(audio_ch, {})
+            true_peak = metrics.get("true_peak")
+            target_db = float(np.clip(target_db, self.fader_floor_db, self.fader_ceiling_db))
+            target_db = round(target_db * 20) / 20.0
+            evidence_overrides = {
+                "ayaic_level_plane": {
+                    "ayaic_level_plane": False,
+                    "status": "realtime_fader_rider_requires_offline_level_plane_review",
+                    "baseline_lufs": metrics.get("baseline_lufs"),
+                    "pre_fader_lufs": metrics.get("pre_fader_lufs"),
+                    "read_only_or_dry_run_only": True,
+                    "live_apply_allowed": False,
+                    "queue_import_allowed": False,
+                    "rollback_required_before_promotion": True,
+                },
+                "true_peak_headroom": {
+                    "current_true_peak_dbtp": true_peak,
+                    "status": "operator_review_required_before_apply",
+                },
+                "feedback_risk": "operator_feedback_check_required_before_apply",
+                "realtime_fader_evidence": {
+                    "baseline_lufs": metrics.get("baseline_lufs"),
+                    "baseline_peak": metrics.get("baseline_peak"),
+                    "pre_fader_lufs": metrics.get("pre_fader_lufs"),
+                    "current_fader": metrics.get("current_fader"),
+                    "target_fader": metrics.get("target_fader"),
+                    "correction": metrics.get("correction"),
+                    "fader_range": metrics.get("fader_range"),
+                    "instrument_type": metrics.get("instrument_type"),
+                    "bleed_ratio": metrics.get("bleed_ratio"),
+                    "bleed_source": metrics.get("bleed_source"),
+                },
+            }
+            blocked_call, proposal = self._fader_balance_proposal(
+                reason=reason,
+                audio_ch=audio_ch,
+                state=state,
+                current_db=current_db,
+                target_db=target_db,
+                old_value_source=old_value_source,
+                semantic="realtime_fader_adjustment_quarantined",
+                evidence_overrides=evidence_overrides,
+                blocker_context=["realtime_fader_apply_remains_proposal_only"],
+            )
+            blocked_calls.append(blocked_call)
+            proposals.append(proposal)
+
+        return self._blocked_fader_result(
+            reason=reason,
+            blocked_calls=blocked_calls,
+            proposals=proposals,
+            preserved_field="realtime_fader_result_preserved",
+        )
+
+    def _auto_balance_apply_denial(self, reason: str) -> Dict[str, Any]:
+        blocked_calls: List[Dict[str, Any]] = []
+        proposals: List[Dict[str, Any]] = []
+
         for audio_ch, result in self.auto_balance_result.items():
             if audio_ch not in self.channels:
                 continue
-            
+
             state = self.channels[audio_ch]
-            
-            # Пропускаем заблокированные каналы
-            if state.locked or result.get('locked', False):
-                logger.info(f"Channel {audio_ch} ({state.instrument_type}): LOCKED, skipping")
+            if state.locked or result.get("locked", False):
                 continue
-            
-            correction = result.get('correction', 0.0)
-            
-            try:
-                # Получаем текущий фейдер из микшера (в dB)
-                current_db_value = self.mixer_client.get_channel_fader(state.mixer_channel)
-                
-                if current_db_value is None:
-                    if state.current_fader != 0.0 and abs(state.current_fader) < 100:
-                        current_db = state.current_fader
-                        logger.warning(f"Channel {state.mixer_channel}: Could not read fader, using saved value {current_db:.1f} dB")
-                    else:
-                        current_db = 0.0
-                        logger.warning(f"Channel {state.mixer_channel}: Could not read fader, using default 0 dB")
-                else:
-                    current_db = float(current_db_value)
-                    if current_db < -100:
-                        if state.current_fader != 0.0 and abs(state.current_fader) < 100:
-                            current_db = state.current_fader
-                            logger.warning(f"Channel {state.mixer_channel}: Fader read as {current_db_value:.1f} dB (invalid), using saved value {current_db:.1f} dB")
-                        else:
-                            current_db = 0.0
-                            logger.warning(f"Channel {state.mixer_channel}: Fader read as {current_db_value:.1f} dB (invalid), using default 0 dB")
-                
-                new_db = current_db + correction
-                new_db = float(np.clip(new_db, self.fader_floor_db, self.fader_ceiling_db))
-                
-                # Округляем до 0.05 dB
-                new_db = round(new_db * 20) / 20.0
-                
-                if self.automation_frozen:
-                    continue
-                if state.mixer_channel in self.channel_freeze_until and self.channel_freeze_until[state.mixer_channel] > time.time():
-                    continue
-                self.mixer_client.set_channel_fader(state.mixer_channel, new_db)
-                
-                state.current_fader = new_db
-                applied_count += 1
-                
-                applied_details[int(audio_ch)] = {
-                    'mixer_channel': int(state.mixer_channel),
-                    'previous_db': float(current_db),
-                    'new_db': float(new_db),
-                    'applied_correction': float(correction)
-                }
-                
-                logger.info(f"Channel {state.mixer_channel} ({state.instrument_type}): "
-                           f"{current_db:.2f} -> {new_db:.2f} dB "
-                           f"(correction={correction:+.1f})")
-                
-            except Exception as e:
-                logger.error(f"Error applying balance to channel {state.mixer_channel}: {e}")
-        
-        logger.info(f"Auto balance applied to {applied_count} channels (pass {self.auto_balance_pass})")
+
+            correction = float(result.get("correction", 0.0))
+            current_db, old_value_source = self._read_current_fader_for_proposal(state)
+            target_db = float(np.clip(
+                current_db + correction,
+                self.fader_floor_db,
+                self.fader_ceiling_db,
+            ))
+            target_db = round(target_db * 20) / 20.0
+            target_lufs = result.get("target_lufs")
+            integrated_lufs = result.get("integrated_lufs")
+            level_plane_summary = {
+                "ayaic_level_plane": result.get("balance_method") == "level_plane",
+                "balance_method": result.get("balance_method"),
+                "instrument_key": result.get("instrument_key"),
+                "target_lufs": None if target_lufs is None else float(target_lufs),
+                "integrated_lufs": (
+                    None if integrated_lufs is None else float(integrated_lufs)
+                ),
+                "level_plane_offset_db": result.get("level_plane_offset_db"),
+                "level_plane_group": result.get("level_plane_group"),
+                "level_plane_group_trim_db": float(
+                    result.get("level_plane_group_trim_db", 0.0)
+                ),
+                "read_only_or_dry_run_only": True,
+                "live_apply_allowed": False,
+                "queue_import_allowed": False,
+                "rollback_required_before_promotion": True,
+            }
+            blocked_call, proposal = self._fader_balance_proposal(
+                reason=reason,
+                audio_ch=audio_ch,
+                state=state,
+                current_db=current_db,
+                target_db=target_db,
+                old_value_source=old_value_source,
+                semantic="auto_balance_apply_quarantined",
+                evidence_overrides={
+                    "ayaic_level_plane": level_plane_summary,
+                    "target_plane_lufs": level_plane_summary["target_lufs"],
+                    "integrated_lufs": level_plane_summary["integrated_lufs"],
+                    "balance_method": result.get("balance_method"),
+                    "instrument_key": result.get("instrument_key"),
+                    "level_plane_group": result.get("level_plane_group"),
+                },
+                blocker_context=["auto_balance_apply_remains_proposal_only"],
+            )
+            blocked_calls.append(blocked_call)
+            proposals.append(proposal)
+
+        return self._blocked_fader_result(
+            reason=reason,
+            blocked_calls=blocked_calls,
+            proposals=proposals,
+            preserved_field="auto_balance_result_preserved",
+        )
+
+    def apply_auto_balance(self, **kwargs) -> bool:
+        """
+        Quarantine Auto Balance apply into proposal-only evidence.
+
+        The current WING MVP has not proven real fader readback, rollback and
+        explicit operator approval. Preserve the computed balance result and
+        expose operator proposals instead of mutating mixer state.
+        """
+        if not self.auto_balance_result:
+            logger.error("No auto balance result to apply")
+            self.last_auto_balance_apply_result = {
+                "applied": False,
+                "blocked": True,
+                "reason": "missing_auto_balance_result",
+                "calls": [],
+                "blocked_calls": [],
+                "live_write": False,
+                "queue_mutation": False,
+                "can_apply_live": False,
+                "can_import_to_queue": False,
+                "queue_import_allowed": False,
+                "live_apply_allowed": False,
+                "read_only_or_dry_run_only": True,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+                "queue_action": "not_queueable_until_promoted",
+                "mutates_mixer": False,
+            }
+            return False
+
+        reason = kwargs.get(
+            "reason",
+            "auto_fader_v1_auto_balance_apply_quarantined",
+        )
+        self.last_auto_balance_apply_result = self._auto_balance_apply_denial(reason)
+        logger.warning(
+            "Auto Balance direct apply quarantined; %s fader moves kept as proposal evidence",
+            self.last_auto_balance_apply_result["blocked_call_count"],
+        )
         
         if self.on_status_update:
             self.on_status_update({
-                'type': 'auto_balance_applied',
-                'applied_count': applied_count,
+                'type': 'auto_balance_apply_blocked',
+                'status_type': 'blocked',
+                'reason': reason,
+                'blocked_call_count': self.last_auto_balance_apply_result[
+                    "blocked_call_count"
+                ],
+                'proposal_count': self.last_auto_balance_apply_result[
+                    "proposal_count"
+                ],
                 'total_count': len(self.auto_balance_result),
                 'pass_number': self.auto_balance_pass,
-                'details': applied_details
+                'read_only_or_dry_run_only': True,
+                'live_apply_allowed': False,
+                'queue_import_allowed': False,
             })
-        
-        # Очищаем результат после применения
-        self.auto_balance_result = {}
-        logger.info("Auto balance result cleared after apply (re-run LEARN for next pass)")
-        
-        return True
+
+        return False
     
     def cancel_auto_balance(self):
         """Отмена сбора Auto Balance"""
@@ -2574,6 +2901,8 @@ class AutoFaderController:
             'level_plane_two_pass_enabled': bool(self.level_plane_two_pass_enabled),
             'channels_count': int(len(self.channels)),
             'auto_balance_result': auto_balance_result,
+            'last_auto_balance_apply_result': self.last_auto_balance_apply_result,
+            'last_realtime_fader_apply_result': self.last_realtime_fader_apply_result,
             'auto_balance_pass': int(self.auto_balance_pass)
         }
     

@@ -22,6 +22,33 @@ from backend.processing_registry import (
 from backend.project_goal_capability_matrix import get_project_goal_capability
 
 
+def _sequence_context():
+    return {
+        "status": "fresh",
+        "field_count": 4,
+        "fresh_field_count": 4,
+        "read_only": True,
+        "live_write": False,
+        "apply_attempted": False,
+        "queries_console": False,
+        "queue_mutation": False,
+        "policy_mutation": False,
+    }
+
+
+def _unsafe_sequence_context():
+    context = _sequence_context()
+    context.update(
+        {
+            "status": "fresh",
+            "read_only": False,
+            "live_write": True,
+            "apply_attempted": True,
+        }
+    )
+    return context
+
+
 def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
     return {
         "sequence_policy_gate_record_id": (
@@ -34,6 +61,7 @@ def _eligible_gate_record(proposal_id="proposal-sequence-fader"):
         "policy_key": f"{proposal_id}/memory-write:{proposal_id}",
         "target_policy_state": "trusted_for_sequence_policy",
         "sequence_policy_gate_status": "trusted",
+        "current_sequence_review_freshness": _sequence_context(),
         "rollback_verified": True,
         "sequence_policy_eligible": True,
         "eligible_for_sequence_policy_consumer": True,
@@ -266,6 +294,12 @@ def test_sequence_policy_queue_ordering_plan_builds_records_without_mutation():
     assert ranked["proposal_id"] == "proposal-sequence-fader"
     assert ranked["planned_queue_index"] == 0
     assert ranked["rank_source"] == "sequence_policy_consumer"
+    assert ranked["source_idempotency_key"] == (
+        "memory-write:proposal-sequence-fader"
+    )
+    assert ranked["current_sequence_review_freshness"]["status"] == "fresh"
+    assert ranked["current_sequence_review_freshness"]["read_only"] is True
+    assert ranked["current_sequence_review_freshness"]["live_write"] is False
     assert ranked["operator_review_required"] is True
     assert ranked["operator_ack_required_before_queue_import"] is True
     assert ranked["operator_ack_required_before_sequence_execution"] is True
@@ -292,6 +326,60 @@ def test_sequence_policy_queue_ordering_plan_builds_records_without_mutation():
     assert unranked["proposal_id"] == "proposal-other"
     assert unranked["planned_queue_index"] == 1
     assert unranked["rank_source"] == "original_order"
+
+
+def test_sequence_policy_queue_ordering_plan_rejects_missing_sequence_context():
+    preview = _ordering_preview()
+    preview["ordered_proposals"][0].pop("current_sequence_review_freshness")
+
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan(
+            ordering_preview=preview,
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_ordering_plan_replacement_required"
+    )
+    assert plan["summary"]["queue_ordering_plan_record_count"] == 0
+    assert plan["summary"]["queue_import_allowed_by_plan"] is False
+    assert plan["summary"]["queue_reorder_allowed_by_plan"] is False
+    assert plan["summary"]["queue_mutation"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+    assert plan["queue_ordering_plan_records"] == []
+    assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview:"
+        "proposal-sequence-fader"
+    ) in plan["summary"]["invalid_record_ids"]
+
+
+def test_sequence_policy_queue_ordering_plan_rejects_live_authority_sequence_context():
+    preview = _ordering_preview()
+    preview["ordered_proposals"][0][
+        "current_sequence_review_freshness"
+    ] = _unsafe_sequence_context()
+
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan(
+            ordering_preview=preview,
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_ordering_plan_replacement_required"
+    )
+    assert plan["summary"]["queue_ordering_plan_record_count"] == 0
+    assert plan["summary"]["queue_import_allowed_by_plan"] is False
+    assert plan["summary"]["queue_reorder_allowed_by_plan"] is False
+    assert plan["summary"]["queue_mutation"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+    assert plan["queue_ordering_plan_records"] == []
+    assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview:"
+        "proposal-sequence-fader"
+    ) in plan["summary"]["invalid_record_ids"]
 
 
 def test_sequence_policy_queue_ordering_plan_rejects_forged_preview_authority():
@@ -324,6 +412,36 @@ def test_sequence_policy_queue_ordering_plan_rejects_forged_preview_authority():
         "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview:proposal-sequence-fader"
         in plan["summary"]["invalid_record_ids"]
     )
+
+
+def test_sequence_policy_queue_ordering_plan_rejects_forged_preview_identity():
+    preview = _ordering_preview()
+    preview["ordered_proposals"][0]["source_idempotency_key"] = (
+        "memory-write:proposal-other"
+    )
+
+    plan = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan(
+            ordering_preview=preview,
+        )
+    )
+
+    assert (
+        plan["status"]
+        == "sequence_memory_trust_promotion_queue_ordering_plan_replacement_required"
+    )
+    assert plan["summary"]["queue_ordering_plan_record_count"] == 0
+    assert plan["summary"]["queue_import_allowed_by_plan"] is False
+    assert plan["summary"]["queue_reorder_allowed_by_plan"] is False
+    assert plan["summary"]["queue_mutation"] is False
+    assert plan["summary"]["sequence_execution_allowed_by_plan"] is False
+    assert plan["summary"]["sequence_policy_change_allowed_by_plan"] is False
+    assert plan["summary"]["live_authority_granted"] is False
+    assert plan["queue_ordering_plan_records"] == []
+    assert (
+        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview:"
+        "proposal-sequence-fader"
+    ) in plan["summary"]["invalid_record_ids"]
 
 
 def test_sequence_policy_queue_ordering_plan_rejects_duplicate_rows():

@@ -48,6 +48,18 @@ def _freshness(status="fresh"):
     }
 
 
+def _assert_top_level_denial(payload):
+    assert payload["can_apply_live"] is False
+    assert payload["can_import_to_queue"] is False
+    assert payload["queue_import_allowed"] is False
+    assert payload["live_apply_allowed"] is False
+    assert payload["read_only_or_dry_run_only"] is True
+    assert payload["live_authority_granted"] is False
+    assert payload["readiness_closure_allowed"] is False
+    assert payload["queue_action"] == "not_queueable_until_promoted"
+    assert payload["mutates_mixer"] is False
+
+
 def test_feature_extractor_builds_level_spectral_dynamics_and_bleed_metrics():
     signal = _tone(120.0, amplitude=0.24) + _tone(4200.0, amplitude=0.04)
     peer = signal * 0.8 + _tone(900.0, amplitude=0.01)
@@ -354,8 +366,7 @@ def test_context_aware_gate_operator_proposal_is_not_queueable_or_live_apply():
 
     assert proposal["method_id"] == "context_aware_gate_agent"
     assert proposal["kind"] == "gate"
-    assert proposal["can_import_to_queue"] is False
-    assert proposal["can_apply_live"] is False
+    _assert_top_level_denial(proposal)
     assert "unsupported_value_type:gate" in proposal["blockers"]
     assert proposal["old_value"]["source"] == GATE_READ_REQUIRED_SOURCE
     assert proposal["rollback_value"]["source"] == GATE_READ_REQUIRED_SOURCE
@@ -368,6 +379,80 @@ def test_context_aware_gate_operator_proposal_is_not_queueable_or_live_apply():
     assert proposal["evidence"]["rollback_required_before_promotion"] is True
     assert proposal["evidence"]["live_write"] is False
     assert proposal["evidence"]["queue_mutation"] is False
+    summary = proposal["evidence"]["gate_safety_summary"]
+    assert summary == proposal["proposed_action"]["gate_safety_summary"]
+    assert summary["summary_type"] == "context_aware_gate_review"
+    assert summary["channel_id"] == 3
+    assert summary["hysteresis_db"] == proposal["proposed_action"]["params"][
+        "hysteresis_db"
+    ]
+    assert summary["chatter_guard_status"] in {"passed", "blocked"}
+    assert summary["source_identity_trust_status"] == "legacy_unverified"
+    assert summary["current_gate_bleed_context_cache_no_live_authority"] is True
+    _assert_top_level_denial(summary)
+    correction = proposal["operator_correction"]
+    assert correction["objective_family"] == "gate_expander"
+    assert correction["bounded_delta"]["delta_db"] == round(
+        proposal["proposed_action"]["params"]["range_db"],
+        1,
+    )
+    assert correction["bounded_delta"]["parameter_deltas"]["range_db"] == (
+        proposal["proposed_action"]["params"]["range_db"]
+    )
+    assert correction["bounded_delta"]["parameter_deltas"]["hysteresis_db"] == (
+        proposal["proposed_action"]["params"]["hysteresis_db"]
+    )
+    assert correction["future_wing_readback_contract"]["target_kind"] == (
+        "channel_gate_or_expander"
+    )
+    assert correction["future_wing_readback_contract"][
+        "required_before_live_promotion"
+    ] is True
+    assert correction["read_only_or_dry_run_only"] is True
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    assert "chatter_guard" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    assert "tails_and_attack" in correction["headroom_feedback_true_peak_checks"][
+        "required_checks"
+    ]
+    assert correction["headroom_feedback_true_peak_checks"]["evidence_checks"][
+        "current_gate_bleed_context_cache_no_live_authority"
+    ] is True
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["gate_safety_summary"] == summary
+    assert source_evidence["bleed_telemetry"]["channel_id"] == 3
+    assert source_evidence["bleed_telemetry"]["channel_label"] == "Snare Top"
+    assert source_evidence["quiet_words_tail_attack_preservation"] == summary[
+        "quiet_words_tail_attack_preservation"
+    ]
+    assert source_evidence["quiet_words_tail_attack_preservation"]["attack_ms"] == (
+        proposal["proposed_action"]["params"]["attack_ms"]
+    )
+    assert source_evidence["rollback_gate_readback"] == {
+        "channel_id": 3,
+        "mode": proposal["proposed_action"]["params"]["mode"],
+        "threshold_db": proposal["proposed_action"]["params"]["threshold_db"],
+        "range_db": proposal["proposed_action"]["params"]["range_db"],
+        "attack_ms": proposal["proposed_action"]["params"]["attack_ms"],
+        "hold_ms": proposal["proposed_action"]["params"]["hold_ms"],
+        "release_ms": proposal["proposed_action"]["params"]["release_ms"],
+        "hysteresis_db": proposal["proposed_action"]["params"]["hysteresis_db"],
+        "source": GATE_READ_REQUIRED_SOURCE,
+        "required_before_live_promotion": True,
+        "live_write": False,
+    }
+    completeness = correction["source_evidence"]["evidence_completeness"]
+    assert completeness["status"] == "complete"
+    assert completeness["missing"] == []
+    assert correction["operator_proposal_review_gate"]["evidence_gate_status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
+    assert source_evidence["current_gate_bleed_context_cache_no_live_authority"] is True
+    assert source_evidence["readback_required_before_promotion"] is True
+    assert source_evidence["rollback_required_before_promotion"] is True
 
 
 def test_context_aware_gate_chatter_guard_forces_expander_instead_of_hard_gate():
@@ -591,6 +676,7 @@ def test_context_aware_gate_contract_requires_freshness_and_source_identity():
     assert "current_gate_bleed_context_cache_no_live_authority" in evidence
     assert "source_identity_downstream_trust" in evidence
     assert "chatter_guard" in evidence
+    assert "quiet_words_tail_attack_preservation" in evidence
     assert "old_value_source" in evidence
     assert "rollback_gate_readback" in evidence
     assert contract["live_apply_allowed"] is False

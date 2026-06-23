@@ -1,7 +1,31 @@
 from pathlib import Path
 
-from auto_compressor import AutoCompressorController
+from auto_compressor import AutoCompressorController, DYNAMICS_READ_REQUIRED_SOURCE
 from auto_compressor_cf import AutoCFCompressorController, CFClass, CFCompressorParams
+
+
+def _assert_top_level_denial(result):
+    assert result["can_apply_live"] is False
+    assert result["can_import_to_queue"] is False
+    assert result["queue_import_allowed"] is False
+    assert result["live_apply_allowed"] is False
+    assert result["read_only_or_dry_run_only"] is True
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+    assert result["queue_action"] == "not_queueable_until_promoted"
+    assert result["live_write"] is False
+    assert result["queue_mutation"] is False
+    assert result["mutates_mixer"] is False
+
+
+def _assert_complete_evidence_gate(correction):
+    assert correction["source_evidence"]["evidence_completeness"]["status"] == (
+        "complete"
+    )
+    assert correction["source_evidence"]["evidence_completeness"]["missing"] == []
+    assert correction["evidence_gate"]["status"] == (
+        "required_evidence_complete_operator_review_still_required"
+    )
 
 
 class FakeCompressorMixer:
@@ -43,9 +67,39 @@ def test_auto_compressor_smooth_apply_is_fail_closed_evidence():
     assert result["reason"] == "auto_compressor_direct_apply_quarantined"
     assert result["write_policy"] == "proposal_only_quarantined"
     assert result["live_write_allowed"] is False
-    assert result["can_apply_live"] is False
+    _assert_top_level_denial(result)
     assert result["mixer_client_present"] is True
-    assert result["mutates_mixer"] is False
+    correction = result["operator_correction"]
+    assert correction["objective_family"] == "compressor_dynamics"
+    assert correction["future_wing_readback_contract"]["target_kind"] == "channel_dynamics"
+    assert correction["bounded_delta"]["action_type"] == "auto_compressor_apply_blocked"
+    assert correction["bounded_delta"]["delta_db"] == 1.5
+    assert correction["bounded_delta"]["parameter_deltas"]["threshold_db"] == -18.5
+    assert correction["bounded_delta"]["parameter_deltas"]["makeup_gain_db"] == 1.5
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    _assert_complete_evidence_gate(correction)
+    assert "hardware_readback_and_rollback_not_proven" in correction["safety_blockers"]
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["old_value_source"] == DYNAMICS_READ_REQUIRED_SOURCE
+    assert source_evidence["rollback_value_source"] == DYNAMICS_READ_REQUIRED_SOURCE
+    assert source_evidence["gain_reduction_estimate"]["status"] == (
+        "required_before_live_promotion"
+    )
+    assert source_evidence["target_gain_reduction_db"] is None
+    assert source_evidence["requested_makeup_gain_db"] == 1.5
+    assert source_evidence["makeup_headroom"]["makeup_gain_db"] == 1.5
+    assert source_evidence["true_peak_headroom"] == "required_before_live_promotion"
+    assert source_evidence["current_dynamics_cache_freshness"] == {
+        "status": "required_before_live_promotion",
+        "source": DYNAMICS_READ_REQUIRED_SOURCE,
+    }
+    assert source_evidence["current_dynamics_cache_no_live_authority"] is True
+    assert source_evidence["rollback_dynamics_readback"] == (
+        DYNAMICS_READ_REQUIRED_SOURCE
+    )
+    assert source_evidence["bypass_state"] == "readback_required_before_live_promotion"
     assert mixer.calls == []
     assert controller.current_params[3]["threshold"] == -18.5
     assert {
@@ -76,6 +130,7 @@ def test_auto_compressor_on_toggle_is_fail_closed():
     assert result["applied"] is False
     assert result["blocked"] is True
     assert result["reason"] == "auto_compressor_direct_apply_quarantined"
+    _assert_top_level_denial(result)
     assert mixer.calls == []
     assert result["blocked_calls"] == [
         {
@@ -85,6 +140,20 @@ def test_auto_compressor_on_toggle_is_fail_closed():
             "semantic": "soundcheck_clean_analysis_disable",
         }
     ]
+    correction = result["operator_correction"]
+    assert correction["objective_family"] == "compressor_dynamics"
+    assert correction["bounded_delta"]["action_type"] == "auto_compressor_on_toggle_blocked"
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    _assert_complete_evidence_gate(correction)
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    assert source_evidence["blocked_call_count"] == result["blocked_call_count"]
+    assert source_evidence["current_dynamics_cache_no_live_authority"] is True
+    assert source_evidence["rollback_dynamics_readback"] == (
+        DYNAMICS_READ_REQUIRED_SOURCE
+    )
+    assert source_evidence["bypass_state"] == "readback_required_before_live_promotion"
 
 
 def test_auto_cf_compressor_apply_params_is_fail_closed_evidence():
@@ -108,7 +177,41 @@ def test_auto_cf_compressor_apply_params_is_fail_closed_evidence():
     assert result["calls"] == []
     assert result["reason"] == "auto_cf_compressor_direct_apply_quarantined"
     assert result["write_policy"] == "proposal_only_quarantined"
-    assert result["mutates_mixer"] is False
+    _assert_top_level_denial(result)
+    correction = result["operator_correction"]
+    assert correction["objective_family"] == "compressor_dynamics"
+    assert correction["future_wing_readback_contract"]["target_kind"] == "channel_dynamics"
+    assert correction["bounded_delta"]["action_type"] == "auto_cf_compressor_apply_blocked"
+    assert correction["bounded_delta"]["delta_db"] == 1.0
+    assert correction["bounded_delta"]["parameter_deltas"]["threshold_db"] == -21.0
+    assert correction["bounded_delta"]["parameter_deltas"]["ratio"] == 4.0
+    assert correction["live_apply_allowed"] is False
+    assert correction["queue_import_allowed"] is False
+    _assert_complete_evidence_gate(correction)
+    source_evidence = correction["source_evidence"]["evidence"]
+    _assert_top_level_denial(source_evidence)
+    summary = result["cf_compressor_safety_summary"]
+    assert summary == source_evidence["cf_compressor_safety_summary"]
+    assert summary["summary_type"] == "auto_cf_compressor_fail_closed_review"
+    _assert_top_level_denial(summary)
+    assert summary["channel"] == 5
+    assert summary["blocked_call_count"] == 2
+    assert summary["threshold_db"] == -21.0
+    assert summary["ratio"] == 4.0
+    assert summary["makeup_gain_db"] == 1.0
+    assert summary["headroom_check"] == "required_before_apply"
+    assert summary["feedback_safety"] == "required_before_apply"
+    assert summary["true_peak_headroom"] == "required_before_apply"
+    assert summary["gain_reduction_review"] == "required_before_apply"
+    assert summary["makeup_gain_safety"] == "required_before_apply"
+    assert source_evidence["crest_factor_class"] == "drums"
+    assert source_evidence["lufs_lra_context"]["target_lufs"] == -18.0
+    assert source_evidence["gain_reduction_estimate"]["cf_db"] == 14.0
+    assert source_evidence["bounded_makeup_headroom"]["makeup_gain_db"] == 1.0
+    assert source_evidence["bypass_state"] == "readback_required_before_live_promotion"
+    assert summary["read_only_or_dry_run_only"] is True
+    assert summary["live_apply_allowed"] is False
+    assert summary["queue_import_allowed"] is False
     assert mixer.calls == []
     assert {
         "cmd": "set_compressor_on",
