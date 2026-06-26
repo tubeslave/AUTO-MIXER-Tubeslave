@@ -1,14 +1,27 @@
 import importlib.util
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 
 
 def load_online_soundcheck_module():
     spec = importlib.util.spec_from_file_location(
         "online_soundcheck_mix_module",
         Path(__file__).resolve().parents[1] / "tools" / "online_soundcheck_mix.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_channel_triggered_soundcheck_module():
+    spec = importlib.util.spec_from_file_location(
+        "channel_triggered_soundcheck_mix_module",
+        Path(__file__).resolve().parents[1] / "tools" / "channel_triggered_soundcheck_mix.py",
     )
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -47,3 +60,49 @@ def test_crossfade_stage_sequence_applies_stages_in_order():
     assert np.allclose(mixed[25], [1.0, 1.0], atol=1e-5)
     assert np.allclose(mixed[45], [2.0, 2.0], atol=1e-5)
     assert np.allclose(mixed[70], [3.0, 3.0], atol=1e-5)
+
+
+def test_channel_triggered_defaults_to_repa_song_desktop_folder():
+    mod = load_channel_triggered_soundcheck_module()
+
+    assert mod.default_repa_song_input_dir() == Path.home() / "Desktop" / "REPA Song"
+    assert mod.default_repa_song_output_path().name == "REPA Song_ONLINE_SOUNDCHECK_MIX.wav"
+
+
+def test_channel_triggered_export_audio_writes_pcm_wav(tmp_path):
+    mod = load_channel_triggered_soundcheck_module()
+    output = tmp_path / "render.wav"
+    audio = np.zeros((128, 2), dtype=np.float32)
+    audio[12, 0] = 0.25
+
+    mod.export_audio(output, audio, 48000)
+
+    info = sf.info(output)
+    assert info.samplerate == 48000
+    assert info.channels == 2
+    assert info.subtype == "PCM_24"
+
+
+def test_channel_triggered_snare_pair_safety_tucks_bottom_mic(tmp_path):
+    mod = load_channel_triggered_soundcheck_module()
+
+    @dataclass
+    class Plan:
+        path: Path
+        name: str
+        instrument: str
+        trim_db: float
+        fader_db: float
+
+    plans = {
+        13: Plan(tmp_path / "SNARE T.wav", "SNARE T", "snare", 7.0, 0.0),
+        14: Plan(tmp_path / "Snare B.wav", "Snare B", "snare", 7.0, 0.0),
+    }
+
+    report = mod.apply_snare_pair_mix_safety(plans)
+
+    assert report["enabled"] is True
+    assert plans[13].trim_db == 0.0
+    assert plans[13].fader_db == -1.0
+    assert plans[14].trim_db == -2.0
+    assert plans[14].fader_db == -12.0

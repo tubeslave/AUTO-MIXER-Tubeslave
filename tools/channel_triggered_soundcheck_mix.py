@@ -27,9 +27,21 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(BACKEND_DIR))
 
 from output_paths import ai_logs_path, ai_mixing_path, ensure_ai_output_dirs, ensure_parent_dir  # noqa: E402
+
+
+SUPPORTED_AUDIO_SUFFIXES = {".wav", ".wave"}
+
+
+def default_repa_song_input_dir() -> Path:
+    return Path.home() / "Desktop" / "REPA Song"
+
+
+def default_repa_song_output_path() -> Path:
+    return Path.home() / "Desktop" / "REPA Song_ONLINE_SOUNDCHECK_MIX.wav"
 
 
 def load_offline_mix_module():
@@ -143,7 +155,11 @@ def _collect_analysis_audio(
 
 
 def build_initial_plans(mixmod, input_dir: Path) -> tuple[int, int, dict[int, Any]]:
-    wavs = sorted(p for p in input_dir.glob("*.wav") if p.is_file())
+    wavs = sorted(
+        p
+        for p in input_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in SUPPORTED_AUDIO_SUFFIXES
+    )
     if not wavs:
         raise SystemExit(f"No WAV files found in {input_dir}")
 
@@ -617,8 +633,77 @@ def channel_report_for_plan(plan: Any) -> dict[str, Any]:
     }
 
 
-def export_mp3(output_path: Path, audio: np.ndarray, sr: int):
+def _snare_pair_role(plan: Any) -> str:
+    name = f"{plan.path.stem} {plan.name}".strip().lower().replace("_", " ")
+    if plan.instrument != "snare":
+        return ""
+    if any(token in name for token in (" snare b", "snare b ", "bottom", "bot")):
+        return "bottom"
+    if any(token in name for token in (" snare t", "snare t ", "top")):
+        return "top"
+    return "snare"
+
+
+def apply_snare_pair_mix_safety(plans: dict[int, Any]) -> dict[str, Any]:
+    snare_channels = {
+        channel: plan
+        for channel, plan in plans.items()
+        if getattr(plan, "instrument", "") == "snare"
+    }
+    if len(snare_channels) < 2:
+        return {
+            "enabled": False,
+            "reason": "snare_pair_not_detected",
+            "actions": [],
+        }
+
+    actions: list[dict[str, Any]] = []
+    for channel, plan in sorted(snare_channels.items()):
+        role = _snare_pair_role(plan)
+        before = {
+            "trim_db": round(float(plan.trim_db), 2),
+            "fader_db": round(float(plan.fader_db), 2),
+        }
+        if role == "bottom":
+            plan.trim_db = min(float(plan.trim_db), -2.0)
+            plan.fader_db = min(float(plan.fader_db), -12.0)
+            reason = "snare_bottom_is_wire_tone_not_second_full_snare_mic"
+        else:
+            plan.trim_db = min(float(plan.trim_db), 0.0)
+            plan.fader_db = min(float(plan.fader_db), -1.0)
+            reason = "snare_top_remains_main_mic_without_sparse_track_boost"
+        after = {
+            "trim_db": round(float(plan.trim_db), 2),
+            "fader_db": round(float(plan.fader_db), 2),
+        }
+        actions.append({
+            "channel": channel,
+            "file": plan.path.name,
+            "role": role or "top",
+            "before": before,
+            "after": after,
+            "reason": reason,
+        })
+
+    return {
+        "enabled": True,
+        "policy": (
+            "Treat snare top/bottom as one source pair: top is the main close mic, "
+            "bottom is tucked for wire tone, and sparse snare tracks cannot receive "
+            "independent large boost on both microphones."
+        ),
+        "actions": actions,
+    }
+
+
+def export_audio(output_path: Path, audio: np.ndarray, sr: int):
     output_path = ensure_parent_dir(output_path)
+    if output_path.suffix.lower() in {".wav", ".wave"}:
+        sf.write(output_path, audio, sr, subtype="PCM_24")
+        return
+    if output_path.suffix.lower() != ".mp3":
+        raise SystemExit(f"Unsupported output format: {output_path.suffix}. Use .wav or .mp3")
+
     tmp_wav = output_path.with_suffix(".wav")
     sf.write(tmp_wav, audio, sr, subtype="PCM_24")
     cmd = [
@@ -637,8 +722,8 @@ def export_mp3(output_path: Path, audio: np.ndarray, sr: int):
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input-dir", default=str(Path.home() / "Desktop" / "MIX"))
-    parser.add_argument("--output", default=str(ai_mixing_path("AUTO_MIX_AGENT_channel_triggered_soundcheck.mp3")))
+    parser.add_argument("--input-dir", default=str(default_repa_song_input_dir()))
+    parser.add_argument("--output", default=str(default_repa_song_output_path()))
     parser.add_argument("--report", default=str(ai_logs_path("AUTO_MIX_AGENT_channel_triggered_soundcheck_report.json")))
     parser.add_argument("--tempo-bpm", type=float, default=120.0)
     parser.add_argument("--use-llm", action="store_true")
@@ -714,6 +799,7 @@ def main() -> int:
         genre=args.genre,
         reference_context=reference_context,
     )
+    snare_pair_safety = apply_snare_pair_mix_safety(working_plans)
     final_plans = clone_plans(working_plans)
 
     baseline_rendered = render_channels(mixmod, baseline_plans, target_len, sr)
@@ -779,7 +865,7 @@ def main() -> int:
     )
 
     output = ensure_parent_dir(args.output)
-    export_mp3(output, mix, sr)
+    export_audio(output, mix, sr)
 
     meter = pyln.Meter(sr)
     final_lufs = None
@@ -828,6 +914,7 @@ def main() -> int:
         "kick_bass_hierarchy": kick_bass_hierarchy,
         "frequency_window_balance": frequency_window_balance,
         "stem_mix_verification": stem_mix_verification,
+        "snare_pair_safety": snare_pair_safety,
         "dynamic_vocal_priority": dynamic_vocal_priority,
         "fx": fx_report,
         "channel_analysis": channel_analysis_reports,
