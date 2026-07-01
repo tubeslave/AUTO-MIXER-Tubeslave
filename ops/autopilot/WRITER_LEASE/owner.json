@@ -1,9 +1,0 @@
-{
-  "owner": "Codex.app",
-  "created_at_utc": "2026-06-23T18:16:05Z",
-  "scope": "offline correction-method evidence-problem-correction-chain review surface",
-  "live_authority_granted": false,
-  "contacts_wing": false,
-  "contacts_backend": false,
-  "mutates_mixer": false
-}

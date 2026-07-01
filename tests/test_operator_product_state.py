@@ -11992,7 +11992,11 @@ def test_operator_analysis_records_shadow_gain_ride_traces_without_queue_mutatio
     assert report["shadow_gain_ride_trace_count"] == 1
     assert report["shadow_gain_rides"][0]["live_apply_allowed"] is False
     assert queue["summary"]["pending_count"] == 0
-    trace = traces["traces"][-1]
+    trace = next(
+        row
+        for row in traces["traces"]
+        if row.get("action_type") == "gain_ride_shadow"
+    )
     assert trace["action_type"] == "gain_ride_shadow"
     assert trace["proof_status"] == "shadow_only"
     assert trace["queue_action"] == "not_queueable_until_promoted"

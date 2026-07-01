@@ -4931,6 +4931,40 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("transport_free", "proposal_only", "current_decision_evidence_context_freshness_gate", "decision_evidence_packet", "no_live_writes"),
     ),
     ProcessingMethod(
+        id="smart_dsp_strategy_engine",
+        label="Smart DSP Strategy Engine",
+        domain="decision_evidence",
+        status="proposal_only",
+        summary=(
+            "Transport-free soundcheck/live-assist strategy search that compares "
+            "EQ, dynamic EQ, de-essing, gate/expander, FX, pan, gain/fader and "
+            "master-bus alternatives from offline audio evidence or typed "
+            "analysis inputs, then emits the safest operator-review proposal "
+            "without live writes."
+        ),
+        module="backend/smart_dsp_strategy_engine.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "smart_dsp_strategy_engine_needs_real_readback_rollback_replay_quality_"
+            "thresholds_operator_acceptance_and_separate_hardware_proof_before_apply"
+        ),
+        promotion_next=(
+            "run strategy-search proposals against soundcheck/live replay scenarios; "
+            "promote only bounded reviewed families after real WING readback and rollback proof"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "strategy_search",
+            "audio_evidence_extraction",
+            "soundcheck_live_assist",
+            "operator_review_required",
+            "no_live_writes",
+        ),
+    ),
+    ProcessingMethod(
         id="long_term_memory_learning_proposal",
         label="Long-Term Memory Learning Proposal Layer",
         domain="memory_learning",
@@ -5548,6 +5582,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "performance_adaptation_proposal",
             "arrangement_role_proposal",
             "decision_evidence_packet_proposal",
+            "smart_dsp_strategy_engine",
             "long_term_memory_learning_proposal",
             "agentic_method_foundation",
             "context_aware_gate_agent",
@@ -5574,6 +5609,7 @@ PIPELINE_PROFILES: Tuple[PipelineProfile, ...] = (
             "performance_adaptation_proposal",
             "arrangement_role_proposal",
             "decision_evidence_packet_proposal",
+            "smart_dsp_strategy_engine",
             "long_term_memory_learning_proposal",
             "agentic_method_foundation",
             "context_aware_gate_agent",
@@ -6596,6 +6632,11 @@ MODULE_STATUS_OVERRIDES: Dict[str, Dict[str, str]] = {
         "entrypoint": "decision_evidence_packet_proposal.analyze_decision_evidence_packet_need / build_decision_evidence_packet_proposals",
         "ui_surface": "Decision evidence, Safety Monitor, Task Queue review metadata",
         "next_step": "Attach fresh-context evidence packets to proposal and rejected shadow decisions; keep them non-queueable until replay learning proves value.",
+    },
+    "smart_dsp_strategy_engine": {
+        "entrypoint": "smart_dsp_evidence_extractor.build_smart_dsp_analysis_input_from_audio / smart_dsp_strategy_engine.analyze_smart_dsp_strategy / build_smart_dsp_strategy_proposals",
+        "ui_surface": "Channel Intelligence, Decision evidence, future Smart DSP review",
+        "next_step": "Replay soundcheck/live strategy-search scenarios and keep selected DSP strategies non-queueable until real readback, rollback, quality threshold and operator acceptance proof exist.",
     },
     "long_term_memory_learning_proposal": {
         "entrypoint": "long_term_memory_learning_proposal.analyze_long_term_memory_learning_need / build_long_term_memory_learning_proposals",

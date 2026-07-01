@@ -1,0 +1,573 @@
+{
+  "can_apply_live": false,
+  "can_import_to_queue": false,
+  "contacts_backend": false,
+  "contacts_wing": false,
+  "denial_reason": "smart_dsp_replay_evaluation_cannot_replace_real_wing_proof",
+  "failed_checks": [],
+  "failed_scenario_count": 0,
+  "future_wing_readback_required": true,
+  "generated_at_utc": "2026-06-24T20:42:00Z",
+  "hardware_proof_required_before_live": true,
+  "live_apply_allowed": false,
+  "live_authority_granted": false,
+  "live_write": false,
+  "method_id": "smart_dsp_strategy_engine",
+  "min_pass_rate": 1.0,
+  "mutates_console_state": false,
+  "mutates_mixer": false,
+  "operator_review_required": true,
+  "pass_rate": 1.0,
+  "passed_scenario_count": 12,
+  "queries_console": false,
+  "queue_import_allowed": false,
+  "read_only": true,
+  "read_only_or_dry_run_only": true,
+  "readiness_closure_allowed": false,
+  "results": [
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "low_mid_corrective_cut",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "high_pass_cleanup": [],
+        "low_mid_corrective_cut": []
+      },
+      "candidate_count": 2,
+      "description": "Muddy lead vocal should prefer a bounded low-mid corrective cut.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "low_mid_corrective_cut",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: muddy. Selected low_mid_corrective_cut because Low-mid buildup is the dominant evidence; a bounded cut fixes it fastest. Alternatives scored: high_pass_cleanup=0.80. Parameters: {'filter_type': 'peaking', 'frequency_hz': 260.0, 'gain_db': -3.2, 'q': 1.35}. Remaining blockers: none. Operator check: Listen for body loss and verify the band is not a feedback notch. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_muddy_vocal",
+      "selected_confidence": 0.847,
+      "selected_parameters": {
+        "filter_type": "peaking",
+        "frequency_hz": 260.0,
+        "gain_db": -3.2,
+        "q": 1.35
+      },
+      "selected_total_score": 0.842,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "de_esser",
+      "actual_selected_strategy_id": "vocal_de_esser",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "broad_presence_cut": [],
+        "presence_dynamic_eq_cut": [],
+        "vocal_de_esser": []
+      },
+      "candidate_count": 3,
+      "description": "Live sibilant vocal should prefer de-essing with no makeup gain.",
+      "expected_method_family": "de_esser",
+      "expected_selected_strategy_id": "vocal_de_esser",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: sibilant. Selected vocal_de_esser because Sibilance evidence is stronger than broad harshness; de-essing is narrower. Alternatives scored: presence_dynamic_eq_cut=0.82, broad_presence_cut=0.80. Parameters: {'frequency_hz': 7800.0, 'threshold_dbfs': -27.3, 'ratio': 3.0, 'max_gain_reduction_db': 5.1, 'makeup_gain_db': 0.0}. Remaining blockers: none. Operator check: Check consonants and air; do not remove intelligibility. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_sibilant_vocal",
+      "selected_confidence": 0.868,
+      "selected_parameters": {
+        "frequency_hz": 7800.0,
+        "makeup_gain_db": 0.0,
+        "max_gain_reduction_db": 5.1,
+        "ratio": 3.0,
+        "threshold_dbfs": -27.3
+      },
+      "selected_total_score": 0.878,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "dynamics",
+      "actual_selected_strategy_id": "gentle_channel_compression",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "fast_peak_clamp_compression": [
+          "limiter_style_channel_compression_requires_operator_review"
+        ],
+        "gentle_channel_compression": [],
+        "manual_level_ride_before_compression": []
+      },
+      "candidate_count": 3,
+      "description": "Dynamic vocal should prefer gentle compression over peak clamping.",
+      "expected_method_family": "dynamics",
+      "expected_selected_strategy_id": "gentle_channel_compression",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: dynamic_control. Selected gentle_channel_compression because Crest/LRA evidence shows performance-level dynamics; gentle compression controls jumps without using makeup as a headroom bypass. Alternatives scored: manual_level_ride_before_compression=0.77, fast_peak_clamp_compression=0.43. Parameters: {'threshold_dbfs': -22.8, 'ratio': 3.3, 'attack_ms': 14.0, 'release_ms': 110.0, 'knee_db': 4.0, 'target_gain_reduction_db': 2.6, 'makeup_gain_db': 1.0}. Remaining blockers: none. Operator check: Check gain reduction on loud phrases and verify makeup headroom. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_dynamic_vocal_compression",
+      "selected_confidence": 0.83,
+      "selected_parameters": {
+        "attack_ms": 14.0,
+        "knee_db": 4.0,
+        "makeup_gain_db": 1.0,
+        "ratio": 3.3,
+        "release_ms": 110.0,
+        "target_gain_reduction_db": 2.6,
+        "threshold_dbfs": -22.8
+      },
+      "selected_total_score": 0.813,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "gain_fader",
+      "actual_selected_strategy_id": "soundcheck_bounded_gain_up",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "avoid_tone_change_for_level_problem": [
+          "tone_change_does_not_match_level_plane_problem"
+        ],
+        "hold_for_level_plane_context": [
+          "level_plane_context_review_required"
+        ],
+        "soundcheck_bounded_gain_up": []
+      },
+      "candidate_count": 3,
+      "description": "Quiet soundcheck vocal should choose bounded gain-up over tone changes.",
+      "expected_method_family": "gain_fader",
+      "expected_selected_strategy_id": "soundcheck_bounded_gain_up",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: level_plane_balance. Selected soundcheck_bounded_gain_up because The source is below its Ayaic level plane; bounded gain-up may be the direct fix during soundcheck, but live mode must hold for review. Alternatives scored: hold_for_level_plane_context=0.48, avoid_tone_change_for_level_problem=0.33. Parameters: {'delta_db': 3.0, 'bounded_delta_db': 3.0, 'target_plane': 'ayaic_mix_monolith', 'current_minus_target_lu': -8.0, 'target_scope': 'source_and_summed_bus', 'future_fader_ceiling_dbfs': 0.0, 'gain_db': 3.0, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Verify source identity, bleed, feedback risk and true-peak headroom. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_quiet_vocal_level_plane_gain_up",
+      "selected_confidence": 0.841,
+      "selected_parameters": {
+        "bounded_delta_db": 3.0,
+        "current_minus_target_lu": -8.0,
+        "delta_db": 3.0,
+        "future_fader_ceiling_dbfs": 0.0,
+        "gain_db": 3.0,
+        "operator_confirmation_required": true,
+        "target_plane": "ayaic_mix_monolith",
+        "target_scope": "source_and_summed_bus"
+      },
+      "selected_total_score": 0.832,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "gain_fader",
+      "actual_selected_strategy_id": "level_plane_gain_down",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "avoid_tone_change_for_level_problem": [
+          "tone_change_does_not_match_level_plane_problem"
+        ],
+        "hold_for_level_plane_context": [
+          "level_plane_context_review_required"
+        ],
+        "level_plane_gain_down": []
+      },
+      "candidate_count": 3,
+      "description": "Loud live bass should choose conservative gain-down, not EQ.",
+      "expected_method_family": "gain_fader",
+      "expected_selected_strategy_id": "level_plane_gain_down",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: level_plane_balance. Selected level_plane_gain_down because The source is above its Ayaic level plane; gain-down is faster and safer than changing tone. Alternatives scored: hold_for_level_plane_context=0.56, avoid_tone_change_for_level_problem=0.43. Parameters: {'delta_db': -1.5, 'bounded_delta_db': 1.5, 'target_plane': 'ayaic_mix_monolith', 'current_minus_target_lu': 5.5, 'target_scope': 'source_and_summed_bus', 'future_fader_ceiling_dbfs': 0.0, 'gain_db': 0.0, 'operator_confirmation_required': False}. Remaining blockers: none. Operator check: Check the source in context and verify summed bus headroom. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_loud_bass_level_plane_gain_down",
+      "selected_confidence": 0.87,
+      "selected_parameters": {
+        "bounded_delta_db": 1.5,
+        "current_minus_target_lu": 5.5,
+        "delta_db": -1.5,
+        "future_fader_ceiling_dbfs": 0.0,
+        "gain_db": 0.0,
+        "operator_confirmation_required": false,
+        "target_plane": "ayaic_mix_monolith",
+        "target_scope": "source_and_summed_bus"
+      },
+      "selected_total_score": 0.882,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "subtractive_unmasking_eq_split",
+      "actual_status": "analysis_only",
+      "candidate_blockers": {
+        "avoid_tone_change_for_level_problem": [
+          "tone_change_does_not_match_level_plane_problem"
+        ],
+        "bus_level_plane_rebalance": [
+          "gain_up_requires_operator_confirmation",
+          "insufficient_true_peak_headroom_for_boost"
+        ],
+        "dynamic_ducking_proposal": [],
+        "hold_for_level_plane_context": [
+          "level_plane_context_review_required"
+        ],
+        "soundcheck_bounded_gain_up": [
+          "insufficient_true_peak_headroom_for_boost"
+        ],
+        "subtractive_unmasking_eq_split": []
+      },
+      "candidate_count": 6,
+      "description": "Kick/bass masking with low headroom must stay analysis-only.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "subtractive_unmasking_eq_split",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "true_peak_headroom_low"
+      ],
+      "operator_explanation": "Problem: masking. Selected subtractive_unmasking_eq_split because Subtractive EQ split reduces masking without adding gain. Alternatives scored: dynamic_ducking_proposal=0.77, soundcheck_bounded_gain_up=0.65, hold_for_level_plane_context=0.48, bus_level_plane_rebalance=0.41. Parameters: {'masked_source': 'ch:1', 'masker_role': 'bass', 'filter_type': 'peaking', 'frequency_hz': 82.0, 'gain_db': -3.0, 'q': 1.1, 'linked_counter_boost_db': 0.0}. Remaining blockers: true_peak_headroom_low. Operator check: Check the summed bus, not only the soloed source. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "kick_bass_masking_low_headroom",
+      "selected_confidence": 0.84,
+      "selected_parameters": {
+        "filter_type": "peaking",
+        "frequency_hz": 82.0,
+        "gain_db": -3.0,
+        "linked_counter_boost_db": 0.0,
+        "masked_source": "ch:1",
+        "masker_role": "bass",
+        "q": 1.1
+      },
+      "selected_total_score": 0.829,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "expander",
+      "actual_selected_strategy_id": "gentle_expander_bleed_control",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "fast_drum_gate": [
+          "gate_tail_or_chatter_risk_high"
+        ],
+        "gentle_expander_bleed_control": []
+      },
+      "candidate_count": 2,
+      "description": "Noisy tom with tail/chatter risk should select gentle expander.",
+      "expected_method_family": "expander",
+      "expected_selected_strategy_id": "gentle_expander_bleed_control",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: noisy_drum. Selected gentle_expander_bleed_control because Tail/chatter risk makes a gentle expander safer than a hard gate. Alternatives scored: fast_drum_gate=0.52. Parameters: {'threshold_dbfs': -41.0, 'range_db': -8.0, 'attack_ms': 4.0, 'hold_ms': 80.0, 'release_ms': 220.0, 'hysteresis_db': 3.0}. Remaining blockers: none. Operator check: Check sustain and quiet hits before accepting. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "noisy_tom_tail_risk",
+      "selected_confidence": 0.824,
+      "selected_parameters": {
+        "attack_ms": 4.0,
+        "hold_ms": 80.0,
+        "hysteresis_db": 3.0,
+        "range_db": -8.0,
+        "release_ms": 220.0,
+        "threshold_dbfs": -41.0
+      },
+      "selected_total_score": 0.802,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "fx",
+      "actual_selected_strategy_id": "reduce_fx_send_or_return",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "duck_fx_return": [],
+        "increase_fx_depth": [
+          "fx_increase_does_not_match_problem",
+          "fx_increase_monitor_or_return_risk"
+        ],
+        "reduce_fx_send_or_return": []
+      },
+      "candidate_count": 3,
+      "description": "Wet FX with monitor risk should reduce send/return, not increase FX.",
+      "expected_method_family": "fx",
+      "expected_selected_strategy_id": "reduce_fx_send_or_return",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: fx_intelligibility. Selected reduce_fx_send_or_return because Reducing wet level restores intelligibility and lowers feedback risk fastest. Alternatives scored: duck_fx_return=0.76, increase_fx_depth=0.05. Parameters: {'send_delta_db': -4.1, 'return_delta_db': -1.5, 'return_hpf_hz': 180.0, 'return_lpf_hz': 7600.0}. Remaining blockers: none. Operator check: Check vocal intelligibility and monitor sends. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "wet_fx_monitor_risk",
+      "selected_confidence": 0.842,
+      "selected_parameters": {
+        "return_delta_db": -1.5,
+        "return_hpf_hz": 180.0,
+        "return_lpf_hz": 7600.0,
+        "send_delta_db": -4.1
+      },
+      "selected_total_score": 0.833,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "pan",
+      "actual_selected_strategy_id": "center_hold_for_phase_safety",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "center_hold_for_phase_safety": [],
+        "phase_safe_pan_target": [
+          "phase_correlation_blocks_width",
+          "mono_sum_loss_blocks_width"
+        ]
+      },
+      "candidate_count": 2,
+      "description": "Unsafe mono/phase evidence should hold center instead of widening.",
+      "expected_method_family": "pan",
+      "expected_selected_strategy_id": "center_hold_for_phase_safety",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: pan_width. Selected center_hold_for_phase_safety because Keeping center is safer when phase or mono evidence is weak. Alternatives scored: phase_safe_pan_target=0.40. Parameters: {'target_pan_percent': 0.0, 'reason': 'phase_or_mono_safety_hold'}. Remaining blockers: none. Operator check: Re-check phase correlation before widening. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "pan_phase_mono_failure",
+      "selected_confidence": 0.836,
+      "selected_parameters": {
+        "reason": "phase_or_mono_safety_hold",
+        "target_pan_percent": 0.0
+      },
+      "selected_total_score": 0.822,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "master_bus",
+      "actual_selected_strategy_id": "master_trim_for_true_peak_headroom",
+      "actual_status": "proposal_only",
+      "candidate_blockers": {
+        "gentle_bus_compression": [
+          "master_bus_change_requires_pa_feed_safety"
+        ],
+        "master_trim_for_true_peak_headroom": []
+      },
+      "candidate_count": 2,
+      "description": "Master overload should restore headroom with trim before bus comp.",
+      "expected_method_family": "master_bus",
+      "expected_selected_strategy_id": "master_trim_for_true_peak_headroom",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: master_overload. Selected master_trim_for_true_peak_headroom because Master true peak is unsafe; trim restores headroom before tone shaping. Alternatives scored: gentle_bus_compression=0.46. Parameters: {'trim_delta_db': -1.3, 'limiter_ceiling_dbtp': -1.0, 'gain_db': 0.0}. Remaining blockers: none. Operator check: Confirm this is the PA feed, not a reference/capture feed. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "master_true_peak_overload",
+      "selected_confidence": 0.851,
+      "selected_parameters": {
+        "gain_db": 0.0,
+        "limiter_ceiling_dbtp": -1.0,
+        "trim_delta_db": -1.3
+      },
+      "selected_total_score": 0.848,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "high_pass_cleanup",
+      "actual_status": "analysis_only",
+      "candidate_blockers": {
+        "high_pass_cleanup": [],
+        "low_mid_corrective_cut": []
+      },
+      "candidate_count": 2,
+      "description": "Stale evidence must fail closed even when a useful strategy exists.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "high_pass_cleanup",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "smart_dsp_context_cache_not_fresh"
+      ],
+      "operator_explanation": "Problem: muddy. Selected high_pass_cleanup because High-pass cleanup is safer than boosting presence when low spill is present. Alternatives scored: low_mid_corrective_cut=0.84. Parameters: {'filter_type': 'high_pass', 'frequency_hz': 95.0, 'slope_db_per_octave': 12, 'gain_db': 0.0, 'q': 0.707}. Remaining blockers: smart_dsp_context_cache_not_fresh. Operator check: Check that the source still has enough fundamental weight. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "stale_context_blocks_strategy",
+      "selected_confidence": 0.822,
+      "selected_parameters": {
+        "filter_type": "high_pass",
+        "frequency_hz": 95.0,
+        "gain_db": 0.0,
+        "q": 0.707,
+        "slope_db_per_octave": 12
+      },
+      "selected_total_score": 0.799,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "high_pass_cleanup",
+      "actual_status": "analysis_only",
+      "candidate_blockers": {
+        "high_pass_cleanup": [],
+        "low_mid_corrective_cut": []
+      },
+      "candidate_count": 2,
+      "description": "Live-authority-tainted context must fail closed.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "high_pass_cleanup",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "smart_dsp_context_cache_live_authority_present"
+      ],
+      "operator_explanation": "Problem: muddy. Selected high_pass_cleanup because High-pass cleanup is safer than boosting presence when low spill is present. Alternatives scored: low_mid_corrective_cut=0.84. Parameters: {'filter_type': 'high_pass', 'frequency_hz': 95.0, 'slope_db_per_octave': 12, 'gain_db': 0.0, 'q': 0.707}. Remaining blockers: smart_dsp_context_cache_live_authority_present. Operator check: Check that the source still has enough fundamental weight. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_authority_context_blocks_strategy",
+      "selected_confidence": 0.822,
+      "selected_parameters": {
+        "filter_type": "high_pass",
+        "frequency_hz": 95.0,
+        "gain_db": 0.0,
+        "q": 0.707,
+        "slope_db_per_octave": 12
+      },
+      "selected_total_score": 0.799,
+      "status": "passed"
+    }
+  ],
+  "scenario_count": 12,
+  "schema": "automixer.smart_dsp_replay_evaluation.v1",
+  "status": "passed",
+  "version": "smart_dsp_replay_evaluation_v1"
+}

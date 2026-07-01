@@ -1,0 +1,45 @@
+{
+  "contacts_backend": false,
+  "contacts_wing": false,
+  "failed_checks": [],
+  "live_apply_allowed": false,
+  "live_authority_granted": false,
+  "live_write": false,
+  "method_review_card_count": 35,
+  "mutates_console_state": false,
+  "mutates_mixer": false,
+  "priority_decision_labels": [
+    "Gain / Trim and Fader / Balance",
+    "EQ and Compressor",
+    "Gate / Expander / De-esser",
+    "FX / Sends",
+    "Pan / Stereo",
+    "Routing / Groups / Scenes",
+    "Master / Output"
+  ],
+  "priority_decision_section_count": 7,
+  "priority_review_labels": [
+    "Gain / Trim and Fader / Balance",
+    "EQ and Compressor",
+    "Gate / Expander / De-esser",
+    "FX / Sends",
+    "Pan / Stereo",
+    "Routing / Groups / Scenes",
+    "Master / Output"
+  ],
+  "priority_review_summary_count": 7,
+  "queries_console": false,
+  "queue_import_allowed": false,
+  "read_only": true,
+  "readiness_closure_allowed": false,
+  "run_dir": "artifacts/correction_method_operator_review/20260624T074430Z_correction_method_operator_review",
+  "schema": "automixer.correction_method_operator_review_export_verification.v1",
+  "status": "passed",
+  "verified_artifacts": [
+    "goal-audit.json",
+    "goal-audit.md",
+    "operator-decision-template.json",
+    "operator-review.md",
+    "packet.json"
+  ]
+}

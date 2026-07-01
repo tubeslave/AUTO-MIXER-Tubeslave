@@ -1,0 +1,50 @@
+{
+  "blocked_by": [
+    "operator_must_capture_missing_physical_readback_artifacts"
+  ],
+  "commands": {
+    "focused_validation": [
+      "PYTHONPATH=backend",
+      "python3",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_read_surface_physical_readback_fixture_acceptance_template.py",
+      "tests/test_read_surface_physical_readback_fixture_acceptance_ledger.py"
+    ]
+  },
+  "executes_tests": false,
+  "execution_allowed_by_template": false,
+  "fixture_closure_allowed_by_template": false,
+  "full_autonomous_ready": false,
+  "generated_at": "2026-06-25T23:22:20Z",
+  "live_authority_granted": false,
+  "live_widening_allowed": false,
+  "live_write": false,
+  "mutates_console_state": false,
+  "operator_required": true,
+  "operator_sequence": [
+    "Confirm the artifact is a valid review candidate from the review queue.",
+    "Confirm candidate_trace still matches the review queue candidate.",
+    "Set decision to accepted or rejected after manual review.",
+    "Set reviewed_by and reviewed_at using a UTC ISO timestamp.",
+    "Keep all authority and fixture-closure flags false.",
+    "Run the fixture acceptance ledger before any separate closure decision."
+  ],
+  "queries_console": false,
+  "read_only": true,
+  "required_operator_edits": [
+    "decision",
+    "reviewed_by",
+    "reviewed_at",
+    "review_notes"
+  ],
+  "review_candidate_count": 0,
+  "selected_surface_id": null,
+  "source_queue_method_id": "read_surface_physical_readback_artifact_review_queue",
+  "source_queue_status": "operator_artifact_capture_required",
+  "status": "operator_candidate_missing",
+  "template_record_count": 0,
+  "template_records": [],
+  "type": "read_surface_physical_readback_fixture_acceptance_template"
+}

@@ -1,10 +1,25 @@
 import json
 from pathlib import Path
 
+from backend.autonomy_promotion_readiness import (
+    build_autonomy_promotion_readiness_snapshot,
+)
+from backend.wing_readonly_preflight_evidence import (
+    EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY,
+    build_wing_readonly_preflight_evidence,
+)
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+    WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+)
+from backend.wing_readonly_preflight_review_decision import (
+    build_wing_readonly_preflight_review_decision_ledger,
 )
 from tools import evaluate_supervised_proof_artifacts as report_tool
 
@@ -26,6 +41,155 @@ GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
     "unsafe_gain_up_followup_blocked",
     "gain_up_operator_authored_opt_in",
 ]
+
+
+def valid_wing_preflight_summary() -> dict:
+    return {
+        "run_id": "20260606T150000Z_wing_readonly_preflight",
+        "status": "passed",
+        "reason": "wing_readonly_preflight_passed",
+        "captured_at": "2026-06-07T01:00:00Z",
+        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_runner": "wing_readonly_preflight_runner",
+        "artifact_root": "artifacts/wing_readonly_preflight",
+        "connection_mode": "wing",
+        "channels": [3],
+        "operator_channel_confirmation_required": True,
+        "operator_confirmed_channels": [3],
+        "operator_session_confirmation_required": True,
+        "operator_confirmed_session_ready": True,
+        "value_types": ["fader", "gain", "pan"],
+        "require_physical_readback": True,
+        "request_id_policy": "required_for_every_query_mixer_parameter_response",
+        "expected_response_types_by_request_type": dict(
+            EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY
+        ),
+        "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_plan.json",
+        "expected_plan_sha256": "0" * 64,
+        "expected_plan_match": True,
+        "expected_plan_violations": [],
+        "expected_plan_required_for_real_run": True,
+        "physical_preflight_requires_existing_backend_connection": True,
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": PRESTART_BACKEND_PORT_CHECK_COMMAND,
+        "backend_port_prestart_check_command_text": (
+            PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
+        ),
+        "backend_port_prestart_check_failure_detail_fields": (
+            PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
+        ),
+        "backend_port_prestart_summary_required": True,
+        "backend_port_prestart_summary_path": "artifacts/no_wing_release_check/run/summary.json",
+        "backend_port_prestart_summary_sha256": "3" * 64,
+        "backend_port_prestart_summary_type": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
+        ),
+        "backend_port_prestart_summary_status": "passed",
+        "backend_port_prestart_summary_connection_policy": (
+            WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
+        ),
+        "backend_port_prestart_summary_read_only": True,
+        "backend_port_prestart_summary_live_write": False,
+        "backend_port_prestart_summary_contacts_backend": False,
+        "backend_port_prestart_summary_contacts_wing": False,
+        "backend_port_prestart_summary_mutates_console_state": False,
+        "backend_port_prestart_summary_queries_console": False,
+        "backend_port_prestart_summary_executes_tests": False,
+        "backend_port_prestart_check_status": "passed",
+        "artifact_manifest_verifier_must_pass_before_websocket": True,
+        "artifact_manifest_verifier_passed_before_websocket": True,
+        "artifact_manifest_verifier_websocket_opened_after_pass": True,
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: False
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: True
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
+        "read_only": True,
+        "live_write": False,
+        "write_request_sent": False,
+        "proposal_request_sent": False,
+        "sent_request_types": [
+            "get_operator_mode",
+            "get_state",
+            "query_mixer_parameter",
+            "query_mixer_parameter",
+            "query_mixer_parameter",
+        ],
+        "forbidden_request_types_sent": [],
+        "readback_count": 3,
+        "physical_readback_count": 3,
+        "readbacks": [
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:gain",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "gain",
+                "address": "/ch/3/in/set/trim",
+                "value": -0.25,
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:pan",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "pan",
+                "address": "/ch/3/pan",
+                "value": 0.0,
+            },
+        ],
+        "events_path": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T150000Z_wing_readonly_preflight/events.jsonl"
+        ),
+        "summary_path": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T150000Z_wing_readonly_preflight/summary.json"
+        ),
+    }
+
+
+def patch_report_tool_wing_preflight_candidate(monkeypatch) -> dict:
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(valid_wing_preflight_summary(),),
+        artifact_roots=(),
+    )
+    monkeypatch.setattr(
+        report_tool,
+        "build_autonomy_promotion_readiness_snapshot",
+        lambda: build_autonomy_promotion_readiness_snapshot(
+            wing_readonly_preflight_evidence_snapshot=evidence,
+        ),
+    )
+    monkeypatch.setattr(
+        report_tool,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: build_wing_readonly_preflight_review_decision_ledger(
+            preflight_evidence=evidence,
+            decision_roots=(),
+        ),
+    )
+    return evidence
 
 
 def write_summary(run_dir: Path, payload: dict) -> Path:
@@ -280,7 +444,11 @@ def test_exit_code_requires_minimum_physical_candidates(tmp_path: Path):
     assert report_tool.exit_code_for_report(report, min_promotion_candidates=1) == 2
 
 
-def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path: Path):
+def test_main_writes_report_and_returns_success_for_physical_candidate(
+    tmp_path: Path,
+    monkeypatch,
+):
+    patch_report_tool_wing_preflight_candidate(monkeypatch)
     write_summary(tmp_path / "physical", physical_summary())
     write_summary(tmp_path / "legacy", legacy_execute_wing_summary())
     output_path = tmp_path / "report.json"
@@ -314,9 +482,12 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     readiness = report["autonomy_promotion_readiness"]
     assert readiness["safety"]["live_write"] is False
     preflight = readiness["summary"]["wing_readonly_preflight_evidence"]
-    assert preflight["evidence_status"] == "operator_preflight_required"
-    assert preflight["readiness_update_candidate_available"] is False
-    assert "operator_must_run_wing_readonly_preflight_runner" in preflight["blocked_by"]
+    assert preflight["evidence_status"] == "readonly_preflight_candidate_available"
+    assert preflight["readiness_update_candidate_available"] is True
+    assert (
+        "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+        in preflight["blocked_by"]
+    )
     decision = report["wing_readonly_preflight_review_decision_ledger"]
     assert decision["safety"]["live_write"] is False
     assert decision["summary"]["accepted_record_count"] == 0
@@ -391,16 +562,16 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
     ]
     assert "Full Autonomous remains blocked" in gap_rollup["claim"]
     assert report["next_wing_proof_plan"]["safety"]["execution_allowed_by_plan"] is False
-    assert report["next_wing_proof_plan"]["status"] == "blocked_by_readonly_preflight"
+    assert report["next_wing_proof_plan"]["status"] == "manual_review_ready"
     assert report["next_wing_proof_plan"]["summary"]["planned_value_types"] == []
     assert report["next_wing_proof_plan"]["summary"]["step_count"] == 0
     assert report["next_wing_proof_plan"]["summary"]["readonly_preflight_required"] is True
     assert_prestart_backend_port_check(report["next_wing_proof_plan"]["summary"])
     assert (
         report["next_wing_proof_plan"]["summary"]["readonly_preflight_candidate_available"]
-        is False
+        is True
     )
-    assert report["next_wing_proof_plan"]["summary"]["readonly_preflight_step_count"] == 1
+    assert report["next_wing_proof_plan"]["summary"]["readonly_preflight_step_count"] == 0
     assert (
         report["next_wing_proof_plan"]["summary"][
             "readonly_preflight_review_decision_accepted"
@@ -413,16 +584,7 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
         ]
         == decision["status"]
     )
-    preflight_step = report["next_wing_proof_plan"]["readonly_preflight_steps"][0]
-    assert preflight_step["read_only"] is True
-    assert preflight_step["live_execution_required"] is False
-    assert preflight_step["execution_allowed_by_plan"] is False
-    assert preflight_step["command"][:2] == [
-        "python3",
-        "tools/wing_readonly_preflight_runner.py",
-    ]
-    assert "--require-physical-readback" in preflight_step["command"]
-    assert "--execute" not in preflight_step["command"]
+    assert report["next_wing_proof_plan"]["readonly_preflight_steps"] == []
     assert (
         report["next_wing_proof_plan"]["summary"]["readonly_preflight_evidence_status"]
         == preflight["evidence_status"]
@@ -432,12 +594,20 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(tmp_path:
         == preflight["blocked_by"]
     )
     assert (
-        "readonly_preflight_candidate_required_before_supervised_proof"
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in report["next_wing_proof_plan"]["summary"]["global_blockers"]
+    )
+    assert (
+        "operator_must_record_readonly_preflight_review_decision"
         in report["next_wing_proof_plan"]["summary"]["global_blockers"]
     )
 
 
-def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(tmp_path: Path):
+def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(
+    tmp_path: Path,
+    monkeypatch,
+):
+    patch_report_tool_wing_preflight_candidate(monkeypatch)
     write_summary(tmp_path / "timeout_after_apply", timeout_after_apply_summary())
     write_summary(tmp_path / "timeout_before_apply", timeout_before_apply_summary())
     output_path = tmp_path / "report.json"
@@ -482,10 +652,14 @@ def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(
     ]
     assert "blocked_artifacts_for_value_type" in fader_row["blockers"]
     assert "physical_candidate_missing" in fader_row["blockers"]
-    assert report["next_wing_proof_plan"]["status"] == "blocked_by_readonly_preflight"
+    assert report["next_wing_proof_plan"]["status"] == "manual_review_ready"
     assert report["next_wing_proof_plan"]["summary"]["step_count"] == 0
     assert_prestart_backend_port_check(report["next_wing_proof_plan"]["summary"])
     assert (
-        "readonly_preflight_candidate_required_before_supervised_proof"
+        "accepted_readonly_preflight_review_decision_required_before_supervised_proof"
+        in report["next_wing_proof_plan"]["summary"]["global_blockers"]
+    )
+    assert (
+        "operator_must_record_readonly_preflight_review_decision"
         in report["next_wing_proof_plan"]["summary"]["global_blockers"]
     )

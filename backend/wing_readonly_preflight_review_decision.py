@@ -27,6 +27,7 @@ try:
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
@@ -52,6 +53,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
         WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
         WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
         wing_readonly_preflight_accepted_candidate_artifact_root_contract,
@@ -87,6 +89,9 @@ REVIEW_DECISION_PRESTART_PROOF_FIELDS = tuple(
 )
 DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS = (
     "artifacts/wing_readonly_preflight_review_decisions",
+)
+AUTO_DISCOVERY_IGNORED_DECISION_FILENAMES = (
+    Path(WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT).name,
 )
 UNSAFE_DECISION_FLAGS = (
     "live_write",
@@ -169,7 +174,12 @@ def _discover_decision_paths(decision_roots: Iterable[str | Path] | None) -> Tup
             paths.append(root)
         if not root.is_dir():
             continue
-        paths.extend(path for path in root.rglob("*.json") if path.is_file())
+        paths.extend(
+            path
+            for path in root.rglob("*.json")
+            if path.is_file()
+            and path.name not in AUTO_DISCOVERY_IGNORED_DECISION_FILENAMES
+        )
     return tuple(sorted(dict.fromkeys(paths), key=lambda path: str(path)))
 
 

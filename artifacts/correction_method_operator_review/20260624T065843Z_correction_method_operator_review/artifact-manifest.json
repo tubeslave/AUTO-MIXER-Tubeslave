@@ -1,0 +1,658 @@
+{
+  "artifact_root": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/correction_method_operator_review/20260624T065843Z_correction_method_operator_review",
+  "artifacts": [
+    {
+      "artifact_id": "packet_json",
+      "bytes": 4789070,
+      "path": "packet.json",
+      "sha256": "da3b480c9161d60f6c03ceae6782b531b48c69ab15e66fd615e1364e485a2cb2"
+    },
+    {
+      "artifact_id": "operator_review_markdown",
+      "bytes": 2494617,
+      "path": "operator-review.md",
+      "sha256": "e5128422ae0d2c23918d5bc2263bdfdd1b82587694eab068eb8f8eda1307b8a1"
+    },
+    {
+      "artifact_id": "operator_decision_template",
+      "bytes": 2633295,
+      "path": "operator-decision-template.json",
+      "sha256": "6b1c7f8242bdeccc03f6b0e781a69fba23d80e53dd1485605dbd2da773aec23c"
+    }
+  ],
+  "contacts_backend": false,
+  "contacts_wing": false,
+  "denial_reason": "operator_review_packet_cannot_replace_real_wing_proof",
+  "future_wing_readback_required": true,
+  "generated_at_utc": "2026-06-24T06:58:43Z",
+  "hardware_proof_required_before_live": true,
+  "live_apply_allowed": false,
+  "live_authority_granted": false,
+  "live_write": false,
+  "mutates_console_state": false,
+  "mutates_mixer": false,
+  "operator_decision_template_schema": "automixer.correction_method_operator_decision_template.v1",
+  "operator_decision_template_status": "operator_review_template_pending_proposal_only",
+  "operator_decision_template_summary": {
+    "can_authorize_live": false,
+    "contacts_backend": false,
+    "contacts_wing": false,
+    "denial_reason": "operator_decision_template_cannot_authorize_live_or_close_readiness",
+    "future_wing_readback_required": true,
+    "hardware_proof_required_before_live": true,
+    "live_apply_allowed": false,
+    "live_authority_granted": false,
+    "live_write": false,
+    "method_decision_count": 35,
+    "mutates_console_state": false,
+    "mutates_mixer": false,
+    "operator_completion_requires": [
+      "review_packet_json",
+      "operator_review_markdown",
+      "verification_report_passed",
+      "explicit_offline_decision_per_priority_section",
+      "explicit_offline_decision_per_method",
+      "future_real_wing_readback_before_live_promotion"
+    ],
+    "operator_review_required": true,
+    "priority_bounded_delta_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_bounded_delta_policy_counts": {
+      "1": 4,
+      "2": 3,
+      "3": 2,
+      "4": 2,
+      "5": 1,
+      "6": 3,
+      "7": 1
+    },
+    "priority_confidence_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_decision_labels": [
+      "Gain / Trim and Fader / Balance",
+      "EQ and Compressor",
+      "Gate / Expander / De-esser",
+      "FX / Sends",
+      "Pan / Stereo",
+      "Routing / Groups / Scenes",
+      "Master / Output"
+    ],
+    "priority_decision_section_count": 7,
+    "priority_evidence_problem_correction_chain_detail_counts": {
+      "1": 6,
+      "2": 6,
+      "3": 6,
+      "4": 6,
+      "5": 6,
+      "6": 6,
+      "7": 6
+    },
+    "priority_future_live_requirement_detail_counts": {
+      "1": 44,
+      "2": 36,
+      "3": 25,
+      "4": 22,
+      "5": 10,
+      "6": 32,
+      "7": 11
+    },
+    "priority_future_wing_readback_contract_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_future_wing_readback_contract_summary_counts": {
+      "1": 23,
+      "2": 19,
+      "3": 12,
+      "4": 10,
+      "5": 7,
+      "6": 17,
+      "7": 6
+    },
+    "priority_goal_requirement_detail_counts": {
+      "1": 11,
+      "2": 11,
+      "3": 11,
+      "4": 11,
+      "5": 11,
+      "6": 11,
+      "7": 11
+    },
+    "priority_headroom_feedback_true_peak_check_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_headroom_feedback_true_peak_check_detail_counts": {
+      "1": 9,
+      "2": 9,
+      "3": 7,
+      "4": 7,
+      "5": 3,
+      "6": 7,
+      "7": 5
+    },
+    "priority_live_authority_boundary_summary_counts": {
+      "1": 7,
+      "2": 7,
+      "3": 7,
+      "4": 7,
+      "5": 7,
+      "6": 7,
+      "7": 7
+    },
+    "priority_measured_or_audible_problem_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_method_decision_counts": {
+      "1": 6,
+      "2": 7,
+      "3": 3,
+      "4": 3,
+      "5": 2,
+      "6": 4,
+      "7": 1
+    },
+    "priority_operator_acceptance_gate_detail_counts": {
+      "1": 10,
+      "2": 10,
+      "3": 10,
+      "4": 10,
+      "5": 10,
+      "6": 10,
+      "7": 10
+    },
+    "priority_operator_evidence_required_field_counts": {
+      "1": 38,
+      "2": 44,
+      "3": 31,
+      "4": 19,
+      "5": 15,
+      "6": 36,
+      "7": 16
+    },
+    "priority_operator_method_review_focus_counts": {
+      "1": 38,
+      "2": 34,
+      "3": 21,
+      "4": 20,
+      "5": 13,
+      "6": 27,
+      "7": 11
+    },
+    "priority_operator_next_action_detail_counts": {
+      "1": 16,
+      "2": 15,
+      "3": 9,
+      "4": 9,
+      "5": 6,
+      "6": 12,
+      "7": 5
+    },
+    "priority_operator_payload_required_field_counts": {
+      "1": 47,
+      "2": 47,
+      "3": 47,
+      "4": 47,
+      "5": 47,
+      "6": 47,
+      "7": 47
+    },
+    "priority_operator_problem_review_summary_counts": {
+      "1": 6,
+      "2": 6,
+      "3": 6,
+      "4": 6,
+      "5": 6,
+      "6": 6,
+      "7": 6
+    },
+    "priority_operator_readable_explanation_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_operator_review_checklist_detail_counts": {
+      "1": 7,
+      "2": 7,
+      "3": 7,
+      "4": 7,
+      "5": 7,
+      "6": 7,
+      "7": 7
+    },
+    "priority_operator_review_decision_option_detail_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_operator_review_record_field_detail_counts": {
+      "1": 23,
+      "2": 23,
+      "3": 23,
+      "4": 23,
+      "5": 23,
+      "6": 23,
+      "7": 23
+    },
+    "priority_operator_review_record_required_field_counts": {
+      "1": 23,
+      "2": 23,
+      "3": 23,
+      "4": 23,
+      "5": 23,
+      "6": 23,
+      "7": 23
+    },
+    "priority_operator_visible_explanation_contract_counts": {
+      "1": 11,
+      "2": 11,
+      "3": 11,
+      "4": 11,
+      "5": 11,
+      "6": 11,
+      "7": 11
+    },
+    "priority_proposed_correction_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_required_confirmation_detail_counts": {
+      "1": 10,
+      "2": 10,
+      "3": 10,
+      "4": 10,
+      "5": 10,
+      "6": 10,
+      "7": 10
+    },
+    "priority_required_evidence_counts": {
+      "1": 38,
+      "2": 44,
+      "3": 31,
+      "4": 19,
+      "5": 15,
+      "6": 36,
+      "7": 16
+    },
+    "priority_required_safety_check_counts": {
+      "1": 9,
+      "2": 9,
+      "3": 7,
+      "4": 7,
+      "5": 3,
+      "6": 7,
+      "7": 5
+    },
+    "priority_rollback_expectation_counts": {
+      "1": 4,
+      "2": 3,
+      "3": 2,
+      "4": 2,
+      "5": 1,
+      "6": 3,
+      "7": 1
+    },
+    "priority_rollback_readback_contract_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_safety_blocker_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_safety_blocker_detail_counts": {
+      "1": 17,
+      "2": 15,
+      "3": 11,
+      "4": 12,
+      "5": 5,
+      "6": 17,
+      "7": 8
+    },
+    "priority_source_evidence_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_source_evidence_detail_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_test_evidence_counts": {
+      "1": 4,
+      "2": 4,
+      "3": 4,
+      "4": 4,
+      "5": 4,
+      "6": 4,
+      "7": 4
+    },
+    "priority_test_evidence_reference_counts": {
+      "1": 9,
+      "2": 9,
+      "3": 6,
+      "4": 5,
+      "5": 5,
+      "6": 6,
+      "7": 4
+    },
+    "priority_why_blocked_summary_counts": {
+      "1": 9,
+      "2": 8,
+      "3": 7,
+      "4": 7,
+      "5": 6,
+      "6": 8,
+      "7": 6
+    },
+    "priority_why_safe_summary_counts": {
+      "1": 12,
+      "2": 10,
+      "3": 8,
+      "4": 8,
+      "5": 6,
+      "6": 10,
+      "7": 6
+    },
+    "queries_console": false,
+    "queue_import_allowed": false,
+    "read_only": true,
+    "read_only_or_dry_run_only": true,
+    "readiness_closure_allowed": false
+  },
+  "operator_next_step": "review_offline_method_cards_and_collect_real_wing_readback_before_live_promotion",
+  "operator_review_required": true,
+  "packet_schema": "automixer.correction_method_goal_operator_review_packet.v1",
+  "packet_status": "operator_review_packet_ready_proposal_only",
+  "pipeline_id": "main_live_assist",
+  "queries_console": false,
+  "queue_import_allowed": false,
+  "read_only": true,
+  "read_only_or_dry_run_only": true,
+  "readiness_closure_allowed": false,
+  "run_id": "20260624T065843Z_correction_method_operator_review",
+  "schema": "automixer.correction_method_operator_review_export_manifest.v1",
+  "status": "operator_review_export_ready_proposal_only",
+  "summary": {
+    "blocked_by": [],
+    "covered_objective_family_count": 11,
+    "fifth_priority_applicable_safety_checks": [
+      "mono_compatibility",
+      "phase",
+      "source_identity"
+    ],
+    "fifth_priority_blocked_live_action_count": 2,
+    "fifth_priority_future_wing_readback_target_count": 3,
+    "fifth_priority_method_count": 2,
+    "fifth_priority_method_ids": [
+      "auto_panner",
+      "pan_spatial_proposal"
+    ],
+    "first_priority_applicable_safety_checks": [
+      "ayaic_level_plane",
+      "bleed",
+      "dry_run",
+      "fader_ceiling",
+      "feedback",
+      "headroom",
+      "main_bus_headroom",
+      "source_identity",
+      "true_peak"
+    ],
+    "first_priority_blocked_live_action_count": 8,
+    "first_priority_future_wing_readback_target_count": 12,
+    "first_priority_method_count": 6,
+    "first_priority_method_ids": [
+      "agentic_method_foundation",
+      "auto_fader_v1",
+      "auto_soundcheck_engine",
+      "bus_group_balance_proposal",
+      "live_shared_mix",
+      "lufs_gain_staging"
+    ],
+    "fourth_priority_applicable_safety_checks": [
+      "feedback",
+      "headroom",
+      "insert_bypass_state",
+      "intelligibility",
+      "monitor_safety",
+      "parameter_bounds",
+      "return_level"
+    ],
+    "fourth_priority_blocked_live_action_count": 5,
+    "fourth_priority_future_wing_readback_target_count": 7,
+    "fourth_priority_method_count": 3,
+    "fourth_priority_method_ids": [
+      "auto_fx",
+      "fx_direct_apply",
+      "fx_send_proposal"
+    ],
+    "live_apply_method_ids": [],
+    "live_authority_method_ids": [],
+    "method_review_card_count": 35,
+    "missing_required_operator_surface_method_ids": [],
+    "operator_review_contract_coverage": {
+      "bounded_delta": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "confidence": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "future_wing_readback_contract": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "headroom_feedback_true_peak_checks": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "measured_or_audible_problem": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "operator_readable_explanation": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "proposed_correction": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "rollback_readback_contract": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "safety_blockers": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "source_evidence": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "source_evidence_details": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      },
+      "test_evidence": {
+        "covered": true,
+        "method_card_count": 35,
+        "priority_section_contract_item_count": 28,
+        "priority_section_count": 7,
+        "required_method_card_count": 35
+      }
+    },
+    "priority_section_count": 7,
+    "queueable_method_ids": [],
+    "required_objective_family_count": 11,
+    "second_priority_applicable_safety_checks": [
+      "feedback",
+      "gain_reduction",
+      "headroom",
+      "makeup_gain",
+      "manual_band",
+      "phase",
+      "source_identity",
+      "sum_bus",
+      "true_peak"
+    ],
+    "second_priority_blocked_live_action_count": 6,
+    "second_priority_future_wing_readback_target_count": 15,
+    "second_priority_method_count": 7,
+    "second_priority_method_ids": [
+      "auto_compressor",
+      "auto_compressor_cf",
+      "auto_eq",
+      "compressor_dynamics_proposal",
+      "corrective_eq_proposal",
+      "cross_adaptive_eq",
+      "frequency_separation_proposal"
+    ],
+    "seventh_priority_applicable_safety_checks": [
+      "headroom",
+      "limiter_or_dynamics_proof",
+      "pa_feed_safety",
+      "reference_feed_exclusion",
+      "true_peak"
+    ],
+    "seventh_priority_blocked_live_action_count": 3,
+    "seventh_priority_future_wing_readback_target_count": 4,
+    "seventh_priority_method_count": 1,
+    "seventh_priority_method_ids": [
+      "master_bus_optimization_proposal"
+    ],
+    "sixth_priority_applicable_safety_checks": [
+      "active_performance_guard",
+      "active_signal_guard",
+      "destructive_scope",
+      "feedback",
+      "read_only_inventory",
+      "read_only_map",
+      "source_identity"
+    ],
+    "sixth_priority_blocked_live_action_count": 10,
+    "sixth_priority_future_wing_readback_target_count": 11,
+    "sixth_priority_method_count": 4,
+    "sixth_priority_method_ids": [
+      "mute_management_proposal",
+      "routing_management_proposal",
+      "routing_snapshot_reset_writes",
+      "scene_preset_management_proposal"
+    ],
+    "supporting_method_review_card_count": 9,
+    "third_priority_applicable_safety_checks": [
+      "arrangement_role",
+      "chatter_guard",
+      "hysteresis",
+      "source_identity",
+      "speech_intelligibility",
+      "tails_and_attack",
+      "true_peak"
+    ],
+    "third_priority_blocked_live_action_count": 4,
+    "third_priority_future_wing_readback_target_count": 9,
+    "third_priority_method_count": 3,
+    "third_priority_method_ids": [
+      "auto_gate_caig",
+      "context_aware_gate_agent",
+      "deesser_vocal_sibilance"
+    ]
+  }
+}

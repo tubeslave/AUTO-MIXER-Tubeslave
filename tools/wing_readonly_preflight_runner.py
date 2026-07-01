@@ -84,6 +84,7 @@ EXPECTED_STATE_EVENTS = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE["get_state"]
 EXPECTED_PARAMETER_EVENTS = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE[
     "query_mixer_parameter"
 ]
+IGNORED_STARTUP_RESPONSE_TYPES = {"connection_status"}
 PRESTART_SUMMARY_TYPE = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
 PRESTART_SUMMARY_CONNECTION_POLICY = (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY
@@ -464,6 +465,24 @@ def response_request_id_matches(
     return payload.get("request_id") == request.get("request_id")
 
 
+def should_ignore_unsolicited_response(
+    request: Dict[str, Any],
+    payload: Dict[str, Any],
+) -> bool:
+    payload_type = payload.get("type")
+    if (
+        request.get("type") == "get_operator_mode"
+        and payload_type in IGNORED_STARTUP_RESPONSE_TYPES
+    ):
+        return True
+    if (
+        request.get("type") == "query_mixer_parameter"
+        and payload_type == "mixer_update"
+    ):
+        return True
+    return False
+
+
 def transport_failure_classification(exc: Exception) -> tuple[str, list[str], Dict[str, Any]]:
     exc_type = type(exc).__name__
     message = str(exc)
@@ -562,19 +581,27 @@ async def send_and_wait(
         )
         raise
     recorder.record("send", request)
-    raw = await asyncio.wait_for(ws.recv(), timeout=timeout)
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        payload = {"type": "invalid_json", "raw": raw}
-    recorder.record("recv", payload)
-    if payload.get("type") not in expected:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            raise asyncio.TimeoutError()
+        raw = await asyncio.wait_for(ws.recv(), timeout=remaining)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            payload = {"type": "invalid_json", "raw": raw}
+        if payload.get("type") in expected:
+            recorder.record("recv", payload)
+            return payload
+        if should_ignore_unsolicited_response(request, payload):
+            continue
+        recorder.record("recv", payload)
         raise UnexpectedResponseError(
             request=request,
             expected_types=expected,
             payload=payload,
         )
-    return payload
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -878,6 +905,14 @@ def load_backend_port_prestart_summary(path: str) -> tuple[Dict[str, Any], list[
                 detail[field] = value
                 if value is not False:
                     violations.append(f"prestart_summary_{field}_not_false")
+                plan_field = f"plan_{field}"
+                detail[plan_field] = check_detail.get(plan_field)
+                if detail[plan_field] is not False:
+                    violations.append(f"prestart_summary_{plan_field}_not_false")
+                match_field = f"{field}_matches_plan"
+                detail[match_field] = check_detail.get(match_field)
+                if detail[match_field] is not True:
+                    violations.append(f"prestart_summary_{match_field}_not_true")
         else:
             violations.append("prestart_summary_backend_port_check_detail_missing")
 

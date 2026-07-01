@@ -613,6 +613,26 @@ PROPOSAL_ONLY_CONTRACTS = {
             "feedback_risk",
         ],
     },
+    "smart_dsp_strategy_engine": {
+        "value_type": "smart_dsp_strategy",
+        "target_kind": "offline_soundcheck_live_strategy_selection",
+        "old_value_source": "offline_strategy_evidence_required_before_live_promotion",
+        "safety_evidence": [
+            "source_identity",
+            "current_smart_dsp_context_cache_no_live_authority",
+            "current_state_readback_available",
+            "rollback_plan_available",
+            "detected_problems",
+            "strategy_search",
+            "selected_strategy",
+            "alternatives",
+            "true_peak_headroom",
+            "feedback_risk",
+            "phase_mono_safety",
+            "operator_explanation",
+            "residual_risk",
+        ],
+    },
     "long_term_memory_learning_proposal": {
         "value_type": "long_term_memory_learning",
         "target_kind": "decision_memory_learning_record",
@@ -8000,6 +8020,39 @@ def _required_confirmation_detail_summary(
     return details
 
 
+def _operator_acceptance_gate_detail_summary(
+    confirmation_items: Iterable[Any],
+) -> List[str]:
+    details: List[str] = []
+    for item in confirmation_items:
+        item_name = str(item)
+        source, action_type, acknowledgement_fields = (
+            REQUIRED_CONFIRMATION_DETAIL_PROFILES.get(
+                item_name,
+                (
+                    "what_operator_must_confirm",
+                    "confirm_required_operator_condition",
+                    "required_confirmations_acknowledgement",
+                ),
+            )
+        )
+        details.append(
+            (
+                f"{item_name}:source={source};action_type={action_type};"
+                f"acknowledgement_fields={acknowledgement_fields};"
+                f"action=confirm_operator_required_condition:{item_name};"
+                "acceptance_scope=offline_proposal_only;required=true;"
+                "required_before_operator_acceptance=true;"
+                "required_before_live_promotion=true;"
+                "required_before_queue_import=true;"
+                "live_apply_allowed=false;queue_import_allowed=false;"
+                "readiness_closure_allowed=false;"
+                "requires_real_wing_proof_before_live=true"
+            )
+        )
+    return details
+
+
 def _operator_review_decision_option_detail_summary(
     decision_options: Iterable[Any],
 ) -> List[str]:
@@ -8340,7 +8393,7 @@ def _evidence_problem_correction_chain_detail_summary(
             "requires_real_wing_proof_before_live=true"
         )
 
-    return [
+    details = [
         _detail(
             "source_evidence",
             chain_step="1_source_evidence",
@@ -8395,6 +8448,456 @@ def _evidence_problem_correction_chain_detail_summary(
             required=bounded_delta_required and bounded_delta_details_required,
         ),
     ]
+    return sorted(details)
+
+
+def _goal_requirement_detail_summary(
+    *,
+    source_evidence_required: bool,
+    source_evidence_details_required: bool,
+    measured_or_audible_problem_required: bool,
+    proposed_correction_required: bool,
+    confidence_required: bool,
+    confidence_review_required: bool,
+    bounded_delta_required: bool,
+    bounded_delta_details_required: bool,
+    safety_blockers_required: bool,
+    safety_blocker_details_required: bool,
+    required_safety_checks: Iterable[Any],
+    headroom_feedback_true_peak_checks_required: bool,
+    headroom_feedback_true_peak_check_details_required: bool,
+    operator_readable_explanation_required: bool,
+    operator_explanation_packet_required: bool,
+    rollback_expectation: Any,
+    rollback_readback_contract_required: bool,
+    rollback_readback_details_required: bool,
+    future_wing_readback_targets: Iterable[Any],
+    future_wing_readback_contract_summary: Iterable[Any],
+    test_evidence_references: Iterable[Any],
+    denial_reason: Any,
+) -> List[str]:
+    reason = str(denial_reason or "real_wing_hardware_proof_required")
+
+    def _covered(value: Any) -> str:
+        return "covered" if bool(value) else "missing"
+
+    def _has_items(values: Iterable[Any]) -> bool:
+        return any(str(item) for item in values)
+
+    def _detail(
+        requirement: str,
+        *,
+        source_fields: Iterable[str],
+        operator_action: str,
+        covered: bool,
+    ) -> str:
+        fields = ",".join(str(field) for field in source_fields)
+        return (
+            f"{requirement}:source=correction_method_goal_requirement;"
+            f"source_fields={fields};"
+            f"operator_action={operator_action};"
+            f"coverage_status={_covered(covered)};"
+            "required=true;"
+            "acceptance_scope=offline_proposal_only;"
+            "required_before_operator_acceptance=true;"
+            "required_before_live_promotion=true;"
+            "required_before_queue_import=true;"
+            f"denial_reason={reason};"
+            "live_apply_allowed=false;"
+            "queue_import_allowed=false;"
+            "readiness_closure_allowed=false;"
+            "requires_real_wing_proof_before_live=true"
+        )
+
+    details = [
+        _detail(
+            "source_evidence",
+            source_fields=["source_evidence", "source_evidence_details"],
+            operator_action="confirm_source_evidence_before_acceptance",
+            covered=source_evidence_required and source_evidence_details_required,
+        ),
+        _detail(
+            "measured_or_audible_problem",
+            source_fields=["measured_or_audible_problem"],
+            operator_action="confirm_problem_statement_before_acceptance",
+            covered=measured_or_audible_problem_required,
+        ),
+        _detail(
+            "proposed_correction",
+            source_fields=["proposed_correction"],
+            operator_action="confirm_proposed_correction_before_acceptance",
+            covered=proposed_correction_required,
+        ),
+        _detail(
+            "confidence",
+            source_fields=[
+                "confidence",
+                "confidence_review",
+                "confidence_review_details",
+            ],
+            operator_action="review_confidence_before_acceptance",
+            covered=confidence_required and confidence_review_required,
+        ),
+        _detail(
+            "bounded_delta",
+            source_fields=[
+                "bounded_delta",
+                "bounded_delta_details",
+                "bounded_delta_unit",
+                "bounded_delta_policy",
+            ],
+            operator_action="review_bounded_delta_before_acceptance",
+            covered=bounded_delta_required and bounded_delta_details_required,
+        ),
+        _detail(
+            "safety_blockers",
+            source_fields=[
+                "safety_blockers",
+                "effective_safety_blockers",
+                "safety_blocker_details",
+                "required_safety_checks",
+            ],
+            operator_action="review_safety_blockers_before_acceptance",
+            covered=(
+                safety_blockers_required
+                and safety_blocker_details_required
+                and _has_items(required_safety_checks)
+            ),
+        ),
+        _detail(
+            "headroom_feedback_true_peak_checks",
+            source_fields=[
+                "headroom_feedback_true_peak_checks",
+                "headroom_feedback_true_peak_check_details",
+            ],
+            operator_action=(
+                "verify_headroom_feedback_true_peak_checks_before_acceptance"
+            ),
+            covered=(
+                headroom_feedback_true_peak_checks_required
+                and headroom_feedback_true_peak_check_details_required
+            ),
+        ),
+        _detail(
+            "operator_readable_explanation",
+            source_fields=[
+                "operator_readable_explanation",
+                "operator_explanation_packet",
+            ],
+            operator_action="confirm_operator_explanation_before_acceptance",
+            covered=(
+                operator_readable_explanation_required
+                and operator_explanation_packet_required
+            ),
+        ),
+        _detail(
+            "rollback_expectation",
+            source_fields=[
+                "rollback_expectation",
+                "rollback_readback_contract",
+                "rollback_readback_details",
+            ],
+            operator_action="confirm_rollback_expectation_before_acceptance",
+            covered=(
+                bool(rollback_expectation)
+                and rollback_readback_contract_required
+                and rollback_readback_details_required
+            ),
+        ),
+        _detail(
+            "future_wing_readback_contract",
+            source_fields=[
+                "future_wing_readback_contract",
+                "future_wing_readback_contract_summary",
+                "future_wing_readback_targets",
+            ],
+            operator_action=(
+                "verify_future_wing_readback_contract_before_live_promotion"
+            ),
+            covered=(
+                _has_items(future_wing_readback_targets)
+                and _has_items(future_wing_readback_contract_summary)
+            ),
+        ),
+        _detail(
+            "test_evidence",
+            source_fields=[
+                "test_evidence_references",
+                "operator_review_contract_tests",
+                "export_verification_tests",
+                "no_wing_release_gate_tests",
+            ],
+            operator_action="verify_offline_tests_before_acceptance",
+            covered=_has_items(test_evidence_references),
+        ),
+    ]
+    return sorted(details)
+
+
+METHOD_SPECIFIC_REVIEW_PROFILES: Dict[str, Dict[str, str]] = {
+    "gain_trim": {
+        "problem_focus": "overload_weak_signal_headroom",
+        "correction_focus": "safe_gain_down_or_trim",
+        "safety_focus": "headroom_true_peak_feedback_ayaic_level_plane",
+    },
+    "gain_trim_and_fader_balance": {
+        "problem_focus": "gain_structure_and_balance_conflict",
+        "correction_focus": "bounded_gain_or_fader_balance_proposal",
+        "safety_focus": "headroom_sum_bus_fader_ceiling_ayaic_level_plane",
+    },
+    "fader_balance": {
+        "problem_focus": "channel_group_vocal_instrument_balance",
+        "correction_focus": "small_bounded_fader_or_group_balance",
+        "safety_focus": "fader_ceiling_sum_bus_headroom_ayaic_level_plane",
+    },
+    "eq": {
+        "problem_focus": "hpf_mud_harshness_masking",
+        "correction_focus": "corrective_eq_cut_or_hpf_proposal",
+        "safety_focus": "feedback_manual_band_phase_sum_bus",
+    },
+    "compressor_dynamics": {
+        "problem_focus": "dynamic_range_gr_threshold_ratio_attack_release",
+        "correction_focus": "compressor_threshold_ratio_attack_release_proposal",
+        "safety_focus": "gain_reduction_makeup_gain_true_peak_headroom",
+    },
+    "gate_expander": {
+        "problem_focus": "noise_bleed_chatter_source_identity",
+        "correction_focus": "gate_or_expander_threshold_hysteresis_proposal",
+        "safety_focus": "chatter_guard_tails_attack_speech_intelligibility",
+    },
+    "gate_expander_deesser": {
+        "problem_focus": "noise_bleed_sibilance_tails",
+        "correction_focus": "gate_expander_deesser_bounded_attenuation",
+        "safety_focus": "source_identity_hysteresis_speech_tails_attack_true_peak",
+    },
+    "fx_sends": {
+        "problem_focus": "reverb_delay_send_return_intelligibility",
+        "correction_focus": "bounded_fx_send_return_level_proposal",
+        "safety_focus": "return_level_monitor_safety_feedback_intelligibility",
+    },
+    "pan_stereo": {
+        "problem_focus": "stereo_placement_mono_phase_risk",
+        "correction_focus": "bounded_pan_proposal",
+        "safety_focus": "mono_compatibility_phase_source_identity",
+    },
+    "routing_groups_scenes": {
+        "problem_focus": "routing_group_scene_inventory_gap",
+        "correction_focus": "read_only_map_or_inventory_only",
+        "safety_focus": "no_routing_scene_mute_dca_matrix_writes",
+    },
+    "master_output": {
+        "problem_focus": "master_true_peak_pa_feed_limiter_risk",
+        "correction_focus": "offline_master_output_recommendation",
+        "safety_focus": "true_peak_pa_feed_limiter_dynamics_proof_reference_feed_exclusion",
+    },
+}
+DEFAULT_METHOD_SPECIFIC_REVIEW_PROFILE = {
+    "problem_focus": "supporting_context_or_calibration_gap",
+    "correction_focus": "proposal_layer_context_only",
+    "safety_focus": "read_only_no_live_authority",
+}
+
+
+def _method_specific_review_detail_summary(
+    *,
+    method_id: Any,
+    objective_family: Any,
+    priority: Any,
+    priority_label: Any,
+    required_evidence: Iterable[Any],
+    required_safety_checks: Iterable[Any],
+    bounded_delta_unit: Any,
+    bounded_delta_policy: Any,
+    rollback_expectation: Any,
+    future_wing_readback_targets: Iterable[Any],
+    blocked_live_actions: Iterable[Any],
+    denial_reason: Any,
+) -> List[str]:
+    family = str(objective_family or "supporting_context")
+    priority_value = "none" if priority is None else str(priority)
+    profile = METHOD_SPECIFIC_REVIEW_PROFILES.get(
+        family,
+        DEFAULT_METHOD_SPECIFIC_REVIEW_PROFILE,
+    )
+
+    def _joined(values: Iterable[Any]) -> str:
+        items = sorted({str(item) for item in values if str(item)})
+        return ",".join(items) if items else "none"
+
+    def _detail(name: str, focus_value: str, *, source_fields: Iterable[str]) -> str:
+        fields = ",".join(str(field) for field in source_fields)
+        return (
+            f"{name}:source=correction_method_goal.method_specific_review;"
+            f"method_id={method_id};"
+            f"objective_family={family};"
+            f"priority={priority_value};"
+            f"priority_label={priority_label};"
+            f"focus={focus_value};"
+            f"source_fields={fields};"
+            f"required_evidence={_joined(required_evidence)};"
+            f"required_safety_checks={_joined(required_safety_checks)};"
+            f"bounded_delta={bounded_delta_unit}:{bounded_delta_policy};"
+            f"rollback_expectation={rollback_expectation};"
+            f"future_wing_readback_targets={_joined(future_wing_readback_targets)};"
+            f"blocked_live_actions={_joined(blocked_live_actions)};"
+            f"operator_action=review_method_specific_{name}:{family};"
+            "acceptance_scope=offline_proposal_only;"
+            "required_before_operator_acceptance=true;"
+            "required_before_live_promotion=true;"
+            "required_before_queue_import=true;"
+            f"denial_reason={denial_reason or 'real_wing_hardware_proof_required'};"
+            "live_apply_allowed=false;"
+            "queue_import_allowed=false;"
+            "readiness_closure_allowed=false;"
+            "requires_real_wing_proof_before_live=true"
+        )
+
+    return sorted(
+        [
+            _detail(
+                "method_problem_focus",
+                profile["problem_focus"],
+                source_fields=[
+                    "source_evidence",
+                    "measured_or_audible_problem",
+                    "operator_evidence_packet",
+                ],
+            ),
+            _detail(
+                "method_correction_focus",
+                profile["correction_focus"],
+                source_fields=[
+                    "proposed_correction",
+                    "bounded_delta",
+                    "operator_explanation_packet",
+                ],
+            ),
+            _detail(
+                "method_safety_focus",
+                profile["safety_focus"],
+                source_fields=[
+                    "safety_blockers",
+                    "headroom_feedback_true_peak_checks",
+                    "required_safety_checks",
+                ],
+            ),
+            _detail(
+                "method_future_live_boundary",
+                "future_wing_readback_and_real_hardware_proof_required",
+                source_fields=[
+                    "future_wing_readback_contract",
+                    "future_live_promotion_requirements",
+                    "live_authority_boundary",
+                ],
+            ),
+        ]
+    )
+
+
+def _operator_actionable_explanation_detail_summary(
+    *,
+    method_id: Any,
+    objective_family: Any,
+    priority: Any,
+    priority_label: Any,
+    required_evidence: Iterable[Any],
+    required_safety_checks: Iterable[Any],
+    bounded_delta_unit: Any,
+    bounded_delta_policy: Any,
+    rollback_expectation: Any,
+    future_wing_readback_targets: Iterable[Any],
+    blocked_live_actions: Iterable[Any],
+    denial_reason: Any,
+) -> List[str]:
+    family = str(objective_family or "supporting_context")
+    priority_value = "none" if priority is None else str(priority)
+    profile = METHOD_SPECIFIC_REVIEW_PROFILES.get(
+        family,
+        DEFAULT_METHOD_SPECIFIC_REVIEW_PROFILE,
+    )
+
+    def _joined(values: Iterable[Any]) -> str:
+        items = sorted({str(item) for item in values if str(item)})
+        return ",".join(items) if items else "none"
+
+    def _detail(
+        name: str,
+        explanation: str,
+        *,
+        source_fields: Iterable[str],
+        operator_action: str,
+    ) -> str:
+        fields = ",".join(str(field) for field in source_fields)
+        return (
+            f"{name}:source=operator_actionable_explanation;"
+            f"method_id={method_id};"
+            f"objective_family={family};"
+            f"priority={priority_value};"
+            f"priority_label={priority_label};"
+            f"explanation={explanation};"
+            f"source_fields={fields};"
+            f"required_evidence={_joined(required_evidence)};"
+            f"required_safety_checks={_joined(required_safety_checks)};"
+            f"bounded_delta={bounded_delta_unit}:{bounded_delta_policy};"
+            f"rollback_expectation={rollback_expectation};"
+            f"future_wing_readback_targets={_joined(future_wing_readback_targets)};"
+            f"blocked_live_actions={_joined(blocked_live_actions)};"
+            f"operator_action={operator_action};"
+            "acceptance_scope=offline_proposal_only;"
+            "required_before_operator_acceptance=true;"
+            "required_before_live_promotion=true;"
+            "required_before_queue_import=true;"
+            f"denial_reason={denial_reason or 'real_wing_hardware_proof_required'};"
+            "live_apply_allowed=false;"
+            "queue_import_allowed=false;"
+            "readiness_closure_allowed=false;"
+            "requires_real_wing_proof_before_live=true"
+        )
+
+    return sorted(
+        [
+            _detail(
+                "what_is_wrong",
+                f"review_{profile['problem_focus']}_from_source_evidence",
+                source_fields=[
+                    "source_evidence",
+                    "source_evidence_details",
+                    "measured_or_audible_problem",
+                ],
+                operator_action="confirm_what_is_wrong_before_acceptance",
+            ),
+            _detail(
+                "what_is_proposed",
+                f"review_{profile['correction_focus']}_from_proposed_correction",
+                source_fields=[
+                    "proposed_correction",
+                    "bounded_delta",
+                    "operator_readable_explanation",
+                ],
+                operator_action="confirm_what_is_proposed_before_acceptance",
+            ),
+            _detail(
+                "why_safe_or_blocked",
+                f"offline_only_until_{profile['safety_focus']}_and_real_wing_proof",
+                source_fields=[
+                    "why_safe_summary",
+                    "why_blocked_summary",
+                    "safety_blocker_details",
+                ],
+                operator_action="review_why_safe_or_blocked_before_acceptance",
+            ),
+            _detail(
+                "what_is_needed_before_live",
+                "collect_operator_acceptance_real_wing_readback_rollback_and_emergency_proof",
+                source_fields=[
+                    "future_wing_readback_contract",
+                    "future_live_promotion_requirements",
+                    "operator_acceptance_gate_details",
+                ],
+                operator_action="collect_future_live_proofs_before_live_promotion",
+            ),
+        ]
+    )
 
 
 def build_correction_method_goal_coverage_report(
@@ -8640,6 +9143,47 @@ def build_correction_method_goal_coverage_report(
                 is True,
                 "bounded_delta_unit": contract.get("bounded_delta_unit"),
                 "bounded_delta_policy": contract.get("bounded_delta_policy"),
+                "evidence_problem_correction_chain_details": (
+                    _evidence_problem_correction_chain_detail_summary(
+                        source_evidence_required=(
+                            operator_contract.get("source_evidence_required") is True
+                        ),
+                        source_evidence_details_required=(
+                            operator_contract.get(
+                                "source_evidence_details_required"
+                            )
+                            is True
+                        ),
+                        measured_or_audible_problem_required=(
+                            operator_contract.get(
+                                "measured_or_audible_problem_required"
+                            )
+                            is True
+                        ),
+                        proposed_correction_required=(
+                            operator_contract.get("proposed_correction_required")
+                            is True
+                        ),
+                        confidence_required=(
+                            operator_contract.get("confidence_required") is True
+                        ),
+                        confidence_review_required=(
+                            operator_contract.get("confidence_review_required")
+                            is True
+                        ),
+                        bounded_delta_required=(
+                            operator_contract.get("bounded_delta_required") is True
+                        ),
+                        bounded_delta_details_required=(
+                            operator_contract.get("bounded_delta_details_required")
+                            is True
+                        ),
+                        denial_reason=(
+                            operator_contract.get("denial_reason")
+                            or live_authority_boundary.get("denial_reason")
+                        ),
+                    )
+                ),
                 "safety_blockers_required": operator_contract.get(
                     "safety_blockers_required"
                 )
@@ -9566,6 +10110,94 @@ def build_correction_method_goal_operator_review_packet(
                 "test_evidence_references": _test_evidence_references(
                     str(row["method_id"])
                 ),
+                "goal_requirement_details": _goal_requirement_detail_summary(
+                    source_evidence_required=row["source_evidence_required"],
+                    source_evidence_details_required=(
+                        row["source_evidence_details_required"]
+                    ),
+                    measured_or_audible_problem_required=(
+                        row["measured_or_audible_problem_required"]
+                    ),
+                    proposed_correction_required=(
+                        row["proposed_correction_required"]
+                    ),
+                    confidence_required=row["confidence_required"],
+                    confidence_review_required=row["confidence_review_required"],
+                    bounded_delta_required=row["bounded_delta_required"],
+                    bounded_delta_details_required=(
+                        row["bounded_delta_details_required"]
+                    ),
+                    safety_blockers_required=row["safety_blockers_required"],
+                    safety_blocker_details_required=(
+                        row["safety_blocker_details_required"]
+                    ),
+                    required_safety_checks=row["applicable_safety_checks"],
+                    headroom_feedback_true_peak_checks_required=row[
+                        "headroom_feedback_true_peak_checks_required"
+                    ],
+                    headroom_feedback_true_peak_check_details_required=row[
+                        "headroom_feedback_true_peak_check_details_required"
+                    ],
+                    operator_readable_explanation_required=row[
+                        "operator_readable_explanation_required"
+                    ],
+                    operator_explanation_packet_required=row[
+                        "operator_explanation_packet_required"
+                    ],
+                    rollback_expectation=row["rollback_expectation"],
+                    rollback_readback_contract_required=row[
+                        "rollback_readback_contract_required"
+                    ],
+                    rollback_readback_details_required=row[
+                        "rollback_readback_details_required"
+                    ],
+                    future_wing_readback_targets=row[
+                        "future_wing_readback_targets"
+                    ],
+                    future_wing_readback_contract_summary=row[
+                        "future_wing_readback_contract_summary"
+                    ],
+                    test_evidence_references=_test_evidence_references(
+                        str(row["method_id"])
+                    ),
+                    denial_reason=row["denial_reason"],
+                ),
+                "method_specific_review_details": (
+                    _method_specific_review_detail_summary(
+                        method_id=row["method_id"],
+                        objective_family=row["objective_family"],
+                        priority=row["priority"],
+                        priority_label=row["priority_label"],
+                        required_evidence=row["safety_evidence_required"],
+                        required_safety_checks=row["applicable_safety_checks"],
+                        bounded_delta_unit=row["bounded_delta_unit"],
+                        bounded_delta_policy=row["bounded_delta_policy"],
+                        rollback_expectation=row["rollback_expectation"],
+                        future_wing_readback_targets=row[
+                            "future_wing_readback_targets"
+                        ],
+                        blocked_live_actions=row["blocked_live_actions"],
+                        denial_reason=row["denial_reason"],
+                    )
+                ),
+                "operator_actionable_explanation_details": (
+                    _operator_actionable_explanation_detail_summary(
+                        method_id=row["method_id"],
+                        objective_family=row["objective_family"],
+                        priority=row["priority"],
+                        priority_label=row["priority_label"],
+                        required_evidence=row["safety_evidence_required"],
+                        required_safety_checks=row["applicable_safety_checks"],
+                        bounded_delta_unit=row["bounded_delta_unit"],
+                        bounded_delta_policy=row["bounded_delta_policy"],
+                        rollback_expectation=row["rollback_expectation"],
+                        future_wing_readback_targets=row[
+                            "future_wing_readback_targets"
+                        ],
+                        blocked_live_actions=row["blocked_live_actions"],
+                        denial_reason=row["denial_reason"],
+                    )
+                ),
                 "operator_problem_review_summary": list(
                     operator_problem_review_summary
                 ),
@@ -9579,6 +10211,11 @@ def build_correction_method_goal_operator_review_packet(
                 ),
                 "required_confirmation_details": (
                     _required_confirmation_detail_summary(
+                        CORRECTION_METHOD_REQUIRED_CONFIRMATIONS
+                    )
+                ),
+                "operator_acceptance_gate_details": (
+                    _operator_acceptance_gate_detail_summary(
                         CORRECTION_METHOD_REQUIRED_CONFIRMATIONS
                     )
                 ),
@@ -9598,6 +10235,9 @@ def build_correction_method_goal_operator_review_packet(
                 "required_safety_checks": list(row["applicable_safety_checks"]),
                 "bounded_delta_unit": row["bounded_delta_unit"],
                 "bounded_delta_policy": row["bounded_delta_policy"],
+                "evidence_problem_correction_chain_details": list(
+                    row["evidence_problem_correction_chain_details"]
+                ),
                 "rollback_expectation": row["rollback_expectation"],
                 "future_wing_readback_targets": list(
                     row["future_wing_readback_targets"]
@@ -9791,6 +10431,18 @@ def build_correction_method_goal_operator_review_packet(
                 ),
                 "why_safe_summary": _section_items("why_safe_summary"),
                 "why_blocked_summary": _section_items("why_blocked_summary"),
+                "goal_requirement_details": _section_items(
+                    "goal_requirement_details"
+                ),
+                "method_specific_review_details": _section_items(
+                    "method_specific_review_details"
+                ),
+                "operator_actionable_explanation_details": _section_items(
+                    "operator_actionable_explanation_details"
+                ),
+                "evidence_problem_correction_chain_details": _section_items(
+                    "evidence_problem_correction_chain_details"
+                ),
                 "operator_visible_explanation_contract": (
                     _section_explanation_contract_items()
                 ),
@@ -9835,6 +10487,9 @@ def build_correction_method_goal_operator_review_packet(
             ),
             "required_confirmation_details": _section_items(
                 "required_confirmation_details"
+            ),
+            "operator_acceptance_gate_details": _section_items(
+                "operator_acceptance_gate_details"
             ),
             "operator_review_decision_option_details": _section_items(
                 "operator_review_decision_option_details"
@@ -10300,6 +10955,22 @@ def render_correction_method_goal_operator_review_markdown(
                     "- proposed_correction: "
                     f"{_items(section['proposed_correction'])}"
                 ),
+                (
+                    "- goal_requirement_details: "
+                    f"{_items(section['goal_requirement_details'])}"
+                ),
+                (
+                    "- method_specific_review_details: "
+                    f"{_items(section['method_specific_review_details'])}"
+                ),
+                (
+                    "- operator_actionable_explanation_details: "
+                    f"{_items(section['operator_actionable_explanation_details'])}"
+                ),
+                (
+                    "- evidence_problem_correction_chain_details: "
+                    f"{_items(section['evidence_problem_correction_chain_details'])}"
+                ),
                 f"- confidence: {_items(section['confidence'])}",
                 (
                     "- bounded_delta_contract: "
@@ -10398,6 +11069,10 @@ def render_correction_method_goal_operator_review_markdown(
                 (
                     "- required_confirmation_details: "
                     f"{_items(section['required_confirmation_details'])}"
+                ),
+                (
+                    "- operator_acceptance_gate_details: "
+                    f"{_items(section['operator_acceptance_gate_details'])}"
                 ),
                 (
                     "- operator_review_decision_option_details: "
@@ -10793,6 +11468,22 @@ def render_correction_method_goal_operator_review_markdown(
                     f"{_items(_operator_review_contract_items(card, 'proposed_correction'))}"
                 ),
                 (
+                    "- goal_requirement_details: "
+                    f"{_items(card['goal_requirement_details'])}"
+                ),
+                (
+                    "- method_specific_review_details: "
+                    f"{_items(card['method_specific_review_details'])}"
+                ),
+                (
+                    "- operator_actionable_explanation_details: "
+                    f"{_items(card['operator_actionable_explanation_details'])}"
+                ),
+                (
+                    "- evidence_problem_correction_chain_details: "
+                    f"{_items(card['evidence_problem_correction_chain_details'])}"
+                ),
+                (
                     "- operator_problem_review_summary: "
                     f"{_items(card['operator_problem_review_summary'])}"
                 ),
@@ -10854,6 +11545,10 @@ def render_correction_method_goal_operator_review_markdown(
                 (
                     "- required_confirmation_details: "
                     f"{_items(card['required_confirmation_details'])}"
+                ),
+                (
+                    "- operator_acceptance_gate_details: "
+                    f"{_items(card['operator_acceptance_gate_details'])}"
                 ),
                 (
                     "- operator_review_decision_option_details: "

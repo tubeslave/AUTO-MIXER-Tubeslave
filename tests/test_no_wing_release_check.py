@@ -626,9 +626,11 @@ def test_no_wing_release_check_commands_have_no_live_write_tokens(tmp_path):
     assert "set_eq" not in command_text
     assert "set_compressor" not in command_text
     assert "route_output" not in command_text
+    assert "set_mute" not in command_text
+    assert "mute_channel" not in command_text
+    assert "mute_channels" not in command_text
     command_tokens = [token for check in checks for token in check.command]
     assert "reset" not in command_tokens
-    assert "mute" not in command_text
     assert any(check.name == "write_surface_static_scan" for check in checks)
     assert any(check.name == "memory_lint" for check in checks)
     assert any(check.name == "frontend_dist_package" for check in checks)
@@ -1105,7 +1107,19 @@ def test_no_wing_release_check_rejects_capture_plan_execution_authority(monkeypa
     assert "read_surface_capture_plan_step_live_write_not_false" in result.detail["violations"]
 
 
-def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapshot():
+def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapshot(
+    monkeypatch,
+):
+    evidence = release_check.build_wing_readonly_preflight_evidence(
+        artifact_payloads=(),
+        artifact_roots=(),
+    )
+    monkeypatch.setitem(
+        validate_wing_readonly_preflight_evidence_snapshot.__globals__,
+        "build_wing_readonly_preflight_evidence",
+        lambda *_, **__: evidence,
+    )
+
     result = validate_wing_readonly_preflight_evidence_snapshot()
 
     assert result.status == "passed"
@@ -7660,7 +7674,22 @@ def test_no_wing_release_check_rejects_non_false_wing_preflight_summary_authorit
     assert summary_payload["source_authority_flags"][field] == value
 
 
-def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_snapshot():
+def test_no_wing_release_check_validates_wing_preflight_review_decision_ledger_snapshot(
+    monkeypatch,
+):
+    preflight_evidence = release_check.build_wing_readonly_preflight_evidence(
+        artifact_payloads=(),
+        artifact_roots=(),
+    )
+    ledger = release_check.build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=preflight_evidence,
+    )
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda *_, **__: ledger,
+    )
+
     result = validate_wing_readonly_preflight_review_decision_ledger_snapshot()
     summary_payload = wing_readonly_preflight_review_decision_summary([result])
 
@@ -13992,7 +14021,7 @@ def test_no_wing_release_check_rejects_current_cycle_forbidden_command_boundary(
         "load_snap",
         "save_snap",
         "reset",
-        "mute",
+        "mute_channels",
         "unmute",
         "set_insert",
         "set_fx_model",
@@ -14099,7 +14128,7 @@ def test_no_wing_release_check_rejects_expanded_forbidden_live_commands():
     assert "bad_eq_runner:set_eq" in message
     assert "bad_compressor_runner:set_compressor" in message
     assert "bad_reset_runner:reset" in message
-    assert "bad_mute_runner:mute" in message
+    assert "bad_mute_runner:mute_channels" in message
 
 
 def test_no_wing_release_check_rejects_unmute_as_live_write():

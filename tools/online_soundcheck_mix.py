@@ -26,6 +26,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(BACKEND_DIR))
 
 from output_paths import ai_logs_path, ai_mixing_path, ensure_ai_output_dirs, ensure_parent_dir  # noqa: E402

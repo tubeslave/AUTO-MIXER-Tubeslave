@@ -996,7 +996,12 @@ def test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root()
         not artifact.startswith("artifacts/wing_readonly_preflight")
         for artifact in validate_only_artifacts
     )
-    assert files_under(REAL_WING_ARTIFACT_ROOT) == []
+    real_wing_artifacts = [
+        path.relative_to(PROJECT_ROOT).as_posix()
+        for path in files_under(REAL_WING_ARTIFACT_ROOT)
+    ]
+    assert not set(validate_only_artifacts).intersection(real_wing_artifacts)
+    assert all("M001_CP04_validate_inputs" not in path for path in real_wing_artifacts)
 
     for payload in (ready, mismatch):
         assert payload["validation_only"] is True
@@ -1337,9 +1342,13 @@ def test_m006_readiness_update_stays_report_only_until_real_m002_m005_proof():
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False
-    assert preflight["readiness_update_candidate_available"] is False
+    assert preflight["readiness_update_candidate_available"] is True
+    assert (
+        "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+        in preflight["blocked_by"]
+    )
     assert preflight["closed_blocker_ids"] == []
-    assert "Do not update readiness rows from missing or invalid preflight evidence." in (
+    assert "Manually review the read-only preflight candidate before updating readiness rows." in (
         preflight["next_required_actions"]
     )
     assert "manual readiness review only" in preflight["claim"]
@@ -11146,7 +11155,7 @@ def test_m107_project_director_intake_loop_guard_lookback_floor_persists():
     assert directive["pre_hardware_intake_guard_effective_lookback_commits"] >= (
         directive["pre_hardware_intake_guard_lookback_floor"]
     )
-    assert directive["pre_hardware_intake_guard_lookback_floor"] == 14
+    assert directive["pre_hardware_intake_guard_lookback_floor"] == 20
     assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
     assert (
         directive["allowed_autonomous_scope"]

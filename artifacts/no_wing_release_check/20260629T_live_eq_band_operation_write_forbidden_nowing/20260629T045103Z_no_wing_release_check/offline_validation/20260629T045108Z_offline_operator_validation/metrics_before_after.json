@@ -1,0 +1,18 @@
+{
+  "before_after_available": false,
+  "foundation_teacher_example_count": 0,
+  "foundation_teacher_examples_path": "artifacts/no_wing_release_check/20260629T_live_eq_band_operation_write_forbidden_nowing/20260629T045103Z_no_wing_release_check/offline_validation/20260629T045108Z_offline_operator_validation/foundation_teacher_examples.jsonl",
+  "generated_at": "2026-06-29T04:51:08Z",
+  "live_write": false,
+  "offline_only": true,
+  "run_id": "20260629T045108Z_offline_operator_validation",
+  "status": "passed",
+  "summary": {
+    "mode_count": 4,
+    "non_supervised_modes_blocked": true,
+    "supervised_failure_count": 0,
+    "supervised_proposal_count": 4,
+    "supervised_simulated_applied_count": 4
+  },
+  "trace_count": 16
+}

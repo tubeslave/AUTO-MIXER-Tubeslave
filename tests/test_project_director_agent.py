@@ -1359,8 +1359,8 @@ def test_project_director_detects_intake_guard_streak_under_direction_commits():
 
     streak = director.wing_readonly_intake_guard_streak(recent_subjects)
 
-    assert director.intake_loop_guard_lookback_floor() == 14
-    assert director.effective_lookback_commits_for_intake_guard(12) == 14
+    assert director.intake_loop_guard_lookback_floor() == 20
+    assert director.effective_lookback_commits_for_intake_guard(12) == 20
     assert director.effective_lookback_commits_for_intake_guard(1) == 1
     assert len(streak) == 10
     assert streak[0] == "Guard WING readonly capture time order"
@@ -1386,8 +1386,8 @@ def test_project_director_narrows_post_m104_intake_hardening_loop():
     assert directive["selected_action_requires_external_validation"] is True
     assert directive["pre_hardware_intake_hardening_loop_guard"] is True
     assert directive["pre_hardware_intake_guard_requested_lookback_commits"] == 12
-    assert directive["pre_hardware_intake_guard_effective_lookback_commits"] == 14
-    assert directive["pre_hardware_intake_guard_lookback_floor"] == 14
+    assert directive["pre_hardware_intake_guard_effective_lookback_commits"] == 20
+    assert directive["pre_hardware_intake_guard_lookback_floor"] == 20
     assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
     assert (
         directive["allowed_autonomous_scope"]

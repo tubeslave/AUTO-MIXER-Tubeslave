@@ -7,18 +7,27 @@ import argparse
 import ast
 import hashlib
 import json
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "backend"))
+
+from tools.audit_correction_method_goal import (  # noqa: E402
+    audit_correction_method_goal_packet,
+)
+
 EXPECTED_MANIFEST_SCHEMA = (
     "automixer.correction_method_operator_review_export_manifest.v1"
 )
 EXPECTED_PACKET_SCHEMA = (
     "automixer.correction_method_goal_operator_review_packet.v1"
 )
+EXPECTED_GOAL_AUDIT_SCHEMA = "automixer.correction_method_goal_audit.v1"
 EXPECTED_DECISION_TEMPLATE_SCHEMA = (
     "automixer.correction_method_operator_decision_template.v1"
 )
@@ -27,6 +36,7 @@ EXPECTED_DECISION_RECORD_SCHEMA = (
 )
 EXPECTED_MANIFEST_STATUS = "operator_review_export_ready_proposal_only"
 EXPECTED_PACKET_STATUS = "operator_review_packet_ready_proposal_only"
+EXPECTED_GOAL_AUDIT_STATUS = "passed"
 EXPECTED_DECISION_TEMPLATE_STATUS = (
     "operator_review_template_pending_proposal_only"
 )
@@ -45,6 +55,8 @@ EXPECTED_ARTIFACTS = {
     "packet_json": "packet.json",
     "operator_review_markdown": "operator-review.md",
     "operator_decision_template": "operator-decision-template.json",
+    "goal_audit_json": "goal-audit.json",
+    "goal_audit_markdown": "goal-audit.md",
 }
 EXPECTED_VERIFICATION_REPORT_REFERENCE = "verification-report.json"
 FALSE_AUTHORITY_FLAGS = (
@@ -194,6 +206,7 @@ ALLOWED_REQUIRED_SAFETY_CHECKS = (
     "eq_hold_policy",
     "fader_ceiling",
     "feedback",
+    "future_wing_readback",
     "gain_reduction",
     "headroom",
     "hysteresis",
@@ -226,6 +239,7 @@ ALLOWED_REQUIRED_SAFETY_CHECKS = (
     "return_level",
     "role_persistence",
     "rollback",
+    "safety_blockers",
     "safety_regressions",
     "source_identity",
     "speech_intelligibility",
@@ -245,6 +259,7 @@ ALLOWED_BOUNDED_DELTA_UNITS = (
     "fx_insert_or_rack_parameter",
     "genre_task_profile",
     "memory_learning_record",
+    "method_specific",
     "mute_state_diff",
     "pan_percent",
     "phase_guard_policy",
@@ -272,6 +287,7 @@ ALLOWED_BOUNDED_DELTA_POLICIES = (
     "operator_reviewed_replay_calibration_only_with_accepted_rejected_outcomes_and_no_live_authority_context",
     "operator_reviewed_source_identity_label_only_with_classifier_confidence_and_replay_calibration_before_downstream_trust",
     "operator_selected_mix_variant_profile_only_with_level_plane_reference_and_no_named_artist_style_clone",
+    "proposal_must_state_method_specific_bounds_before_operator_review",
     "persistent_level_drift_proposal_only_with_headroom_feedback_cooldown_and_operator_review",
     "preview_only_downward_gain_or_fader_delta",
     "proposal_only_delay_or_polarity_change_requires_correlation_readback_and_manual_confirmation",
@@ -339,11 +355,13 @@ ALLOWED_FUTURE_WING_READBACK_TARGETS = (
     "mono_phase_check",
     "mute_group",
     "offline_replay_summary",
+    "old_value",
     "operator_acceptance_record",
     "operator_accepted_source_label",
     "operator_accepted_source_role",
     "operator_review_record",
     "operator_selected_profile",
+    "proposed_value",
     "phase_measurements",
     "polarity_invert",
     "preamp_gain",
@@ -364,6 +382,7 @@ ALLOWED_FUTURE_WING_READBACK_TARGETS = (
     "rollback_mute_state",
     "rollback_plan",
     "rollback_profile",
+    "rollback_value",
     "rollback_route",
     "rollback_snapshot",
     "routing_map",
@@ -372,6 +391,7 @@ ALLOWED_FUTURE_WING_READBACK_TARGETS = (
     "stem_spectrum",
     "stereo_pair_link",
     "sum_bus",
+    "target_parameter",
     "threshold",
 )
 ALLOWED_ROLLBACK_EXPECTATIONS = (
@@ -398,6 +418,7 @@ ALLOWED_ROLLBACK_EXPECTATIONS = (
     "restore_previous_mute_state_after_physical_readback_or_operator_manual_action",
     "restore_previous_operator_accepted_arrangement_role_or_hold_for_manual_review",
     "restore_previous_operator_selected_mix_profile_or_hold_for_manual_review",
+    "restore_previous_readback_value_or_hold_for_operator_manual_rollback",
     "restore_previous_pan_value_after_physical_readback",
     "restore_previous_send_and_return_values_after_physical_readback",
 )
@@ -447,11 +468,16 @@ REQUIRED_METHOD_CARD_LIST_FIELDS = (
     "operator_method_review_focus",
     "why_safe_summary",
     "why_blocked_summary",
+    "goal_requirement_details",
+    "method_specific_review_details",
+    "operator_actionable_explanation_details",
+    "evidence_problem_correction_chain_details",
     "safety_blocker_details",
     "headroom_feedback_true_peak_check_details",
     "test_evidence_references",
     "what_operator_must_confirm",
     "required_confirmation_details",
+    "operator_acceptance_gate_details",
     "operator_review_checklist",
     "operator_review_checklist_details",
     "operator_review_decision_option_details",
@@ -516,6 +542,10 @@ PRIORITY_SECTION_LIST_AGGREGATE_FIELDS = (
     "operator_method_review_focus",
     "why_safe_summary",
     "why_blocked_summary",
+    "goal_requirement_details",
+    "method_specific_review_details",
+    "operator_actionable_explanation_details",
+    "evidence_problem_correction_chain_details",
     "safety_blocker_details",
     "headroom_feedback_true_peak_check_details",
     "future_wing_readback_targets",
@@ -526,6 +556,7 @@ PRIORITY_SECTION_LIST_AGGREGATE_FIELDS = (
     "live_authority_boundary_summary",
     "operator_review_record_required_fields",
     "required_confirmation_details",
+    "operator_acceptance_gate_details",
     "operator_review_decision_option_details",
     "operator_review_checklist_details",
     "operator_review_record_field_details",
@@ -1145,6 +1176,38 @@ def _expected_required_confirmation_details(
     return details
 
 
+def _expected_operator_acceptance_gate_details(
+    confirmation_items: Any,
+) -> List[str]:
+    details: List[str] = []
+    for item in _sorted_str_items(confirmation_items):
+        source, action_type, acknowledgement_fields = (
+            REQUIRED_CONFIRMATION_DETAIL_PROFILES.get(
+                item,
+                (
+                    "what_operator_must_confirm",
+                    "confirm_required_operator_condition",
+                    "required_confirmations_acknowledgement",
+                ),
+            )
+        )
+        details.append(
+            (
+                f"{item}:source={source};action_type={action_type};"
+                f"acknowledgement_fields={acknowledgement_fields};"
+                f"action=confirm_operator_required_condition:{item};"
+                "acceptance_scope=offline_proposal_only;required=true;"
+                "required_before_operator_acceptance=true;"
+                "required_before_live_promotion=true;"
+                "required_before_queue_import=true;"
+                "live_apply_allowed=false;queue_import_allowed=false;"
+                "readiness_closure_allowed=false;"
+                "requires_real_wing_proof_before_live=true"
+            )
+        )
+    return details
+
+
 def _expected_operator_review_decision_option_details(
     decision_items: Any,
 ) -> List[str]:
@@ -1415,6 +1478,501 @@ def _expected_headroom_feedback_true_peak_check_details(
             )
         )
     return sorted(details)
+
+
+def _expected_evidence_problem_correction_chain_details(
+    card: Mapping[str, Any]
+) -> List[str]:
+    reason = str(card.get("denial_reason") or "real_wing_hardware_proof_required")
+
+    def _required(field: str) -> bool:
+        contract = card.get(field)
+        return isinstance(contract, Mapping) and contract.get("required") is True
+
+    def _detail(
+        name: str,
+        *,
+        chain_step: str,
+        source_fields: Iterable[str],
+        operator_action: str,
+        required: bool,
+    ) -> str:
+        fields = ",".join(str(field) for field in source_fields)
+        return (
+            f"{name}:source=operator_review_contract.{name};"
+            f"chain_step={chain_step};"
+            f"source_fields={fields};"
+            f"operator_action={operator_action};"
+            "review_status=required_from_offline_proposal_payload;"
+            f"required={str(required).lower()};"
+            f"denial_reason={reason};"
+            "required_before_operator_acceptance=true;"
+            "required_before_live_promotion=true;"
+            "required_before_queue_import=true;"
+            "live_apply_allowed=false;"
+            "queue_import_allowed=false;"
+            "requires_real_wing_proof_before_live=true"
+        )
+
+    details = [
+        _detail(
+            "source_evidence",
+            chain_step="1_source_evidence",
+            source_fields=["source_evidence"],
+            operator_action=(
+                "confirm_source_evidence_matches_current_offline_material"
+            ),
+            required=_required("source_evidence"),
+        ),
+        _detail(
+            "source_evidence_details",
+            chain_step="2_source_evidence_details",
+            source_fields=["source_evidence_details"],
+            operator_action="review_source_evidence_details_before_acceptance",
+            required=_required("source_evidence_details"),
+        ),
+        _detail(
+            "measured_or_audible_problem",
+            chain_step="3_measured_or_audible_problem",
+            source_fields=["measured_or_audible_problem"],
+            operator_action="confirm_problem_statement_matches_source_evidence",
+            required=_required("measured_or_audible_problem"),
+        ),
+        _detail(
+            "proposed_correction",
+            chain_step="4_proposed_correction",
+            source_fields=["proposed_correction"],
+            operator_action="confirm_proposed_correction_matches_the_problem",
+            required=_required("proposed_correction"),
+        ),
+        _detail(
+            "confidence",
+            chain_step="5_confidence",
+            source_fields=[
+                "confidence",
+                "confidence_review",
+                "confidence_review_details",
+            ],
+            operator_action="review_confidence_and_confidence_blockers",
+            required=_required("confidence"),
+        ),
+        _detail(
+            "bounded_delta",
+            chain_step="6_bounded_delta",
+            source_fields=[
+                "bounded_delta",
+                "bounded_delta_details",
+                "bounded_delta_unit",
+                "bounded_delta_policy",
+            ],
+            operator_action="review_bounded_delta_and_required_evidence",
+            required=_required("bounded_delta"),
+        ),
+    ]
+    return sorted(details)
+
+
+def _expected_goal_requirement_details(card: Mapping[str, Any]) -> List[str]:
+    reason = str(card.get("denial_reason") or "real_wing_hardware_proof_required")
+
+    def _required(field: str) -> bool:
+        contract = card.get(field)
+        return isinstance(contract, Mapping) and contract.get("required") is True
+
+    def _covered(value: Any) -> str:
+        return "covered" if bool(value) else "missing"
+
+    def _detail(
+        requirement: str,
+        *,
+        source_fields: Iterable[str],
+        operator_action: str,
+        covered: bool,
+    ) -> str:
+        fields = ",".join(str(field) for field in source_fields)
+        return (
+            f"{requirement}:source=correction_method_goal_requirement;"
+            f"source_fields={fields};"
+            f"operator_action={operator_action};"
+            f"coverage_status={_covered(covered)};"
+            "required=true;"
+            "acceptance_scope=offline_proposal_only;"
+            "required_before_operator_acceptance=true;"
+            "required_before_live_promotion=true;"
+            "required_before_queue_import=true;"
+            f"denial_reason={reason};"
+            "live_apply_allowed=false;"
+            "queue_import_allowed=false;"
+            "readiness_closure_allowed=false;"
+            "requires_real_wing_proof_before_live=true"
+        )
+
+    details = [
+        _detail(
+            "source_evidence",
+            source_fields=["source_evidence", "source_evidence_details"],
+            operator_action="confirm_source_evidence_before_acceptance",
+            covered=_required("source_evidence")
+            and _required("source_evidence_details"),
+        ),
+        _detail(
+            "measured_or_audible_problem",
+            source_fields=["measured_or_audible_problem"],
+            operator_action="confirm_problem_statement_before_acceptance",
+            covered=_required("measured_or_audible_problem"),
+        ),
+        _detail(
+            "proposed_correction",
+            source_fields=["proposed_correction"],
+            operator_action="confirm_proposed_correction_before_acceptance",
+            covered=_required("proposed_correction"),
+        ),
+        _detail(
+            "confidence",
+            source_fields=[
+                "confidence",
+                "confidence_review",
+                "confidence_review_details",
+            ],
+            operator_action="review_confidence_before_acceptance",
+            covered=_required("confidence"),
+        ),
+        _detail(
+            "bounded_delta",
+            source_fields=[
+                "bounded_delta",
+                "bounded_delta_details",
+                "bounded_delta_unit",
+                "bounded_delta_policy",
+            ],
+            operator_action="review_bounded_delta_before_acceptance",
+            covered=_required("bounded_delta"),
+        ),
+        _detail(
+            "safety_blockers",
+            source_fields=[
+                "safety_blockers",
+                "effective_safety_blockers",
+                "safety_blocker_details",
+                "required_safety_checks",
+            ],
+            operator_action="review_safety_blockers_before_acceptance",
+            covered=_required("safety_blockers")
+            and bool(_sorted_str_items(card.get("safety_blocker_details")))
+            and bool(_sorted_str_items(card.get("required_safety_checks"))),
+        ),
+        _detail(
+            "headroom_feedback_true_peak_checks",
+            source_fields=[
+                "headroom_feedback_true_peak_checks",
+                "headroom_feedback_true_peak_check_details",
+            ],
+            operator_action=(
+                "verify_headroom_feedback_true_peak_checks_before_acceptance"
+            ),
+            covered=_required("headroom_feedback_true_peak_checks")
+            and bool(
+                _sorted_str_items(card.get("headroom_feedback_true_peak_check_details"))
+            ),
+        ),
+        _detail(
+            "operator_readable_explanation",
+            source_fields=[
+                "operator_readable_explanation",
+                "operator_explanation_packet",
+            ],
+            operator_action="confirm_operator_explanation_before_acceptance",
+            covered=_required("operator_readable_explanation"),
+        ),
+        _detail(
+            "rollback_expectation",
+            source_fields=[
+                "rollback_expectation",
+                "rollback_readback_contract",
+                "rollback_readback_details",
+            ],
+            operator_action="confirm_rollback_expectation_before_acceptance",
+            covered=bool(card.get("rollback_expectation"))
+            and _required("rollback_readback_contract"),
+        ),
+        _detail(
+            "future_wing_readback_contract",
+            source_fields=[
+                "future_wing_readback_contract",
+                "future_wing_readback_contract_summary",
+                "future_wing_readback_targets",
+            ],
+            operator_action=(
+                "verify_future_wing_readback_contract_before_live_promotion"
+            ),
+            covered=_required("future_wing_readback_contract")
+            and bool(_sorted_str_items(card.get("future_wing_readback_targets")))
+            and bool(
+                _sorted_str_items(card.get("future_wing_readback_contract_summary"))
+            ),
+        ),
+        _detail(
+            "test_evidence",
+            source_fields=[
+                "test_evidence_references",
+                "operator_review_contract_tests",
+                "export_verification_tests",
+                "no_wing_release_gate_tests",
+            ],
+            operator_action="verify_offline_tests_before_acceptance",
+            covered=_required("test_evidence")
+            and bool(_sorted_str_items(card.get("test_evidence_references"))),
+        ),
+    ]
+    return sorted(details)
+
+
+METHOD_SPECIFIC_REVIEW_PROFILES: Dict[str, Dict[str, str]] = {
+    "gain_trim": {
+        "problem_focus": "overload_weak_signal_headroom",
+        "correction_focus": "safe_gain_down_or_trim",
+        "safety_focus": "headroom_true_peak_feedback_ayaic_level_plane",
+    },
+    "gain_trim_and_fader_balance": {
+        "problem_focus": "gain_structure_and_balance_conflict",
+        "correction_focus": "bounded_gain_or_fader_balance_proposal",
+        "safety_focus": "headroom_sum_bus_fader_ceiling_ayaic_level_plane",
+    },
+    "fader_balance": {
+        "problem_focus": "channel_group_vocal_instrument_balance",
+        "correction_focus": "small_bounded_fader_or_group_balance",
+        "safety_focus": "fader_ceiling_sum_bus_headroom_ayaic_level_plane",
+    },
+    "eq": {
+        "problem_focus": "hpf_mud_harshness_masking",
+        "correction_focus": "corrective_eq_cut_or_hpf_proposal",
+        "safety_focus": "feedback_manual_band_phase_sum_bus",
+    },
+    "compressor_dynamics": {
+        "problem_focus": "dynamic_range_gr_threshold_ratio_attack_release",
+        "correction_focus": "compressor_threshold_ratio_attack_release_proposal",
+        "safety_focus": "gain_reduction_makeup_gain_true_peak_headroom",
+    },
+    "gate_expander": {
+        "problem_focus": "noise_bleed_chatter_source_identity",
+        "correction_focus": "gate_or_expander_threshold_hysteresis_proposal",
+        "safety_focus": "chatter_guard_tails_attack_speech_intelligibility",
+    },
+    "gate_expander_deesser": {
+        "problem_focus": "noise_bleed_sibilance_tails",
+        "correction_focus": "gate_expander_deesser_bounded_attenuation",
+        "safety_focus": "source_identity_hysteresis_speech_tails_attack_true_peak",
+    },
+    "fx_sends": {
+        "problem_focus": "reverb_delay_send_return_intelligibility",
+        "correction_focus": "bounded_fx_send_return_level_proposal",
+        "safety_focus": "return_level_monitor_safety_feedback_intelligibility",
+    },
+    "pan_stereo": {
+        "problem_focus": "stereo_placement_mono_phase_risk",
+        "correction_focus": "bounded_pan_proposal",
+        "safety_focus": "mono_compatibility_phase_source_identity",
+    },
+    "routing_groups_scenes": {
+        "problem_focus": "routing_group_scene_inventory_gap",
+        "correction_focus": "read_only_map_or_inventory_only",
+        "safety_focus": "no_routing_scene_mute_dca_matrix_writes",
+    },
+    "master_output": {
+        "problem_focus": "master_true_peak_pa_feed_limiter_risk",
+        "correction_focus": "offline_master_output_recommendation",
+        "safety_focus": "true_peak_pa_feed_limiter_dynamics_proof_reference_feed_exclusion",
+    },
+}
+DEFAULT_METHOD_SPECIFIC_REVIEW_PROFILE = {
+    "problem_focus": "supporting_context_or_calibration_gap",
+    "correction_focus": "proposal_layer_context_only",
+    "safety_focus": "read_only_no_live_authority",
+}
+
+
+def _expected_method_specific_review_details(
+    card: Mapping[str, Any]
+) -> List[str]:
+    family = str(card.get("objective_family") or "supporting_context")
+    priority = card.get("priority")
+    priority_value = "none" if priority is None else str(priority)
+    profile = METHOD_SPECIFIC_REVIEW_PROFILES.get(
+        family,
+        DEFAULT_METHOD_SPECIFIC_REVIEW_PROFILE,
+    )
+
+    def _joined(values: Any) -> str:
+        items = _sorted_str_items(values)
+        return ",".join(items) if items else "none"
+
+    def _detail(name: str, focus_value: str, *, source_fields: Iterable[str]) -> str:
+        fields = ",".join(str(field) for field in source_fields)
+        return (
+            f"{name}:source=correction_method_goal.method_specific_review;"
+            f"method_id={card.get('method_id')};"
+            f"objective_family={family};"
+            f"priority={priority_value};"
+            f"priority_label={card.get('priority_label')};"
+            f"focus={focus_value};"
+            f"source_fields={fields};"
+            f"required_evidence={_joined(card.get('required_evidence'))};"
+            f"required_safety_checks={_joined(card.get('required_safety_checks'))};"
+            f"bounded_delta={card.get('bounded_delta_unit')}:"
+            f"{card.get('bounded_delta_policy')};"
+            f"rollback_expectation={card.get('rollback_expectation')};"
+            "future_wing_readback_targets="
+            f"{_joined(card.get('future_wing_readback_targets'))};"
+            f"blocked_live_actions={_joined(card.get('blocked_live_actions'))};"
+            f"operator_action=review_method_specific_{name}:{family};"
+            "acceptance_scope=offline_proposal_only;"
+            "required_before_operator_acceptance=true;"
+            "required_before_live_promotion=true;"
+            "required_before_queue_import=true;"
+            f"denial_reason={card.get('denial_reason') or 'real_wing_hardware_proof_required'};"
+            "live_apply_allowed=false;"
+            "queue_import_allowed=false;"
+            "readiness_closure_allowed=false;"
+            "requires_real_wing_proof_before_live=true"
+        )
+
+    return sorted(
+        [
+            _detail(
+                "method_problem_focus",
+                profile["problem_focus"],
+                source_fields=[
+                    "source_evidence",
+                    "measured_or_audible_problem",
+                    "operator_evidence_packet",
+                ],
+            ),
+            _detail(
+                "method_correction_focus",
+                profile["correction_focus"],
+                source_fields=[
+                    "proposed_correction",
+                    "bounded_delta",
+                    "operator_explanation_packet",
+                ],
+            ),
+            _detail(
+                "method_safety_focus",
+                profile["safety_focus"],
+                source_fields=[
+                    "safety_blockers",
+                    "headroom_feedback_true_peak_checks",
+                    "required_safety_checks",
+                ],
+            ),
+            _detail(
+                "method_future_live_boundary",
+                "future_wing_readback_and_real_hardware_proof_required",
+                source_fields=[
+                    "future_wing_readback_contract",
+                    "future_live_promotion_requirements",
+                    "live_authority_boundary",
+                ],
+            ),
+        ]
+    )
+
+
+def _expected_operator_actionable_explanation_details(
+    card: Mapping[str, Any]
+) -> List[str]:
+    family = str(card.get("objective_family") or "supporting_context")
+    priority = card.get("priority")
+    priority_value = "none" if priority is None else str(priority)
+    profile = METHOD_SPECIFIC_REVIEW_PROFILES.get(
+        family,
+        DEFAULT_METHOD_SPECIFIC_REVIEW_PROFILE,
+    )
+
+    def _joined(values: Any) -> str:
+        items = _sorted_str_items(values)
+        return ",".join(items) if items else "none"
+
+    def _detail(
+        name: str,
+        explanation: str,
+        *,
+        source_fields: Iterable[str],
+        operator_action: str,
+    ) -> str:
+        fields = ",".join(str(field) for field in source_fields)
+        return (
+            f"{name}:source=operator_actionable_explanation;"
+            f"method_id={card.get('method_id')};"
+            f"objective_family={family};"
+            f"priority={priority_value};"
+            f"priority_label={card.get('priority_label')};"
+            f"explanation={explanation};"
+            f"source_fields={fields};"
+            f"required_evidence={_joined(card.get('required_evidence'))};"
+            f"required_safety_checks={_joined(card.get('required_safety_checks'))};"
+            f"bounded_delta={card.get('bounded_delta_unit')}:"
+            f"{card.get('bounded_delta_policy')};"
+            f"rollback_expectation={card.get('rollback_expectation')};"
+            "future_wing_readback_targets="
+            f"{_joined(card.get('future_wing_readback_targets'))};"
+            f"blocked_live_actions={_joined(card.get('blocked_live_actions'))};"
+            f"operator_action={operator_action};"
+            "acceptance_scope=offline_proposal_only;"
+            "required_before_operator_acceptance=true;"
+            "required_before_live_promotion=true;"
+            "required_before_queue_import=true;"
+            f"denial_reason={card.get('denial_reason') or 'real_wing_hardware_proof_required'};"
+            "live_apply_allowed=false;"
+            "queue_import_allowed=false;"
+            "readiness_closure_allowed=false;"
+            "requires_real_wing_proof_before_live=true"
+        )
+
+    return sorted(
+        [
+            _detail(
+                "what_is_wrong",
+                f"review_{profile['problem_focus']}_from_source_evidence",
+                source_fields=[
+                    "source_evidence",
+                    "source_evidence_details",
+                    "measured_or_audible_problem",
+                ],
+                operator_action="confirm_what_is_wrong_before_acceptance",
+            ),
+            _detail(
+                "what_is_proposed",
+                f"review_{profile['correction_focus']}_from_proposed_correction",
+                source_fields=[
+                    "proposed_correction",
+                    "bounded_delta",
+                    "operator_readable_explanation",
+                ],
+                operator_action="confirm_what_is_proposed_before_acceptance",
+            ),
+            _detail(
+                "why_safe_or_blocked",
+                f"offline_only_until_{profile['safety_focus']}_and_real_wing_proof",
+                source_fields=[
+                    "why_safe_summary",
+                    "why_blocked_summary",
+                    "safety_blocker_details",
+                ],
+                operator_action="review_why_safe_or_blocked_before_acceptance",
+            ),
+            _detail(
+                "what_is_needed_before_live",
+                "collect_operator_acceptance_real_wing_readback_rollback_and_emergency_proof",
+                source_fields=[
+                    "future_wing_readback_contract",
+                    "future_live_promotion_requirements",
+                    "operator_acceptance_gate_details",
+                ],
+                operator_action="collect_future_live_proofs_before_live_promotion",
+            ),
+        ]
+    )
 
 
 def _check_future_live_required_proofs(
@@ -3146,6 +3704,8 @@ def verify_correction_method_operator_review_export(
     packet_path = run_dir / "packet.json"
     markdown_path = run_dir / "operator-review.md"
     decision_template_path = run_dir / "operator-decision-template.json"
+    goal_audit_path = run_dir / "goal-audit.json"
+    goal_audit_markdown_path = run_dir / "goal-audit.md"
 
     manifest = _load_json_object(
         manifest_path, label="manifest", failures=failures
@@ -3156,6 +3716,11 @@ def verify_correction_method_operator_review_export(
         label="operator_decision_template",
         failures=failures,
     )
+    goal_audit = _load_json_object(
+        goal_audit_path,
+        label="goal_audit",
+        failures=failures,
+    )
     markdown = ""
     if not markdown_path.exists():
         failures.append(
@@ -3163,6 +3728,13 @@ def verify_correction_method_operator_review_export(
         )
     else:
         markdown = markdown_path.read_text(encoding="utf-8")
+    goal_audit_markdown = ""
+    if not goal_audit_markdown_path.exists():
+        failures.append(
+            _failure("missing_goal_audit_markdown", str(goal_audit_markdown_path))
+        )
+    else:
+        goal_audit_markdown = goal_audit_markdown_path.read_text(encoding="utf-8")
 
     if manifest:
         _check_equal(
@@ -3188,6 +3760,18 @@ def verify_correction_method_operator_review_export(
             code="manifest_packet_status_mismatch",
             actual=manifest.get("packet_status"),
             expected=EXPECTED_PACKET_STATUS,
+        )
+        _check_equal(
+            failures,
+            code="manifest_goal_audit_schema_mismatch",
+            actual=manifest.get("goal_audit_schema"),
+            expected=EXPECTED_GOAL_AUDIT_SCHEMA,
+        )
+        _check_equal(
+            failures,
+            code="manifest_goal_audit_status_mismatch",
+            actual=manifest.get("goal_audit_status"),
+            expected=EXPECTED_GOAL_AUDIT_STATUS,
         )
         _check_equal(
             failures,
@@ -3246,6 +3830,113 @@ def verify_correction_method_operator_review_export(
                 code=f"{artifact_id}_byte_count_mismatch",
                 actual=row.get("bytes"),
                 expected=path.stat().st_size,
+            )
+
+        if goal_audit:
+            _check_equal(
+                failures,
+                code="goal_audit_schema_mismatch",
+                actual=goal_audit.get("schema"),
+                expected=EXPECTED_GOAL_AUDIT_SCHEMA,
+            )
+            _check_equal(
+                failures,
+                code="goal_audit_status_mismatch",
+                actual=goal_audit.get("status"),
+                expected=EXPECTED_GOAL_AUDIT_STATUS,
+            )
+            _check_equal(
+                failures,
+                code="goal_audit_failed_checks_not_empty",
+                actual=goal_audit.get("failed_checks"),
+                expected=[],
+            )
+            _check_equal(
+                failures,
+                code="manifest_goal_audit_failed_check_count_mismatch",
+                actual=manifest.get("goal_audit_failed_check_count"),
+                expected=len(goal_audit.get("failed_checks") or []),
+            )
+            _check_false_flags(
+                failures,
+                payload=goal_audit,
+                label="goal_audit",
+                flags=(
+                    "contacts_wing",
+                    "contacts_backend",
+                    "mutates_mixer",
+                    "live_authority_granted",
+                    "readiness_closure_allowed",
+                    "live_apply_allowed",
+                    "queue_import_allowed",
+                ),
+            )
+            _check_true_flags(
+                failures,
+                payload=goal_audit,
+                label="goal_audit",
+                flags=(
+                    "read_only",
+                    "operator_review_required",
+                    "future_wing_readback_required",
+                    "hardware_proof_required_before_live",
+                    "blocks_live_promotion",
+                    "blocks_queue_import",
+                ),
+            )
+            goal_audit_summary = manifest.get("goal_audit_summary")
+            if not isinstance(goal_audit_summary, dict):
+                failures.append(
+                    _failure(
+                        "manifest_goal_audit_summary_not_object",
+                        repr(goal_audit_summary),
+                    )
+                )
+                goal_audit_summary = {}
+            for key in (
+                "overall_offline_goal_percent",
+                "method_review_card_count",
+                "expected_method_count",
+                "priority_section_count",
+                "expected_priority_section_count",
+                "missing_required_objective_families",
+                "missing_expected_objective_families",
+                "coverage_percent",
+                "no_live_authority",
+                "contacts_wing",
+                "contacts_backend",
+                "mutates_mixer",
+                "live_authority_granted",
+                "readiness_closure_allowed",
+                "live_apply_allowed",
+                "queue_import_allowed",
+                "hardware_proof_required_before_live",
+            ):
+                _check_equal(
+                    failures,
+                    code=f"manifest_goal_audit_summary_{key}_mismatch",
+                    actual=goal_audit_summary.get(key),
+                    expected=goal_audit.get(key),
+                )
+            _check_false_flags(
+                failures,
+                payload=goal_audit_summary,
+                label="manifest_goal_audit_summary",
+                flags=(
+                    "contacts_wing",
+                    "contacts_backend",
+                    "mutates_mixer",
+                    "live_authority_granted",
+                    "readiness_closure_allowed",
+                    "live_apply_allowed",
+                    "queue_import_allowed",
+                ),
+            )
+            _check_equal(
+                failures,
+                code="manifest_goal_audit_summary_no_live_authority_mismatch",
+                actual=goal_audit_summary.get("no_live_authority"),
+                expected=True,
             )
 
         summary = manifest.get("summary") if isinstance(manifest.get("summary"), dict) else {}
@@ -3412,6 +4103,22 @@ def verify_correction_method_operator_review_export(
                         "safety_blockers",
                     ),
                     (
+                        "priority_goal_requirement_detail_counts",
+                        "goal_requirement_details",
+                    ),
+                    (
+                        "priority_method_specific_review_detail_counts",
+                        "method_specific_review_details",
+                    ),
+                    (
+                        "priority_operator_actionable_explanation_detail_counts",
+                        "operator_actionable_explanation_details",
+                    ),
+                    (
+                        "priority_evidence_problem_correction_chain_detail_counts",
+                        "evidence_problem_correction_chain_details",
+                    ),
+                    (
                         "priority_safety_blocker_detail_counts",
                         "safety_blocker_details",
                     ),
@@ -3498,6 +4205,10 @@ def verify_correction_method_operator_review_export(
                     (
                         "priority_required_confirmation_detail_counts",
                         "required_confirmation_details",
+                    ),
+                    (
+                        "priority_operator_acceptance_gate_detail_counts",
+                        "operator_acceptance_gate_details",
                     ),
                     (
                         "priority_operator_review_decision_option_detail_counts",
@@ -3609,6 +4320,57 @@ def verify_correction_method_operator_review_export(
             actual=_sorted_str_items(packet.get("required_operator_surfaces")),
             expected=sorted(REQUIRED_OPERATOR_SURFACES),
         )
+        if goal_audit:
+            expected_goal_audit = audit_correction_method_goal_packet(
+                packet,
+                pipeline_id=str(packet.get("pipeline_id") or ""),
+                generated_at_utc=str(goal_audit.get("generated_at_utc") or ""),
+            )
+            for key in (
+                "schema",
+                "status",
+                "failed_checks",
+                "method_review_card_count",
+                "expected_method_count",
+                "missing_expected_method_ids",
+                "extra_method_ids",
+                "priority_section_count",
+                "expected_priority_section_count",
+                "required_objective_families",
+                "covered_required_objective_families",
+                "missing_required_objective_families",
+                "expected_objective_families",
+                "covered_expected_objective_families",
+                "missing_expected_objective_families",
+                "supporting_objective_families",
+                "required_operator_surfaces",
+                "required_method_review_fields",
+                "required_method_detail_list_fields",
+                "coverage_percent",
+                "overall_offline_goal_percent",
+                "denial_reason",
+                "operator_next_step",
+                "read_only",
+                "contacts_wing",
+                "contacts_backend",
+                "mutates_mixer",
+                "live_authority_granted",
+                "readiness_closure_allowed",
+                "live_apply_allowed",
+                "queue_import_allowed",
+                "hardware_proof_required_before_live",
+                "operator_review_required",
+                "future_wing_readback_required",
+                "blocks_live_promotion",
+                "blocks_queue_import",
+                "no_live_authority",
+            ):
+                _check_equal(
+                    failures,
+                    code=f"goal_audit_{key}_mismatch",
+                    actual=goal_audit.get(key),
+                    expected=expected_goal_audit.get(key),
+                )
 
         priority_sections = packet.get("priority_sections")
         if not isinstance(priority_sections, list):
@@ -3774,6 +4536,18 @@ def verify_correction_method_operator_review_export(
             )
             _check_equal(
                 failures,
+                code=f"method_{method_id}_operator_acceptance_gate_details_mismatch",
+                actual=_sorted_str_items(
+                    card.get("operator_acceptance_gate_details")
+                ),
+                expected=sorted(
+                    _expected_operator_acceptance_gate_details(
+                        card.get("what_operator_must_confirm")
+                    )
+                ),
+            )
+            _check_equal(
+                failures,
                 code=(
                     f"method_{method_id}_"
                     "operator_review_decision_option_details_mismatch"
@@ -3833,6 +4607,29 @@ def verify_correction_method_operator_review_export(
                 actual=_summary_keys(card.get("why_blocked_summary")),
                 expected=list(REQUIRED_OPERATOR_WHY_BLOCKED_SUMMARY_KEYS),
             )
+            _check_equal(
+                failures,
+                code=f"method_{method_id}_goal_requirement_details_mismatch",
+                actual=_sorted_str_items(card.get("goal_requirement_details")),
+                expected=_expected_goal_requirement_details(card),
+            )
+            _check_equal(
+                failures,
+                code=f"method_{method_id}_method_specific_review_details_mismatch",
+                actual=_sorted_str_items(card.get("method_specific_review_details")),
+                expected=_expected_method_specific_review_details(card),
+            )
+            _check_equal(
+                failures,
+                code=(
+                    f"method_{method_id}_"
+                    "operator_actionable_explanation_details_mismatch"
+                ),
+                actual=_sorted_str_items(
+                    card.get("operator_actionable_explanation_details")
+                ),
+                expected=_expected_operator_actionable_explanation_details(card),
+            )
             _check_test_evidence_references(
                 failures,
                 method_id=method_id,
@@ -3877,6 +4674,17 @@ def verify_correction_method_operator_review_export(
                 code=f"method_{method_id}_safety_blocker_details_mismatch",
                 actual=_sorted_str_items(card.get("safety_blocker_details")),
                 expected=_expected_safety_blocker_details(card),
+            )
+            _check_equal(
+                failures,
+                code=(
+                    f"method_{method_id}_"
+                    "evidence_problem_correction_chain_details_mismatch"
+                ),
+                actual=_sorted_str_items(
+                    card.get("evidence_problem_correction_chain_details")
+                ),
+                expected=_expected_evidence_problem_correction_chain_details(card),
             )
             _check_equal(
                 failures,
@@ -4751,6 +5559,10 @@ def verify_correction_method_operator_review_export(
                         "required_confirmation_details",
                     ),
                     (
+                        "operator_acceptance_gate_details",
+                        "operator_acceptance_gate_details",
+                    ),
+                    (
                         "operator_review_decision_option_details",
                         "operator_review_decision_option_details",
                     ),
@@ -4778,6 +5590,22 @@ def verify_correction_method_operator_review_export(
                     ),
                     ("why_safe_summary", "why_safe_summary"),
                     ("why_blocked_summary", "why_blocked_summary"),
+                    (
+                        "goal_requirement_details",
+                        "goal_requirement_details",
+                    ),
+                    (
+                        "method_specific_review_details",
+                        "method_specific_review_details",
+                    ),
+                    (
+                        "operator_actionable_explanation_details",
+                        "operator_actionable_explanation_details",
+                    ),
+                    (
+                        "evidence_problem_correction_chain_details",
+                        "evidence_problem_correction_chain_details",
+                    ),
                     (
                         "future_wing_readback_targets",
                         "future_wing_readback_targets",
@@ -5220,10 +6048,15 @@ def verify_correction_method_operator_review_export(
                     "bounded_delta_policies",
                     "rollback_expectations",
                     "required_confirmation_details",
+                    "operator_acceptance_gate_details",
                     "operator_review_decision_option_details",
                     "operator_review_checklist_details",
                     "operator_review_record_field_details",
                     "operator_next_action_details",
+                    "goal_requirement_details",
+                    "method_specific_review_details",
+                    "operator_actionable_explanation_details",
+                    "evidence_problem_correction_chain_details",
                     "future_live_requirement_details",
                     "safety_blocker_details",
                     "headroom_feedback_true_peak_check_details",
@@ -5271,6 +6104,19 @@ def verify_correction_method_operator_review_export(
                 ),
                 ("why_safe_summary", "why_safe_summary"),
                 ("why_blocked_summary", "why_blocked_summary"),
+                ("goal_requirement_details", "goal_requirement_details"),
+                (
+                    "method_specific_review_details",
+                    "method_specific_review_details",
+                ),
+                (
+                    "operator_actionable_explanation_details",
+                    "operator_actionable_explanation_details",
+                ),
+                (
+                    "evidence_problem_correction_chain_details",
+                    "evidence_problem_correction_chain_details",
+                ),
                 (
                     "future_wing_readback_targets",
                     "future_wing_readback_targets",
@@ -5301,6 +6147,10 @@ def verify_correction_method_operator_review_export(
                 (
                     "required_confirmation_details",
                     "required_confirmation_details",
+                ),
+                (
+                    "operator_acceptance_gate_details",
+                    "operator_acceptance_gate_details",
                 ),
                 (
                     "operator_review_decision_option_details",
@@ -5856,6 +6706,34 @@ def verify_correction_method_operator_review_export(
                         ),
                     ),
                     (
+                        "goal_requirement_details",
+                        (
+                            "- goal_requirement_details: "
+                            f"{_markdown_items(decision_section.get('goal_requirement_details'))}"
+                        ),
+                    ),
+                    (
+                        "method_specific_review_details",
+                        (
+                            "- method_specific_review_details: "
+                            f"{_markdown_items(decision_section.get('method_specific_review_details'))}"
+                        ),
+                    ),
+                    (
+                        "operator_actionable_explanation_details",
+                        (
+                            "- operator_actionable_explanation_details: "
+                            f"{_markdown_items(decision_section.get('operator_actionable_explanation_details'))}"
+                        ),
+                    ),
+                    (
+                        "evidence_problem_correction_chain_details",
+                        (
+                            "- evidence_problem_correction_chain_details: "
+                            f"{_markdown_items(decision_section.get('evidence_problem_correction_chain_details'))}"
+                        ),
+                    ),
+                    (
                         "confidence",
                         (
                             "- confidence: "
@@ -6080,6 +6958,13 @@ def verify_correction_method_operator_review_export(
                         ),
                     ),
                     (
+                        "operator_acceptance_gate_details",
+                        (
+                            "- operator_acceptance_gate_details: "
+                            f"{_markdown_items(decision_section.get('operator_acceptance_gate_details'))}"
+                        ),
+                    ),
+                    (
                         "operator_review_decision_option_details",
                         (
                             "- operator_review_decision_option_details: "
@@ -6230,6 +7115,34 @@ def verify_correction_method_operator_review_export(
                     ),
                 ),
                 (
+                    "goal_requirement_details",
+                    (
+                        "- goal_requirement_details: "
+                        f"{_markdown_items(card.get('goal_requirement_details'))}"
+                    ),
+                ),
+                (
+                    "method_specific_review_details",
+                    (
+                        "- method_specific_review_details: "
+                        f"{_markdown_items(card.get('method_specific_review_details'))}"
+                    ),
+                ),
+                (
+                    "operator_actionable_explanation_details",
+                    (
+                        "- operator_actionable_explanation_details: "
+                        f"{_markdown_items(card.get('operator_actionable_explanation_details'))}"
+                    ),
+                ),
+                (
+                    "evidence_problem_correction_chain_details",
+                    (
+                        "- evidence_problem_correction_chain_details: "
+                        f"{_markdown_items(card.get('evidence_problem_correction_chain_details'))}"
+                    ),
+                ),
+                (
                     "operator_problem_review_summary",
                     (
                         "- operator_problem_review_summary: "
@@ -6350,6 +7263,13 @@ def verify_correction_method_operator_review_export(
                     (
                         "- required_confirmation_details: "
                         f"{_markdown_items(card.get('required_confirmation_details'))}"
+                    ),
+                ),
+                (
+                    "operator_acceptance_gate_details",
+                    (
+                        "- operator_acceptance_gate_details: "
+                        f"{_markdown_items(card.get('operator_acceptance_gate_details'))}"
                     ),
                 ),
                 (
@@ -6552,6 +7472,51 @@ def verify_correction_method_operator_review_export(
                             expected_line,
                         )
                     )
+
+    if goal_audit_markdown:
+        if not goal_audit_markdown.startswith(
+            "# Automixer Correction Method Goal Audit\n"
+        ):
+            failures.append(
+                _failure(
+                    "goal_audit_markdown_header_missing",
+                    "goal-audit.md must start with the goal audit heading",
+                )
+            )
+        for expected_line in (
+            "- status: `passed`",
+            "- read_only: `true`",
+            "- contacts_wing: `false`",
+            "- live_authority_granted: `false`",
+            "- readiness_closure_allowed: `false`",
+            "- overall_offline_goal_percent: `100.0`",
+            "- `none`",
+        ):
+            if expected_line not in goal_audit_markdown:
+                failures.append(
+                    _failure(
+                        "goal_audit_markdown_required_line_missing",
+                        expected_line,
+                    )
+                )
+        for family in (
+            goal_audit.get("required_objective_families")
+            if isinstance(goal_audit.get("required_objective_families"), list)
+            else []
+        ):
+            expected_line = f"- `{family}`: `covered`"
+            if expected_line not in goal_audit_markdown:
+                failures.append(
+                    _failure(
+                        "goal_audit_markdown_required_family_missing",
+                        expected_line,
+                    )
+                )
+        for forbidden in FORBIDDEN_MARKDOWN_TRUE_FLAGS:
+            if forbidden in goal_audit_markdown:
+                failures.append(
+                    _failure("goal_audit_markdown_forbidden_true_flag", forbidden)
+                )
 
     return {
         "schema": "automixer.correction_method_operator_review_export_verification.v1",
@@ -6795,6 +7760,7 @@ def validate_correction_method_operator_decision_record(
             for row_field in (
                 "required_confirmations",
                 "required_confirmation_details",
+                "operator_acceptance_gate_details",
                 "operator_review_decision_option_details",
                 "required_evidence",
                 "required_safety_checks",
@@ -6804,6 +7770,10 @@ def validate_correction_method_operator_decision_record(
                 "operator_method_review_focus",
                 "why_safe_summary",
                 "why_blocked_summary",
+                "goal_requirement_details",
+                "method_specific_review_details",
+                "operator_actionable_explanation_details",
+                "evidence_problem_correction_chain_details",
                 "safety_blocker_details",
                 "headroom_feedback_true_peak_check_details",
                 "operator_visible_explanation_contract",
@@ -6895,7 +7865,17 @@ def validate_correction_method_operator_decision_record(
             future_live_requirement_details = record_row.get(
                 "future_live_requirement_details"
             )
+            goal_requirement_details = record_row.get("goal_requirement_details")
+            method_specific_review_details = record_row.get(
+                "method_specific_review_details"
+            )
+            operator_actionable_explanation_details = record_row.get(
+                "operator_actionable_explanation_details"
+            )
             safety_blocker_details = record_row.get("safety_blocker_details")
+            evidence_problem_correction_chain_details = record_row.get(
+                "evidence_problem_correction_chain_details"
+            )
             headroom_feedback_true_peak_check_details = record_row.get(
                 "headroom_feedback_true_peak_check_details"
             )
@@ -6915,6 +7895,9 @@ def validate_correction_method_operator_decision_record(
             )
             required_confirmation_details = record_row.get(
                 "required_confirmation_details"
+            )
+            operator_acceptance_gate_details = record_row.get(
+                "operator_acceptance_gate_details"
             )
             review_decision_option_details = record_row.get(
                 "operator_review_decision_option_details"
@@ -7005,6 +7988,14 @@ def validate_correction_method_operator_decision_record(
                         if isinstance(safety_blocker_details, list)
                         else 0
                     ),
+                    "evidence_problem_correction_chain_detail_count": (
+                        len(evidence_problem_correction_chain_details)
+                        if isinstance(
+                            evidence_problem_correction_chain_details,
+                            list,
+                        )
+                        else 0
+                    ),
                     "headroom_feedback_true_peak_check_detail_count": (
                         len(headroom_feedback_true_peak_check_details)
                         if isinstance(
@@ -7033,6 +8024,24 @@ def validate_correction_method_operator_decision_record(
                         if isinstance(why_blocked_summary, list)
                         else 0
                     ),
+                    "goal_requirement_detail_count": (
+                        len(goal_requirement_details)
+                        if isinstance(goal_requirement_details, list)
+                        else 0
+                    ),
+                    "method_specific_review_detail_count": (
+                        len(method_specific_review_details)
+                        if isinstance(method_specific_review_details, list)
+                        else 0
+                    ),
+                    "operator_actionable_explanation_detail_count": (
+                        len(operator_actionable_explanation_details)
+                        if isinstance(
+                            operator_actionable_explanation_details,
+                            list,
+                        )
+                        else 0
+                    ),
                     "operator_review_record_required_field_count": (
                         len(review_record_required_fields)
                         if isinstance(review_record_required_fields, list)
@@ -7041,6 +8050,11 @@ def validate_correction_method_operator_decision_record(
                     "required_confirmation_detail_count": (
                         len(required_confirmation_details)
                         if isinstance(required_confirmation_details, list)
+                        else 0
+                    ),
+                    "operator_acceptance_gate_detail_count": (
+                        len(operator_acceptance_gate_details)
+                        if isinstance(operator_acceptance_gate_details, list)
                         else 0
                     ),
                     "operator_review_decision_option_detail_count": (
@@ -7321,6 +8335,10 @@ def validate_correction_method_operator_decision_record(
                 "operator_method_review_focus",
                 "why_safe_summary",
                 "why_blocked_summary",
+                "goal_requirement_details",
+                "method_specific_review_details",
+                "operator_actionable_explanation_details",
+                "evidence_problem_correction_chain_details",
                 "safety_blocker_details",
                 "headroom_feedback_true_peak_check_details",
                 "operator_visible_explanation_contract",
@@ -7331,6 +8349,7 @@ def validate_correction_method_operator_decision_record(
                 "blocked_live_actions",
                 "live_authority_boundary_summary",
                 "required_confirmation_details",
+                "operator_acceptance_gate_details",
                 "operator_review_decision_option_details",
                 "operator_review_checklist_details",
                 "operator_review_record_required_fields",
@@ -7608,6 +8627,15 @@ def validate_correction_method_operator_decision_record(
             section_why_blocked_summary = record_section.get(
                 "why_blocked_summary"
             )
+            section_goal_requirement_details = record_section.get(
+                "goal_requirement_details"
+            )
+            section_method_specific_review_details = record_section.get(
+                "method_specific_review_details"
+            )
+            section_operator_actionable_explanation_details = record_section.get(
+                "operator_actionable_explanation_details"
+            )
             section_review_record_required_fields = record_section.get(
                 "operator_review_record_required_fields"
             )
@@ -7616,6 +8644,9 @@ def validate_correction_method_operator_decision_record(
             )
             section_required_confirmation_details = record_section.get(
                 "required_confirmation_details"
+            )
+            section_operator_acceptance_gate_details = record_section.get(
+                "operator_acceptance_gate_details"
             )
             section_review_decision_option_details = record_section.get(
                 "operator_review_decision_option_details"
@@ -7817,6 +8848,27 @@ def validate_correction_method_operator_decision_record(
                         if isinstance(section_why_blocked_summary, list)
                         else 0
                     ),
+                    "goal_requirement_detail_count": (
+                        len(section_goal_requirement_details)
+                        if isinstance(section_goal_requirement_details, list)
+                        else 0
+                    ),
+                    "method_specific_review_detail_count": (
+                        len(section_method_specific_review_details)
+                        if isinstance(
+                            section_method_specific_review_details,
+                            list,
+                        )
+                        else 0
+                    ),
+                    "operator_actionable_explanation_detail_count": (
+                        len(section_operator_actionable_explanation_details)
+                        if isinstance(
+                            section_operator_actionable_explanation_details,
+                            list,
+                        )
+                        else 0
+                    ),
                     "operator_review_record_required_field_count": (
                         len(section_review_record_required_fields)
                         if isinstance(section_review_record_required_fields, list)
@@ -7825,6 +8877,14 @@ def validate_correction_method_operator_decision_record(
                     "required_confirmation_detail_count": (
                         len(section_required_confirmation_details)
                         if isinstance(section_required_confirmation_details, list)
+                        else 0
+                    ),
+                    "operator_acceptance_gate_detail_count": (
+                        len(section_operator_acceptance_gate_details)
+                        if isinstance(
+                            section_operator_acceptance_gate_details,
+                            list,
+                        )
                         else 0
                     ),
                     "operator_review_decision_option_detail_count": (

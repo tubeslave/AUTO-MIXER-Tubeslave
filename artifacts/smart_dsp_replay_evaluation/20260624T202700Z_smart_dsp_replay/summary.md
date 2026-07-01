@@ -1,0 +1,115 @@
+# Smart DSP Replay Evaluation
+
+- schema: `automixer.smart_dsp_replay_evaluation.v1`
+- status: `passed`
+- method_id: `smart_dsp_strategy_engine`
+- scenario_count: `10`
+- passed_scenario_count: `10`
+- failed_scenario_count: `0`
+- pass_rate: `1.0`
+- read_only_or_dry_run_only: `True`
+- live_authority_granted: `False`
+- live_apply_allowed: `False`
+- queue_import_allowed: `False`
+
+## Scenario Results
+
+### soundcheck_muddy_vocal
+
+- status: `passed`
+- expected_selected_strategy_id: `low_mid_corrective_cut`
+- actual_selected_strategy_id: `low_mid_corrective_cut`
+- actual_method_family: `eq`
+- candidate_count: `2`
+- selected_total_score: `0.842`
+- global_blockers: `none`
+
+### live_sibilant_vocal
+
+- status: `passed`
+- expected_selected_strategy_id: `vocal_de_esser`
+- actual_selected_strategy_id: `vocal_de_esser`
+- actual_method_family: `de_esser`
+- candidate_count: `3`
+- selected_total_score: `0.878`
+- global_blockers: `none`
+
+### soundcheck_dynamic_vocal_compression
+
+- status: `passed`
+- expected_selected_strategy_id: `gentle_channel_compression`
+- actual_selected_strategy_id: `gentle_channel_compression`
+- actual_method_family: `dynamics`
+- candidate_count: `3`
+- selected_total_score: `0.813`
+- global_blockers: `none`
+
+### kick_bass_masking_low_headroom
+
+- status: `passed`
+- expected_selected_strategy_id: `subtractive_unmasking_eq_split`
+- actual_selected_strategy_id: `subtractive_unmasking_eq_split`
+- actual_method_family: `eq`
+- candidate_count: `3`
+- selected_total_score: `0.829`
+- global_blockers: `true_peak_headroom_low`
+
+### noisy_tom_tail_risk
+
+- status: `passed`
+- expected_selected_strategy_id: `gentle_expander_bleed_control`
+- actual_selected_strategy_id: `gentle_expander_bleed_control`
+- actual_method_family: `expander`
+- candidate_count: `2`
+- selected_total_score: `0.802`
+- global_blockers: `none`
+
+### wet_fx_monitor_risk
+
+- status: `passed`
+- expected_selected_strategy_id: `reduce_fx_send_or_return`
+- actual_selected_strategy_id: `reduce_fx_send_or_return`
+- actual_method_family: `fx`
+- candidate_count: `3`
+- selected_total_score: `0.833`
+- global_blockers: `none`
+
+### pan_phase_mono_failure
+
+- status: `passed`
+- expected_selected_strategy_id: `center_hold_for_phase_safety`
+- actual_selected_strategy_id: `center_hold_for_phase_safety`
+- actual_method_family: `pan`
+- candidate_count: `2`
+- selected_total_score: `0.822`
+- global_blockers: `none`
+
+### master_true_peak_overload
+
+- status: `passed`
+- expected_selected_strategy_id: `master_trim_for_true_peak_headroom`
+- actual_selected_strategy_id: `master_trim_for_true_peak_headroom`
+- actual_method_family: `master_bus`
+- candidate_count: `2`
+- selected_total_score: `0.848`
+- global_blockers: `none`
+
+### stale_context_blocks_strategy
+
+- status: `passed`
+- expected_selected_strategy_id: `high_pass_cleanup`
+- actual_selected_strategy_id: `high_pass_cleanup`
+- actual_method_family: `eq`
+- candidate_count: `2`
+- selected_total_score: `0.799`
+- global_blockers: `smart_dsp_context_cache_not_fresh`
+
+### live_authority_context_blocks_strategy
+
+- status: `passed`
+- expected_selected_strategy_id: `high_pass_cleanup`
+- actual_selected_strategy_id: `high_pass_cleanup`
+- actual_method_family: `eq`
+- candidate_count: `2`
+- selected_total_score: `0.799`
+- global_blockers: `smart_dsp_context_cache_live_authority_present`

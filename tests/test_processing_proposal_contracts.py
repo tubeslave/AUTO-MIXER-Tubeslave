@@ -16,6 +16,11 @@ from backend.processing_registry import iter_processing_methods
 from tools.export_correction_method_operator_review_packet import (
     export_correction_method_operator_review_packet,
 )
+from tools.audit_correction_method_goal import (
+    audit_correction_method_goal_packet,
+    main as audit_correction_method_goal_main,
+    render_correction_method_goal_audit_markdown,
+)
 from tools.verify_correction_method_operator_review_export import (
     ALLOWED_BOUNDED_DELTA_POLICIES,
     ALLOWED_BOUNDED_DELTA_UNITS,
@@ -49,8 +54,13 @@ from tools.verify_correction_method_operator_review_export import (
     REQUIRED_SOURCE_EVIDENCE_ACKNOWLEDGEMENT,
     REQUIRED_TEST_EVIDENCE_ACKNOWLEDGEMENT,
     REQUIRED_VERIFICATION_REPORT_ACKNOWLEDGEMENT,
+    _expected_evidence_problem_correction_chain_details,
     _expected_future_live_requirement_details,
+    _expected_goal_requirement_details,
     _expected_headroom_feedback_true_peak_check_details,
+    _expected_method_specific_review_details,
+    _expected_operator_actionable_explanation_details,
+    _expected_operator_acceptance_gate_details,
     _expected_safety_blocker_details,
     _expected_operator_review_checklist_details,
     _expected_operator_review_decision_option_details,
@@ -125,6 +135,7 @@ OBJECTIVE_FAMILY_METHODS = {
     "performance_adaptation": ("performance_adaptation_proposal",),
     "arrangement_role": ("arrangement_role_proposal",),
     "decision_evidence_packet": ("decision_evidence_packet_proposal",),
+    "proposal_only_method": ("smart_dsp_strategy_engine",),
     "long_term_memory_learning": ("long_term_memory_learning_proposal",),
 }
 
@@ -132,6 +143,8 @@ QUARANTINED_WRITE_SURFACE_METHODS = (
     "routing_snapshot_reset_writes",
     "fx_direct_apply",
 )
+
+EXPECTED_METHOD_REVIEW_CARD_COUNT = 36
 
 REQUIRED_OPERATOR_FIELDS = (
     "method_id",
@@ -275,6 +288,7 @@ FULL_REQUIRED_SAFETY_CHECKS = (
     "eq_hold_policy",
     "fader_ceiling",
     "feedback",
+    "future_wing_readback",
     "gain_reduction",
     "headroom",
     "hysteresis",
@@ -307,6 +321,7 @@ FULL_REQUIRED_SAFETY_CHECKS = (
     "return_level",
     "role_persistence",
     "rollback",
+    "safety_blockers",
     "safety_regressions",
     "source_identity",
     "speech_intelligibility",
@@ -326,6 +341,7 @@ FULL_BOUNDED_DELTA_UNITS = (
     "fx_insert_or_rack_parameter",
     "genre_task_profile",
     "memory_learning_record",
+    "method_specific",
     "mute_state_diff",
     "pan_percent",
     "phase_guard_policy",
@@ -353,6 +369,7 @@ FULL_BOUNDED_DELTA_POLICIES = (
     "operator_reviewed_replay_calibration_only_with_accepted_rejected_outcomes_and_no_live_authority_context",
     "operator_reviewed_source_identity_label_only_with_classifier_confidence_and_replay_calibration_before_downstream_trust",
     "operator_selected_mix_variant_profile_only_with_level_plane_reference_and_no_named_artist_style_clone",
+    "proposal_must_state_method_specific_bounds_before_operator_review",
     "persistent_level_drift_proposal_only_with_headroom_feedback_cooldown_and_operator_review",
     "preview_only_downward_gain_or_fader_delta",
     "proposal_only_delay_or_polarity_change_requires_correlation_readback_and_manual_confirmation",
@@ -420,11 +437,13 @@ FULL_FUTURE_WING_READBACK_TARGETS = (
     "mono_phase_check",
     "mute_group",
     "offline_replay_summary",
+    "old_value",
     "operator_acceptance_record",
     "operator_accepted_source_label",
     "operator_accepted_source_role",
     "operator_review_record",
     "operator_selected_profile",
+    "proposed_value",
     "phase_measurements",
     "polarity_invert",
     "preamp_gain",
@@ -445,6 +464,7 @@ FULL_FUTURE_WING_READBACK_TARGETS = (
     "rollback_mute_state",
     "rollback_plan",
     "rollback_profile",
+    "rollback_value",
     "rollback_route",
     "rollback_snapshot",
     "routing_map",
@@ -453,6 +473,7 @@ FULL_FUTURE_WING_READBACK_TARGETS = (
     "stem_spectrum",
     "stereo_pair_link",
     "sum_bus",
+    "target_parameter",
     "threshold",
 )
 FULL_ROLLBACK_EXPECTATIONS = (
@@ -479,6 +500,7 @@ FULL_ROLLBACK_EXPECTATIONS = (
     "restore_previous_mute_state_after_physical_readback_or_operator_manual_action",
     "restore_previous_operator_accepted_arrangement_role_or_hold_for_manual_review",
     "restore_previous_operator_selected_mix_profile_or_hold_for_manual_review",
+    "restore_previous_readback_value_or_hold_for_operator_manual_rollback",
     "restore_previous_pan_value_after_physical_readback",
     "restore_previous_send_and_return_values_after_physical_readback",
 )
@@ -4927,9 +4949,7 @@ def test_correction_method_goal_operator_review_packet_is_readonly_and_actionabl
         for action in card["blocked_live_actions"]
     }
     assert generated_blocked_live_actions <= set(FULL_BLOCKED_LIVE_ACTIONS)
-    assert set(FULL_BLOCKED_LIVE_ACTIONS) - generated_blocked_live_actions == {
-        "live_apply"
-    }
+    assert set(FULL_BLOCKED_LIVE_ACTIONS) - generated_blocked_live_actions == set()
     generated_required_safety_checks = {
         check
         for card in packet["method_review_cards"]
@@ -5100,6 +5120,26 @@ def test_correction_method_goal_operator_review_packet_is_readonly_and_actionabl
                 card["what_operator_must_confirm"]
             )
         )
+        assert sorted(card["operator_acceptance_gate_details"]) == sorted(
+            _expected_operator_acceptance_gate_details(
+                card["what_operator_must_confirm"]
+            )
+        )
+        assert len(card["operator_acceptance_gate_details"]) == len(
+            card["what_operator_must_confirm"]
+        )
+        assert all(
+            "acceptance_scope=offline_proposal_only" in item
+            and "required=true" in item
+            and "required_before_operator_acceptance=true" in item
+            and "required_before_live_promotion=true" in item
+            and "required_before_queue_import=true" in item
+            and "live_apply_allowed=false" in item
+            and "queue_import_allowed=false" in item
+            and "readiness_closure_allowed=false" in item
+            and "requires_real_wing_proof_before_live=true" in item
+            for item in card["operator_acceptance_gate_details"]
+        )
         assert any(
             item.startswith(
                 "confidence_and_confidence_blockers_are_reviewed:source=confidence"
@@ -5194,6 +5234,105 @@ def test_correction_method_goal_operator_review_packet_is_readonly_and_actionabl
             "future_live_required_proofs="
             f"{','.join(card['future_live_required_proofs'])}"
         ) in why_blocked_summary
+        assert sorted(card["goal_requirement_details"]) == (
+            _expected_goal_requirement_details(card)
+        )
+        goal_requirement_detail_text = ",".join(card["goal_requirement_details"])
+        for requirement in (
+            "source_evidence",
+            "measured_or_audible_problem",
+            "proposed_correction",
+            "confidence",
+            "bounded_delta",
+            "safety_blockers",
+            "headroom_feedback_true_peak_checks",
+            "operator_readable_explanation",
+            "rollback_expectation",
+            "future_wing_readback_contract",
+            "test_evidence",
+        ):
+            assert f"{requirement}:source=correction_method_goal_requirement" in (
+                goal_requirement_detail_text
+            )
+        assert all(
+            "coverage_status=covered" in item
+            and "acceptance_scope=offline_proposal_only" in item
+            and "live_apply_allowed=false" in item
+            and "queue_import_allowed=false" in item
+            and "readiness_closure_allowed=false" in item
+            and "requires_real_wing_proof_before_live=true" in item
+            for item in card["goal_requirement_details"]
+        )
+        assert sorted(card["method_specific_review_details"]) == (
+            _expected_method_specific_review_details(card)
+        )
+        method_specific_review_text = ",".join(
+            card["method_specific_review_details"]
+        )
+        for focus in (
+            "method_problem_focus",
+            "method_correction_focus",
+            "method_safety_focus",
+            "method_future_live_boundary",
+        ):
+            assert (
+                f"{focus}:source=correction_method_goal.method_specific_review"
+                in method_specific_review_text
+            )
+        assert all(
+            "acceptance_scope=offline_proposal_only" in item
+            and "live_apply_allowed=false" in item
+            and "queue_import_allowed=false" in item
+            and "readiness_closure_allowed=false" in item
+            and "requires_real_wing_proof_before_live=true" in item
+            for item in card["method_specific_review_details"]
+        )
+        assert sorted(card["operator_actionable_explanation_details"]) == (
+            _expected_operator_actionable_explanation_details(card)
+        )
+        actionable_explanation_text = ",".join(
+            card["operator_actionable_explanation_details"]
+        )
+        for explanation_step in (
+            "what_is_wrong",
+            "what_is_proposed",
+            "why_safe_or_blocked",
+            "what_is_needed_before_live",
+        ):
+            assert (
+                f"{explanation_step}:source=operator_actionable_explanation"
+                in actionable_explanation_text
+            )
+        assert all(
+            "acceptance_scope=offline_proposal_only" in item
+            and "required_before_operator_acceptance=true" in item
+            and "live_apply_allowed=false" in item
+            and "queue_import_allowed=false" in item
+            and "readiness_closure_allowed=false" in item
+            and "requires_real_wing_proof_before_live=true" in item
+            for item in card["operator_actionable_explanation_details"]
+        )
+        assert sorted(card["evidence_problem_correction_chain_details"]) == (
+            _expected_evidence_problem_correction_chain_details(card)
+        )
+        chain_detail_text = ",".join(
+            card["evidence_problem_correction_chain_details"]
+        )
+        for chain_step in (
+            "1_source_evidence",
+            "2_source_evidence_details",
+            "3_measured_or_audible_problem",
+            "4_proposed_correction",
+            "5_confidence",
+            "6_bounded_delta",
+        ):
+            assert f"chain_step={chain_step}" in chain_detail_text
+        assert all(
+            "live_apply_allowed=false" in item
+            and "queue_import_allowed=false" in item
+            and "requires_real_wing_proof_before_live=true" in item
+            for item in card["evidence_problem_correction_chain_details"]
+        )
         assert card["bounded_delta_unit"]
         assert card["bounded_delta_unit"] in ALLOWED_BOUNDED_DELTA_UNITS
         assert card["bounded_delta_policy"]
@@ -5594,11 +5733,15 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     packet_path = run_dir / "packet.json"
     markdown_path = run_dir / "operator-review.md"
     decision_template_path = run_dir / "operator-decision-template.json"
+    goal_audit_path = run_dir / "goal-audit.json"
+    goal_audit_markdown_path = run_dir / "goal-audit.md"
     manifest_path = run_dir / "artifact-manifest.json"
 
     assert packet_path.exists()
     assert markdown_path.exists()
     assert decision_template_path.exists()
+    assert goal_audit_path.exists()
+    assert goal_audit_markdown_path.exists()
     assert manifest_path.exists()
 
     disk_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -5608,6 +5751,8 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     decision_template = json.loads(
         decision_template_path.read_text(encoding="utf-8")
     )
+    goal_audit = json.loads(goal_audit_path.read_text(encoding="utf-8"))
+    goal_audit_markdown = goal_audit_markdown_path.read_text(encoding="utf-8")
 
     assert manifest == disk_manifest
     assert manifest["schema"] == (
@@ -5620,6 +5765,29 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     assert manifest["packet_status"] == (
         "operator_review_packet_ready_proposal_only"
     )
+    assert manifest["goal_audit_schema"] == (
+        "automixer.correction_method_goal_audit.v1"
+    )
+    assert manifest["goal_audit_status"] == "passed"
+    assert manifest["goal_audit_failed_check_count"] == 0
+    assert manifest["goal_audit_summary"]["overall_offline_goal_percent"] == 100.0
+    assert (
+        manifest["goal_audit_summary"]["method_review_card_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
+    assert (
+        manifest["goal_audit_summary"]["expected_method_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
+    assert manifest["goal_audit_summary"]["priority_section_count"] == 7
+    assert manifest["goal_audit_summary"]["missing_required_objective_families"] == []
+    assert manifest["goal_audit_summary"]["missing_expected_objective_families"] == []
+    assert manifest["goal_audit_summary"]["no_live_authority"] is True
+    assert manifest["goal_audit_summary"]["contacts_wing"] is False
+    assert manifest["goal_audit_summary"]["live_authority_granted"] is False
+    assert manifest["goal_audit_summary"]["readiness_closure_allowed"] is False
+    assert manifest["goal_audit_summary"]["live_apply_allowed"] is False
+    assert manifest["goal_audit_summary"]["queue_import_allowed"] is False
     assert manifest["operator_decision_template_schema"] == (
         "automixer.correction_method_operator_decision_template.v1"
     )
@@ -5653,7 +5821,10 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     )
     assert manifest["summary"]["queueable_method_ids"] == []
     decision_template_summary = manifest["operator_decision_template_summary"]
-    assert decision_template_summary["method_decision_count"] == 35
+    assert (
+        decision_template_summary["method_decision_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     assert decision_template_summary["priority_decision_section_count"] == 7
     assert decision_template_summary["priority_decision_labels"] == [
         "Gain / Trim and Fader / Balance",
@@ -5708,6 +5879,20 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         "priority_operator_review_record_field_detail_counts"
     ]["1"] == len(FULL_OPERATOR_REVIEW_RECORD_FIELD_DETAILS)
     assert decision_template_summary[
+        "priority_operator_acceptance_gate_detail_counts"
+    ]["1"] == len(packet["priority_sections"][0]["operator_acceptance_gate_details"])
+    assert decision_template_summary[
+        "priority_goal_requirement_detail_counts"
+    ]["1"] == len(packet["priority_sections"][0]["goal_requirement_details"])
+    assert decision_template_summary[
+        "priority_method_specific_review_detail_counts"
+    ]["1"] == len(packet["priority_sections"][0]["method_specific_review_details"])
+    assert decision_template_summary[
+        "priority_operator_actionable_explanation_detail_counts"
+    ]["1"] == len(
+        packet["priority_sections"][0]["operator_actionable_explanation_details"]
+    )
+    assert decision_template_summary[
         "priority_operator_next_action_detail_counts"
     ]["1"] == len(packet["priority_sections"][0]["operator_next_action_details"])
     assert (
@@ -5739,12 +5924,16 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         "packet_json",
         "operator_review_markdown",
         "operator_decision_template",
+        "goal_audit_json",
+        "goal_audit_markdown",
     }
     assert artifacts["packet_json"]["path"] == "packet.json"
     assert artifacts["operator_review_markdown"]["path"] == "operator-review.md"
     assert artifacts["operator_decision_template"]["path"] == (
         "operator-decision-template.json"
     )
+    assert artifacts["goal_audit_json"]["path"] == "goal-audit.json"
+    assert artifacts["goal_audit_markdown"]["path"] == "goal-audit.md"
     assert artifacts["packet_json"]["sha256"] == hashlib.sha256(
         packet_path.read_bytes()
     ).hexdigest()
@@ -5754,6 +5943,25 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     assert artifacts["operator_decision_template"]["sha256"] == hashlib.sha256(
         decision_template_path.read_bytes()
     ).hexdigest()
+    assert artifacts["goal_audit_json"]["sha256"] == hashlib.sha256(
+        goal_audit_path.read_bytes()
+    ).hexdigest()
+    assert artifacts["goal_audit_markdown"]["sha256"] == hashlib.sha256(
+        goal_audit_markdown_path.read_bytes()
+    ).hexdigest()
+    assert goal_audit["status"] == "passed"
+    assert goal_audit["failed_checks"] == []
+    assert goal_audit["overall_offline_goal_percent"] == 100.0
+    assert goal_audit["method_review_card_count"] == len(
+        packet["method_review_cards"]
+    )
+    assert goal_audit["priority_section_count"] == len(packet["priority_sections"])
+    assert goal_audit["contacts_wing"] is False
+    assert goal_audit["live_authority_granted"] is False
+    assert goal_audit["readiness_closure_allowed"] is False
+    assert "- status: `passed`" in goal_audit_markdown
+    assert "- live_authority_granted: `false`" in goal_audit_markdown
+    assert "- overall_offline_goal_percent: `100.0`" in goal_audit_markdown
 
     assert packet["status"] == "operator_review_packet_ready_proposal_only"
     assert packet["live_authority_granted"] is False
@@ -5783,8 +5991,23 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         ]
         assert row["why_safe_summary"] == packet_card["why_safe_summary"]
         assert row["why_blocked_summary"] == packet_card["why_blocked_summary"]
+        assert row["goal_requirement_details"] == packet_card[
+            "goal_requirement_details"
+        ]
+        assert row["method_specific_review_details"] == packet_card[
+            "method_specific_review_details"
+        ]
+        assert row["operator_actionable_explanation_details"] == packet_card[
+            "operator_actionable_explanation_details"
+        ]
+        assert row["evidence_problem_correction_chain_details"] == packet_card[
+            "evidence_problem_correction_chain_details"
+        ]
         assert row["required_confirmation_details"] == packet_card[
             "required_confirmation_details"
+        ]
+        assert row["operator_acceptance_gate_details"] == packet_card[
+            "operator_acceptance_gate_details"
         ]
         assert row["operator_review_decision_option_details"] == packet_card[
             "operator_review_decision_option_details"
@@ -5891,6 +6114,60 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         for item in packet_priority_sections[1]["future_live_requirement_details"]
     )
     assert packet_priority_sections[1]["safety_blocker_details"]
+    assert packet_priority_sections[1]["goal_requirement_details"]
+    assert packet_priority_sections[1]["method_specific_review_details"]
+    assert packet_priority_sections[1]["operator_actionable_explanation_details"]
+    assert any(
+        item.startswith(
+            "source_evidence:source=correction_method_goal_requirement"
+        )
+        for item in packet_priority_sections[1]["goal_requirement_details"]
+    )
+    assert any(
+        "future_wing_readback_contract" in item
+        and "coverage_status=covered" in item
+        for item in packet_priority_sections[1]["goal_requirement_details"]
+    )
+    assert any(
+        item.startswith(
+            "method_problem_focus:"
+            "source=correction_method_goal.method_specific_review"
+        )
+        for item in packet_priority_sections[1]["method_specific_review_details"]
+    )
+    assert any(
+        "focus=safe_gain_down_or_trim" in item
+        or "focus=channel_group_vocal_instrument_balance" in item
+        for item in packet_priority_sections[1]["method_specific_review_details"]
+    )
+    assert any(
+        item.startswith("what_is_wrong:source=operator_actionable_explanation")
+        for item in packet_priority_sections[1][
+            "operator_actionable_explanation_details"
+        ]
+    )
+    assert any(
+        "what_is_needed_before_live" in item
+        and "requires_real_wing_proof_before_live=true" in item
+        for item in packet_priority_sections[1][
+            "operator_actionable_explanation_details"
+        ]
+    )
+    assert packet_priority_sections[1]["evidence_problem_correction_chain_details"]
+    assert any(
+        item.startswith(
+            "source_evidence:source=operator_review_contract.source_evidence"
+        )
+        for item in packet_priority_sections[1][
+            "evidence_problem_correction_chain_details"
+        ]
+    )
+    assert any(
+        "chain_step=4_proposed_correction" in item
+        for item in packet_priority_sections[1][
+            "evidence_problem_correction_chain_details"
+        ]
+    )
     assert any(
         item.startswith("headroom:source=required_safety_checks")
         for item in packet_priority_sections[1]["safety_blocker_details"]
@@ -6036,6 +6313,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
             "blocked_live_actions",
             "live_authority_boundary_summary",
             "required_confirmation_details",
+            "operator_acceptance_gate_details",
             "operator_review_decision_option_details",
             "operator_review_checklist_details",
             "operator_review_record_required_fields",
@@ -6113,6 +6391,10 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     assert "- source_evidence_details:" in first_decision_block
     assert "- measured_or_audible_problem:" in first_decision_block
     assert "- proposed_correction:" in first_decision_block
+    assert "- goal_requirement_details:" in first_decision_block
+    assert "- method_specific_review_details:" in first_decision_block
+    assert "- operator_actionable_explanation_details:" in first_decision_block
+    assert "- evidence_problem_correction_chain_details:" in first_decision_block
     assert "- confidence:" in first_decision_block
     assert "- bounded_delta_contract:" in first_decision_block
     assert "- safety_blockers:" in first_decision_block
@@ -6131,6 +6413,8 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     assert "- test_evidence_references:" in first_decision_block
     assert "- live_authority_boundary_summary:" in first_decision_block
     assert "- operator_review_record_required_fields:" in first_decision_block
+    assert "- required_confirmation_details:" in first_decision_block
+    assert "- operator_acceptance_gate_details:" in first_decision_block
     assert "- operator_review_decision_option_details:" in first_decision_block
     assert "- operator_next_action_details:" in first_decision_block
     assert "- future_live_requirement_details:" in first_decision_block
@@ -6157,6 +6441,10 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     assert "- source_evidence_details:" in markdown
     assert "- measured_or_audible_problem:" in markdown
     assert "- proposed_correction:" in markdown
+    assert "- goal_requirement_details:" in markdown
+    assert "- method_specific_review_details:" in markdown
+    assert "- operator_actionable_explanation_details:" in markdown
+    assert "- evidence_problem_correction_chain_details:" in markdown
     assert "- confidence:" in markdown
     assert "- bounded_delta_contract:" in markdown
     assert "- safety_blockers:" in markdown
@@ -6170,6 +6458,9 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     assert "- required_operator_surfaces:" in markdown
     assert "- operator_payload_required_fields:" in markdown
     assert "- operator_evidence_required_fields:" in markdown
+    assert "- must_confirm:" in markdown
+    assert "- required_confirmation_details:" in markdown
+    assert "- operator_acceptance_gate_details:" in markdown
     assert "- operator_review_decision_option_details:" in markdown
     assert "- operator_next_action_details:" in markdown
     assert "- future_live_requirement_details:" in markdown
@@ -6187,7 +6478,10 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     assert decision_template["status"] == (
         "operator_review_template_pending_proposal_only"
     )
-    assert decision_template["method_decision_count"] == 35
+    assert (
+        decision_template["method_decision_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     assert decision_template["priority_decision_section_count"] == 7
     assert decision_template["read_only"] is True
     assert decision_template["contacts_wing"] is False
@@ -6283,8 +6577,13 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         assert section["blocked_live_actions"]
         assert section["why_safe_summary"]
         assert section["why_blocked_summary"]
+        assert section["goal_requirement_details"]
+        assert section["method_specific_review_details"]
+        assert section["operator_actionable_explanation_details"]
+        assert section["evidence_problem_correction_chain_details"]
         assert section["live_authority_boundary_summary"]
         assert section["required_confirmation_details"]
+        assert section["operator_acceptance_gate_details"]
         assert section["operator_review_decision_option_details"]
         assert section["operator_review_checklist_details"]
         assert section["operator_review_record_required_fields"]
@@ -6317,6 +6616,9 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         assert section["required_confirmation_details"] == packet_section[
             "required_confirmation_details"
         ]
+        assert section["operator_acceptance_gate_details"] == packet_section[
+            "operator_acceptance_gate_details"
+        ]
         assert section["operator_review_decision_option_details"] == packet_section[
             "operator_review_decision_option_details"
         ]
@@ -6335,6 +6637,18 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         assert section["safety_blocker_details"] == packet_section[
             "safety_blocker_details"
         ]
+        assert section["goal_requirement_details"] == (
+            packet_section["goal_requirement_details"]
+        )
+        assert section["method_specific_review_details"] == (
+            packet_section["method_specific_review_details"]
+        )
+        assert section["operator_actionable_explanation_details"] == (
+            packet_section["operator_actionable_explanation_details"]
+        )
+        assert section["evidence_problem_correction_chain_details"] == (
+            packet_section["evidence_problem_correction_chain_details"]
+        )
         assert section["headroom_feedback_true_peak_check_details"] == (
             packet_section["headroom_feedback_true_peak_check_details"]
         )
@@ -6366,6 +6680,18 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
             "confidence": "priority_confidence_counts",
             "bounded_delta": "priority_bounded_delta_counts",
             "safety_blockers": "priority_safety_blocker_counts",
+            "goal_requirement_details": (
+                "priority_goal_requirement_detail_counts"
+            ),
+            "method_specific_review_details": (
+                "priority_method_specific_review_detail_counts"
+            ),
+            "operator_actionable_explanation_details": (
+                "priority_operator_actionable_explanation_detail_counts"
+            ),
+            "evidence_problem_correction_chain_details": (
+                "priority_evidence_problem_correction_chain_detail_counts"
+            ),
             "headroom_feedback_true_peak_checks": (
                 "priority_headroom_feedback_true_peak_check_counts"
             ),
@@ -6426,6 +6752,12 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         )
         assert (
             decision_template_summary[
+                "priority_operator_acceptance_gate_detail_counts"
+            ][str(section["priority"])]
+            == len(section["operator_acceptance_gate_details"])
+        )
+        assert (
+            decision_template_summary[
                 "priority_operator_review_decision_option_detail_counts"
             ][str(section["priority"])]
             == len(section["operator_review_decision_option_details"])
@@ -6459,6 +6791,30 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
                 "priority_safety_blocker_detail_counts"
             ][str(section["priority"])]
             == len(section["safety_blocker_details"])
+        )
+        assert (
+            decision_template_summary[
+                "priority_goal_requirement_detail_counts"
+            ][str(section["priority"])]
+            == len(section["goal_requirement_details"])
+        )
+        assert (
+            decision_template_summary[
+                "priority_method_specific_review_detail_counts"
+            ][str(section["priority"])]
+            == len(section["method_specific_review_details"])
+        )
+        assert (
+            decision_template_summary[
+                "priority_operator_actionable_explanation_detail_counts"
+            ][str(section["priority"])]
+            == len(section["operator_actionable_explanation_details"])
+        )
+        assert (
+            decision_template_summary[
+                "priority_evidence_problem_correction_chain_detail_counts"
+            ][str(section["priority"])]
+            == len(section["evidence_problem_correction_chain_details"])
         )
         assert (
             decision_template_summary[
@@ -6605,6 +6961,18 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         )
         assert row["why_safe_summary"] == card["why_safe_summary"]
         assert row["why_blocked_summary"] == card["why_blocked_summary"]
+        assert row["goal_requirement_details"] == (
+            card["goal_requirement_details"]
+        )
+        assert row["method_specific_review_details"] == (
+            card["method_specific_review_details"]
+        )
+        assert row["operator_actionable_explanation_details"] == (
+            card["operator_actionable_explanation_details"]
+        )
+        assert row["evidence_problem_correction_chain_details"] == (
+            card["evidence_problem_correction_chain_details"]
+        )
         assert row["required_confirmation_details"] == (
             card["required_confirmation_details"]
         )
@@ -6825,7 +7193,7 @@ def test_correction_method_goal_operator_review_export_verifier_accepts_bundle(t
     assert report["readiness_closure_allowed"] is False
     assert report["live_apply_allowed"] is False
     assert report["queue_import_allowed"] is False
-    assert report["method_review_card_count"] == 35
+    assert report["method_review_card_count"] == EXPECTED_METHOD_REVIEW_CARD_COUNT
     assert report["priority_review_summary_count"] == 7
     assert report["priority_review_labels"] == [
         "Gain / Trim and Fader / Balance",
@@ -6839,10 +7207,37 @@ def test_correction_method_goal_operator_review_export_verifier_accepts_bundle(t
     assert report["priority_decision_section_count"] == 7
     assert report["priority_decision_labels"] == report["priority_review_labels"]
     assert report["verified_artifacts"] == [
+        "goal-audit.json",
+        "goal-audit.md",
         "operator-decision-template.json",
         "operator-review.md",
         "packet.json",
     ]
+
+
+def test_correction_method_goal_operator_review_export_verifier_rejects_tampered_goal_audit(tmp_path):
+    run_id = "20260622T121499Z_correction_method_operator_review"
+    export_correction_method_operator_review_packet(
+        artifact_root=tmp_path,
+        run_id=run_id,
+        generated_at_utc="2026-06-22T12:14:59Z",
+    )
+    run_dir = tmp_path / run_id
+    goal_audit_path = run_dir / "goal-audit.json"
+    goal_audit = json.loads(goal_audit_path.read_text(encoding="utf-8"))
+    goal_audit["live_authority_granted"] = True
+    goal_audit_path.write_text(
+        json.dumps(goal_audit, indent=2, ensure_ascii=True, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    report = verify_correction_method_operator_review_export(run_dir)
+    failure_codes = {failure["code"] for failure in report["failed_checks"]}
+
+    assert report["status"] == "failed"
+    assert "goal_audit_json_sha256_mismatch" in failure_codes
+    assert "goal_audit_live_authority_granted_not_false" in failure_codes
+    assert "goal_audit_live_authority_granted_mismatch" in failure_codes
 
 
 def test_correction_method_goal_operator_review_export_verifier_rejects_missing_priority_summary(tmp_path):
@@ -7856,6 +8251,27 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
     row["operator_method_review_focus"] = []
     _tamper_why_safe_summary(row)
     _tamper_why_blocked_summary(row)
+    row["goal_requirement_details"] = [
+        "source_evidence:source=live_console;source_fields=none;"
+        "operator_action=apply_live_now;coverage_status=covered;"
+        "required=false;acceptance_scope=live_apply;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;denial_reason=none;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
+    ]
+    row["evidence_problem_correction_chain_details"] = [
+        "source_evidence:source=live_console;chain_step=1_source_evidence;"
+        "source_fields=none;operator_action=apply_live_now;"
+        "review_status=live_authorized;required=false;denial_reason=none;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
+    ]
     row["future_live_required_proofs"] = [
         proof
         for proof in row["future_live_required_proofs"]
@@ -7921,6 +8337,19 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
         "action_type=write;acknowledgement_fields=none;"
         "action=confirm_operator_required_condition:"
         "live_apply_and_queue_import_remain_blocked"
+    ]
+    row["operator_acceptance_gate_details"] = [
+        "live_apply_and_queue_import_remain_blocked:source=live_console;"
+        "action_type=write;acknowledgement_fields=none;"
+        "action=confirm_operator_required_condition:"
+        "live_apply_and_queue_import_remain_blocked;"
+        "acceptance_scope=live_apply;required=false;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
     ]
     row["operator_review_decision_option_details"] = [
         "accept_as_offline_proposal:effect=authorize_live_now;"
@@ -8067,6 +8496,15 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
         in failure_codes
     )
     assert (
+        f"decision_template_{method_id}_goal_requirement_details_mismatch"
+        in failure_codes
+    )
+    assert (
+        "decision_template_"
+        f"{method_id}_evidence_problem_correction_chain_details_mismatch"
+        in failure_codes
+    )
+    assert (
         f"decision_template_{method_id}_missing_required_confirmations"
         in failure_codes
     )
@@ -8210,6 +8648,11 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
     )
     assert (
         "decision_template_"
+        f"{method_id}_operator_acceptance_gate_details_mismatch"
+        in failure_codes
+    )
+    assert (
+        "decision_template_"
         f"{method_id}_operator_review_decision_option_details_mismatch"
         in failure_codes
     )
@@ -8265,6 +8708,27 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
     section["operator_method_review_focus"] = []
     section["why_safe_summary"] = []
     section["why_blocked_summary"] = []
+    section["goal_requirement_details"] = [
+        "source_evidence:source=live_console;source_fields=none;"
+        "operator_action=apply_live_now;coverage_status=covered;"
+        "required=false;acceptance_scope=live_apply;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;denial_reason=none;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
+    ]
+    section["evidence_problem_correction_chain_details"] = [
+        "source_evidence:source=live_console;chain_step=1_source_evidence;"
+        "source_fields=none;operator_action=apply_live_now;"
+        "review_status=live_authorized;required=false;denial_reason=none;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
+    ]
     section["operator_visible_explanation_contract"] = []
     _tamper_future_wing_readback_targets(section)
     _tamper_future_wing_readback_contract_summary(section)
@@ -8325,6 +8789,19 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
         "action_type=write;acknowledgement_fields=none;"
         "action=confirm_operator_required_condition:"
         "live_apply_and_queue_import_remain_blocked"
+    ]
+    section["operator_acceptance_gate_details"] = [
+        "live_apply_and_queue_import_remain_blocked:source=live_console;"
+        "action_type=write;acknowledgement_fields=none;"
+        "action=confirm_operator_required_condition:"
+        "live_apply_and_queue_import_remain_blocked;"
+        "acceptance_scope=live_apply;required=false;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
     ]
     section["operator_review_decision_option_details"] = [
         "accept_as_offline_proposal:effect=authorize_live_now;"
@@ -8467,6 +8944,14 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
     ) in failure_codes
     assert (
         "decision_template_priority_"
+        f"{priority}_goal_requirement_details_mismatch"
+    ) in failure_codes
+    assert (
+        "decision_template_priority_"
+        f"{priority}_evidence_problem_correction_chain_details_mismatch"
+    ) in failure_codes
+    assert (
+        "decision_template_priority_"
         f"{priority}_missing_why_blocked_summary_keys"
     ) in failure_codes
     assert (
@@ -8580,6 +9065,10 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
     assert (
         "decision_template_priority_"
         f"{priority}_required_confirmation_details_mismatch"
+    ) in failure_codes
+    assert (
+        "decision_template_priority_"
+        f"{priority}_operator_acceptance_gate_details_mismatch"
     ) in failure_codes
     assert (
         "decision_template_priority_"
@@ -8963,6 +9452,16 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_markdown
                 "- expected_verification_report_reference: "
                 "`stale-verification-report.json`"
             )
+        elif line.startswith("- goal_requirement_details: "):
+            tampered_lines.append(
+                "- goal_requirement_details: "
+                "`source_evidence:source=live_console;live_apply_allowed=true`"
+            )
+        elif line.startswith("- evidence_problem_correction_chain_details: "):
+            tampered_lines.append(
+                "- evidence_problem_correction_chain_details: "
+                "`source_evidence:source=live_console;live_apply_allowed=true`"
+            )
         elif line.startswith("- confidence: "):
             tampered_lines.append("- confidence: `none`")
         elif line.startswith("- operator_readable_explanation: "):
@@ -9024,6 +9523,12 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_markdown
                 "- required_confirmation_details: "
                 "`live_apply_and_queue_import_remain_blocked:"
                 "source=live_console;action_type=write`"
+            )
+        elif line.startswith("- operator_acceptance_gate_details: "):
+            tampered_lines.append(
+                "- operator_acceptance_gate_details: "
+                "`live_apply_and_queue_import_remain_blocked:"
+                "source=live_console;live_apply_allowed=true`"
             )
         elif line.startswith("- operator_review_decision_option_details: "):
             tampered_lines.append(
@@ -9175,6 +9680,15 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_markdown
         "markdown_decision_section_1_future_live_requirement_details_mismatch"
         in failure_codes
     )
+    assert (
+        "markdown_decision_section_1_goal_requirement_details_mismatch"
+        in failure_codes
+    )
+    assert (
+        "markdown_decision_section_1_"
+        "evidence_problem_correction_chain_details_mismatch"
+        in failure_codes
+    )
     assert "markdown_decision_section_1_safety_blocker_details_mismatch" in (
         failure_codes
     )
@@ -9194,6 +9708,10 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_markdown
     )
     assert (
         "markdown_decision_section_1_required_confirmation_details_mismatch"
+        in failure_codes
+    )
+    assert (
+        "markdown_decision_section_1_operator_acceptance_gate_details_mismatch"
         in failure_codes
     )
     assert (
@@ -9294,6 +9812,14 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
             "- safety_blocker_details: "
             f"{_md_items(card['safety_blocker_details'])}"
         ),
+        "goal_requirement_details": (
+            "- goal_requirement_details: "
+            f"{_md_items(card['goal_requirement_details'])}"
+        ),
+        "evidence_problem_correction_chain_details": (
+            "- evidence_problem_correction_chain_details: "
+            f"{_md_items(card['evidence_problem_correction_chain_details'])}"
+        ),
         "headroom_feedback_true_peak_check_details": (
             "- headroom_feedback_true_peak_check_details: "
             f"{_md_items(card['headroom_feedback_true_peak_check_details'])}"
@@ -9302,6 +9828,10 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
         "required_confirmation_details": (
             "- required_confirmation_details: "
             f"{_md_items(card['required_confirmation_details'])}"
+        ),
+        "operator_acceptance_gate_details": (
+            "- operator_acceptance_gate_details: "
+            f"{_md_items(card['operator_acceptance_gate_details'])}"
         ),
         "operator_review_decision_option_details": (
             "- operator_review_decision_option_details: "
@@ -9468,6 +9998,10 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_tampered
         "required_confirmation_details": (
             "- required_confirmation_details: "
             f"{_md_items(card['required_confirmation_details'])}"
+        ),
+        "operator_acceptance_gate_details": (
+            "- operator_acceptance_gate_details: "
+            f"{_md_items(card['operator_acceptance_gate_details'])}"
         ),
         "operator_review_decision_option_details": (
             "- operator_review_decision_option_details: "
@@ -9650,9 +10184,12 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_manifest
     summary["priority_operator_visible_explanation_contract_counts"]["1"] = 1
     summary["priority_future_wing_readback_contract_summary_counts"]["1"] = 1
     summary["priority_future_live_requirement_detail_counts"]["1"] = 1
+    summary["priority_goal_requirement_detail_counts"]["1"] = 1
+    summary["priority_evidence_problem_correction_chain_detail_counts"]["1"] = 1
     summary["priority_safety_blocker_detail_counts"]["1"] = 1
     summary["priority_headroom_feedback_true_peak_check_detail_counts"]["1"] = 1
     summary["priority_required_confirmation_detail_counts"]["1"] = 1
+    summary["priority_operator_acceptance_gate_detail_counts"]["1"] = 1
     summary["priority_operator_review_decision_option_detail_counts"]["1"] = 1
     summary["priority_operator_review_checklist_detail_counts"]["1"] = 1
     summary["priority_operator_review_record_field_detail_counts"]["1"] = 1
@@ -9728,6 +10265,14 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_manifest
     ) in failure_codes
     assert (
         "manifest_decision_template_summary_"
+        "priority_goal_requirement_detail_counts_mismatch"
+    ) in failure_codes
+    assert (
+        "manifest_decision_template_summary_"
+        "priority_evidence_problem_correction_chain_detail_counts_mismatch"
+    ) in failure_codes
+    assert (
+        "manifest_decision_template_summary_"
         "priority_safety_blocker_detail_counts_mismatch"
     ) in failure_codes
     assert (
@@ -9737,6 +10282,10 @@ def test_correction_method_goal_operator_review_export_verifier_rejects_manifest
     assert (
         "manifest_decision_template_summary_"
         "priority_required_confirmation_detail_counts_mismatch"
+    ) in failure_codes
+    assert (
+        "manifest_decision_template_summary_"
+        "priority_operator_acceptance_gate_detail_counts_mismatch"
     ) in failure_codes
     assert (
         "manifest_decision_template_summary_"
@@ -9949,7 +10498,10 @@ def test_correction_method_goal_operator_review_export_verifier_persists_report(
     assert disk_report["contacts_backend"] is False
     assert disk_report["live_authority_granted"] is False
     assert disk_report["readiness_closure_allowed"] is False
-    assert disk_report["method_review_card_count"] == 35
+    assert (
+        disk_report["method_review_card_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     assert disk_report["priority_review_summary_count"] == 7
     assert disk_report["priority_decision_section_count"] == 7
 
@@ -10003,16 +10555,22 @@ def test_correction_method_goal_operator_decision_record_validator_accepts_offli
         "use_offline_decisions_for_engineer_review_and_collect_real_wing_"
         "readback_before_live_promotion"
     )
-    assert report["method_decision_count"] == 35
-    assert report["accepted_offline_proposal_count"] == 35
+    assert report["method_decision_count"] == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    assert (
+        report["accepted_offline_proposal_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     assert report["decision_counts"] == {
-        "accept_as_offline_proposal": 35,
+        "accept_as_offline_proposal": EXPECTED_METHOD_REVIEW_CARD_COUNT,
         "defer_until_real_wing_proof": 0,
         "missing_operator_decision": 0,
         "reject_proposal": 0,
         "request_more_evidence": 0,
     }
-    assert len(report["method_ids_by_decision"]["accept_as_offline_proposal"]) == 35
+    assert (
+        len(report["method_ids_by_decision"]["accept_as_offline_proposal"])
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     assert report["method_ids_by_decision"]["missing_operator_decision"] == []
     assert report["priority_decision_counts"] == {
         "accept_as_offline_proposal": 7,
@@ -10100,7 +10658,10 @@ def test_correction_method_goal_operator_decision_record_validator_accepts_offli
         assert section["live_apply_allowed"] is False
         assert section["queue_import_allowed"] is False
         assert section["can_authorize_live"] is False
-    assert len(report["validated_method_decisions"]) == 35
+    assert (
+        len(report["validated_method_decisions"])
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     for row in report["validated_method_decisions"]:
         assert row["operator_decision"] == "accept_as_offline_proposal"
         assert row["review_scope"] == "offline_proposal_only"
@@ -10190,7 +10751,10 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_live_
     assert report["denial_reason"] == (
         "operator_decision_record_cannot_authorize_live_or_close_readiness"
     )
-    assert report["accepted_offline_proposal_count"] == 35
+    assert (
+        report["accepted_offline_proposal_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
 
 
 def test_correction_method_goal_operator_decision_record_validator_rejects_tampered_evidence_references(tmp_path):
@@ -10528,6 +11092,17 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
     row["operator_method_review_focus"] = []
     _tamper_why_safe_summary(row)
     _tamper_why_blocked_summary(row)
+    row["goal_requirement_details"] = [
+        "source_evidence:source=live_console;source_fields=none;"
+        "operator_action=apply_live_now;coverage_status=covered;"
+        "required=false;acceptance_scope=live_apply;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;denial_reason=none;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
+    ]
     row["future_live_required_proofs"] = [
         proof
         for proof in row["future_live_required_proofs"]
@@ -10548,6 +11123,16 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         "required_before_queue_import=false;"
         "blocked_live_actions=none;live_apply_allowed=true;"
         "queue_import_allowed=true;requires_real_wing_proof_before_live=false"
+    ]
+    row["evidence_problem_correction_chain_details"] = [
+        "source_evidence:source=live_console;chain_step=1_source_evidence;"
+        "source_fields=none;operator_action=apply_live_now;"
+        "review_status=live_authorized;required=false;denial_reason=none;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
     ]
     row["safety_blocker_details"] = [
         "headroom:source=live_console;blocker_type=live_apply;"
@@ -10588,6 +11173,19 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         "action_type=write;acknowledgement_fields=none;"
         "action=confirm_operator_required_condition:"
         "live_apply_and_queue_import_remain_blocked"
+    ]
+    row["operator_acceptance_gate_details"] = [
+        "live_apply_and_queue_import_remain_blocked:source=live_console;"
+        "action_type=write;acknowledgement_fields=none;"
+        "action=confirm_operator_required_condition:"
+        "live_apply_and_queue_import_remain_blocked;"
+        "acceptance_scope=live_apply;required=false;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
     ]
     row["operator_review_decision_option_details"] = [
         "accept_as_offline_proposal:effect=authorize_live_now;"
@@ -10861,6 +11459,15 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         in failure_codes
     )
     assert (
+        f"decision_record_{method_id}_goal_requirement_details_mismatch"
+        in failure_codes
+    )
+    assert (
+        "decision_record_"
+        f"{method_id}_evidence_problem_correction_chain_details_mismatch"
+        in failure_codes
+    )
+    assert (
         f"decision_record_{method_id}_safety_blocker_details_mismatch"
         in failure_codes
     )
@@ -10954,6 +11561,10 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         in failure_codes
     )
     assert (
+        f"decision_record_{method_id}_operator_acceptance_gate_details_mismatch"
+        in failure_codes
+    )
+    assert (
         f"decision_record_{method_id}_operator_review_decision_option_details_mismatch"
         in failure_codes
     )
@@ -10976,7 +11587,10 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         f"{method_id}_duplicate_operator_review_record_required_fields"
         in failure_codes
     )
-    assert report["accepted_offline_proposal_count"] == 35
+    assert (
+        report["accepted_offline_proposal_count"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     assert report["read_only"] is True
     assert report["contacts_wing"] is False
     assert report["live_authority_granted"] is False
@@ -11011,6 +11625,17 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
     section["operator_method_review_focus"] = []
     section["why_safe_summary"] = []
     section["why_blocked_summary"] = []
+    section["goal_requirement_details"] = [
+        "source_evidence:source=live_console;source_fields=none;"
+        "operator_action=apply_live_now;coverage_status=covered;"
+        "required=false;acceptance_scope=live_apply;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;denial_reason=none;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
+    ]
     section["operator_visible_explanation_contract"] = []
     _tamper_future_wing_readback_targets(section)
     _tamper_future_wing_readback_contract_summary(section)
@@ -11028,6 +11653,16 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         "required_before_queue_import=false;"
         "blocked_live_actions=none;live_apply_allowed=true;"
         "queue_import_allowed=true;requires_real_wing_proof_before_live=false"
+    ]
+    section["evidence_problem_correction_chain_details"] = [
+        "source_evidence:source=live_console;chain_step=1_source_evidence;"
+        "source_fields=none;operator_action=apply_live_now;"
+        "review_status=live_authorized;required=false;denial_reason=none;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
     ]
     section["safety_blocker_details"] = [
         "headroom:source=live_console;blocker_type=live_apply;"
@@ -11066,6 +11701,19 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         "action_type=write;acknowledgement_fields=none;"
         "action=confirm_operator_required_condition:"
         "live_apply_and_queue_import_remain_blocked"
+    ]
+    section["operator_acceptance_gate_details"] = [
+        "live_apply_and_queue_import_remain_blocked:source=live_console;"
+        "action_type=write;acknowledgement_fields=none;"
+        "action=confirm_operator_required_condition:"
+        "live_apply_and_queue_import_remain_blocked;"
+        "acceptance_scope=live_apply;required=false;"
+        "required_before_operator_acceptance=false;"
+        "required_before_live_promotion=false;"
+        "required_before_queue_import=false;"
+        "live_apply_allowed=true;queue_import_allowed=true;"
+        "readiness_closure_allowed=true;"
+        "requires_real_wing_proof_before_live=false"
     ]
     section["operator_review_decision_option_details"] = [
         "accept_as_offline_proposal:effect=authorize_live_now;"
@@ -11340,6 +11988,15 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
         in failure_codes
     )
     assert (
+        f"decision_record_priority_{priority}_goal_requirement_details_mismatch"
+        in failure_codes
+    )
+    assert (
+        "decision_record_priority_"
+        f"{priority}_evidence_problem_correction_chain_details_mismatch"
+        in failure_codes
+    )
+    assert (
         f"decision_record_priority_{priority}_safety_blocker_details_mismatch"
         in failure_codes
     )
@@ -11411,6 +12068,10 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_tampe
     assert (
         "decision_record_priority_"
         f"{priority}_required_confirmation_details_mismatch"
+    ) in failure_codes
+    assert (
+        "decision_record_priority_"
+        f"{priority}_operator_acceptance_gate_details_mismatch"
     ) in failure_codes
     assert (
         "decision_record_priority_"
@@ -11559,7 +12220,10 @@ def test_correction_method_goal_operator_decision_record_validator_rejects_prior
         in failure_codes
     )
     assert report["priority_decision_counts"]["reject_proposal"] == 1
-    assert report["decision_counts"]["accept_as_offline_proposal"] == 35
+    assert (
+        report["decision_counts"]["accept_as_offline_proposal"]
+        == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    )
     assert priority_one["operator_decision"] == "reject_proposal"
     assert priority_one["accepted_offline_proposal_count"] == priority_one[
         "method_decision_count"
@@ -13275,3 +13939,104 @@ def test_agentic_foundation_adapter_operator_correction_stays_dry_run_only():
     assert "foundation_preview_requires_explicit_promotion" in correction[
         "safety_blockers"
     ]
+
+
+def test_correction_method_goal_audit_passes_without_live_authority():
+    report = audit_correction_method_goal_packet(
+        generated_at_utc="2026-06-24T07:30:00Z",
+    )
+
+    assert report["status"] == "passed"
+    assert report["failed_checks"] == []
+    assert report["method_review_card_count"] == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    assert report["expected_method_count"] == EXPECTED_METHOD_REVIEW_CARD_COUNT
+    assert report["priority_section_count"] == 7
+    assert report["missing_required_objective_families"] == []
+    assert report["missing_expected_objective_families"] == []
+    assert report["coverage_percent"]["required_objective_families"] == 100.0
+    assert report["coverage_percent"]["expected_method_cards"] == 100.0
+    assert report["coverage_percent"]["operator_surfaces"] == 100.0
+    assert report["coverage_percent"]["no_live_authority"] == 100.0
+    assert report["overall_offline_goal_percent"] == 100.0
+    assert report["read_only"] is True
+    assert report["contacts_wing"] is False
+    assert report["contacts_backend"] is False
+    assert report["mutates_mixer"] is False
+    assert report["live_authority_granted"] is False
+    assert report["readiness_closure_allowed"] is False
+    assert report["live_apply_allowed"] is False
+    assert report["queue_import_allowed"] is False
+    assert report["hardware_proof_required_before_live"] is True
+
+
+def test_correction_method_goal_audit_writes_json_and_markdown(tmp_path):
+    output = tmp_path / "goal-audit.json"
+    markdown_output = tmp_path / "goal-audit.md"
+
+    exit_code = audit_correction_method_goal_main([
+        "--output",
+        str(output),
+        "--markdown-output",
+        str(markdown_output),
+        "--generated-at-utc",
+        "2026-06-24T07:31:00Z",
+    ])
+
+    report = json.loads(output.read_text(encoding="utf-8"))
+    markdown = markdown_output.read_text(encoding="utf-8")
+    assert exit_code == 0
+    assert report["status"] == "passed"
+    assert report["overall_offline_goal_percent"] == 100.0
+    assert "- status: `passed`" in markdown
+    assert "- live_authority_granted: `false`" in markdown
+    assert "- overall_offline_goal_percent: `100.0`" in markdown
+    assert "- `none`" in markdown
+
+
+def test_correction_method_goal_audit_rejects_live_authority_tamper():
+    packet = build_correction_method_goal_operator_review_packet()
+    packet["live_authority_granted"] = True
+
+    report = audit_correction_method_goal_packet(
+        packet,
+        generated_at_utc="2026-06-24T07:32:00Z",
+    )
+    failure_codes = {failure["code"] for failure in report["failed_checks"]}
+
+    assert report["status"] == "failed"
+    assert "packet_live_authority_granted_not_false" in failure_codes
+    assert report["coverage_percent"]["no_live_authority"] == 0.0
+    assert report["overall_offline_goal_percent"] < 100.0
+    markdown = render_correction_method_goal_audit_markdown(report)
+    assert "- status: `failed`" in markdown
+    assert "`packet_live_authority_granted_not_false`" in markdown
+
+
+def test_correction_method_goal_audit_rejects_missing_objective_family():
+    packet = build_correction_method_goal_operator_review_packet()
+    packet["method_review_cards"] = [
+        card
+        for card in packet["method_review_cards"]
+        if card["objective_family"] != "eq"
+    ]
+    for section in packet["priority_sections"]:
+        if section["priority"] == 2:
+            section["methods"] = [
+                method
+                for method in section["methods"]
+                if method["objective_family"] != "eq"
+            ]
+            section["objective_families"] = ["compressor_dynamics"]
+
+    report = audit_correction_method_goal_packet(
+        packet,
+        generated_at_utc="2026-06-24T07:33:00Z",
+    )
+    failure_codes = {failure["code"] for failure in report["failed_checks"]}
+
+    assert report["status"] == "failed"
+    assert "missing_objective_family_eq" in failure_codes
+    assert "priority_2_objective_families_mismatch" in failure_codes
+    assert report["method_review_card_count"] < report["expected_method_count"]
+    assert "eq" in report["missing_required_objective_families"]
+    assert report["coverage_percent"]["required_objective_families"] < 100.0

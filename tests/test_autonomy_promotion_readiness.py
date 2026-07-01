@@ -511,7 +511,13 @@ def test_autonomy_promotion_readiness_module_is_read_only_and_transport_free():
 
 
 def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
-    snapshot = build_autonomy_promotion_readiness_snapshot()
+    evidence = build_wing_readonly_preflight_evidence(
+        artifact_payloads=(),
+        artifact_roots=(),
+    )
+    snapshot = build_autonomy_promotion_readiness_snapshot(
+        wing_readonly_preflight_evidence_snapshot=evidence,
+    )
 
     assert snapshot["type"] == "autonomy_promotion_readiness"
     assert snapshot["safety"] == {

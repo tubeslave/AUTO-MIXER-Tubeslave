@@ -21,6 +21,10 @@ from backend.processing_proposal_adapters import (  # noqa: E402
     build_correction_method_goal_operator_review_packet,
     render_correction_method_goal_operator_review_markdown,
 )
+from tools.audit_correction_method_goal import (  # noqa: E402
+    audit_correction_method_goal_packet,
+    render_correction_method_goal_audit_markdown,
+)
 
 
 DEFAULT_ARTIFACT_ROOT = (
@@ -144,6 +148,9 @@ def build_operator_decision_template(
                 "required_confirmation_details": list(
                     card["required_confirmation_details"]
                 ),
+                "operator_acceptance_gate_details": list(
+                    card["operator_acceptance_gate_details"]
+                ),
                 "operator_review_decision_option_details": list(
                     card["operator_review_decision_option_details"]
                 ),
@@ -159,6 +166,18 @@ def build_operator_decision_template(
                 ),
                 "why_safe_summary": list(card["why_safe_summary"]),
                 "why_blocked_summary": list(card["why_blocked_summary"]),
+                "goal_requirement_details": list(
+                    card["goal_requirement_details"]
+                ),
+                "method_specific_review_details": list(
+                    card["method_specific_review_details"]
+                ),
+                "operator_actionable_explanation_details": list(
+                    card["operator_actionable_explanation_details"]
+                ),
+                "evidence_problem_correction_chain_details": list(
+                    card["evidence_problem_correction_chain_details"]
+                ),
                 "operator_visible_explanation_contract": dict(
                     card["operator_visible_explanation_contract"]
                 ),
@@ -316,6 +335,16 @@ def build_operator_decision_template(
             }
         )
         safety_blocker_details = _section_items("safety_blocker_details")
+        goal_requirement_details = _section_items("goal_requirement_details")
+        method_specific_review_details = _section_items(
+            "method_specific_review_details"
+        )
+        operator_actionable_explanation_details = _section_items(
+            "operator_actionable_explanation_details"
+        )
+        evidence_problem_correction_chain_details = _section_items(
+            "evidence_problem_correction_chain_details"
+        )
         headroom_feedback_true_peak_check_details = _section_items(
             "headroom_feedback_true_peak_check_details"
         )
@@ -327,6 +356,9 @@ def build_operator_decision_template(
         )
         required_confirmation_details = _section_items(
             "required_confirmation_details"
+        )
+        operator_acceptance_gate_details = _section_items(
+            "operator_acceptance_gate_details"
         )
         operator_review_decision_option_details = _section_items(
             "operator_review_decision_option_details"
@@ -379,6 +411,16 @@ def build_operator_decision_template(
                 "operator_method_review_focus": operator_method_review_focus,
                 "why_safe_summary": why_safe_summary,
                 "why_blocked_summary": why_blocked_summary,
+                "goal_requirement_details": goal_requirement_details,
+                "method_specific_review_details": (
+                    method_specific_review_details
+                ),
+                "operator_actionable_explanation_details": (
+                    operator_actionable_explanation_details
+                ),
+                "evidence_problem_correction_chain_details": (
+                    evidence_problem_correction_chain_details
+                ),
                 "operator_visible_explanation_contract": (
                     operator_visible_explanation_contract
                 ),
@@ -401,6 +443,9 @@ def build_operator_decision_template(
                 ),
                 "required_confirmation_details": (
                     required_confirmation_details
+                ),
+                "operator_acceptance_gate_details": (
+                    operator_acceptance_gate_details
                 ),
                 "operator_review_decision_option_details": (
                     operator_review_decision_option_details
@@ -523,6 +568,18 @@ def build_operator_decision_template_summary(
         "priority_safety_blocker_counts": _priority_field_counts(
             "safety_blockers"
         ),
+        "priority_goal_requirement_detail_counts": (
+            _priority_field_counts("goal_requirement_details")
+        ),
+        "priority_method_specific_review_detail_counts": (
+            _priority_field_counts("method_specific_review_details")
+        ),
+        "priority_operator_actionable_explanation_detail_counts": (
+            _priority_field_counts("operator_actionable_explanation_details")
+        ),
+        "priority_evidence_problem_correction_chain_detail_counts": (
+            _priority_field_counts("evidence_problem_correction_chain_details")
+        ),
         "priority_safety_blocker_detail_counts": _priority_field_counts(
             "safety_blocker_details"
         ),
@@ -588,6 +645,9 @@ def build_operator_decision_template_summary(
         ),
         "priority_required_confirmation_detail_counts": (
             _priority_field_counts("required_confirmation_details")
+        ),
+        "priority_operator_acceptance_gate_detail_counts": (
+            _priority_field_counts("operator_acceptance_gate_details")
         ),
         "priority_operator_review_decision_option_detail_counts": (
             _priority_field_counts("operator_review_decision_option_details")
@@ -667,6 +727,14 @@ def export_correction_method_operator_review_packet(
         pipeline_id=pipeline_id,
         generated_at_utc=generated_at,
     )
+    goal_audit = audit_correction_method_goal_packet(
+        packet,
+        pipeline_id=pipeline_id,
+        generated_at_utc=generated_at,
+    )
+    goal_audit_markdown = render_correction_method_goal_audit_markdown(
+        goal_audit
+    )
 
     packet_bytes = (
         json.dumps(packet, indent=2, ensure_ascii=True, sort_keys=True) + "\n"
@@ -681,6 +749,10 @@ def export_correction_method_operator_review_packet(
         )
         + "\n"
     ).encode("utf-8")
+    goal_audit_bytes = (
+        json.dumps(goal_audit, indent=2, ensure_ascii=True, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    goal_audit_markdown_bytes = goal_audit_markdown.encode("utf-8")
 
     packet_artifact = _write_bytes(run_dir / "packet.json", packet_bytes)
     markdown_artifact = _write_bytes(
@@ -689,6 +761,14 @@ def export_correction_method_operator_review_packet(
     decision_template_artifact = _write_bytes(
         run_dir / "operator-decision-template.json",
         decision_template_bytes,
+    )
+    goal_audit_artifact = _write_bytes(
+        run_dir / "goal-audit.json",
+        goal_audit_bytes,
+    )
+    goal_audit_markdown_artifact = _write_bytes(
+        run_dir / "goal-audit.md",
+        goal_audit_markdown_bytes,
     )
 
     manifest = {
@@ -699,11 +779,49 @@ def export_correction_method_operator_review_packet(
         "artifact_root": str(run_dir),
         "status": (
             "operator_review_export_ready_proposal_only"
-            if packet["covered"]
+            if packet["covered"] and goal_audit["status"] == "passed"
             else "operator_review_export_incomplete"
         ),
         "packet_schema": packet["schema"],
         "packet_status": packet["status"],
+        "goal_audit_schema": goal_audit["schema"],
+        "goal_audit_status": goal_audit["status"],
+        "goal_audit_failed_check_count": len(goal_audit["failed_checks"]),
+        "goal_audit_summary": {
+            "overall_offline_goal_percent": (
+                goal_audit["overall_offline_goal_percent"]
+            ),
+            "method_review_card_count": (
+                goal_audit["method_review_card_count"]
+            ),
+            "expected_method_count": goal_audit["expected_method_count"],
+            "priority_section_count": goal_audit["priority_section_count"],
+            "expected_priority_section_count": (
+                goal_audit["expected_priority_section_count"]
+            ),
+            "missing_required_objective_families": list(
+                goal_audit["missing_required_objective_families"]
+            ),
+            "missing_expected_objective_families": list(
+                goal_audit["missing_expected_objective_families"]
+            ),
+            "coverage_percent": dict(goal_audit["coverage_percent"]),
+            "no_live_authority": goal_audit["no_live_authority"],
+            "contacts_wing": goal_audit["contacts_wing"],
+            "contacts_backend": goal_audit["contacts_backend"],
+            "mutates_mixer": goal_audit["mutates_mixer"],
+            "live_authority_granted": goal_audit[
+                "live_authority_granted"
+            ],
+            "readiness_closure_allowed": goal_audit[
+                "readiness_closure_allowed"
+            ],
+            "live_apply_allowed": goal_audit["live_apply_allowed"],
+            "queue_import_allowed": goal_audit["queue_import_allowed"],
+            "hardware_proof_required_before_live": (
+                goal_audit["hardware_proof_required_before_live"]
+            ),
+        },
         "operator_decision_template_schema": decision_template["schema"],
         "operator_decision_template_status": decision_template["status"],
         "operator_decision_template_summary": (
@@ -733,6 +851,11 @@ def export_correction_method_operator_review_packet(
             {
                 "artifact_id": "operator_decision_template",
                 **decision_template_artifact,
+            },
+            {"artifact_id": "goal_audit_json", **goal_audit_artifact},
+            {
+                "artifact_id": "goal_audit_markdown",
+                **goal_audit_markdown_artifact,
             },
         ],
     }

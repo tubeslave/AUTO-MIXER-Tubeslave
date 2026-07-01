@@ -1,0 +1,804 @@
+{
+  "connection_policy": "no_hardware_no_network_no_live_writes",
+  "fixture": {
+    "channel_count": 7,
+    "channels": [
+      {
+        "channel": 1,
+        "fader_db": 0.0,
+        "gain_db": 0.0,
+        "group": "DRUMS",
+        "lufs": -27.5,
+        "name": "KICK",
+        "peak_db": -4.8,
+        "role": "Kick"
+      },
+      {
+        "channel": 2,
+        "fader_db": 0.0,
+        "gain_db": -12.0,
+        "group": "DRUMS",
+        "lufs": -24.0,
+        "name": "SNARE T",
+        "peak_db": -2.4,
+        "role": "Snare"
+      },
+      {
+        "channel": 3,
+        "fader_db": 0.0,
+        "gain_db": -11.9,
+        "group": "DRUMS",
+        "lufs": -23.2,
+        "name": "SNARE B",
+        "peak_db": -4.2,
+        "role": "Snare"
+      },
+      {
+        "channel": 4,
+        "fader_db": 0.0,
+        "gain_db": 0.0,
+        "group": "DRUMS",
+        "lufs": -26.0,
+        "name": "TOM",
+        "peak_db": -0.8,
+        "role": "Tom"
+      },
+      {
+        "channel": 6,
+        "fader_db": 0.0,
+        "gain_db": -0.7,
+        "group": "DRUMS",
+        "lufs": -24.2,
+        "name": "OH L",
+        "peak_db": -5.0,
+        "role": "Overhead"
+      },
+      {
+        "channel": 9,
+        "fader_db": 0.0,
+        "gain_db": -2.4,
+        "group": "GUITARS",
+        "lufs": -21.5,
+        "name": "GUITAR L",
+        "peak_db": -5.1,
+        "role": "Guitar"
+      },
+      {
+        "channel": 16,
+        "fader_db": 0.0,
+        "gain_db": -11.9,
+        "group": "VOCALS",
+        "lufs": -17.7,
+        "name": "VOCAL",
+        "peak_db": -3.5,
+        "role": "Vocal"
+      }
+    ]
+  },
+  "forbidden_messages": [
+    "load_snap",
+    "route_output",
+    "save_snap",
+    "set_fader",
+    "set_gain"
+  ],
+  "generated_at": "2026-06-25T15:25:23Z",
+  "live_write": false,
+  "mode_results": [
+    {
+      "analysis_status": "ok",
+      "applied_simulation_count": 0,
+      "emergency_stop_proven": false,
+      "final_state": {
+        "/ch/1/$name": "KICK",
+        "/ch/1/fdr": 0.0,
+        "/ch/1/in/set/trim": 0.0,
+        "/ch/1/mute": 0,
+        "/ch/1/name": "KICK",
+        "/ch/16/$name": "VOCAL",
+        "/ch/16/fdr": 0.0,
+        "/ch/16/in/set/trim": -11.9,
+        "/ch/16/mute": 0,
+        "/ch/16/name": "VOCAL",
+        "/ch/2/$name": "SNARE T",
+        "/ch/2/fdr": 0.0,
+        "/ch/2/in/set/trim": -12.0,
+        "/ch/2/mute": 0,
+        "/ch/2/name": "SNARE T",
+        "/ch/3/$name": "SNARE B",
+        "/ch/3/fdr": 0.0,
+        "/ch/3/in/set/trim": -11.9,
+        "/ch/3/mute": 0,
+        "/ch/3/name": "SNARE B",
+        "/ch/4/$name": "TOM",
+        "/ch/4/fdr": 0.0,
+        "/ch/4/in/set/trim": 0.0,
+        "/ch/4/mute": 0,
+        "/ch/4/name": "TOM",
+        "/ch/6/$name": "OH L",
+        "/ch/6/fdr": 0.0,
+        "/ch/6/in/set/trim": -0.7,
+        "/ch/6/mute": 0,
+        "/ch/6/name": "OH L",
+        "/ch/9/$name": "GUITAR L",
+        "/ch/9/fdr": 0.0,
+        "/ch/9/in/set/trim": -2.4,
+        "/ch/9/mute": 0,
+        "/ch/9/name": "GUITAR L"
+      },
+      "mode": "analyze",
+      "mode_blocked_count": 4,
+      "observation_count": 4,
+      "proposal_count": 4,
+      "proposal_results": [
+        {
+          "live_write": false,
+          "proposal_id": "analysis:peak_risk:2",
+          "reason": "analyze_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 2,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.6,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "SNARE T: peak -2.4 dBFS, propose fader -3.6 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:gain_trim_down:4",
+          "reason": "analyze_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 4,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -2.2,
+                "value_type": "gain"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "TOM: peak -0.8 dBFS, propose input trim -2.2 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:guitar_level_high:9",
+          "reason": "analyze_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 9,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.5,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "GUITAR L: guitar level -21.5 LUFS, propose fader -3.5 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:vocal_level_high:16",
+          "reason": "analyze_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 16,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -4.3,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "VOCAL: vocal level -17.7 LUFS, propose fader -4.3 dB"
+        }
+      ]
+    },
+    {
+      "analysis_status": "ok",
+      "applied_simulation_count": 0,
+      "emergency_stop_proven": false,
+      "final_state": {
+        "/ch/1/$name": "KICK",
+        "/ch/1/fdr": 0.0,
+        "/ch/1/in/set/trim": 0.0,
+        "/ch/1/mute": 0,
+        "/ch/1/name": "KICK",
+        "/ch/16/$name": "VOCAL",
+        "/ch/16/fdr": 0.0,
+        "/ch/16/in/set/trim": -11.9,
+        "/ch/16/mute": 0,
+        "/ch/16/name": "VOCAL",
+        "/ch/2/$name": "SNARE T",
+        "/ch/2/fdr": 0.0,
+        "/ch/2/in/set/trim": -12.0,
+        "/ch/2/mute": 0,
+        "/ch/2/name": "SNARE T",
+        "/ch/3/$name": "SNARE B",
+        "/ch/3/fdr": 0.0,
+        "/ch/3/in/set/trim": -11.9,
+        "/ch/3/mute": 0,
+        "/ch/3/name": "SNARE B",
+        "/ch/4/$name": "TOM",
+        "/ch/4/fdr": 0.0,
+        "/ch/4/in/set/trim": 0.0,
+        "/ch/4/mute": 0,
+        "/ch/4/name": "TOM",
+        "/ch/6/$name": "OH L",
+        "/ch/6/fdr": 0.0,
+        "/ch/6/in/set/trim": -0.7,
+        "/ch/6/mute": 0,
+        "/ch/6/name": "OH L",
+        "/ch/9/$name": "GUITAR L",
+        "/ch/9/fdr": 0.0,
+        "/ch/9/in/set/trim": -2.4,
+        "/ch/9/mute": 0,
+        "/ch/9/name": "GUITAR L"
+      },
+      "mode": "assist",
+      "mode_blocked_count": 4,
+      "observation_count": 4,
+      "proposal_count": 4,
+      "proposal_results": [
+        {
+          "live_write": false,
+          "proposal_id": "analysis:peak_risk:2",
+          "reason": "assist_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 2,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.6,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "SNARE T: peak -2.4 dBFS, propose fader -3.6 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:gain_trim_down:4",
+          "reason": "assist_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 4,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -2.2,
+                "value_type": "gain"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "TOM: peak -0.8 dBFS, propose input trim -2.2 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:guitar_level_high:9",
+          "reason": "assist_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 9,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.5,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "GUITAR L: guitar level -21.5 LUFS, propose fader -3.5 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:vocal_level_high:16",
+          "reason": "assist_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 16,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -4.3,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "VOCAL: vocal level -17.7 LUFS, propose fader -4.3 dB"
+        }
+      ]
+    },
+    {
+      "analysis_status": "ok",
+      "applied_simulation_count": 0,
+      "emergency_stop_proven": false,
+      "final_state": {
+        "/ch/1/$name": "KICK",
+        "/ch/1/fdr": 0.0,
+        "/ch/1/in/set/trim": 0.0,
+        "/ch/1/mute": 0,
+        "/ch/1/name": "KICK",
+        "/ch/16/$name": "VOCAL",
+        "/ch/16/fdr": 0.0,
+        "/ch/16/in/set/trim": -11.9,
+        "/ch/16/mute": 0,
+        "/ch/16/name": "VOCAL",
+        "/ch/2/$name": "SNARE T",
+        "/ch/2/fdr": 0.0,
+        "/ch/2/in/set/trim": -12.0,
+        "/ch/2/mute": 0,
+        "/ch/2/name": "SNARE T",
+        "/ch/3/$name": "SNARE B",
+        "/ch/3/fdr": 0.0,
+        "/ch/3/in/set/trim": -11.9,
+        "/ch/3/mute": 0,
+        "/ch/3/name": "SNARE B",
+        "/ch/4/$name": "TOM",
+        "/ch/4/fdr": 0.0,
+        "/ch/4/in/set/trim": 0.0,
+        "/ch/4/mute": 0,
+        "/ch/4/name": "TOM",
+        "/ch/6/$name": "OH L",
+        "/ch/6/fdr": 0.0,
+        "/ch/6/in/set/trim": -0.7,
+        "/ch/6/mute": 0,
+        "/ch/6/name": "OH L",
+        "/ch/9/$name": "GUITAR L",
+        "/ch/9/fdr": 0.0,
+        "/ch/9/in/set/trim": -2.4,
+        "/ch/9/mute": 0,
+        "/ch/9/name": "GUITAR L"
+      },
+      "mode": "auto",
+      "mode_blocked_count": 4,
+      "observation_count": 4,
+      "proposal_count": 4,
+      "proposal_results": [
+        {
+          "live_write": false,
+          "proposal_id": "analysis:peak_risk:2",
+          "reason": "auto_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 2,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.6,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "SNARE T: peak -2.4 dBFS, propose fader -3.6 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:gain_trim_down:4",
+          "reason": "auto_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 4,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -2.2,
+                "value_type": "gain"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "TOM: peak -0.8 dBFS, propose input trim -2.2 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:guitar_level_high:9",
+          "reason": "auto_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 9,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.5,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "GUITAR L: guitar level -21.5 LUFS, propose fader -3.5 dB"
+        },
+        {
+          "live_write": false,
+          "proposal_id": "analysis:vocal_level_high:16",
+          "reason": "auto_mode_does_not_apply",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 16,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -4.3,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "mode_blocked",
+          "title": "VOCAL: vocal level -17.7 LUFS, propose fader -4.3 dB"
+        }
+      ]
+    },
+    {
+      "analysis_status": "ok",
+      "applied_simulation_count": 4,
+      "emergency_stop_proven": true,
+      "final_state": {
+        "/ch/1/$name": "KICK",
+        "/ch/1/fdr": 0.0,
+        "/ch/1/in/set/trim": 0.0,
+        "/ch/1/mute": 0,
+        "/ch/1/name": "KICK",
+        "/ch/16/$name": "VOCAL",
+        "/ch/16/fdr": 0.0,
+        "/ch/16/in/set/trim": -11.9,
+        "/ch/16/mute": 0,
+        "/ch/16/name": "VOCAL",
+        "/ch/2/$name": "SNARE T",
+        "/ch/2/fdr": 0.0,
+        "/ch/2/in/set/trim": -12.0,
+        "/ch/2/mute": 0,
+        "/ch/2/name": "SNARE T",
+        "/ch/3/$name": "SNARE B",
+        "/ch/3/fdr": 0.0,
+        "/ch/3/in/set/trim": -11.9,
+        "/ch/3/mute": 0,
+        "/ch/3/name": "SNARE B",
+        "/ch/4/$name": "TOM",
+        "/ch/4/fdr": 0.0,
+        "/ch/4/in/set/trim": 0.0,
+        "/ch/4/mute": 0,
+        "/ch/4/name": "TOM",
+        "/ch/6/$name": "OH L",
+        "/ch/6/fdr": 0.0,
+        "/ch/6/in/set/trim": -0.7,
+        "/ch/6/mute": 0,
+        "/ch/6/name": "OH L",
+        "/ch/9/$name": "GUITAR L",
+        "/ch/9/fdr": 0.0,
+        "/ch/9/in/set/trim": -2.4,
+        "/ch/9/mute": 0,
+        "/ch/9/name": "GUITAR L"
+      },
+      "mode": "supervised",
+      "mode_blocked_count": 0,
+      "observation_count": 4,
+      "proposal_count": 4,
+      "proposal_results": [
+        {
+          "apply_result": {
+            "apply_results": [
+              {
+                "address": "/ch/2/fdr",
+                "old_value": 0.0,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": -3.6,
+                "requested_value": -3.6
+              }
+            ],
+            "live_write": false,
+            "proof_status": "verified",
+            "proposal_id": "analysis:peak_risk:2",
+            "readback_status": "verified_from_simulated_readback",
+            "rollback_readback_status": "verified_from_simulated_readback",
+            "rollback_results": [
+              {
+                "address": "/ch/2/fdr",
+                "old_value": -3.6,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": 0.0,
+                "requested_value": 0.0,
+                "status": "applied"
+              }
+            ],
+            "status": "simulated_applied_and_rolled_back"
+          },
+          "live_write": false,
+          "post_emergency_apply": {
+            "live_write": false,
+            "reason": "emergency_stop_active",
+            "status": "blocked"
+          },
+          "proposal_id": "analysis:peak_risk:2",
+          "reason": "simulated_apply_readback_rollback_complete",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 2,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.6,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "simulated_applied_and_rolled_back",
+          "title": "SNARE T: peak -2.4 dBFS, propose fader -3.6 dB"
+        },
+        {
+          "apply_result": {
+            "apply_results": [
+              {
+                "address": "/ch/4/in/set/trim",
+                "old_value": 0.0,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": -2.2,
+                "requested_value": -2.2
+              }
+            ],
+            "live_write": false,
+            "proof_status": "verified",
+            "proposal_id": "analysis:gain_trim_down:4",
+            "readback_status": "verified_from_simulated_readback",
+            "rollback_readback_status": "verified_from_simulated_readback",
+            "rollback_results": [
+              {
+                "address": "/ch/4/in/set/trim",
+                "old_value": -2.2,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": 0.0,
+                "requested_value": 0.0,
+                "status": "applied"
+              }
+            ],
+            "status": "simulated_applied_and_rolled_back"
+          },
+          "live_write": false,
+          "post_emergency_apply": {
+            "live_write": false,
+            "reason": "emergency_stop_active",
+            "status": "blocked"
+          },
+          "proposal_id": "analysis:gain_trim_down:4",
+          "reason": "simulated_apply_readback_rollback_complete",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 4,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -2.2,
+                "value_type": "gain"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "simulated_applied_and_rolled_back",
+          "title": "TOM: peak -0.8 dBFS, propose input trim -2.2 dB"
+        },
+        {
+          "apply_result": {
+            "apply_results": [
+              {
+                "address": "/ch/9/fdr",
+                "old_value": 0.0,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": -3.5,
+                "requested_value": -3.5
+              }
+            ],
+            "live_write": false,
+            "proof_status": "verified",
+            "proposal_id": "analysis:guitar_level_high:9",
+            "readback_status": "verified_from_simulated_readback",
+            "rollback_readback_status": "verified_from_simulated_readback",
+            "rollback_results": [
+              {
+                "address": "/ch/9/fdr",
+                "old_value": -3.5,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": 0.0,
+                "requested_value": 0.0,
+                "status": "applied"
+              }
+            ],
+            "status": "simulated_applied_and_rolled_back"
+          },
+          "live_write": false,
+          "post_emergency_apply": {
+            "live_write": false,
+            "reason": "emergency_stop_active",
+            "status": "blocked"
+          },
+          "proposal_id": "analysis:guitar_level_high:9",
+          "reason": "simulated_apply_readback_rollback_complete",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 9,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -3.5,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "simulated_applied_and_rolled_back",
+          "title": "GUITAR L: guitar level -21.5 LUFS, propose fader -3.5 dB"
+        },
+        {
+          "apply_result": {
+            "apply_results": [
+              {
+                "address": "/ch/16/fdr",
+                "old_value": 0.0,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": -4.3,
+                "requested_value": -4.3
+              }
+            ],
+            "live_write": false,
+            "proof_status": "verified",
+            "proposal_id": "analysis:vocal_level_high:16",
+            "readback_status": "verified_from_simulated_readback",
+            "rollback_readback_status": "verified_from_simulated_readback",
+            "rollback_results": [
+              {
+                "address": "/ch/16/fdr",
+                "old_value": -4.3,
+                "readback_status": "verified_from_simulated_readback",
+                "readback_value": 0.0,
+                "requested_value": 0.0,
+                "status": "applied"
+              }
+            ],
+            "status": "simulated_applied_and_rolled_back"
+          },
+          "live_write": false,
+          "post_emergency_apply": {
+            "live_write": false,
+            "reason": "emergency_stop_active",
+            "status": "blocked"
+          },
+          "proposal_id": "analysis:vocal_level_high:16",
+          "reason": "simulated_apply_readback_rollback_complete",
+          "safety_review": {
+            "approved": true,
+            "blockers": [],
+            "evidence": [
+              {
+                "channel": 16,
+                "current_value": 0.0,
+                "direction": "down_or_same",
+                "readback_required": true,
+                "rollback_value": 0.0,
+                "target_value": -4.3,
+                "value_type": "fader"
+              }
+            ],
+            "live_write": false,
+            "status": "approved_for_simulation"
+          },
+          "status": "simulated_applied_and_rolled_back",
+          "title": "VOCAL: vocal level -17.7 LUFS, propose fader -4.3 dB"
+        }
+      ]
+    }
+  ],
+  "reason": "offline_simulated_apply_readback_rollback_complete",
+  "status": "passed",
+  "summary": {
+    "mode_count": 4,
+    "non_supervised_modes_blocked": true,
+    "supervised_failure_count": 0,
+    "supervised_proposal_count": 4,
+    "supervised_simulated_applied_count": 4
+  },
+  "type": "offline_operator_validation",
+  "write_policy": "simulated_apply_only"
+}

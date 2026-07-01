@@ -20,6 +20,7 @@ from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_REQUEST_SEQUENCE_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_CANDIDATE_VERIFIER_WS_PROOF_BLOCKER,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS,
+    WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT,
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
     WING_READONLY_PREFLIGHT_REVIEW_MANUAL_CHECKLIST_IDS,
     WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
@@ -551,7 +552,10 @@ def _accepted_record(**overrides) -> dict:
 
 
 def test_review_decision_ledger_requires_preflight_candidate_first():
-    ledger = build_wing_readonly_preflight_review_decision_ledger()
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence={"artifacts": []},
+        decision_roots=(),
+    )
 
     assert ledger["type"] == "wing_readonly_preflight_review_decision_ledger"
     assert ledger["method_id"] == WING_READONLY_PREFLIGHT_REVIEW_DECISION_LEDGER_METHOD_ID
@@ -580,6 +584,50 @@ def test_review_decision_ledger_requires_preflight_candidate_first():
     }
     assert ledger["summary"]["readiness_matrix_update_allowed_by_decision"] is False
     assert ledger["summary"]["live_authority_granted"] is False
+
+
+def test_review_decision_ledger_ignores_discovered_pending_template(tmp_path: Path):
+    decision_root = tmp_path / "decisions"
+    template_path = decision_root / Path(
+        WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_OUTPUT
+    ).name
+    template_path.parent.mkdir(parents=True)
+    template_path.write_text(
+        json.dumps(
+            _accepted_record(
+                decision="pending_operator_decision",
+                reviewed_by="",
+                reviewed_at="",
+                template_status=WING_READONLY_PREFLIGHT_REVIEW_DECISION_TEMPLATE_STATUS,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    ledger = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_roots=(decision_root,),
+    )
+
+    assert ledger["status"] == "operator_review_required"
+    assert ledger["summary"]["decision_record_count"] == 0
+    assert ledger["summary"]["invalid_record_count"] == 0
+    assert ledger["summary"]["unreviewed_candidate_count"] == 1
+
+    explicit = build_wing_readonly_preflight_review_decision_ledger(
+        preflight_evidence=_evidence_with_candidate(),
+        decision_paths=(template_path,),
+    )
+    assert explicit["status"] == "operator_review_decision_replacement_required"
+    assert explicit["summary"]["invalid_record_count"] == 1
+    assert "review_decision_unknown" in explicit["records"][0]["violations"]
+    assert (
+        "review_decision_template_status_unedited"
+        in explicit["records"][0]["violations"]
+    )
 
 
 def test_review_decision_ledger_tracks_unreviewed_preflight_candidate():

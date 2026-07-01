@@ -277,6 +277,18 @@ def ensure_prestart_summary(tmp_path: Path) -> Path:
     if path.exists():
         return path
     generated_at = "2026-06-15T00:00:00Z"
+    prestart_required_false_detail = {
+        field: False
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
+    prestart_required_plan_detail = {
+        f"plan_{field}": False
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
+    prestart_required_match_detail = {
+        f"{field}_matches_plan": True
+        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+    }
     write_no_wing_release_summary(
         tmp_path,
         [
@@ -295,11 +307,9 @@ def ensure_prestart_summary(tmp_path: Path) -> Path:
                     "backend_port_prestart_check_failure_detail_fields": list(
                         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
                     ),
-                    "safe_to_stop_listener_by_gate": False,
-                    "live_authority_granted": False,
-                    "backend_port_prestart_gate_execution_allowed": False,
-                    "backend_port_prestart_gate_readiness_closure_allowed": False,
-                    "backend_port_prestart_gate_live_authority_granted": False,
+                    **prestart_required_false_detail,
+                    **prestart_required_plan_detail,
+                    **prestart_required_match_detail,
                 },
             )
         ],
@@ -315,6 +325,8 @@ def ensure_prestart_summary(tmp_path: Path) -> Path:
             "queries_console": False,
             "executes_tests": False,
             "readiness_closure_allowed_by_packet": False,
+            "readiness_matrix_update_allowed": False,
+            "readiness_matrix_update_allowed_by_packet": False,
             "live_authority_granted": False,
         }
     )
@@ -428,6 +440,10 @@ def assert_summary_prestart_contract(summary: dict) -> None:
     assert summary["backend_port_prestart_check_failure_detail_fields"] == list(
         WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS
     )
+    for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS:
+        assert summary[field] is False
+        assert summary[f"plan_{field}"] is False
+        assert summary[f"{field}_matches_plan"] is True
     prestart_path = prestart_summary_path(Path(summary["backend_port_prestart_summary_path"]).parent)
     assert summary["backend_port_prestart_summary_required"] is True
     assert Path(summary["backend_port_prestart_summary_path"]).exists()
@@ -703,6 +719,153 @@ async def test_readonly_preflight_passes_with_physical_readbacks_without_write_m
         "send",
         "recv",
     ]
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_ignores_initial_connection_status_noise(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "connection_status", "connected": True, "mode": "wing"},
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    summary = read_summary(tmp_path)
+    assert summary["status"] == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    assert summary["sent_request_types"] == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+    ]
+    events = read_events(summary)
+    assert [event["event_type"] for event in events] == [
+        "send",
+        "recv",
+        "send",
+        "recv",
+        "send",
+        "recv",
+    ]
+    assert all(
+        event["payload"].get("type") != "connection_status"
+        for event in events
+        if isinstance(event.get("payload"), dict)
+    )
+
+
+@pytest.mark.asyncio
+async def test_readonly_preflight_ignores_matching_mixer_update_before_readback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            {
+                "type": "mixer_update",
+                "address": "/ch/3/fdr",
+                "values": ["-12.0", 0.5, -12.0],
+            },
+            {
+                "type": "mixer_parameter_value",
+                "request_id": "wing-readonly-preflight:ch3:fader",
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+                "value": -12.0,
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    expected_plan = write_expected_plan(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+    )
+    args = parse_args(
+        tmp_path,
+        "--channels",
+        "3",
+        "--value-types",
+        "fader",
+        "--require-physical-readback",
+        "--operator-confirm-channels",
+        "3",
+        "--operator-confirm-session-ready",
+        "--expected-plan",
+        str(expected_plan),
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 0
+    summary = read_summary(tmp_path)
+    assert summary["status"] == WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
+    events = read_events(summary)
+    assert [event["event_type"] for event in events] == [
+        "send",
+        "recv",
+        "send",
+        "recv",
+        "send",
+        "recv",
+    ]
+    assert all(
+        event["payload"].get("type") != "mixer_update"
+        for event in events
+        if isinstance(event.get("payload"), dict)
+    )
 
 
 @pytest.mark.asyncio

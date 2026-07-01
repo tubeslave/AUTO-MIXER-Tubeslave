@@ -1,0 +1,4513 @@
+{
+  "can_apply_live": false,
+  "can_import_to_queue": false,
+  "contacts_backend": false,
+  "contacts_wing": false,
+  "denial_reason": "smart_dsp_replay_evaluation_cannot_replace_real_wing_proof",
+  "failed_checks": [],
+  "failed_scenario_count": 0,
+  "future_wing_readback_required": true,
+  "generated_at_utc": "2026-06-25T04:00:00Z",
+  "hardware_proof_required_before_live": true,
+  "live_apply_allowed": false,
+  "live_authority_granted": false,
+  "live_write": false,
+  "method_id": "smart_dsp_strategy_engine",
+  "min_pass_rate": 1.0,
+  "mutates_console_state": false,
+  "mutates_mixer": false,
+  "operator_review_required": true,
+  "pass_rate": 1.0,
+  "passed_scenario_count": 28,
+  "queries_console": false,
+  "queue_import_allowed": false,
+  "read_only": true,
+  "read_only_or_dry_run_only": true,
+  "readiness_closure_allowed": false,
+  "results": [
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "low_mid_corrective_cut",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "High-pass cleanup is safer than boosting presence when low spill is present.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Check that the source still has enough fundamental weight.",
+          "problem": "muddy",
+          "score_delta_vs_selected": 0.043,
+          "score_gaps": [
+            {
+              "alternative": 0.68,
+              "delta": 0.14,
+              "metric": "precision",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.06,
+              "metric": "musical",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.84,
+              "delta": 0.06,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "high_pass_cleanup",
+          "total_score": 0.799,
+          "why_not_selected": "lower_precision,musical_score;total_score_delta=0.043"
+        }
+      ],
+      "candidate_blockers": {
+        "high_pass_cleanup": [],
+        "low_mid_corrective_cut": []
+      },
+      "candidate_count": 2,
+      "description": "Muddy lead vocal should prefer a bounded low-mid corrective cut.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "low_mid_corrective_cut",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: muddy. Selected low_mid_corrective_cut because Low-mid buildup is the dominant evidence; a bounded cut fixes it fastest. Alternatives scored: high_pass_cleanup=0.80. Alternative tradeoffs: high_pass_cleanup: lower_precision,musical_score;total_score_delta=0.043. Parameters: {'filter_type': 'peaking', 'frequency_hz': 260.0, 'gain_db': -3.2, 'q': 1.35}. Remaining blockers: none. Operator check: Listen for body loss and verify the band is not a feedback notch. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_muddy_vocal",
+      "selected_confidence": 0.847,
+      "selected_parameters": {
+        "filter_type": "peaking",
+        "frequency_hz": 260.0,
+        "gain_db": -3.2,
+        "q": 1.35
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 1,
+        "confidence": 0.847,
+        "global_blockers": [],
+        "method_family": "eq",
+        "problem": "muddy",
+        "reason": "Low-mid buildup is the dominant evidence; a bounded cut fixes it fastest.",
+        "status": "candidate",
+        "strategy_id": "low_mid_corrective_cut",
+        "strongest_score_dimensions": [
+          {
+            "metric": "operator_clarity",
+            "score": 0.9
+          },
+          {
+            "metric": "speed",
+            "score": 0.88
+          },
+          {
+            "metric": "safety",
+            "score": 0.88
+          }
+        ],
+        "total_score": 0.842
+      },
+      "selected_total_score": 0.842,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "dynamic_eq",
+      "actual_selected_strategy_id": "vocal_dynamic_low_mid_de_mud",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Low-mid buildup is the dominant evidence; a bounded cut fixes it fastest.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Listen for body loss and verify the band is not a feedback notch.",
+          "problem": "muddy",
+          "score_delta_vs_selected": 0.017,
+          "score_gaps": [
+            {
+              "alternative": 0.78,
+              "delta": 0.1,
+              "metric": "musical",
+              "selected": 0.88
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.08,
+              "metric": "precision",
+              "selected": 0.9
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "low_mid_corrective_cut",
+          "total_score": 0.842,
+          "why_not_selected": "lower_musical,precision_score;total_score_delta=0.017"
+        },
+        {
+          "alternative_reason": "Crest/LRA evidence shows performance-level dynamics; gentle compression controls jumps without using makeup as a headroom bypass.",
+          "blockers": [],
+          "method_family": "dynamics",
+          "operator_check": "Check gain reduction on loud phrases and verify makeup headroom.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.046,
+          "score_gaps": [
+            {
+              "alternative": 0.82,
+              "delta": 0.08,
+              "metric": "precision",
+              "selected": 0.9
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "gentle_channel_compression",
+          "total_score": 0.813,
+          "why_not_selected": "lower_precision_score;total_score_delta=0.046"
+        },
+        {
+          "alternative_reason": "High-pass cleanup is safer than boosting presence when low spill is present.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Check that the source still has enough fundamental weight.",
+          "problem": "muddy",
+          "score_delta_vs_selected": 0.06,
+          "score_gaps": [
+            {
+              "alternative": 0.68,
+              "delta": 0.22,
+              "metric": "precision",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.16,
+              "metric": "musical",
+              "selected": 0.88
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "high_pass_cleanup",
+          "total_score": 0.799,
+          "why_not_selected": "lower_precision,musical_score;total_score_delta=0.060"
+        },
+        {
+          "alternative_reason": "A manual level ride may preserve tone better than compression.",
+          "blockers": [],
+          "method_family": "gain_fader",
+          "operator_check": "Check whether the issue is performance dynamics or static balance.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.09,
+          "score_gaps": [
+            {
+              "alternative": 0.62,
+              "delta": 0.28,
+              "metric": "precision",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.66,
+              "delta": 0.14,
+              "metric": "speed",
+              "selected": 0.8
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "manual_level_ride_before_compression",
+          "total_score": 0.769,
+          "why_not_selected": "lower_precision,speed_score;total_score_delta=0.090"
+        },
+        {
+          "alternative_reason": "Multiband control may handle broad low-mid bloom, but it is slower and harder to verify than dynamic EQ.",
+          "blockers": [
+            "multiband_change_requires_operator_review"
+          ],
+          "method_family": "multiband",
+          "operator_check": "Use only after checking phase, vocal body and band crossover audibility.",
+          "problem": "muddy_dynamic_vocal",
+          "score_delta_vs_selected": 0.288,
+          "score_gaps": [
+            {
+              "alternative": 0.58,
+              "delta": 0.22,
+              "metric": "speed",
+              "selected": 0.8
+            },
+            {
+              "alternative": 0.66,
+              "delta": 0.2,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.14,
+              "metric": "safety",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.68,
+              "delta": 0.14,
+              "metric": "reversibility",
+              "selected": 0.82
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "vocal_low_mid_multiband_control",
+          "total_score": 0.571,
+          "why_not_selected": "blocked_by:multiband_change_requires_operator_review"
+        },
+        {
+          "alternative_reason": "Peak clamping is fast but can flatten tone and needs explicit review.",
+          "blockers": [
+            "limiter_style_channel_compression_requires_operator_review"
+          ],
+          "method_family": "dynamics",
+          "operator_check": "Avoid unless clipping risk is proven and operator accepts tone loss.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.426,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.42,
+              "metric": "musical",
+              "selected": 0.88
+            },
+            {
+              "alternative": 0.48,
+              "delta": 0.38,
+              "metric": "safety",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.28,
+              "metric": "precision",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.64,
+              "delta": 0.18,
+              "metric": "reversibility",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.7,
+              "delta": 0.16,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "fast_peak_clamp_compression",
+          "total_score": 0.433,
+          "why_not_selected": "blocked_by:limiter_style_channel_compression_requires_operator_review"
+        }
+      ],
+      "candidate_blockers": {
+        "fast_peak_clamp_compression": [
+          "limiter_style_channel_compression_requires_operator_review"
+        ],
+        "gentle_channel_compression": [],
+        "high_pass_cleanup": [],
+        "low_mid_corrective_cut": [],
+        "manual_level_ride_before_compression": [],
+        "vocal_dynamic_low_mid_de_mud": [],
+        "vocal_low_mid_multiband_control": [
+          "multiband_change_requires_operator_review"
+        ]
+      },
+      "candidate_count": 7,
+      "description": "Muddy vocal with dynamic low-mid bloom should prefer dynamic EQ over a static cut.",
+      "expected_method_family": "dynamic_eq",
+      "expected_selected_strategy_id": "vocal_dynamic_low_mid_de_mud",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: muddy_dynamic_vocal. Selected vocal_dynamic_low_mid_de_mud because Low-mid buildup is dynamic; dynamic EQ controls muddy phrases without permanently thinning the vocal. Alternatives scored: low_mid_corrective_cut=0.84, gentle_channel_compression=0.81, high_pass_cleanup=0.80, manual_level_ride_before_compression=0.77. Alternative tradeoffs: low_mid_corrective_cut: lower_musical,precision_score;total_score_delta=0.017; gentle_channel_compression: lower_precision_score;total_score_delta=0.046; high_pass_cleanup: lower_precision,musical_score;total_score_delta=0.060; manual_level_ride_before_compression: lower_precision,speed_score;total_score_delta=0.090. Parameters: {'filter_type': 'dynamic_peaking', 'frequency_hz': 260.0, 'q': 1.6, 'threshold_dbfs': -19.0, 'static_gain_db': -0.6, 'max_gain_reduction_db': 3.5, 'attack_ms': 18.0, 'release_ms': 180.0, 'makeup_gain_db': 0.0, 'gain_db': -0.6}. Remaining blockers: none. Operator check: Check chest/body on quiet words and gain reduction on loud phrases. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_dynamic_muddy_vocal",
+      "selected_confidence": 0.857,
+      "selected_parameters": {
+        "attack_ms": 18.0,
+        "filter_type": "dynamic_peaking",
+        "frequency_hz": 260.0,
+        "gain_db": -0.6,
+        "makeup_gain_db": 0.0,
+        "max_gain_reduction_db": 3.5,
+        "q": 1.6,
+        "release_ms": 180.0,
+        "static_gain_db": -0.6,
+        "threshold_dbfs": -19.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 6,
+        "confidence": 0.857,
+        "global_blockers": [],
+        "method_family": "dynamic_eq",
+        "problem": "muddy_dynamic_vocal",
+        "reason": "Low-mid buildup is dynamic; dynamic EQ controls muddy phrases without permanently thinning the vocal.",
+        "status": "candidate",
+        "strategy_id": "vocal_dynamic_low_mid_de_mud",
+        "strongest_score_dimensions": [
+          {
+            "metric": "precision",
+            "score": 0.9
+          },
+          {
+            "metric": "musical",
+            "score": 0.88
+          },
+          {
+            "metric": "safety",
+            "score": 0.86
+          }
+        ],
+        "total_score": 0.859
+      },
+      "selected_total_score": 0.859,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "soundcheck_presence_air_lift",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "A source can feel dull when it is simply below the level plane.",
+          "blockers": [
+            "level_plane_error_not_primary_for_presence"
+          ],
+          "method_family": "gain_fader",
+          "operator_check": "Compare source and bus level planes before adding high-frequency gain.",
+          "problem": "dull_presence",
+          "score_delta_vs_selected": 0.242,
+          "score_gaps": [
+            {
+              "alternative": 0.58,
+              "delta": 0.18,
+              "metric": "precision",
+              "selected": 0.76
+            },
+            {
+              "alternative": 0.7,
+              "delta": 0.12,
+              "metric": "musical",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.1,
+              "metric": "speed",
+              "selected": 0.86
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "level_plane_check_before_presence_boost",
+          "total_score": 0.559,
+          "why_not_selected": "blocked_by:level_plane_error_not_primary_for_presence"
+        },
+        {
+          "alternative_reason": "Holding the boost is safer until feedback/headroom/source identity are verified.",
+          "blockers": [
+            "soundcheck_presence_boost_safe_to_compare"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Use manual review if clarity is needed during an active performance.",
+          "problem": "dull_presence",
+          "score_delta_vs_selected": 0.292,
+          "score_gaps": [
+            {
+              "alternative": 0.52,
+              "delta": 0.3,
+              "metric": "musical",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.48,
+              "delta": 0.28,
+              "metric": "precision",
+              "selected": 0.76
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.14,
+              "metric": "speed",
+              "selected": 0.86
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "hold_presence_boost_for_live_safety",
+          "total_score": 0.509,
+          "why_not_selected": "blocked_by:soundcheck_presence_boost_safe_to_compare"
+        }
+      ],
+      "candidate_blockers": {
+        "hold_presence_boost_for_live_safety": [
+          "soundcheck_presence_boost_safe_to_compare"
+        ],
+        "level_plane_check_before_presence_boost": [
+          "level_plane_error_not_primary_for_presence"
+        ],
+        "soundcheck_presence_air_lift": []
+      },
+      "candidate_count": 3,
+      "description": "Dull soundcheck vocal should choose a bounded presence/air EQ lift.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "soundcheck_presence_air_lift",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: dull_presence. Selected soundcheck_presence_air_lift because Presence/air evidence is low; a bounded lift is the fastest soundcheck clarity move. Alternatives scored: level_plane_check_before_presence_boost=0.56, hold_presence_boost_for_live_safety=0.51. Alternative tradeoffs: level_plane_check_before_presence_boost: blocked_by:level_plane_error_not_primary_for_presence; hold_presence_boost_for_live_safety: blocked_by:soundcheck_presence_boost_safe_to_compare. Parameters: {'filter_type': 'high_shelf', 'frequency_hz': 3400.0, 'gain_db': 2.3, 'q': 0.8, 'presence_deficit_score': 0.82, 'bounded_boost_db': 2.3, 'requires_true_peak_headroom_db': 3.3, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Check feedback, harshness and true-peak headroom before keeping the boost. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_dull_vocal_presence_lift",
+      "selected_confidence": 0.823,
+      "selected_parameters": {
+        "bounded_boost_db": 2.3,
+        "filter_type": "high_shelf",
+        "frequency_hz": 3400.0,
+        "gain_db": 2.3,
+        "operator_confirmation_required": true,
+        "presence_deficit_score": 0.82,
+        "q": 0.8,
+        "requires_true_peak_headroom_db": 3.3
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.823,
+        "global_blockers": [],
+        "method_family": "eq",
+        "problem": "dull_presence",
+        "reason": "Presence/air evidence is low; a bounded lift is the fastest soundcheck clarity move.",
+        "status": "candidate",
+        "strategy_id": "soundcheck_presence_air_lift",
+        "strongest_score_dimensions": [
+          {
+            "metric": "reversibility",
+            "score": 0.88
+          },
+          {
+            "metric": "speed",
+            "score": 0.86
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.86
+          }
+        ],
+        "total_score": 0.801
+      },
+      "selected_total_score": 0.801,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "analysis_only",
+      "actual_selected_strategy_id": "hold_presence_boost_for_live_safety",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "A source can feel dull when it is simply below the level plane.",
+          "blockers": [
+            "level_plane_error_not_primary_for_presence"
+          ],
+          "method_family": "gain_fader",
+          "operator_check": "Compare source and bus level planes before adding high-frequency gain.",
+          "problem": "dull_presence",
+          "score_delta_vs_selected": 0.188,
+          "score_gaps": [
+            {
+              "alternative": 0.76,
+              "delta": 0.16,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.9,
+              "delta": 0.08,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.92,
+              "delta": 0.08,
+              "metric": "reversibility",
+              "selected": 1.0
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.08,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "level_plane_check_before_presence_boost",
+          "total_score": 0.598,
+          "why_not_selected": "blocked_by:level_plane_error_not_primary_for_presence"
+        },
+        {
+          "alternative_reason": "Presence/air evidence is low; a bounded lift is the fastest soundcheck clarity move.",
+          "blockers": [
+            "live_eq_boost_requires_operator_review_and_wing_proof"
+          ],
+          "method_family": "eq",
+          "operator_check": "Check feedback, harshness and true-peak headroom before keeping the boost.",
+          "problem": "dull_presence",
+          "score_delta_vs_selected": 0.32,
+          "score_gaps": [
+            {
+              "alternative": 0.42,
+              "delta": 0.56,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.52,
+              "delta": 0.4,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.88,
+              "delta": 0.12,
+              "metric": "reversibility",
+              "selected": 1.0
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "soundcheck_presence_air_lift",
+          "total_score": 0.466,
+          "why_not_selected": "blocked_by:live_eq_boost_requires_operator_review_and_wing_proof"
+        }
+      ],
+      "candidate_blockers": {
+        "hold_presence_boost_for_live_safety": [],
+        "level_plane_check_before_presence_boost": [
+          "level_plane_error_not_primary_for_presence"
+        ],
+        "soundcheck_presence_air_lift": [
+          "live_eq_boost_requires_operator_review_and_wing_proof"
+        ]
+      },
+      "candidate_count": 3,
+      "description": "Live dull vocal should hold the presence boost for operator review.",
+      "expected_method_family": "analysis_only",
+      "expected_selected_strategy_id": "hold_presence_boost_for_live_safety",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: dull_presence. Selected hold_presence_boost_for_live_safety because Holding the boost is safer until feedback/headroom/source identity are verified. Alternatives scored: level_plane_check_before_presence_boost=0.60, soundcheck_presence_air_lift=0.47. Alternative tradeoffs: level_plane_check_before_presence_boost: blocked_by:level_plane_error_not_primary_for_presence; soundcheck_presence_air_lift: blocked_by:live_eq_boost_requires_operator_review_and_wing_proof. Parameters: {'dsp_change': 'hold', 'reason': 'presence_boost_can_trigger_feedback_or_harshness', 'presence_deficit_score': 0.82}. Remaining blockers: none. Operator check: Use manual review if clarity is needed during an active performance. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_dull_vocal_presence_hold",
+      "selected_confidence": 0.815,
+      "selected_parameters": {
+        "dsp_change": "hold",
+        "presence_deficit_score": 0.82,
+        "reason": "presence_boost_can_trigger_feedback_or_harshness"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.815,
+        "global_blockers": [],
+        "method_family": "analysis_only",
+        "problem": "dull_presence",
+        "reason": "Holding the boost is safer until feedback/headroom/source identity are verified.",
+        "status": "candidate",
+        "strategy_id": "hold_presence_boost_for_live_safety",
+        "strongest_score_dimensions": [
+          {
+            "metric": "reversibility",
+            "score": 1.0
+          },
+          {
+            "metric": "safety",
+            "score": 0.98
+          },
+          {
+            "metric": "speed",
+            "score": 0.92
+          }
+        ],
+        "total_score": 0.786
+      },
+      "selected_total_score": 0.786,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "gain_fader",
+      "actual_selected_strategy_id": "feedback_gain_pullback",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "A narrow cut can reduce feedback while preserving level, but the ring frequency must be verified.",
+          "blockers": [
+            "feedback_frequency_requires_operator_confirmation"
+          ],
+          "method_family": "eq",
+          "operator_check": "Confirm the ringing frequency on analyzer/readback before promoting the notch.",
+          "problem": "feedback_risk",
+          "score_delta_vs_selected": 0.278,
+          "score_gaps": [
+            {
+              "alternative": 0.52,
+              "delta": 0.16,
+              "metric": "precision",
+              "selected": 0.68
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.14,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.86,
+              "delta": 0.12,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.12,
+              "metric": "reversibility",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.12,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "narrow_feedback_notch_review",
+          "total_score": 0.56,
+          "why_not_selected": "blocked_by:feedback_frequency_requires_operator_confirmation"
+        },
+        {
+          "alternative_reason": "Holding is safest if the feedback source or ring frequency is not confirmed.",
+          "blockers": [
+            "feedback_risk_reduction_candidate_available"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Confirm source identity, PA path and ring frequency before any live promotion.",
+          "problem": "feedback_risk",
+          "score_delta_vs_selected": 0.294,
+          "score_gaps": [
+            {
+              "alternative": 0.58,
+              "delta": 0.34,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.42,
+              "delta": 0.26,
+              "metric": "precision",
+              "selected": 0.68
+            },
+            {
+              "alternative": 0.5,
+              "delta": 0.12,
+              "metric": "musical",
+              "selected": 0.62
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "hold_for_feedback_source_confirmation",
+          "total_score": 0.544,
+          "why_not_selected": "blocked_by:feedback_risk_reduction_candidate_available"
+        }
+      ],
+      "candidate_blockers": {
+        "feedback_gain_pullback": [],
+        "hold_for_feedback_source_confirmation": [
+          "feedback_risk_reduction_candidate_available"
+        ],
+        "narrow_feedback_notch_review": [
+          "feedback_frequency_requires_operator_confirmation"
+        ]
+      },
+      "candidate_count": 3,
+      "description": "Live vocal feedback risk should prefer a bounded gain pullback over a speculative notch.",
+      "expected_method_family": "gain_fader",
+      "expected_selected_strategy_id": "feedback_gain_pullback",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: feedback_risk. Selected feedback_gain_pullback because Feedback risk is high; a bounded level pullback reduces risk fastest. Alternatives scored: narrow_feedback_notch_review=0.56, hold_for_feedback_source_confirmation=0.54. Alternative tradeoffs: narrow_feedback_notch_review: blocked_by:feedback_frequency_requires_operator_confirmation; hold_for_feedback_source_confirmation: blocked_by:feedback_risk_reduction_candidate_available. Parameters: {'delta_db': -1.5, 'bounded_delta_db': 1.5, 'gain_db': 0.0, 'feedback_risk': 0.82, 'target_scope': 'source_feedback_risk_reduction', 'future_fader_ceiling_dbfs': 0.0, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Verify the source in the PA and confirm the move preserves audibility. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_vocal_feedback_gain_pullback",
+      "selected_confidence": 0.845,
+      "selected_parameters": {
+        "bounded_delta_db": 1.5,
+        "delta_db": -1.5,
+        "feedback_risk": 0.82,
+        "future_fader_ceiling_dbfs": 0.0,
+        "gain_db": 0.0,
+        "operator_confirmation_required": true,
+        "target_scope": "source_feedback_risk_reduction"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.845,
+        "global_blockers": [],
+        "method_family": "gain_fader",
+        "problem": "feedback_risk",
+        "reason": "Feedback risk is high; a bounded level pullback reduces risk fastest.",
+        "status": "candidate",
+        "strategy_id": "feedback_gain_pullback",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.98
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.94
+          },
+          {
+            "metric": "speed",
+            "score": 0.92
+          }
+        ],
+        "total_score": 0.838
+      },
+      "selected_total_score": 0.838,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "gain_fader",
+      "actual_selected_strategy_id": "feedback_gain_pullback",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Holding the boost is safer until feedback/headroom/source identity are verified.",
+          "blockers": [],
+          "method_family": "analysis_only",
+          "operator_check": "Use manual review if clarity is needed during an active performance.",
+          "problem": "dull_presence",
+          "score_delta_vs_selected": 0.101,
+          "score_gaps": [
+            {
+              "alternative": 0.48,
+              "delta": 0.2,
+              "metric": "precision",
+              "selected": 0.68
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.14,
+              "metric": "speed",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.52,
+              "delta": 0.1,
+              "metric": "musical",
+              "selected": 0.62
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "hold_presence_boost_for_live_safety",
+          "total_score": 0.689,
+          "why_not_selected": "lower_precision,speed_score;total_score_delta=0.101"
+        },
+        {
+          "alternative_reason": "Presence/air evidence is low; a bounded lift is the fastest soundcheck clarity move.",
+          "blockers": [
+            "feedback_risk_blocks_boost"
+          ],
+          "method_family": "eq",
+          "operator_check": "Check feedback, harshness and true-peak headroom before keeping the boost.",
+          "problem": "dull_presence",
+          "score_delta_vs_selected": 0.169,
+          "score_gaps": [
+            {
+              "alternative": 0.72,
+              "delta": 0.26,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.88,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.94
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "soundcheck_presence_air_lift",
+          "total_score": 0.621,
+          "why_not_selected": "blocked_by:feedback_risk_blocks_boost"
+        },
+        {
+          "alternative_reason": "A source can feel dull when it is simply below the level plane.",
+          "blockers": [
+            "level_plane_error_not_primary_for_presence"
+          ],
+          "method_family": "gain_fader",
+          "operator_check": "Compare source and bus level planes before adding high-frequency gain.",
+          "problem": "dull_presence",
+          "score_delta_vs_selected": 0.231,
+          "score_gaps": [
+            {
+              "alternative": 0.76,
+              "delta": 0.1,
+              "metric": "speed",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.58,
+              "delta": 0.1,
+              "metric": "precision",
+              "selected": 0.68
+            },
+            {
+              "alternative": 0.9,
+              "delta": 0.08,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.08,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "level_plane_check_before_presence_boost",
+          "total_score": 0.559,
+          "why_not_selected": "blocked_by:level_plane_error_not_primary_for_presence"
+        },
+        {
+          "alternative_reason": "A narrow cut can reduce feedback while preserving level, but the ring frequency must be verified.",
+          "blockers": [
+            "feedback_frequency_requires_operator_confirmation"
+          ],
+          "method_family": "eq",
+          "operator_check": "Confirm the ringing frequency on analyzer/readback before promoting the notch.",
+          "problem": "feedback_risk",
+          "score_delta_vs_selected": 0.262,
+          "score_gaps": [
+            {
+              "alternative": 0.52,
+              "delta": 0.16,
+              "metric": "precision",
+              "selected": 0.68
+            },
+            {
+              "alternative": 0.86,
+              "delta": 0.12,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.12,
+              "metric": "reversibility",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.12,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.08,
+              "metric": "speed",
+              "selected": 0.86
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "narrow_feedback_notch_review",
+          "total_score": 0.528,
+          "why_not_selected": "blocked_by:feedback_frequency_requires_operator_confirmation"
+        },
+        {
+          "alternative_reason": "Holding is safest if the feedback source or ring frequency is not confirmed.",
+          "blockers": [
+            "feedback_risk_reduction_candidate_available"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Confirm source identity, PA path and ring frequency before any live promotion.",
+          "problem": "feedback_risk",
+          "score_delta_vs_selected": 0.332,
+          "score_gaps": [
+            {
+              "alternative": 0.58,
+              "delta": 0.28,
+              "metric": "speed",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.42,
+              "delta": 0.26,
+              "metric": "precision",
+              "selected": 0.68
+            },
+            {
+              "alternative": 0.5,
+              "delta": 0.12,
+              "metric": "musical",
+              "selected": 0.62
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "hold_for_feedback_source_confirmation",
+          "total_score": 0.458,
+          "why_not_selected": "blocked_by:feedback_risk_reduction_candidate_available"
+        }
+      ],
+      "candidate_blockers": {
+        "feedback_gain_pullback": [],
+        "hold_for_feedback_source_confirmation": [
+          "feedback_risk_reduction_candidate_available"
+        ],
+        "hold_presence_boost_for_live_safety": [],
+        "level_plane_check_before_presence_boost": [
+          "level_plane_error_not_primary_for_presence"
+        ],
+        "narrow_feedback_notch_review": [
+          "feedback_frequency_requires_operator_confirmation"
+        ],
+        "soundcheck_presence_air_lift": [
+          "feedback_risk_blocks_boost"
+        ]
+      },
+      "candidate_count": 6,
+      "description": "Soundcheck feedback risk should beat and block a presence boost.",
+      "expected_method_family": "gain_fader",
+      "expected_selected_strategy_id": "feedback_gain_pullback",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: feedback_risk. Selected feedback_gain_pullback because Feedback risk is high; a bounded level pullback reduces risk fastest. Alternatives scored: hold_presence_boost_for_live_safety=0.69, soundcheck_presence_air_lift=0.62, level_plane_check_before_presence_boost=0.56, narrow_feedback_notch_review=0.53. Alternative tradeoffs: hold_presence_boost_for_live_safety: lower_precision,speed_score;total_score_delta=0.101; soundcheck_presence_air_lift: blocked_by:feedback_risk_blocks_boost; level_plane_check_before_presence_boost: blocked_by:level_plane_error_not_primary_for_presence; narrow_feedback_notch_review: blocked_by:feedback_frequency_requires_operator_confirmation. Parameters: {'delta_db': -2.1, 'bounded_delta_db': 2.1, 'gain_db': 0.0, 'feedback_risk': 0.82, 'target_scope': 'source_feedback_risk_reduction', 'future_fader_ceiling_dbfs': 0.0, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Verify the source in the PA and confirm the move preserves audibility. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_feedback_blocks_presence_boost",
+      "selected_confidence": 0.817,
+      "selected_parameters": {
+        "bounded_delta_db": 2.1,
+        "delta_db": -2.1,
+        "feedback_risk": 0.82,
+        "future_fader_ceiling_dbfs": 0.0,
+        "gain_db": 0.0,
+        "operator_confirmation_required": true,
+        "target_scope": "source_feedback_risk_reduction"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 5,
+        "confidence": 0.817,
+        "global_blockers": [],
+        "method_family": "gain_fader",
+        "problem": "feedback_risk",
+        "reason": "Feedback risk is high; a bounded level pullback reduces risk fastest.",
+        "status": "candidate",
+        "strategy_id": "feedback_gain_pullback",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.98
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.94
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.9
+          }
+        ],
+        "total_score": 0.79
+      },
+      "selected_total_score": 0.79,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "de_esser",
+      "actual_selected_strategy_id": "vocal_de_esser",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Dynamic EQ can catch harsh peaks without permanently dulling the vocal.",
+          "blockers": [],
+          "method_family": "dynamic_eq",
+          "operator_check": "Check that the vocal does not fall behind the mix on loud words.",
+          "problem": "harsh",
+          "score_delta_vs_selected": 0.058,
+          "score_gaps": [
+            {
+              "alternative": 0.78,
+              "delta": 0.12,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.1,
+              "metric": "speed",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.84,
+              "delta": 0.06,
+              "metric": "safety",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.84
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "presence_dynamic_eq_cut",
+          "total_score": 0.82,
+          "why_not_selected": "lower_operator_clarity,speed_score;total_score_delta=0.058"
+        },
+        {
+          "alternative_reason": "A broad cut is fast, but less precise than de-essing or dynamic EQ.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Check presence and lyric intelligibility.",
+          "problem": "harsh",
+          "score_delta_vs_selected": 0.076,
+          "score_gaps": [
+            {
+              "alternative": 0.68,
+              "delta": 0.22,
+              "metric": "precision",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.12,
+              "metric": "musical",
+              "selected": 0.84
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "broad_presence_cut",
+          "total_score": 0.802,
+          "why_not_selected": "lower_precision,musical_score;total_score_delta=0.076"
+        }
+      ],
+      "candidate_blockers": {
+        "broad_presence_cut": [],
+        "presence_dynamic_eq_cut": [],
+        "vocal_de_esser": []
+      },
+      "candidate_count": 3,
+      "description": "Live sibilant vocal should prefer de-essing with no makeup gain.",
+      "expected_method_family": "de_esser",
+      "expected_selected_strategy_id": "vocal_de_esser",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: sibilant. Selected vocal_de_esser because Sibilance evidence is stronger than broad harshness; de-essing is narrower. Alternatives scored: presence_dynamic_eq_cut=0.82, broad_presence_cut=0.80. Alternative tradeoffs: presence_dynamic_eq_cut: lower_operator_clarity,speed_score;total_score_delta=0.058; broad_presence_cut: lower_precision,musical_score;total_score_delta=0.076. Parameters: {'frequency_hz': 7800.0, 'threshold_dbfs': -27.3, 'ratio': 3.0, 'max_gain_reduction_db': 5.1, 'makeup_gain_db': 0.0}. Remaining blockers: none. Operator check: Check consonants and air; do not remove intelligibility. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_sibilant_vocal",
+      "selected_confidence": 0.868,
+      "selected_parameters": {
+        "frequency_hz": 7800.0,
+        "makeup_gain_db": 0.0,
+        "max_gain_reduction_db": 5.1,
+        "ratio": 3.0,
+        "threshold_dbfs": -27.3
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.868,
+        "global_blockers": [],
+        "method_family": "de_esser",
+        "problem": "sibilant",
+        "reason": "Sibilance evidence is stronger than broad harshness; de-essing is narrower.",
+        "status": "candidate",
+        "strategy_id": "vocal_de_esser",
+        "strongest_score_dimensions": [
+          {
+            "metric": "precision",
+            "score": 0.9
+          },
+          {
+            "metric": "safety",
+            "score": 0.9
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.9
+          }
+        ],
+        "total_score": 0.878
+      },
+      "selected_total_score": 0.878,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "dynamics",
+      "actual_selected_strategy_id": "vocal_compressor_envelope_smoothing",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Dynamic EQ can catch harsh peaks without permanently dulling the vocal.",
+          "blockers": [],
+          "method_family": "dynamic_eq",
+          "operator_check": "Check that the vocal does not fall behind the mix on loud words.",
+          "problem": "harsh",
+          "score_delta_vs_selected": 0.033,
+          "score_gaps": [
+            {
+              "alternative": 0.78,
+              "delta": 0.08,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.06,
+              "metric": "speed",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.06,
+              "metric": "musical",
+              "selected": 0.88
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.84
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "presence_dynamic_eq_cut",
+          "total_score": 0.816,
+          "why_not_selected": "lower_operator_clarity,speed_score;total_score_delta=0.033"
+        },
+        {
+          "alternative_reason": "Crest/LRA evidence shows performance-level dynamics; gentle compression controls jumps without using makeup as a headroom bypass.",
+          "blockers": [],
+          "method_family": "dynamics",
+          "operator_check": "Check gain reduction on loud phrases and verify makeup headroom.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.036,
+          "score_gaps": [
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.84
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "gentle_channel_compression",
+          "total_score": 0.813,
+          "why_not_selected": "lower_reversibility_score;total_score_delta=0.036"
+        },
+        {
+          "alternative_reason": "A broad cut is fast, but less precise than de-essing or dynamic EQ.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Check presence and lyric intelligibility.",
+          "problem": "harsh",
+          "score_delta_vs_selected": 0.062,
+          "score_gaps": [
+            {
+              "alternative": 0.68,
+              "delta": 0.16,
+              "metric": "precision",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.16,
+              "metric": "musical",
+              "selected": 0.88
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "broad_presence_cut",
+          "total_score": 0.787,
+          "why_not_selected": "lower_precision,musical_score;total_score_delta=0.062"
+        },
+        {
+          "alternative_reason": "A manual level ride may preserve tone better than compression.",
+          "blockers": [],
+          "method_family": "gain_fader",
+          "operator_check": "Check whether the issue is performance dynamics or static balance.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.08,
+          "score_gaps": [
+            {
+              "alternative": 0.62,
+              "delta": 0.22,
+              "metric": "precision",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.66,
+              "delta": 0.16,
+              "metric": "speed",
+              "selected": 0.82
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "manual_level_ride_before_compression",
+          "total_score": 0.769,
+          "why_not_selected": "lower_precision,speed_score;total_score_delta=0.080"
+        },
+        {
+          "alternative_reason": "Sibilance evidence is stronger than broad harshness; de-essing is narrower.",
+          "blockers": [
+            "sibilance_evidence_low_for_de_esser"
+          ],
+          "method_family": "de_esser",
+          "operator_check": "Check consonants and air; do not remove intelligibility.",
+          "problem": "sibilant",
+          "score_delta_vs_selected": 0.155,
+          "score_gaps": [],
+          "status": "blocked",
+          "strategy_id": "vocal_de_esser",
+          "total_score": 0.694,
+          "why_not_selected": "blocked_by:sibilance_evidence_low_for_de_esser"
+        },
+        {
+          "alternative_reason": "Peak clamping is fast but can flatten tone and needs explicit review.",
+          "blockers": [
+            "limiter_style_channel_compression_requires_operator_review"
+          ],
+          "method_family": "dynamics",
+          "operator_check": "Avoid unless clipping risk is proven and operator accepts tone loss.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.416,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.42,
+              "metric": "musical",
+              "selected": 0.88
+            },
+            {
+              "alternative": 0.48,
+              "delta": 0.38,
+              "metric": "safety",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.22,
+              "metric": "precision",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.64,
+              "delta": 0.2,
+              "metric": "reversibility",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.7,
+              "delta": 0.16,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "fast_peak_clamp_compression",
+          "total_score": 0.433,
+          "why_not_selected": "blocked_by:limiter_style_channel_compression_requires_operator_review"
+        }
+      ],
+      "candidate_blockers": {
+        "broad_presence_cut": [],
+        "fast_peak_clamp_compression": [
+          "limiter_style_channel_compression_requires_operator_review"
+        ],
+        "gentle_channel_compression": [],
+        "manual_level_ride_before_compression": [],
+        "presence_dynamic_eq_cut": [],
+        "vocal_compressor_envelope_smoothing": [],
+        "vocal_de_esser": [
+          "sibilance_evidence_low_for_de_esser"
+        ]
+      },
+      "candidate_count": 7,
+      "description": "Harsh dynamic vocal without sibilance should prefer compressor envelope tuning over de-essing.",
+      "expected_method_family": "dynamics",
+      "expected_selected_strategy_id": "vocal_compressor_envelope_smoothing",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: harsh_dynamic_vocal. Selected vocal_compressor_envelope_smoothing because Harshness follows dynamic vocal peaks; adjusting compressor attack/release is more musical than cutting presence first. Alternatives scored: presence_dynamic_eq_cut=0.82, gentle_channel_compression=0.81, broad_presence_cut=0.79, manual_level_ride_before_compression=0.77. Alternative tradeoffs: presence_dynamic_eq_cut: lower_operator_clarity,speed_score;total_score_delta=0.033; gentle_channel_compression: lower_reversibility_score;total_score_delta=0.036; broad_presence_cut: lower_precision,musical_score;total_score_delta=0.062; manual_level_ride_before_compression: lower_precision,speed_score;total_score_delta=0.080. Parameters: {'envelope_change': 'slower_attack_smoother_release', 'threshold_dbfs': -20.0, 'ratio': 2.6, 'attack_ms': 22.0, 'release_ms': 170.0, 'knee_db': 5.0, 'target_gain_reduction_db': 2.8, 'makeup_gain_db': 0.0, 'max_attack_delta_ms': 12.0, 'max_release_delta_ms': 80.0, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Watch gain reduction on loud words and verify lyric presence stays forward. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_harsh_dynamic_vocal_envelope",
+      "selected_confidence": 0.851,
+      "selected_parameters": {
+        "attack_ms": 22.0,
+        "envelope_change": "slower_attack_smoother_release",
+        "knee_db": 5.0,
+        "makeup_gain_db": 0.0,
+        "max_attack_delta_ms": 12.0,
+        "max_release_delta_ms": 80.0,
+        "operator_confirmation_required": true,
+        "ratio": 2.6,
+        "release_ms": 170.0,
+        "target_gain_reduction_db": 2.8,
+        "threshold_dbfs": -20.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 6,
+        "confidence": 0.851,
+        "global_blockers": [],
+        "method_family": "dynamics",
+        "problem": "harsh_dynamic_vocal",
+        "reason": "Harshness follows dynamic vocal peaks; adjusting compressor attack/release is more musical than cutting presence first.",
+        "status": "candidate",
+        "strategy_id": "vocal_compressor_envelope_smoothing",
+        "strongest_score_dimensions": [
+          {
+            "metric": "musical",
+            "score": 0.88
+          },
+          {
+            "metric": "safety",
+            "score": 0.86
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.86
+          }
+        ],
+        "total_score": 0.849
+      },
+      "selected_total_score": 0.849,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "de_esser",
+      "actual_selected_strategy_id": "vocal_de_esser",
+      "actual_status": "analysis_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Dynamic EQ can catch harsh peaks without permanently dulling the vocal.",
+          "blockers": [],
+          "method_family": "dynamic_eq",
+          "operator_check": "Check that the vocal does not fall behind the mix on loud words.",
+          "problem": "harsh",
+          "score_delta_vs_selected": 0.058,
+          "score_gaps": [
+            {
+              "alternative": 0.78,
+              "delta": 0.12,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.1,
+              "metric": "speed",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.84,
+              "delta": 0.06,
+              "metric": "safety",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.84
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "presence_dynamic_eq_cut",
+          "total_score": 0.816,
+          "why_not_selected": "lower_operator_clarity,speed_score;total_score_delta=0.058"
+        },
+        {
+          "alternative_reason": "A broad cut is fast, but less precise than de-essing or dynamic EQ.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Check presence and lyric intelligibility.",
+          "problem": "harsh",
+          "score_delta_vs_selected": 0.087,
+          "score_gaps": [
+            {
+              "alternative": 0.68,
+              "delta": 0.22,
+              "metric": "precision",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.12,
+              "metric": "musical",
+              "selected": 0.84
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "broad_presence_cut",
+          "total_score": 0.787,
+          "why_not_selected": "lower_precision,musical_score;total_score_delta=0.087"
+        }
+      ],
+      "candidate_blockers": {
+        "broad_presence_cut": [],
+        "presence_dynamic_eq_cut": [],
+        "vocal_de_esser": []
+      },
+      "candidate_count": 3,
+      "description": "Inferred vocal evidence can find de-essing but still needs source identity confirmation.",
+      "expected_method_family": "de_esser",
+      "expected_selected_strategy_id": "vocal_de_esser",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "source_identity_not_confirmed",
+        "source_identity_confidence_low"
+      ],
+      "operator_explanation": "Problem: sibilant. Selected vocal_de_esser because Sibilance evidence is stronger than broad harshness; de-essing is narrower. Alternatives scored: presence_dynamic_eq_cut=0.82, broad_presence_cut=0.79. Alternative tradeoffs: presence_dynamic_eq_cut: lower_operator_clarity,speed_score;total_score_delta=0.058; broad_presence_cut: lower_precision,musical_score;total_score_delta=0.087. Parameters: {'frequency_hz': 7600.0, 'threshold_dbfs': -27.0, 'ratio': 3.0, 'max_gain_reduction_db': 5.0, 'makeup_gain_db': 0.0}. Remaining blockers: source_identity_not_confirmed, source_identity_confidence_low. Operator check: Check consonants and air; do not remove intelligibility. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "inferred_vocal_identity_requires_confirmation",
+      "selected_confidence": 0.734,
+      "selected_parameters": {
+        "frequency_hz": 7600.0,
+        "makeup_gain_db": 0.0,
+        "max_gain_reduction_db": 5.0,
+        "ratio": 3.0,
+        "threshold_dbfs": -27.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.734,
+        "global_blockers": [
+          "source_identity_not_confirmed",
+          "source_identity_confidence_low"
+        ],
+        "method_family": "de_esser",
+        "problem": "sibilant",
+        "reason": "Sibilance evidence is stronger than broad harshness; de-essing is narrower.",
+        "status": "candidate",
+        "strategy_id": "vocal_de_esser",
+        "strongest_score_dimensions": [
+          {
+            "metric": "precision",
+            "score": 0.9
+          },
+          {
+            "metric": "safety",
+            "score": 0.9
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.9
+          }
+        ],
+        "total_score": 0.874
+      },
+      "selected_total_score": 0.874,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "dynamics",
+      "actual_selected_strategy_id": "gentle_channel_compression",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "A manual level ride may preserve tone better than compression.",
+          "blockers": [],
+          "method_family": "gain_fader",
+          "operator_check": "Check whether the issue is performance dynamics or static balance.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.044,
+          "score_gaps": [
+            {
+              "alternative": 0.62,
+              "delta": 0.2,
+              "metric": "precision",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.66,
+              "delta": 0.12,
+              "metric": "speed",
+              "selected": 0.78
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "manual_level_ride_before_compression",
+          "total_score": 0.769,
+          "why_not_selected": "lower_precision,speed_score;total_score_delta=0.044"
+        },
+        {
+          "alternative_reason": "Peak clamping is fast but can flatten tone and needs explicit review.",
+          "blockers": [
+            "limiter_style_channel_compression_requires_operator_review"
+          ],
+          "method_family": "dynamics",
+          "operator_check": "Avoid unless clipping risk is proven and operator accepts tone loss.",
+          "problem": "dynamic_control",
+          "score_delta_vs_selected": 0.38,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.38,
+              "metric": "musical",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.48,
+              "delta": 0.34,
+              "metric": "safety",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.2,
+              "metric": "precision",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.64,
+              "delta": 0.14,
+              "metric": "reversibility",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.7,
+              "delta": 0.12,
+              "metric": "operator_clarity",
+              "selected": 0.82
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "fast_peak_clamp_compression",
+          "total_score": 0.433,
+          "why_not_selected": "blocked_by:limiter_style_channel_compression_requires_operator_review"
+        }
+      ],
+      "candidate_blockers": {
+        "fast_peak_clamp_compression": [
+          "limiter_style_channel_compression_requires_operator_review"
+        ],
+        "gentle_channel_compression": [],
+        "manual_level_ride_before_compression": []
+      },
+      "candidate_count": 3,
+      "description": "Dynamic vocal should prefer gentle compression over peak clamping.",
+      "expected_method_family": "dynamics",
+      "expected_selected_strategy_id": "gentle_channel_compression",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: dynamic_control. Selected gentle_channel_compression because Crest/LRA evidence shows performance-level dynamics; gentle compression controls jumps without using makeup as a headroom bypass. Alternatives scored: manual_level_ride_before_compression=0.77, fast_peak_clamp_compression=0.43. Alternative tradeoffs: manual_level_ride_before_compression: lower_precision,speed_score;total_score_delta=0.044; fast_peak_clamp_compression: blocked_by:limiter_style_channel_compression_requires_operator_review. Parameters: {'threshold_dbfs': -22.8, 'ratio': 3.3, 'attack_ms': 14.0, 'release_ms': 110.0, 'knee_db': 4.0, 'target_gain_reduction_db': 2.6, 'makeup_gain_db': 1.0}. Remaining blockers: none. Operator check: Check gain reduction on loud phrases and verify makeup headroom. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_dynamic_vocal_compression",
+      "selected_confidence": 0.83,
+      "selected_parameters": {
+        "attack_ms": 14.0,
+        "knee_db": 4.0,
+        "makeup_gain_db": 1.0,
+        "ratio": 3.3,
+        "release_ms": 110.0,
+        "target_gain_reduction_db": 2.6,
+        "threshold_dbfs": -22.8
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.83,
+        "global_blockers": [],
+        "method_family": "dynamics",
+        "problem": "dynamic_control",
+        "reason": "Crest/LRA evidence shows performance-level dynamics; gentle compression controls jumps without using makeup as a headroom bypass.",
+        "status": "candidate",
+        "strategy_id": "gentle_channel_compression",
+        "strongest_score_dimensions": [
+          {
+            "metric": "musical",
+            "score": 0.84
+          },
+          {
+            "metric": "precision",
+            "score": 0.82
+          },
+          {
+            "metric": "safety",
+            "score": 0.82
+          }
+        ],
+        "total_score": 0.813
+      },
+      "selected_total_score": 0.813,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "gain_fader",
+      "actual_selected_strategy_id": "soundcheck_bounded_gain_up",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Holding is safest when the level-plane evidence is incomplete or risky.",
+          "blockers": [
+            "level_plane_context_review_required"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Capture longer source and bus context before accepting a move.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.35,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.32,
+              "metric": "precision",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.54,
+              "delta": 0.32,
+              "metric": "musical",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.28,
+              "metric": "speed",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.06,
+              "metric": "operator_clarity",
+              "selected": 0.88
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "hold_for_level_plane_context",
+          "total_score": 0.482,
+          "why_not_selected": "blocked_by:level_plane_context_review_required"
+        },
+        {
+          "alternative_reason": "EQ should not be used to solve a measured level-plane problem.",
+          "blockers": [
+            "tone_change_does_not_match_level_plane_problem"
+          ],
+          "method_family": "eq",
+          "operator_check": "Confirm there is no separate tonal problem before using EQ.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.504,
+          "score_gaps": [
+            {
+              "alternative": 0.35,
+              "delta": 0.51,
+              "metric": "musical",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.4,
+              "delta": 0.5,
+              "metric": "speed",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.28,
+              "delta": 0.5,
+              "metric": "precision",
+              "selected": 0.78
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "avoid_tone_change_for_level_problem",
+          "total_score": 0.328,
+          "why_not_selected": "blocked_by:tone_change_does_not_match_level_plane_problem"
+        }
+      ],
+      "candidate_blockers": {
+        "avoid_tone_change_for_level_problem": [
+          "tone_change_does_not_match_level_plane_problem"
+        ],
+        "hold_for_level_plane_context": [
+          "level_plane_context_review_required"
+        ],
+        "soundcheck_bounded_gain_up": []
+      },
+      "candidate_count": 3,
+      "description": "Quiet soundcheck vocal should choose bounded gain-up over tone changes.",
+      "expected_method_family": "gain_fader",
+      "expected_selected_strategy_id": "soundcheck_bounded_gain_up",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: level_plane_balance. Selected soundcheck_bounded_gain_up because The source is below its Ayaic level plane; bounded gain-up may be the direct fix during soundcheck, but live mode must hold for review. Alternatives scored: hold_for_level_plane_context=0.48, avoid_tone_change_for_level_problem=0.33. Alternative tradeoffs: hold_for_level_plane_context: blocked_by:level_plane_context_review_required; avoid_tone_change_for_level_problem: blocked_by:tone_change_does_not_match_level_plane_problem. Parameters: {'delta_db': 3.0, 'bounded_delta_db': 3.0, 'target_plane': 'ayaic_mix_monolith', 'current_minus_target_lu': -8.0, 'target_scope': 'source_and_summed_bus', 'future_fader_ceiling_dbfs': 0.0, 'gain_db': 3.0, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Verify source identity, bleed, feedback risk and true-peak headroom. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_quiet_vocal_level_plane_gain_up",
+      "selected_confidence": 0.841,
+      "selected_parameters": {
+        "bounded_delta_db": 3.0,
+        "current_minus_target_lu": -8.0,
+        "delta_db": 3.0,
+        "future_fader_ceiling_dbfs": 0.0,
+        "gain_db": 3.0,
+        "operator_confirmation_required": true,
+        "target_plane": "ayaic_mix_monolith",
+        "target_scope": "source_and_summed_bus"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.841,
+        "global_blockers": [],
+        "method_family": "gain_fader",
+        "problem": "level_plane_balance",
+        "reason": "The source is below its Ayaic level plane; bounded gain-up may be the direct fix during soundcheck, but live mode must hold for review.",
+        "status": "candidate",
+        "strategy_id": "soundcheck_bounded_gain_up",
+        "strongest_score_dimensions": [
+          {
+            "metric": "reversibility",
+            "score": 0.92
+          },
+          {
+            "metric": "speed",
+            "score": 0.9
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.88
+          }
+        ],
+        "total_score": 0.832
+      },
+      "selected_total_score": 0.832,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "gain_fader",
+      "actual_selected_strategy_id": "summed_bus_rebalance_before_source_gain",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Holding is safest when the level-plane evidence is incomplete or risky.",
+          "blockers": [
+            "level_plane_context_review_required"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Capture longer source and bus context before accepting a move.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.356,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.3,
+              "metric": "precision",
+              "selected": 0.76
+            },
+            {
+              "alternative": 0.54,
+              "delta": 0.3,
+              "metric": "musical",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.22,
+              "metric": "speed",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.06,
+              "metric": "operator_clarity",
+              "selected": 0.88
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "hold_for_level_plane_context",
+          "total_score": 0.482,
+          "why_not_selected": "blocked_by:level_plane_context_review_required"
+        },
+        {
+          "alternative_reason": "The source is below its Ayaic level plane; bounded gain-up may be the direct fix during soundcheck, but live mode must hold for review.",
+          "blockers": [
+            "summed_bus_headroom_blocks_gain_up",
+            "summed_bus_level_plane_rebalance_required"
+          ],
+          "method_family": "gain_fader",
+          "operator_check": "Verify source identity, bleed, feedback risk and true-peak headroom.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.366,
+          "score_gaps": [
+            {
+              "alternative": 0.74,
+              "delta": 0.16,
+              "metric": "safety",
+              "selected": 0.9
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "soundcheck_bounded_gain_up",
+          "total_score": 0.472,
+          "why_not_selected": "blocked_by:summed_bus_headroom_blocks_gain_up,summed_bus_level_plane_rebalance_required"
+        },
+        {
+          "alternative_reason": "EQ should not be used to solve a measured level-plane problem.",
+          "blockers": [
+            "tone_change_does_not_match_level_plane_problem"
+          ],
+          "method_family": "eq",
+          "operator_check": "Confirm there is no separate tonal problem before using EQ.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.51,
+          "score_gaps": [
+            {
+              "alternative": 0.35,
+              "delta": 0.49,
+              "metric": "musical",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.28,
+              "delta": 0.48,
+              "metric": "precision",
+              "selected": 0.76
+            },
+            {
+              "alternative": 0.4,
+              "delta": 0.44,
+              "metric": "speed",
+              "selected": 0.84
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "avoid_tone_change_for_level_problem",
+          "total_score": 0.328,
+          "why_not_selected": "blocked_by:tone_change_does_not_match_level_plane_problem"
+        }
+      ],
+      "candidate_blockers": {
+        "avoid_tone_change_for_level_problem": [
+          "tone_change_does_not_match_level_plane_problem"
+        ],
+        "hold_for_level_plane_context": [
+          "level_plane_context_review_required"
+        ],
+        "soundcheck_bounded_gain_up": [
+          "summed_bus_headroom_blocks_gain_up",
+          "summed_bus_level_plane_rebalance_required"
+        ],
+        "summed_bus_rebalance_before_source_gain": []
+      },
+      "candidate_count": 4,
+      "description": "Quiet source with a hot summed bus should rebalance the bus before source gain-up.",
+      "expected_method_family": "gain_fader",
+      "expected_selected_strategy_id": "summed_bus_rebalance_before_source_gain",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: level_plane_balance. Selected summed_bus_rebalance_before_source_gain because The source is quiet, but the summed bus is already hot; rebalance the bus before adding source gain. Alternatives scored: hold_for_level_plane_context=0.48, soundcheck_bounded_gain_up=0.47, avoid_tone_change_for_level_problem=0.33. Alternative tradeoffs: hold_for_level_plane_context: blocked_by:level_plane_context_review_required; soundcheck_bounded_gain_up: blocked_by:summed_bus_headroom_blocks_gain_up,summed_bus_level_plane_rebalance_required; avoid_tone_change_for_level_problem: blocked_by:tone_change_does_not_match_level_plane_problem. Parameters: {'delta_db': -3.0, 'bounded_delta_db': 3.0, 'source_delta_db': 0.0, 'bus_delta_db': -3.0, 'target_plane': 'ayaic_mix_monolith', 'current_minus_target_lu': -8.0, 'target_scope': 'summed_bus_before_source_gain', 'summed_bus_role': 'vocal_bus', 'summed_bus_true_peak_headroom_db': 0.4, 'summed_bus_level_plane_error_lu': 4.5, 'future_fader_ceiling_dbfs': 0.0, 'gain_db': 0.0, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Verify the bus contains this source and that bus gain-down preserves the mix. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_quiet_vocal_hot_bus_rebalance",
+      "selected_confidence": 0.845,
+      "selected_parameters": {
+        "bounded_delta_db": 3.0,
+        "bus_delta_db": -3.0,
+        "current_minus_target_lu": -8.0,
+        "delta_db": -3.0,
+        "future_fader_ceiling_dbfs": 0.0,
+        "gain_db": 0.0,
+        "operator_confirmation_required": true,
+        "source_delta_db": 0.0,
+        "summed_bus_level_plane_error_lu": 4.5,
+        "summed_bus_role": "vocal_bus",
+        "summed_bus_true_peak_headroom_db": 0.4,
+        "target_plane": "ayaic_mix_monolith",
+        "target_scope": "summed_bus_before_source_gain"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 3,
+        "confidence": 0.845,
+        "global_blockers": [],
+        "method_family": "gain_fader",
+        "problem": "level_plane_balance",
+        "reason": "The source is quiet, but the summed bus is already hot; rebalance the bus before adding source gain.",
+        "status": "candidate",
+        "strategy_id": "summed_bus_rebalance_before_source_gain",
+        "strongest_score_dimensions": [
+          {
+            "metric": "reversibility",
+            "score": 0.92
+          },
+          {
+            "metric": "safety",
+            "score": 0.9
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.88
+          }
+        ],
+        "total_score": 0.838
+      },
+      "selected_total_score": 0.838,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "gain_fader",
+      "actual_selected_strategy_id": "level_plane_gain_down",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Holding is safest when the level-plane evidence is incomplete or risky.",
+          "blockers": [
+            "level_plane_context_review_required"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Capture longer source and bus context before accepting a move.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.323,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.32,
+              "metric": "precision",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.54,
+              "delta": 0.32,
+              "metric": "musical",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.28,
+              "metric": "speed",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.06,
+              "metric": "operator_clarity",
+              "selected": 0.88
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "hold_for_level_plane_context",
+          "total_score": 0.559,
+          "why_not_selected": "blocked_by:level_plane_context_review_required"
+        },
+        {
+          "alternative_reason": "EQ should not be used to solve a measured level-plane problem.",
+          "blockers": [
+            "tone_change_does_not_match_level_plane_problem"
+          ],
+          "method_family": "eq",
+          "operator_check": "Confirm there is no separate tonal problem before using EQ.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.456,
+          "score_gaps": [
+            {
+              "alternative": 0.35,
+              "delta": 0.51,
+              "metric": "musical",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.4,
+              "delta": 0.5,
+              "metric": "speed",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.28,
+              "delta": 0.5,
+              "metric": "precision",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.88,
+              "delta": 0.06,
+              "metric": "safety",
+              "selected": 0.94
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "avoid_tone_change_for_level_problem",
+          "total_score": 0.426,
+          "why_not_selected": "blocked_by:tone_change_does_not_match_level_plane_problem"
+        }
+      ],
+      "candidate_blockers": {
+        "avoid_tone_change_for_level_problem": [
+          "tone_change_does_not_match_level_plane_problem"
+        ],
+        "hold_for_level_plane_context": [
+          "level_plane_context_review_required"
+        ],
+        "level_plane_gain_down": []
+      },
+      "candidate_count": 3,
+      "description": "Loud live bass should choose conservative gain-down, not EQ.",
+      "expected_method_family": "gain_fader",
+      "expected_selected_strategy_id": "level_plane_gain_down",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: level_plane_balance. Selected level_plane_gain_down because The source is above its Ayaic level plane; gain-down is faster and safer than changing tone. Alternatives scored: hold_for_level_plane_context=0.56, avoid_tone_change_for_level_problem=0.43. Alternative tradeoffs: hold_for_level_plane_context: blocked_by:level_plane_context_review_required; avoid_tone_change_for_level_problem: blocked_by:tone_change_does_not_match_level_plane_problem. Parameters: {'delta_db': -1.5, 'bounded_delta_db': 1.5, 'target_plane': 'ayaic_mix_monolith', 'current_minus_target_lu': 5.5, 'target_scope': 'source_and_summed_bus', 'future_fader_ceiling_dbfs': 0.0, 'gain_db': 0.0, 'operator_confirmation_required': False}. Remaining blockers: none. Operator check: Check the source in context and verify summed bus headroom. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_loud_bass_level_plane_gain_down",
+      "selected_confidence": 0.87,
+      "selected_parameters": {
+        "bounded_delta_db": 1.5,
+        "current_minus_target_lu": 5.5,
+        "delta_db": -1.5,
+        "future_fader_ceiling_dbfs": 0.0,
+        "gain_db": 0.0,
+        "operator_confirmation_required": false,
+        "target_plane": "ayaic_mix_monolith",
+        "target_scope": "source_and_summed_bus"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.87,
+        "global_blockers": [],
+        "method_family": "gain_fader",
+        "problem": "level_plane_balance",
+        "reason": "The source is above its Ayaic level plane; gain-down is faster and safer than changing tone.",
+        "status": "candidate",
+        "strategy_id": "level_plane_gain_down",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.94
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.92
+          },
+          {
+            "metric": "speed",
+            "score": 0.9
+          }
+        ],
+        "total_score": 0.882
+      },
+      "selected_total_score": 0.882,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "kick_bass_pocket_eq_split",
+      "actual_status": "analysis_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "If the conflict is arrangement/register overlap, holding DSP can be the safest musical answer.",
+          "blockers": [],
+          "method_family": "analysis",
+          "operator_check": "Ask whether the part overlap is intentional and verify the bus before changing tone.",
+          "problem": "masking",
+          "score_delta_vs_selected": 0.067,
+          "score_gaps": [
+            {
+              "alternative": 0.58,
+              "delta": 0.26,
+              "metric": "speed",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.08,
+              "metric": "precision",
+              "selected": 0.8
+            },
+            {
+              "alternative": 0.8,
+              "delta": 0.06,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "arrangement_aware_low_end_separation_hold",
+          "total_score": 0.791,
+          "why_not_selected": "lower_speed,precision_score;total_score_delta=0.067"
+        },
+        {
+          "alternative_reason": "Strong low-end overlap can be more musical with source-keyed dynamic EQ than a static carve.",
+          "blockers": [
+            "level_plane_rebalance_should_precede_dynamic_ducking"
+          ],
+          "method_family": "dynamic_eq",
+          "operator_check": "Check groove, pumping and kick sustain before considering live promotion.",
+          "problem": "masking",
+          "score_delta_vs_selected": 0.168,
+          "score_gaps": [
+            {
+              "alternative": 0.84,
+              "delta": 0.13,
+              "metric": "safety",
+              "selected": 0.97
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.08,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "speed",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.84
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "kick_bass_dynamic_pocket_ducking",
+          "total_score": 0.69,
+          "why_not_selected": "blocked_by:level_plane_rebalance_should_precede_dynamic_ducking"
+        },
+        {
+          "alternative_reason": "The source is below its Ayaic level plane; bounded gain-up may be the direct fix during soundcheck, but live mode must hold for review.",
+          "blockers": [
+            "insufficient_true_peak_headroom_for_boost"
+          ],
+          "method_family": "gain_fader",
+          "operator_check": "Verify source identity, bleed, feedback risk and true-peak headroom.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.206,
+          "score_gaps": [
+            {
+              "alternative": 0.74,
+              "delta": 0.23,
+              "metric": "safety",
+              "selected": 0.97
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "soundcheck_bounded_gain_up",
+          "total_score": 0.652,
+          "why_not_selected": "blocked_by:insufficient_true_peak_headroom_for_boost"
+        },
+        {
+          "alternative_reason": "Holding is safest when the level-plane evidence is incomplete or risky.",
+          "blockers": [
+            "level_plane_context_review_required"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Capture longer source and bus context before accepting a move.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.376,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.34,
+              "metric": "precision",
+              "selected": 0.8
+            },
+            {
+              "alternative": 0.54,
+              "delta": 0.32,
+              "metric": "musical",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.22,
+              "metric": "speed",
+              "selected": 0.84
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "hold_for_level_plane_context",
+          "total_score": 0.482,
+          "why_not_selected": "blocked_by:level_plane_context_review_required"
+        },
+        {
+          "alternative_reason": "When one low-end source is off its Ayaic plane, balance is a better first fix than tone.",
+          "blockers": [
+            "gain_up_requires_operator_confirmation",
+            "insufficient_true_peak_headroom_for_boost"
+          ],
+          "method_family": "gain_fader",
+          "operator_check": "Check both the source level plane and the summed low-end bus before EQ.",
+          "problem": "masking",
+          "score_delta_vs_selected": 0.394,
+          "score_gaps": [
+            {
+              "alternative": 0.72,
+              "delta": 0.25,
+              "metric": "safety",
+              "selected": 0.97
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "kick_bass_level_plane_rebalance",
+          "total_score": 0.464,
+          "why_not_selected": "blocked_by:gain_up_requires_operator_confirmation,insufficient_true_peak_headroom_for_boost"
+        },
+        {
+          "alternative_reason": "EQ should not be used to solve a measured level-plane problem.",
+          "blockers": [
+            "tone_change_does_not_match_level_plane_problem"
+          ],
+          "method_family": "eq",
+          "operator_check": "Confirm there is no separate tonal problem before using EQ.",
+          "problem": "level_plane_balance",
+          "score_delta_vs_selected": 0.53,
+          "score_gaps": [
+            {
+              "alternative": 0.28,
+              "delta": 0.52,
+              "metric": "precision",
+              "selected": 0.8
+            },
+            {
+              "alternative": 0.35,
+              "delta": 0.51,
+              "metric": "musical",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.4,
+              "delta": 0.44,
+              "metric": "speed",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.88,
+              "delta": 0.09,
+              "metric": "safety",
+              "selected": 0.97
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "avoid_tone_change_for_level_problem",
+          "total_score": 0.328,
+          "why_not_selected": "blocked_by:tone_change_does_not_match_level_plane_problem"
+        }
+      ],
+      "candidate_blockers": {
+        "arrangement_aware_low_end_separation_hold": [],
+        "avoid_tone_change_for_level_problem": [
+          "tone_change_does_not_match_level_plane_problem"
+        ],
+        "hold_for_level_plane_context": [
+          "level_plane_context_review_required"
+        ],
+        "kick_bass_dynamic_pocket_ducking": [
+          "level_plane_rebalance_should_precede_dynamic_ducking"
+        ],
+        "kick_bass_level_plane_rebalance": [
+          "gain_up_requires_operator_confirmation",
+          "insufficient_true_peak_headroom_for_boost"
+        ],
+        "kick_bass_pocket_eq_split": [],
+        "soundcheck_bounded_gain_up": [
+          "insufficient_true_peak_headroom_for_boost"
+        ]
+      },
+      "candidate_count": 7,
+      "description": "Kick/bass masking with low headroom must stay analysis-only.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "kick_bass_pocket_eq_split",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "true_peak_headroom_low"
+      ],
+      "operator_explanation": "Problem: masking. Selected kick_bass_pocket_eq_split because Kick/bass masking is a pair problem; a no-boost EQ pocket is the fastest safe separation. Alternatives scored: arrangement_aware_low_end_separation_hold=0.79, kick_bass_dynamic_pocket_ducking=0.69, soundcheck_bounded_gain_up=0.65, hold_for_level_plane_context=0.48. Alternative tradeoffs: arrangement_aware_low_end_separation_hold: lower_speed,precision_score;total_score_delta=0.067; kick_bass_dynamic_pocket_ducking: blocked_by:level_plane_rebalance_should_precede_dynamic_ducking; soundcheck_bounded_gain_up: blocked_by:insufficient_true_peak_headroom_for_boost; hold_for_level_plane_context: blocked_by:level_plane_context_review_required. Parameters: {'relationship': 'bass_masks_kick', 'target_role': 'kick', 'counterpart_role': 'bass', 'masked_source': 'ch:1', 'masker_role': 'bass', 'filter_type': 'peaking', 'frequency_hz': 82.0, 'target_cut_db': -1.8, 'counterpart_cut_db': -3.0, 'gain_db': -3.0, 'q': 1.25, 'linked_counter_boost_db': 0.0, 'requires_pair_readback': True, 'target_scope': 'source_and_summed_bus'}. Remaining blockers: true_peak_headroom_low. Operator check: Check the low-end bus in context and confirm neither source loses its fundamental. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "kick_bass_masking_low_headroom",
+      "selected_confidence": 0.856,
+      "selected_parameters": {
+        "counterpart_cut_db": -3.0,
+        "counterpart_role": "bass",
+        "filter_type": "peaking",
+        "frequency_hz": 82.0,
+        "gain_db": -3.0,
+        "linked_counter_boost_db": 0.0,
+        "masked_source": "ch:1",
+        "masker_role": "bass",
+        "q": 1.25,
+        "relationship": "bass_masks_kick",
+        "requires_pair_readback": true,
+        "target_cut_db": -1.8,
+        "target_role": "kick",
+        "target_scope": "source_and_summed_bus"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 6,
+        "confidence": 0.856,
+        "global_blockers": [
+          "true_peak_headroom_low"
+        ],
+        "method_family": "eq",
+        "problem": "masking",
+        "reason": "Kick/bass masking is a pair problem; a no-boost EQ pocket is the fastest safe separation.",
+        "status": "candidate",
+        "strategy_id": "kick_bass_pocket_eq_split",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.97
+          },
+          {
+            "metric": "musical",
+            "score": 0.86
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.86
+          }
+        ],
+        "total_score": 0.858
+      },
+      "selected_total_score": 0.858,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "dynamic_eq",
+      "actual_selected_strategy_id": "kick_bass_dynamic_pocket_ducking",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Kick/bass masking is a pair problem; a no-boost EQ pocket is the fastest safe separation.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Check the low-end bus in context and confirm neither source loses its fundamental.",
+          "problem": "masking",
+          "score_delta_vs_selected": 0.012,
+          "score_gaps": [
+            {
+              "alternative": 0.8,
+              "delta": 0.15,
+              "metric": "precision",
+              "selected": 0.95
+            },
+            {
+              "alternative": 0.86,
+              "delta": 0.08,
+              "metric": "musical",
+              "selected": 0.94
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "kick_bass_pocket_eq_split",
+          "total_score": 0.858,
+          "why_not_selected": "lower_precision,musical_score;total_score_delta=0.012"
+        },
+        {
+          "alternative_reason": "If the conflict is arrangement/register overlap, holding DSP can be the safest musical answer.",
+          "blockers": [],
+          "method_family": "analysis",
+          "operator_check": "Ask whether the part overlap is intentional and verify the bus before changing tone.",
+          "problem": "masking",
+          "score_delta_vs_selected": 0.079,
+          "score_gaps": [
+            {
+              "alternative": 0.72,
+              "delta": 0.23,
+              "metric": "precision",
+              "selected": 0.95
+            },
+            {
+              "alternative": 0.58,
+              "delta": 0.2,
+              "metric": "speed",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.88,
+              "delta": 0.06,
+              "metric": "musical",
+              "selected": 0.94
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "arrangement_aware_low_end_separation_hold",
+          "total_score": 0.791,
+          "why_not_selected": "lower_precision,speed_score;total_score_delta=0.079"
+        }
+      ],
+      "candidate_blockers": {
+        "arrangement_aware_low_end_separation_hold": [],
+        "kick_bass_dynamic_pocket_ducking": [],
+        "kick_bass_pocket_eq_split": []
+      },
+      "candidate_count": 3,
+      "description": "Strong soundcheck kick/bass overlap should prefer dynamic pocket ducking.",
+      "expected_method_family": "dynamic_eq",
+      "expected_selected_strategy_id": "kick_bass_dynamic_pocket_ducking",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: masking. Selected kick_bass_dynamic_pocket_ducking because Strong low-end overlap can be more musical with source-keyed dynamic EQ than a static carve. Alternatives scored: kick_bass_pocket_eq_split=0.86, arrangement_aware_low_end_separation_hold=0.79. Alternative tradeoffs: kick_bass_pocket_eq_split: lower_precision,musical_score;total_score_delta=0.012; arrangement_aware_low_end_separation_hold: lower_precision,speed_score;total_score_delta=0.079. Parameters: {'relationship': 'kick_masks_bass', 'target_role': 'bass', 'sidechain_role': 'kick', 'frequency_hz': 74.0, 'bandwidth_q': 1.1, 'max_gain_reduction_db': 3.5, 'threshold_dbfs': -18.0, 'attack_ms': 6.0, 'release_ms': 95.0, 'makeup_gain_db': 0.0, 'aggressive': False, 'requires_pair_readback': True}. Remaining blockers: none. Operator check: Check groove, pumping and kick sustain before considering live promotion. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_kick_bass_dynamic_pocket",
+      "selected_confidence": 0.863,
+      "selected_parameters": {
+        "aggressive": false,
+        "attack_ms": 6.0,
+        "bandwidth_q": 1.1,
+        "frequency_hz": 74.0,
+        "makeup_gain_db": 0.0,
+        "max_gain_reduction_db": 3.5,
+        "relationship": "kick_masks_bass",
+        "release_ms": 95.0,
+        "requires_pair_readback": true,
+        "sidechain_role": "kick",
+        "target_role": "bass",
+        "threshold_dbfs": -18.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.863,
+        "global_blockers": [],
+        "method_family": "dynamic_eq",
+        "problem": "masking",
+        "reason": "Strong low-end overlap can be more musical with source-keyed dynamic EQ than a static carve.",
+        "status": "candidate",
+        "strategy_id": "kick_bass_dynamic_pocket_ducking",
+        "strongest_score_dimensions": [
+          {
+            "metric": "precision",
+            "score": 0.95
+          },
+          {
+            "metric": "musical",
+            "score": 0.94
+          },
+          {
+            "metric": "safety",
+            "score": 0.84
+          }
+        ],
+        "total_score": 0.87
+      },
+      "selected_total_score": 0.87,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "kick_bass_pocket_eq_split",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "If the conflict is arrangement/register overlap, holding DSP can be the safest musical answer.",
+          "blockers": [],
+          "method_family": "analysis",
+          "operator_check": "Ask whether the part overlap is intentional and verify the bus before changing tone.",
+          "problem": "masking",
+          "score_delta_vs_selected": 0.039,
+          "score_gaps": [
+            {
+              "alternative": 0.58,
+              "delta": 0.26,
+              "metric": "speed",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.08,
+              "metric": "precision",
+              "selected": 0.8
+            },
+            {
+              "alternative": 0.8,
+              "delta": 0.06,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "arrangement_aware_low_end_separation_hold",
+          "total_score": 0.839,
+          "why_not_selected": "lower_speed,precision_score;total_score_delta=0.039"
+        },
+        {
+          "alternative_reason": "Strong low-end overlap can be more musical with source-keyed dynamic EQ than a static carve.",
+          "blockers": [
+            "aggressive_live_strategy_requires_operator_review"
+          ],
+          "method_family": "dynamic_eq",
+          "operator_check": "Check groove, pumping and kick sustain before considering live promotion.",
+          "problem": "masking",
+          "score_delta_vs_selected": 0.266,
+          "score_gaps": [
+            {
+              "alternative": 0.62,
+              "delta": 0.35,
+              "metric": "safety",
+              "selected": 0.97
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.08,
+              "metric": "operator_clarity",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "speed",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.84
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "kick_bass_dynamic_pocket_ducking",
+          "total_score": 0.612,
+          "why_not_selected": "blocked_by:aggressive_live_strategy_requires_operator_review"
+        }
+      ],
+      "candidate_blockers": {
+        "arrangement_aware_low_end_separation_hold": [],
+        "kick_bass_dynamic_pocket_ducking": [
+          "aggressive_live_strategy_requires_operator_review"
+        ],
+        "kick_bass_pocket_eq_split": []
+      },
+      "candidate_count": 3,
+      "description": "Live kick/bass overlap should prefer no-boost EQ split over dynamic ducking.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "kick_bass_pocket_eq_split",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: masking. Selected kick_bass_pocket_eq_split because Kick/bass masking is a pair problem; a no-boost EQ pocket is the fastest safe separation. Alternatives scored: arrangement_aware_low_end_separation_hold=0.84, kick_bass_dynamic_pocket_ducking=0.61. Alternative tradeoffs: arrangement_aware_low_end_separation_hold: lower_speed,precision_score;total_score_delta=0.039; kick_bass_dynamic_pocket_ducking: blocked_by:aggressive_live_strategy_requires_operator_review. Parameters: {'relationship': 'kick_masks_bass', 'target_role': 'bass', 'counterpart_role': 'kick', 'masked_source': 'ch:2', 'masker_role': 'kick', 'filter_type': 'peaking', 'frequency_hz': 74.0, 'target_cut_db': -2.4, 'counterpart_cut_db': -1.6, 'gain_db': -2.4, 'q': 1.25, 'linked_counter_boost_db': 0.0, 'requires_pair_readback': True, 'target_scope': 'source_and_summed_bus'}. Remaining blockers: none. Operator check: Check the low-end bus in context and confirm neither source loses its fundamental. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_kick_bass_conservative_eq_split",
+      "selected_confidence": 0.868,
+      "selected_parameters": {
+        "counterpart_cut_db": -1.6,
+        "counterpart_role": "kick",
+        "filter_type": "peaking",
+        "frequency_hz": 74.0,
+        "gain_db": -2.4,
+        "linked_counter_boost_db": 0.0,
+        "masked_source": "ch:2",
+        "masker_role": "kick",
+        "q": 1.25,
+        "relationship": "kick_masks_bass",
+        "requires_pair_readback": true,
+        "target_cut_db": -2.4,
+        "target_role": "bass",
+        "target_scope": "source_and_summed_bus"
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.868,
+        "global_blockers": [],
+        "method_family": "eq",
+        "problem": "masking",
+        "reason": "Kick/bass masking is a pair problem; a no-boost EQ pocket is the fastest safe separation.",
+        "status": "candidate",
+        "strategy_id": "kick_bass_pocket_eq_split",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.97
+          },
+          {
+            "metric": "musical",
+            "score": 0.86
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.86
+          }
+        ],
+        "total_score": 0.878
+      },
+      "selected_total_score": 0.878,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "expander",
+      "actual_selected_strategy_id": "gentle_expander_bleed_control",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Fast gate is quick, but can cut tails or chatter on marginal evidence.",
+          "blockers": [
+            "gate_tail_or_chatter_risk_high"
+          ],
+          "method_family": "gate",
+          "operator_check": "Check tails, ghost notes and chatter at performance level.",
+          "problem": "noisy_drum",
+          "score_delta_vs_selected": 0.281,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.38,
+              "metric": "safety",
+              "selected": 0.84
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.18,
+              "metric": "musical",
+              "selected": 0.8
+            },
+            {
+              "alternative": 0.8,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.86
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "fast_drum_gate",
+          "total_score": 0.521,
+          "why_not_selected": "blocked_by:gate_tail_or_chatter_risk_high"
+        }
+      ],
+      "candidate_blockers": {
+        "fast_drum_gate": [
+          "gate_tail_or_chatter_risk_high"
+        ],
+        "gentle_expander_bleed_control": []
+      },
+      "candidate_count": 2,
+      "description": "Noisy tom with tail/chatter risk should select gentle expander.",
+      "expected_method_family": "expander",
+      "expected_selected_strategy_id": "gentle_expander_bleed_control",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: noisy_drum. Selected gentle_expander_bleed_control because Tail/chatter risk makes a gentle expander safer than a hard gate. Alternatives scored: fast_drum_gate=0.52. Alternative tradeoffs: fast_drum_gate: blocked_by:gate_tail_or_chatter_risk_high. Parameters: {'threshold_dbfs': -41.0, 'bleed_aware_threshold_dbfs': -41.0, 'noise_floor_dbfs': -49.0, 'bleed_risk': 0.82, 'tail_risk': 0.78, 'chatter_risk': 0.61, 'range_db': -8.0, 'attack_ms': 4.0, 'hold_ms': 80.0, 'release_ms': 220.0, 'hysteresis_db': 3.0}. Remaining blockers: none. Operator check: Check sustain and quiet hits before accepting. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "noisy_tom_tail_risk",
+      "selected_confidence": 0.824,
+      "selected_parameters": {
+        "attack_ms": 4.0,
+        "bleed_aware_threshold_dbfs": -41.0,
+        "bleed_risk": 0.82,
+        "chatter_risk": 0.61,
+        "hold_ms": 80.0,
+        "hysteresis_db": 3.0,
+        "noise_floor_dbfs": -49.0,
+        "range_db": -8.0,
+        "release_ms": 220.0,
+        "tail_risk": 0.78,
+        "threshold_dbfs": -41.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 1,
+        "confidence": 0.824,
+        "global_blockers": [],
+        "method_family": "expander",
+        "problem": "noisy_drum",
+        "reason": "Tail/chatter risk makes a gentle expander safer than a hard gate.",
+        "status": "candidate",
+        "strategy_id": "gentle_expander_bleed_control",
+        "strongest_score_dimensions": [
+          {
+            "metric": "reversibility",
+            "score": 0.86
+          },
+          {
+            "metric": "safety",
+            "score": 0.84
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.84
+          }
+        ],
+        "total_score": 0.802
+      },
+      "selected_total_score": 0.802,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "mute",
+      "actual_selected_strategy_id": "manual_tom_mute_between_hits",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Tail/chatter risk makes a gentle expander safer than a hard gate.",
+          "blockers": [
+            "extreme_tail_chatter_prefers_manual_mute_review"
+          ],
+          "method_family": "expander",
+          "operator_check": "Check sustain and quiet hits before accepting.",
+          "problem": "noisy_drum",
+          "score_delta_vs_selected": 0.224,
+          "score_gaps": [
+            {
+              "alternative": 0.74,
+              "delta": 0.12,
+              "metric": "precision",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.84,
+              "delta": 0.12,
+              "metric": "safety",
+              "selected": 0.96
+            },
+            {
+              "alternative": 0.86,
+              "delta": 0.08,
+              "metric": "reversibility",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.84,
+              "delta": 0.06,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "gentle_expander_bleed_control",
+          "total_score": 0.622,
+          "why_not_selected": "blocked_by:extreme_tail_chatter_prefers_manual_mute_review"
+        },
+        {
+          "alternative_reason": "Fast gate is quick, but can cut tails or chatter on marginal evidence.",
+          "blockers": [
+            "gate_tail_or_chatter_risk_high"
+          ],
+          "method_family": "gate",
+          "operator_check": "Check tails, ghost notes and chatter at performance level.",
+          "problem": "noisy_drum",
+          "score_delta_vs_selected": 0.325,
+          "score_gaps": [
+            {
+              "alternative": 0.46,
+              "delta": 0.5,
+              "metric": "safety",
+              "selected": 0.96
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.14,
+              "metric": "precision",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.14,
+              "metric": "musical",
+              "selected": 0.76
+            },
+            {
+              "alternative": 0.8,
+              "delta": 0.14,
+              "metric": "reversibility",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.08,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "fast_drum_gate",
+          "total_score": 0.521,
+          "why_not_selected": "blocked_by:gate_tail_or_chatter_risk_high"
+        },
+        {
+          "alternative_reason": "Blocking is safer than promoting an unstable gate or expander.",
+          "blockers": [
+            "clean_hit_detection_required_before_gate"
+          ],
+          "method_family": "analysis_only",
+          "operator_check": "Capture cleaner isolated tom hits before tuning automatic gating.",
+          "problem": "noisy_drum",
+          "score_delta_vs_selected": 0.336,
+          "score_gaps": [
+            {
+              "alternative": 0.56,
+              "delta": 0.3,
+              "metric": "precision",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.54,
+              "delta": 0.24,
+              "metric": "speed",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.14,
+              "metric": "musical",
+              "selected": 0.76
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.08,
+              "metric": "operator_clarity",
+              "selected": 0.9
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "block_gate_until_clean_hit_detection",
+          "total_score": 0.51,
+          "why_not_selected": "blocked_by:clean_hit_detection_required_before_gate"
+        }
+      ],
+      "candidate_blockers": {
+        "block_gate_until_clean_hit_detection": [
+          "clean_hit_detection_required_before_gate"
+        ],
+        "fast_drum_gate": [
+          "gate_tail_or_chatter_risk_high"
+        ],
+        "gentle_expander_bleed_control": [
+          "extreme_tail_chatter_prefers_manual_mute_review"
+        ],
+        "manual_tom_mute_between_hits": []
+      },
+      "candidate_count": 4,
+      "description": "Extreme tom bleed/tail/chatter should prefer manual mute review over unstable gating.",
+      "expected_method_family": "mute",
+      "expected_selected_strategy_id": "manual_tom_mute_between_hits",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: noisy_drum. Selected manual_tom_mute_between_hits because Bleed, tail and chatter are all high; manual mute review is safer than trying to tune a gate from unstable evidence. Alternatives scored: gentle_expander_bleed_control=0.62, fast_drum_gate=0.52, block_gate_until_clean_hit_detection=0.51. Alternative tradeoffs: gentle_expander_bleed_control: blocked_by:extreme_tail_chatter_prefers_manual_mute_review; fast_drum_gate: blocked_by:gate_tail_or_chatter_risk_high; block_gate_until_clean_hit_detection: blocked_by:clean_hit_detection_required_before_gate. Parameters: {'proposed_muted': True, 'manual_mute_scope': 'between_tom_hits_only', 'mute_reason': 'extreme_bleed_tail_chatter', 'automation_review_only': True, 'operator_confirmation_required': True, 'manual_mute_authority_preserved': True, 'rollback_requires_previous_mute_readback': True, 'bleed_risk': 0.9, 'tail_risk': 0.86, 'chatter_risk': 0.82, 'gain_db': 0.0}. Remaining blockers: none. Operator check: Confirm hit map and previous mute state before any promoted manual mute action. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "extreme_noisy_tom_manual_mute_review",
+      "selected_confidence": 0.849,
+      "selected_parameters": {
+        "automation_review_only": true,
+        "bleed_risk": 0.9,
+        "chatter_risk": 0.82,
+        "gain_db": 0.0,
+        "manual_mute_authority_preserved": true,
+        "manual_mute_scope": "between_tom_hits_only",
+        "mute_reason": "extreme_bleed_tail_chatter",
+        "operator_confirmation_required": true,
+        "proposed_muted": true,
+        "rollback_requires_previous_mute_readback": true,
+        "tail_risk": 0.86
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 3,
+        "confidence": 0.849,
+        "global_blockers": [],
+        "method_family": "mute",
+        "problem": "noisy_drum",
+        "reason": "Bleed, tail and chatter are all high; manual mute review is safer than trying to tune a gate from unstable evidence.",
+        "status": "candidate",
+        "strategy_id": "manual_tom_mute_between_hits",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.96
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.94
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.9
+          }
+        ],
+        "total_score": 0.846
+      },
+      "selected_total_score": 0.846,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "fx",
+      "actual_selected_strategy_id": "fx_monitor_feedback_safety_pullback",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Reducing wet level restores intelligibility and lowers feedback risk fastest.",
+          "blockers": [],
+          "method_family": "fx",
+          "operator_check": "Check vocal intelligibility and monitor sends.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.017,
+          "score_gaps": [
+            {
+              "alternative": 0.7,
+              "delta": 0.08,
+              "metric": "precision",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.92,
+              "delta": 0.06,
+              "metric": "safety",
+              "selected": 0.98
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "reduce_fx_send_or_return",
+          "total_score": 0.833,
+          "why_not_selected": "lower_precision,safety_score;total_score_delta=0.017"
+        },
+        {
+          "alternative_reason": "Delay smear can be cleaned by ducking the return and reducing feedback.",
+          "blockers": [
+            "monitor_feedback_risk_blocks_delay_ducking"
+          ],
+          "method_family": "fx",
+          "operator_check": "Check delay repeats against lyric timing and groove.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.253,
+          "score_gaps": [
+            {
+              "alternative": 0.6,
+              "delta": 0.34,
+              "metric": "speed",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.22,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.7,
+              "delta": 0.22,
+              "metric": "operator_clarity",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.2,
+              "metric": "reversibility",
+              "selected": 0.92
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "duck_delay_return_cleanup",
+          "total_score": 0.597,
+          "why_not_selected": "blocked_by:monitor_feedback_risk_blocks_delay_ducking"
+        },
+        {
+          "alternative_reason": "Ducking is more musical but slower to validate than reducing the send.",
+          "blockers": [
+            "monitor_feedback_risk_blocks_fx_ducking"
+          ],
+          "method_family": "fx",
+          "operator_check": "Check that ducking does not pump unnaturally.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.274,
+          "score_gaps": [
+            {
+              "alternative": 0.58,
+              "delta": 0.36,
+              "metric": "speed",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.26,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.68,
+              "delta": 0.24,
+              "metric": "operator_clarity",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.74,
+              "delta": 0.18,
+              "metric": "reversibility",
+              "selected": 0.92
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "duck_fx_return",
+          "total_score": 0.576,
+          "why_not_selected": "blocked_by:monitor_feedback_risk_blocks_fx_ducking"
+        },
+        {
+          "alternative_reason": "FX evidence points to a long tail/filter problem; shortening decay and filtering the return preserves space better than only lowering wet level.",
+          "blockers": [
+            "monitor_feedback_risk_blocks_decay_edit"
+          ],
+          "method_family": "fx",
+          "operator_check": "Check tail length between phrases and monitor feedback risk.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.299,
+          "score_gaps": [
+            {
+              "alternative": 0.7,
+              "delta": 0.24,
+              "metric": "speed",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.78,
+              "delta": 0.14,
+              "metric": "reversibility",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.86,
+              "delta": 0.12,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.68,
+              "delta": 0.1,
+              "metric": "precision",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.1,
+              "metric": "operator_clarity",
+              "selected": 0.92
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "shorten_fx_decay_filter",
+          "total_score": 0.551,
+          "why_not_selected": "blocked_by:monitor_feedback_risk_blocks_decay_edit"
+        },
+        {
+          "alternative_reason": "Adding FX does not solve the measured intelligibility problem.",
+          "blockers": [
+            "fx_increase_does_not_match_problem",
+            "fx_increase_monitor_or_return_risk"
+          ],
+          "method_family": "fx",
+          "operator_check": "Do not accept unless the operator explicitly wants more ambience.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.804,
+          "score_gaps": [
+            {
+              "alternative": 0.22,
+              "delta": 0.76,
+              "metric": "safety",
+              "selected": 0.98
+            },
+            {
+              "alternative": 0.5,
+              "delta": 0.44,
+              "metric": "speed",
+              "selected": 0.94
+            },
+            {
+              "alternative": 0.35,
+              "delta": 0.43,
+              "metric": "precision",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.56,
+              "delta": 0.36,
+              "metric": "operator_clarity",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.42,
+              "delta": 0.28,
+              "metric": "musical",
+              "selected": 0.7
+            },
+            {
+              "alternative": 0.65,
+              "delta": 0.27,
+              "metric": "reversibility",
+              "selected": 0.92
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "increase_fx_depth",
+          "total_score": 0.046,
+          "why_not_selected": "blocked_by:fx_increase_does_not_match_problem,fx_increase_monitor_or_return_risk"
+        }
+      ],
+      "candidate_blockers": {
+        "duck_delay_return_cleanup": [
+          "monitor_feedback_risk_blocks_delay_ducking"
+        ],
+        "duck_fx_return": [
+          "monitor_feedback_risk_blocks_fx_ducking"
+        ],
+        "fx_monitor_feedback_safety_pullback": [],
+        "increase_fx_depth": [
+          "fx_increase_does_not_match_problem",
+          "fx_increase_monitor_or_return_risk"
+        ],
+        "reduce_fx_send_or_return": [],
+        "shorten_fx_decay_filter": [
+          "monitor_feedback_risk_blocks_decay_edit"
+        ]
+      },
+      "candidate_count": 6,
+      "description": "Wet FX with extreme monitor risk should safety-pull back and block complex edits.",
+      "expected_method_family": "fx",
+      "expected_selected_strategy_id": "fx_monitor_feedback_safety_pullback",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: fx_feedback_risk. Selected fx_monitor_feedback_safety_pullback because Monitor feedback or FX-return headroom risk is high; a safety pullback is faster and safer than tuning ambience. Alternatives scored: reduce_fx_send_or_return=0.83, duck_delay_return_cleanup=0.60, duck_fx_return=0.58, shorten_fx_decay_filter=0.55. Alternative tradeoffs: reduce_fx_send_or_return: lower_precision,safety_score;total_score_delta=0.017; duck_delay_return_cleanup: blocked_by:monitor_feedback_risk_blocks_delay_ducking; duck_fx_return: blocked_by:monitor_feedback_risk_blocks_fx_ducking; shorten_fx_decay_filter: blocked_by:monitor_feedback_risk_blocks_decay_edit. Parameters: {'send_delta_db': -5.5, 'return_delta_db': -3.7, 'return_mute_review_required': True, 'return_hpf_hz': 220.0, 'return_lpf_hz': 6200.0, 'delay_feedback_percent': 6.0, 'decay_s': 1.2, 'monitor_feedback_risk': 0.82, 'fx_return_headroom_db': 0.8, 'operator_confirmation_required': True, 'gain_db': 0.0}. Remaining blockers: none. Operator check: Check monitor sends and FX return headroom before restoring ambience. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "wet_fx_monitor_risk",
+      "selected_confidence": 0.852,
+      "selected_parameters": {
+        "decay_s": 1.2,
+        "delay_feedback_percent": 6.0,
+        "fx_return_headroom_db": 0.8,
+        "gain_db": 0.0,
+        "monitor_feedback_risk": 0.82,
+        "operator_confirmation_required": true,
+        "return_delta_db": -3.7,
+        "return_hpf_hz": 220.0,
+        "return_lpf_hz": 6200.0,
+        "return_mute_review_required": true,
+        "send_delta_db": -5.5
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 5,
+        "confidence": 0.852,
+        "global_blockers": [],
+        "method_family": "fx",
+        "problem": "fx_feedback_risk",
+        "reason": "Monitor feedback or FX-return headroom risk is high; a safety pullback is faster and safer than tuning ambience.",
+        "status": "candidate",
+        "strategy_id": "fx_monitor_feedback_safety_pullback",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.98
+          },
+          {
+            "metric": "speed",
+            "score": 0.94
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.92
+          }
+        ],
+        "total_score": 0.85
+      },
+      "selected_total_score": 0.85,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "fx",
+      "actual_selected_strategy_id": "shorten_fx_decay_filter",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Delay smear can be cleaned by ducking the return and reducing feedback.",
+          "blockers": [],
+          "method_family": "fx",
+          "operator_check": "Check delay repeats against lyric timing and groove.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.064,
+          "score_gaps": [
+            {
+              "alternative": 0.7,
+              "delta": 0.12,
+              "metric": "operator_clarity",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.6,
+              "delta": 0.1,
+              "metric": "speed",
+              "selected": 0.7
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.1,
+              "metric": "safety",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.06,
+              "metric": "reversibility",
+              "selected": 0.78
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "duck_delay_return_cleanup",
+          "total_score": 0.777,
+          "why_not_selected": "lower_operator_clarity,speed_score;total_score_delta=0.064"
+        },
+        {
+          "alternative_reason": "Reducing wet level restores intelligibility and lowers feedback risk fastest.",
+          "blockers": [],
+          "method_family": "fx",
+          "operator_check": "Check vocal intelligibility and monitor sends.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.068,
+          "score_gaps": [
+            {
+              "alternative": 0.562,
+              "delta": 0.348,
+              "metric": "precision",
+              "selected": 0.91
+            },
+            {
+              "alternative": 0.71,
+              "delta": 0.2,
+              "metric": "musical",
+              "selected": 0.91
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "reduce_fx_send_or_return",
+          "total_score": 0.773,
+          "why_not_selected": "lower_precision,musical_score;total_score_delta=0.068"
+        },
+        {
+          "alternative_reason": "Ducking is more musical but slower to validate than reducing the send.",
+          "blockers": [],
+          "method_family": "fx",
+          "operator_check": "Check that ducking does not pump unnaturally.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.085,
+          "score_gaps": [
+            {
+              "alternative": 0.72,
+              "delta": 0.14,
+              "metric": "safety",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.68,
+              "delta": 0.14,
+              "metric": "operator_clarity",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.58,
+              "delta": 0.12,
+              "metric": "speed",
+              "selected": 0.7
+            },
+            {
+              "alternative": 0.86,
+              "delta": 0.05,
+              "metric": "precision",
+              "selected": 0.91
+            },
+            {
+              "alternative": 0.86,
+              "delta": 0.05,
+              "metric": "musical",
+              "selected": 0.91
+            }
+          ],
+          "status": "candidate",
+          "strategy_id": "duck_fx_return",
+          "total_score": 0.756,
+          "why_not_selected": "lower_safety,operator_clarity_score;total_score_delta=0.085"
+        },
+        {
+          "alternative_reason": "Adding FX does not solve the measured intelligibility problem.",
+          "blockers": [
+            "fx_increase_does_not_match_problem"
+          ],
+          "method_family": "fx",
+          "operator_check": "Do not accept unless the operator explicitly wants more ambience.",
+          "problem": "fx_intelligibility",
+          "score_delta_vs_selected": 0.615,
+          "score_gaps": [
+            {
+              "alternative": 0.22,
+              "delta": 0.64,
+              "metric": "safety",
+              "selected": 0.86
+            },
+            {
+              "alternative": 0.35,
+              "delta": 0.56,
+              "metric": "precision",
+              "selected": 0.91
+            },
+            {
+              "alternative": 0.42,
+              "delta": 0.49,
+              "metric": "musical",
+              "selected": 0.91
+            },
+            {
+              "alternative": 0.56,
+              "delta": 0.26,
+              "metric": "operator_clarity",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.5,
+              "delta": 0.2,
+              "metric": "speed",
+              "selected": 0.7
+            },
+            {
+              "alternative": 0.65,
+              "delta": 0.13,
+              "metric": "reversibility",
+              "selected": 0.78
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "increase_fx_depth",
+          "total_score": 0.226,
+          "why_not_selected": "blocked_by:fx_increase_does_not_match_problem"
+        }
+      ],
+      "candidate_blockers": {
+        "duck_delay_return_cleanup": [],
+        "duck_fx_return": [],
+        "increase_fx_depth": [
+          "fx_increase_does_not_match_problem"
+        ],
+        "reduce_fx_send_or_return": [],
+        "shorten_fx_decay_filter": []
+      },
+      "candidate_count": 5,
+      "description": "Long FX tail should prefer decay/filter cleanup over simple wet reduction.",
+      "expected_method_family": "fx",
+      "expected_selected_strategy_id": "shorten_fx_decay_filter",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: fx_intelligibility. Selected shorten_fx_decay_filter because FX evidence points to a long tail/filter problem; shortening decay and filtering the return preserves space better than only lowering wet level. Alternatives scored: duck_delay_return_cleanup=0.78, reduce_fx_send_or_return=0.77, duck_fx_return=0.76, increase_fx_depth=0.23. Alternative tradeoffs: duck_delay_return_cleanup: lower_operator_clarity,speed_score;total_score_delta=0.064; reduce_fx_send_or_return: lower_precision,musical_score;total_score_delta=0.068; duck_fx_return: lower_safety,operator_clarity_score;total_score_delta=0.085; increase_fx_depth: blocked_by:fx_increase_does_not_match_problem. Parameters: {'send_delta_db': 0.0, 'return_delta_db': 0.0, 'decay_s': 1.19, 'pre_delay_ms': 25.0, 'return_hpf_hz': 220.0, 'return_lpf_hz': 6800.0, 'delay_feedback_percent': 13.4}. Remaining blockers: none. Operator check: Check tail length between phrases and monitor feedback risk. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_long_fx_tail_decay_filter",
+      "selected_confidence": 0.847,
+      "selected_parameters": {
+        "decay_s": 1.19,
+        "delay_feedback_percent": 13.4,
+        "pre_delay_ms": 25.0,
+        "return_delta_db": 0.0,
+        "return_hpf_hz": 220.0,
+        "return_lpf_hz": 6800.0,
+        "send_delta_db": 0.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 4,
+        "confidence": 0.847,
+        "global_blockers": [],
+        "method_family": "fx",
+        "problem": "fx_intelligibility",
+        "reason": "FX evidence points to a long tail/filter problem; shortening decay and filtering the return preserves space better than only lowering wet level.",
+        "status": "candidate",
+        "strategy_id": "shorten_fx_decay_filter",
+        "strongest_score_dimensions": [
+          {
+            "metric": "precision",
+            "score": 0.91
+          },
+          {
+            "metric": "musical",
+            "score": 0.91
+          },
+          {
+            "metric": "safety",
+            "score": 0.86
+          }
+        ],
+        "total_score": 0.841
+      },
+      "selected_total_score": 0.841,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "pan",
+      "actual_selected_strategy_id": "center_hold_for_phase_safety",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Pan is useful only when mono and phase evidence is safe.",
+          "blockers": [
+            "phase_correlation_blocks_width",
+            "mono_sum_loss_blocks_width"
+          ],
+          "method_family": "pan",
+          "operator_check": "Check mono compatibility and stereo-pair identity.",
+          "problem": "pan_width",
+          "score_delta_vs_selected": 0.383,
+          "score_gaps": [
+            {
+              "alternative": 0.72,
+              "delta": 0.24,
+              "metric": "safety",
+              "selected": 0.96
+            },
+            {
+              "alternative": 0.82,
+              "delta": 0.1,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.9,
+              "delta": 0.05,
+              "metric": "reversibility",
+              "selected": 0.95
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "phase_safe_pan_target",
+          "total_score": 0.439,
+          "why_not_selected": "blocked_by:phase_correlation_blocks_width,mono_sum_loss_blocks_width"
+        }
+      ],
+      "candidate_blockers": {
+        "center_hold_for_phase_safety": [],
+        "phase_safe_pan_target": [
+          "phase_correlation_blocks_width",
+          "mono_sum_loss_blocks_width"
+        ]
+      },
+      "candidate_count": 2,
+      "description": "Unsafe mono/phase evidence should hold center instead of widening.",
+      "expected_method_family": "pan",
+      "expected_selected_strategy_id": "center_hold_for_phase_safety",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: pan_width. Selected center_hold_for_phase_safety because Keeping center is safer when phase or mono evidence is weak. Alternatives scored: phase_safe_pan_target=0.44. Alternative tradeoffs: phase_safe_pan_target: blocked_by:phase_correlation_blocks_width,mono_sum_loss_blocks_width. Parameters: {'target_pan_percent': 0.0, 'current_pan_percent': 0.0, 'pan_delta_percent': -0.0, 'bounded_delta_percent': 0.0, 'reason': 'phase_or_mono_safety_hold'}. Remaining blockers: none. Operator check: Re-check phase correlation before widening. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "pan_phase_mono_failure",
+      "selected_confidence": 0.836,
+      "selected_parameters": {
+        "bounded_delta_percent": 0.0,
+        "current_pan_percent": 0.0,
+        "pan_delta_percent": -0.0,
+        "reason": "phase_or_mono_safety_hold",
+        "target_pan_percent": 0.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 1,
+        "confidence": 0.836,
+        "global_blockers": [],
+        "method_family": "pan",
+        "problem": "pan_width",
+        "reason": "Keeping center is safer when phase or mono evidence is weak.",
+        "status": "candidate",
+        "strategy_id": "center_hold_for_phase_safety",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.96
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.95
+          },
+          {
+            "metric": "speed",
+            "score": 0.92
+          }
+        ],
+        "total_score": 0.822
+      },
+      "selected_total_score": 0.822,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "pan",
+      "actual_selected_strategy_id": "phase_safe_pan_target",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Keeping center is safer when phase or mono evidence is weak.",
+          "blockers": [
+            "phase_mono_safe_no_center_hold_required"
+          ],
+          "method_family": "pan",
+          "operator_check": "Re-check phase correlation before widening.",
+          "problem": "pan_width",
+          "score_delta_vs_selected": 0.157,
+          "score_gaps": [
+            {
+              "alternative": 0.68,
+              "delta": 0.1,
+              "metric": "precision",
+              "selected": 0.78
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.1,
+              "metric": "musical",
+              "selected": 0.82
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "center_hold_for_phase_safety",
+          "total_score": 0.642,
+          "why_not_selected": "blocked_by:phase_mono_safe_no_center_hold_required"
+        }
+      ],
+      "candidate_blockers": {
+        "center_hold_for_phase_safety": [
+          "phase_mono_safe_no_center_hold_required"
+        ],
+        "phase_safe_pan_target": []
+      },
+      "candidate_count": 2,
+      "description": "Soundcheck phase-safe pan request should calculate bounded pan target and delta.",
+      "expected_method_family": "pan",
+      "expected_selected_strategy_id": "phase_safe_pan_target",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: pan_width. Selected phase_safe_pan_target because Pan is useful only when mono and phase evidence is safe. Alternatives scored: center_hold_for_phase_safety=0.64. Alternative tradeoffs: center_hold_for_phase_safety: blocked_by:phase_mono_safe_no_center_hold_required. Parameters: {'target_pan_percent': 35.0, 'current_pan_percent': 5.0, 'pan_delta_percent': 30.0, 'bounded_delta_percent': 30.0, 'pan_scope': 'source_role_stereo_placement', 'phase_correlation': 0.92, 'mono_sum_delta_db': -0.6, 'operator_confirmation_required': True}. Remaining blockers: none. Operator check: Check mono compatibility and stereo-pair identity. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "soundcheck_phase_safe_pan_delta",
+      "selected_confidence": 0.822,
+      "selected_parameters": {
+        "bounded_delta_percent": 30.0,
+        "current_pan_percent": 5.0,
+        "mono_sum_delta_db": -0.6,
+        "operator_confirmation_required": true,
+        "pan_delta_percent": 30.0,
+        "pan_scope": "source_role_stereo_placement",
+        "phase_correlation": 0.92,
+        "target_pan_percent": 35.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 1,
+        "confidence": 0.822,
+        "global_blockers": [],
+        "method_family": "pan",
+        "problem": "pan_width",
+        "reason": "Pan is useful only when mono and phase evidence is safe.",
+        "status": "candidate",
+        "strategy_id": "phase_safe_pan_target",
+        "strongest_score_dimensions": [
+          {
+            "metric": "reversibility",
+            "score": 0.9
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.86
+          },
+          {
+            "metric": "speed",
+            "score": 0.82
+          }
+        ],
+        "total_score": 0.799
+      },
+      "selected_total_score": 0.799,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "pan",
+      "actual_selected_strategy_id": "center_hold_for_phase_safety",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Pan is useful only when mono and phase evidence is safe.",
+          "blockers": [
+            "live_pan_change_requires_operator_review_and_wing_proof"
+          ],
+          "method_family": "pan",
+          "operator_check": "Check mono compatibility and stereo-pair identity.",
+          "problem": "pan_width",
+          "score_delta_vs_selected": 0.339,
+          "score_gaps": [
+            {
+              "alternative": 0.5,
+              "delta": 0.46,
+              "metric": "safety",
+              "selected": 0.96
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.3,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.9,
+              "delta": 0.05,
+              "metric": "reversibility",
+              "selected": 0.95
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "phase_safe_pan_target",
+          "total_score": 0.512,
+          "why_not_selected": "blocked_by:live_pan_change_requires_operator_review_and_wing_proof"
+        }
+      ],
+      "candidate_blockers": {
+        "center_hold_for_phase_safety": [],
+        "phase_safe_pan_target": [
+          "live_pan_change_requires_operator_review_and_wing_proof"
+        ]
+      },
+      "candidate_count": 2,
+      "description": "Live non-center pan request should hold center and block the pan change.",
+      "expected_method_family": "pan",
+      "expected_selected_strategy_id": "center_hold_for_phase_safety",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: pan_width. Selected center_hold_for_phase_safety because Keeping center is safer when phase or mono evidence is weak. Alternatives scored: phase_safe_pan_target=0.51. Alternative tradeoffs: phase_safe_pan_target: blocked_by:live_pan_change_requires_operator_review_and_wing_proof. Parameters: {'target_pan_percent': 0.0, 'current_pan_percent': 5.0, 'pan_delta_percent': -5.0, 'bounded_delta_percent': 5.0, 'reason': 'phase_or_mono_safety_hold'}. Remaining blockers: none. Operator check: Re-check phase correlation before widening. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_pan_change_holds_for_operator_review",
+      "selected_confidence": 0.852,
+      "selected_parameters": {
+        "bounded_delta_percent": 5.0,
+        "current_pan_percent": 5.0,
+        "pan_delta_percent": -5.0,
+        "reason": "phase_or_mono_safety_hold",
+        "target_pan_percent": 0.0
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 1,
+        "confidence": 0.852,
+        "global_blockers": [],
+        "method_family": "pan",
+        "problem": "pan_width",
+        "reason": "Keeping center is safer when phase or mono evidence is weak.",
+        "status": "candidate",
+        "strategy_id": "center_hold_for_phase_safety",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.96
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.95
+          },
+          {
+            "metric": "speed",
+            "score": 0.92
+          }
+        ],
+        "total_score": 0.851
+      },
+      "selected_total_score": 0.851,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "master_bus",
+      "actual_selected_strategy_id": "master_trim_for_true_peak_headroom",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "A limiter ceiling can catch residual peaks, but it cannot replace restoring headroom first.",
+          "blockers": [
+            "limiter_change_requires_pa_feed_safety"
+          ],
+          "method_family": "master_bus",
+          "operator_check": "Check limiter gain reduction and PA/reference feed identity.",
+          "problem": "master_overload",
+          "score_delta_vs_selected": 0.342,
+          "score_gaps": [
+            {
+              "alternative": 0.72,
+              "delta": 0.24,
+              "metric": "safety",
+              "selected": 0.96
+            },
+            {
+              "alternative": 0.7,
+              "delta": 0.22,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.2,
+              "metric": "operator_clarity",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.66,
+              "delta": 0.16,
+              "metric": "musical",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.14,
+              "metric": "reversibility",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.76,
+              "delta": 0.06,
+              "metric": "precision",
+              "selected": 0.82
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "master_limiter_ceiling_guard",
+          "total_score": 0.536,
+          "why_not_selected": "blocked_by:limiter_change_requires_pa_feed_safety"
+        },
+        {
+          "alternative_reason": "Bus compression may help dynamics, but it does not replace headroom trim or tonal cleanup.",
+          "blockers": [
+            "master_bus_change_requires_pa_feed_safety"
+          ],
+          "method_family": "master_bus",
+          "operator_check": "Check limiter behavior and PA-feed safety.",
+          "problem": "master_overload",
+          "score_delta_vs_selected": 0.419,
+          "score_gaps": [
+            {
+              "alternative": 0.54,
+              "delta": 0.38,
+              "metric": "speed",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.34,
+              "metric": "safety",
+              "selected": 0.96
+            },
+            {
+              "alternative": 0.62,
+              "delta": 0.3,
+              "metric": "operator_clarity",
+              "selected": 0.92
+            },
+            {
+              "alternative": 0.68,
+              "delta": 0.22,
+              "metric": "reversibility",
+              "selected": 0.9
+            },
+            {
+              "alternative": 0.66,
+              "delta": 0.16,
+              "metric": "precision",
+              "selected": 0.82
+            },
+            {
+              "alternative": 0.72,
+              "delta": 0.1,
+              "metric": "musical",
+              "selected": 0.82
+            }
+          ],
+          "status": "blocked",
+          "strategy_id": "gentle_bus_compression",
+          "total_score": 0.459,
+          "why_not_selected": "blocked_by:master_bus_change_requires_pa_feed_safety"
+        }
+      ],
+      "candidate_blockers": {
+        "gentle_bus_compression": [
+          "master_bus_change_requires_pa_feed_safety"
+        ],
+        "master_limiter_ceiling_guard": [
+          "limiter_change_requires_pa_feed_safety"
+        ],
+        "master_trim_for_true_peak_headroom": []
+      },
+      "candidate_count": 3,
+      "description": "Master overload should restore headroom with trim before bus comp.",
+      "expected_method_family": "master_bus",
+      "expected_selected_strategy_id": "master_trim_for_true_peak_headroom",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: master_overload. Selected master_trim_for_true_peak_headroom because Master true peak is unsafe; trim restores headroom before tone shaping. Alternatives scored: master_limiter_ceiling_guard=0.54, gentle_bus_compression=0.46. Alternative tradeoffs: master_limiter_ceiling_guard: blocked_by:limiter_change_requires_pa_feed_safety; gentle_bus_compression: blocked_by:master_bus_change_requires_pa_feed_safety. Parameters: {'trim_delta_db': -1.3, 'target_true_peak_dbtp': -1.0, 'limiter_ceiling_dbtp': -1.0, 'pa_reference_feed_check_required': True, 'gain_db': 0.0}. Remaining blockers: none. Operator check: Confirm this is the PA feed, not a reference/capture feed. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "master_true_peak_overload",
+      "selected_confidence": 0.868,
+      "selected_parameters": {
+        "gain_db": 0.0,
+        "limiter_ceiling_dbtp": -1.0,
+        "pa_reference_feed_check_required": true,
+        "target_true_peak_dbtp": -1.0,
+        "trim_delta_db": -1.3
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 2,
+        "confidence": 0.868,
+        "global_blockers": [],
+        "method_family": "master_bus",
+        "problem": "master_overload",
+        "reason": "Master true peak is unsafe; trim restores headroom before tone shaping.",
+        "status": "candidate",
+        "strategy_id": "master_trim_for_true_peak_headroom",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.96
+          },
+          {
+            "metric": "speed",
+            "score": 0.92
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.92
+          }
+        ],
+        "total_score": 0.878
+      },
+      "selected_total_score": 0.878,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "analysis_only",
+      "actual_selected_strategy_id": "hold_master_reference_feed_no_pa_write",
+      "actual_status": "analysis_only",
+      "alternative_tradeoffs": [],
+      "candidate_blockers": {
+        "hold_master_reference_feed_no_pa_write": [
+          "master_reference_or_capture_feed_not_pa_output"
+        ]
+      },
+      "candidate_count": 1,
+      "description": "Reference/capture feeds must hold instead of proposing master-bus DSP.",
+      "expected_method_family": "analysis_only",
+      "expected_selected_strategy_id": "hold_master_reference_feed_no_pa_write",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "true_peak_headroom_low",
+        "master_reference_or_capture_feed_not_pa_output"
+      ],
+      "operator_explanation": "Problem: master_overload. Selected hold_master_reference_feed_no_pa_write because The evidence appears to be a reference/capture feed, not the PA output; master DSP must wait for PA-feed identity. Alternatives scored: no competing strategy. Alternative tradeoffs: no competing strategy. Parameters: {'dsp_change': 'hold', 'reason': 'reference_or_capture_feed_not_pa_output', 'master_feed_role': 'reference_or_capture', 'pa_reference_feed_check_required': True, 'requires_pa_output_identity': True, 'forbidden_without_pa_identity': 'trim_limiter_bus_compression_broad_eq'}. Remaining blockers: true_peak_headroom_low, master_reference_or_capture_feed_not_pa_output. Operator check: Confirm the PA output path before any master trim, limiter, compression or EQ proposal. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "master_reference_feed_holds_processing",
+      "selected_confidence": 0.718,
+      "selected_parameters": {
+        "dsp_change": "hold",
+        "forbidden_without_pa_identity": "trim_limiter_bus_compression_broad_eq",
+        "master_feed_role": "reference_or_capture",
+        "pa_reference_feed_check_required": true,
+        "reason": "reference_or_capture_feed_not_pa_output",
+        "requires_pa_output_identity": true
+      },
+      "selected_rationale": {
+        "blockers": [
+          "master_reference_or_capture_feed_not_pa_output"
+        ],
+        "compared_alternative_count": 0,
+        "confidence": 0.718,
+        "global_blockers": [
+          "true_peak_headroom_low",
+          "master_reference_or_capture_feed_not_pa_output"
+        ],
+        "method_family": "analysis_only",
+        "problem": "master_overload",
+        "reason": "The evidence appears to be a reference/capture feed, not the PA output; master DSP must wait for PA-feed identity.",
+        "status": "blocked",
+        "strategy_id": "hold_master_reference_feed_no_pa_write",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 1.0
+          },
+          {
+            "metric": "reversibility",
+            "score": 1.0
+          },
+          {
+            "metric": "operator_clarity",
+            "score": 0.9
+          }
+        ],
+        "total_score": 0.619
+      },
+      "selected_total_score": 0.619,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "master_bus",
+      "actual_selected_strategy_id": "master_low_end_broad_eq_cleanup",
+      "actual_status": "proposal_only",
+      "alternative_tradeoffs": [],
+      "candidate_blockers": {
+        "master_low_end_broad_eq_cleanup": []
+      },
+      "candidate_count": 1,
+      "description": "Master low-end overload with safe true peak should prefer broad EQ cleanup.",
+      "expected_method_family": "master_bus",
+      "expected_selected_strategy_id": "master_low_end_broad_eq_cleanup",
+      "expected_status": "proposal_only",
+      "failed_checks": [],
+      "global_blockers": [],
+      "operator_explanation": "Problem: master_overload. Selected master_low_end_broad_eq_cleanup because Master evidence points to low-end build-up; broad cut is more direct than compression. Alternatives scored: no competing strategy. Alternative tradeoffs: no competing strategy. Parameters: {'filter_type': 'low_shelf', 'frequency_hz': 120.0, 'gain_db': -3.1, 'q': 0.7, 'target_scope': 'master_and_pa_feed', 'pa_reference_feed_check_required': True, 'true_peak_headroom_required_before_tone': True}. Remaining blockers: none. Operator check: Check PA translation and confirm the low end is not only a reference-feed issue. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "master_low_end_broad_eq_cleanup",
+      "selected_confidence": 0.841,
+      "selected_parameters": {
+        "filter_type": "low_shelf",
+        "frequency_hz": 120.0,
+        "gain_db": -3.1,
+        "pa_reference_feed_check_required": true,
+        "q": 0.7,
+        "target_scope": "master_and_pa_feed",
+        "true_peak_headroom_required_before_tone": true
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 0,
+        "confidence": 0.841,
+        "global_blockers": [],
+        "method_family": "master_bus",
+        "problem": "master_overload",
+        "reason": "Master evidence points to low-end build-up; broad cut is more direct than compression.",
+        "status": "candidate",
+        "strategy_id": "master_low_end_broad_eq_cleanup",
+        "strongest_score_dimensions": [
+          {
+            "metric": "safety",
+            "score": 0.9
+          },
+          {
+            "metric": "musical",
+            "score": 0.88
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.84
+          }
+        ],
+        "total_score": 0.831
+      },
+      "selected_total_score": 0.831,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "high_pass_cleanup",
+      "actual_status": "analysis_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Low-mid buildup is the dominant evidence; a bounded cut fixes it fastest.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Listen for body loss and verify the band is not a feedback notch.",
+          "problem": "muddy",
+          "score_delta_vs_selected": -0.043,
+          "score_gaps": [],
+          "status": "candidate",
+          "strategy_id": "low_mid_corrective_cut",
+          "total_score": 0.842,
+          "why_not_selected": "safety_first_selection_under_global_blockers"
+        }
+      ],
+      "candidate_blockers": {
+        "high_pass_cleanup": [],
+        "low_mid_corrective_cut": []
+      },
+      "candidate_count": 2,
+      "description": "Stale evidence must fail closed even when a useful strategy exists.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "high_pass_cleanup",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "smart_dsp_context_cache_not_fresh"
+      ],
+      "operator_explanation": "Problem: muddy. Selected high_pass_cleanup because High-pass cleanup is safer than boosting presence when low spill is present. Alternatives scored: low_mid_corrective_cut=0.84. Alternative tradeoffs: low_mid_corrective_cut: safety_first_selection_under_global_blockers. Parameters: {'filter_type': 'high_pass', 'frequency_hz': 95.0, 'slope_db_per_octave': 12, 'gain_db': 0.0, 'q': 0.707}. Remaining blockers: smart_dsp_context_cache_not_fresh. Operator check: Check that the source still has enough fundamental weight. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "stale_context_blocks_strategy",
+      "selected_confidence": 0.822,
+      "selected_parameters": {
+        "filter_type": "high_pass",
+        "frequency_hz": 95.0,
+        "gain_db": 0.0,
+        "q": 0.707,
+        "slope_db_per_octave": 12
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 1,
+        "confidence": 0.822,
+        "global_blockers": [
+          "smart_dsp_context_cache_not_fresh"
+        ],
+        "method_family": "eq",
+        "problem": "muddy",
+        "reason": "High-pass cleanup is safer than boosting presence when low spill is present.",
+        "status": "candidate",
+        "strategy_id": "high_pass_cleanup",
+        "strongest_score_dimensions": [
+          {
+            "metric": "speed",
+            "score": 0.9
+          },
+          {
+            "metric": "safety",
+            "score": 0.9
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.88
+          }
+        ],
+        "total_score": 0.799
+      },
+      "selected_total_score": 0.799,
+      "status": "passed"
+    },
+    {
+      "actual_method_family": "eq",
+      "actual_selected_strategy_id": "high_pass_cleanup",
+      "actual_status": "analysis_only",
+      "alternative_tradeoffs": [
+        {
+          "alternative_reason": "Low-mid buildup is the dominant evidence; a bounded cut fixes it fastest.",
+          "blockers": [],
+          "method_family": "eq",
+          "operator_check": "Listen for body loss and verify the band is not a feedback notch.",
+          "problem": "muddy",
+          "score_delta_vs_selected": -0.043,
+          "score_gaps": [],
+          "status": "candidate",
+          "strategy_id": "low_mid_corrective_cut",
+          "total_score": 0.842,
+          "why_not_selected": "safety_first_selection_under_global_blockers"
+        }
+      ],
+      "candidate_blockers": {
+        "high_pass_cleanup": [],
+        "low_mid_corrective_cut": []
+      },
+      "candidate_count": 2,
+      "description": "Live-authority-tainted context must fail closed.",
+      "expected_method_family": "eq",
+      "expected_selected_strategy_id": "high_pass_cleanup",
+      "expected_status": "analysis_only",
+      "failed_checks": [],
+      "global_blockers": [
+        "smart_dsp_context_cache_live_authority_present"
+      ],
+      "operator_explanation": "Problem: muddy. Selected high_pass_cleanup because High-pass cleanup is safer than boosting presence when low spill is present. Alternatives scored: low_mid_corrective_cut=0.84. Alternative tradeoffs: low_mid_corrective_cut: safety_first_selection_under_global_blockers. Parameters: {'filter_type': 'high_pass', 'frequency_hz': 95.0, 'slope_db_per_octave': 12, 'gain_db': 0.0, 'q': 0.707}. Remaining blockers: smart_dsp_context_cache_live_authority_present. Operator check: Check that the source still has enough fundamental weight. Rollback/readback is required before any live promotion.",
+      "passed": true,
+      "proposal_authority": {
+        "can_apply_live": false,
+        "can_import_to_queue": false,
+        "live_apply_allowed": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "mutates_mixer": false,
+        "queue_import_allowed": false,
+        "queue_mutation": false,
+        "readiness_closure_allowed": false
+      },
+      "read_only_or_dry_run_only": true,
+      "scenario_id": "live_authority_context_blocks_strategy",
+      "selected_confidence": 0.822,
+      "selected_parameters": {
+        "filter_type": "high_pass",
+        "frequency_hz": 95.0,
+        "gain_db": 0.0,
+        "q": 0.707,
+        "slope_db_per_octave": 12
+      },
+      "selected_rationale": {
+        "blockers": [],
+        "compared_alternative_count": 1,
+        "confidence": 0.822,
+        "global_blockers": [
+          "smart_dsp_context_cache_live_authority_present"
+        ],
+        "method_family": "eq",
+        "problem": "muddy",
+        "reason": "High-pass cleanup is safer than boosting presence when low spill is present.",
+        "status": "candidate",
+        "strategy_id": "high_pass_cleanup",
+        "strongest_score_dimensions": [
+          {
+            "metric": "speed",
+            "score": 0.9
+          },
+          {
+            "metric": "safety",
+            "score": 0.9
+          },
+          {
+            "metric": "reversibility",
+            "score": 0.88
+          }
+        ],
+        "total_score": 0.799
+      },
+      "selected_total_score": 0.799,
+      "status": "passed"
+    }
+  ],
+  "scenario_count": 28,
+  "schema": "automixer.smart_dsp_replay_evaluation.v1",
+  "status": "passed",
+  "version": "smart_dsp_replay_evaluation_v1"
+}

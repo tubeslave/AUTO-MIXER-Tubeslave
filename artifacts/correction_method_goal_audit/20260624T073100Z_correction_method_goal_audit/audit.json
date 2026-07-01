@@ -1,0 +1,235 @@
+{
+  "blocks_live_promotion": true,
+  "blocks_queue_import": true,
+  "contacts_backend": false,
+  "contacts_wing": false,
+  "coverage_percent": {
+    "expected_method_cards": 100.0,
+    "expected_objective_families": 100.0,
+    "no_live_authority": 100.0,
+    "operator_surfaces": 100.0,
+    "required_objective_families": 100.0
+  },
+  "covered_expected_objective_families": [
+    "arrangement_role",
+    "compressor_dynamics",
+    "decision_evidence_packet",
+    "eq",
+    "fader_balance",
+    "fx_sends",
+    "gain_trim",
+    "gain_trim_and_fader_balance",
+    "gate_expander",
+    "gate_expander_deesser",
+    "long_term_memory_learning",
+    "master_output",
+    "mix_variant_profile",
+    "pan_stereo",
+    "performance_adaptation",
+    "phase_alignment",
+    "routing_groups_scenes",
+    "source_identity",
+    "source_identity_calibration"
+  ],
+  "covered_required_objective_families": [
+    "compressor_dynamics",
+    "eq",
+    "fader_balance",
+    "fx_sends",
+    "gain_trim",
+    "gain_trim_and_fader_balance",
+    "gate_expander",
+    "gate_expander_deesser",
+    "master_output",
+    "pan_stereo",
+    "routing_groups_scenes"
+  ],
+  "denial_reason": "offline_goal_audit_cannot_replace_real_wing_proof",
+  "expected_method_count": 35,
+  "expected_objective_families": [
+    "arrangement_role",
+    "compressor_dynamics",
+    "decision_evidence_packet",
+    "eq",
+    "fader_balance",
+    "fx_sends",
+    "gain_trim",
+    "gain_trim_and_fader_balance",
+    "gate_expander",
+    "gate_expander_deesser",
+    "long_term_memory_learning",
+    "master_output",
+    "mix_variant_profile",
+    "pan_stereo",
+    "performance_adaptation",
+    "phase_alignment",
+    "routing_groups_scenes",
+    "source_identity",
+    "source_identity_calibration"
+  ],
+  "expected_priority_section_count": 7,
+  "extra_method_ids": [],
+  "failed_checks": [],
+  "future_wing_readback_required": true,
+  "generated_at_utc": "2026-06-24T07:31:00Z",
+  "hardware_proof_required_before_live": true,
+  "live_apply_allowed": false,
+  "live_authority_granted": false,
+  "method_review_card_count": 35,
+  "missing_expected_method_ids": [],
+  "missing_expected_objective_families": [],
+  "missing_required_objective_families": [],
+  "mutates_mixer": false,
+  "no_live_authority": true,
+  "operator_next_step": "review_offline_method_cards_and_collect_real_wing_readback_before_live_promotion",
+  "operator_review_required": true,
+  "overall_offline_goal_percent": 100.0,
+  "packet_schema": "automixer.correction_method_goal_operator_review_packet.v1",
+  "pipeline_id": "main_live_assist",
+  "priority_rows": [
+    {
+      "covered": true,
+      "label": "Gain / Trim and Fader / Balance",
+      "method_count": 6,
+      "objective_families": [
+        "gain_trim",
+        "gain_trim_and_fader_balance",
+        "fader_balance"
+      ],
+      "priority": 1
+    },
+    {
+      "covered": true,
+      "label": "EQ and Compressor",
+      "method_count": 7,
+      "objective_families": [
+        "eq",
+        "compressor_dynamics"
+      ],
+      "priority": 2
+    },
+    {
+      "covered": true,
+      "label": "Gate / Expander / De-esser",
+      "method_count": 3,
+      "objective_families": [
+        "gate_expander",
+        "gate_expander_deesser"
+      ],
+      "priority": 3
+    },
+    {
+      "covered": true,
+      "label": "FX / Sends",
+      "method_count": 3,
+      "objective_families": [
+        "fx_sends"
+      ],
+      "priority": 4
+    },
+    {
+      "covered": true,
+      "label": "Pan / Stereo",
+      "method_count": 2,
+      "objective_families": [
+        "pan_stereo"
+      ],
+      "priority": 5
+    },
+    {
+      "covered": true,
+      "label": "Routing / Groups / Scenes",
+      "method_count": 4,
+      "objective_families": [
+        "routing_groups_scenes"
+      ],
+      "priority": 6
+    },
+    {
+      "covered": true,
+      "label": "Master / Output",
+      "method_count": 1,
+      "objective_families": [
+        "master_output"
+      ],
+      "priority": 7
+    }
+  ],
+  "priority_section_count": 7,
+  "queue_import_allowed": false,
+  "read_only": true,
+  "readiness_closure_allowed": false,
+  "required_method_detail_list_fields": [
+    "goal_requirement_details",
+    "method_specific_review_details",
+    "operator_actionable_explanation_details",
+    "evidence_problem_correction_chain_details",
+    "safety_blocker_details",
+    "headroom_feedback_true_peak_check_details",
+    "operator_acceptance_gate_details",
+    "operator_next_action_details"
+  ],
+  "required_method_review_fields": [
+    "source_evidence",
+    "source_evidence_details",
+    "measured_or_audible_problem",
+    "proposed_correction",
+    "confidence",
+    "bounded_delta",
+    "safety_blockers",
+    "headroom_feedback_true_peak_checks",
+    "operator_readable_explanation",
+    "rollback_readback_contract",
+    "future_wing_readback_contract",
+    "test_evidence"
+  ],
+  "required_objective_families": [
+    "gain_trim",
+    "gain_trim_and_fader_balance",
+    "fader_balance",
+    "eq",
+    "compressor_dynamics",
+    "gate_expander",
+    "gate_expander_deesser",
+    "fx_sends",
+    "pan_stereo",
+    "routing_groups_scenes",
+    "master_output"
+  ],
+  "required_operator_surfaces": [
+    "source_evidence",
+    "source_evidence_details",
+    "measured_or_audible_problem",
+    "proposed_correction",
+    "confidence",
+    "confidence_review",
+    "bounded_delta",
+    "bounded_delta_details",
+    "safety_blockers",
+    "safety_blocker_details",
+    "headroom_feedback_true_peak_checks",
+    "headroom_feedback_true_peak_check_details",
+    "operator_safety_review_matrix",
+    "operator_readable_explanation",
+    "operator_explanation_packet",
+    "operator_evidence_packet",
+    "rollback_expectation",
+    "rollback_readback_contract",
+    "rollback_readback_details",
+    "future_wing_readback_contract",
+    "future_live_promotion_requirements",
+    "live_authority_boundary"
+  ],
+  "schema": "automixer.correction_method_goal_audit.v1",
+  "status": "passed",
+  "supporting_objective_families": [
+    "arrangement_role",
+    "decision_evidence_packet",
+    "long_term_memory_learning",
+    "mix_variant_profile",
+    "performance_adaptation",
+    "phase_alignment",
+    "source_identity",
+    "source_identity_calibration"
+  ]
+}
