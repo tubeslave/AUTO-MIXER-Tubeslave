@@ -107,6 +107,7 @@ from backend.smart_dsp_strategy_engine import (
     WING_GAIN_WRITE_PATH_SUFFIXES,
     WING_GATE_REQUIRED_MODEL,
     WING_GATE_HYSTERESIS_REVIEW_TOLERANCE_DB,
+    WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER,
     WING_GATE_SLOT_OPERATOR_OWNED_MODEL_BLOCKER,
     WING_GATE_SLOT_SINGLE_MODEL_COMBO_BLOCKER,
     WING_GATE_SLOT_SINGLE_MODEL_COMBO_POLICY,
@@ -1617,8 +1618,8 @@ def test_default_smart_dsp_replay_scenarios_pass_and_deny_authority():
     assert report["schema"] == SMART_DSP_REPLAY_EVALUATION_SCHEMA
     assert report["status"] == "passed"
     assert report["failed_checks"] == []
-    assert report["scenario_count"] == 187
-    assert report["passed_scenario_count"] == 187
+    assert report["scenario_count"] == 188
+    assert report["passed_scenario_count"] == 188
     assert report["failed_scenario_count"] == 0
     assert report["pass_rate"] == 1.0
     assert report["read_only_or_dry_run_only"] is True
@@ -2376,6 +2377,46 @@ def test_default_smart_dsp_replay_scenarios_pass_and_deny_authority():
             "wing_osc_apply_parameter_keys"
         ]
     )
+    real_gate_readback = results[
+        "soundcheck_real_wing_gate_slot_gate_readback_blocks_deq_hpf"
+    ]
+    assert real_gate_readback["actual_selected_strategy_id"] == (
+        "static_plosive_high_pass_cleanup"
+    )
+    assert real_gate_readback["actual_method_family"] == "eq"
+    assert real_gate_readback["candidate_blockers"][
+        "vocal_plosive_dynamic_hpf_control"
+    ] == [WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER]
+    real_gate_dynamic_params = real_gate_readback["candidate_parameters"][
+        "vocal_plosive_dynamic_hpf_control"
+    ]
+    assert real_gate_dynamic_params["wing_gate_slot_current_model"] == (
+        WING_GATE_REQUIRED_MODEL
+    )
+    assert real_gate_dynamic_params["wing_gate_slot_current_enabled"] is False
+    assert real_gate_dynamic_params["wing_gate_slot_model_conflict"] is True
+    assert (
+        real_gate_dynamic_params[
+            "wing_dynamic_eq_gate_slot_parameter_apply_ready"
+        ]
+        is False
+    )
+    real_gate_dynamic_contract = real_gate_readback[
+        "candidate_future_wing_readback_contracts"
+    ]["vocal_plosive_dynamic_hpf_control"]
+    real_gate_dynamic_applicability = real_gate_dynamic_contract[
+        "wing_osc_applicability"
+    ]
+    assert real_gate_dynamic_applicability["native_osc_supported"] is False
+    assert real_gate_dynamic_applicability["native_osc_support_level"] == (
+        "gate_slot_model_conflict_requires_operator_review"
+    )
+    assert real_gate_dynamic_applicability[
+        "gate_slot_model_conflict_blocker"
+    ] == WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER
+    assert real_gate_dynamic_contract["dynamic_eq_readback"][
+        "gate_model_readback_must_equal"
+    ] == WING_DYNAMIC_EQ_GATE_MODEL
     assert results["live_plosive_vocal_hold_before_hpf"][
         "actual_selected_strategy_id"
     ] == "manual_plosive_mic_technique_review"

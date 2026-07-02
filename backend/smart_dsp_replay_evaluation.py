@@ -871,6 +871,69 @@ def build_default_smart_dsp_replay_scenarios() -> Tuple[SmartDSPReplayScenario, 
             },
         ),
         SmartDSPReplayScenario(
+            scenario_id="soundcheck_real_wing_gate_slot_gate_readback_blocks_deq_hpf",
+            description=(
+                "Real WING readback with gate/mdl=GATE, gate/on=false should "
+                "block a hidden DEQ model switch and use the static HPF fallback."
+            ),
+            analysis=_base_analysis(
+                target_id="ch:3",
+                problem_hints=("plosive_control", "muddy"),
+                muddiness_score=0.72,
+                low_end_excess_score=0.84,
+                spectral_tilt_score=0.58,
+                plosive_risk_score=0.82,
+                plosive_frequency_hz=82.0,
+                plosive_event_peak_dbfs=-18.4,
+                plosive_event_contrast_db=17.2,
+                plosive_event_rise_time_ms=18.0,
+                plosive_event_recovery_ms=82.0,
+                dynamics_variance_score=0.62,
+                crest_factor_db=18.0,
+                lra_proxy_db=14.0,
+                estimated_lufs=-24.0,
+                level_plane_error_lu=0.2,
+                current_wing_gate_model=WING_GATE_REQUIRED_MODEL,
+                current_wing_gate_enabled=False,
+                current_wing_gate_slot_readback_available=True,
+            ),
+            expected_status="proposal_only",
+            expected_selected_strategy_id="static_plosive_high_pass_cleanup",
+            expected_method_family="eq",
+            min_candidate_count=6,
+            min_selected_total_score=0.74,
+            required_selected_parameter_keys=(
+                "filter_type",
+                "frequency_hz",
+                "slope_db_per_octave",
+                "static_hpf_fallback_for_dynamic_plosive_control",
+                "plosive_risk_score",
+                "wing_eq_filter_family",
+            ),
+            expected_candidate_blockers={
+                "vocal_plosive_dynamic_hpf_control": (
+                    WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER,
+                ),
+            },
+            expected_candidate_parameter_keys={
+                "vocal_plosive_dynamic_hpf_control": (
+                    "wing_gate_slot_required_model",
+                    "wing_gate_slot_current_model",
+                    "wing_gate_slot_current_enabled",
+                    "wing_gate_slot_model_readback_available",
+                    "wing_gate_slot_model_conflict",
+                    "wing_gate_slot_model_conflict_blocker",
+                    "wing_dynamic_eq_gate_slot_parameter_apply_ready",
+                ),
+            },
+            expected_alternative_tradeoff_reasons={
+                "vocal_plosive_dynamic_hpf_control": (
+                    "soundcheck_wing_native_osc_priority",
+                    "static_hpf_has_verified_wing_fw_3_0_5_osc_path",
+                ),
+            },
+        ),
+        SmartDSPReplayScenario(
             scenario_id="soundcheck_plosive_vocal_eq_model_conflict_hold",
             description=(
                 "Soundcheck plosive vocal should hold for operator review when "
