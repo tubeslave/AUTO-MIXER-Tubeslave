@@ -843,7 +843,19 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
     assert state["last_validation_summary"]["hardware_evidence"] is False
     assert state["last_validation_summary"]["product_runtime_changed"] is False
     assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
-    assert "operator-supervised WING read-only preflight" in state["next_action"]
+    if (
+        state["last_validation_summary"].get("wing_readonly_preflight_review_status")
+        == "candidate_ready_for_manual_review"
+    ):
+        assert "Operator reviews artifacts/wing_readonly_preflight" in state[
+            "next_action"
+        ]
+        assert (
+            "artifacts/wing_readonly_preflight_review_decisions/"
+            "pending_review_decision_template.json"
+        ) in state["next_action"]
+    else:
+        assert "operator-supervised WING read-only preflight" in state["next_action"]
 
     assert "## Goal transition" in contract
     assert "Native thread Goal management" in contract
@@ -871,7 +883,15 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
 
     assert "Writer lease: none" in heartbeat
     assert "This heartbeat made no product/runtime\nchange" in heartbeat
-    assert "M001 still has no real WING read-only artifact" in heartbeat
+    if (
+        state["last_validation_summary"].get("wing_readonly_preflight_review_status")
+        == "candidate_ready_for_manual_review"
+    ):
+        assert "latest real WING read-only candidate" in heartbeat
+        assert "operator_review_required" in heartbeat
+        assert "pending_operator_decision" in heartbeat
+    else:
+        assert "M001 still has no real WING read-only artifact" in heartbeat
 
     assert "## First Goal" in report
     assert "The next finite Goal should only be created after a real\nWING read-only artifact" in report
@@ -1031,8 +1051,15 @@ def test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root()
         assert artifact in handoff
     assert "Validate-only summaries were moved to `ops/autopilot/evidence/`" in report
     assert "not treated as real `artifacts/wing_readonly_preflight` candidates" in report
-    assert "M001 still has no real WING read-only artifact under\n" in heartbeat
-    assert "`artifacts/wing_readonly_preflight/`" in heartbeat
+    if summary.get("wing_readonly_preflight_review_status") == (
+        "candidate_ready_for_manual_review"
+    ):
+        assert "latest real WING read-only candidate" in heartbeat
+        assert "operator_review_required" in heartbeat
+        assert "accepted hardware evidence" in heartbeat
+    else:
+        assert "M001 still has no real WING read-only artifact under\n" in heartbeat
+        assert "`artifacts/wing_readonly_preflight/`" in heartbeat
     assert "No real hardware evidence was produced" in current
     assert "`artifacts/wing_readonly_preflight` root" in current
     assert "websocket_opened: false" in handoff
@@ -1053,10 +1080,25 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
     assert state["active_checkpoint"] == "M001-EXTERNAL-WING-READONLY-ARTIFACT"
     assert state["last_validation_summary"]["hardware_evidence"] is False
     assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
-    assert state["next_action"] == (
-        "Wait for operator-supervised WING read-only preflight using "
-        "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json."
-    )
+    if (
+        state["last_validation_summary"].get("wing_readonly_preflight_review_status")
+        == "candidate_ready_for_manual_review"
+    ):
+        assert state["last_validation_summary"][
+            "wing_readonly_preflight_decision_ledger_status"
+        ] == "operator_review_required"
+        assert state["last_validation_summary"][
+            "wing_readonly_preflight_latest_valid_candidate_source_id"
+        ] == (
+            "artifacts/wing_readonly_preflight/"
+            "20260702T061111Z_wing_readonly_preflight/summary.json"
+        )
+        assert "pending_review_decision_template.json" in state["next_action"]
+    else:
+        assert state["next_action"] == (
+            "Wait for operator-supervised WING read-only preflight using "
+            "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json."
+        )
     assert state["external_validation_requirements"] == [
         "Real WING Rack read-only artifact",
         "Operator review of accepted read-only preflight candidate",

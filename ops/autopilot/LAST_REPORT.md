@@ -3,11 +3,17 @@
 ## Текущее состояние
 
 - Milestone: M001, WING read-only preflight evidence gate.
-- Checkpoint: M001-CP05.
+- Checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT.
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-06-20T17:54:44Z.
+- Latest heartbeat: 2026-07-02T06:58:04Z.
+- Latest WING read-only candidate:
+  `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`.
+- Decision ledger status: `operator_review_required`; no accepted or rejected
+  operator decision record exists yet.
+- Pending review template:
+  `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`.
 
 ## Что сделано
 
@@ -16,6 +22,15 @@ no-WING/read-only evidence. M001 is now waiting for external WING/operator
 validation.
 
 After CP05, verified no-WING safety-scope hardening commits were added:
+
+- WING read-only decision handoff was refreshed for the latest real candidate:
+  `Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md` now scopes the
+  artifact review to `20260702T061111Z_wing_readonly_preflight`, and the
+  pending decision template points at the same summary SHA. The decision ledger
+  report remains `blocked` / `operator_review_required` because the operator
+  has not recorded an accepted or rejected decision. This is control-plane
+  handoff evidence only; it creates no new WING/backend contact, live write,
+  readiness closure, accepted hardware evidence or live authority.
 
 - M081 WING review decision prestart proof binding rail is now automated:
   review decision templates and accepted decision records must carry the same

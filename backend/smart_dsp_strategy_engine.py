@@ -32397,7 +32397,30 @@ def _decision_engine_contract(
             "mode": mode,
             "supported_modes": sorted(SUPPORTED_MODES),
             "soundcheck_strategy_search_allowed": mode == "soundcheck",
+            "soundcheck_bounded_exploration_allowed": mode == "soundcheck",
+            "soundcheck_gain_up_eq_boost_dynamics_fx_require_safety_checks": (
+                mode == "soundcheck"
+            ),
             "live_conservative_policy": mode == "live",
+            "live_prefers_risk_reduction": mode == "live",
+            "live_gain_up_requires_operator_review": mode == "live",
+            "live_aggressive_processing_requires_operator_review": mode == "live",
+            "live_routing_scene_master_requires_supervised_proof": mode == "live",
+            "live_max_single_step_db": (
+                LIVE_MAX_SINGLE_STEP_DB if mode == "live" else None
+            ),
+            "live_max_single_step_percent": (
+                LIVE_MAX_SINGLE_STEP_PERCENT if mode == "live" else None
+            ),
+            "live_min_step_interval_ms": (
+                LIVE_MIN_STEP_INTERVAL_MS if mode == "live" else None
+            ),
+            "live_eq_max_cut_db": LIVE_EQ_MAX_CUT_DB if mode == "live" else None,
+            "live_eq_max_boost_db": LIVE_EQ_MAX_BOOST_DB if mode == "live" else None,
+            "live_fx_max_pullback_db": (
+                LIVE_FX_MAX_PULLBACK_DB if mode == "live" else None
+            ),
+            "live_fx_max_boost_db": LIVE_FX_MAX_BOOST_DB if mode == "live" else None,
             "live_apply_allowed": False,
             "live_authority_granted": False,
         },
@@ -32537,6 +32560,9 @@ def _decision_engine_contract(
             "wing_osc_candidate_apply_status": (
                 selected_wing_osc_summary["wing_osc_candidate_apply_status"]
             ),
+            "live_apply_blocked": True,
+            "live_apply_blocker_status": "blocked_before_live_apply",
+            "operator_review_required_before_live_apply": True,
         },
         "safety_layer": {
             "fader_ceiling_dbfs": 0.0,
@@ -32547,7 +32573,23 @@ def _decision_engine_contract(
             "readback_required_before_live_promotion": True,
             "rollback_required_before_live_promotion": True,
             "no_hidden_live_authority_widening": True,
+            "live_gain_up_blocked_without_operator_review": mode == "live",
+            "live_aggressive_dsp_blocked_without_operator_review": mode == "live",
             "routing_scene_master_live_write_blocked_without_supervised_proof": True,
+            "wing_fw305_verified_mapping_readback_rollback_required": True,
+            "unverified_dsp_families_operator_review_only": [
+                "eq",
+                "dynamics",
+                "gate",
+                "de_esser",
+                "fx",
+                "pan",
+                "routing",
+                "scene",
+                "master_output",
+                "model_selection",
+                "time_parameter",
+            ],
             "live_write": False,
             "queue_mutation": False,
             "live_authority_granted": False,
@@ -32579,6 +32621,10 @@ def _decision_engine_contract(
             "target_console": WING_RACK_OSC_TARGET_CONSOLE,
             "firmware": WING_RACK_OSC_FIRMWARE,
             "correction_exists_on_console_required": True,
+            "verified_osc_mapping_required": True,
+            "verified_readback_required": True,
+            "verified_rollback_required": True,
+            "read_only_until_verified": True,
             "selected_read_before_paths": list(
                 selected_wing_osc_readback_summary["wing_osc_read_before_paths"]
             ),

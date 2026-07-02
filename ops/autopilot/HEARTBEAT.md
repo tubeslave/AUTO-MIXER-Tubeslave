@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-06-20T18:06:52Z
+Last heartbeat UTC: 2026-07-02T06:58:04Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -10,21 +10,25 @@ Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
 Writer lease: none
 
-Next action: wait for operator-supervised WING read-only preflight using `ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json`, or name a concrete unverified contract gap before selecting more WING read-only intake work.
+Next action: operator must review the latest real WING read-only candidate
+`artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
+using
+`artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`,
+then rerun
+`PYTHONPATH=backend python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions`.
 
-Latest check: M107 Project Director intake loop lookback floor now keeps the
-M105/M106 guard active when additional direction-guard commits would otherwise
-push the WING read-only streak outside the requested lookback window. Current
-Project Director output remains `external_validation_wait_or_named_gap_only`.
+Latest check: the WING read-only artifact review was refreshed for the selected
+candidate and remains `candidate_ready_for_manual_review`. The decision ledger
+review remains blocked with `operator_review_required` because there is no
+accepted or rejected operator decision record yet.
 
-Focused Project Director validation passed with `8 passed`; the M107 rail
-passed with `1 passed`; the full WING rail passed with `120 passed`; the
-staged-only full suite passed with `4045 passed, 1 skipped, 1 warning`; memory
-lint, `STATE.json` validation and `RUN_LEDGER.jsonl` validation passed.
+The pending template still has
+`template_status: operator_must_replace_placeholders_before_ledger_acceptance`
+and `decision: pending_operator_decision`. This is the intended fail-closed
+state before manual review.
 
 This heartbeat made no product/runtime
-change to live console authority. No WING/backend contact was made. No
-OSC/websocket transport was opened. No live write, readiness closure, live
-authority grant, hardware evidence or Full Autonomous readiness was produced.
-M001 still has no real WING read-only artifact under
-`artifacts/wing_readonly_preflight/`.
+change to live console authority. No WING/backend contact was made by this
+cycle. No OSC/websocket transport was opened by this cycle. No live write,
+readiness closure, live authority grant, accepted hardware evidence or Full
+Autonomous readiness was produced.

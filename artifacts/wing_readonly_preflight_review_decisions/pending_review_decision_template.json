@@ -105,7 +105,7 @@
   "safe_to_stop_listener_by_gate_matches_plan": true,
   "summary_path": "artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json",
   "summary_sha256": "102a70155ee24c86ee7dee242eb4fab7aef6cb17eed9048d1cb7112304d475bc",
-  "template_generated_at": "2026-07-02T06:22:13Z",
+  "template_generated_at": "2026-07-02T06:56:43Z",
   "template_status": "operator_must_replace_placeholders_before_ledger_acceptance",
   "value_types": [
     "eq_on",

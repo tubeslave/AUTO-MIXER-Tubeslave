@@ -10,6 +10,7 @@ from backend.smart_dsp_strategy_engine import (
     LIVE_FX_MAX_BOOST_DB,
     LIVE_FX_MAX_PULLBACK_DB,
     LIVE_MAX_SINGLE_STEP_DB,
+    LIVE_MIN_STEP_INTERVAL_MS,
     SOUNDCHECK_FX_MAX_BOOST_DB,
     SOUNDCHECK_FX_MAX_PULLBACK_DB,
     SOUNDCHECK_MASTER_MAX_LIFT_DB,
@@ -15594,9 +15595,68 @@ def test_live_master_true_peak_overload_prefers_native_main_pullback_before_proc
         "live_master_bus_compression_requires_operator_review_and_wing_proof"
         in bus_comp.blockers
     )
+    contract = recommendation.evidence["decision_engine_contract"]
+    assert contract["contract_id"] == "smart_dsp_decision_engine_contract_v1"
+    assert contract["method_id"] == SMART_DSP_METHOD_ID
+    mode_policy = contract["mode_policy"]
+    assert mode_policy["mode"] == "live"
+    assert mode_policy["soundcheck_strategy_search_allowed"] is False
+    assert mode_policy["soundcheck_bounded_exploration_allowed"] is False
+    assert mode_policy["live_conservative_policy"] is True
+    assert mode_policy["live_prefers_risk_reduction"] is True
+    assert mode_policy["live_gain_up_requires_operator_review"] is True
+    assert mode_policy["live_aggressive_processing_requires_operator_review"] is True
+    assert mode_policy["live_routing_scene_master_requires_supervised_proof"] is True
+    assert mode_policy["live_max_single_step_db"] == LIVE_MAX_SINGLE_STEP_DB
+    assert mode_policy["live_min_step_interval_ms"] == LIVE_MIN_STEP_INTERVAL_MS
+    assert mode_policy["live_eq_max_boost_db"] == LIVE_EQ_MAX_BOOST_DB
+    assert mode_policy["live_eq_max_cut_db"] == LIVE_EQ_MAX_CUT_DB
+    assert mode_policy["live_fx_max_boost_db"] == LIVE_FX_MAX_BOOST_DB
+    assert mode_policy["live_fx_max_pullback_db"] == LIVE_FX_MAX_PULLBACK_DB
+    assert mode_policy["live_apply_allowed"] is False
+    assert mode_policy["live_authority_granted"] is False
+    parameter_contract = contract["parameter_calculation"]
+    assert "master_true_peak_pullback_db" in parameter_contract["parameter_keys"]
+    assert "trim_delta_db" in parameter_contract["parameter_keys"]
+    assert parameter_contract["live_apply_blocked"] is True
+    assert parameter_contract["live_apply_blocker_status"] == "blocked_before_live_apply"
+    assert parameter_contract["operator_review_required_before_live_apply"] is True
+    assert (
+        parameter_contract["wing_osc_candidate_apply_status"]
+        == "wing_native_osc_candidate_requires_absolute_value_readback_before_apply"
+    )
+    safety = contract["safety_layer"]
+    assert safety["true_peak_headroom_guard"] is True
+    assert safety["feedback_guard"] is True
+    assert safety["live_gain_up_blocked_without_operator_review"] is True
+    assert safety["live_aggressive_dsp_blocked_without_operator_review"] is True
+    assert (
+        safety["routing_scene_master_live_write_blocked_without_supervised_proof"]
+        is True
+    )
+    assert safety["wing_fw305_verified_mapping_readback_rollback_required"] is True
+    assert "master_output" in safety["unverified_dsp_families_operator_review_only"]
+    assert safety["live_write"] is False
+    assert safety["queue_mutation"] is False
+    assert safety["live_authority_granted"] is False
+    readback_contract = contract["wing_readback_contract"]
+    assert readback_contract["target_console"] == WING_RACK_OSC_TARGET_CONSOLE
+    assert readback_contract["firmware"] == WING_RACK_OSC_FIRMWARE
+    assert readback_contract["correction_exists_on_console_required"] is True
+    assert readback_contract["verified_osc_mapping_required"] is True
+    assert readback_contract["verified_readback_required"] is True
+    assert readback_contract["verified_rollback_required"] is True
+    assert readback_contract["read_only_until_verified"] is True
+    assert "fdr" in readback_contract["selected_read_before_paths"]
+    assert "in/set/trim" in readback_contract["selected_read_before_paths"]
+    assert readback_contract["live_write"] is False
+    assert readback_contract["live_authority_granted"] is False
     proposal = recommendation.to_operator_proposal()
     _assert_proposal_denial(proposal)
     assert proposal["proposed_action"]["method_family"] == "gain_fader"
+    assert proposal["decision_engine_contract"] == contract
+    assert proposal["proposed_action"]["decision_engine_contract"] == contract
+    assert proposal["evidence"]["decision_engine_contract"] == contract
 
 
 def _assert_operator_owned_master_output_gain_hold(
