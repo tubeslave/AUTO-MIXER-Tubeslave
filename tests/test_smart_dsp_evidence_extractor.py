@@ -23,6 +23,7 @@ from backend.smart_dsp_strategy_engine import (
     WING_FX_LEVEL_OPERATOR_OWNED_BLOCKER,
     WING_FX_OPERATOR_OWNED_MODEL_BLOCKER,
     WING_GAIN_UP_FADER_CEILING_BLOCKER,
+    WING_GAIN_UP_FADER_READBACK_BLOCKER,
     WING_GAIN_OPERATOR_OWNED_BLOCKER,
     WING_GATE_REQUIRED_MODEL,
     WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER,
@@ -3551,6 +3552,66 @@ def test_quiet_vocal_audio_blocks_gain_up_when_readonly_fader_near_ceiling():
     assert gain_up.parameters["wing_gain_fader_ceiling_limited_delta_db"] == 1.0
     assert gain_up.parameters["wing_gain_fader_ceiling_exceeded"] is True
     assert recommendation.evidence["current_wing_controls"]["fader_db"] == -1.0
+    assert recommendation.to_operator_proposal()["live_apply_allowed"] is False
+
+
+def test_quiet_vocal_audio_requires_fader_readback_before_wing_gain_up_ceiling_check():
+    samples = _tone(900.0, amplitude=0.035)
+    wing_state = build_current_wing_state_from_readonly_preflight(
+        target_id="ch:21",
+        summary={
+            "run_id": "20260702T075151Z_wing_readonly_preflight",
+            "connection_mode": "wing",
+            "read_only": True,
+            "live_write": False,
+            "write_request_sent": False,
+            "proposal_request_sent": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "readbacks": [
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 21,
+                    "value_type": "gain",
+                    "address": "/ch/21/in/set/trim",
+                    "value": 1.0,
+                },
+            ],
+        },
+    )
+
+    recommendation = analyze_smart_dsp_audio(
+        samples,
+        target_id="ch:21",
+        source_role="lead_vocal",
+        source_label="Quiet Lead",
+        sample_rate=SR,
+        source_identity_confirmed=True,
+        source_identity_confidence=0.92,
+        current_state_cache_freshness=_fresh(),
+        current_state_readback_available=True,
+        rollback_plan_available=True,
+        current_wing_state=wing_state,
+        target_plane_lufs=-22.0,
+    )
+
+    candidates = {
+        candidate.strategy_id: candidate
+        for candidate in (recommendation.selected_strategy, *recommendation.alternatives)
+    }
+    gain_up = candidates["soundcheck_bounded_gain_up"]
+    assert WING_GAIN_UP_FADER_READBACK_BLOCKER in gain_up.blockers
+    assert gain_up.parameters["wing_current_fader_readback_available"] is False
+    assert gain_up.parameters["wing_current_fader_readback_required"] is True
+    assert gain_up.parameters["wing_gain_fader_ceiling_blocker"] == (
+        WING_GAIN_UP_FADER_READBACK_BLOCKER
+    )
+    controls = recommendation.evidence["current_wing_controls"]
+    assert controls["readback_available"] is True
+    assert controls["fader_db"] is None
+    assert controls["input_trim_db"] == 1.0
     assert recommendation.to_operator_proposal()["live_apply_allowed"] is False
 
 

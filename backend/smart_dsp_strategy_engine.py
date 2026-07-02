@@ -849,6 +849,9 @@ WING_GAIN_OPERATOR_OWNED_BLOCKER = (
     "wing_gain_operator_owned_edit_requires_operator_review"
 )
 WING_GAIN_UP_FADER_CEILING_BLOCKER = "wing_current_fader_ceiling_blocks_gain_up"
+WING_GAIN_UP_FADER_READBACK_BLOCKER = (
+    "wing_current_fader_readback_required_for_gain_up"
+)
 WING_FADER_CEILING_DBFS = 0.0
 WING_GAIN_WRITE_PATH_PREFERRED_SUFFIX_BY_SOURCE = {
     "trim_delta_db": "in/set/trim",
@@ -12436,7 +12439,27 @@ def _wing_gain_up_fader_ceiling_state(
         return {}, ()
     current_fader = _numeric_float_or_none(analysis.current_wing_fader_db)
     if current_fader is None:
-        return {}, ()
+        if not bool(analysis.current_wing_control_readback_available):
+            return {}, ()
+        ceiling = _numeric_float_or_none(parameters.get("future_fader_ceiling_dbfs"))
+        if ceiling is None:
+            ceiling = WING_FADER_CEILING_DBFS
+        requested_delta = max(0.0, _safe_float(gain_up_db))
+        return (
+            {
+                "wing_current_fader_readback_available": False,
+                "wing_current_fader_readback_required": True,
+                "wing_gain_requested_delta_db": round(requested_delta, 3),
+                "wing_gain_fader_ceiling_dbfs": round(ceiling, 3),
+                "wing_gain_fader_ceiling_blocker": (
+                    WING_GAIN_UP_FADER_READBACK_BLOCKER
+                ),
+                "wing_gain_fader_ceiling_policy": (
+                    "require_current_wing_fader_readback_before_gain_up_ceiling_check"
+                ),
+            },
+            (WING_GAIN_UP_FADER_READBACK_BLOCKER,),
+        )
 
     ceiling = _numeric_float_or_none(parameters.get("future_fader_ceiling_dbfs"))
     if ceiling is None:
@@ -12448,6 +12471,7 @@ def _wing_gain_up_fader_ceiling_state(
     exceeded = projected_fader > ceiling + 1e-9
     return (
         {
+            "wing_current_fader_readback_available": True,
             "wing_current_fader_db": round(current_fader, 3),
             "wing_gain_requested_delta_db": round(requested_delta, 3),
             "wing_gain_projected_fader_db": round(projected_fader, 3),
