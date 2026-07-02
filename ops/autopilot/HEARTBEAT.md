@@ -40,7 +40,7 @@ Current WING proof apply surface-contract checks passed:
 selected `tests/test_server.py` apply/preflight mismatch and linked rollback
 coverage `5 passed`, selected product-state preflight/plan/dry-run checks
 `3 passed`, handler/queue `py_compile` passed, full suite passed, and
-`tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_apply_surface_contract_20260702T0850Z`
+`tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_basic_controls_20260702T0850Z`
 passed.
 
 The latest real WING read-only candidate remains

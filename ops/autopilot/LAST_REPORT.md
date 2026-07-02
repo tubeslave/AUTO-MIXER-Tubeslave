@@ -2168,7 +2168,7 @@ live authority is introduced.
   `3 passed`; `py_compile backend/operator_proposal_queue.py
   backend/handlers/product_state_handlers.py`: passed; full suite:
   `4786 passed, 1 skipped, 1 warning`; no-WING quick:
-  `/tmp/automixer_no_wing_apply_surface_contract_20260702T0850Z/20260702T083608Z_no_wing_release_check`,
+  `/tmp/automixer_no_wing_basic_controls_20260702T0850Z/20260702T085111Z_no_wing_release_check`,
   status `passed`, `failed_checks: []`, `read_only: true`, `live_write:
   false`, `contacts_wing: false`, `contacts_backend: false`,
   `live_authority_granted: false`.
