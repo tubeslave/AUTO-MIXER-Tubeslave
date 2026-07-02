@@ -10187,7 +10187,12 @@ def test_m094_project_director_external_validation_scope_guard_stays_readonly():
     assert "No live transport" in adr
 
     assert directive["selected_blocker"] == "WING read-only connection proof"
-    assert directive["selected_blocker_status"] == "tooling_ready_waits_real_wing"
+    assert directive["selected_blocker_status"] in {
+        "tooling_ready_waits_real_wing",
+        "blocked_by_real_artifact_review",
+    }
+    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
+        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
     assert directive["selected_action_requires_external_validation"] is True
     assert directive["external_validation_wait"] is True
     assert directive["stop_broad_work"] is True

@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -5,18 +6,26 @@ from backend.autonomy_promotion_readiness import (
     build_autonomy_promotion_readiness_snapshot,
 )
 from backend.wing_readonly_preflight_evidence import (
+    EXPECTED_PLAN_ALLOWED_REQUEST_TYPES,
+    EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS,
+    EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES,
     EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE_SUMMARY,
+    EXPECTED_SELECTED_MVP_BLOCKER,
+    EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
     build_wing_readonly_preflight_evidence,
 )
 from backend.wing_readonly_preflight_contract import (
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND_TEXT,
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_FAILURE_DETAIL_FIELDS,
+    WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT,
+    WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+    WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME,
 )
 from backend.wing_readonly_preflight_review_decision import (
     build_wing_readonly_preflight_review_decision_ledger,
@@ -166,12 +175,319 @@ def valid_wing_preflight_summary() -> dict:
             "artifacts/wing_readonly_preflight/"
             "20260606T150000Z_wing_readonly_preflight/summary.json"
         ),
+        "expected_artifacts": [
+            (
+                "artifacts/wing_readonly_preflight/"
+                "20260606T150000Z_wing_readonly_preflight/summary.json"
+            ),
+            (
+                "artifacts/wing_readonly_preflight/"
+                "20260606T150000Z_wing_readonly_preflight/events.jsonl"
+            ),
+        ],
+        "expected_summary_artifact": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T150000Z_wing_readonly_preflight/summary.json"
+        ),
+        "expected_events_artifact": (
+            "artifacts/wing_readonly_preflight/"
+            "20260606T150000Z_wing_readonly_preflight/events.jsonl"
+        ),
+        "summary_path_matches_expected_artifact": True,
+        "events_path_matches_expected_artifact": True,
     }
 
 
-def patch_report_tool_wing_preflight_candidate(monkeypatch) -> dict:
+def _expected_wing_preflight_artifacts(artifact_root: str) -> list[str]:
+    return [
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME}",
+        f"{artifact_root}/<run_id>/{WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME}",
+    ]
+
+
+def _expected_wing_preflight_request_sequence(summary: dict) -> list[dict]:
+    return [
+        {"type": "get_operator_mode"},
+        {"type": "get_state"},
+        *[
+            {
+                "type": "query_mixer_parameter",
+                "request_id": row["request_id"],
+                "channel": row["channel"],
+                "value_type": row["value_type"],
+                "address": row["address"],
+            }
+            for row in summary["readbacks"]
+        ],
+    ]
+
+
+def _wing_preflight_event(
+    seq: int,
+    event_type: str,
+    payload: dict,
+    *,
+    run_id: str,
+) -> dict:
+    return {
+        "run_id": run_id,
+        "seq": seq,
+        "timestamp": "2026-06-06T15:00:00.000Z",
+        "event_type": event_type,
+        "payload": payload,
+    }
+
+
+def _valid_wing_preflight_events(summary: dict) -> list[dict]:
+    events = [
+        _wing_preflight_event(
+            1,
+            "send",
+            {"type": "get_operator_mode"},
+            run_id=summary["run_id"],
+        ),
+        _wing_preflight_event(
+            2,
+            "recv",
+            {"type": "operator_mode_status", "mode": "assist", "connection_mode": "wing"},
+            run_id=summary["run_id"],
+        ),
+        _wing_preflight_event(
+            3,
+            "send",
+            {"type": "get_state"},
+            run_id=summary["run_id"],
+        ),
+        _wing_preflight_event(
+            4,
+            "recv",
+            {"type": "state_update", "mode": "wing", "state": {"/ch/3/fdr": -12.0}},
+            run_id=summary["run_id"],
+        ),
+    ]
+    seq = 5
+    for row in summary["readbacks"]:
+        events.append(
+            _wing_preflight_event(
+                seq,
+                "send",
+                {
+                    "type": "query_mixer_parameter",
+                    "request_id": row["request_id"],
+                    "channel": row["channel"],
+                    "value_type": row["value_type"],
+                    "address": row["address"],
+                },
+                run_id=summary["run_id"],
+            )
+        )
+        events.append(
+            _wing_preflight_event(seq + 1, "recv", row, run_id=summary["run_id"])
+        )
+        seq += 2
+    return events
+
+
+def _valid_wing_preflight_expected_plan(summary: dict) -> dict:
+    return {
+        "type": "wing_readonly_preflight_offline_plan",
+        "status": "ready_for_operator_review",
+        "proof_artifact_schema": summary["proof_artifact_schema"],
+        "proof_runner": summary["proof_runner"],
+        "selected_mvp_blocker": EXPECTED_SELECTED_MVP_BLOCKER,
+        "selected_mvp_blocker_status": EXPECTED_SELECTED_MVP_BLOCKER_STATUS,
+        "plan_output": summary["expected_plan_path"],
+        "artifact_root": summary["artifact_root"],
+        "channels": summary["channels"],
+        "operator_channel_confirmation_required": summary[
+            "operator_channel_confirmation_required"
+        ],
+        "operator_confirmed_channels": summary["operator_confirmed_channels"],
+        "operator_session_confirmation_required": summary[
+            "operator_session_confirmation_required"
+        ],
+        "operator_confirmed_session_ready": summary[
+            "operator_confirmed_session_ready"
+        ],
+        "value_types": summary["value_types"],
+        "require_physical_readback": summary["require_physical_readback"],
+        "read_only": summary["read_only"],
+        "live_write": summary["live_write"],
+        "expected_plan_required_for_real_run": summary[
+            "expected_plan_required_for_real_run"
+        ],
+        "physical_preflight_requires_existing_backend_connection": summary[
+            "physical_preflight_requires_existing_backend_connection"
+        ],
+        "backend_port_prestart_check_required": True,
+        "backend_port_prestart_check_must_pass_before_starting_backend": True,
+        "backend_port_prestart_check_command": PRESTART_BACKEND_PORT_CHECK_COMMAND,
+        "backend_port_prestart_check_command_text": (
+            PRESTART_BACKEND_PORT_CHECK_COMMAND_TEXT
+        ),
+        "backend_port_prestart_check_failure_detail_fields": (
+            PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
+        ),
+        "backend_port_prestart_summary_required": summary[
+            "backend_port_prestart_summary_required"
+        ],
+        "backend_port_prestart_summary_path": summary[
+            "backend_port_prestart_summary_path"
+        ],
+        "backend_port_prestart_summary_sha256": summary[
+            "backend_port_prestart_summary_sha256"
+        ],
+        "backend_port_prestart_summary_type": summary[
+            "backend_port_prestart_summary_type"
+        ],
+        "backend_port_prestart_summary_status": summary[
+            "backend_port_prestart_summary_status"
+        ],
+        "backend_port_prestart_summary_connection_policy": summary[
+            "backend_port_prestart_summary_connection_policy"
+        ],
+        "backend_port_prestart_summary_read_only": summary[
+            "backend_port_prestart_summary_read_only"
+        ],
+        "backend_port_prestart_summary_live_write": summary[
+            "backend_port_prestart_summary_live_write"
+        ],
+        "backend_port_prestart_summary_contacts_backend": summary[
+            "backend_port_prestart_summary_contacts_backend"
+        ],
+        "backend_port_prestart_summary_contacts_wing": summary[
+            "backend_port_prestart_summary_contacts_wing"
+        ],
+        "backend_port_prestart_summary_mutates_console_state": summary[
+            "backend_port_prestart_summary_mutates_console_state"
+        ],
+        "backend_port_prestart_summary_queries_console": summary[
+            "backend_port_prestart_summary_queries_console"
+        ],
+        "backend_port_prestart_summary_executes_tests": summary[
+            "backend_port_prestart_summary_executes_tests"
+        ],
+        "backend_port_prestart_check_status": summary[
+            "backend_port_prestart_check_status"
+        ],
+        "artifact_manifest_verifier_must_pass_before_websocket": summary[
+            "artifact_manifest_verifier_must_pass_before_websocket"
+        ],
+        "artifact_manifest_verifier_passed_before_websocket": summary[
+            "artifact_manifest_verifier_passed_before_websocket"
+        ],
+        "artifact_manifest_verifier_websocket_opened_after_pass": False,
+        **{
+            field: summary[field]
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+        },
+        **{
+            field: summary[field]
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+        },
+        **{
+            field: summary[field]
+            for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+        },
+        "operator_required": True,
+        "manual_review_required_before_readiness_update": True,
+        "contacts_backend": False,
+        "queries_console": False,
+        "execution_allowed_by_plan": False,
+        "live_authority_granted": False,
+        "allowed_request_types": list(EXPECTED_PLAN_ALLOWED_REQUEST_TYPES),
+        "forbidden_request_types": list(EXPECTED_PLAN_FORBIDDEN_REQUEST_TYPES),
+        "request_id_policy": summary["request_id_policy"],
+        "expected_response_types_by_request_type": summary[
+            "expected_response_types_by_request_type"
+        ],
+        "request_sequence": _expected_wing_preflight_request_sequence(summary),
+        "expected_artifacts": _expected_wing_preflight_artifacts(
+            summary["artifact_root"]
+        ),
+        "fail_closed_conditions": list(EXPECTED_PLAN_FAIL_CLOSED_CONDITIONS),
+    }
+
+
+def _write_prestart_summary(path: Path) -> str:
+    payload = {
+        "type": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE,
+        "status": "passed",
+        "connection_policy": WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_CONNECTION_POLICY,
+        "read_only": True,
+        "live_write": False,
+        "contacts_backend": False,
+        "contacts_wing": False,
+        "mutates_console_state": False,
+        "queries_console": False,
+        "executes_tests": False,
+        "results": [
+            {
+                "name": "backend_port_free",
+                "status": "passed",
+                "detail": {
+                    "backend_port_prestart_check_failure_detail_fields": (
+                        PRESTART_BACKEND_PORT_CHECK_FAILURE_DETAIL_FIELDS
+                    ),
+                    "safe_to_stop_listener_by_gate": False,
+                    "live_authority_granted": False,
+                    **{
+                        field: False
+                        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_DETAIL_FIELDS
+                    },
+                    **{
+                        field: False
+                        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_PLAN_FIELDS
+                    },
+                    **{
+                        field: True
+                        for field in WING_READONLY_PREFLIGHT_PRESTART_BACKEND_CHECK_REQUIRED_FALSE_MATCH_FIELDS
+                    },
+                },
+            }
+        ],
+    }
+    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_wing_preflight_artifact(root: Path) -> Path:
+    summary = valid_wing_preflight_summary()
+    artifact_root = root / WING_READONLY_PREFLIGHT_CAPTURE_ARTIFACT_ROOT
+    run_dir = artifact_root / summary["run_id"]
+    run_dir.mkdir(parents=True)
+    summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+    events_path = run_dir / WING_READONLY_PREFLIGHT_EVENTS_ARTIFACT_NAME
+    expected_plan_path = run_dir / "expected_plan.json"
+    prestart_path = run_dir / "no_wing_prestart_summary.json"
+    summary["artifact_root"] = artifact_root.as_posix()
+    summary["summary_path"] = summary_path.as_posix()
+    summary["events_path"] = events_path.as_posix()
+    summary["expected_plan_path"] = expected_plan_path.as_posix()
+    summary["backend_port_prestart_summary_path"] = prestart_path.as_posix()
+    summary["backend_port_prestart_summary_sha256"] = _write_prestart_summary(
+        prestart_path
+    )
+    expected_plan = _valid_wing_preflight_expected_plan(summary)
+    expected_plan_path.write_text(
+        json.dumps(expected_plan, sort_keys=True),
+        encoding="utf-8",
+    )
+    summary["expected_plan_sha256"] = hashlib.sha256(
+        expected_plan_path.read_bytes()
+    ).hexdigest()
+    events_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in _valid_wing_preflight_events(summary)),
+        encoding="utf-8",
+    )
+    summary_path.write_text(json.dumps(summary, sort_keys=True), encoding="utf-8")
+    return summary_path
+
+
+def patch_report_tool_wing_preflight_candidate(monkeypatch, tmp_path: Path) -> dict:
+    summary_path = _write_wing_preflight_artifact(tmp_path / "wing_preflight")
     evidence = build_wing_readonly_preflight_evidence(
-        artifact_payloads=(valid_wing_preflight_summary(),),
+        artifact_paths=(summary_path,),
         artifact_roots=(),
     )
     monkeypatch.setattr(
@@ -448,7 +764,7 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(
     tmp_path: Path,
     monkeypatch,
 ):
-    patch_report_tool_wing_preflight_candidate(monkeypatch)
+    patch_report_tool_wing_preflight_candidate(monkeypatch, tmp_path)
     write_summary(tmp_path / "physical", physical_summary())
     write_summary(tmp_path / "legacy", legacy_execute_wing_summary())
     output_path = tmp_path / "report.json"
@@ -607,7 +923,7 @@ def test_timeout_artifacts_remain_blocked_through_report_and_promotion_evidence(
     tmp_path: Path,
     monkeypatch,
 ):
-    patch_report_tool_wing_preflight_candidate(monkeypatch)
+    patch_report_tool_wing_preflight_candidate(monkeypatch, tmp_path)
     write_summary(tmp_path / "timeout_after_apply", timeout_after_apply_summary())
     write_summary(tmp_path / "timeout_before_apply", timeout_before_apply_summary())
     output_path = tmp_path / "report.json"
