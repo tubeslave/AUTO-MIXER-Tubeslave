@@ -5,6 +5,7 @@ import numpy as np
 from backend.smart_dsp_evidence_extractor import (
     SMART_DSP_EVIDENCE_EXTRACTOR_VERSION,
     analyze_smart_dsp_audio,
+    build_current_wing_state_from_readonly_preflight,
     build_smart_dsp_analysis_input_from_audio,
     extract_smart_dsp_audio_evidence,
 )
@@ -20,6 +21,8 @@ from backend.smart_dsp_strategy_engine import (
     WING_FX_LEVEL_OPERATOR_OWNED_BLOCKER,
     WING_FX_OPERATOR_OWNED_MODEL_BLOCKER,
     WING_GAIN_OPERATOR_OWNED_BLOCKER,
+    WING_GATE_REQUIRED_MODEL,
+    WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER,
     WING_GATE_SLOT_OPERATOR_OWNED_MODEL_BLOCKER,
     analyze_smart_dsp_strategy,
 )
@@ -854,6 +857,139 @@ def test_current_wing_state_operator_owned_eq_path_blocks_extracted_static_eq():
     assert static_hpf.future_wing_readback_contract["wing_osc_applicability"][
         "native_osc_supported"
     ] is False
+
+
+def test_readonly_preflight_gate_readback_reaches_smart_dsp_state():
+    wing_state = build_current_wing_state_from_readonly_preflight(
+        target_id="ch:3",
+        summary={
+            "run_id": "20260702T075151Z_wing_readonly_preflight",
+            "connection_mode": "wing",
+            "read_only": True,
+            "live_write": False,
+            "write_request_sent": False,
+            "proposal_request_sent": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "readbacks": [
+                {
+                    "type": "mixer_parameter_value",
+                    "request_id": "wing-readonly-preflight:ch3:gate_model",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "gate_model",
+                    "address": "/ch/3/gate/mdl",
+                    "value": "GATE",
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "request_id": "wing-readonly-preflight:ch3:gate_on",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "gate_on",
+                    "address": "/ch/3/gate/on",
+                    "value": 0,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "request_id": "wing-readonly-preflight:ch3:gate_threshold",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "gate_threshold",
+                    "address": "/ch/3/gate/thr",
+                    "value": -40.0,
+                },
+            ],
+        },
+    )
+
+    assert wing_state["current_wing_gate_model"] == WING_GATE_REQUIRED_MODEL
+    assert wing_state["current_wing_gate_enabled"] is False
+    assert wing_state["current_wing_gate_slot_readback_available"] is True
+    assert wing_state["wing_readonly_gate_threshold_dbfs"] == -40.0
+    assert wing_state["current_wing_state_live_authority_granted"] is False
+
+    duration_sec = 3.0
+    time = np.arange(int(SR * duration_sec), dtype=np.float64) / SR
+    samples = (
+        0.055 * np.sin(2.0 * np.pi * 220.0 * time)
+        + 0.05 * np.sin(2.0 * np.pi * 1350.0 * time)
+        + 0.055 * np.sin(2.0 * np.pi * 3200.0 * time)
+    )
+    for start_sec in (0.35, 1.05, 1.75, 2.45):
+        start = int(start_sec * SR)
+        length = int(0.07 * SR)
+        local_time = np.arange(length, dtype=np.float64) / SR
+        envelope = np.exp(-np.linspace(0.0, 8.0, length))
+        burst = np.sin(2.0 * np.pi * 82.0 * local_time)
+        samples[start : start + length] += 0.35 * envelope * burst
+
+    analysis = build_smart_dsp_analysis_input_from_audio(
+        np.clip(samples, -0.95, 0.95),
+        target_id="ch:3",
+        source_role="lead_vocal",
+        source_label="Lead Vox",
+        sample_rate=SR,
+        source_identity_confirmed=True,
+        source_identity_confidence=0.91,
+        current_state_cache_freshness=_fresh(),
+        current_state_readback_available=True,
+        rollback_plan_available=True,
+        current_wing_state=wing_state,
+    )
+    recommendation = analyze_smart_dsp_strategy(analysis)
+    candidates = {
+        candidate.strategy_id: candidate
+        for candidate in (recommendation.selected_strategy, *recommendation.alternatives)
+    }
+    dynamic_hpf = candidates["vocal_plosive_dynamic_hpf_control"]
+
+    assert analysis.current_wing_gate_model == WING_GATE_REQUIRED_MODEL
+    assert analysis.current_wing_gate_enabled is False
+    assert analysis.current_wing_gate_slot_readback_available is True
+    assert dynamic_hpf.blockers == (WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER,)
+    assert dynamic_hpf.parameters["wing_gate_slot_current_model"] == (
+        WING_GATE_REQUIRED_MODEL
+    )
+    assert dynamic_hpf.parameters["wing_gate_slot_current_enabled"] is False
+    assert dynamic_hpf.future_wing_readback_contract["wing_osc_applicability"][
+        "native_osc_supported"
+    ] is False
+
+
+def test_readonly_preflight_state_fails_closed_on_unsafe_artifact_flags():
+    wing_state = build_current_wing_state_from_readonly_preflight(
+        target_id="ch:3",
+        summary={
+            "run_id": "unsafe_wing_readonly_preflight",
+            "read_only": False,
+            "live_write": True,
+            "write_request_sent": True,
+            "proposal_request_sent": True,
+            "live_authority_granted": True,
+            "readiness_closure_allowed": True,
+            "readbacks": [
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "gate_model",
+                    "address": "/ch/3/gate/mdl",
+                    "value": "DEQ",
+                }
+            ],
+        },
+    )
+
+    assert wing_state["current_wing_state_rejected"] is True
+    assert "read_only_not_true" in wing_state["current_wing_state_violations"]
+    assert "live_write_not_false" in wing_state["current_wing_state_violations"]
+    assert "current_wing_gate_model" not in wing_state
+    assert wing_state["current_wing_state_live_authority_granted"] is False
 
 
 def test_current_wing_state_operator_owned_gate_path_blocks_extracted_dynamic_hpf():

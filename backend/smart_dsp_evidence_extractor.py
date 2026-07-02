@@ -8,7 +8,9 @@ the proposal-only smart DSP selector.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import json
 import math
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
@@ -54,6 +56,9 @@ except ImportError:  # pragma: no cover - package import compatibility
 
 
 SMART_DSP_EVIDENCE_EXTRACTOR_VERSION = "smart_dsp_audio_evidence_extractor_v1"
+SMART_DSP_WING_READONLY_PREFLIGHT_STATE_METHOD_ID = (
+    "smart_dsp_wing_readonly_preflight_current_state"
+)
 DEFAULT_SAMPLE_RATE = 48000
 EPSILON = 1e-12
 
@@ -168,6 +173,217 @@ def _resolve_string_state(
         return str(explicit)
     resolved = _mapping_first_present(state, keys)
     return "" if resolved is None else str(resolved)
+
+
+def _json_object_from_path(path: str | Path) -> Mapping[str, Any]:
+    with Path(path).open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    return payload if isinstance(payload, Mapping) else {}
+
+
+def _jsonl_objects_from_path(path: str | Path) -> Tuple[Mapping[str, Any], ...]:
+    rows: List[Mapping[str, Any]] = []
+    with Path(path).open("r", encoding="utf-8") as handle:
+        for line in handle:
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, Mapping):
+                rows.append(payload)
+    return tuple(rows)
+
+
+def _readonly_preflight_safety_violations(summary: Mapping[str, Any]) -> Tuple[str, ...]:
+    checks = (
+        ("read_only", True),
+        ("live_write", False),
+        ("write_request_sent", False),
+        ("proposal_request_sent", False),
+        ("live_authority_granted", False),
+        ("readiness_closure_allowed", False),
+    )
+    violations: List[str] = []
+    for key, expected in checks:
+        if key in summary and summary.get(key) is not expected:
+            violations.append(f"{key}_not_{str(expected).lower()}")
+    return tuple(violations)
+
+
+def _readonly_preflight_summary_readbacks(
+    summary: Optional[Mapping[str, Any]],
+) -> Tuple[Mapping[str, Any], ...]:
+    if not isinstance(summary, Mapping):
+        return ()
+    readbacks = summary.get("readbacks")
+    if not isinstance(readbacks, list):
+        return ()
+    return tuple(row for row in readbacks if isinstance(row, Mapping))
+
+
+def _readonly_preflight_event_readbacks(
+    events: Optional[Iterable[Mapping[str, Any]]],
+) -> Tuple[Mapping[str, Any], ...]:
+    if events is None:
+        return ()
+    readbacks: List[Mapping[str, Any]] = []
+    for event in events:
+        if not isinstance(event, Mapping) or event.get("event_type") != "recv":
+            continue
+        payload = event.get("payload")
+        if isinstance(payload, Mapping) and payload.get("type") == "mixer_parameter_value":
+            readbacks.append(payload)
+    return tuple(readbacks)
+
+
+def _physical_readonly_readbacks(
+    readbacks: Iterable[Mapping[str, Any]],
+) -> Tuple[Mapping[str, Any], ...]:
+    rows: List[Mapping[str, Any]] = []
+    for row in readbacks:
+        if row.get("type") != "mixer_parameter_value":
+            continue
+        if row.get("source") != "physical_readback":
+            continue
+        if row.get("status") != "verified_from_physical_readback":
+            continue
+        rows.append(row)
+    return tuple(rows)
+
+
+def _target_channel_from_target_id(target_id: str) -> Optional[int]:
+    token = str(target_id or "").strip().lower().replace("/", ":")
+    parts = [part for part in token.split(":") if part]
+    if len(parts) >= 2 and parts[0] in {"ch", "channel"}:
+        try:
+            channel = int(parts[1])
+        except ValueError:
+            return None
+        return channel if channel > 0 else None
+    return None
+
+
+def _readback_channel(row: Mapping[str, Any]) -> Optional[int]:
+    channel = row.get("channel")
+    try:
+        numeric = int(channel)
+    except (TypeError, ValueError):
+        return None
+    return numeric if numeric > 0 else None
+
+
+def _readback_bool(value: Any) -> Optional[bool]:
+    return _bool_or_none(value)
+
+
+def _readback_float(value: Any) -> Optional[float]:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) else None
+
+
+def build_current_wing_state_from_readonly_preflight(
+    *,
+    summary: Optional[Mapping[str, Any]] = None,
+    events: Optional[Iterable[Mapping[str, Any]]] = None,
+    summary_path: str | Path | None = None,
+    events_path: str | Path | None = None,
+    target_id: str = "",
+) -> Dict[str, Any]:
+    """Build SmartDSP ``current_wing_state`` from read-only preflight artifacts.
+
+    The function only consumes already captured JSON/JSONL artifacts. It never
+    opens a mixer connection, never queries WING, and never grants live apply.
+    Unsafe artifact flags fail closed by returning metadata without DSP state.
+    """
+
+    loaded_summary = dict(summary or {})
+    if summary_path is not None:
+        loaded_summary.update(_json_object_from_path(summary_path))
+    loaded_events: Tuple[Mapping[str, Any], ...] = tuple(events or ())
+    if events_path is not None:
+        loaded_events = (*loaded_events, *_jsonl_objects_from_path(events_path))
+
+    violations = list(_readonly_preflight_safety_violations(loaded_summary))
+    state: Dict[str, Any] = {
+        "method_id": SMART_DSP_WING_READONLY_PREFLIGHT_STATE_METHOD_ID,
+        "current_wing_state_source": "wing_readonly_preflight_artifact",
+        "current_wing_state_read_only": True,
+        "current_wing_state_live_write": False,
+        "current_wing_state_live_authority_granted": False,
+        "current_wing_state_readiness_closure_allowed": False,
+        "current_wing_state_run_id": str(loaded_summary.get("run_id") or ""),
+        "current_wing_state_connection_mode": str(
+            loaded_summary.get("connection_mode") or ""
+        ),
+        "current_wing_state_target_id": str(target_id or ""),
+        "current_wing_state_violations": violations,
+        "current_wing_state_readback_available": False,
+        "current_wing_state_readback_count": 0,
+        "current_wing_state_physical_readback_count": 0,
+        "current_wing_state_channels": [],
+        "current_wing_state_value_types": [],
+    }
+    if violations:
+        state["current_wing_state_rejected"] = True
+        return state
+
+    target_channel = _target_channel_from_target_id(target_id)
+    readbacks = (
+        *_readonly_preflight_summary_readbacks(loaded_summary),
+        *_readonly_preflight_event_readbacks(loaded_events),
+    )
+    physical_readbacks = _physical_readonly_readbacks(readbacks)
+    channels: List[int] = []
+    value_types: List[str] = []
+    raw_by_value_type: Dict[str, Any] = {}
+    for row in physical_readbacks:
+        channel = _readback_channel(row)
+        if target_channel is not None and channel != target_channel:
+            continue
+        value_type = str(row.get("value_type") or "").strip()
+        if not value_type:
+            continue
+        value = row.get("value")
+        if channel is not None:
+            channels.append(channel)
+        value_types.append(value_type)
+        raw_by_value_type[value_type] = value
+        if value_type == "gate_model":
+            state["current_wing_gate_model"] = str(value or "")
+            state["current_wing_gate_slot_readback_available"] = True
+        elif value_type == "gate_on":
+            state["current_wing_gate_enabled"] = _readback_bool(value)
+            state["current_wing_gate_slot_readback_available"] = True
+        elif value_type == "gate_threshold":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["wing_readonly_gate_threshold_dbfs"] = round(numeric, 3)
+        elif value_type == "gate_ratio":
+            state["wing_readonly_gate_ratio"] = str(value or "")
+        elif value_type == "gate_attack":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["wing_readonly_gate_attack_ms"] = round(numeric, 3)
+        elif value_type == "gate_release":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["wing_readonly_gate_release_ms"] = round(numeric, 3)
+
+    state["current_wing_state_readback_count"] = len(readbacks)
+    state["current_wing_state_physical_readback_count"] = len(physical_readbacks)
+    state["current_wing_state_channels"] = sorted(set(channels))
+    state["current_wing_state_value_types"] = list(_ordered_unique(value_types))
+    state["current_wing_state_raw_readback_by_value_type"] = raw_by_value_type
+    state["current_wing_state_readback_available"] = bool(value_types)
+    if state.get("current_wing_gate_slot_readback_available") is True:
+        state["current_wing_state_gate_slot_readback_available"] = True
+    return state
 
 
 def _flatten_strings(value: Any) -> Tuple[str, ...]:
