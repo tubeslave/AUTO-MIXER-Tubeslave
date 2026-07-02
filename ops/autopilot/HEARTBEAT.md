@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T09:52:54Z
+Last heartbeat UTC: 2026-07-02T10:17:24Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -26,11 +26,22 @@ readback values through the existing backend session, with no proposal request,
 no write request, no live authority and no readiness closure. It is not a
 canonical readiness candidate because its artifact root is under `/tmp`, not
 `artifacts/wing_readonly_preflight`.
+Latest blocker truth sync: `ops/autopilot/BLOCKERS.md` now reflects that
+supporting real WING read-only evidence exists, while canonical readiness still
+waits for accepted or rejected operator decisions for the four unreviewed
+source ids. Targeted WING MVP blocker rails passed with `2 passed`.
 Current targeted surface-contract checks passed:
 `tests/test_supervised_wing_proof_plan.py` `186 passed`, selected WING MVP
 rails `4 passed`, `py_compile` passed, JSON/JSONL validation passed, and
 `tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_surface_contract_20260702T0815Z`
 passed.
+Current SmartDSP weighted-score evidence checks passed:
+selected strategy-search/operator-explanation checks `2 passed`,
+`tests/test_smart_dsp_strategy_engine.py` `248 passed`, `py_compile` passed,
+and full suite `4795 passed, 1 skipped, 1 warning`. SmartDSP now exposes
+mode-specific weighted score contributions for selected and alternative
+strategies in offline/dry-run evidence only; no WING live authority, readiness
+closure, queue import, or live write scope changed.
 Current runner artifact surface-contract checks passed:
 `tests/test_wing_operator_proposal_validation_runner.py` `21 passed`, and
 `py_compile tools/wing_operator_proposal_validation_runner.py` passed.
@@ -59,7 +70,7 @@ readiness candidates from `artifacts/wing_readonly_preflight`. See
 
 The latest real WING read-only candidate remains
 `candidate_ready_for_manual_review`. The decision ledger review remains blocked
-with `operator_review_required` because three unreviewed candidates still need
+with `operator_review_required` because four unreviewed candidates still need
 accepted or rejected operator decision records. The decision report now lists
 each source id, a suggested decision JSON path, and the exact template command.
 This is the intended fail-closed state before manual review.

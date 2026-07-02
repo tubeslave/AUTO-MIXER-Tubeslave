@@ -23,6 +23,30 @@ SMART_DSP_VERSION = "smart_dsp_strategy_engine_v1"
 SMART_DSP_OLD_VALUE_SOURCE = "offline_strategy_evidence_required_before_live_promotion"
 
 SUPPORTED_MODES = {"soundcheck", "live"}
+STRATEGY_SCORE_DIMENSIONS = (
+    "speed",
+    "precision",
+    "musical",
+    "safety",
+    "reversibility",
+    "operator_clarity",
+)
+SOUNDCHECK_STRATEGY_SCORE_WEIGHTS = {
+    "speed": 0.22,
+    "precision": 0.26,
+    "musical": 0.22,
+    "safety": 0.18,
+    "reversibility": 0.07,
+    "operator_clarity": 0.05,
+}
+LIVE_STRATEGY_SCORE_WEIGHTS = {
+    "speed": 0.14,
+    "precision": 0.2,
+    "musical": 0.18,
+    "safety": 0.32,
+    "reversibility": 0.1,
+    "operator_clarity": 0.06,
+}
 EVIDENCE_EXTRACTION_REQUIRED_COMPONENTS = (
     "source_identity",
     "musical_role",
@@ -1694,34 +1718,133 @@ def _candidate_score(
     blockers: Sequence[str],
 ) -> float:
     normalized = {
-        "speed": _clip01(scores.get("speed")),
-        "precision": _clip01(scores.get("precision")),
-        "musical": _clip01(scores.get("musical")),
-        "safety": _clip01(scores.get("safety")),
-        "reversibility": _clip01(scores.get("reversibility")),
-        "operator_clarity": _clip01(scores.get("operator_clarity")),
+        dimension: _clip01(scores.get(dimension))
+        for dimension in STRATEGY_SCORE_DIMENSIONS
     }
-    if mode == "live":
-        weights = {
-            "speed": 0.14,
-            "precision": 0.2,
-            "musical": 0.18,
-            "safety": 0.32,
-            "reversibility": 0.1,
-            "operator_clarity": 0.06,
-        }
-    else:
-        weights = {
-            "speed": 0.22,
-            "precision": 0.26,
-            "musical": 0.22,
-            "safety": 0.18,
-            "reversibility": 0.07,
-            "operator_clarity": 0.05,
-        }
+    weights = _strategy_score_weights(mode)
     score = sum(normalized[key] * weight for key, weight in weights.items())
     score -= min(len(blockers) * 0.18, 0.54)
     return round(_clip(score, 0.0, 1.0), 3)
+
+
+def _strategy_score_weights(mode: str) -> Dict[str, float]:
+    if normalize_mode(mode) == "live":
+        return dict(LIVE_STRATEGY_SCORE_WEIGHTS)
+    return dict(SOUNDCHECK_STRATEGY_SCORE_WEIGHTS)
+
+
+def _strategy_score_weight_priority(mode: str) -> List[str]:
+    weights = _strategy_score_weights(mode)
+    return sorted(weights, key=lambda dimension: weights[dimension], reverse=True)
+
+
+def _candidate_blocker_score_penalty(candidate: DSPStrategyCandidate) -> float:
+    return round(min(len(candidate.blockers) * 0.18, 0.54), 3)
+
+
+def _weighted_score_contributions(
+    candidate: DSPStrategyCandidate,
+    *,
+    mode: str,
+) -> List[Dict[str, Any]]:
+    weights = _strategy_score_weights(mode)
+    rows = [
+        {
+            "metric": dimension,
+            "score": round(_clip01(candidate.scores.get(dimension)), 3),
+            "weight": round(_safe_float(weights.get(dimension)), 3),
+            "weighted_contribution": round(
+                _clip01(candidate.scores.get(dimension))
+                * _safe_float(weights.get(dimension)),
+                3,
+            ),
+        }
+        for dimension in STRATEGY_SCORE_DIMENSIONS
+    ]
+    return sorted(
+        rows,
+        key=lambda item: (
+            item["weighted_contribution"],
+            item["score"],
+        ),
+        reverse=True,
+    )
+
+
+def _weighted_score_gap_rows(
+    selected: DSPStrategyCandidate,
+    alternative: DSPStrategyCandidate,
+    *,
+    mode: str,
+) -> List[Dict[str, Any]]:
+    selected_by_metric = {
+        item["metric"]: item for item in _weighted_score_contributions(selected, mode=mode)
+    }
+    alternative_by_metric = {
+        item["metric"]: item
+        for item in _weighted_score_contributions(alternative, mode=mode)
+    }
+    rows: List[Dict[str, Any]] = []
+    for dimension in STRATEGY_SCORE_DIMENSIONS:
+        selected_row = selected_by_metric[dimension]
+        alternative_row = alternative_by_metric[dimension]
+        contribution_delta = round(
+            selected_row["weighted_contribution"]
+            - alternative_row["weighted_contribution"],
+            3,
+        )
+        score_delta = round(selected_row["score"] - alternative_row["score"], 3)
+        if abs(contribution_delta) >= 0.01 or abs(score_delta) >= 0.05:
+            rows.append(
+                {
+                    "metric": dimension,
+                    "weight": selected_row["weight"],
+                    "selected_score": selected_row["score"],
+                    "alternative_score": alternative_row["score"],
+                    "score_delta": score_delta,
+                    "selected_weighted_contribution": selected_row[
+                        "weighted_contribution"
+                    ],
+                    "alternative_weighted_contribution": alternative_row[
+                        "weighted_contribution"
+                    ],
+                    "weighted_contribution_delta": contribution_delta,
+                }
+            )
+    return sorted(
+        rows,
+        key=lambda item: abs(item["weighted_contribution_delta"]),
+        reverse=True,
+    )
+
+
+def _weighted_score_summary(
+    candidate: DSPStrategyCandidate,
+    *,
+    mode: str,
+) -> Dict[str, Any]:
+    contributions = _weighted_score_contributions(candidate, mode=mode)
+    pre_blocker_score = round(
+        sum(item["weighted_contribution"] for item in contributions),
+        3,
+    )
+    penalty = _candidate_blocker_score_penalty(candidate)
+    return {
+        "mode": normalize_mode(mode),
+        "score_weight_profile": f"{normalize_mode(mode)}_weighted_strategy_search",
+        "weighted_score_before_blockers": pre_blocker_score,
+        "blocker_score_penalty": penalty,
+        "weighted_score_after_blockers": round(
+            _clip(pre_blocker_score - penalty, 0.0, 1.0),
+            3,
+        ),
+        "total_score": candidate.total_score,
+        "weighted_score_matches_total": (
+            round(_clip(pre_blocker_score - penalty, 0.0, 1.0), 3)
+            == candidate.total_score
+        ),
+        "weighted_score_contributions": contributions,
+    }
 
 
 def _rollback_expectation(method_family: str) -> Dict[str, Any]:
@@ -32423,6 +32546,7 @@ def _selected_strategy_rationale(
     alternatives: Sequence[DSPStrategyCandidate],
     blockers: Sequence[str],
     selection_policy: str,
+    mode: str,
 ) -> Dict[str, Any]:
     strongest_dimensions = sorted(
         (
@@ -32447,6 +32571,7 @@ def _selected_strategy_rationale(
         "global_blockers": list(blockers),
         "selection_policy": selection_policy,
         "strongest_score_dimensions": strongest_dimensions,
+        "weighted_score_summary": _weighted_score_summary(selected, mode=mode),
         "compared_alternative_count": len(alternatives),
         **_candidate_wing_osc_tradeoff_summary(selected),
     }
@@ -32458,6 +32583,7 @@ def _alternative_tradeoffs(
     alternatives: Sequence[DSPStrategyCandidate],
     blockers: Sequence[str],
     analysis: SmartDSPAnalysisInput,
+    mode: str,
 ) -> List[Dict[str, Any]]:
     return [
         {
@@ -32471,6 +32597,15 @@ def _alternative_tradeoffs(
                 3,
             ),
             "blockers": list(alternative.blockers),
+            "weighted_score_summary": _weighted_score_summary(
+                alternative,
+                mode=mode,
+            ),
+            "weighted_score_gaps": _weighted_score_gap_rows(
+                selected,
+                alternative,
+                mode=mode,
+            ),
             "why_not_selected": _why_alternative_lost(
                 selected=selected,
                 alternative=alternative,
@@ -32494,6 +32629,7 @@ def _operator_explanation_sections(
     tradeoffs: Sequence[Mapping[str, Any]],
     residual_risk: str,
     selection_policy: str,
+    mode: str,
 ) -> Dict[str, Any]:
     tradeoff_by_id = {str(item.get("strategy_id")): item for item in tradeoffs}
     selected_wing_osc_summary = _candidate_wing_osc_tradeoff_summary(selected)
@@ -32514,6 +32650,7 @@ def _operator_explanation_sections(
             selected_wing_osc_summary["wing_osc_live_authority_granted"]
         ),
     }
+    selected_weighted_score_summary = _weighted_score_summary(selected, mode=mode)
     parameter_review = {
         "proposed_parameters": dict(selected.parameters),
         "wing_osc_apply_parameter_values": dict(
@@ -32559,6 +32696,13 @@ def _operator_explanation_sections(
                     global_blockers=blockers,
                 ),
                 "score_gaps": list(tradeoff.get("score_gaps") or []),
+                "weighted_score_gaps": list(
+                    tradeoff.get("weighted_score_gaps") or []
+                ),
+                "weighted_score_summary": dict(
+                    tradeoff.get("weighted_score_summary")
+                    or _weighted_score_summary(alternative, mode=mode)
+                ),
                 **_candidate_wing_osc_tradeoff_summary(alternative),
             }
         )
@@ -32570,6 +32714,7 @@ def _operator_explanation_sections(
         "selection_policy": selection_policy,
         "why_this_processing": selected.reason,
         "why_selected": selected.reason,
+        "selected_weighted_score_summary": selected_weighted_score_summary,
         "selected_wing_osc_summary": dict(selected_wing_osc_summary),
         "selected_wing_osc_readback_summary": dict(
             selected_wing_osc_readback_summary
@@ -32626,14 +32771,8 @@ def _decision_engine_contract(
     selected_wing_osc_readback_summary = _candidate_wing_osc_readback_summary(
         selected
     )
-    scoring_dimensions = (
-        "speed",
-        "precision",
-        "musical",
-        "safety",
-        "reversibility",
-        "operator_clarity",
-    )
+    scoring_dimensions = STRATEGY_SCORE_DIMENSIONS
+    score_weights = _strategy_score_weights(mode)
     return {
         "contract_id": "smart_dsp_decision_engine_contract_v1",
         "method_id": SMART_DSP_METHOD_ID,
@@ -32775,7 +32914,15 @@ def _decision_engine_contract(
             "selected_processing_type": selected.method_family,
             "selection_policy": selection_policy,
             "scoring_dimensions": list(scoring_dimensions),
-            "score_weights_equal": True,
+            "score_weights": dict(score_weights),
+            "score_weight_priority": _strategy_score_weight_priority(mode),
+            "score_weight_profile": f"{mode}_weighted_strategy_search",
+            "score_weights_equal": False,
+            "mode_specific_score_weights": True,
+            "selected_weighted_score_summary": _weighted_score_summary(
+                selected,
+                mode=mode,
+            ),
             "alternatives_compared": [
                 {
                     "strategy_id": row.get("strategy_id"),
@@ -32783,6 +32930,8 @@ def _decision_engine_contract(
                     "status": row.get("status"),
                     "why_not_selected": row.get("why_not_selected"),
                     "score_delta_vs_selected": row.get("score_delta_vs_selected"),
+                    "weighted_score_summary": row.get("weighted_score_summary"),
+                    "weighted_score_gaps": row.get("weighted_score_gaps"),
                 }
                 for row in tradeoffs
             ],
@@ -33573,12 +33722,14 @@ def analyze_smart_dsp_strategy(
         alternatives=alternatives,
         blockers=all_blockers,
         selection_policy=selection_policy,
+        mode=mode,
     )
     alternative_tradeoffs = _alternative_tradeoffs(
         selected=selected,
         alternatives=alternatives,
         blockers=all_blockers,
         analysis=analysis,
+        mode=mode,
     )
     operator_explanation_sections = _operator_explanation_sections(
         selected=selected,
@@ -33587,6 +33738,7 @@ def analyze_smart_dsp_strategy(
         tradeoffs=alternative_tradeoffs,
         residual_risk=residual_risk,
         selection_policy=selection_policy,
+        mode=mode,
     )
     decision_engine_contract = _decision_engine_contract(
         analysis=analysis,

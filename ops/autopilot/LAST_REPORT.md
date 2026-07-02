@@ -7,10 +7,10 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The real WING Rack is reported connected
   and waiting for tests; the next proof still requires the intended backend/WING session and operator review plus accepted decision records before any supervised write proof.
-- Latest heartbeat: 2026-07-02T09:52:54Z.
+- Latest heartbeat: 2026-07-02T10:17:24Z.
 - Latest WING read-only candidate:
-  `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`.
-- Decision ledger status: `operator_review_required`; three unreviewed WING
+  `artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json`.
+- Decision ledger status: `operator_review_required`; four unreviewed WING
   read-only candidates still need accepted or rejected operator decision
   records.
 - Operator decision queue:
@@ -23,6 +23,11 @@
   request, no write request, no live authority and no readiness closure. It is
   supporting evidence only because the artifact root is under `/tmp`, not the
   canonical `artifacts/wing_readonly_preflight` readiness root.
+- Blocker truth sync:
+  `ops/autopilot/BLOCKERS.md` now records the supporting tmp capture without
+  treating it as readiness. Canonical readiness still waits for the four
+  operator decision records in
+  `Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md`.
 
 ## Что сделано
 
@@ -34,9 +39,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 
 - WING read-only decision handoff was refreshed for the latest real candidate:
   `Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md` now scopes the
-  artifact review to `20260702T075151Z_wing_readonly_preflight`. The decision
+  artifact review to `20260702T095758Z_wing_readonly_preflight`. The decision
   ledger report remains `blocked` / `operator_review_required` and now shows
-  an `Operator Decision Queue` for all three unreviewed candidate source ids.
+  an `Operator Decision Queue` for all four unreviewed candidate source ids.
   This is control-plane handoff evidence only; it creates no new WING/backend
   contact, live write, readiness closure, accepted hardware evidence or live
   authority.
@@ -46,6 +51,19 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   live authority. It is documented in
   `Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`, but it is not a readiness candidate because it is outside the
   canonical `artifacts/wing_readonly_preflight` root.
+
+- `ops/autopilot/BLOCKERS.md` was synchronized to the same truth boundary:
+  the blocker file no longer says real WING evidence is unavailable, but it
+  still blocks readiness, M002 intake and supervised writes until the four
+  canonical read-only candidates have accepted or rejected operator decisions.
+
+- SmartDSP strategy evidence now exposes mode-specific weighted score
+  contributions for selected and alternative strategies. Operator-facing
+  strategy search can show `score_weights`, `selected_weighted_score_summary`,
+  per-alternative `weighted_score_summary`, and `weighted_score_gaps`, so the
+  engine explains which criteria actually made a DSP strategy win. This is
+  offline/dry-run decision evidence only; it grants no WING live write, queue
+  import, readiness closure, or EQ/dynamics/FX/pan/master live authority.
 
 - The latest verified product/runtime baseline is now
   `22852a7e8 Ignore validate-only WING preflight traces`. The current

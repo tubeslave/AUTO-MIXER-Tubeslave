@@ -11,6 +11,7 @@ from backend.smart_dsp_strategy_engine import (
     LIVE_FX_MAX_PULLBACK_DB,
     LIVE_MAX_SINGLE_STEP_DB,
     LIVE_MIN_STEP_INTERVAL_MS,
+    LIVE_STRATEGY_SCORE_WEIGHTS,
     SOUNDCHECK_FX_MAX_BOOST_DB,
     SOUNDCHECK_FX_MAX_PULLBACK_DB,
     SOUNDCHECK_MASTER_MAX_LIFT_DB,
@@ -25,6 +26,7 @@ from backend.smart_dsp_strategy_engine import (
     SOUNDCHECK_DYNAMICS_MIN_HEADROOM_MARGIN_DB,
     SOUNDCHECK_EQ_MAX_BOOST_DB,
     SOUNDCHECK_EQ_MIN_HEADROOM_MARGIN_DB,
+    SOUNDCHECK_STRATEGY_SCORE_WEIGHTS,
     SOUNDCHECK_GATE_EXPANDER_MAX_HYSTERESIS_REVIEW_DB,
     SOUNDCHECK_GATE_EXPANDER_MAX_RANGE_DB,
     SOUNDCHECK_GATE_EXPANDER_MIN_HIT_BLEED_MARGIN_DB,
@@ -222,6 +224,40 @@ def _candidate_scores():
     }
 
 
+def _assert_weighted_score_summary(summary, *, mode, expected_total_score=None):
+    expected_weights = (
+        LIVE_STRATEGY_SCORE_WEIGHTS
+        if mode == "live"
+        else SOUNDCHECK_STRATEGY_SCORE_WEIGHTS
+    )
+    assert summary["mode"] == mode
+    assert summary["score_weight_profile"] == f"{mode}_weighted_strategy_search"
+    assert set(item["metric"] for item in summary["weighted_score_contributions"]) == (
+        set(expected_weights)
+    )
+    for item in summary["weighted_score_contributions"]:
+        assert item["weight"] == expected_weights[item["metric"]]
+        assert item["weighted_contribution"] == round(
+            item["score"] * item["weight"],
+            3,
+        )
+    expected_after_blockers = round(
+        max(
+            0.0,
+            min(
+                1.0,
+                summary["weighted_score_before_blockers"]
+                - summary["blocker_score_penalty"],
+            ),
+        ),
+        3,
+    )
+    assert summary["weighted_score_after_blockers"] == expected_after_blockers
+    assert summary["weighted_score_matches_total"] is True
+    if expected_total_score is not None:
+        assert summary["total_score"] == expected_total_score
+
+
 def _assert_proposal_denial(payload):
     assert payload["method_id"] == SMART_DSP_METHOD_ID
     assert payload["queue_action"] == "not_queueable_until_promoted"
@@ -244,6 +280,69 @@ def _assert_proposal_denial(payload):
     assert correction["future_wing_readback_contract"][
         "required_before_live_promotion"
     ] is True
+
+
+def test_strategy_score_weights_shift_between_soundcheck_and_live():
+    fast_precise = {
+        "speed": 0.98,
+        "precision": 0.95,
+        "musical": 0.95,
+        "safety": 0.55,
+        "reversibility": 0.55,
+        "operator_clarity": 0.84,
+    }
+    safer_reversible = {
+        "speed": 0.55,
+        "precision": 0.7,
+        "musical": 0.68,
+        "safety": 0.95,
+        "reversibility": 0.9,
+        "operator_clarity": 0.82,
+    }
+
+    soundcheck_fast = _make_candidate(
+        strategy_id="fast_precise_soundcheck_probe",
+        method_family="eq",
+        problem="weighting_probe",
+        parameters={},
+        scores=fast_precise,
+        reason="Probe fast precise scoring in soundcheck.",
+        operator_check="No mixer write; scoring probe only.",
+        analysis=_analysis(mode="soundcheck"),
+    )
+    soundcheck_safe = _make_candidate(
+        strategy_id="safe_reversible_soundcheck_probe",
+        method_family="eq",
+        problem="weighting_probe",
+        parameters={},
+        scores=safer_reversible,
+        reason="Probe safe reversible scoring in soundcheck.",
+        operator_check="No mixer write; scoring probe only.",
+        analysis=_analysis(mode="soundcheck"),
+    )
+    live_fast = _make_candidate(
+        strategy_id="fast_precise_live_probe",
+        method_family="eq",
+        problem="weighting_probe",
+        parameters={},
+        scores=fast_precise,
+        reason="Probe fast precise scoring in live mode.",
+        operator_check="No mixer write; scoring probe only.",
+        analysis=_analysis(mode="live"),
+    )
+    live_safe = _make_candidate(
+        strategy_id="safe_reversible_live_probe",
+        method_family="eq",
+        problem="weighting_probe",
+        parameters={},
+        scores=safer_reversible,
+        reason="Probe safe reversible scoring in live mode.",
+        operator_check="No mixer write; scoring probe only.",
+        analysis=_analysis(mode="live"),
+    )
+
+    assert soundcheck_fast.total_score > soundcheck_safe.total_score
+    assert live_safe.total_score > live_fast.total_score
 
 
 def _assert_common_readback_contract(contract):
@@ -4038,6 +4137,11 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
     ) in recommendation.operator_explanation
     search = recommendation.evidence["strategy_search"]
     assert search["selected_rationale"]["strategy_id"] == "low_mid_corrective_cut"
+    _assert_weighted_score_summary(
+        search["selected_rationale"]["weighted_score_summary"],
+        mode="soundcheck",
+        expected_total_score=recommendation.selected_strategy.total_score,
+    )
     _assert_tradeoff_wing_osc_summary(
         search["selected_rationale"],
         native_supported=True,
@@ -4047,6 +4151,12 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
     assert all(row["why_not_selected"] for row in search["alternative_tradeoffs"])
     for row in search["alternative_tradeoffs"]:
         _assert_tradeoff_wing_osc_summary(row)
+        _assert_weighted_score_summary(
+            row["weighted_score_summary"],
+            mode="soundcheck",
+            expected_total_score=row["total_score"],
+        )
+        assert row["weighted_score_gaps"]
 
     proposal = recommendation.to_operator_proposal()
     _assert_proposal_denial(proposal)
@@ -4141,6 +4251,13 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
     assert proposal["strategy_search_details"]["selected_rationale"][
         "strategy_id"
     ] == "low_mid_corrective_cut"
+    _assert_weighted_score_summary(
+        proposal["strategy_search_details"]["selected_rationale"][
+            "weighted_score_summary"
+        ],
+        mode="soundcheck",
+        expected_total_score=recommendation.selected_strategy.total_score,
+    )
     _assert_tradeoff_wing_osc_summary(
         proposal["strategy_search_details"]["selected_rationale"],
         native_supported=True,
@@ -4157,6 +4274,11 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
     assert sections["problem_found"] == "muddy"
     assert sections["selected_processing_type"] == "eq"
     assert sections["selected_strategy_id"] == "low_mid_corrective_cut"
+    _assert_weighted_score_summary(
+        sections["selected_weighted_score_summary"],
+        mode="soundcheck",
+        expected_total_score=recommendation.selected_strategy.total_score,
+    )
     _assert_tradeoff_wing_osc_summary(
         sections["selected_wing_osc_summary"],
         native_supported=True,
@@ -4184,6 +4306,12 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
     assert all(row["why_not_selected"] for row in sections["alternatives_worse"])
     for row in sections["alternatives_worse"]:
         _assert_tradeoff_wing_osc_summary(row)
+        _assert_weighted_score_summary(
+            row["weighted_score_summary"],
+            mode="soundcheck",
+            expected_total_score=row["total_score"],
+        )
+        assert row["weighted_score_gaps"]
     assert sections["remaining_risk"] == proposal["residual_risk"]
     assert sections["operator_verification"]
     assert sections["rollback_readback"]["required_before_live_promotion"] is True
@@ -4222,11 +4350,30 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
         "reversibility",
         "operator_clarity",
     ]
+    assert contract["strategy_search"]["score_weights"] == (
+        SOUNDCHECK_STRATEGY_SCORE_WEIGHTS
+    )
+    assert contract["strategy_search"]["score_weight_profile"] == (
+        "soundcheck_weighted_strategy_search"
+    )
+    assert contract["strategy_search"]["score_weights_equal"] is False
+    assert contract["strategy_search"]["mode_specific_score_weights"] is True
+    _assert_weighted_score_summary(
+        contract["strategy_search"]["selected_weighted_score_summary"],
+        mode="soundcheck",
+        expected_total_score=recommendation.selected_strategy.total_score,
+    )
     assert contract["strategy_search"]["alternatives_compared"]
     assert all(
         row["why_not_selected"]
         for row in contract["strategy_search"]["alternatives_compared"]
     )
+    for row in contract["strategy_search"]["alternatives_compared"]:
+        _assert_weighted_score_summary(
+            row["weighted_score_summary"],
+            mode="soundcheck",
+        )
+        assert row["weighted_score_gaps"]
     assert "gain_db" in contract["parameter_calculation"]["parameter_keys"]
     assert "wing_eq_band_operations" in contract["parameter_calculation"][
         "wing_osc_apply_parameter_keys"
@@ -15822,6 +15969,16 @@ def test_live_master_true_peak_overload_prefers_native_main_pullback_before_proc
     assert mode_policy["live_fx_max_pullback_db"] == LIVE_FX_MAX_PULLBACK_DB
     assert mode_policy["live_apply_allowed"] is False
     assert mode_policy["live_authority_granted"] is False
+    strategy_search = contract["strategy_search"]
+    assert strategy_search["score_weights"] == LIVE_STRATEGY_SCORE_WEIGHTS
+    assert strategy_search["score_weight_profile"] == "live_weighted_strategy_search"
+    assert strategy_search["score_weights_equal"] is False
+    assert strategy_search["mode_specific_score_weights"] is True
+    _assert_weighted_score_summary(
+        strategy_search["selected_weighted_score_summary"],
+        mode="live",
+        expected_total_score=recommendation.selected_strategy.total_score,
+    )
     parameter_contract = contract["parameter_calculation"]
     assert "master_true_peak_pullback_db" in parameter_contract["parameter_keys"]
     assert "trim_delta_db" in parameter_contract["parameter_keys"]

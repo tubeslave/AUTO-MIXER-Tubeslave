@@ -776,6 +776,10 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     assert gain[3] == "no live write"
 
     assert "real WING Rack read-only artifact" in blockers
+    assert "WING_REAL_HARDWARE_READONLY_20260702.md" in blockers
+    assert "temporary-root capture only" in blockers
+    assert "cannot close readiness" in blockers
+    assert "Real WING Rack hardware evidence is not available from this setup run" not in blockers
     assert "Control-plane docs/state can proceed without live hardware contact" in blockers
 
 
@@ -1116,11 +1120,11 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             "wing_readonly_preflight_latest_valid_candidate_source_id"
         ] == (
             "artifacts/wing_readonly_preflight/"
-            "20260702T075151Z_wing_readonly_preflight/summary.json"
+            "20260702T095758Z_wing_readonly_preflight/summary.json"
         )
         assert state["last_validation_summary"][
             "wing_readonly_preflight_unreviewed_candidate_count"
-        ] == 3
+        ] == 4
         assert state["last_validation_summary"][
             "wing_readonly_preflight_unreviewed_candidate_source_ids"
         ] == [
@@ -1130,6 +1134,8 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             "20260702T061111Z_wing_readonly_preflight/summary.json",
             "artifacts/wing_readonly_preflight/"
             "20260702T075151Z_wing_readonly_preflight/summary.json",
+            "artifacts/wing_readonly_preflight/"
+            "20260702T095758Z_wing_readonly_preflight/summary.json",
         ]
         assert state["last_validation_summary"][
             "wing_readonly_preflight_operator_decision_queue_report"
