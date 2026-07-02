@@ -13,7 +13,7 @@
   "last_validation_summary": {
     "status": "wing_test_proof_gate_prepared_waiting_operator_decisions",
     "hardware_evidence": false,
-    "product_runtime_changed": true,
+    "product_runtime_changed": false,
     "product_runtime_change_scope": "State is synchronized after verified runtime commit 22852a7e8. Runtime now blocks positive WING proof-direction moves even for operator-authored proof proposals and ignores validate-only/no-transport WING preflight traces when reviewing real read-only candidate roots. A real WING read-only tmp capture is recorded as supporting evidence only because it is outside the canonical readiness artifact root and has no accepted operator decision. The connected WING Rack is treated as available for supervised tests, with operator permission limited to necessary test actions inside the fader/gain-down proof flow after accepted read-only decisions. No unrestricted EQ, dynamics, FX, routing, master, scene, live or soundcheck authority is granted.",
     "pytest": "PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q: 4794 passed, 1 skipped, 1 warning",
     "latest_verified_product_runtime_commit": "22852a7e8 Ignore validate-only WING preflight traces",
