@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-07-02T08:22:59Z
+Generated: 2026-07-02T08:50:39Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `30712d4f2 Cover WING gate slot conflicts in replay evaluation`
+  `c21082c0d Extract WING basic control readbacks`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
 - Tracked/untracked worktree state: dirty before this setup, with many
@@ -56,7 +56,8 @@ Generated: 2026-07-02T08:22:59Z
   `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`,
   `ff8a70ff`, `2f8bb432`, `1ff17877`, `41a60af6`, `7de7bfe1`,
   `80e625a4`, `e8a38bc0`, `2cf226437`, `c058270a8`, `afd7ecb78`,
-  `0d4358132`, `4f703c1be`, and `30712d4f2`.
+  `0d4358132`, `4f703c1be`, `30712d4f2`, `2a8de72ac`,
+  `12a1ad7cc`, `e69ab53ca`, `f8134554c`, and `c21082c0d`.
 - The current HEAD now includes `c058270a8`, which adds read-only WING gate
   slot readbacks and an operator decision queue for all unreviewed read-only
   candidates, plus `afd7ecb78`, which binds future fader/gain proof steps to
@@ -68,7 +69,20 @@ Generated: 2026-07-02T08:22:59Z
   into runner summaries and proposals. `0d4358132` blocks WING dynamic-EQ
   gate-slot parameter apply when the real `gate/mdl` readback does not match
   the required processor model, and `30712d4f2` covers that fail-closed path in
-  replay evaluation.
+  replay evaluation. `2a8de72ac` builds SmartDSP `current_wing_state` directly
+  from already captured read-only WING preflight artifacts while preserving
+  no-live-authority and no-readiness-closure flags. `12a1ad7cc` keeps SmartDSP
+  readback state freshness fail-closed, and `e69ab53ca` makes
+  `apply_operator_proposal` reject WING proof proposals whose
+  `wing_surface`, `wing_address` or `proof_direction` contradict the
+  canonical fader/input-trim proof contract before any live write path is
+  called. `f8134554c` imports WING EQ/dynamics readbacks as read-only state
+  without treating those readbacks as verified processor-model proof.
+  `c21082c0d` also imports read-only fader, input-trim and pan readbacks into
+  SmartDSP current state and evidence, while keeping those values as analysis
+  context only: no WING live write, live authority or readiness closure is
+  granted, and `pan` remains outside the current WING deployment apply
+  boundary.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -1617,5 +1631,5 @@ Generated: 2026-07-02T08:22:59Z
 - Current WING Rack availability is UNKNOWN.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `30712d4f2` passed with
-  `4778 passed, 1 skipped, 1 warning`.
+- The latest verified full-suite run for `c21082c0d` passed with
+  `4786 passed, 1 skipped, 1 warning`.
