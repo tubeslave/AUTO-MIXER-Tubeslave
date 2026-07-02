@@ -478,6 +478,7 @@ def build_review_decision_template(
         "decision": "pending_operator_decision",
         "reviewed_by": "",
         "reviewed_at": "",
+        "required_edits": review_decision_template_required_edits(),
         "checklist_ids": list(REQUIRED_REVIEW_CHECKLIST_IDS),
     }
     template.update(

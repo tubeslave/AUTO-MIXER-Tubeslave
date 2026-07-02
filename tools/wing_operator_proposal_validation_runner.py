@@ -22,6 +22,22 @@ from typing import Any, Dict, Iterable, Optional
 
 import websockets
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_ROOT = REPO_ROOT / "backend"
+TOOLS_ROOT = REPO_ROOT / "tools"
+for import_path in (str(TOOLS_ROOT), str(REPO_ROOT), str(BACKEND_ROOT)):
+    if import_path not in sys.path:
+        sys.path.insert(0, import_path)
+
+try:
+    from review_wing_readonly_preflight_decisions import (  # type: ignore
+        ACCEPTED_DECISION_READY_STATUS,
+        build_decision_review_report,
+    )
+except Exception:  # pragma: no cover - fail closed when import is unavailable
+    ACCEPTED_DECISION_READY_STATUS = "accepted_decision_ready"
+    build_decision_review_report = None  # type: ignore[assignment]
+
 
 EXPECTED_PROPOSAL_EVENTS = {"operator_proposal_created"}
 EXPECTED_APPLY_EVENTS = {"operator_proposal_apply_result", "operator_proposal_apply_blocked"}
@@ -33,6 +49,8 @@ EXPECTED_ROLLBACK_EVENTS = {
 }
 EXPECTED_PARAMETER_EVENTS = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
+DEFAULT_PREFLIGHT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
+DEFAULT_PREFLIGHT_DECISION_ROOT = "artifacts/wing_readonly_preflight_review_decisions"
 
 
 def utc_stamp() -> str:
@@ -214,6 +232,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--artifact-root", default="artifacts/wing_telemetry", help="Artifact root directory")
     parser.add_argument("--approval-prefix", default="wing-proposal-validation", help="Approval id prefix")
     parser.add_argument("--reason", default="wing_operator_proposal_validation", help="Reason text sent to backend")
+    parser.add_argument(
+        "--preflight-artifact-root",
+        default=DEFAULT_PREFLIGHT_ARTIFACT_ROOT,
+        help="Read-only WING preflight artifact root used to gate --execute",
+    )
+    parser.add_argument(
+        "--preflight-decision-root",
+        default=DEFAULT_PREFLIGHT_DECISION_ROOT,
+        help="Operator decision root used to gate --execute",
+    )
+    parser.add_argument(
+        "--accepted-readonly-source-id",
+        help="Accepted read-only preflight summary.json source id required before --execute",
+    )
     return parser
 
 
@@ -235,6 +267,8 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
             return "--operator-confirm-value-type must match --value-type"
         if round(float(args.operator_confirm_delta_db), 3) != round(float(args.delta_db), 3):
             return "--operator-confirm-delta-db must match --delta-db"
+        if not args.accepted_readonly_source_id:
+            return "--accepted-readonly-source-id is required with --execute"
     if args.prove_emergency_stop and not args.execute:
         return "--prove-emergency-stop requires --execute"
     if args.prove_blocked_apply and not args.execute:
@@ -242,6 +276,75 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
     if args.rollback_delay_sec < 0.0 or args.rollback_delay_sec > 5.0:
         return "--rollback-delay-sec must be between 0 and 5 seconds"
     return None
+
+
+def build_preflight_decision_gate(args: argparse.Namespace) -> tuple[Dict[str, Any], Optional[str]]:
+    gate: Dict[str, Any] = {
+        "required_for_execute": True,
+        "artifact_root": args.preflight_artifact_root,
+        "decision_root": args.preflight_decision_root,
+        "expected_accepted_readonly_source_id": args.accepted_readonly_source_id,
+    }
+    if not args.execute:
+        gate.update({"status": "not_required_for_dry_run", "accepted": False})
+        return gate, None
+    if build_decision_review_report is None:
+        gate.update({"status": "unavailable", "accepted": False})
+        return gate, "preflight_decision_review_import_unavailable"
+
+    try:
+        report = build_decision_review_report(
+            artifact_roots=[args.preflight_artifact_root],
+            decision_roots=[args.preflight_decision_root],
+        )
+    except Exception as exc:
+        gate.update(
+            {
+                "status": "error",
+                "accepted": False,
+                "error": type(exc).__name__,
+                "message": str(exc),
+            }
+        )
+        return gate, "preflight_decision_review_unavailable"
+
+    accepted_source_ids = [
+        str(source_id)
+        for source_id in report.get("accepted_source_ids", [])
+        if source_id
+    ]
+    expected_source_id = str(args.accepted_readonly_source_id or "")
+    gate.update(
+        {
+            "status": report.get("status"),
+            "ledger_status": report.get("ledger_status"),
+            "accepted": report.get("status") == ACCEPTED_DECISION_READY_STATUS,
+            "accepted_source_ids": accepted_source_ids,
+            "accepted_record_count": report.get("accepted_record_count"),
+            "decision_record_count": report.get("decision_record_count"),
+            "invalid_record_count": report.get("invalid_record_count"),
+            "unreviewed_candidate_count": report.get("unreviewed_candidate_count"),
+            "manual_readiness_update_candidate_available": report.get(
+                "manual_readiness_update_candidate_available"
+            ),
+            "source_authority_denied": report.get("source_authority_denied"),
+            "live_authority_granted": report.get("live_authority_granted"),
+            "execution_allowed_by_decision": report.get("execution_allowed_by_decision"),
+            "next_required_action": report.get("next_required_action"),
+            "blocked_by": report.get("blocked_by", []),
+        }
+    )
+    if report.get("status") != ACCEPTED_DECISION_READY_STATUS:
+        return gate, "preflight_decision_review_not_accepted"
+    if expected_source_id not in accepted_source_ids:
+        return gate, "accepted_readonly_source_id_not_accepted"
+    if report.get("live_authority_granted") is True:
+        return gate, "preflight_decision_must_not_grant_live_authority"
+    if report.get("execution_allowed_by_decision") is True:
+        return gate, "preflight_decision_must_not_allow_execution_by_itself"
+    if report.get("source_authority_denied") is not True:
+        return gate, "preflight_decision_source_authority_not_denied"
+    return gate, None
 
 
 def build_proposal(
@@ -431,6 +534,8 @@ async def run(args: argparse.Namespace) -> int:
         "write_policy": "apply_operator_proposal_only",
         "physical_proof_requires_execute": True,
         "forbidden_messages": ["set_fader", "set_gain", "route_output", "load_snap", "save_snap"],
+        "preflight_decision_gate_required_for_execute": True,
+        "accepted_readonly_source_id": args.accepted_readonly_source_id,
     }
 
     if validation_error:
@@ -438,6 +543,23 @@ async def run(args: argparse.Namespace) -> int:
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 2
+
+    preflight_gate, preflight_gate_error = build_preflight_decision_gate(args)
+    summary["preflight_decision_gate"] = preflight_gate
+    if preflight_gate_error:
+        summary.update(
+            {
+                "status": "blocked",
+                "reason": preflight_gate_error,
+                "fail_closed": True,
+                "live_apply_request_sent": False,
+                "rollback_request_sent": False,
+                "sent_request_types": [],
+            }
+        )
+        recorder.write_summary(summary)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        return 13
 
     try:
         async with websockets.connect(args.url) as ws:

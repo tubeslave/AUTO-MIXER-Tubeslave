@@ -97,6 +97,12 @@
   "readiness_matrix_update_allowed_by_decision": false,
   "request_id_correlation_required": true,
   "request_id_policy": "required_for_every_query_mixer_parameter_response",
+  "required_edits": [
+    "set decision to accepted or rejected after manual review",
+    "set reviewed_by to the operator name",
+    "set reviewed_at to a UTC timestamp at or after artifact_captured_at",
+    "remove template_status or replace the generated pending marker before ledger acceptance"
+  ],
   "review_id": "review-wing-readonly-20260702T061111Z_wing_readonly_preflight",
   "reviewed_at": "",
   "reviewed_by": "",
@@ -105,7 +111,7 @@
   "safe_to_stop_listener_by_gate_matches_plan": true,
   "summary_path": "artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json",
   "summary_sha256": "102a70155ee24c86ee7dee242eb4fab7aef6cb17eed9048d1cb7112304d475bc",
-  "template_generated_at": "2026-07-02T06:56:43Z",
+  "template_generated_at": "2026-07-02T07:09:33Z",
   "template_status": "operator_must_replace_placeholders_before_ledger_acceptance",
   "value_types": [
     "eq_on",

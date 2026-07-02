@@ -17000,7 +17000,17 @@ def validate_wing_operator_proposal_runner_physical_readback_policy(
             "rollback_requires_physical_status": (
                 "rollback_readback_status not in PHYSICAL_READBACK_STATUSES"
             ),
+            "execute_requires_accepted_readonly_source": (
+                "--accepted-readonly-source-id is required with --execute"
+            ),
+            "execute_runs_preflight_decision_gate_before_backend": (
+                "preflight_decision_review_not_accepted"
+            ),
+            "preflight_decision_gate_denies_live_authority": (
+                "preflight_decision_must_not_grant_live_authority"
+            ),
             "summary_exposes_required_flag": '"physical_readback_required"',
+            "summary_exposes_preflight_decision_gate": '"preflight_decision_gate"',
             "cache_status_remains_dry_run_only": '"status": "verified_from_cache"',
         }
         for violation_id, marker in required_markers.items():

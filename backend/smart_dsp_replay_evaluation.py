@@ -85,6 +85,7 @@ try:
         WING_DYNAMIC_EQ_RELEASE_MIN_MS,
         WING_DYNAMIC_EQ_THRESHOLD_MAX_DB,
         WING_DYNAMIC_EQ_THRESHOLD_MIN_DB,
+        WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER,
         WING_DYNAMIC_EQ_WRITE_KEY_SELECTION_POLICY,
         WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS,
         WING_COMPRESSOR_ATTACK_MAX_MS,
@@ -291,6 +292,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         WING_DYNAMIC_EQ_RELEASE_MIN_MS,
         WING_DYNAMIC_EQ_THRESHOLD_MAX_DB,
         WING_DYNAMIC_EQ_THRESHOLD_MIN_DB,
+        WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER,
         WING_DYNAMIC_EQ_WRITE_KEY_SELECTION_POLICY,
         WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS,
         WING_COMPRESSOR_ATTACK_MAX_MS,
@@ -7036,33 +7038,62 @@ def build_default_smart_dsp_replay_scenarios() -> Tuple[SmartDSPReplayScenario, 
                 masking_conflict_role="kick",
                 masking_conflict_target_id="ch:1",
                 masking_frequency_hz=74.0,
-                masking_score=0.92,
+                masking_score=0.94,
                 masking_bandwidth_hz=28.0,
-                masking_overlap_peak_share=0.42,
+                masking_overlap_peak_share=0.48,
+                arrangement_overlap_score=0.12,
+                transient_strength=0.82,
+                transient_rise_time_ms=7.0,
+                dynamics_peak_to_median_db=16.0,
                 rms_dbfs=-23.0,
                 estimated_lufs=-24.0,
                 true_peak_headroom_db=6.0,
             ),
-            expected_status="proposal_only",
-            expected_selected_strategy_id="kick_bass_pocket_eq_split",
-            expected_method_family="eq",
+            expected_status="analysis_only",
+            expected_selected_strategy_id="kick_bass_dynamic_pocket_ducking",
+            expected_method_family="dynamic_eq",
             min_candidate_count=3,
-            min_selected_total_score=0.84,
+            min_selected_total_score=0.68,
             required_selected_parameter_keys=(
                 "relationship",
                 "target_role",
-                "counterpart_role",
+                "sidechain_role",
                 "frequency_hz",
-                "target_cut_db",
-                "counterpart_cut_db",
-                "gain_db",
-                "q",
+                "dynamic_eq_frequency_hz",
+                "bandwidth_q",
+                "dynamic_eq_q",
+                "max_gain_reduction_db",
+                "dynamic_eq_max_gain_reduction_db",
+                "threshold_dbfs",
+                "dynamic_eq_threshold_dbfs",
+                "dynamic_eq_ratio",
+                "dynamic_eq_filter_type",
+                "attack_ms",
+                "dynamic_eq_attack_ms",
+                "release_ms",
+                "dynamic_eq_release_ms",
                 "requires_pair_readback",
+                "soundcheck_dynamic_ducking_priority_ready",
+                "soundcheck_dynamic_ducking_review_only",
+                "static_eq_native_fallback_strategy_id",
+                "transient_masking_score",
+                "wing_dynamic_eq_external_key_review_only",
+                "wing_dynamic_eq_external_key_source_target_id",
+                "wing_dynamic_eq_external_key_candidate_source_alias",
+                "wing_dynamic_eq_external_key_concrete_source_available",
+                "wing_dynamic_eq_external_key_verified_osc_mapping_available",
+                "wing_dynamic_eq_external_key_apply_blocked_even_with_concrete_source",
             ),
             expected_candidate_blockers={
                 "kick_bass_dynamic_pocket_ducking": (
                     "wing_dynamic_eq_value_mapping_required",
                 )
+            },
+            expected_alternative_tradeoff_reasons={
+                "kick_bass_pocket_eq_split": (
+                    "kick_bass_dynamic_ducking_priority",
+                    "more_precise_than_static_eq_review_only",
+                ),
             },
             expected_candidate_parameter_keys={
                 "kick_bass_dynamic_pocket_ducking": (
@@ -12652,6 +12683,59 @@ def _selected_write_key_contract_failures(
     return failures
 
 
+def _external_key_dynamic_eq_review_only_selected(
+    *,
+    method_family: str,
+    parameters: Mapping[str, Any],
+    dynamic_eq_contract: Mapping[str, Any],
+    wing_osc_applicability: Mapping[str, Any],
+    selected_blockers: Iterable[Any],
+) -> bool:
+    blocker_set = {str(blocker) for blocker in selected_blockers}
+    dynamic_eq_value_mapping = dynamic_eq_contract.get("wing_dynamic_eq_value_mapping")
+    if not isinstance(dynamic_eq_value_mapping, Mapping):
+        dynamic_eq_value_mapping = {}
+    selected_write_keys = parameters.get("wing_dynamic_eq_selected_write_keys")
+    contract_selected_write_keys = dynamic_eq_contract.get(
+        "wing_dynamic_eq_selected_write_keys"
+    )
+    direct_apply_keys = wing_osc_applicability.get("direct_apply_parameter_keys") or []
+    actionable_keys = wing_osc_applicability.get("actionable_parameter_keys") or []
+    empty_write_fields = {
+        "wing_dynamic_eq_apply_only_selected_write_keys",
+        "wing_dynamic_eq_forbidden_write_keys",
+        "wing_dynamic_eq_write_key_selection_policy",
+    }
+
+    return (
+        method_family == "dynamic_eq"
+        and WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER in blocker_set
+        and parameters.get("soundcheck_dynamic_ducking_review_only") is True
+        and parameters.get("wing_dynamic_eq_external_key_review_only") is True
+        and dynamic_eq_value_mapping.get("wing_dynamic_eq_external_key_review_only")
+        is True
+        and parameters.get("wing_dynamic_eq_value_mapping_supported") is False
+        and dynamic_eq_contract.get("wing_dynamic_eq_value_mapping_supported") is False
+        and wing_osc_applicability.get("native_osc_supported") is False
+        and wing_osc_applicability.get("has_actionable_parameter_value") is False
+        and wing_osc_applicability.get("has_direct_apply_parameter_value") is False
+        and not actionable_keys
+        and not direct_apply_keys
+        and selected_write_keys in (None, (), [])
+        and contract_selected_write_keys in (None, (), [])
+        and all(parameters.get(field) in (None, (), []) for field in empty_write_fields)
+        and all(
+            dynamic_eq_contract.get(field) in (None, (), [])
+            for field in empty_write_fields
+        )
+        and all(parameters.get(key) is None for key in WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS)
+        and all(
+            dynamic_eq_contract.get(key) is None
+            for key in WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS
+        )
+    )
+
+
 def _live_eq_conservative_guard_failures(
     *,
     parameters: Mapping[str, Any],
@@ -15972,6 +16056,18 @@ def _readback_contract_failures(
                 "detail": repr(wing_osc_applicability),
             }
         )
+    dynamic_eq_contract_for_applicability = (
+        contract.get("dynamic_eq_readback")
+        if isinstance(contract.get("dynamic_eq_readback"), Mapping)
+        else {}
+    )
+    external_key_dynamic_eq_review_only = _external_key_dynamic_eq_review_only_selected(
+        method_family=method_family,
+        parameters=parameters,
+        dynamic_eq_contract=dynamic_eq_contract_for_applicability,
+        wing_osc_applicability=wing_osc_applicability,
+        selected_blockers=selected_blockers,
+    )
     if method_family not in {"analysis", "analysis_only"} and not isinstance(
         wing_osc_applicability.get("native_osc_path_templates"),
         list,
@@ -15998,6 +16094,7 @@ def _readback_contract_failures(
         and wing_osc_applicability.get("native_osc_supported") is not True
         and not live_parameter_write_forbidden_review_only
         and not operator_owned_review_only
+        and not external_key_dynamic_eq_review_only
     ):
         failures.append(
             {
@@ -16044,6 +16141,7 @@ def _readback_contract_failures(
             not has_actionable
             and method_family not in {"analysis", "analysis_only"}
             and not live_parameter_write_forbidden_review_only
+            and not external_key_dynamic_eq_review_only
         ):
             failures.append(
                 {
@@ -16690,34 +16788,42 @@ def _readback_contract_failures(
             )
     dynamic_eq_contract = contract.get("dynamic_eq_readback") or {}
     if dynamic_eq_like and isinstance(dynamic_eq_contract, Mapping):
-        failures.extend(
-            _selected_write_key_contract_failures(
-                parameters=parameters,
-                readback_contract=dynamic_eq_contract,
-                scenario_id=scenario_id,
-                family_label="dynamic_eq",
-                field_prefix="wing_dynamic_eq",
-                write_parameter_keys=WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS,
-                selection_policy=WING_DYNAMIC_EQ_WRITE_KEY_SELECTION_POLICY,
-            )
+        external_key_review_only = _external_key_dynamic_eq_review_only_selected(
+            method_family=method_family,
+            parameters=parameters,
+            dynamic_eq_contract=dynamic_eq_contract,
+            wing_osc_applicability=wing_osc_applicability,
+            selected_blockers=selected_blockers,
         )
-        failures.extend(
-            _selected_parameter_rollback_operation_failures(
-                parameters=parameters,
-                readback_contract=dynamic_eq_contract,
-                scenario_id=scenario_id,
-                code_prefix="readback_contract",
-                selected_write_keys_field="wing_dynamic_eq_selected_write_keys",
-                operations_field=(
-                    "wing_dynamic_eq_selected_parameter_rollback_operations"
-                ),
-                contract_marker_field="fw305_selected_parameter_rollback_contract",
-                expected_contract_marker=(
-                    "read_previous_dynamic_eq_value_before_write_then_"
-                    "restore_same_path"
-                ),
+        if not external_key_review_only:
+            failures.extend(
+                _selected_write_key_contract_failures(
+                    parameters=parameters,
+                    readback_contract=dynamic_eq_contract,
+                    scenario_id=scenario_id,
+                    family_label="dynamic_eq",
+                    field_prefix="wing_dynamic_eq",
+                    write_parameter_keys=WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS,
+                    selection_policy=WING_DYNAMIC_EQ_WRITE_KEY_SELECTION_POLICY,
+                )
             )
-        )
+            failures.extend(
+                _selected_parameter_rollback_operation_failures(
+                    parameters=parameters,
+                    readback_contract=dynamic_eq_contract,
+                    scenario_id=scenario_id,
+                    code_prefix="readback_contract",
+                    selected_write_keys_field="wing_dynamic_eq_selected_write_keys",
+                    operations_field=(
+                        "wing_dynamic_eq_selected_parameter_rollback_operations"
+                    ),
+                    contract_marker_field="fw305_selected_parameter_rollback_contract",
+                    expected_contract_marker=(
+                        "read_previous_dynamic_eq_value_before_write_then_"
+                        "restore_same_path"
+                    ),
+                )
+            )
         failures.extend(
             _gate_slot_model_precondition_failures(
                 parameters=parameters,
@@ -16740,6 +16846,93 @@ def _readback_contract_failures(
             "gate/q",
             "gate/mode",
         }
+        if external_key_review_only:
+            for field in (
+                "wing_dynamic_eq_mapping_required",
+                "wing_dynamic_eq_value_mapping_supported",
+            ):
+                expected = (
+                    True
+                    if field == "wing_dynamic_eq_mapping_required"
+                    else False
+                )
+                if (
+                    parameters.get(field) is not expected
+                    or dynamic_eq_contract.get(field) is not expected
+                ):
+                    failures.append(
+                        {
+                            "code": (
+                                f"{scenario_id}_selected_dynamic_eq_review_only_"
+                                f"{field}_mismatch"
+                            ),
+                            "detail": repr(
+                                {
+                                    "parameters": parameters.get(field),
+                                    "contract": dynamic_eq_contract.get(field),
+                                    "expected": expected,
+                                }
+                            ),
+                        }
+                    )
+            if parameters.get("wing_dynamic_eq_mapping_blocker") != (
+                WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER
+            ):
+                failures.append(
+                    {
+                        "code": (
+                            f"{scenario_id}_selected_dynamic_eq_review_only_"
+                            "mapping_blocker_mismatch"
+                        ),
+                        "detail": repr(parameters.get("wing_dynamic_eq_mapping_blocker")),
+                    }
+                )
+            if (
+                dynamic_eq_contract.get("wing_dynamic_eq_model_osc_path_suffix")
+                != "gate/mdl"
+            ):
+                failures.append(
+                    {
+                        "code": (
+                            f"{scenario_id}_selected_dynamic_eq_review_only_"
+                            "model_path_mismatch"
+                        ),
+                        "detail": repr(
+                            dynamic_eq_contract.get(
+                                "wing_dynamic_eq_model_osc_path_suffix"
+                            )
+                        ),
+                    }
+                )
+            if dynamic_eq_contract.get("wing_dynamic_eq_model_readback_must_equal") != (
+                WING_DYNAMIC_EQ_GATE_MODEL
+            ):
+                failures.append(
+                    {
+                        "code": (
+                            f"{scenario_id}_readback_contract_dynamic_eq_review_only_"
+                            "model_mismatch"
+                        ),
+                        "detail": repr(dynamic_eq_contract),
+                    }
+                )
+            for readback_key in ("read_before_paths", "read_after_paths"):
+                path_values = {
+                    str(path)
+                    for path in dynamic_eq_contract.get(readback_key) or []
+                }
+                missing_paths = sorted(expected_dynamic_eq_paths - path_values)
+                if missing_paths:
+                    failures.append(
+                        {
+                            "code": (
+                                f"{scenario_id}_readback_contract_dynamic_eq_"
+                                f"review_only_{readback_key}_missing"
+                            ),
+                            "detail": repr(missing_paths),
+                        }
+                    )
+            return failures
         if parameters.get("wing_dynamic_eq_mapping_required") is not True:
             failures.append(
                 {
@@ -22497,6 +22690,31 @@ def _selected_wing_osc_applicability_violations(
         if wing_osc_applicability.get("native_osc_supported") is True:
             continue
         if _selected_operator_owned_review_only_wing_osc(result):
+            continue
+        parameters = result.get("selected_parameters")
+        if not isinstance(parameters, Mapping):
+            parameters = {}
+        dynamic_eq_contract = (
+            contract.get("dynamic_eq_readback")
+            if isinstance(contract, Mapping)
+            and isinstance(contract.get("dynamic_eq_readback"), Mapping)
+            else {}
+        )
+        candidate_blockers = result.get("candidate_blockers")
+        selected_strategy_id = str(result.get("actual_selected_strategy_id") or "")
+        selected_blockers: Iterable[Any] = ()
+        if isinstance(candidate_blockers, Mapping):
+            selected_blockers = candidate_blockers.get(selected_strategy_id) or ()
+        if (
+            result.get("actual_status") == "analysis_only"
+            and _external_key_dynamic_eq_review_only_selected(
+                method_family=method_family,
+                parameters=parameters,
+                dynamic_eq_contract=dynamic_eq_contract,
+                wing_osc_applicability=wing_osc_applicability,
+                selected_blockers=selected_blockers,
+            )
+        ):
             continue
         violations.append(
             {

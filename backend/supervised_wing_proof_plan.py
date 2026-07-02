@@ -207,6 +207,7 @@ class WingProofPlanStep:
             "--operator-confirm-value-type",
             "--delta-db",
             "--operator-confirm-delta-db",
+            "--accepted-readonly-source-id",
             "--execute",
             "--prove-blocked-apply",
             "--prove-emergency-stop",
@@ -226,6 +227,7 @@ class WingProofPlanStep:
             "--operator-confirm-value-type",
             "--delta-db",
             "--operator-confirm-delta-db",
+            "--accepted-readonly-source-id",
             "--rollback-delay-sec",
             "--artifact-root",
             "--reason",
@@ -287,6 +289,21 @@ class WingProofPlanStep:
         if not _is_artifacts_path(artifact_root):
             raise ValueError(
                 "Physical proof step artifact root must stay under artifacts"
+            )
+        accepted_readonly_source_id = _command_value(
+            command,
+            "--accepted-readonly-source-id",
+        )
+        if (
+            not accepted_readonly_source_id
+            or not _is_artifacts_path(accepted_readonly_source_id)
+            or not accepted_readonly_source_id.startswith(
+                "artifacts/wing_readonly_preflight/"
+            )
+            or not accepted_readonly_source_id.endswith("/summary.json")
+        ):
+            raise ValueError(
+                "Physical proof step command must bind an accepted read-only summary source id"
             )
         if _command_value(command, "--reason") != f"supervised_physical_{self.value_type}_proof":
             raise ValueError("Physical proof step command must bind supervised proof reason")
@@ -1291,6 +1308,7 @@ def _proof_command(
     *,
     backend_url: str,
     artifact_root: str,
+    accepted_readonly_source_id: str,
     channel: int,
     value_type: str,
     delta_db: float,
@@ -1312,6 +1330,8 @@ def _proof_command(
         value_type,
         "--operator-confirm-delta-db",
         f"{delta_db:.2f}",
+        "--accepted-readonly-source-id",
+        accepted_readonly_source_id,
         "--execute",
         "--prove-blocked-apply",
         "--prove-emergency-stop",
@@ -1463,6 +1483,7 @@ def _build_steps(
     *,
     backend_url: str,
     artifact_root: str,
+    accepted_readonly_source_id: str,
     channels_by_value_type: Mapping[str, Tuple[int, ...]],
     delta_db_by_value_type: Mapping[str, float],
 ) -> Tuple[WingProofPlanStep, ...]:
@@ -1489,6 +1510,7 @@ def _build_steps(
                     command=_proof_command(
                         backend_url=backend_url,
                         artifact_root=artifact_root,
+                        accepted_readonly_source_id=accepted_readonly_source_id,
                         channel=int(channel),
                         value_type=value_type,
                         delta_db=delta_db,
@@ -1699,6 +1721,7 @@ def build_supervised_wing_proof_plan(
             promotion_evidence_snapshot,
             backend_url=backend_url,
             artifact_root=artifact_root,
+            accepted_readonly_source_id=accepted_source_ids[0],
             channels_by_value_type=channels,
             delta_db_by_value_type=deltas,
         )

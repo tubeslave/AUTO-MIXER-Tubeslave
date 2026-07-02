@@ -155,6 +155,15 @@ VALUE_TYPE_ADDRESS_TEMPLATES = {
     "dyn_threshold": "/ch/{channel}/dyn/thr",
     "gate_on": "/ch/{channel}/gate/on",
     "gate_threshold": "/ch/{channel}/gate/thr",
+    "gate_model": "/ch/{channel}/gate/mdl",
+    "gate_ratio": "/ch/{channel}/gate/ratio",
+    "gate_attack": "/ch/{channel}/gate/att",
+    "gate_release": "/ch/{channel}/gate/rel",
+    "gate_filter": "/ch/{channel}/gate/filt",
+    "gate_gain": "/ch/{channel}/gate/g",
+    "gate_frequency": "/ch/{channel}/gate/f",
+    "gate_q": "/ch/{channel}/gate/q",
+    "gate_mode": "/ch/{channel}/gate/mode",
 }
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND

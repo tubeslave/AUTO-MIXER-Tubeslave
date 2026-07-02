@@ -112,6 +112,15 @@ WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = (
     "dyn_threshold",
     "gate_on",
     "gate_threshold",
+    "gate_model",
+    "gate_ratio",
+    "gate_attack",
+    "gate_release",
+    "gate_filter",
+    "gate_gain",
+    "gate_frequency",
+    "gate_q",
+    "gate_mode",
 )
 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = ",".join(
     WING_READONLY_PREFLIGHT_RUNNER_DEFAULT_VALUE_TYPES

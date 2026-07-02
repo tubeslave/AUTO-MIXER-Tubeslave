@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T06:58:04Z
+Last heartbeat UTC: 2026-07-02T07:10:30Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -24,8 +24,10 @@ accepted or rejected operator decision record yet.
 
 The pending template still has
 `template_status: operator_must_replace_placeholders_before_ledger_acceptance`
-and `decision: pending_operator_decision`. This is the intended fail-closed
-state before manual review.
+and `decision: pending_operator_decision`. It now also embeds a
+machine-readable `required_edits` list for the operator fields that must be
+changed before ledger acceptance. This is the intended fail-closed state before
+manual review.
 
 This heartbeat made no product/runtime
 change to live console authority. No WING/backend contact was made by this

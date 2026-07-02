@@ -42,10 +42,20 @@ dynamics on/threshold and gate on/threshold. Keep the runner default value
 types as `fader,gain,pan`. Do not grant live authority, readiness closure, or
 supervised apply from these readbacks.
 
+For smart-DSP DEQ/dynamic-EQ proof work, also add explicit opt-in read-only
+gate-slot value types for `gate/mdl`, `gate/ratio`, `gate/att`, `gate/rel`,
+`gate/filt`, `gate/g`, `gate/f`, `gate/q` and `gate/mode`. These aliases only
+prove that the connected console can return the current gate-slot/DEQ health
+state. They do not prove write mapping, external-key routing, staged rollback,
+or live-apply authority.
+
 ## Test plan
 
 Run focused WING read-only runner, server query and artifact review tests.
 Verify the no-WING gate still denies backend/WING contact and live authority.
+For gate-slot/DEQ aliases, add runner request-address tests and artifact-review
+tests that accept physical readbacks while keeping all write/proposal request
+flags false.
 
 ## Risks and rollback
 

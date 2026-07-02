@@ -72,6 +72,7 @@ from backend.smart_dsp_strategy_engine import (
     WING_DE_ESSER_WRITE_KEY_SELECTION_POLICY,
     WING_DE_ESSER_WRITE_PARAMETER_KEYS,
     WING_DYNAMIC_EQ_GATE_MODEL,
+    WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER,
     WING_DYNAMIC_EQ_WRITE_KEY_SELECTION_POLICY,
     WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS,
     WING_EQ_MIX_BASELINE_PERCENT,
@@ -7286,12 +7287,29 @@ def test_default_smart_dsp_replay_scenarios_pass_and_deny_authority():
     concrete_key_result = results[
         "soundcheck_kick_bass_concrete_external_key_stays_review_only"
     ]
+    assert concrete_key_result["actual_status"] == "analysis_only"
     assert concrete_key_result["actual_selected_strategy_id"] == (
+        "kick_bass_dynamic_pocket_ducking"
+    )
+    assert concrete_key_result["actual_method_family"] == "dynamic_eq"
+    assert concrete_key_result["operator_explanation_sections"][
+        "selection_policy"
+    ] == "soundcheck_kick_bass_dynamic_ducking_priority"
+    concrete_key_duck = concrete_key_result["selected_parameters"]
+    assert concrete_key_duck["frequency_hz"] == 74.0
+    assert concrete_key_duck["dynamic_eq_frequency_hz"] == 74.0
+    assert concrete_key_duck["bandwidth_q"] == 1.82
+    assert concrete_key_duck["dynamic_eq_q"] == 1.82
+    assert concrete_key_duck["dynamic_eq_filter_type"] == "dynamic_peaking"
+    assert concrete_key_duck["max_gain_reduction_db"] == 3.5
+    assert concrete_key_duck["dynamic_eq_max_gain_reduction_db"] == 3.5
+    assert concrete_key_duck["dynamic_eq_threshold_dbfs"] == -19.5
+    assert concrete_key_duck["soundcheck_dynamic_ducking_priority_ready"] is True
+    assert concrete_key_duck["soundcheck_dynamic_ducking_review_only"] is True
+    assert concrete_key_duck["static_eq_native_fallback_strategy_id"] == (
         "kick_bass_pocket_eq_split"
     )
-    concrete_key_duck = concrete_key_result["candidate_parameters"][
-        "kick_bass_dynamic_pocket_ducking"
-    ]
+    assert concrete_key_duck["transient_masking_score"] == 1.0
     assert concrete_key_duck["wing_dynamic_eq_external_key_source_target_id"] == "ch:1"
     assert (
         concrete_key_duck["wing_dynamic_eq_external_key_source_target_surface"]
@@ -7332,14 +7350,25 @@ def test_default_smart_dsp_replay_scenarios_pass_and_deny_authority():
         is True
     )
     concrete_key_duck_wing = concrete_key_result[
-        "candidate_future_wing_readback_contracts"
-    ]["kick_bass_dynamic_pocket_ducking"]["wing_osc_applicability"]
+        "selected_future_wing_readback_contract"
+    ]["wing_osc_applicability"]
     assert concrete_key_duck_wing["native_osc_supported"] is False
     assert concrete_key_duck_wing["native_osc_support_level"] == (
         "dynamic_eq_value_mapping_required"
     )
     assert concrete_key_duck_wing["unsupported_strategy_reason"] == (
         "dynamic_eq_sidechain_or_paired_ducking_requires_verified_wing_sidechain_mapping"
+    )
+    assert concrete_key_duck_wing["actionable_parameter_keys"] == []
+    assert concrete_key_duck_wing["direct_apply_parameter_keys"] == []
+    assert concrete_key_duck_wing["live_write"] is False
+    concrete_key_tradeoffs = {
+        row["strategy_id"]: row["why_not_selected"]
+        for row in concrete_key_result["alternative_tradeoffs"]
+    }
+    assert concrete_key_tradeoffs["kick_bass_pocket_eq_split"] == (
+        "kick_bass_dynamic_ducking_priority:concrete_counterpart_key_and_"
+        "transient_overlap_make_ducking_more_precise_than_static_eq_review_only"
     )
     assert concrete_key_result["proposal_authority"]["live_apply_allowed"] is False
     assert (
@@ -8742,9 +8771,29 @@ def test_default_smart_dsp_replay_scenarios_pass_and_deny_authority():
                 WING_PAN_WIDTH_OPERATOR_OWNED_BLOCKER,
             }
         )
+        external_key_dynamic_eq_review_only_selected = (
+            result["actual_status"] == "analysis_only"
+            and result["actual_method_family"] == "dynamic_eq"
+            and result["actual_selected_strategy_id"]
+            == "kick_bass_dynamic_pocket_ducking"
+            and selected_blockers == {WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER}
+            and result["selected_parameters"].get(
+                "wing_dynamic_eq_external_key_review_only"
+            )
+            is True
+            and result["selected_parameters"].get(
+                "wing_dynamic_eq_external_key_verified_osc_mapping_available"
+            )
+            is False
+        )
         if result["actual_method_family"] not in {"analysis", "analysis_only"}:
             assert wing_osc["native_osc_supported"] is (
-                False if operator_owned_review_only_selected else True
+                False
+                if (
+                    operator_owned_review_only_selected
+                    or external_key_dynamic_eq_review_only_selected
+                )
+                else True
             )
             assert isinstance(wing_osc["native_osc_path_templates"], list)
             assert wing_osc["native_osc_path_templates"]
@@ -8759,7 +8808,10 @@ def test_default_smart_dsp_replay_scenarios_pass_and_deny_authority():
         }
         expected_wing_native_supported = (
             False
-            if operator_owned_review_only_selected
+            if (
+                operator_owned_review_only_selected
+                or external_key_dynamic_eq_review_only_selected
+            )
             else True
             if require_readback_paths
             else None

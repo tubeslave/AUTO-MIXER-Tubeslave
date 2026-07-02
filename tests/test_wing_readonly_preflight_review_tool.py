@@ -204,6 +204,15 @@ def _valid_dsp_summary() -> dict:
         ("dyn_threshold", "/ch/3/dyn/thr", -10.0),
         ("gate_on", "/ch/3/gate/on", 0),
         ("gate_threshold", "/ch/3/gate/thr", -40.0),
+        ("gate_model", "/ch/3/gate/mdl", "DEQ"),
+        ("gate_ratio", "/ch/3/gate/ratio", "2:1"),
+        ("gate_attack", "/ch/3/gate/att", 4.0),
+        ("gate_release", "/ch/3/gate/rel", 115.0),
+        ("gate_filter", "/ch/3/gate/filt", "PEQ"),
+        ("gate_gain", "/ch/3/gate/g", -3.5),
+        ("gate_frequency", "/ch/3/gate/f", 74.0),
+        ("gate_q", "/ch/3/gate/q", 1.82),
+        ("gate_mode", "/ch/3/gate/mode", "HIGH"),
     ]
     summary["value_types"] = [value_type for value_type, _address, _value in readbacks]
     summary["sent_request_types"] = [
@@ -760,9 +769,18 @@ def test_review_report_accepts_clean_dsp_health_artifact(tmp_path: Path):
         "dyn_threshold",
         "gate_on",
         "gate_threshold",
+        "gate_model",
+        "gate_ratio",
+        "gate_attack",
+        "gate_release",
+        "gate_filter",
+        "gate_gain",
+        "gate_frequency",
+        "gate_q",
+        "gate_mode",
     ]
-    assert review["readback_count"] == 8
-    assert review["physical_readback_count"] == 8
+    assert review["readback_count"] == 17
+    assert review["physical_readback_count"] == 17
     assert review["violations"] == []
     assert report["artifact_sources"] == [str(summary_path)]
 
@@ -861,6 +879,13 @@ def test_review_decision_template_links_clean_candidate_but_requires_operator_ed
     assert template["decision"] == "pending_operator_decision"
     assert template["reviewed_by"] == ""
     assert template["reviewed_at"] == ""
+    assert template["required_edits"] == list(
+        review_tool.REVIEW_DECISION_TEMPLATE_REQUIRED_EDITS
+    )
+    assert (
+        "remove template_status or replace the generated pending marker before ledger acceptance"
+        in template["required_edits"]
+    )
     assert template["checklist_ids"] == list(REQUIRED_REVIEW_CHECKLIST_IDS)
     assert template["live_authority_granted"] is False
     assert template["readiness_matrix_update_allowed_by_decision"] is False
@@ -1126,6 +1151,9 @@ def test_review_tool_main_writes_output_and_returns_gate_status(tmp_path: Path):
     template = json.loads(template_output.read_text(encoding="utf-8"))
     assert template["decision"] == "pending_operator_decision"
     assert template["reviewed_by"] == ""
+    assert template["required_edits"] == list(
+        review_tool.REVIEW_DECISION_TEMPLATE_REQUIRED_EDITS
+    )
 
 
 def test_review_tool_is_transport_free():

@@ -15775,6 +15775,73 @@ def _kick_bass_relationship(source_family: str, conflict_role: str) -> str:
     return "low_end_pair_masking"
 
 
+def _kick_bass_transient_masking_score(analysis: SmartDSPAnalysisInput) -> float:
+    measured_overlap = _clip(
+        _safe_float(analysis.masking_overlap_peak_share) / 0.45,
+        0.0,
+        1.0,
+    )
+    transient_strength = _clip01(analysis.transient_strength)
+    peak_to_median = _clip(
+        _safe_float(analysis.dynamics_peak_to_median_db) / 18.0,
+        0.0,
+        1.0,
+    )
+    rise_time = _safe_float(analysis.transient_rise_time_ms, 0.0)
+    fast_rise = _clip(1.0 - ((rise_time - 5.0) / 35.0), 0.0, 1.0) if rise_time else 0.0
+    return max(measured_overlap, transient_strength, peak_to_median, fast_rise)
+
+
+def _kick_bass_has_transient_masking_evidence(
+    analysis: SmartDSPAnalysisInput,
+) -> bool:
+    transient_strength = _clip01(analysis.transient_strength)
+    peak_to_median = _clip(
+        _safe_float(analysis.dynamics_peak_to_median_db) / 18.0,
+        0.0,
+        1.0,
+    )
+    rise_time = _safe_float(analysis.transient_rise_time_ms, 0.0)
+    fast_rise = _clip(1.0 - ((rise_time - 5.0) / 35.0), 0.0, 1.0) if rise_time else 0.0
+    return max(transient_strength, peak_to_median, fast_rise) >= 0.72
+
+
+def _soundcheck_kick_bass_dynamic_ducking_priority_active(
+    analysis: SmartDSPAnalysisInput,
+    mode: str,
+) -> bool:
+    source_family = classify_source_family(analysis.source_role)
+    if mode != "soundcheck" or source_family != "bass":
+        return False
+    if not _is_kick_bass_pair(source_family, analysis.masking_conflict_role):
+        return False
+    if _clip01(analysis.masking_score) < 0.86:
+        return False
+    if _clip01(analysis.arrangement_overlap_score) >= 0.45:
+        return False
+    if abs(_safe_float(analysis.level_plane_error_lu)) >= 2.0:
+        return False
+    if (
+        analysis.summed_bus_evidence_available
+        and (
+            _safe_float(analysis.summed_bus_true_peak_headroom_db)
+            < MIN_TRUE_PEAK_HEADROOM_DB
+            or _safe_float(analysis.summed_bus_level_plane_error_lu)
+            >= SUMMED_BUS_REBALANCE_ERROR_LU
+        )
+    ):
+        return False
+    if not _kick_bass_has_transient_masking_evidence(analysis):
+        return False
+    if _kick_bass_transient_masking_score(analysis) < 0.72:
+        return False
+    return bool(
+        _wing_sidechain_source_target_diagnostics(
+            analysis.masking_conflict_target_id
+        )["concrete_source_available"]
+    )
+
+
 def _build_plosive_candidates(
     analysis: SmartDSPAnalysisInput,
     source_family: str,
@@ -19680,6 +19747,10 @@ def _build_kick_bass_masking_candidates(
         frequency_hz=frequency,
     )
     dynamic_ducking_would_duck_kick = source_family == "kick"
+    dynamic_ducking_priority_ready = (
+        _soundcheck_kick_bass_dynamic_ducking_priority_active(analysis, mode)
+    )
+    transient_masking_score = _kick_bass_transient_masking_score(analysis)
     summed_bus_rebalance_required = (
         mode in {"soundcheck", "live"}
         and analysis.summed_bus_evidence_available
@@ -19799,6 +19870,21 @@ def _build_kick_bass_masking_candidates(
                 ),
                 "wing_dynamic_eq_external_key_concrete_source_available": (
                     external_key_concrete_source_available
+                ),
+                "soundcheck_dynamic_ducking_priority_ready": (
+                    dynamic_ducking_priority_ready
+                ),
+                "soundcheck_dynamic_ducking_review_only": mode == "soundcheck",
+                "static_eq_native_fallback_strategy_id": "kick_bass_pocket_eq_split",
+                "transient_masking_score": round(transient_masking_score, 3),
+                "transient_strength": round(_clip01(analysis.transient_strength), 3),
+                "transient_rise_time_ms": round(
+                    _safe_float(analysis.transient_rise_time_ms),
+                    1,
+                ),
+                "dynamics_peak_to_median_db": round(
+                    _safe_float(analysis.dynamics_peak_to_median_db),
+                    1,
                 ),
                 "wing_dynamic_eq_external_key_target_role": "bass",
                 "wing_dynamic_eq_external_key_requires_concrete_source_channel": True,
@@ -29995,6 +30081,29 @@ def _select_candidate(
                     item.confidence,
                 ),
             )
+    if _soundcheck_kick_bass_dynamic_ducking_priority_active(analysis, mode):
+        review_only_blockers = {WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER}
+        dynamic_pool = [
+            candidate
+            for candidate in candidates
+            if _is_kick_bass_dynamic_ducking_candidate(candidate)
+            and set(candidate.blockers).issubset(review_only_blockers)
+        ]
+        static_pool = [
+            candidate
+            for candidate in unblocked
+            if candidate.strategy_id == "kick_bass_pocket_eq_split"
+        ]
+        if dynamic_pool and static_pool:
+            return max(
+                dynamic_pool,
+                key=lambda item: (
+                    item.scores["precision"],
+                    item.scores["musical"],
+                    item.total_score,
+                    item.confidence,
+                ),
+            )
     if _low_end_resonance_summed_bus_priority_active(analysis, mode):
         bus_pool = [
             candidate
@@ -30736,6 +30845,12 @@ def _is_kick_bass_summed_bus_rebalance_candidate(
     candidate: DSPStrategyCandidate,
 ) -> bool:
     return candidate.strategy_id == "kick_bass_summed_bus_rebalance_before_ducking"
+
+
+def _is_kick_bass_dynamic_ducking_candidate(
+    candidate: DSPStrategyCandidate,
+) -> bool:
+    return candidate.strategy_id == "kick_bass_dynamic_pocket_ducking"
 
 
 def _is_bass_sustain_summed_bus_rebalance_candidate(
@@ -31793,6 +31908,15 @@ def _why_alternative_lost(
             "alternative_requires_dynamic_or_deesser_mapping"
         )
     if (
+        _is_kick_bass_dynamic_ducking_candidate(selected)
+        and alternative.strategy_id == "kick_bass_pocket_eq_split"
+    ):
+        return (
+            "kick_bass_dynamic_ducking_priority:"
+            "concrete_counterpart_key_and_transient_overlap_make_ducking_more_precise_"
+            "than_static_eq_review_only"
+        )
+    if (
         _is_wing_native_osc_candidate(selected)
         and selected.problem == alternative.problem
         and selected.method_family == "eq"
@@ -32791,6 +32915,13 @@ def _selection_policy(
         return "soundcheck_operator_owned_gain_review_priority"
     if blockers and _is_soundcheck_operator_owned_mute_review_candidate(selected):
         return "soundcheck_operator_owned_mute_review_priority"
+    if (
+        blockers
+        and set(blockers).issubset({WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER})
+        and _soundcheck_kick_bass_dynamic_ducking_priority_active(analysis, mode)
+        and _is_kick_bass_dynamic_ducking_candidate(selected)
+    ):
+        return "soundcheck_kick_bass_dynamic_ducking_priority"
     if blockers:
         return "global_safety_blocker_priority"
     if _is_live_operator_owned_gain_review_candidate(selected):
@@ -32983,6 +33114,11 @@ def _selection_policy(
         mode,
     ) and _is_kick_bass_summed_bus_rebalance_candidate(selected):
         return "soundcheck_kick_bass_summed_bus_rebalance_priority"
+    if _soundcheck_kick_bass_dynamic_ducking_priority_active(
+        analysis,
+        mode,
+    ) and _is_kick_bass_dynamic_ducking_candidate(selected):
+        return "soundcheck_kick_bass_dynamic_ducking_priority"
     if _live_kick_bass_summed_bus_priority_active(
         analysis,
         mode,

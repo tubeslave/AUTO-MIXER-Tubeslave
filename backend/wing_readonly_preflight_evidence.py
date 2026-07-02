@@ -599,6 +599,21 @@ READONLY_VALUE_TYPE_ADDRESS_TEMPLATES = {
     "dyn_threshold": "/ch/{channel}/dyn/thr",
     "gate_on": "/ch/{channel}/gate/on",
     "gate_threshold": "/ch/{channel}/gate/thr",
+    "gate_model": "/ch/{channel}/gate/mdl",
+    "gate_ratio": "/ch/{channel}/gate/ratio",
+    "gate_attack": "/ch/{channel}/gate/att",
+    "gate_release": "/ch/{channel}/gate/rel",
+    "gate_filter": "/ch/{channel}/gate/filt",
+    "gate_gain": "/ch/{channel}/gate/g",
+    "gate_frequency": "/ch/{channel}/gate/f",
+    "gate_q": "/ch/{channel}/gate/q",
+    "gate_mode": "/ch/{channel}/gate/mode",
+}
+READONLY_ENUM_VALUE_TYPES = {
+    "gate_model",
+    "gate_ratio",
+    "gate_filter",
+    "gate_mode",
 }
 
 
@@ -1393,7 +1408,10 @@ def _validate_readback_row(index: int, row: Mapping[str, Any], violations: list[
         if address != _address_for(channel, value_type):
             violations.append(f"readback_{index}_address_mismatch")
     value = row.get("value")
-    if (
+    if value_type in READONLY_ENUM_VALUE_TYPES:
+        if isinstance(value, bool) or not str(value or ""):
+            violations.append(f"readback_{index}_value_missing_or_empty")
+    elif (
         isinstance(value, bool)
         or not isinstance(value, (int, float))
         or not math.isfinite(float(value))

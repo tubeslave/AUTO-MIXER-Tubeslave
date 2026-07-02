@@ -401,6 +401,15 @@ def test_build_read_requests_supports_wing_dsp_health_paths() -> None:
             "dyn_threshold",
             "gate_on",
             "gate_threshold",
+            "gate_model",
+            "gate_ratio",
+            "gate_attack",
+            "gate_release",
+            "gate_filter",
+            "gate_gain",
+            "gate_frequency",
+            "gate_q",
+            "gate_mode",
         ),
     )
 
@@ -413,6 +422,15 @@ def test_build_read_requests_supports_wing_dsp_health_paths() -> None:
         "wing-readonly-preflight:ch3:dyn_threshold",
         "wing-readonly-preflight:ch3:gate_on",
         "wing-readonly-preflight:ch3:gate_threshold",
+        "wing-readonly-preflight:ch3:gate_model",
+        "wing-readonly-preflight:ch3:gate_ratio",
+        "wing-readonly-preflight:ch3:gate_attack",
+        "wing-readonly-preflight:ch3:gate_release",
+        "wing-readonly-preflight:ch3:gate_filter",
+        "wing-readonly-preflight:ch3:gate_gain",
+        "wing-readonly-preflight:ch3:gate_frequency",
+        "wing-readonly-preflight:ch3:gate_q",
+        "wing-readonly-preflight:ch3:gate_mode",
     ]
     assert [request["address"] for request in requests] == [
         "/ch/3/eq/on",
@@ -423,6 +441,15 @@ def test_build_read_requests_supports_wing_dsp_health_paths() -> None:
         "/ch/3/dyn/thr",
         "/ch/3/gate/on",
         "/ch/3/gate/thr",
+        "/ch/3/gate/mdl",
+        "/ch/3/gate/ratio",
+        "/ch/3/gate/att",
+        "/ch/3/gate/rel",
+        "/ch/3/gate/filt",
+        "/ch/3/gate/g",
+        "/ch/3/gate/f",
+        "/ch/3/gate/q",
+        "/ch/3/gate/mode",
     ]
     assert all(request["type"] == "query_mixer_parameter" for request in requests)
 

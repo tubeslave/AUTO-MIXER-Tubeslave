@@ -890,6 +890,7 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
         assert "latest real WING read-only candidate" in heartbeat
         assert "operator_review_required" in heartbeat
         assert "pending_operator_decision" in heartbeat
+        assert "required_edits" in heartbeat
     else:
         assert "M001 still has no real WING read-only artifact" in heartbeat
 
@@ -1088,6 +1089,9 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             "wing_readonly_preflight_decision_ledger_status"
         ] == "operator_review_required"
         assert state["last_validation_summary"][
+            "wing_readonly_preflight_review_template_required_edits_present"
+        ] is True
+        assert state["last_validation_summary"][
             "wing_readonly_preflight_latest_valid_candidate_source_id"
         ] == (
             "artifacts/wing_readonly_preflight/"
@@ -1214,7 +1218,14 @@ def test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_appro
     assert "- `gain` with a negative delta only" in supervised_runbook
     for forbidden in ("EQ", "compressor", "gate", "routing", "mute/unmute", "FX", "scenes"):
         assert f"- {forbidden}" in supervised_runbook
+    normalized_supervised_runbook = " ".join(supervised_runbook.split())
     assert "The operator explicitly approves the exact channel, value type, and delta" in supervised_runbook
+    assert "`--accepted-readonly-source-id`" in supervised_runbook
+    assert (
+        "the runner must re-check the decision review before opening a backend WebSocket"
+        in normalized_supervised_runbook
+    )
+    assert "preflight decision gate status is `accepted_decision_ready`" in supervised_runbook
     assert "The selected delta is small and negative" in supervised_runbook
     assert "rollback went through `rollback_last_manual_write`" in supervised_runbook
     assert "rollback readback status is `verified_from_physical_readback`" in supervised_runbook

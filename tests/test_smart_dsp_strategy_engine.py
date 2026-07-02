@@ -80,6 +80,7 @@ from backend.smart_dsp_strategy_engine import (
     WING_DE_ESSER_WRITE_PARAMETER_KEYS,
     WING_DYNAMIC_EQ_GATE_MODEL,
     WING_DYNAMIC_EQ_GATE_SLOT_CONFLICT_POLICY,
+    WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER,
     WING_DYNAMIC_EQ_WRITE_KEY_SELECTION_POLICY,
     WING_DYNAMIC_EQ_WRITE_PARAMETER_KEYS,
     WING_AUX_DYNAMICS_OPERATOR_OWNED_BLOCKER,
@@ -9088,6 +9089,105 @@ def test_soundcheck_kick_bass_overlap_prefers_wing_native_eq_split():
     assert recommendation.selected_strategy.future_wing_readback_contract[
         "wing_osc_applicability"
     ]["native_osc_supported"] is True
+
+
+def test_soundcheck_kick_bass_concrete_key_transient_overlap_prefers_dynamic_ducking_review_only():
+    recommendation = analyze_smart_dsp_strategy(
+        _analysis(
+            target_id="ch:2",
+            source_role="bass",
+            source_label="Bass DI",
+            problem_hints=("masking",),
+            muddiness_score=0.0,
+            masking_conflict_role="kick",
+            masking_conflict_target_id="ch:1",
+            masking_frequency_hz=74.0,
+            masking_score=0.94,
+            masking_bandwidth_hz=28.0,
+            masking_overlap_peak_share=0.48,
+            arrangement_overlap_score=0.12,
+            level_plane_error_lu=0.0,
+            rms_dbfs=-23.0,
+            estimated_lufs=-24.0,
+            true_peak_headroom_db=6.0,
+            transient_strength=0.82,
+            transient_rise_time_ms=7.0,
+            dynamics_peak_to_median_db=16.0,
+        )
+    )
+
+    assert recommendation.status == "analysis_only"
+    assert recommendation.blockers == (WING_DYNAMIC_EQ_VALUE_MAPPING_BLOCKER,)
+    assert (
+        recommendation.selected_strategy.strategy_id
+        == "kick_bass_dynamic_pocket_ducking"
+    )
+    assert recommendation.selected_strategy.method_family == "dynamic_eq"
+    assert recommendation.evidence["operator_explanation_sections"][
+        "selection_policy"
+    ] == "soundcheck_kick_bass_dynamic_ducking_priority"
+    params = recommendation.selected_strategy.parameters
+    assert params["relationship"] == "kick_masks_bass"
+    assert params["processing_target"] == "current_bass_channel"
+    assert params["sidechain_role"] == "kick"
+    assert params["wing_dynamic_eq_external_key_source_target_id"] == "ch:1"
+    assert params["wing_dynamic_eq_external_key_candidate_source_alias"] == "CH.1"
+    assert params["wing_dynamic_eq_external_key_concrete_source_available"] is True
+    assert (
+        params["wing_dynamic_eq_external_key_verified_osc_mapping_available"]
+        is False
+    )
+    assert (
+        params["wing_dynamic_eq_external_key_apply_blocked_without_concrete_source"]
+        is False
+    )
+    assert (
+        params["wing_dynamic_eq_external_key_apply_blocked_even_with_concrete_source"]
+        is True
+    )
+    assert params["wing_dynamic_eq_keyed_ducking_live_apply_blocked"] is True
+    assert params["soundcheck_dynamic_ducking_priority_ready"] is True
+    assert params["soundcheck_dynamic_ducking_review_only"] is True
+    assert params["static_eq_native_fallback_strategy_id"] == "kick_bass_pocket_eq_split"
+    assert params["transient_masking_score"] >= 0.88
+    assert params["dynamic_eq_filter_type"] == "dynamic_peaking"
+    assert params["dynamic_eq_frequency_hz"] == 74.0
+    assert params["dynamic_eq_q"] == 1.82
+    assert params["dynamic_eq_max_gain_reduction_db"] == 3.5
+    assert params["dynamic_eq_threshold_dbfs"] == -19.5
+    assert params["dynamic_eq_attack_ms"] == 4.2
+    assert params["dynamic_eq_release_ms"] == 115.0
+
+    alternatives = {
+        candidate.strategy_id: candidate for candidate in recommendation.alternatives
+    }
+    assert alternatives["kick_bass_pocket_eq_split"].method_family == "eq"
+    assert alternatives["kick_bass_pocket_eq_split"].future_wing_readback_contract[
+        "wing_osc_applicability"
+    ]["native_osc_supported"] is True
+    tradeoffs = {
+        row["strategy_id"]: row["why_not_selected"]
+        for row in recommendation.evidence["strategy_search"]["alternative_tradeoffs"]
+    }
+    assert tradeoffs["kick_bass_pocket_eq_split"] == (
+        "kick_bass_dynamic_ducking_priority:"
+        "concrete_counterpart_key_and_transient_overlap_make_ducking_more_precise_"
+        "than_static_eq_review_only"
+    )
+    assert recommendation.selected_strategy.future_wing_readback_contract[
+        "wing_osc_applicability"
+    ]["native_osc_supported"] is False
+    assert recommendation.selected_strategy.future_wing_readback_contract[
+        "wing_osc_applicability"
+    ]["native_osc_support_level"] == "dynamic_eq_value_mapping_required"
+    contract = recommendation.evidence["decision_engine_contract"]
+    assert contract["strategy_search"]["selected_processing_type"] == "dynamic_eq"
+    assert contract["wing_readback_contract"]["live_write"] is False
+    assert contract["wing_readback_contract"]["live_authority_granted"] is False
+    _assert_selected_has_no_apply_values(recommendation)
+    proposal = recommendation.to_operator_proposal()
+    _assert_proposal_denial(proposal)
+    assert proposal["decision_engine_contract"] == contract
 
 
 def test_kick_bass_external_key_abstract_source_target_stays_unresolved_review_only():

@@ -5,16 +5,16 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "e8a38bc0",
-  "last_heartbeat_utc": "2026-07-02T06:58:04Z",
+  "last_heartbeat_utc": "2026-07-02T07:10:30Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": "Latest real WING read-only candidate is ready for manual operator review; an accepted or rejected decision record is required before readiness update, physical readback promotion, or supervised fader/gain proof.",
   "next_action": "Operator reviews artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json using artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json, then reruns tools/review_wing_readonly_preflight_decisions.py.",
   "last_validation_summary": {
-    "status": "wing_readonly_decision_template_refreshed_operator_review_required",
+    "status": "wing_readonly_decision_template_required_edits_bound",
     "hardware_evidence": false,
     "product_runtime_changed": false,
-    "product_runtime_change_scope": "Control-plane refresh only: latest WING read-only candidate review report, pending operator decision template, decision ledger report, heartbeat/state/report/ledger. No product runtime change and no live authority.",
+    "product_runtime_change_scope": "Control-plane/template refresh only: pending WING read-only operator decision template now embeds required_edits. No product runtime change and no live authority.",
     "pytest": "staged-only PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4045 passed, 1 skipped, 1 warning",
     "no_wing_quick": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/no_wing_release_check.py --quick: passed",
     "artifact_manifest_verifier": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/verify_no_wing_artifact_manifest.py artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check: passed",
@@ -252,8 +252,15 @@
     "wing_readonly_preflight_decision_review_report": "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
     "wing_readonly_preflight_review_template_status": "operator_must_replace_placeholders_before_ledger_acceptance",
     "wing_readonly_preflight_review_template_decision": "pending_operator_decision",
-    "wing_readonly_preflight_review_artifact_command": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/review_wing_readonly_preflight_artifacts.py --artifact-path artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json --decision-template-output artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json --output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md --quiet: exit 0",
-    "wing_readonly_preflight_decision_review_command": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions --output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md --quiet: exit 3 operator_review_required"
+    "wing_readonly_preflight_review_artifact_command": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/review_wing_readonly_preflight_artifacts.py --artifact-path artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json --decision-template-output artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json --output Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md --quiet: exit 0; pending template includes required_edits",
+    "wing_readonly_preflight_decision_review_command": "PYTHONPATH=backend /opt/homebrew/bin/python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions --output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md --quiet: exit 3 operator_review_required",
+    "wing_readonly_preflight_review_template_required_edits_present": true,
+    "wing_readonly_preflight_review_template_required_edits": [
+      "set decision to accepted or rejected after manual review",
+      "set reviewed_by to the operator name",
+      "set reviewed_at to a UTC timestamp at or after artifact_captured_at",
+      "remove template_status or replace the generated pending marker before ledger acceptance"
+    ]
   },
   "external_validation_requirements": [
     "Real WING Rack read-only artifact",

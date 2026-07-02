@@ -88,6 +88,9 @@ Forbidden live writes:
 - The operator explicitly approves the exact channel, value type, and delta.
 - The command repeats that approval with matching `--operator-confirm-channel`,
   `--operator-confirm-value-type`, and `--operator-confirm-delta-db` flags.
+- The command binds the accepted read-only preflight decision with
+  `--accepted-readonly-source-id`; the runner must re-check the decision review
+  before opening a backend WebSocket.
 - The selected delta is small and negative.
 - The operator is present and can stop the test.
 
@@ -104,6 +107,7 @@ python3 tools/wing_operator_proposal_validation_runner.py \
   --operator-confirm-channel 3 \
   --operator-confirm-value-type fader \
   --operator-confirm-delta-db -0.25 \
+  --accepted-readonly-source-id artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json \
   --execute \
   --prove-blocked-apply \
   --prove-emergency-stop \
@@ -124,6 +128,7 @@ python3 tools/wing_operator_proposal_validation_runner.py \
   --operator-confirm-channel 3 \
   --operator-confirm-value-type gain \
   --operator-confirm-delta-db -0.25 \
+  --accepted-readonly-source-id artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json \
   --execute \
   --prove-blocked-apply \
   --prove-emergency-stop \
@@ -141,6 +146,8 @@ The artifact must show:
 - `physical_readback_required: true`
 - pre-read status is `verified_from_physical_readback`
 - apply went through `apply_operator_proposal`
+- preflight decision gate status is `accepted_decision_ready` and the accepted
+  source id matches `--accepted-readonly-source-id`
 - apply readback status is `verified_from_physical_readback`
 - rollback went through `rollback_last_manual_write`
 - rollback readback status is `verified_from_physical_readback`
@@ -185,6 +192,8 @@ The artifact must show:
 - operator approval is not explicit;
 - operator confirmation flags are missing or do not match the requested
   channel, value type, and delta;
+- `--accepted-readonly-source-id` is missing, not accepted by the decision
+  ledger, or the decision review is not `accepted_decision_ready`;
 - the delta is positive;
 - the value type is not `fader` or `gain`;
 - pre-read comes only from cache during physical `--execute`;

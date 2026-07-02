@@ -80,6 +80,7 @@ def proof_command(
     delta="-0.25",
     artifact_root="artifacts/proof",
     operator_channel=None,
+    accepted_readonly_source_id="artifacts/wing_readonly_preflight/run/summary.json",
     include_safety_flags=True,
     tail=None,
 ):
@@ -102,6 +103,8 @@ def proof_command(
         delta,
         "--operator-confirm-delta-db",
         delta,
+        "--accepted-readonly-source-id",
+        accepted_readonly_source_id,
     )
     if include_safety_flags:
         command += (

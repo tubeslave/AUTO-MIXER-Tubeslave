@@ -1,6 +1,6 @@
 # WING Read-Only Preflight Artifact Review
 
-Generated: `2026-07-02T06:56:43Z`
+Generated: `2026-07-02T07:09:33Z`
 Status: `candidate_ready_for_manual_review`
 
 ## Summary

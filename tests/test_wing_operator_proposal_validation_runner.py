@@ -17,6 +17,11 @@ runner = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(runner)
 
+ACCEPTED_READONLY_SOURCE_ID = (
+    "artifacts/wing_readonly_preflight/"
+    "20260702T061111Z_wing_readonly_preflight/summary.json"
+)
+
 
 class FakeWebSocket:
     def __init__(self, responses: list[dict]):
@@ -92,11 +97,52 @@ def read_events(summary: dict) -> list[dict]:
     return [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines()]
 
 
+def accepted_preflight_args() -> list[str]:
+    return ["--accepted-readonly-source-id", ACCEPTED_READONLY_SOURCE_ID]
+
+
+def patch_preflight_decision_report(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    status: str = "accepted_decision_ready",
+    accepted_source_ids: list[str] | None = None,
+    live_authority_granted: bool = False,
+    execution_allowed_by_decision: bool = False,
+    source_authority_denied: bool = True,
+) -> None:
+    if accepted_source_ids is None:
+        accepted_source_ids = [ACCEPTED_READONLY_SOURCE_ID]
+
+    def fake_build_decision_review_report(*, artifact_roots=None, decision_roots=None):
+        return {
+            "status": status,
+            "ledger_status": "operator_review_decision_records_available",
+            "accepted_source_ids": accepted_source_ids,
+            "accepted_record_count": len(accepted_source_ids),
+            "decision_record_count": len(accepted_source_ids),
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 0,
+            "manual_readiness_update_candidate_available": status == "accepted_decision_ready",
+            "source_authority_denied": source_authority_denied,
+            "live_authority_granted": live_authority_granted,
+            "execution_allowed_by_decision": execution_allowed_by_decision,
+            "blocked_by": [],
+            "next_required_action": "Accepted review decision is ready for the next manual WING MVP step.",
+        }
+
+    monkeypatch.setattr(
+        runner,
+        "build_decision_review_report",
+        fake_build_decision_review_report,
+    )
+
+
 @pytest.mark.asyncio
 async def test_connection_failure_before_apply_records_fail_closed_without_live_request(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    patch_preflight_decision_report(monkeypatch)
     patch_websocket_connect_failure(monkeypatch, OSError("backend unavailable"))
     args = parse_args(
         tmp_path,
@@ -112,6 +158,7 @@ async def test_connection_failure_before_apply_records_fail_closed_without_live_
         "fader",
         "--operator-confirm-delta-db",
         "-0.25",
+        *accepted_preflight_args(),
         "--execute",
     )
 
@@ -133,6 +180,7 @@ async def test_timeout_after_apply_request_requires_manual_review_not_promotion_
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    patch_preflight_decision_report(monkeypatch)
     websocket = HangingWebSocket(
         [
             {"type": "operator_mode_status", "mode": "assist"},
@@ -165,6 +213,7 @@ async def test_timeout_after_apply_request_requires_manual_review_not_promotion_
         "fader",
         "--operator-confirm-delta-db",
         "-0.25",
+        *accepted_preflight_args(),
         "--execute",
     )
 
@@ -282,6 +331,24 @@ async def test_timeout_after_apply_request_requires_manual_review_not_promotion_
             ],
             "--operator-confirm-delta-db must match --delta-db",
         ),
+        (
+            [
+                "--channel",
+                "1",
+                "--value-type",
+                "fader",
+                "--delta-db",
+                "-0.1",
+                "--operator-confirm-channel",
+                "1",
+                "--operator-confirm-value-type",
+                "fader",
+                "--operator-confirm-delta-db",
+                "-0.1",
+                "--execute",
+            ],
+            "--accepted-readonly-source-id is required with --execute",
+        ),
     ],
 )
 def test_validate_args_blocks_unsafe_invocations(tmp_path: Path, argv: list[str], expected_error: str) -> None:
@@ -375,10 +442,56 @@ async def test_dry_run_uses_readonly_physical_read_when_backend_state_missing(
 
 
 @pytest.mark.asyncio
+async def test_execute_blocks_before_websocket_without_accepted_preflight_decision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_preflight_decision_report(
+        monkeypatch,
+        status="blocked",
+        accepted_source_ids=[],
+        source_authority_denied=True,
+    )
+    patch_websocket_connect_failure(monkeypatch, AssertionError("backend must not be contacted"))
+    args = parse_args(
+        tmp_path,
+        "--channel",
+        "4",
+        "--value-type",
+        "fader",
+        "--delta-db",
+        "-0.25",
+        "--operator-confirm-channel",
+        "4",
+        "--operator-confirm-value-type",
+        "fader",
+        "--operator-confirm-delta-db",
+        "-0.25",
+        *accepted_preflight_args(),
+        "--execute",
+    )
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 13
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "preflight_decision_review_not_accepted"
+    assert summary["fail_closed"] is True
+    assert summary["live_apply_request_sent"] is False
+    assert summary["rollback_request_sent"] is False
+    assert summary["sent_request_types"] == []
+    assert summary["preflight_decision_gate"]["status"] == "blocked"
+    assert summary["preflight_decision_gate"]["accepted"] is False
+    assert summary["preflight_decision_gate"]["expected_accepted_readonly_source_id"] == ACCEPTED_READONLY_SOURCE_ID
+
+
+@pytest.mark.asyncio
 async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    patch_preflight_decision_report(monkeypatch)
     proposal_id_prefix = "wing-proposal-validation"
     websocket = FakeWebSocket(
         [
@@ -449,6 +562,7 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
         "fader",
         "--operator-confirm-delta-db",
         "-0.25",
+        *accepted_preflight_args(),
         "--execute",
         "--prove-blocked-apply",
         "--prove-emergency-stop",
@@ -508,6 +622,9 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     assert summary["operator_confirmed_value_type"] == "fader"
     assert summary["operator_confirmed_delta_db"] == -0.25
     assert summary["operator_confirmation_match"] is True
+    assert summary["accepted_readonly_source_id"] == ACCEPTED_READONLY_SOURCE_ID
+    assert summary["preflight_decision_gate"]["accepted"] is True
+    assert summary["preflight_decision_gate"]["live_authority_granted"] is False
     assert summary["write_policy"] == "apply_operator_proposal_only"
     assert summary["apply_result"]["type"] == "operator_proposal_apply_result"
     assert summary["rollback_result"]["type"] == "manual_write_rollback_applied"
@@ -519,6 +636,7 @@ async def test_execute_path_blocks_when_pre_read_is_not_physical(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    patch_preflight_decision_report(monkeypatch)
     websocket = FakeWebSocket(
         [
             {"type": "operator_mode_status", "mode": "assist"},
@@ -549,6 +667,7 @@ async def test_execute_path_blocks_when_pre_read_is_not_physical(
         "fader",
         "--operator-confirm-delta-db",
         "-0.25",
+        *accepted_preflight_args(),
         "--execute",
     )
 
@@ -572,6 +691,7 @@ async def test_execute_path_rejects_apply_cache_readback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    patch_preflight_decision_report(monkeypatch)
     websocket = FakeWebSocket(
         [
             {"type": "operator_mode_status", "mode": "assist"},
@@ -619,6 +739,7 @@ async def test_execute_path_rejects_apply_cache_readback(
         "fader",
         "--operator-confirm-delta-db",
         "-0.25",
+        *accepted_preflight_args(),
         "--execute",
     )
 
