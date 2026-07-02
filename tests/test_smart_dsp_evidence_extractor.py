@@ -13,8 +13,10 @@ from backend.smart_dsp_strategy_engine import (
     WING_DE_ESSER_GATE_MODEL,
     WING_DE_ESSER_GATE_SLOT_CONFLICT_POLICY,
     WING_DYNAMIC_EQ_GATE_MODEL,
+    WING_DYNAMICS_MODEL_READBACK_BLOCKER,
     WING_DYNAMICS_REQUIRED_MODEL,
     WING_EQ_FILTER_OPERATOR_OWNED_BLOCKER,
+    WING_EQ_MODEL_READBACK_BLOCKER,
     WING_EQ_OPERATOR_OWNED_MODEL_BLOCKER,
     WING_EQ_MIX_BASELINE_PERCENT,
     WING_EQ_REQUIRED_MODEL,
@@ -966,6 +968,146 @@ def test_readonly_preflight_gate_readback_reaches_smart_dsp_state():
     assert dynamic_hpf.future_wing_readback_contract["wing_osc_applicability"][
         "native_osc_supported"
     ] is False
+
+
+def test_readonly_preflight_eq_dynamics_readbacks_keep_model_guards_closed():
+    wing_state = build_current_wing_state_from_readonly_preflight(
+        target_id="ch:3",
+        summary={
+            "run_id": "20260702T075151Z_wing_readonly_preflight",
+            "connection_mode": "wing",
+            "read_only": True,
+            "live_write": False,
+            "write_request_sent": False,
+            "proposal_request_sent": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "readbacks": [
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "eq_on",
+                    "address": "/ch/3/eq/on",
+                    "value": 1,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "eq_mix",
+                    "address": "/ch/3/eq/mix",
+                    "value": 100.0,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "eq_low_gain",
+                    "address": "/ch/3/eq/lg",
+                    "value": -1.25,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "eq_high_gain",
+                    "address": "/ch/3/eq/hg",
+                    "value": 0.5,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "dyn_on",
+                    "address": "/ch/3/dyn/on",
+                    "value": 1,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "dyn_threshold",
+                    "address": "/ch/3/dyn/thr",
+                    "value": -22.5,
+                },
+            ],
+        },
+    )
+
+    assert wing_state["current_wing_eq_enabled"] is True
+    assert wing_state["current_wing_eq_readback_available"] is True
+    assert wing_state["wing_readonly_eq_mix_percent"] == 100.0
+    assert wing_state["wing_readonly_eq_low_gain_db"] == -1.25
+    assert wing_state["wing_readonly_eq_high_gain_db"] == 0.5
+    assert wing_state["current_wing_dynamics_enabled"] is True
+    assert wing_state["current_wing_dynamics_readback_available"] is True
+    assert wing_state["wing_readonly_dynamics_threshold_dbfs"] == -22.5
+    assert "current_wing_eq_model" not in wing_state
+    assert "current_wing_dynamics_model" not in wing_state
+
+    duration_sec = 3.0
+    time = np.arange(int(SR * duration_sec), dtype=np.float64) / SR
+    envelope = np.where((time % 0.6) < 0.18, 0.22, 0.025)
+    samples = envelope * np.sin(2.0 * np.pi * 900.0 * time)
+    for start_sec in (0.35, 1.05, 1.75, 2.45):
+        start = int(start_sec * SR)
+        length = int(0.07 * SR)
+        local_time = np.arange(length, dtype=np.float64) / SR
+        burst_envelope = np.exp(-np.linspace(0.0, 8.0, length))
+        burst = np.sin(2.0 * np.pi * 82.0 * local_time)
+        samples[start : start + length] += 0.35 * burst_envelope * burst
+
+    analysis = build_smart_dsp_analysis_input_from_audio(
+        np.clip(samples, -0.95, 0.95),
+        target_id="ch:3",
+        source_role="lead_vocal",
+        source_label="Lead Vox",
+        sample_rate=SR,
+        source_identity_confirmed=True,
+        source_identity_confidence=0.91,
+        current_wing_state=wing_state,
+        extra_problem_hints=("dynamic_control",),
+        target_plane_lufs=-22.0,
+    )
+    recommendation = analyze_smart_dsp_strategy(analysis)
+    candidates = {
+        candidate.strategy_id: candidate
+        for candidate in (recommendation.selected_strategy, *recommendation.alternatives)
+    }
+    static_hpf = candidates["static_plosive_high_pass_cleanup"]
+    compressor = candidates["vocal_phrase_leveling_compression"]
+
+    assert analysis.current_wing_eq_enabled is True
+    assert analysis.current_wing_eq_model == ""
+    assert analysis.current_wing_eq_model_readback_available is False
+    assert analysis.current_wing_dynamics_enabled is True
+    assert analysis.current_wing_dynamics_model == ""
+    assert analysis.current_wing_dynamics_model_readback_available is False
+    assert analysis.current_state_readback_available is True
+    assert analysis.rollback_plan_available is False
+    assert WING_EQ_MODEL_READBACK_BLOCKER in static_hpf.blockers
+    assert static_hpf.parameters["wing_eq_current_enabled"] is True
+    assert (
+        static_hpf.parameters["wing_eq_model_readback_required_for_active_slot"]
+        is True
+    )
+    assert WING_DYNAMICS_MODEL_READBACK_BLOCKER in compressor.blockers
+    assert compressor.parameters["wing_dynamics_current_enabled"] is True
+    assert (
+        compressor.parameters[
+            "wing_dynamics_model_readback_required_for_active_slot"
+        ]
+        is True
+    )
+    assert "current_state_readback_missing" not in recommendation.blockers
+    assert "rollback_plan_missing" in recommendation.blockers
 
 
 def test_readonly_preflight_state_fails_closed_on_unsafe_artifact_flags():

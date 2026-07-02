@@ -357,7 +357,33 @@ def build_current_wing_state_from_readonly_preflight(
             channels.append(channel)
         value_types.append(value_type)
         raw_by_value_type[value_type] = value
-        if value_type == "gate_model":
+        if value_type == "eq_on":
+            state["current_wing_eq_enabled"] = _readback_bool(value)
+            state["current_wing_eq_readback_available"] = True
+        elif value_type == "eq_mix":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["wing_readonly_eq_mix_percent"] = round(numeric, 3)
+            state["current_wing_eq_readback_available"] = True
+        elif value_type == "eq_low_gain":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["wing_readonly_eq_low_gain_db"] = round(numeric, 3)
+            state["current_wing_eq_readback_available"] = True
+        elif value_type == "eq_high_gain":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["wing_readonly_eq_high_gain_db"] = round(numeric, 3)
+            state["current_wing_eq_readback_available"] = True
+        elif value_type == "dyn_on":
+            state["current_wing_dynamics_enabled"] = _readback_bool(value)
+            state["current_wing_dynamics_readback_available"] = True
+        elif value_type == "dyn_threshold":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["wing_readonly_dynamics_threshold_dbfs"] = round(numeric, 3)
+            state["current_wing_dynamics_readback_available"] = True
+        elif value_type == "gate_model":
             state["current_wing_gate_model"] = str(value or "")
             state["current_wing_gate_slot_readback_available"] = True
         elif value_type == "gate_on":
@@ -384,6 +410,10 @@ def build_current_wing_state_from_readonly_preflight(
     state["current_wing_state_value_types"] = list(_ordered_unique(value_types))
     state["current_wing_state_raw_readback_by_value_type"] = raw_by_value_type
     state["current_wing_state_readback_available"] = bool(value_types)
+    if state.get("current_wing_eq_readback_available") is True:
+        state["current_wing_state_eq_readback_available"] = True
+    if state.get("current_wing_dynamics_readback_available") is True:
+        state["current_wing_state_dynamics_readback_available"] = True
     if state.get("current_wing_gate_slot_readback_available") is True:
         state["current_wing_state_gate_slot_readback_available"] = True
     return state
