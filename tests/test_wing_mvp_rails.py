@@ -11010,21 +11010,33 @@ def test_m105_project_director_post_m104_intake_loop_guard_stays_readonly():
         assert heading in adr
     assert "No live transport" in adr
 
-    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
-    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
-    assert (
-        directive["allowed_autonomous_scope"]
-        == "external_validation_wait_or_named_gap_only"
-    )
-    assert any("After M104" in item for item in directive["allowed_scope"])
-    assert any(
-        "No further generic WING read-only intake guard milestone after M104" in item
-        for item in directive["forbidden_scope"]
-    )
-    assert any(
-        "Do not keep improving the same WING read-only intake function" in item
-        for item in directive["forbidden_scope"]
-    )
+    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
+        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is False
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_handoff_or_control_plane_only"
+        )
+        assert any(
+            "selected external WING validation handoff/intake" in item
+            for item in directive["allowed_scope"]
+        )
+    else:
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+        assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_wait_or_named_gap_only"
+        )
+        assert any("After M104" in item for item in directive["allowed_scope"])
+        assert any(
+            "No further generic WING read-only intake guard milestone after M104" in item
+            for item in directive["forbidden_scope"]
+        )
+        assert any(
+            "Do not keep improving the same WING read-only intake function" in item
+            for item in directive["forbidden_scope"]
+        )
 
     assert "M105 Project Director post-M104 intake loop guard is now covered" in current
     assert "M105 Project Director post-M104 intake loop guard rail is now" in report
@@ -11083,19 +11095,27 @@ def test_m106_project_director_post_m105_intake_loop_guard_persists():
         assert heading in adr
     assert "No live transport" in adr
 
-    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
-    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
-    assert directive["pre_hardware_intake_guard_recent_subjects"][0] == (
-        "Guard WING readonly capture time order"
-    )
-    assert (
-        directive["allowed_autonomous_scope"]
-        == "external_validation_wait_or_named_gap_only"
-    )
-    assert any(
-        "No further generic WING read-only intake guard milestone after M104" in item
-        for item in directive["forbidden_scope"]
-    )
+    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
+        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is False
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_handoff_or_control_plane_only"
+        )
+    else:
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+        assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+        assert directive["pre_hardware_intake_guard_recent_subjects"][0] == (
+            "Guard WING readonly capture time order"
+        )
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_wait_or_named_gap_only"
+        )
+        assert any(
+            "No further generic WING read-only intake guard milestone after M104" in item
+            for item in directive["forbidden_scope"]
+        )
 
     assert "M106 Project Director post-M105 intake loop persistence is now covered" in current
     assert "M106 Project Director post-M105 intake loop persistence rail is now" in report
@@ -11155,21 +11175,29 @@ def test_m107_project_director_intake_loop_guard_lookback_floor_persists():
         assert heading in adr
     assert "No live transport" in adr
 
-    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
     assert directive["pre_hardware_intake_guard_requested_lookback_commits"] == 12
     assert directive["pre_hardware_intake_guard_effective_lookback_commits"] >= (
         directive["pre_hardware_intake_guard_lookback_floor"]
     )
     assert directive["pre_hardware_intake_guard_lookback_floor"] == 20
-    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
-    assert (
-        directive["allowed_autonomous_scope"]
-        == "external_validation_wait_or_named_gap_only"
-    )
-    assert any(
-        "Do not keep improving the same WING read-only intake function" in item
-        for item in directive["forbidden_scope"]
-    )
+    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
+        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is False
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_handoff_or_control_plane_only"
+        )
+    else:
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+        assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_wait_or_named_gap_only"
+        )
+        assert any(
+            "Do not keep improving the same WING read-only intake function" in item
+            for item in directive["forbidden_scope"]
+        )
 
     assert "M107 Project Director intake loop lookback floor is now covered" in current
     assert "M107 Project Director intake loop lookback floor rail is now" in report

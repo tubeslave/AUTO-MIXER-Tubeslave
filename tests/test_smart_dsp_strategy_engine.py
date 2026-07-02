@@ -156,6 +156,8 @@ from backend.smart_dsp_strategy_engine import (
     WING_PAN_WIDTH_OSC_PROTOCOL_SOURCE,
     WING_PAN_WIDTH_OSC_PROTOCOL_VERSION,
     WING_PAN_WIDTH_OPERATOR_OWNED_BLOCKER,
+    WING_RACK_OSC_FIRMWARE,
+    WING_RACK_OSC_TARGET_CONSOLE,
     WING_STRIP_LOW_CUT_TYPE_ALLOWED_VALUES_BY_SURFACE,
     WING_WIDTH_MIN_PERCENT,
     SmartDSPAnalysisInput,
@@ -4183,6 +4185,69 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
     assert sections["rollback_readback"]["required_before_live_promotion"] is True
     assert sections["rollback_readback"]["live_authority_granted"] is False
     assert proposal["evidence"]["operator_explanation_sections"] == sections
+    contract = recommendation.evidence["decision_engine_contract"]
+    assert contract["contract_id"] == "smart_dsp_decision_engine_contract_v1"
+    assert contract["method_id"] == SMART_DSP_METHOD_ID
+    assert contract["mode_policy"]["mode"] == "soundcheck"
+    assert contract["mode_policy"]["supported_modes"] == ["live", "soundcheck"]
+    assert contract["mode_policy"]["soundcheck_strategy_search_allowed"] is True
+    assert contract["mode_policy"]["live_conservative_policy"] is False
+    assert contract["mode_policy"]["live_apply_allowed"] is False
+    assert contract["mode_policy"]["live_authority_granted"] is False
+    assert contract["evidence_extraction"]["source_identity"]["source_family"] == "vocal"
+    assert contract["evidence_extraction"]["source_identity"]["musical_role"] == "lead"
+    assert contract["evidence_extraction"]["source_identity"]["confirmed"] is True
+    assert contract["evidence_extraction"]["spectral_balance"]["muddiness_score"] == 0.82
+    assert contract["evidence_extraction"]["level"]["true_peak_headroom_db"] == 5.0
+    assert "phase_mono_safety" in contract["evidence_extraction"]
+    assert "feedback_risk" in contract["evidence_extraction"]
+    assert "bus_group_master_impact" in contract["evidence_extraction"]
+    assert contract["strategy_search"]["candidate_count"] == 1 + len(
+        recommendation.alternatives
+    )
+    assert contract["strategy_search"]["alternative_count"] == len(
+        recommendation.alternatives
+    )
+    assert contract["strategy_search"]["selected_strategy_id"] == "low_mid_corrective_cut"
+    assert contract["strategy_search"]["selected_processing_type"] == "eq"
+    assert contract["strategy_search"]["scoring_dimensions"] == [
+        "speed",
+        "precision",
+        "musical",
+        "safety",
+        "reversibility",
+        "operator_clarity",
+    ]
+    assert contract["strategy_search"]["alternatives_compared"]
+    assert all(
+        row["why_not_selected"]
+        for row in contract["strategy_search"]["alternatives_compared"]
+    )
+    assert "gain_db" in contract["parameter_calculation"]["parameter_keys"]
+    assert "wing_eq_band_operations" in contract["parameter_calculation"][
+        "wing_osc_apply_parameter_keys"
+    ]
+    assert contract["safety_layer"]["true_peak_headroom_guard"] is True
+    assert contract["safety_layer"]["feedback_guard"] is True
+    assert contract["safety_layer"]["no_hidden_live_authority_widening"] is True
+    assert contract["safety_layer"]["live_write"] is False
+    assert contract["safety_layer"]["queue_mutation"] is False
+    assert contract["safety_layer"]["live_authority_granted"] is False
+    assert contract["operator_explanation"]["problem_found"] == "muddy"
+    assert contract["operator_explanation"]["rollback_readback"][
+        "required_before_live_promotion"
+    ] is True
+    assert contract["wing_readback_contract"]["target_console"] == (
+        WING_RACK_OSC_TARGET_CONSOLE
+    )
+    assert contract["wing_readback_contract"]["firmware"] == WING_RACK_OSC_FIRMWARE
+    assert contract["wing_readback_contract"]["selected_read_before_paths"] == (
+        expected_eq_readback_paths
+    )
+    assert contract["wing_readback_contract"]["live_write"] is False
+    assert proposal["decision_engine_contract"] == contract
+    assert proposal["proposed_action"]["decision_engine_contract"] == contract
+    assert proposal["evidence"]["decision_engine_contract"] == contract
     readback = recommendation.selected_strategy.future_wing_readback_contract
     _assert_common_readback_contract(readback)
     assert readback["eq_band_readback"]["protected_band_policy"] == (

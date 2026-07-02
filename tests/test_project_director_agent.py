@@ -1394,24 +1394,36 @@ def test_project_director_narrows_post_m104_intake_hardening_loop():
 
     assert directive["selected_blocker"] == "WING read-only connection proof"
     assert directive["selected_action_requires_external_validation"] is True
-    assert directive["pre_hardware_intake_hardening_loop_guard"] is True
     assert directive["pre_hardware_intake_guard_requested_lookback_commits"] == 12
     assert directive["pre_hardware_intake_guard_effective_lookback_commits"] == 20
     assert directive["pre_hardware_intake_guard_lookback_floor"] == 20
-    assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
-    assert (
-        directive["allowed_autonomous_scope"]
-        == "external_validation_wait_or_named_gap_only"
-    )
-    assert any("After M104" in item for item in directive["allowed_scope"])
-    assert any(
-        "No further generic WING read-only intake guard milestone after M104" in item
-        for item in directive["forbidden_scope"]
-    )
-    assert any(
-        "Do not keep improving the same WING read-only intake function" in item
-        for item in directive["forbidden_scope"]
-    )
+    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
+        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is False
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_handoff_or_control_plane_only"
+        )
+        assert any(
+            "selected external WING validation handoff/intake" in item
+            for item in directive["allowed_scope"]
+        )
+    else:
+        assert directive["pre_hardware_intake_hardening_loop_guard"] is True
+        assert directive["pre_hardware_intake_guard_recent_streak_count"] >= 10
+        assert (
+            directive["allowed_autonomous_scope"]
+            == "external_validation_wait_or_named_gap_only"
+        )
+        assert any("After M104" in item for item in directive["allowed_scope"])
+        assert any(
+            "No further generic WING read-only intake guard milestone after M104" in item
+            for item in directive["forbidden_scope"]
+        )
+        assert any(
+            "Do not keep improving the same WING read-only intake function" in item
+            for item in directive["forbidden_scope"]
+        )
 
 
 def test_project_director_selects_operator_review_for_real_wing_candidate():

@@ -1528,6 +1528,7 @@ class SmartDSPRecommendation:
         strategy_search_details = self.evidence.get("strategy_search", {})
         alternative_tradeoffs = strategy_search_details.get("alternative_tradeoffs", [])
         operator_explanation_sections = self.evidence.get("operator_explanation_sections", {})
+        decision_engine_contract = self.evidence.get("decision_engine_contract", {})
         selected_wing_osc_summary = _candidate_wing_osc_tradeoff_summary(
             self.selected_strategy
         )
@@ -1547,6 +1548,7 @@ class SmartDSPRecommendation:
             ),
             **selected_wing_osc_summary,
             **selected_wing_osc_readback_summary,
+            "decision_engine_contract": decision_engine_contract,
             "alternatives_considered": [
                 {
                     "strategy_id": candidate.strategy_id,
@@ -1583,6 +1585,7 @@ class SmartDSPRecommendation:
             "strategy_search_details": strategy_search_details,
             "alternative_tradeoffs": alternative_tradeoffs,
             "operator_explanation_sections": operator_explanation_sections,
+            "decision_engine_contract": decision_engine_contract,
             "selected_wing_osc_summary": dict(selected_wing_osc_summary),
             "selected_wing_osc_readback_summary": dict(
                 selected_wing_osc_readback_summary
@@ -1611,6 +1614,7 @@ class SmartDSPRecommendation:
                 "alternative_tradeoffs": alternative_tradeoffs,
                 "operator_explanation": self.operator_explanation,
                 "operator_explanation_sections": operator_explanation_sections,
+                "decision_engine_contract": decision_engine_contract,
                 "selected_wing_osc_readback_summary": dict(
                     selected_wing_osc_readback_summary
                 ),
@@ -32360,6 +32364,236 @@ def _operator_explanation_sections(
     }
 
 
+def _decision_engine_contract(
+    *,
+    analysis: SmartDSPAnalysisInput,
+    source_family: str,
+    musical_role: str,
+    selected: DSPStrategyCandidate,
+    alternatives: Sequence[DSPStrategyCandidate],
+    blockers: Sequence[str],
+    tradeoffs: Sequence[Mapping[str, Any]],
+    residual_risk: str,
+    selection_policy: str,
+    operator_explanation_sections: Mapping[str, Any],
+) -> Dict[str, Any]:
+    mode = normalize_mode(analysis.mode)
+    selected_wing_osc_summary = _candidate_wing_osc_tradeoff_summary(selected)
+    selected_wing_osc_readback_summary = _candidate_wing_osc_readback_summary(
+        selected
+    )
+    scoring_dimensions = (
+        "speed",
+        "precision",
+        "musical",
+        "safety",
+        "reversibility",
+        "operator_clarity",
+    )
+    return {
+        "contract_id": "smart_dsp_decision_engine_contract_v1",
+        "method_id": SMART_DSP_METHOD_ID,
+        "mode_policy": {
+            "mode": mode,
+            "supported_modes": sorted(SUPPORTED_MODES),
+            "soundcheck_strategy_search_allowed": mode == "soundcheck",
+            "live_conservative_policy": mode == "live",
+            "live_apply_allowed": False,
+            "live_authority_granted": False,
+        },
+        "evidence_extraction": {
+            "source_identity": {
+                "source_role": analysis.source_role,
+                "source_family": source_family,
+                "musical_role": musical_role,
+                "confirmed": bool(analysis.source_identity_confirmed),
+                "confidence": round(_clip01(analysis.source_identity_confidence), 3),
+                "minimum_confidence": MIN_SOURCE_IDENTITY_CONFIDENCE,
+            },
+            "level": {
+                "rms_dbfs": round(_safe_float(analysis.rms_dbfs), 2),
+                "estimated_lufs": round(_safe_float(analysis.estimated_lufs), 2),
+                "lra_proxy_db": round(_safe_float(analysis.lra_proxy_db), 2),
+                "crest_factor_db": round(_safe_float(analysis.crest_factor_db), 2),
+                "true_peak_headroom_db": round(
+                    _safe_float(analysis.true_peak_headroom_db),
+                    2,
+                ),
+            },
+            "spectral_balance": {
+                "muddiness_score": round(_clip01(analysis.muddiness_score), 3),
+                "presence_deficit_score": round(
+                    _clip01(analysis.presence_deficit_score),
+                    3,
+                ),
+                "presence_harshness_score": round(
+                    _clip01(analysis.presence_harshness_score),
+                    3,
+                ),
+                "spectral_tilt_score": round(_clip01(analysis.spectral_tilt_score), 3),
+                "low_end_excess_score": round(_clip01(analysis.low_end_excess_score), 3),
+            },
+            "masking_conflict": {
+                "role": analysis.masking_conflict_role,
+                "target_id": analysis.masking_conflict_target_id,
+                "frequency_hz": analysis.masking_frequency_hz,
+                "score": round(_clip01(analysis.masking_score), 3),
+                "bandwidth_hz": round(_safe_float(analysis.masking_bandwidth_hz), 1),
+                "overlap_peak_share": round(
+                    _clip01(analysis.masking_overlap_peak_share),
+                    3,
+                ),
+            },
+            "transient_behavior": {
+                "density": round(_safe_float(analysis.transient_density), 3),
+                "strength": round(_clip01(analysis.transient_strength), 3),
+                "peak_dbfs": round(_safe_float(analysis.transient_peak_dbfs), 1),
+                "rise_time_ms": round(_safe_float(analysis.transient_rise_time_ms), 1),
+                "decay_ms": round(_safe_float(analysis.transient_decay_ms), 1),
+            },
+            "noise_floor_bleed": {
+                "noise_floor_dbfs": round(_safe_float(analysis.noise_floor_dbfs), 1),
+                "bleed_risk": round(_clip01(analysis.bleed_risk), 3),
+                "tail_risk": round(_clip01(analysis.tail_risk), 3),
+                "chatter_risk": round(_clip01(analysis.chatter_risk), 3),
+                "gate_hit_to_bleed_margin_db": round(
+                    _safe_float(analysis.gate_hit_to_bleed_margin_db),
+                    1,
+                ),
+            },
+            "phase_mono_safety": {
+                "phase_correlation": round(
+                    _safe_float(analysis.phase_correlation),
+                    3,
+                ),
+                "mono_sum_delta_db": round(_safe_float(analysis.mono_sum_delta_db), 2),
+            },
+            "feedback_risk": {
+                "score": round(_clip01(analysis.feedback_risk), 3),
+                "frequency_hz": analysis.feedback_frequency_hz,
+                "frequency_confidence": round(
+                    _clip01(analysis.feedback_frequency_confidence),
+                    3,
+                ),
+                "monitor_feedback_risk": round(
+                    _clip01(analysis.monitor_feedback_risk),
+                    3,
+                ),
+            },
+            "bus_group_master_impact": {
+                "summed_bus_evidence_available": bool(
+                    analysis.summed_bus_evidence_available
+                ),
+                "summed_bus_role": analysis.summed_bus_role,
+                "summed_bus_target_id": analysis.summed_bus_target_id,
+                "summed_bus_true_peak_headroom_db": round(
+                    _safe_float(analysis.summed_bus_true_peak_headroom_db),
+                    2,
+                ),
+                "summed_bus_level_plane_error_lu": round(
+                    _safe_float(analysis.summed_bus_level_plane_error_lu),
+                    2,
+                ),
+                "master_true_peak_db": round(_safe_float(analysis.master_true_peak_db), 2),
+                "master_integrated_lufs": round(
+                    _safe_float(analysis.master_integrated_lufs),
+                    2,
+                ),
+            },
+        },
+        "strategy_search": {
+            "candidate_count": 1 + len(alternatives),
+            "alternative_count": len(alternatives),
+            "selected_strategy_id": selected.strategy_id,
+            "selected_processing_type": selected.method_family,
+            "selection_policy": selection_policy,
+            "scoring_dimensions": list(scoring_dimensions),
+            "score_weights_equal": True,
+            "alternatives_compared": [
+                {
+                    "strategy_id": row.get("strategy_id"),
+                    "method_family": row.get("method_family"),
+                    "status": row.get("status"),
+                    "why_not_selected": row.get("why_not_selected"),
+                    "score_delta_vs_selected": row.get("score_delta_vs_selected"),
+                }
+                for row in tradeoffs
+            ],
+        },
+        "parameter_calculation": {
+            "parameter_keys": sorted(selected.parameters),
+            "parameter_count": len(selected.parameters),
+            "wing_osc_apply_parameter_keys": list(
+                selected_wing_osc_summary["wing_osc_apply_parameter_keys"]
+            ),
+            "wing_osc_review_only_parameter_keys": list(
+                selected_wing_osc_summary["wing_osc_review_only_parameter_keys"]
+            ),
+            "wing_osc_absolute_value_readback_parameter_keys": list(
+                selected_wing_osc_summary[
+                    "wing_osc_absolute_value_readback_parameter_keys"
+                ]
+            ),
+            "wing_osc_candidate_apply_status": (
+                selected_wing_osc_summary["wing_osc_candidate_apply_status"]
+            ),
+        },
+        "safety_layer": {
+            "fader_ceiling_dbfs": 0.0,
+            "true_peak_headroom_guard": True,
+            "feedback_guard": True,
+            "source_identity_guard": True,
+            "stale_evidence_guard": True,
+            "readback_required_before_live_promotion": True,
+            "rollback_required_before_live_promotion": True,
+            "no_hidden_live_authority_widening": True,
+            "routing_scene_master_live_write_blocked_without_supervised_proof": True,
+            "live_write": False,
+            "queue_mutation": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "global_blockers": list(blockers),
+        },
+        "operator_explanation": {
+            "problem_found": operator_explanation_sections.get("problem_found"),
+            "why_selected": operator_explanation_sections.get("why_selected"),
+            "alternatives_worse": operator_explanation_sections.get(
+                "alternatives_worse",
+                [],
+            ),
+            "proposed_parameters": operator_explanation_sections.get(
+                "proposed_parameters",
+                {},
+            ),
+            "remaining_risk": residual_risk,
+            "operator_checklist": operator_explanation_sections.get(
+                "operator_checklist",
+                [],
+            ),
+            "rollback_readback": operator_explanation_sections.get(
+                "rollback_readback",
+                {},
+            ),
+        },
+        "wing_readback_contract": {
+            "target_console": WING_RACK_OSC_TARGET_CONSOLE,
+            "firmware": WING_RACK_OSC_FIRMWARE,
+            "correction_exists_on_console_required": True,
+            "selected_read_before_paths": list(
+                selected_wing_osc_readback_summary["wing_osc_read_before_paths"]
+            ),
+            "selected_read_after_paths": list(
+                selected_wing_osc_readback_summary["wing_osc_read_after_paths"]
+            ),
+            "readback_status": selected_wing_osc_readback_summary[
+                "wing_osc_readback_status"
+            ],
+            "live_write": False,
+            "live_authority_granted": False,
+        },
+    }
+
+
 def _operator_explanation(
     *,
     analysis: SmartDSPAnalysisInput,
@@ -32939,6 +33173,18 @@ def analyze_smart_dsp_strategy(
         residual_risk=residual_risk,
         selection_policy=selection_policy,
     )
+    decision_engine_contract = _decision_engine_contract(
+        analysis=analysis,
+        source_family=source_family,
+        musical_role=musical_role,
+        selected=selected,
+        alternatives=alternatives,
+        blockers=all_blockers,
+        tradeoffs=alternative_tradeoffs,
+        residual_risk=residual_risk,
+        selection_policy=selection_policy,
+        operator_explanation_sections=operator_explanation_sections,
+    )
     explanation = _operator_explanation(
         analysis=analysis,
         selected=selected,
@@ -33293,6 +33539,7 @@ def analyze_smart_dsp_strategy(
             "alternative_tradeoffs": alternative_tradeoffs,
         },
         "operator_explanation_sections": operator_explanation_sections,
+        "decision_engine_contract": decision_engine_contract,
         "required_safety_checks": {
             "source_identity": "required_before_live_promotion",
             "current_state_readback": "required_before_live_promotion",
