@@ -1,17 +1,16 @@
 # Current State
 
-Generated: 2026-07-02T09:22:35Z
+Generated: 2026-07-02T09:52:54Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `4ac594b22 Expose SmartDSP evidence extraction contract`
+  `22852a7e8 Ignore validate-only WING preflight traces`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked/untracked worktree state: dirty before this setup, with many
-  unrelated modified backend/tests/docs files and generated artifacts.
+- Tracked/untracked worktree state: clean after the WING proof-gate state sync.
 - Complete tracked file count from `rg --files`: 14140.
 - Existing root agent file: only `./AGENTS.md`.
 - Canonical docs tree: `Docs/`. On this macOS checkout `docs` resolves to the
@@ -42,7 +41,18 @@ Generated: 2026-07-02T09:22:35Z
   `CURRENT_PROVEN_LIVE_WRITE_KINDS`, but WING deployment live writes are limited
   by `WING_DEPLOYMENT_LIVE_WRITE_KINDS = ("fader", "gain")`.
 - Full Autonomous Mixing Mode is not ready.
-- No real hardware evidence was produced during this setup run.
+- No real hardware evidence was produced in the canonical readiness-closing
+  artifact root during this state-sync cycle; existing real WING read-only
+  candidates remain queued for operator review.
+- A supporting real WING read-only tmp capture is documented in
+  `Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`. It read 15 channel-3
+  values through the existing backend session with `write_request_sent: false`,
+  `live_authority_granted: false` and `readiness_closure_allowed: false`. Its
+  `/tmp` artifact root is not the canonical `artifacts/wing_readonly_preflight`
+  root, so it cannot close readiness or replace operator decision records.
+- Operator has reported that the real WING Rack is connected and waiting for
+  tests. This is treated as permission for necessary supervised test actions
+  only, not unlimited live/soundcheck authority.
 - M001 autonomous pre-hardware work is complete and waiting for external
   WING/operator validation. The exact real-run handoff is
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
@@ -58,7 +68,7 @@ Generated: 2026-07-02T09:22:35Z
   `80e625a4`, `e8a38bc0`, `2cf226437`, `c058270a8`, `afd7ecb78`,
   `0d4358132`, `4f703c1be`, `30712d4f2`, `2a8de72ac`,
   `12a1ad7cc`, `e69ab53ca`, `f8134554c`, `c21082c0d`, and
-  `1de0a34ae`, `f1bb5f05c`, and `4ac594b22`.
+  `1de0a34ae`, `f1bb5f05c`, `4ac594b22`, `0dd5687f8`, and `22852a7e8`.
 - The current HEAD now includes `c058270a8`, which adds read-only WING gate
   slot readbacks and an operator decision queue for all unreviewed read-only
   candidates, plus `afd7ecb78`, which binds future fader/gain proof steps to
@@ -93,6 +103,7 @@ Generated: 2026-07-02T09:22:35Z
   proposals so the operator can see required source identity, level, spectral,
   masking, transient, noise/bleed, phase/mono, feedback and bus/master evidence
   coverage before trusting a proposed correction.
+  `0dd5687f8` blocks positive WING proof-direction moves even when a proof proposal is operator-authored, so the fader/gain-down proof cannot become an accidental gain-up path. `22852a7e8` ignores validate-only/no-transport preflight traces inside real read-only artifact roots, keeping the decision queue focused on actual WING readback candidates.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -1638,8 +1649,10 @@ Generated: 2026-07-02T09:22:35Z
 
 - Exact current validity of every generated no-WING artifact under
   `artifacts/no_wing_release_check/` is not assumed.
-- Current WING Rack availability is UNKNOWN.
+- Current WING Rack availability is reported connected for tests, but the
+  operator must still confirm readiness at the moment of any supervised proof
+  command.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `4ac594b22` passed with
-  `4791 passed, 1 skipped, 1 warning`.
+- The latest verified full-suite run for `22852a7e8` passed with
+  `4794 passed, 1 skipped, 1 warning`.

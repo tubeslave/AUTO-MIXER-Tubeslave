@@ -5,9 +5,9 @@
 - Milestone: M001, WING read-only preflight evidence gate.
 - Checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT.
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
-- Hardware input required now: yes. The next proof requires real WING Rack,
-  intended backend/WING session and operator review.
-- Latest heartbeat: 2026-07-02T09:22:35Z.
+- Hardware input required now: yes. The real WING Rack is reported connected
+  and waiting for tests; the next proof still requires the intended backend/WING session and operator review plus accepted decision records before any supervised write proof.
+- Latest heartbeat: 2026-07-02T09:52:54Z.
 - Latest WING read-only candidate:
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`.
 - Decision ledger status: `operator_review_required`; three unreviewed WING
@@ -17,6 +17,12 @@
   `Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md`. It lists
   every unreviewed source id, a suggested decision JSON path, and the exact
   template command for each record.
+- Supporting real WING read-only tmp capture:
+  `Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`. It confirms 15
+  channel-3 readbacks through the existing backend session with no proposal
+  request, no write request, no live authority and no readiness closure. It is
+  supporting evidence only because the artifact root is under `/tmp`, not the
+  canonical `artifacts/wing_readonly_preflight` readiness root.
 
 ## Что сделано
 
@@ -35,8 +41,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   contact, live write, readiness closure, accepted hardware evidence or live
   authority.
 
+- A supporting real WING read-only capture was recorded in a temporary root:
+  `/tmp/automixer_real_wing_verified_subset_20260702T_tmp_persist/wing_readonly_preflight/20260702T094851Z_wing_readonly_preflight/summary.json`. It passed with 15 physical readbacks, no writes and no
+  live authority. It is documented in
+  `Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`, but it is not a readiness candidate because it is outside the
+  canonical `artifacts/wing_readonly_preflight` root.
+
 - The latest verified product/runtime baseline is now
-  `4ac594b22 Expose SmartDSP evidence extraction contract`. The current
+  `22852a7e8 Ignore validate-only WING preflight traces`. The current
   verified baseline includes `c058270a8` read-only WING gate slot physical
   readbacks and operator decision queue, `afd7ecb78` fader/gain proof steps
   bound to concrete WING surfaces, and `4f703c1be` runner summaries/proposals
@@ -65,14 +77,16 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   live boundary. `4ac594b22` exposes a SmartDSP evidence-extraction contract
   in operator proposals, showing required source identity, level, spectral,
   masking, transient, noise/bleed, phase/mono, feedback and bus/master evidence
-  coverage before a proposed correction is trusted. The latest verified full
-  suite passed with `4791 passed, 1 skipped, 1 warning`;
+  coverage before a proposed correction is trusted. `0dd5687f8` blocks positive WING proof-direction moves even for operator-authored proof proposals, and `22852a7e8` ignores validate-only/no-transport WING preflight traces in real artifact roots. The latest verified full
+  suite passed with `4794 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path
   and no-WING quick gate. This is progress toward the WING MVP gate, but it does not
-  replace the missing accepted operator decisions or accepted real WING
-  physical readback proof.
+  replace the missing accepted operator decisions or accepted canonical real
+  WING physical readback proof. The operator's test permission is scoped to the
+  supervised fader/gain-down proof after those decisions; it is not unlimited
+  live/soundcheck authority for EQ, dynamics, FX, routing, master or scenes.
 
 - M081 WING review decision prestart proof binding rail is now automated:
   review decision templates and accepted decision records must carry the same

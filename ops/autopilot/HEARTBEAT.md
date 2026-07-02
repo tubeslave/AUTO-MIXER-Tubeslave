@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T09:22:35Z
+Last heartbeat UTC: 2026-07-02T09:52:54Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -17,8 +17,15 @@ candidate source id, then rerun
 `PYTHONPATH=backend python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions`.
 
 Latest check: the control-plane state is synchronized to latest verified
-product/runtime commit `4ac594b22 Expose SmartDSP evidence extraction contract`.
-Latest verified full pytest passed with `4791 passed, 1 skipped, 1 warning`.
+product/runtime commit `22852a7e8 Ignore validate-only WING preflight traces`.
+Latest verified full pytest passed with `4794 passed, 1 skipped, 1 warning`.
+no-WING quick passed with failed_checks `[]` and no live authority at `/tmp/automixer_no_wing_proof_direction_post_transport_fix_20260702/20260702T094513Z_no_wing_release_check/summary.json`.
+Supporting real WING read-only tmp capture was recorded in
+`Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`: channel 3 produced 15
+readback values through the existing backend session, with no proposal request,
+no write request, no live authority and no readiness closure. It is not a
+canonical readiness candidate because its artifact root is under `/tmp`, not
+`artifacts/wing_readonly_preflight`.
 Current targeted surface-contract checks passed:
 `tests/test_supervised_wing_proof_plan.py` `186 passed`, selected WING MVP
 rails `4 passed`, `py_compile` passed, JSON/JSONL validation passed, and
@@ -42,6 +49,13 @@ coverage `5 passed`, selected product-state preflight/plan/dry-run checks
 `3 passed`, handler/queue `py_compile` passed, full suite passed, and
 `tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_basic_controls_20260702T0850Z`
 passed.
+
+
+Supporting real WING read-only evidence was also captured into a temporary root:
+`/tmp/automixer_real_wing_verified_subset_20260702T_tmp_persist/wing_readonly_preflight/20260702T094851Z_wing_readonly_preflight/summary.json`. It passed with 15 physical readbacks and no writes, but it
+does not close readiness because the canonical review contract only accepts
+readiness candidates from `artifacts/wing_readonly_preflight`. See
+`Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`.
 
 The latest real WING read-only candidate remains
 `candidate_ready_for_manual_review`. The decision ledger review remains blocked
@@ -73,4 +87,11 @@ fader would cross the 0 dB ceiling. If WING control readback context exists but
 the current fader value is missing, gain-up is also blocked until the fader
 readback is available. SmartDSP operator proposals now also include an
 evidence-extraction contract that lists required evidence components and their
-coverage without granting live authority.
+coverage without granting live authority. The apply path now blocks positive
+WING proof-direction moves even for operator-authored proof proposals, and
+read-only evidence intake ignores validate-only/no-transport preflight traces
+so they do not pollute the real candidate queue. The real WING Rack is treated
+as connected and available for supervised tests, but permission is limited to
+necessary fader/gain-down proof actions after accepted read-only decisions; it
+does not grant unrestricted EQ, dynamics, FX, routing, master, scene, live or
+soundcheck authority.
