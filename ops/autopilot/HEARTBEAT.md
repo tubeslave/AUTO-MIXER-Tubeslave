@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T08:50:39Z
+Last heartbeat UTC: 2026-07-02T08:56:41Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -17,7 +17,7 @@ candidate source id, then rerun
 `PYTHONPATH=backend python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions`.
 
 Latest check: the control-plane state is synchronized to latest verified
-product/runtime commit `c21082c0d Extract WING basic control readbacks`.
+product/runtime commit `1de0a34ae Block WING gain-up past fader ceiling`.
 Latest verified full pytest passed with `4786 passed, 1 skipped, 1 warning`.
 Current targeted surface-contract checks passed:
 `tests/test_supervised_wing_proof_plan.py` `186 passed`, selected WING MVP
@@ -33,8 +33,8 @@ Current smart-DSP gate-slot conflict checks passed:
 `py_compile backend/smart_dsp_replay_evaluation.py backend/smart_dsp_strategy_engine.py`
 passed.
 Current SmartDSP WING readback evidence extraction checks passed:
-`tests/test_smart_dsp_evidence_extractor.py` `81 passed`, combined
-SmartDSP strategy/replay checks `336 passed`, and extractor/strategy
+`tests/test_smart_dsp_evidence_extractor.py` `82 passed`, combined
+SmartDSP strategy/replay checks `338 passed`, and extractor/strategy
 `py_compile` passed.
 Current WING proof apply surface-contract checks passed:
 selected `tests/test_server.py` apply/preflight mismatch and linked rollback
@@ -67,4 +67,6 @@ live authority grant, accepted hardware evidence or Full Autonomous readiness
 was produced. WING EQ/dynamics readbacks are imported as read-only state but do
 not count as verified processor-model proof. WING fader, input-trim and pan
 readbacks are also imported as read-only SmartDSP analysis context only; `pan`
-does not become a current WING deployment apply target.
+does not become a current WING deployment apply target. WING gain-up candidates
+now also consult the read-only current fader value and block when the projected
+fader would cross the 0 dB ceiling.
