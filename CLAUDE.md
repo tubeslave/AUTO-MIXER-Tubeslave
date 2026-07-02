@@ -60,12 +60,29 @@ Docs/                    — PDF документация WING, техничес
 
 ### Баги, которые повторялись
 - `gcc_phat(target, reference)` — НЕ `gcc_phat(reference, target)`. Инверсия = фаза корректируется в обратную сторону
+- GCC-PHAT знак ПРИМЕНЕНИЯ: `delay_ms > 0` = target ОТСТАЁТ. Задерживать target только при `delay_ms < 0` (когда он опережает), иначе положительная обратная связь до предела delay
 - Agent `while self.state == RUNNING` завершается при PAUSED. Использовать `asyncio.Event.wait()`
+- Agent `start()` на PAUSED обязан только resume — второй `_run_loop` = дублирующиеся OSC-записи
 - `find_snap_by_name()` — КЭШИРОВАТЬ имена. Загрузка = деструкция mixer state на концерте
 - `ratio_float_to_wing()` — константы WING_RATIO_VALUES/WING_RATIO_STRINGS должны быть на уровне модуля
 - NumPy типы (np.float64) не сериализуются в JSON → `convert_numpy_types()` перед `json.dumps()`
+- `set_channel_fader()` принимает dB — НЕ конвертировать в линейный коэффициент (`_db_to_linear(-10)=0.316` ≈ unity → аварийное снижение не срабатывает)
+- Pre-fader компенсация: `pre_fader = measured - fader_db` — НЕ плюс (плюс = положительная обратная связь контура Fader Riding)
+- Readback вернул None → НЕ подставлять 0.0 и НЕ писать в пульт (запись «0 − шаг» при реальном trim −10 dB = повышение gain при перегрузе). Пропустить цикл/канал
+- Notch-слоты feedback_detector: max 7 (4 EQ + 3 PEQ бэнда), наименьший свободный слот, слот↔бэнд взаимно однозначно. `(slot % 4) + 1` перезаписывал чужие бэнды
+- `signal.lfilter` в блочном DSP (TruePeakMeter и т.п.) — ВСЕГДА с `zi=`, иначе межблочные пики занижаются
+- Клэмп по пиковому запасу: всегда `min(gain, delta_peak)`, в т.ч. при `delta_peak < 0`
+- MIDI поверх TCP (dlive_client): накопительный RX-буфер обязателен — TCP не сохраняет границы сообщений, partial read без буфера искажает NRPN-state фейдеров
+- dLive mute — ПАРА NoteOn(vel состояния) + NoteOn(vel=0): хвост vel=0 не несёт состояния, читать отдельный mute-ключ, не сырой note
+- Пер-сэмпловые константы (peak_decay, attack/release/hold в сэмплах) при вызове раз на КАДР — умножать/возводить в степень на размер кадра
+- Ratio-строки WING: только "1.1".."100" (формат "2.0:1"/"inf:1" пульт не принимает); таблицы signal_analysis и compressor_adaptation синхронны (тест)
+- Reconnect клиентов: потоки receiver/renewal привязывать к поколению подключения (иначе disconnect→connect плодит дубликаты, читающие новый сокет)
+- `asyncio.create_task` из потоков — только через `loop.call_soon_threadsafe(self._create_broadcast_task, payload)` (сильная ссылка + payload фиксируется сразу)
 
 ### Архитектурные решения
+- Потолок автоматики для фейдера — 0 dBFS (клэмпы/`FADER_MAX`/`MAX_GAIN_DB` = 0.0); +10 dB доступен только оператору вручную
+- Синхронные вызовы mixer-клиента с `time.sleep` (load_snap/save_snap) из async-хендлеров — только через `asyncio.to_thread`
+- Fader Riding: канал без прочитанного с пульта якоря (`anchor_valid=False`) не управляется вообще
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях
 - ScenarioDetector — кэшировать экземпляр, НЕ создавать на каждый аудиоблок
 - server.py — координатор. Логика в handlers/. НЕ добавлять новые маршруты в server.py напрямую

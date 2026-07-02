@@ -75,13 +75,23 @@ class StateUpdateQueue:
         self._lock = threading.Lock()
         self._subscribers: Dict[int, _Subscriber] = {}
         self._next_id = 1
+        # Event loop, в котором живут подписчики (asyncio.Queue не потокобезопасен):
+        # запоминается при subscribe(); publish() из чужого потока маршрутизируется
+        # через call_soon_threadsafe, иначе await queue.get() может не проснуться
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def subscribe(
         self,
         channels: Optional[Set[int]] = None,
         update_types: Optional[Set[UpdateType]] = None,
     ) -> int:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
         with self._lock:
+            if loop is not None:
+                self._loop = loop
             sub_id = self._next_id
             self._next_id += 1
             self._subscribers[sub_id] = _Subscriber(
@@ -116,25 +126,47 @@ class StateUpdateQueue:
                 sub.update_types = update_types
             return True
 
+    @staticmethod
+    def _put_dropping_oldest(queue: asyncio.Queue, update: StateUpdate) -> bool:
+        try:
+            queue.put_nowait(update)
+            return True
+        except asyncio.QueueFull:
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                queue.put_nowait(update)
+                return True
+            except asyncio.QueueFull:
+                return False
+
     def publish(self, update: StateUpdate) -> int:
         delivered = 0
         with self._lock:
             subs = list(self._subscribers.values())
+            loop = self._loop
+        # asyncio.Queue не потокобезопасен: из чужого потока put_nowait не будит
+        # ожидающих в await queue.get() и гонится на внутреннем deque —
+        # маршрутизируем через event loop подписчиков
+        if loop is not None and loop.is_running():
+            try:
+                on_loop_thread = asyncio.get_running_loop() is loop
+            except RuntimeError:
+                on_loop_thread = False
+            if not on_loop_thread:
+                for sub in subs:
+                    if sub.matches(update):
+                        loop.call_soon_threadsafe(
+                            self._put_dropping_oldest, sub.queue, update
+                        )
+                        delivered += 1
+                return delivered
         for sub in subs:
             if sub.matches(update):
-                try:
-                    sub.queue.put_nowait(update)
+                if self._put_dropping_oldest(sub.queue, update):
                     delivered += 1
-                except asyncio.QueueFull:
-                    try:
-                        sub.queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        pass
-                    try:
-                        sub.queue.put_nowait(update)
-                        delivered += 1
-                    except asyncio.QueueFull:
-                        pass
         return delivered
 
     async def get_update(self, sub_id: int, timeout: float = 1.0) -> Optional[StateUpdate]:

@@ -64,6 +64,17 @@ class GCCPHATAnalyzer:
         self.fft_size = fft_size
         self.hop_size = hop_size
         self.max_delay_samples = int(max_delay_ms * sample_rate / 1000.0)
+        # Циркулярная корреляция однозначна только в пределах ±fft_size/2 - 1:
+        # задержка за этим пределом заворачивается и читается с обратным знаком.
+        # Клэмпим диапазон поиска, чтобы конфиг не обещал больше измеримого.
+        unambiguous_limit = fft_size // 2 - 1
+        if self.max_delay_samples > unambiguous_limit:
+            logger.warning(
+                f"max_delay_ms={max_delay_ms} exceeds unambiguous range for "
+                f"fft_size={fft_size} (±{unambiguous_limit * 1000.0 / sample_rate:.1f}ms); "
+                f"clamping search range"
+            )
+            self.max_delay_samples = unambiguous_limit
         
         # Pre-compute window
         self.window = np.hanning(fft_size)
@@ -113,20 +124,28 @@ class GCCPHATAnalyzer:
         Returns:
             DelayMeasurement with estimated delay and quality metrics
         """
-        # Use buffer if signals not provided
+        # Use buffer if signals not provided.
+        # Кольцевой буфер разворачиваем в хронологический порядок относительно
+        # buffer_idx — иначе после первого оборота записи внутрь анализируемого
+        # окна попадает граница «новые/старые данные» (склейка кадров,
+        # разнесённых по времени на ~0.68 с) и GCC-PHAT выдаёт фиктивные пики
         if ref_signal is None:
-            ref_signal = self.ref_buffer
+            ref_signal = np.concatenate(
+                (self.ref_buffer[self.buffer_idx:], self.ref_buffer[:self.buffer_idx])
+            )
         if tgt_signal is None:
-            tgt_signal = self.tgt_buffer
-        
+            tgt_signal = np.concatenate(
+                (self.tgt_buffer[self.buffer_idx:], self.tgt_buffer[:self.buffer_idx])
+            )
+
         # Ensure we have enough samples
         if len(ref_signal) < self.fft_size:
             logger.warning(f"Signal too short: {len(ref_signal)} < {self.fft_size}")
             return DelayMeasurement(0, 0, 0, 0, -60, 0, 0)
-        
-        # Extract frames with windowing
-        ref_frame = ref_signal[:self.fft_size] * self.window
-        tgt_frame = tgt_signal[:self.fft_size] * self.window
+
+        # Extract frames with windowing: берём самые свежие fft_size сэмплов
+        ref_frame = ref_signal[-self.fft_size:] * self.window
+        tgt_frame = tgt_signal[-self.fft_size:] * self.window
         
         # Compute FFT
         Ref = fft(ref_frame)
@@ -347,12 +366,21 @@ class AutoPhaseAligner:
         try:
             # Round to mixer precision (typically 0.02ms @ 48kHz)
             delay_ms = round(measurement.delay_ms * 50) / 50  # 0.02ms resolution
-            
-            # Only apply if delay is positive (add delay to faster channel)
-            if delay_ms > 0:
-                self.mixer_client.set_channel_delay(channel, delay_ms)
-                logger.debug(f"Set delay for channel {channel}: {delay_ms:.2f}ms "
+
+            # Знак измерения (см. самотест в __main__): delay_ms > 0 означает,
+            # что target ОТСТАЁТ от reference. Задерживаем опережающий канал:
+            # target задерживается только при delay_ms < 0 (target быстрее).
+            # Задержка target при delay_ms > 0 удваивала бы рассогласование
+            # (положительная обратная связь до предела delay).
+            if delay_ms < 0:
+                self.mixer_client.set_channel_delay(channel, -delay_ms)
+                logger.debug(f"Set delay for channel {channel}: {-delay_ms:.2f}ms "
                            f"(confidence: {measurement.confidence:.2f})")
+            elif delay_ms > 0:
+                # Target и так опаздывает — выровнять можно только задержкой
+                # reference-канала, чего этот контур не делает
+                logger.info(f"Channel {channel} lags reference by {delay_ms:.2f}ms; "
+                            f"not adding delay (would worsen alignment)")
         except Exception as e:
             logger.error(f"Failed to send delay command: {e}")
     

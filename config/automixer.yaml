@@ -43,7 +43,7 @@ safety:
   feedback_detection: true
   max_gain_db: 12.0
   true_peak_limit: -1.0
-  max_notch_filters: 8
+  max_notch_filters: 7  # 4 EQ + 3 PEQ аппаратных бэнда на канал
   max_notch_depth_db: -12.0
 
 logging:

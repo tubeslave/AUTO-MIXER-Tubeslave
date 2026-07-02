@@ -102,34 +102,43 @@ def detect_audio_device() -> tuple:
 
 @dataclass
 class ChannelBuffer:
-    """Ring buffer for a single channel's audio data."""
+    """Ring buffer for a single channel's audio data.
+
+    write() вызывается из callback-потока аудиодрайвера, read() — из event
+    loop/других потоков: без блокировки читатель получал рваные окна
+    (половина старых, половина новых сэмплов) → ложные LUFS/спектры.
+    """
     channel: int
     buffer: np.ndarray
     write_pos: int = 0
     sample_rate: int = 48000
     filled: bool = False
 
+    def __post_init__(self):
+        self._lock = threading.Lock()
+
     def write(self, samples: np.ndarray):
         """Write samples to ring buffer."""
         n = len(samples)
         buf_len = len(self.buffer)
-        if n >= buf_len:
-            self.buffer[:] = samples[-buf_len:]
-            self.write_pos = 0
-            self.filled = True
-        elif self.write_pos + n <= buf_len:
-            self.buffer[self.write_pos:self.write_pos + n] = samples
-            self.write_pos += n
-            if self.write_pos >= buf_len:
+        with self._lock:
+            if n >= buf_len:
+                self.buffer[:] = samples[-buf_len:]
                 self.write_pos = 0
                 self.filled = True
-        else:
-            first = buf_len - self.write_pos
-            self.buffer[self.write_pos:] = samples[:first]
-            remainder = n - first
-            self.buffer[:remainder] = samples[first:]
-            self.write_pos = remainder
-            self.filled = True
+            elif self.write_pos + n <= buf_len:
+                self.buffer[self.write_pos:self.write_pos + n] = samples
+                self.write_pos += n
+                if self.write_pos >= buf_len:
+                    self.write_pos = 0
+                    self.filled = True
+            else:
+                first = buf_len - self.write_pos
+                self.buffer[self.write_pos:] = samples[:first]
+                remainder = n - first
+                self.buffer[:remainder] = samples[first:]
+                self.write_pos = remainder
+                self.filled = True
 
     def read(self, num_samples: int = 0) -> np.ndarray:
         """Read the most recent samples from the buffer."""
@@ -139,23 +148,25 @@ class ChannelBuffer:
 
         num_samples = min(num_samples, buf_len)
 
-        if not self.filled and self.write_pos < num_samples:
-            return self.buffer[:self.write_pos].copy()
+        with self._lock:
+            if not self.filled and self.write_pos < num_samples:
+                return self.buffer[:self.write_pos].copy()
 
-        start = (self.write_pos - num_samples) % buf_len
-        if start < self.write_pos:
-            return self.buffer[start:self.write_pos].copy()
-        else:
-            return np.concatenate([
-                self.buffer[start:],
-                self.buffer[:self.write_pos]
-            ])
+            start = (self.write_pos - num_samples) % buf_len
+            if start < self.write_pos:
+                return self.buffer[start:self.write_pos].copy()
+            else:
+                return np.concatenate([
+                    self.buffer[start:],
+                    self.buffer[:self.write_pos]
+                ])
 
     @property
     def available_samples(self) -> int:
-        if self.filled:
-            return len(self.buffer)
-        return self.write_pos
+        with self._lock:
+            if self.filled:
+                return len(self.buffer)
+            return self.write_pos
 
 
 class AudioCapture:

@@ -213,7 +213,10 @@ class KWeightingFilter:
         
         K = np.tan(np.pi * f0 / fs)
         a0 = 1 + K / Q + K * K
-        self.hp_b = np.array([1 / a0, -2 / a0, 1 / a0])
+        # BS.1770-4 задаёт числитель HPF ровно [1.0, -2.0, 1.0] БЕЗ нормировки
+        # на a0 (нормируется только знаменатель); деление на a0 занижало все
+        # LUFS-измерения на ~0.043 dB
+        self.hp_b = np.array([1.0, -2.0, 1.0])
         self.hp_a = np.array([
             1,
             2 * (K * K - 1) / a0,
@@ -352,6 +355,11 @@ class TruePeakMeter:
         cutoff = 0.5 / self.oversample_factor
         self.interp_filter = signal.firwin(num_taps, cutoff)
         self.filter_delay = (num_taps - 1) // 2
+        # Состояние FIR между блоками: без него каждый блок фильтруется с нуля,
+        # и межблочные (межсэмпловые) пики на стыках систематически занижаются —
+        # а на это значение опирается проверка true_peak < -1.0 dBTP перед
+        # повышением gain (SAFETY инвариант 2)
+        self._filter_zi = np.zeros(num_taps - 1)
     
     def process(self, samples: np.ndarray) -> float:
         """
@@ -367,8 +375,10 @@ class TruePeakMeter:
         upsampled = np.zeros(len(samples) * self.oversample_factor)
         upsampled[::self.oversample_factor] = samples
         
-        # Применяем интерполяционный фильтр
-        interpolated = signal.lfilter(self.interp_filter, 1, upsampled)
+        # Применяем интерполяционный фильтр с переносом состояния между блоками
+        interpolated, self._filter_zi = signal.lfilter(
+            self.interp_filter, 1, upsampled, zi=self._filter_zi
+        )
         interpolated *= self.oversample_factor  # Компенсация амплитуды
         
         # Находим максимальный пик
@@ -404,6 +414,7 @@ class TruePeakMeter:
         """Полный сброс."""
         self._max_peak = 0.0
         self._current_peak = 0.0
+        self._filter_zi = np.zeros(len(self.interp_filter) - 1)
 
 
 class AGCEnvelope:
@@ -952,7 +963,12 @@ class LUFSGainStagingController:
                         if chunks:
                             try:
                                 audio_data = np.concatenate(chunks)
-                                
+
+                                # Gain ДО обработки: agc.process() перезапишет
+                                # current_gain, а bleed-блокировке ниже нужно
+                                # прежнее значение для сравнения
+                                previous_gain = agc.current_gain
+
                                 # Обрабатываем (включая тихие данные - AGC сам отметит gated/idle)
                                 result = agc.process(audio_data)
                             except Exception as e:
@@ -984,11 +1000,18 @@ class LUFSGainStagingController:
                                 bleed_info = self.bleed_service.get_bleed_info(audio_ch)
                                 if bleed_info:
                                     bleed_ratio = float(bleed_info.bleed_ratio)
-                                    # Блокируем повышение gain при высоком bleed (>0.5)
-                                    if bleed_ratio > 0.5 and result['gain'] > agc.current_gain:
-                                        # Не повышаем gain - оставляем текущий
-                                        logger.debug(f"Ch{audio_ch}: High bleed (ratio={bleed_ratio:.2f}), blocking gain increase")
-                                        # Можно также компенсировать LUFS перед расчетом коррекции
+                                    # Блокируем повышение gain при высоком bleed (>0.5).
+                                    # Сравниваем с gain ДО agc.process() (previous_gain):
+                                    # прежнее сравнение с agc.current_gain было невыполнимо
+                                    # (process уже присвоил current_gain = result['gain']),
+                                    # и блокировка была no-op — канал с сильным блидом
+                                    # (тихий вокал, ловящий барабаны) получал повышение
+                                    if bleed_ratio > 0.5 and result['gain'] > previous_gain:
+                                        logger.info(f"Ch{audio_ch}: High bleed (ratio={bleed_ratio:.2f}), "
+                                                    f"blocking gain increase {previous_gain:.2f} -> {result['gain']:.2f}")
+                                        agc.current_gain = previous_gain
+                                        result['gain'] = previous_gain
+                                        result['applied_gain'] = agc.base_trim + previous_gain
                                     # Компенсируем LUFS для более точного расчета
                                     compensated_lufs = self.bleed_service.get_compensated_level(audio_ch, result['lufs'])
                                     if compensated_lufs != result['lufs']:
@@ -1024,7 +1047,14 @@ class LUFSGainStagingController:
                                         
                                         # Получаем текущий Trim
                                         try:
-                                            current_trim = self.mixer_client.get_channel_gain(mixer_ch) or 0.0
+                                            current_trim = self.mixer_client.get_channel_gain(mixer_ch)
+                                            if current_trim is None:
+                                                # Без readback НЕ пишем: подстановка 0.0 при реальном
+                                                # trim -10 dB означала бы запись -1 dB, т.е. ПОВЫШЕНИЕ
+                                                # gain на +9 dB прямо во время пикового перегруза
+                                                logger.warning(f"Trim readback unavailable for channel {mixer_ch}, "
+                                                               f"skipping trim reduction this cycle")
+                                                continue
                                             
                                             # Вычисляем новый Trim (снижаем на 1дБ)
                                             new_trim = current_trim - self.trim_reduction_step_db

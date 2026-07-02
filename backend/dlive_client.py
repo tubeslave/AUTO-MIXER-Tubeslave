@@ -273,9 +273,15 @@ class DLiveClient(MixerClientBase):
         self.is_connected = False
 
         self._lock = threading.Lock()
+        self._connect_lock = threading.Lock()
         self._recv_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._reconnect_interval = 3.0
+        self._send_timeout = 5.0
+        # Накопительный RX-буфер: TCP не сохраняет границы MIDI-сообщений,
+        # сообщение может быть разрезано между recv()
+        self._rx_buf = bytearray()
+        self._MAX_SYSEX_LEN = 65536
 
         self.state: Dict[str, Any] = {}
         self.callbacks: Dict[str, List[Callable]] = {}
@@ -286,8 +292,15 @@ class DLiveClient(MixerClientBase):
     # ── Connection ─────────────────────────────────────────────
 
     def connect(self, timeout: float = 5.0) -> bool:
+        # Лок: конкурентный connect (приложение + auto-reconnect) создавал
+        # два сокета и два receiver-потока, первый сокет утекал
+        with self._connect_lock:
+            return self._connect_locked(timeout)
+
+    def _connect_locked(self, timeout: float = 5.0) -> bool:
         if self.is_connected:
             return True
+        raw = None
         try:
             raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             raw.settimeout(timeout)
@@ -312,6 +325,11 @@ class DLiveClient(MixerClientBase):
             else:
                 self._sock = raw
 
+            # Таймаут выставляется ОДИН раз: recv-поллинг 1 c; sendall с
+            # таймаутом обрабатывается в _send_raw дослылкой остатка
+            self._sock.settimeout(1.0)
+            self._rx_buf.clear()
+
             self.is_connected = True
             self._stop_event.clear()
 
@@ -324,6 +342,16 @@ class DLiveClient(MixerClientBase):
         except Exception as e:
             logger.error(f"dLive connection failed: {e}")
             self.is_connected = False
+            # Не утекать сокетом при неудачной попытке (реконнект каждые 3 c)
+            try:
+                if self._sock:
+                    self._sock.close()
+                elif raw is not None:
+                    raw.close()
+            except Exception:
+                pass
+            self._sock = None
+            self._ssl_sock = None
             return False
 
     def disconnect(self):
@@ -347,7 +375,24 @@ class DLiveClient(MixerClientBase):
             if not self.is_connected or not self._sock:
                 return False
             try:
-                self._sock.sendall(data)
+                # НЕ sendall: у сокета recv-таймаут 1 c, и sendall при
+                # заполненном буфере бросал timeout ПОСЛЕ частичной отправки —
+                # на пульт уходила усечённая NRPN-команда (например, порог
+                # компрессора записан, ratio — нет). Досылаем остаток
+                # до дедлайна, чтобы сообщение ушло целиком либо никак.
+                view = memoryview(data)
+                total = 0
+                deadline = time.time() + self._send_timeout
+                while total < len(view):
+                    try:
+                        sent = self._sock.send(view[total:])
+                    except socket.timeout:
+                        if time.time() > deadline:
+                            raise
+                        continue
+                    if sent == 0:
+                        raise ConnectionError("socket closed during send")
+                    total += sent
                 return True
             except Exception as e:
                 logger.error(f"dLive send error: {e}")
@@ -362,7 +407,6 @@ class DLiveClient(MixerClientBase):
             try:
                 if self._sock is None:
                     break
-                self._sock.settimeout(1.0)
                 data = self._sock.recv(4096)
                 if not data:
                     logger.warning("dLive connection closed by remote")
@@ -377,40 +421,64 @@ class DLiveClient(MixerClientBase):
                     self.is_connected = False
                 break
 
-        # Auto-reconnect
-        if not self._stop_event.is_set():
+        # Auto-reconnect: с ретраями и перепроверкой stop_event (одноразовая
+        # попытка после time.sleep оставляла клиент отключённым навсегда,
+        # а sleep игнорировал явный disconnect())
+        while not self._stop_event.is_set():
             logger.info(f"dLive reconnecting in {self._reconnect_interval}s …")
-            time.sleep(self._reconnect_interval)
-            self.connect()
+            if self._stop_event.wait(self._reconnect_interval):
+                break  # явный disconnect во время ожидания
+            if self.connect():
+                break  # connect() запустил новый receiver-поток
 
     def _parse_incoming(self, data: bytes):
-        """Best-effort parse of incoming MIDI messages for state tracking."""
+        """Parse incoming MIDI messages for state tracking.
+
+        TCP не сохраняет границы сообщений: 3-байтовое CC/NRPN или SysEx
+        может быть разрезано между recv(). Незавершённый хвост копится в
+        self._rx_buf до прихода остатка — прежняя версия молча теряла его
+        (и все сообщения после разрезанного SysEx), из-за чего NRPN-автомат
+        спаривал старый Data Entry MSB с новым LSB → мусор в state фейдеров.
+        """
+        self._rx_buf.extend(data)
+        buf = self._rx_buf
         i = 0
-        while i < len(data):
-            status = data[i]
+        n = len(buf)
+        while i < n:
+            status = buf[i]
             if status == 0xF0:
-                # SysEx — find F7
-                end = data.find(b'\xF7', i)
+                end = buf.find(b'\xF7', i)
                 if end == -1:
+                    # Незавершённый SysEx — ждём следующий recv
+                    if n - i > self._MAX_SYSEX_LEN:
+                        logger.warning("dLive: oversized/corrupt SysEx dropped")
+                        i = n
                     break
-                sysex_body = data[i + 1:end]
-                self._handle_sysex(sysex_body)
+                self._handle_sysex(bytes(buf[i + 1:end]))
                 i = end + 1
-            elif status & 0xF0 == 0xB0:
-                # CC / NRPN — 3 bytes
-                if i + 2 < len(data):
-                    self._handle_cc(status & 0x0F, data[i + 1], data[i + 2])
-                i += 3
-            elif status & 0xF0 == 0x90:
-                if i + 2 < len(data):
-                    self._handle_note(status & 0x0F, data[i + 1], data[i + 2])
-                i += 3
-            elif status & 0xF0 == 0xE0:
-                if i + 2 < len(data):
-                    self._handle_pitchbend(status & 0x0F, data[i + 1], data[i + 2])
-                i += 3
+            elif status & 0x80:
+                msg_type = status & 0xF0
+                if msg_type in (0xB0, 0x90, 0xE0):
+                    if i + 3 > n:
+                        break  # неполное сообщение — ждём хвост
+                    d1, d2 = buf[i + 1], buf[i + 2]
+                    if (d1 & 0x80) or (d2 & 0x80):
+                        # Рассинхрон: data-байт со старшим битом — сдвигаемся
+                        # к следующему статус-байту
+                        i += 1
+                        continue
+                    if msg_type == 0xB0:
+                        self._handle_cc(status & 0x0F, d1, d2)
+                    elif msg_type == 0x90:
+                        self._handle_note(status & 0x0F, d1, d2)
+                    else:
+                        self._handle_pitchbend(status & 0x0F, d1, d2)
+                    i += 3
+                else:
+                    i += 1  # неподдерживаемый статус — пропускаем байт
             else:
-                i += 1
+                i += 1  # осиротевший data-байт
+        del buf[:i]
 
     def _handle_cc(self, channel: int, cc: int, value: int):
         key = f"cc/{channel}/{cc}"
@@ -440,9 +508,14 @@ class DLiveClient(MixerClientBase):
     def _handle_note(self, channel: int, note: int, velocity: int):
         key = f"note/{channel}/{note}"
         self.state[key] = velocity
-        # Track mute state: note number = channel-1, velocity >= 0x40 = muted
+        # Mute передаётся ПАРОЙ NoteOn: (vel>=0x40 = muted | 0x01..0x3F =
+        # unmuted) + завершающий NoteOn(vel=0). Хвост с velocity 0 не несёт
+        # состояния — раньше он перетирал mute на False для реально
+        # замьюченного канала. Ключ включает MIDI-канал, чтобы mute
+        # группы/aux не перетирал состояние input-канала с тем же номером.
         ch_1based = note + 1
-        self.state[f"mute/{ch_1based}"] = velocity >= 0x40
+        if velocity > 0:
+            self.state[f"mute/{channel}/{ch_1based}"] = velocity >= 0x40
         self._notify(key, velocity)
 
     def _handle_pitchbend(self, channel: int, lsb: int, msb: int):
@@ -524,9 +597,10 @@ class DLiveClient(MixerClientBase):
         return self._send_raw(msg)
 
     def get_mute(self, channel: int) -> bool:
-        key = f"note/{self._midi_channel()}/{channel - 1}"
-        val = self.state.get(key, 0)
-        return val >= 0x40
+        # Читаем отслеженное состояние mute, а не сырой note-ключ: последний
+        # всегда перезаписывался хвостовым NoteOn(vel=0) пары → всегда False
+        key = f"mute/{self._midi_channel()}/{channel}"
+        return bool(self.state.get(key, False))
 
     # ── Gain / Preamp (Pitchbend) ──────────────────────────────
 
@@ -672,13 +746,22 @@ class DLiveClient(MixerClientBase):
 
     # ── Scene Recall (Program Change) ──────────────────────────
 
-    def recall_scene(self, scene_number: int):
-        """Recall scene by number (0-499).  Scenes span 4 banks of 125."""
+    def recall_scene(self, scene_number: int) -> bool:
+        """Recall scene by 1-based number (1-500), как сцены нумеруются
+        на пульте dLive. По протоколу A&H: Bank = (Scene-1) // 128,
+        Program = (Scene-1) % 128. Контракт зафиксирован явно: прежний код
+        трактовал номер как 0-based без валидации — привычный 1-based номер
+        реколил СОСЕДНЮЮ сцену на живом пульте.
+        """
+        if not 1 <= scene_number <= 500:
+            logger.error(f"recall_scene: scene {scene_number} out of range 1-500, refusing")
+            return False
         midi_ch = self._midi_channel("input")
-        bank = scene_number // 128
-        program = scene_number % 128
+        idx = scene_number - 1
+        bank = idx // 128
+        program = idx % 128
         msg = build_program_change(midi_ch, 0, bank, program)
-        self._send_raw(msg)
+        return bool(self._send_raw(msg))
 
     # ── Channel Name (SysEx) ───────────────────────────────────
 

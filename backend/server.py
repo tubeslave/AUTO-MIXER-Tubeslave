@@ -119,12 +119,37 @@ class AutoMixerServer:
         
         # Load configuration
         self.config = self._load_config()
+
+        # Аутентификация WebSocket API. По умолчанию выключена (совместимость),
+        # включается AUTOMIXER_AUTH_ENABLED=true; статический токен —
+        # AUTOMIXER_AUTH_TOKEN, разрешённые IP — AUTOMIXER_AUTH_ALLOWED_IPS
+        # (через запятую). Раньше AuthManager существовал, но не был подключён:
+        # любой клиент в сети площадки мог двигать фейдеры на концерте.
+        from auth import AuthManager
+        auth_enabled = os.getenv("AUTOMIXER_AUTH_ENABLED", "false").lower() in ("1", "true", "yes")
+        self.auth = AuthManager(enabled=auth_enabled)
+        static_token = os.getenv("AUTOMIXER_AUTH_TOKEN", "").strip()
+        if static_token:
+            self.auth._tokens[static_token] = {
+                "client_id": "static-env-token",
+                "created": time.time(),
+                "expires": float("inf"),
+            }
+        for ip_entry in os.getenv("AUTOMIXER_AUTH_ALLOWED_IPS", "").split(","):
+            ip_entry = ip_entry.strip()
+            if ip_entry:
+                self.auth.add_allowed_ip(ip_entry)
         
         # Unified mixer client (can be EnhancedOSCClient wrapping WingClient, DLiveClient, or MixingStationClient)
         self.mixer_client: Optional[Union[EnhancedOSCClient, WingClient, DLiveClient, MixingStationClient]] = None
         self.connection_mode: Optional[str] = None  # 'wing', 'dlive', or 'mixing_station'
         
         self.connected_clients: Set[WebSocketServerProtocol] = set()
+
+        # Сильные ссылки на фоновые broadcast-задачи: asyncio.create_task без
+        # ссылки может быть собран GC на лету; на метрах WING (десятки
+        # сообщений в секунду) это лавина безымянных задач
+        self._background_tasks: Set[asyncio.Task] = set()
         
         # Voice runtime is attached lazily: Sherpa primary, Whisper V2 fallback.
         self.voice_control: Optional[Any] = None
@@ -2219,6 +2244,18 @@ class AutoMixerServer:
             else:
                 logger.error(f"Error sending to client: {e}")
 
+    def _create_broadcast_task(self, payload: dict):
+        """Планирует broadcast из event loop, удерживая ссылку на задачу.
+
+        Использовать через loop.call_soon_threadsafe(self._create_broadcast_task,
+        payload) из OSC/аудио-потоков: create_task без ссылки может быть
+        собран GC на лету, а payload-аргумент (в отличие от lambda-замыкания)
+        фиксирует значения в момент планирования.
+        """
+        task = asyncio.create_task(self.broadcast(payload))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
     async def broadcast(self, message: dict):
         logger.debug("Broadcasting message: %s to %s clients", message.get("type"), len(self.connected_clients))
         if not self.connected_clients:
@@ -2355,11 +2392,11 @@ class AutoMixerServer:
                             pass  # Ignore parsing errors
                     
                     loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
+                        self._create_broadcast_task, {
                             "type": "mixer_update",
                             "address": address,
                             "values": args
-                        }))
+                        }
                     )
                 except Exception as e:
                     logger.error(f"Callback asyncio error: {e}")
@@ -2519,11 +2556,11 @@ class AutoMixerServer:
                             pass  # Ignore parsing errors
                     
                     loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
+                        self._create_broadcast_task, {
                             "type": "mixer_update",
                             "address": address,
                             "values": args
-                        }))
+                        }
                     )
                 except Exception as e:
                     logger.error(f"Callback asyncio error: {e}")
@@ -2998,12 +3035,21 @@ class AutoMixerServer:
                 self.config['automation']['safe_gain_calibration']['learning_duration_sec'] = float(learning_duration_sec)
                 logger.info(f"Applying learning_duration_sec={learning_duration_sec} seconds for this measurement")
             
-            # Initialize SafeGainCalibrator
-            import pyaudio
-            pa = pyaudio.PyAudio()
-            device_info = pa.get_device_info_by_index(int(device_id))
-            sample_rate = int(device_info.get('defaultSampleRate', 48000))
-            pa.terminate()
+            # Initialize SafeGainCalibrator.
+            # PyAudio() опрашивает CoreAudio и может висеть секунды при занятом
+            # устройстве — в executor, чтобы не замораживать event loop
+            def _query_device_sample_rate() -> int:
+                import pyaudio
+                pa = pyaudio.PyAudio()
+                try:
+                    device_info = pa.get_device_info_by_index(int(device_id))
+                    return int(device_info.get('defaultSampleRate', 48000))
+                finally:
+                    pa.terminate()
+
+            sample_rate = await asyncio.get_running_loop().run_in_executor(
+                None, _query_device_sample_rate
+            )
             
             logger.info("Initializing SafeGainCalibrator...")
             
@@ -3864,28 +3910,28 @@ class AutoMixerServer:
             def on_spectrum_update(spectrum_data: dict):
                 """Handle spectrum data updates."""
                 loop.call_soon_threadsafe(
-                    lambda: asyncio.create_task(self.broadcast({
+                    self._create_broadcast_task, {
                         "type": "auto_eq_spectrum",
                         **spectrum_data
-                    }))
+                    }
                 )
             
             def on_corrections_calculated(corrections: list):
                 """Handle EQ corrections updates."""
                 loop.call_soon_threadsafe(
-                    lambda: asyncio.create_task(self.broadcast({
+                    self._create_broadcast_task, {
                         "type": "auto_eq_corrections",
                         "corrections": corrections
-                    }))
+                    }
                 )
             
             def on_status_update(status: dict):
                 """Handle status updates."""
                 loop.call_soon_threadsafe(
-                    lambda: asyncio.create_task(self.broadcast({
+                    self._create_broadcast_task, {
                         "type": "auto_eq_status",
                         **status
-                    }))
+                    }
                 )
             
             # Start analysis
@@ -4263,28 +4309,28 @@ class AutoMixerServer:
             def on_spectrum_update(spectrum_data: dict):
                 """Handle spectrum data updates."""
                 loop.call_soon_threadsafe(
-                    lambda: asyncio.create_task(self.broadcast({
+                    self._create_broadcast_task, {
                         "type": "multi_channel_spectrum",
                         **spectrum_data
-                    }))
+                    }
                 )
             
             def on_corrections_calculated(corrections_data: dict):
                 """Handle EQ corrections updates."""
                 loop.call_soon_threadsafe(
-                    lambda: asyncio.create_task(self.broadcast({
+                    self._create_broadcast_task, {
                         "type": "multi_channel_corrections",
                         **corrections_data
-                    }))
+                    }
                 )
             
             def on_status_update(status_data: dict):
                 """Handle status updates."""
                 loop.call_soon_threadsafe(
-                    lambda: asyncio.create_task(self.broadcast({
+                    self._create_broadcast_task, {
                         "type": "multi_channel_status",
                         **status_data
-                    }))
+                    }
                 )
             
             # Start multi-channel analysis
@@ -4563,10 +4609,10 @@ class AutoMixerServer:
                     measurements_serializable[serializable_key] = serializable_value
                 
                 loop.call_soon_threadsafe(
-                    lambda: asyncio.create_task(self.broadcast({
+                    self._create_broadcast_task, {
                         "type": "phase_alignment_measurements",
                         "measurements": measurements_serializable
-                    }))
+                    }
                 )
             
             # Convert device_id to int if needed
@@ -5120,11 +5166,11 @@ class AutoMixerServer:
                     status_data_copy = dict(status_data)
                     status_type = status_data_copy.pop('type', 'status_update')
                     loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
+                        self._create_broadcast_task, {
                             "type": "auto_fader_status",
                             "status_type": status_type,
                             **status_data_copy
-                        }))
+                        }
                     )
                 except Exception as e:
                     logger.error(f"Error broadcasting auto fader status: {e}")
@@ -5132,11 +5178,11 @@ class AutoMixerServer:
             def on_levels_updated(levels_data):
                 try:
                     loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
+                        self._create_broadcast_task, {
                             "type": "auto_fader_status",
                             "status_type": "levels_update",
                             "channels": levels_data
-                        }))
+                        }
                     )
                 except Exception as e:
                     logger.error(f"Error broadcasting auto fader levels: {e}")
@@ -5305,11 +5351,11 @@ class AutoMixerServer:
                     status_data_copy = dict(status_data)
                     status_type = status_data_copy.pop('type', 'status_update')
                     loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
+                        self._create_broadcast_task, {
                             "type": "auto_fader_status",
                             "status_type": status_type,
                             **status_data_copy
-                        }))
+                        }
                     )
                 except Exception as e:
                     logger.error(f"Error broadcasting auto balance status: {e}")
@@ -5317,11 +5363,11 @@ class AutoMixerServer:
             def on_levels_updated(levels_data):
                 try:
                     loop.call_soon_threadsafe(
-                        lambda: asyncio.create_task(self.broadcast({
+                        self._create_broadcast_task, {
                             "type": "auto_fader_status",
                             "status_type": "levels_update",
                             "channels": levels_data
-                        }))
+                        }
                     )
                 except Exception as e:
                     logger.error(f"Error broadcasting auto balance levels: {e}")
@@ -6854,6 +6900,32 @@ class AutoMixerServer:
             })
 
     async def handler(self, websocket: WebSocketServerProtocol):
+        # Аутентификация до регистрации: IP-allowlist + токен из query
+        # (?token=...) или заголовка Authorization: Bearer <token>
+        if self.auth.enabled:
+            client_ip = None
+            try:
+                if websocket.remote_address:
+                    client_ip = websocket.remote_address[0]
+            except Exception:
+                pass
+            token = None
+            try:
+                path = getattr(websocket, "path", "") or ""
+                if "token=" in path:
+                    from urllib.parse import urlparse, parse_qs
+                    token = parse_qs(urlparse(path).query).get("token", [None])[0]
+                if token is None:
+                    auth_header = websocket.request_headers.get("Authorization", "")
+                    if auth_header.startswith("Bearer "):
+                        token = auth_header[len("Bearer "):].strip()
+            except Exception:
+                pass
+            if not self.auth.authenticate(token=token, ip=client_ip):
+                logger.warning(f"WebSocket auth REJECTED for {client_ip}")
+                await websocket.close(code=4401, reason="Unauthorized")
+                return
+
         await self.register_client(websocket)
         
         try:

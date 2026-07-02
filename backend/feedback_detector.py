@@ -18,7 +18,10 @@ from collections import deque
 
 logger = logging.getLogger(__name__)
 
-MAX_NOTCH_FILTERS = 8
+# 4 EQ-бэнда (/ch/N/eq/1..4) + 3 PEQ-бэнда (/ch/N/peq/1..3) — больше аппаратных
+# слотов на канале нет; при исчерпании add_notch вернёт None и сработает
+# fallback на снижение фейдера
+MAX_NOTCH_FILTERS = 7
 MAX_NOTCH_DEPTH_DB = -12.0
 MIN_FEEDBACK_FREQ_HZ = 80.0
 MAX_FEEDBACK_FREQ_HZ = 12000.0
@@ -185,7 +188,6 @@ class _ChannelFeedbackState:
         self.fader_reduction_db: float = 0.0
         self.avg_spectrum: Optional[np.ndarray] = None
         self.events: List[FeedbackEvent] = []
-        self._next_slot = 0
 
     def add_notch(
         self, frequency: float, confidence: float, now: float = 0.0
@@ -204,7 +206,14 @@ class _ChannelFeedbackState:
                 nf.applied_at = now
                 return nf
 
-        if len(self.notch_filters) >= self.config.max_notch_filters:
+        # Слоты соответствуют аппаратным EQ/PEQ-бэндам: выделяем наименьший
+        # свободный, а не монотонный счётчик — иначе после release/add индексы
+        # растут и (slot % N) начинает перезаписывать чужие бэнды, снимая
+        # подавление с ранее пойманных частот заводки
+        max_slots = min(self.config.max_notch_filters, MAX_NOTCH_FILTERS)
+        used_slots = {nf.slot_index for nf in self.notch_filters}
+        free_slots = [s for s in range(max_slots) if s not in used_slots]
+        if not free_slots:
             return None
 
         q = _q_for_feedback(confidence)
@@ -212,10 +221,9 @@ class _ChannelFeedbackState:
             frequency=frequency,
             gain_db=-3.0,
             q_factor=q,
-            slot_index=self._next_slot,
+            slot_index=free_slots[0],
             applied_at=now,
         )
-        self._next_slot += 1
         self.notch_filters.append(nf)
         return nf
 
@@ -365,9 +373,13 @@ class FeedbackDetector:
         ])
         peak_indices = peak_indices[freq_mask]
 
-        current_bins = set()
+        # Треки хранятся под ключом ИСХОДНОГО бина, но локальный максимум
+        # дрейфует на ±1 бин между кадрами (разрешение ~23 Гц). «Протухшими»
+        # считаем только треки, НЕ совпавшие в этом кадре, — иначе пик с
+        # джиттером частоты получал +1 и тут же -1 (persistence стоял на
+        # месте, заводка не детектировалась)
+        matched_pids = set()
         for idx in peak_indices:
-            current_bins.add(int(idx))
             freq = float(self.freqs[idx])
             mag = float(magnitude_db[idx])
 
@@ -380,6 +392,7 @@ class FeedbackDetector:
                     if len(peak.magnitude_history) > 20:
                         peak.magnitude_history = peak.magnitude_history[-20:]
                     peak.last_seen = now
+                    matched_pids.add(pid)
                     matched = True
                     break
 
@@ -392,9 +405,10 @@ class FeedbackDetector:
                     first_seen=now,
                     last_seen=now,
                 )
+                matched_pids.add(int(idx))
 
         stale = [pid for pid, p in state.tracked_peaks.items()
-                 if pid not in current_bins]
+                 if pid not in matched_pids]
         for pid in stale:
             peak = state.tracked_peaks[pid]
             peak.persistence = max(0, peak.persistence - 1)
@@ -505,10 +519,16 @@ class FeedbackDetector:
         commands = []
         commands.append((f"/ch/{channel}/eq/on", 1))
         for nf in state.notch_filters:
-            slot = (nf.slot_index % 4) + 1
-            commands.append((f"/ch/{channel}/eq/{slot}f", nf.frequency))
-            commands.append((f"/ch/{channel}/eq/{slot}g", nf.gain_db))
-            commands.append((f"/ch/{channel}/eq/{slot}q", nf.q_factor))
+            # Слоты 0-3 → EQ-бэнды 1-4, слоты 4-6 → PEQ-бэнды 1-3.
+            # Взаимно однозначно: никакой notch не перезаписывает бэнд другого
+            # (ранее (slot % 4) + 1 отображал слоты 4+ обратно на бэнды 1-4)
+            if nf.slot_index < 4:
+                prefix, band = "eq", nf.slot_index + 1
+            else:
+                prefix, band = "peq", nf.slot_index - 3
+            commands.append((f"/ch/{channel}/{prefix}/{band}f", nf.frequency))
+            commands.append((f"/ch/{channel}/{prefix}/{band}g", nf.gain_db))
+            commands.append((f"/ch/{channel}/{prefix}/{band}q", nf.q_factor))
         return commands
 
     def generate_reset_osc_commands(self, channel: int) -> List[Tuple[str, Any]]:

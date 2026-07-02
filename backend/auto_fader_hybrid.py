@@ -345,7 +345,9 @@ class SafetyValidator:
     """
     
     # Hard limits
-    MAX_GAIN_DB = 10.0
+    # Потолок 0 dBFS: автоматика никогда не поднимает фейдер выше unity
+    # без явного запроса оператора (SAFETY инвариант 1)
+    MAX_GAIN_DB = 0.0
     MIN_GAIN_DB = -60.0
     MAX_TRUE_PEAK_DB = -1.0  # dBTP
     SAFETY_HEADROOM_DB = 10.0
@@ -673,9 +675,12 @@ class AutoFaderController:
             # Send OSC if mixer client available (Level 6)
             if self.mixer_client and self.mode == FaderMode.FULL_AUTO:
                 try:
+                    # set_channel_fader принимает dB (см. wing_client.py), НЕ линейный коэффициент:
+                    # _db_to_linear(-10 dB) = 0.316 → пульт понял бы это как ~+0.3 dB (unity),
+                    # и аварийное снижение фейдера не происходило бы
                     self.mixer_client.set_channel_fader(
                         state.mixer_channel,
-                        self._db_to_linear(final_gain)
+                        final_gain
                     )
                 except Exception as e:
                     logger.error(f"Failed to send OSC for ch{channel_id}: {e}")

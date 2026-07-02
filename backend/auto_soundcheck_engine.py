@@ -2040,8 +2040,10 @@ class AutoSoundcheckEngine:
                     )
                     return
                 self.mixer_client.set_eq_band(ch, band, event.frequency_hz, -6.0, 10.0)
-            except Exception:
-                pass
+            except Exception as e:
+                # Отказ подавления заводки нельзя глотать молча: оператор
+                # должен видеть, что защита не сработала
+                logger.error(f"FEEDBACK: Ch {ch} notch apply FAILED: {e}")
         elif event.action == "fader_reduce":
             try:
                 info = self.channels.get(ch)
@@ -2058,20 +2060,27 @@ class AutoSoundcheckEngine:
                     extra_payload={"feedback_action": event.action},
                 )
                 if intent is not None and not intent["allow_live_write"]:
+                    # SAFETY инвариант 3 (feedback first): снижение фейдера при
+                    # активной заводке имеет абсолютный приоритет и идёт в
+                    # безопасную сторону — выполняем live-запись несмотря на
+                    # dry-run поверхность, intent уже эмитирован для replay
                     logger.warning(
-                        "FEEDBACK: Ch %s fader reduction skipped; replay intent emitted (%s)",
+                        "FEEDBACK: Ch %s dry-run surface overridden by "
+                        "feedback-first safety rule (%s)",
                         ch,
                         intent["replay_correlation_id"],
                     )
-                    return
                 result = self.mixer_client.set_fader(ch, new_fader)
                 if result is False:
-                    logger.warning(f"FEEDBACK: Ch {ch} fader reduction blocked or failed")
+                    logger.error(
+                        f"FEEDBACK: Ch {ch} fader reduction BLOCKED (write gate?) — "
+                        f"feedback at {event.frequency_hz:.0f}Hz remains unsuppressed"
+                    )
                     return
                 info.fader_db = new_fader
                 logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {new_fader:.1f}dB")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"FEEDBACK: Ch {ch} fader reduction FAILED: {e}")
 
     # ── Main run ─────────────────────────────────────────────────
 

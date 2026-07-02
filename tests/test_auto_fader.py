@@ -44,7 +44,9 @@ def test_apply_auto_balance_uses_precomputed_max_clipped_target_when_readback_mi
     }
 
     assert controller.apply_auto_balance() is True
-    mixer.set_channel_fader.assert_called_once_with(17, 10.0)
+    # Потолок автоматики — 0 dBFS (SAFETY инвариант 1): target_fader 10.0
+    # клэмпится к 0.0, автоматика не поднимает фейдер выше unity
+    mixer.set_channel_fader.assert_called_once_with(17, 0.0)
 
 
 def test_apply_auto_balance_uses_precomputed_min_clipped_target_when_readback_invalid():

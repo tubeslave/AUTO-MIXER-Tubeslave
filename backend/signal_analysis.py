@@ -15,9 +15,15 @@ from lufs_gain_staging import LUFSMeter, TruePeakMeter
 
 logger = logging.getLogger(__name__)
 
-# Wing compressor ratio values (float) and their corresponding OSC string labels
-WING_RATIO_VALUES = [1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 20.0, float('inf')]
-WING_RATIO_STRINGS = ["1.0:1", "1.5:1", "2.0:1", "3.0:1", "4.0:1", "6.0:1", "8.0:1", "10:1", "20:1", "inf:1"]
+# Wing compressor ratio values (float) and their corresponding OSC string labels.
+# ВАЖНО: таблица обязана совпадать с compressor_adaptation.py (канонический
+# источник) и протоколом WING: пульт принимает строки "1.1".."100"
+# (см. wing_client.set_compressor_ratio). Прежний локальный вариант
+# ("2.0:1", "inf:1") был НЕВАЛИДЕН для пульта. Синхронность закреплена
+# тестом tests/test_safety_regressions.py. Реэкспорт невозможен:
+# compressor_adaptation импортирует из этого модуля (цикл).
+WING_RATIO_STRINGS = ["1.1", "1.2", "1.3", "1.5", "1.7", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "6.0", "8.0", "10", "20", "50", "100"]
+WING_RATIO_VALUES = [1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 20.0, 50.0, 100.0]
 
 
 @dataclass
@@ -51,14 +57,12 @@ class ChannelSignalFeatures:
 def ratio_float_to_wing(ratio: float) -> str:
     """Convert float ratio to nearest Wing OSC ratio string."""
     if ratio <= 0:
-        return "1.0:1"
+        return "1.1"
     if ratio == float('inf'):
-        return "inf:1"
+        return "100"
     best_idx = 0
     best_diff = abs(WING_RATIO_VALUES[0] - ratio)
     for i, v in enumerate(WING_RATIO_VALUES):
-        if v == float('inf'):
-            continue
         d = abs(v - ratio)
         if d < best_diff:
             best_diff = d

@@ -64,26 +64,64 @@ class AutoMaster:
             attack_ms=30.0, release_ms=200.0
         )
 
-        # 3. Loudness normalization
-        current_rms = np.sqrt(np.mean(processed ** 2) + 1e-12)
-        current_db = 20 * np.log10(current_rms)
-        gain_db = self.target_lufs - current_db
+        # 3. Loudness normalization по интегральному LUFS (BS.1770-4,
+        # K-weighting + double gating) — невзвешенный RMS расходится с LUFS
+        # на музыкальном материале на несколько dB, таргет промахивался
+        current_lufs = self._measure_integrated_lufs(processed)
+        gain_db = self.target_lufs - current_lufs
         gain_db = max(-12.0, min(12.0, gain_db))
         gain_linear = 10 ** (gain_db / 20.0)
         processed = processed * gain_linear
 
-        # 4. Brick-wall limiter
+        # 4. Brick-wall limiter по TRUE peak (4x oversampling): сэмпловый пик
+        # не видит межсэмпловых пиков и пропускал их над потолком -1 dBTP
         processed, limiter_reduction = self._apply_limiter(processed, self.true_peak_limit)
 
         # Final measurements
-        peak_db = float(20 * np.log10(np.max(np.abs(processed)) + 1e-10))
-        rms_db = float(20 * np.log10(np.sqrt(np.mean(processed ** 2)) + 1e-10))
+        peak_db = self._measure_true_peak(processed)
+        final_lufs = self._measure_integrated_lufs(processed)
 
         return MasteringResult(
-            audio=processed, peak_db=peak_db, lufs=rms_db,
+            audio=processed, peak_db=peak_db, lufs=final_lufs,
             gain_applied_db=gain_db, limiter_reduction_db=limiter_reduction,
             eq_applied=True, success=True
         )
+
+    def _measure_integrated_lufs(self, audio: np.ndarray) -> float:
+        """Integrated LUFS по ITU-R BS.1770-4: K-weighting, блоки 400 мс
+        с перекрытием 75%, double gating (-70 LUFS абс. + -10 LU отн.)."""
+        from lufs_gain_staging import KWeightingFilter
+
+        k_filter = KWeightingFilter(self.sample_rate)
+        weighted = k_filter.process(np.asarray(audio, dtype=np.float64))
+
+        block = int(0.4 * self.sample_rate)
+        hop = block // 4  # 100 мс, перекрытие 75%
+        if len(weighted) < block:
+            mean_sq = float(np.mean(weighted ** 2)) if len(weighted) else 0.0
+            return -0.691 + 10 * np.log10(max(mean_sq, 1e-10))
+
+        powers = np.array([
+            np.mean(weighted[i:i + block] ** 2)
+            for i in range(0, len(weighted) - block + 1, hop)
+        ])
+        loudness = -0.691 + 10 * np.log10(np.maximum(powers, 1e-10))
+
+        abs_gated = powers[loudness > -70.0]
+        if len(abs_gated) == 0:
+            return -100.0
+        rel_threshold = -0.691 + 10 * np.log10(np.mean(abs_gated)) - 10.0
+        gated = powers[(loudness > -70.0) & (loudness > rel_threshold)]
+        if len(gated) == 0:
+            gated = abs_gated
+        return float(-0.691 + 10 * np.log10(np.mean(gated)))
+
+    def _measure_true_peak(self, audio: np.ndarray) -> float:
+        """True peak (dBTP) с 4x oversampling (стандарт проекта)."""
+        from lufs_gain_staging import TruePeakMeter
+
+        meter = TruePeakMeter(sample_rate=self.sample_rate)
+        return float(meter.process(np.asarray(audio, dtype=np.float64)))
 
     def _master_with_reference(self, audio: np.ndarray, reference: np.ndarray) -> MasteringResult:
         """Master using matchering library with a reference track."""
@@ -164,14 +202,12 @@ class AutoMaster:
         return output, max_reduction
 
     def _apply_limiter(self, audio: np.ndarray, ceiling_db: float) -> Tuple[np.ndarray, float]:
-        """Apply brick-wall limiter."""
-        ceiling_lin = 10 ** (ceiling_db / 20.0)
-        peak = np.max(np.abs(audio))
+        """Apply brick-wall limiter против TRUE peak (4x oversampling)."""
+        true_peak_db = self._measure_true_peak(audio)
         reduction_db = 0.0
 
-        if peak > ceiling_lin:
-            gain = ceiling_lin / peak
-            audio = audio * gain
-            reduction_db = float(20 * np.log10(gain))
+        if true_peak_db > ceiling_db:
+            reduction_db = true_peak_db - ceiling_db
+            audio = audio * (10 ** (-reduction_db / 20.0))
 
-        return audio, abs(reduction_db)
+        return audio, abs(float(reduction_db))

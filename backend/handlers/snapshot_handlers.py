@@ -1,5 +1,7 @@
 """Snapshot/scene message handlers."""
 
+import asyncio
+
 from wing_client import WingClient
 from osc.enhanced_osc_client import EnhancedOSCClient
 
@@ -16,7 +18,10 @@ def register_handlers(server):
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             snap_name = data.get("snap_name")
             if snap_name:
-                success = server.mixer_client.load_snap(snap_name)
+                # load_snap — синхронный, внутри до ~20 c time.sleep-поллинга;
+                # в executor, иначе замирает весь event loop (WS-команды
+                # оператора, feedback-события, mute)
+                success = await asyncio.to_thread(server.mixer_client.load_snap, snap_name)
                 await server.send_to_client(websocket, {
                     "type": "load_snap_result",
                     "success": success,
@@ -34,7 +39,8 @@ def register_handlers(server):
         if server.mixer_client and isinstance(server.mixer_client, (WingClient, EnhancedOSCClient)):
             snap_name = data.get("snap_name")
             if snap_name:
-                success = server.mixer_client.save_snap(snap_name)
+                # save_snap — синхронный (см. load_snap выше)
+                success = await asyncio.to_thread(server.mixer_client.save_snap, snap_name)
                 await server.send_to_client(websocket, {
                     "type": "save_snap_result",
                     "success": success,

@@ -9,10 +9,12 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(server):
     async def handle_connect_wing(websocket, data):
+        # data.get() без default вернул бы None и затёр дефолтные порты
+        # позиционным None → падение при создании OSC-клиента
         await server.connect_wing(
             data.get("ip"),
-            data.get("send_port"),
-            data.get("receive_port"),
+            data.get("send_port") or 2223,
+            data.get("receive_port") or 2223,
             observation_only=data.get("observation_only", None),
             record_telemetry=data.get("record_telemetry", None),
             telemetry_session_label=data.get("telemetry_session_label"),

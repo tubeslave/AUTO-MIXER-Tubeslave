@@ -58,52 +58,19 @@ def get_snapshots_list(client: WingClient):
         if value:
             logger.info(f"    ✓ Получено: {value}")
     
-    # Метод 3: Пробуем использовать команды навигации для получения имен
-    logger.info("\nМетод 3: Навигация по snapshots через PREV/NEXT")
+    # Метод 3 (навигация PREV/NEXT) УДАЛЁН: /$ctl/lib/$action NEXT/PREV — это
+    # реальный рекол снапшотов на пульте (деструкция состояния на концерте),
+    # и код возврата к исходному снапшоту был заглушкой. Для перечисления имён
+    # использовать неразрушающий WingClient.refresh_snap_name_cache().
+    logger.info("\nМетод 3: неразрушающий скан имён через refresh_snap_name_cache()")
     try:
-        # Запоминаем текущий активный
-        client.send("/$ctl/lib/$active")
-        time.sleep(0.2)
-        start_active = client.state.get("/$ctl/lib/$active")
-        logger.info(f"Начальный активный: {start_active}")
-        
-        snapshots = {}
-        if start_active:
-            snapshots[0] = start_active  # Текущий активный
-        
-        # Пробуем перейти к следующему и предыдущему
-        for direction in ["NEXT", "PREV"]:
-            logger.info(f"\nНавигация: {direction}")
-            for i in range(10):  # Пробуем до 10 раз
-                client.send("/$ctl/lib/$action", direction)
-                time.sleep(0.3)
-                
-                client.send("/$ctl/lib/$active")
-                time.sleep(0.2)
-                active = client.state.get("/$ctl/lib/$active")
-                
-                if active and active != start_active:
-                    # Нашли новый snapshot
-                    # Нужно определить его индекс
-                    logger.info(f"  Найден snapshot: {active}")
-                    # Но мы не знаем индекс, только имя
-                
-                # Возвращаемся обратно
-                if direction == "NEXT":
-                    client.send("/$ctl/lib/$action", "PREV")
-                else:
-                    client.send("/$ctl/lib/$action", "NEXT")
-                time.sleep(0.2)
-        
-        # Возвращаемся к начальному
-        # Пробуем найти его через GO
-        if start_active:
-            # Может быть нужно использовать другой метод для возврата
-            pass
-            
+        cache = client.refresh_snap_name_cache()
+        for idx in sorted(cache):
+            logger.info(f"  [{idx}] {cache[idx]}")
+        return dict(cache)
     except Exception as e:
-        logger.error(f"Ошибка при навигации: {e}")
-    
+        logger.error(f"Ошибка при скане имён: {e}")
+
     return {}
 
 

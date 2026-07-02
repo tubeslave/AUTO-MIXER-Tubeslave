@@ -1,5 +1,7 @@
 """Auto soundcheck message handlers."""
 
+import asyncio
+
 from auto_soundcheck_engine import AutoSoundcheckEngine
 
 
@@ -50,18 +52,24 @@ def register_handlers(server):
         if mixer_type == "wing":
             auto_apply = False
 
-        async def on_state(state, msg):
-            await server.broadcast({
+        # Движок зовёт колбэки СИНХРОННО из своего потока — планируем
+        # broadcast в event loop через call_soon_threadsafe (async-колбэки
+        # давали бы "coroutine never awaited", а раньше колбэки вообще
+        # не передавались в движок: оператор не видел ни прогресса, ни ошибок)
+        loop = asyncio.get_running_loop()
+
+        def on_state(state, msg):
+            loop.call_soon_threadsafe(server._create_broadcast_task, {
                 "type": "auto_engine_state",
                 "state": state,
-                "message": msg
+                "message": msg,
             })
 
-        async def on_channel(ch, ch_data):
-            await server.broadcast({
+        def on_channel(ch, ch_data):
+            loop.call_soon_threadsafe(server._create_broadcast_task, {
                 "type": "auto_engine_channel",
                 "channel": ch,
-                "data": ch_data
+                "data": ch_data,
             })
 
         engine = AutoSoundcheckEngine(
@@ -71,6 +79,8 @@ def register_handlers(server):
             audio_device_name=audio_device,
             num_channels=num_channels,
             auto_apply=auto_apply,
+            on_state_change=on_state,
+            on_channel_update=on_channel,
         )
         server.auto_soundcheck_engine = engine
         engine.start_async()

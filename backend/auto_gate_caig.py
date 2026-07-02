@@ -260,18 +260,30 @@ class AdaptiveThreshold:
     - cross_adaptive_offset: 0-9dB based on group activity
     """
     
-    def __init__(self, tracking_coeff: float = 0.99):
+    def __init__(self, tracking_coeff: float = 0.99, rise_db_per_sec: float = 2.0):
         self.tracking_coeff = tracking_coeff
+        self.rise_db_per_sec = rise_db_per_sec
         self.noise_floor_db = -70.0
-        
+
         logger.info("AdaptiveThreshold initialized")
-    
-    def update_noise_floor(self, rms_db: float):
-        """Update noise floor with slow tracking."""
-        # Only track when signal is low
-        if rms_db < self.noise_floor_db + 10:
-            self.noise_floor_db = (self.tracking_coeff * self.noise_floor_db + 
-                                  (1 - self.tracking_coeff) * rms_db)
+
+    def update_noise_floor(self, rms_db: float, frame_sec: float = 64.0 / 48000.0):
+        """Update noise floor: быстро вниз, медленно вверх.
+
+        Прежнее условие `rms < floor + 10` при инициализации -70 dB и реальном
+        поле сцены -50 dB не выполнялось НИКОГДА — floor мёртво залипал на -70,
+        порог -64, гейт постоянно открыт. Медленный подъём (rise_db_per_sec)
+        позволяет оценке дойти до реального пола между сигналами, не убегая
+        к уровню полезного сигнала.
+        """
+        if rms_db < self.noise_floor_db:
+            self.noise_floor_db = (self.tracking_coeff * self.noise_floor_db +
+                                   (1 - self.tracking_coeff) * rms_db)
+        else:
+            self.noise_floor_db = min(
+                self.noise_floor_db + self.rise_db_per_sec * frame_sec,
+                rms_db,
+            )
     
     def calculate_threshold(
         self,
@@ -405,10 +417,18 @@ class GateProcessor:
         self,
         features: GateFeatures,
         threshold_db: float,
-        settings: GateSettings
+        settings: GateSettings,
+        frame_samples: int = 1
     ) -> GateDecision:
-        """Process one frame and return decision."""
+        """Process one frame and return decision.
+
+        frame_samples — размер кадра в сэмплах: attack/release/hold заданы
+        в сэмплах, а process() вызывается раз на КАДР. Без учёта размера
+        кадра тайминги растягивались в frame_samples раз (attack 0.5 мс
+        превращался в ~32 мс — гейт пропускал транзиенты, hold 10 мс — в ~640 мс).
+        """
         decision = GateDecision(channel_id=0, state=self.state)
+        frame_samples = max(1, int(frame_samples))
 
         # C-02 FIX: Implement proper hysteresis.
         # Gate OPENS when signal > threshold (open threshold).
@@ -427,8 +447,8 @@ class GateProcessor:
                 self.current_gain_db = settings.range_db
 
         elif self.state == GateState.OPENING:
-            # Attack phase
-            gain_step = abs(settings.range_db) / max(1, self.attack_samples)
+            # Attack phase (шаг пропорционален размеру кадра)
+            gain_step = abs(settings.range_db) / max(1, self.attack_samples) * frame_samples
             self.current_gain_db += gain_step
 
             if self.current_gain_db >= 0:
@@ -442,7 +462,7 @@ class GateProcessor:
                 self.hold_counter = self.hold_samples
 
         elif self.state == GateState.HOLD:
-            self.hold_counter -= 1
+            self.hold_counter -= frame_samples
             if self.hold_counter <= 0:
                 self.state = GateState.RELEASING
             # If signal recovers above open threshold during hold, re-open
@@ -450,8 +470,8 @@ class GateProcessor:
                 self.state = GateState.OPEN
 
         elif self.state == GateState.RELEASING:
-            # Release phase
-            gain_step = abs(settings.range_db) / max(1, self.release_samples)
+            # Release phase (шаг пропорционален размеру кадра)
+            gain_step = abs(settings.range_db) / max(1, self.release_samples) * frame_samples
             self.current_gain_db -= gain_step
 
             if self.current_gain_db <= settings.range_db:
@@ -497,7 +517,12 @@ class AutoGateController:
         # Components
         self.extractor = FeatureExtractor(sample_rate)
         self.group_analyzer = GroupAnalyzer()
-        self.threshold_calculator = AdaptiveThreshold()
+        # Пер-канальные трекеры noise floor: один общий на все каналы сходился
+        # к минимуму по ВСЕМ каналам (например, к тихому overhead), и этот же
+        # порог применялся к kick/vocal — гейты громких каналов не закрывались
+        self.threshold_calculators: Dict[int, AdaptiveThreshold] = {
+            ch: AdaptiveThreshold() for ch in range(num_channels)
+        }
         self.drum_rules = DrumKitRules()
         
         # Per-channel processors
@@ -562,12 +587,17 @@ class AutoGateController:
         """
         # Step 1: Extract features
         features = {}
+        frame_sizes = {}
         for ch, audio in audio_data.items():
             if ch < self.num_channels:
                 features[ch] = self.extractor.extract(audio)
-                
-                # Update noise floor
-                self.threshold_calculator.update_noise_floor(features[ch].rms_db)
+                frame_sizes[ch] = len(audio)
+
+                # Update per-channel noise floor
+                self.threshold_calculators[ch].update_noise_floor(
+                    features[ch].rms_db,
+                    frame_sec=len(audio) / self.sample_rate,
+                )
         
         # Step 2: Analyze groups
         group_data = self.group_analyzer.analyze_groups(features)
@@ -585,7 +615,7 @@ class AutoGateController:
             group = self.groups.get(ch, InstrumentGroup.OTHER)
             group_influence = self.group_analyzer.get_group_influence(ch, group)
             
-            threshold = self.threshold_calculator.calculate_threshold(
+            threshold = self.threshold_calculators[ch].calculate_threshold(
                 feat, group_influence
             )
             
@@ -596,7 +626,9 @@ class AutoGateController:
             )
             
             # Process gate
-            decision = self.processors[ch].process(feat, threshold, settings)
+            decision = self.processors[ch].process(
+                feat, threshold, settings, frame_samples=frame_sizes.get(ch, 1)
+            )
             decision.channel_id = ch
             decision.group_influence = group_influence
             
@@ -622,7 +654,10 @@ class AutoGateController:
     def get_status(self) -> Dict[str, Any]:
         """Get current status."""
         return {
-            'noise_floor': self.threshold_calculator.noise_floor_db,
+            'noise_floor': {
+                ch: calc.noise_floor_db
+                for ch, calc in self.threshold_calculators.items()
+            },
             'groups': {
                 group.value: len(channels)
                 for group, channels in self.group_analyzer.group_channels.items()

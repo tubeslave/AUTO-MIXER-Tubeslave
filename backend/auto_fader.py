@@ -710,6 +710,9 @@ class ChannelFaderState:
         
         # Real-Time Fader Riding: Anchor position and running average
         self.initial_fader_db = 0.0  # Anchor position read from mixer at start
+        self.anchor_valid = False  # True только если якорь реально прочитан с пульта;
+                                   # без якоря канал НЕ управляется (запись initial±range
+                                   # с фиктивным якорем 0 dB = скачок громкости на десятки dB)
         self.lufs_ring_buffer: deque = deque(maxlen=50)  # Ring buffer for running average (will be resized based on avg_window_sec)
         self.avg_lufs = -60.0  # Running average LUFS (computed from ring buffer)
         
@@ -728,11 +731,14 @@ class ChannelFaderState:
         # КОМПЕНСАЦИЯ ФЕЙДЕРА: вычисляем pre-fader уровень
         # Проблема: USB-интерфейс микшера отправляет post-fader сигнал, что создает обратную связь:
         # когда мы корректируем фейдер, это влияет на измеряемый уровень.
-        # Решение: компенсируем влияние фейдера, добавляя его значение к измеренному LUFS.
-        # Если фейдер уменьшает уровень на X dB, то измеренный LUFS на X dB меньше реального pre-fader уровня.
-        # Формула: pre_fader_lufs = measured_lufs + current_fader_db
+        # Решение: компенсируем влияние фейдера, вычитая его значение из измеренного LUFS.
+        # post_fader = pre_fader + fader_db, поэтому pre_fader = measured - fader_db.
+        # Формула: pre_fader_lufs = measured_lufs - current_fader_db
         # Пример: если measured_lufs = -30 LUFS, а current_fader = -6 dB, то pre_fader_lufs = -24 LUFS
-        self.pre_fader_lufs = measured_lufs + self.current_fader
+        # ВАЖНО: знак НЕ инвертировать — сложение даёт положительную обратную связь в контуре
+        # Fader Riding (снижение фейдера на d dB занижает pre-fader оценку на 2d) и загоняет
+        # фейдер в край диапазона. Та же формула уже корректно применена в _compute_auto_balance.
+        self.pre_fader_lufs = measured_lufs - self.current_fader
         # Используем компенсированный уровень для дальнейших расчетов (это реальный уровень входного сигнала)
         self.current_lufs = self.pre_fader_lufs
         
@@ -1179,6 +1185,7 @@ class AutoFaderController:
                     state.initial_fader_db = float(current_fader)
                     state.current_fader = state.initial_fader_db
                     state.target_fader = state.initial_fader_db
+                    state.anchor_valid = True
                     
                     # Инициализируем ring buffer для среднего LUFS
                     # Размер буфера = avg_window_sec / update_interval
@@ -1199,7 +1206,10 @@ class AutoFaderController:
                               f"avg_window: {self.avg_window_sec:.1f}s, "
                               f"instrument = {state.instrument_type}")
                 else:
-                    # Если значение не получено, используем 0 dB (unity) по умолчанию
+                    # Значение не получено: канал НЕ управляется (anchor_valid=False).
+                    # Якорение на 0 dB при реальном фейдере, например, -20 dB означало бы
+                    # мгновенный скачок громкости >20 dB первой же коррекцией.
+                    state.anchor_valid = False
                     state.initial_fader_db = 0.0
                     state.current_fader = 0.0
                     state.target_fader = 0.0
@@ -1215,9 +1225,11 @@ class AutoFaderController:
                     state.calibration_start_time = time.time()
                     
                     logger.warning(f"Channel {state.mixer_channel} (audio {audio_ch}): "
-                                 f"fader value not received, using 0 dB default as anchor")
+                                 f"fader value not received, channel EXCLUDED from fader riding "
+                                 f"(no valid anchor)")
             except Exception as e:
                 logger.warning(f"Could not get fader for channel {state.mixer_channel}: {e}")
+                state.anchor_valid = False
                 state.initial_fader_db = 0.0
                 state.current_fader = 0.0
                 state.target_fader = 0.0
@@ -1313,6 +1325,11 @@ class AutoFaderController:
                     self.bleed_service.update(all_channel_levels, all_channel_centroids, all_channel_metrics)
                 
                 for audio_ch, state in list(self.channels.items()):
+                    # Без валидного якоря каналом не управляем: запись initial±range
+                    # с фиктивным якорем 0 dB = скачок громкости
+                    if not state.anchor_valid:
+                        continue
+
                     # Получаем аудио данные
                     buffer_size = len(self._audio_buffers[audio_ch]) if audio_ch in self._audio_buffers else 0
                     
@@ -1518,8 +1535,9 @@ class AutoFaderController:
                     max_fader = state.initial_fader_db + self.fader_range_db
                     target_fader_db = np.clip(target_fader_db, min_fader, max_fader)
                     
-                    # Также ограничиваем абсолютными пределами микшера
-                    target_fader_db = np.clip(target_fader_db, -60.0, 10.0)
+                    # Абсолютные пределы: потолок 0 dBFS — автоматика никогда не поднимает
+                    # фейдер выше unity без явного запроса оператора (SAFETY инвариант 1)
+                    target_fader_db = np.clip(target_fader_db, -60.0, 0.0)
                     
                     # Применяем envelope для плавности
                     if audio_ch in self.envelopes:
@@ -1528,7 +1546,14 @@ class AutoFaderController:
                     
                     # Вычисляем фактическую коррекцию
                     actual_correction = target_fader_db - state.current_fader
-                    
+
+                    # SAFETY инвариант 2: перед ПОВЫШЕНИЕМ фейдера проверяем
+                    # true peak < -1.0 dBTP; при перегрузе повышение блокируется
+                    # (снижение разрешено всегда)
+                    if actual_correction > 0 and current_peak > -1.0:
+                        target_fader_db = state.current_fader
+                        actual_correction = 0.0
+
                     # Применяем коррекцию только если она значительна (минимум 0.1 dB)
                     min_correction_threshold = 0.1
                     if abs(actual_correction) > min_correction_threshold:
@@ -1755,7 +1780,10 @@ class AutoFaderController:
         """
         logger.info(f"Computing auto balance (pass {self.auto_balance_pass})...")
         
-        FADER_MAX = 10.0   # dB — максимум фейдера микшера
+        # Потолок 0 dBFS: автоматика не поднимает фейдер выше unity без явного
+        # запроса оператора (SAFETY инвариант 1); физический максимум пульта +10 dB
+        # доступен только оператору вручную
+        FADER_MAX = 0.0    # dB — потолок для автоматики
         FADER_MIN = -60.0   # dB — минимум фейдера микшера
         
         # === Шаг 1: Получаем Integrated LUFS для каждого канала ===
@@ -2031,11 +2059,12 @@ class AutoFaderController:
                         current_db = 0.0
                         logger.warning(f"Channel {state.mixer_channel}: Could not read fader, using default 0 dB")
                 
+                # Потолок 0 dBFS для автоматики (SAFETY инвариант 1)
                 if not readback_valid and target_fader is not None:
-                    new_db = float(np.clip(float(target_fader), -60.0, 10.0))
+                    new_db = float(np.clip(float(target_fader), -60.0, 0.0))
                 else:
                     new_db = current_db + correction
-                    new_db = float(np.clip(new_db, -60.0, 10.0))
+                    new_db = float(np.clip(new_db, -60.0, 0.0))
                 
                 # Округляем до 0.05 dB
                 new_db = round(new_db * 20) / 20.0

@@ -133,11 +133,11 @@ class SignalStats:
         
         gain_correction = (weight_lufs * delta_lufs) + (weight_peak * delta_peak)
         
-        # ИСПРАВЛЕНИЕ: Правильное ограничение
-        if delta_peak < 0:
-            gain_correction = max(gain_correction, delta_peak)
-        else:
-            gain_correction = min(gain_correction, delta_peak)
+        # Ограничение сверху: gain никогда не превышает запас до пикового лимита.
+        # Всегда min — в т.ч. при delta_peak < 0 (пик уже выше лимита: коррекция
+        # обязана быть не мягче, чем delta_peak, иначе пик останется над лимитом;
+        # max() здесь давал бы нижнюю границу и мог даже дать буст)
+        gain_correction = min(gain_correction, delta_peak)
         
         self.gain_limited_by = "blended_peak_lufs"
         self.suggested_gain_db = np.clip(gain_correction, -24.0, 24.0)

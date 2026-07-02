@@ -82,8 +82,10 @@ class AuthManager:
         if ip and not self.check_ip(ip):
             logger.warning(f"Rejected IP: {ip}")
             return False
-        if token and not self.validate_token(token):
-            logger.warning(f"Invalid token from {ip or 'unknown'}")
+        # Токен ОБЯЗАТЕЛЕН при включённой аутентификации: прежняя проверка
+        # `if token and ...` пропускала клиента, не приславшего токен вообще
+        if not token or not self.validate_token(token):
+            logger.warning(f"Missing or invalid token from {ip or 'unknown'}")
             return False
         if client_id and not self.check_rate_limit(client_id):
             logger.warning(f"Rate limit exceeded: {client_id}")

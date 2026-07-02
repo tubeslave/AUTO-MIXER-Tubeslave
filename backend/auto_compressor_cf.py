@@ -18,7 +18,7 @@ CF Classification:
 Adaptive Formulas:
 - Attack = 15 * (0.1 + 0.9 * cf_norm) ms
 - Release = 100 * (1.2 - 0.4 * cf_norm) ms
-- Ratio = 3.0 * (1.0 - 0.3 * cf_norm)
+- Ratio = 3.0 * (1.0 + 0.5 * cf_norm)  # растёт с CF (C-05: НЕ инвертировать)
 
 Hard Limits:
 - Attack: 1-100ms
@@ -126,12 +126,16 @@ class CFAnalyzer:
         rms = np.sqrt(rms_squared + 1e-10)
         self.rms_db = 20 * np.log10(rms)
         
-        # Peak detector with decay
+        # Peak detector with decay: peak_decay — ПЕР-СЭМПЛОВЫЙ коэффициент,
+        # а process() вызывается раз на кадр → возводим в степень размера
+        # кадра. Однократное умножение растягивало распад 10 мс до ~10 с:
+        # пик «зависал», crest factor завышался, классификация уезжала в
+        # PERCUSSION и назначались излишне агрессивные attack/ratio
         frame_peak = np.max(np.abs(audio))
         if frame_peak > self.current_peak:
             self.current_peak = frame_peak
         else:
-            self.current_peak *= self.peak_decay
+            self.current_peak *= self.peak_decay ** frame_size
             if self.current_peak < frame_peak:
                 self.current_peak = frame_peak
         
@@ -221,7 +225,7 @@ class CFCompressorCalculator:
     Adaptive Formulas:
     - Attack = 15 * (0.1 + 0.9 * cf_norm) ms
     - Release = 100 * (1.2 - 0.4 * cf_norm) ms
-    - Ratio = 3.0 * (1.0 - 0.3 * cf_norm)
+    - Ratio = 3.0 * (1.0 + 0.5 * cf_norm)  # растёт с CF (C-05: НЕ инвертировать)
     
     Hard Limits:
     - Attack: 1-100ms
@@ -297,7 +301,7 @@ class CFCompressorCalculator:
         # C-05 FIX: Original formula was inverted — (1.0 - 0.3 * cf_norm)
         # made high CF produce LOW ratio (soft), opposite of correct behaviour.
         # Percussion (cf_norm → 1) must get AGGRESSIVE compression (high ratio).
-        # New formula: ratio grows with cf_norm, range 1.5 × to 4.5 ×.
+        # New formula: ratio grows with cf_norm, range 3.0 × to 4.5 ×.
         ratio = 3.0 * (1.0 + 0.5 * cf_norm)
         
         # Blend with base params (50% adaptive, 50% base)

@@ -8,30 +8,40 @@ import pytest
 
 
 class TestRatioConversion:
+    # Строки ratio обязаны быть валидными для протокола WING ("1.1".."100",
+    # см. wing_client.set_compressor_ratio) — формат "2.0:1"/"inf:1" пульт
+    # не принимает
     def test_ratio_float_to_wing_basic(self):
         from signal_analysis import ratio_float_to_wing
-        assert ratio_float_to_wing(1.0) == "1.0:1"
-        assert ratio_float_to_wing(2.0) == "2.0:1"
-        assert ratio_float_to_wing(4.0) == "4.0:1"
+        assert ratio_float_to_wing(1.1) == "1.1"
+        assert ratio_float_to_wing(2.0) == "2.0"
+        assert ratio_float_to_wing(4.0) == "4.0"
 
-    def test_ratio_negative_returns_1(self):
+    def test_ratio_negative_returns_min(self):
         from signal_analysis import ratio_float_to_wing
-        assert ratio_float_to_wing(-1.0) == "1.0:1"
-        assert ratio_float_to_wing(0) == "1.0:1"
+        assert ratio_float_to_wing(-1.0) == "1.1"
+        assert ratio_float_to_wing(0) == "1.1"
 
     def test_ratio_infinity(self):
         from signal_analysis import ratio_float_to_wing
-        assert ratio_float_to_wing(float('inf')) == "inf:1"
+        assert ratio_float_to_wing(float('inf')) == "100"
 
     def test_ratio_nearest(self):
         from signal_analysis import ratio_float_to_wing
-        # 2.5 should snap to 2.0 or 3.0
-        result = ratio_float_to_wing(2.5)
-        assert result in ("2.0:1", "3.0:1")
+        # 2.2 should snap to a neighbouring table value
+        result = ratio_float_to_wing(2.2)
+        assert result in ("2.0", "2.5")
 
     def test_wing_ratio_strings(self):
         from signal_analysis import WING_RATIO_VALUES, WING_RATIO_STRINGS
         assert len(WING_RATIO_VALUES) == len(WING_RATIO_STRINGS)
+
+    def test_tables_match_canonical_compressor_adaptation(self):
+        """signal_analysis и compressor_adaptation обязаны иметь одну таблицу."""
+        import signal_analysis as sa
+        import compressor_adaptation as ca
+        assert sa.WING_RATIO_VALUES == ca.WING_RATIO_VALUES
+        assert sa.WING_RATIO_STRINGS == ca.WING_RATIO_STRINGS
 
 
 class TestSpectralAnalyzer:

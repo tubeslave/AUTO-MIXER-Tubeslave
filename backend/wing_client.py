@@ -73,10 +73,20 @@ class WingClient(MixerClientBase):
         self.sock = None
         self.receiver_thread = None
         self._stop_receiver = False
+        # Поколение подключения: receiver/renewal-потоки выходят, когда их
+        # поколение устарело. Без этого disconnect() → connect() оставлял
+        # старые потоки живыми (они читали НОВЫЙ сокет и дублировали /xremote)
+        self._conn_generation = 0
         
         self.state = {}
         self.callbacks = {}
-        
+
+        # Кэш имён снапшотов {index: name} — правило SAFETY 4:
+        # find_snap_by_name() читает ТОЛЬКО этот кэш и не трогает пульт.
+        # Заполняется refresh_snap_name_cache() (двигает курсор библиотеки —
+        # выполнять при подготовке или в составе явного load_snap)
+        self._snap_name_cache: Dict[int, str] = {}
+
         self.is_connected = False
         
         # OSC throttle: track last send time per address to limit rate
@@ -341,6 +351,8 @@ class WingClient(MixerClientBase):
         except (TypeError, ValueError):
             return expected == actual
 
+    _READBACK_MISSING = object()  # локальный сентинел, НИКОГДА не кладётся в state
+
     def _wait_for_readback(
         self,
         address: str,
@@ -348,26 +360,26 @@ class WingClient(MixerClientBase):
         *,
         fallback_to_previous: bool = True,
     ) -> Any:
-        marker = object()
-        previous = self.state.get(address, marker)
-        self.state[address] = marker
+        # Ключ удаляется на время ожидания, а не подменяется маркером:
+        # служебный object() в общем self.state ронял конкурентных читателей
+        # (get_fader → float(marker) = TypeError, get_state → json.dumps падал).
+        # Отсутствие ключа читатели трактуют как «readback недоступен» — безопасно.
+        previous = self.state.pop(address, self._READBACK_MISSING)
         self.send(address)
         deadline = time.time() + max(0.0, timeout_sec)
         while time.time() < deadline:
-            current = self.state.get(address, marker)
-            if current is not marker:
-                return current
+            if address in self.state:
+                return self.state.get(address)
             time.sleep(self._write_gate_readback_poll_sec)
-        current = self.state.get(address, marker)
-        if current is marker:
-            if previous is marker:
-                self.state.pop(address, None)
-                return None
-            self.state[address] = previous
-            if fallback_to_previous:
-                return previous
+        if address in self.state:
+            return self.state.get(address)
+        if previous is self._READBACK_MISSING:
             return None
-        return current
+        # Восстанавливаем прежнее значение, чтобы кэш состояния не пустел
+        self.state[address] = previous
+        if fallback_to_previous:
+            return previous
+        return None
 
     def _evaluate_supervised_write(
         self,
@@ -946,6 +958,14 @@ class WingClient(MixerClientBase):
         Returns:
             True if connected successfully, False otherwise
         """
+        # Останавливаем потоки предыдущего подключения ДО создания нового
+        # сокета: иначе старый receiver продолжает читать новый self.sock
+        self._stop_receiver = True
+        old_thread = self.receiver_thread
+        if old_thread is not None and old_thread.is_alive():
+            old_thread.join(timeout=1.5)  # recv-timeout 0.5 c — успеет увидеть флаг
+        self._conn_generation += 1
+
         try:
             # Create UDP socket for bidirectional communication
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -987,6 +1007,7 @@ class WingClient(MixerClientBase):
             except socket.timeout:
                 logger.error(f"Connection timeout: Wing at {self.ip} did not respond to handshake")
                 self.sock.close()
+                self.sock = None
                 return False
             
             # Step 2: Verify OSC is working by querying a parameter
@@ -1001,6 +1022,7 @@ class WingClient(MixerClientBase):
             except socket.timeout:
                 logger.error(f"OSC timeout: Wing not responding on port {self.port}")
                 self.sock.close()
+                self.sock = None
                 return False
             
             self.is_connected = True
@@ -1028,6 +1050,14 @@ class WingClient(MixerClientBase):
         except Exception as e:
             logger.error(f"Connection failed: {e}")
             self.is_connected = False
+            # Закрываем сокет, иначе каждая неудачная попытка реконнекта
+            # (каждые ~5 c) утекала бы дескриптором
+            if self.sock:
+                try:
+                    self.sock.close()
+                except Exception:
+                    pass
+                self.sock = None
             return False
 
     def disconnect(self):
@@ -1040,6 +1070,11 @@ class WingClient(MixerClientBase):
         )
         self._stop_receiver = True
         self.is_connected = False
+        # Дожидаемся выхода receiver-потока: немедленный повторный connect()
+        # сбрасывал флаги до того, как старый поток их увидит
+        thread = self.receiver_thread
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=1.5)
         if self.sock:
             try:
                 self.sock.close()
@@ -1056,8 +1091,12 @@ class WingClient(MixerClientBase):
             self.sock.settimeout(0.5)
         except Exception:
             return
-            
-        while not self._stop_receiver and self.is_connected:
+
+        # Выходим, когда поколение подключения устарело (reconnect создал
+        # новый receiver) — иначе два потока конкурируют за датаграммы
+        generation = self._conn_generation
+        while (not self._stop_receiver and self.is_connected
+               and generation == self._conn_generation):
             if not self.sock:
                 break
             try:
@@ -1306,13 +1345,19 @@ class WingClient(MixerClientBase):
     
     def _start_xremote_renewal(self):
         """Periodically send /xremote to maintain subscription"""
+        generation = self._conn_generation
+
         def renewal_loop():
-            while self.is_connected and not self._stop_receiver:
+            # Поток предыдущего подключения переживал reconnect (8-секундный
+            # сон пропускал смену флагов) — привязка к поколению гарантирует
+            # ровно один renewal-поток на подключение
+            while (self.is_connected and not self._stop_receiver
+                   and generation == self._conn_generation):
                 time.sleep(8)
-                if self.is_connected:
+                if self.is_connected and generation == self._conn_generation:
                     self.send("/xremote")
                     logger.debug("Renewed /xremote subscription")
-        
+
         thread = threading.Thread(target=renewal_loop, daemon=True)
         thread.start()
 
@@ -2329,57 +2374,116 @@ class WingClient(MixerClientBase):
         
         return snapshots
     
-    def find_snap_by_name(self, snap_name: str, max_index: int = 200) -> Optional[int]:
+    @staticmethod
+    def _normalize_snap_name(name: str) -> str:
+        return str(name).upper().replace("I:/", "").replace(".SNAP", "").strip()
+
+    def refresh_snap_name_cache(self, max_index: int = 200) -> Dict[int, str]:
         """
-        Найти индекс snapshot по имени БЕЗ загрузки (неразрушающий поиск).
+        Просканировать библиотеку снапшотов и закэшировать имена {index: name}.
 
-        C-04 FIX: The original implementation sent a "GO" (load) command for
-        each index to read back the name, which destructively changed the
-        mixer state on every iteration during a live performance.  This
-        rewrite queries snapshot names via the read-only OSC address
-        ``/$ctl/lib/$name`` (set index first, then query name without GO)
-        so the active scene is never altered during the search.
-
-        Args:
-            snap_name: Имя snapshot для поиска
-            max_index: Максимальный индекс для проверки
+        ВНИМАНИЕ: скан двигает курсор библиотеки ($actionidx) — то, что
+        загрузит кнопка GO на пульте. Выполнять при подготовке (саундчек)
+        или в составе явного load_snap, НЕ в фоновых/пассивных потоках.
+        После скана курсор возвращается на активный снапшот.
 
         Returns:
-            Индекс snapshot или None если не найден
+            Заполненный кэш (возможно частичный, если скан прерван write-gate)
         """
         if not self.is_connected:
             logger.warning("Not connected to Wing")
-            return None
+            return {}
 
-        search_name_upper = snap_name.upper().strip()
+        cache: Dict[int, str] = {}
+        name_key = "/$ctl/lib/$name"
 
-        # Query names without loading — set index then read $name (not $active)
         for idx in range(1, max_index + 1):
             try:
-                # Point the library cursor at this index (read-only operation)
-                self.send("/$ctl/lib/$actionidx", idx)
-                time.sleep(0.05)
+                # Убираем ответ прошлой итерации: иначе запоздалый ответ пульта
+                # на idx N-1 читается как имя idx N → сдвиг индексов и загрузка
+                # ЧУЖОГО снапшота
+                self.state.pop(name_key, None)
 
-                # Request the snapshot name at the current index.
-                # $name is a read-only query; it does NOT load the snapshot.
-                self.send("/$ctl/lib/$name")
-                time.sleep(0.05)
-                snap_name_at_idx = self.state.get("/$ctl/lib/$name")
+                if not self.send("/$ctl/lib/$actionidx", idx):
+                    # Write-gate/observation mode блокирует движение курсора:
+                    # без него $name возвращал бы одно имя для всех idx
+                    logger.warning(
+                        "Snapshot scan aborted at index %d: $actionidx write "
+                        "blocked (write gate / observation mode)", idx
+                    )
+                    break
+
+                # $name — read-only запрос, снапшот НЕ загружается
+                self.send(name_key)
+
+                # Ждём именно СВЕЖИЙ ответ (ключ очищен выше)
+                deadline = time.time() + 0.2
+                snap_name_at_idx = None
+                while time.time() < deadline:
+                    snap_name_at_idx = self.state.get(name_key)
+                    if snap_name_at_idx is not None:
+                        break
+                    time.sleep(0.02)
 
                 if snap_name_at_idx:
-                    name_upper = str(snap_name_at_idx).upper()
-                    name_clean = name_upper.replace("I:/", "").replace(".SNAP", "").strip()
-
-                    if (search_name_upper == name_upper
-                            or search_name_upper == name_clean
-                            or search_name_upper in name_upper):
-                        logger.debug(f"Found snapshot '{snap_name_at_idx}' at index {idx}")
-                        return idx
-
+                    cache[idx] = str(snap_name_at_idx)
             except Exception as e:
-                logger.debug(f"Error checking snapshot index {idx}: {e}")
+                logger.debug(f"Error scanning snapshot index {idx}: {e}")
 
-        logger.warning(f"Snapshot '{snap_name}' not found in first {max_index} slots")
+        # Возвращаем курсор библиотеки на активный снапшот, чтобы GO с пульта
+        # загружал то же, что и до скана
+        try:
+            self.state.pop("/$ctl/lib/$actidx", None)
+            self.send("/$ctl/lib/$actidx")
+            time.sleep(0.1)
+            active_idx = self.state.get("/$ctl/lib/$actidx")
+            if isinstance(active_idx, int) and active_idx > 0:
+                self.send("/$ctl/lib/$actionidx", active_idx)
+        except Exception as e:
+            logger.debug(f"Could not restore library cursor after scan: {e}")
+
+        self._snap_name_cache = cache
+        logger.info(f"Snapshot name cache refreshed: {len(cache)} entries")
+        return cache
+
+    def find_snap_by_name(self, snap_name: str, max_index: int = 200) -> Optional[int]:
+        """
+        Найти индекс snapshot по имени. Читает ТОЛЬКО кэш имён (SAFETY 4) —
+        никаких обращений к пульту: движение курсора библиотеки во время
+        концерта меняет, что загрузит GO, а гонка с запоздалым ответом
+        возвращала индекс соседнего снапшота.
+
+        Кэш заполняется refresh_snap_name_cache() при подготовке
+        (или автоматически внутри load_snap при промахе кэша).
+
+        Args:
+            snap_name: Имя snapshot для поиска
+            max_index: Не используется (совместимость сигнатуры)
+
+        Returns:
+            Индекс snapshot или None если не найден в кэше
+        """
+        search = snap_name.upper().strip()
+
+        # Точное совпадение приоритетнее подстроки: иначе "AC" находил бы
+        # первый попавшийся снапшот с "AC" в имени
+        for idx, name in self._snap_name_cache.items():
+            if search == str(name).upper() or search == self._normalize_snap_name(name):
+                logger.debug(f"Found snapshot '{name}' at index {idx} (exact)")
+                return idx
+        for idx, name in self._snap_name_cache.items():
+            if search in str(name).upper():
+                logger.debug(f"Found snapshot '{name}' at index {idx} (substring)")
+                return idx
+
+        if not self._snap_name_cache:
+            logger.warning(
+                "Snapshot name cache is empty — call refresh_snap_name_cache() "
+                "during setup (find_snap_by_name reads cache only)"
+            )
+        else:
+            logger.warning(f"Snapshot '{snap_name}' not found in cache "
+                           f"({len(self._snap_name_cache)} entries)")
         return None
     
     def load_snap(self, snap_name: str, max_index: int = 200) -> bool:
@@ -2404,9 +2508,15 @@ class WingClient(MixerClientBase):
             return False
         
         try:
-            # Находим индекс snapshot по имени
+            # Находим индекс snapshot по имени (только кэш)
             snap_index = self.find_snap_by_name(snap_name, max_index)
-            
+
+            if snap_index is None:
+                # Промах кэша: load_snap — явная деструктивная операция
+                # оператора, поэтому скан библиотеки здесь допустим
+                self.refresh_snap_name_cache(max_index)
+                snap_index = self.find_snap_by_name(snap_name, max_index)
+
             if snap_index is None:
                 logger.warning(f"Snapshot '{snap_name}' not found")
                 return False

@@ -47,6 +47,13 @@ class BaseAgent(ABC):
         self._cycle_count = 0
         self._last_error: Optional[str] = None
         self._config: Dict[str, Any] = {}
+        # Событие для PAUSED вместо busy-poll (правило CLAUDE.md: asyncio.Event.wait())
+        self._resume_event = asyncio.Event()
+        self._resume_event.set()
+        # Подряд идущие ошибки цикла; ERROR только после порога, чтобы
+        # кратковременный обрыв связи с пультом не убивал агента навсегда
+        self._consecutive_errors = 0
+        self._max_consecutive_errors = 3
         logger.info(f"Agent '{name}' created (interval={cycle_interval}s)")
 
     # ------ Abstract ODA methods ------
@@ -73,6 +80,11 @@ class BaseAgent(ABC):
         if self.state == AgentState.RUNNING:
             logger.warning(f"Agent '{self.name}' already running")
             return
+        if self.state == AgentState.PAUSED:
+            # Старый _run_loop жив (он не выходит при PAUSED) — второй цикл
+            # слал бы дублирующиеся OSC-записи на пульт. Только возобновляем.
+            self.resume()
+            return
         self.state = AgentState.RUNNING
         logger.info(f"Agent '{self.name}' started")
         await self._run_loop()
@@ -80,9 +92,9 @@ class BaseAgent(ABC):
     async def _run_loop(self) -> None:
         """Main ODA loop. Continues while RUNNING or PAUSED."""
         while self.state in (AgentState.RUNNING, AgentState.PAUSED):
-            # If paused, wait without doing work
+            # If paused, wait without doing work (без busy-poll)
             if self.state == AgentState.PAUSED:
-                await asyncio.sleep(0.1)
+                await self._resume_event.wait()
                 continue
 
             try:
@@ -91,11 +103,22 @@ class BaseAgent(ABC):
                 if decision:
                     await self.act(decision)
                 self._cycle_count += 1
+                self._consecutive_errors = 0
             except Exception as e:
                 self._last_error = str(e)
-                logger.error(f"Agent '{self.name}' cycle error: {e}")
-                self.state = AgentState.ERROR
-                break
+                self._consecutive_errors += 1
+                if self._consecutive_errors >= self._max_consecutive_errors:
+                    logger.error(
+                        f"Agent '{self.name}' cycle error ({self._consecutive_errors} "
+                        f"consecutive), entering ERROR state: {e}"
+                    )
+                    self.state = AgentState.ERROR
+                    break
+                logger.warning(
+                    f"Agent '{self.name}' cycle error "
+                    f"({self._consecutive_errors}/{self._max_consecutive_errors}), "
+                    f"retrying: {e}"
+                )
 
             await asyncio.sleep(self.cycle_interval)
 
@@ -105,17 +128,21 @@ class BaseAgent(ABC):
         """Pause the agent. Can be resumed."""
         if self.state == AgentState.RUNNING:
             self.state = AgentState.PAUSED
+            self._resume_event.clear()
             logger.info(f"Agent '{self.name}' paused")
 
     def resume(self) -> None:
         """Resume a paused agent."""
         if self.state == AgentState.PAUSED:
             self.state = AgentState.RUNNING
+            self._resume_event.set()
             logger.info(f"Agent '{self.name}' resumed")
 
     def stop(self) -> None:
         """Stop the agent permanently."""
         self.state = AgentState.STOPPED
+        # Будим цикл, если он ждёт resume в PAUSED, чтобы он мог выйти
+        self._resume_event.set()
         logger.info(f"Agent '{self.name}' stopped")
 
     def configure(self, config: Dict[str, Any]) -> None:

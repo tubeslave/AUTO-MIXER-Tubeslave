@@ -48,7 +48,12 @@ class AgentCoordinator:
         """Start all registered agents."""
         self._running = True
         for name, agent in self._agents.items():
-            if agent.state != AgentState.RUNNING:
+            if agent.state == AgentState.PAUSED:
+                # Цикл агента жив — возобновляем, не создавая вторую задачу
+                # (иначе ссылка на живой _run_loop в self._tasks была бы затёрта)
+                agent.resume()
+                logger.info(f"Resumed agent: {name}")
+            elif agent.state != AgentState.RUNNING:
                 task = asyncio.create_task(agent.start())
                 self._tasks[name] = task
                 logger.info(f"Started agent: {name}")

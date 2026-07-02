@@ -83,7 +83,7 @@ class ConfigManager:
                 'feedback_detection': True,
                 'max_gain_db': 10.0,
                 'true_peak_limit': -1.0,
-                'max_notch_filters': 8,
+                'max_notch_filters': 7,  # 4 EQ + 3 PEQ аппаратных бэнда
                 'max_notch_depth_db': -12.0,
             },
             'logging': {
@@ -185,6 +185,39 @@ class ConfigManager:
             except Exception as e:
                 logger.error(f"Config callback error: {e}")
 
+    def reload(self):
+        """Атомарная перезагрузка конфига из файла.
+
+        Новый конфиг собирается во временном dict и подменяется одной
+        ссылкой — читатели никогда не видят промежуточное состояние (голые
+        defaults между сбросом и load_yaml). При битом YAML действующий
+        конфиг остаётся прежним, а не молча откатывается на defaults.
+        """
+        new_config = copy.deepcopy(self._defaults)
+        if self.config_path:
+            try:
+                import yaml
+                with open(self.config_path, 'r') as f:
+                    data = yaml.safe_load(f) or {}
+                if not isinstance(data, dict):
+                    raise ValueError(f"config root is {type(data).__name__}, expected mapping")
+                self._deep_merge(new_config, data)
+            except ImportError:
+                logger.warning("PyYAML not installed, skipping YAML config")
+            except Exception as e:
+                logger.error(f"Config reload FAILED, keeping current config: {e}")
+                return
+
+        old_config = self._config
+        self._config = new_config
+        self._apply_env_vars()
+        try:
+            self._notify_callbacks()
+        except Exception:
+            self._config = old_config
+            raise
+        logger.info("Config reloaded")
+
     def start_watching(self):
         """Start watching config file for changes (requires watchdog)."""
         if not self.config_path:
@@ -201,10 +234,7 @@ class ConfigManager:
                 def on_modified(self, event):
                     if os.path.basename(event.src_path) == config_name:
                         logger.info("Config file changed, reloading...")
-                        manager._config = copy.deepcopy(manager._defaults)
-                        manager._load_yaml(manager.config_path)
-                        manager._apply_env_vars()
-                        manager._notify_callbacks()
+                        manager.reload()
 
             observer = Observer()
             observer.schedule(Handler(), config_dir, recursive=False)

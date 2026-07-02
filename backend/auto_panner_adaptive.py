@@ -23,6 +23,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 
+from scipy import signal as sp_signal
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,66 +113,49 @@ class LinkwitzRileyCrossover:
         self.low_freq = 250.0
         self.high_freq = 4000.0
         
-        # Filter states
-        self.low_state = np.zeros(4)
-        self.mid_state = np.zeros(4)
-        self.high_state = np.zeros(4)
-        
         # Filter coefficients (LR4)
         self._calculate_coeffs()
-        
+
         logger.info(f"LinkwitzRileyCrossover initialized: {self.low_freq}Hz, {self.high_freq}Hz")
-    
+
     def _calculate_coeffs(self):
-        """Calculate LR4 filter coefficients."""
-        # Simplified coefficients - in production use proper LR4 design
-        self.low_a = np.array([1.0, -3.9, 5.7, -3.7, 0.9])
-        self.low_b = np.array([0.001, 0.004, 0.006, 0.004, 0.001])
-        
-        self.mid_a = np.array([1.0, -3.8, 5.5, -3.5, 0.85])
-        self.mid_b = np.array([0.002, 0.008, 0.012, 0.008, 0.002])
-        
-        self.high_a = np.array([1.0, -3.7, 5.3, -3.4, 0.82])
-        self.high_b = np.array([0.003, 0.012, 0.018, 0.012, 0.003])
-    
+        """LR4 = каскад двух Butterworth 2-го порядка на полосу.
+
+        Коэффициенты проектируются от sample_rate и частот среза. Прежние
+        захардкоженные «LR4»-полиномы имели полюс |z| > 1 (фильтр расходился
+        до Inf/NaN, mid = audio - low - high наследовал NaN) и вообще не
+        зависели от частоты дискретизации.
+        """
+        nyq = self.sample_rate / 2.0
+        self.low_b, self.low_a = sp_signal.butter(2, self.low_freq / nyq, btype="low")
+        self.high_b, self.high_a = sp_signal.butter(2, self.high_freq / nyq, btype="high")
+        # Состояние каждой из двух каскадных секций на полосу
+        order = max(len(self.low_a), len(self.low_b)) - 1
+        self._low_zi = [np.zeros(order), np.zeros(order)]
+        self._high_zi = [np.zeros(order), np.zeros(order)]
+
     def process(self, audio: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Split audio into 3 bands.
-        
+
         Returns:
             (low_band, mid_band, high_band)
         """
-        # Simplified processing - in production use proper filter implementation
-        # Low band
-        low = self._apply_filter(audio, self.low_b, self.low_a, self.low_state)
-        
-        # High band
-        high = self._apply_filter(audio, self.high_b, self.high_a, self.high_state)
-        
+        low = self._cascade(audio, self.low_b, self.low_a, self._low_zi)
+        high = self._cascade(audio, self.high_b, self.high_a, self._high_zi)
+
         # Mid band = original - low - high
         mid = audio - low - high
-        
+
         return low, mid, high
-    
-    def _apply_filter(self, x: np.ndarray, b: np.ndarray, a: np.ndarray, 
-                     state: np.ndarray) -> np.ndarray:
-        """Apply IIR filter with state."""
-        y = np.zeros_like(x)
-        for i in range(len(x)):
-            # Shift state
-            state[3] = state[2]
-            state[2] = state[1]
-            state[1] = state[0]
-            state[0] = x[i]
-            
-            # Compute output
-            y[i] = (b[0] * state[0] + b[1] * state[1] + b[2] * state[2] + 
-                   b[3] * state[3] + b[4] * (state[3] if len(state) > 3 else 0))
-            y[i] -= (a[1] * (y[i-1] if i > 0 else 0) + 
-                    a[2] * (y[i-2] if i > 1 else 0) +
-                    a[3] * (y[i-3] if i > 2 else 0))
-            y[i] /= a[0]
-        
+
+    @staticmethod
+    def _cascade(x: np.ndarray, b: np.ndarray, a: np.ndarray,
+                 zis: List[np.ndarray]) -> np.ndarray:
+        """Два прохода Butterworth 2-го порядка = LR4, с переносом состояния."""
+        y = x
+        for idx in range(len(zis)):
+            y, zis[idx] = sp_signal.lfilter(b, a, y, zi=zis[idx])
         return y
 
 
