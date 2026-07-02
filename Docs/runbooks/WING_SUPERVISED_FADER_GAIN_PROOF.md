@@ -26,6 +26,16 @@ Allowed write kinds for this MVP:
 - `fader`
 - `gain` with a negative delta only
 
+Surface/address contract for the proof plan:
+
+- `fader`: WING channel fader surface, address `/ch/<channel>/fdr`,
+  direction `negative_db_move_only`.
+- `gain`: WING input trim surface, address `/ch/<channel>/in/set/trim`,
+  direction `negative_input_trim_move_only`.
+
+`gain` in this runbook means input trim/gain-down proof only. It is not a
+generic gain/preamp expansion and it does not authorize gain-up.
+
 Forbidden live writes:
 
 - EQ
@@ -92,6 +102,10 @@ Forbidden live writes:
   `--accepted-readonly-source-id`; the runner must re-check the decision review
   before opening a backend WebSocket.
 - The selected delta is small and negative.
+- The proof plan summary includes `proof_surface_contracts` for `fader` and
+  `gain` matching the surface/address contract above.
+- Every planned proof step carries matching `wing_surface`, `wing_address`, and
+  `proof_direction` fields before the operator runs any command.
 - The operator is present and can stop the test.
 
 ## Fader Proof Command
@@ -154,6 +168,8 @@ The artifact must show:
 - emergency stop was applied
 - later apply was blocked with `emergency_stop_active`
 - fader/gain physical readback was recorded after apply and rollback
+- each proof step records the expected `wing_surface`, `wing_address`, and
+  `proof_direction`
 
 ## Fail Closed If
 
@@ -196,6 +212,10 @@ The artifact must show:
   ledger, or the decision review is not `accepted_decision_ready`;
 - the delta is positive;
 - the value type is not `fader` or `gain`;
+- the proof plan omits or mismatches `proof_surface_contracts`;
+- a proof step omits or mismatches `wing_surface`, `wing_address`, or
+  `proof_direction`;
+- `gain` resolves to anything other than `/ch/<channel>/in/set/trim`;
 - pre-read comes only from cache during physical `--execute`;
 - apply readback comes only from cache;
 - rollback readback is missing;
