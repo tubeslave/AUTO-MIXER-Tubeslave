@@ -78,6 +78,14 @@ be trusted.
 
 See `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`.
 
+## Real WING interaction plan
+
+The full operator/backend route for real-console work is
+`Docs/plans/M001-real-wing-interaction-plan.md`. It keeps the current milestone
+blocked before writes until read-only artifacts have accepted operator decision
+records, then allows only the supervised `fader`/`gain-down` proof with
+physical readback, rollback and emergency-stop evidence.
+
 ## Rollback
 
 Rollback is a docs/state-only rollback: revert the M001 plan/state updates and

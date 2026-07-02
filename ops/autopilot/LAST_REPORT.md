@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The real WING Rack is reported connected
   and waiting for tests; the next proof still requires the intended backend/WING session and operator review plus accepted decision records before any supervised write proof.
-- Latest heartbeat: 2026-07-02T10:17:24Z.
+- Latest heartbeat: 2026-07-02T11:41:10Z.
 - Latest WING read-only candidate:
   `artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json`.
 - Decision ledger status: `operator_review_required`; four unreviewed WING
@@ -58,12 +58,40 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   canonical read-only candidates have accepted or rejected operator decisions.
 
 - SmartDSP strategy evidence now exposes mode-specific weighted score
-  contributions for selected and alternative strategies. Operator-facing
-  strategy search can show `score_weights`, `selected_weighted_score_summary`,
-  per-alternative `weighted_score_summary`, and `weighted_score_gaps`, so the
-  engine explains which criteria actually made a DSP strategy win. This is
-  offline/dry-run decision evidence only; it grants no WING live write, queue
-  import, readiness closure, or EQ/dynamics/FX/pan/master live authority.
+  contributions and WING-native strategy-fit evidence for selected and
+  alternative strategies. Operator-facing strategy search can show
+  `score_weights`, `selected_weighted_score_summary`, per-alternative
+  `weighted_score_summary`, `weighted_score_gaps`, `wing_native_strategy_fit`
+  and `wing_native_strategy_fit_gaps`, so the engine explains which criteria
+  actually made a DSP strategy win and whether a close-score WING Rack fw3.0.5
+  native OSC option is faster to soundcheck/live-review. The fit selector may
+  prefer that WING-native option only with no blockers and no lower safety
+  score. This is offline/dry-run decision evidence only; it grants no WING live
+  write, queue import, readiness closure, or EQ/dynamics/FX/pan/master live
+  authority.
+
+- SmartDSP method evidence now also exposes concrete DSP-parameter calculation
+  summaries for the selected strategy and alternatives. Operator-facing
+  rationale, tradeoffs, proposal, explanation sections and the
+  decision-engine contract now include `dsp_parameter_calculation_summary` /
+  `selected_dsp_parameter_calculation_summary` with calculated parameter
+  keys/values, calculation source fields, WING OSC apply/review/readback keys,
+  WING-native fit status and required readback/rollback policy. This proves the
+  strategy layer is reasoning about method parameters, not only picking a card.
+  It is still proposal-only/offline evidence: no WING write, readiness closure,
+  queue import, or new EQ/dynamics/FX/pan/master authority is granted.
+
+- SmartDSP strategy choice evidence now exposes problem-first action decision
+  summaries for the selected strategy and alternatives. Operator-facing
+  rationale, proposed action, proposal, explanation sections and the
+  decision-engine contract now include `problem_action_decision_summary` /
+  `selected_problem_action_decision_summary` with selected action intent,
+  considered method families, considered action intents, method-family score
+  leaders, top alternative actions and `selection_basis`. This makes
+  balance-before-EQ and other "best action for the problem" choices auditable,
+  instead of treating EQ/dynamics/FX/gain as fixed cards. It is still
+  proposal-only/offline evidence: no WING write, readiness closure, queue
+  import, or new EQ/dynamics/FX/pan/master authority is granted.
 
 - The latest verified product/runtime baseline is now
   `22852a7e8 Ignore validate-only WING preflight traces`. The current
@@ -73,8 +101,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   that expose the same fader/input-trim addresses and negative-only proof
   directions. `0d4358132` blocks hidden dynamic-EQ gate-slot model switches
   when real WING `gate/mdl` readback does not match the required model, and
-  `30712d4f2` covers that fail-closed path in replay evaluation. `2a8de72ac`
-  builds SmartDSP current-state inputs from already captured read-only WING
+  `30712d4f2` covers that fail-closed path in replay evaluation. Local
+  SmartDSP strategy scoring now also exposes mode-specific weighted score
+  contributions, WING-native strategy-fit evidence and DSP-parameter
+  calculation summaries plus problem-first action decision summaries for
+  selected and alternative strategies in
+  offline/dry-run evidence, without queue import, readiness closure or live
+  authority.
+  `2a8de72ac` builds SmartDSP current-state inputs from already captured read-only WING
   preflight artifacts while preserving no-live-authority and no-readiness
   flags. `12a1ad7cc` keeps SmartDSP readback state freshness fail-closed, and
   `e69ab53ca` makes apply/preflight reject WING proof proposals whose
@@ -96,7 +130,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   in operator proposals, showing required source identity, level, spectral,
   masking, transient, noise/bleed, phase/mono, feedback and bus/master evidence
   coverage before a proposed correction is trusted. `0dd5687f8` blocks positive WING proof-direction moves even for operator-authored proof proposals, and `22852a7e8` ignores validate-only/no-transport WING preflight traces in real artifact roots. The latest verified full
-  suite passed with `4794 passed, 1 skipped, 1 warning`;
+  suite passed with `4796 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path

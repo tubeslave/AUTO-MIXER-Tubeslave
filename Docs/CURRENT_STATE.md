@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-02T09:52:54Z
+Generated: 2026-07-02T11:41:10Z
 
 ## Repository snapshot
 
@@ -107,6 +107,35 @@ Generated: 2026-07-02T09:52:54Z
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
+- Local SmartDSP strategy scoring now exposes mode-specific weighted score
+  contributions and WING-native strategy-fit evidence for selected and
+  alternative strategies in soundcheck/live dry-run evidence. The fit selector
+  may prefer a close-score WING Rack fw3.0.5 native OSC strategy only when it
+  has a concrete target, actionable apply keys, no unsupported/review-only
+  apply values, no blockers and no lower safety score. This is product/runtime
+  logic evidence only: it does not grant WING live authority, readiness
+  closure, queue import, EQ/dynamics/FX, pan, routing, scene, master or
+  soundcheck write authority.
+- Local SmartDSP method evidence now exposes concrete DSP-parameter calculation
+  summaries for selected and alternative strategies. The selected rationale,
+  alternative tradeoffs, operator proposal, operator explanation sections and
+  decision-engine contract now carry `dsp_parameter_calculation_summary` /
+  `selected_dsp_parameter_calculation_summary` with calculated parameter
+  keys/values, calculation source fields, WING OSC apply/review/readback keys,
+  WING-native fit status and readback/rollback requirements. This is
+  product/runtime logic evidence only: it remains proposal-only/offline
+  evidence and grants no WING live authority, readiness closure, queue import,
+  EQ/dynamics/FX, pan, routing, scene, master or soundcheck write authority.
+- Local SmartDSP strategy-choice evidence now exposes problem-first action
+  decision summaries for selected and alternative strategies. The selected
+  rationale, proposed action, operator proposal, operator explanation sections
+  and decision-engine contract now carry `problem_action_decision_summary` /
+  `selected_problem_action_decision_summary` with selected action intent,
+  considered method families, considered action intents, method-family score
+  leaders, top alternative actions and `selection_basis`. This is
+  product/runtime logic evidence only: it remains proposal-only/offline
+  evidence and grants no WING live authority, readiness closure, queue import,
+  EQ/dynamics/FX, pan, routing, scene, master or soundcheck write authority.
 - Operator-facing product state now filters and recomputes autonomy-overlay
   rows, status counts and target buckets against the same WING deployment
   boundary before exposing supervised proof evidence to the UI.
@@ -1655,4 +1684,6 @@ Generated: 2026-07-02T09:52:54Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - The latest verified full-suite run for `22852a7e8` passed with
-  `4794 passed, 1 skipped, 1 warning`.
+  `4796 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
+  WING-native fit, DSP-parameter calculation summary and problem-first action
+  decision summary evidence tests.

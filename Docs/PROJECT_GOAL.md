@@ -18,6 +18,13 @@ effects, sends, master bus и адаптации во время выступл�
 Это не отменяет долгосрочную цель, но запрещает перескакивать к широкой live
 автономии без доказанной безопасной hardware-петли.
 
+Полный рабочий маршрут взаимодействия с реальным WING Rack зафиксирован в
+`Docs/plans/M001-real-wing-interaction-plan.md`. Этот маршрут является частью
+текущей цели: сначала read-only evidence и operator decision, затем узкий
+supervised `fader`/`gain-down` proof с physical readback, rollback и
+emergency-stop evidence, и только после этого последующее расширение
+soundcheck-автоматизации отдельными hardware-backed решениями.
+
 MVP закрыт только когда есть реальные, принятые evidence artifacts для:
 
 1. WING read-only connection proof.
@@ -48,4 +55,3 @@ MVP закрыт только когда есть реальные, принят
 - `.ai/project-layer/wing_mvp_blockers.md`
 - `backend/project_goal_capability_matrix.py`
 - `backend/operator_mode_policy.py`
-

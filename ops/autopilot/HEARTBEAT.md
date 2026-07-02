@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T10:17:24Z
+Last heartbeat UTC: 2026-07-02T11:41:10Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -18,7 +18,7 @@ candidate source id, then rerun
 
 Latest check: the control-plane state is synchronized to latest verified
 product/runtime commit `22852a7e8 Ignore validate-only WING preflight traces`.
-Latest verified full pytest passed with `4794 passed, 1 skipped, 1 warning`.
+Latest verified full pytest passed with `4796 passed, 1 skipped, 1 warning`.
 no-WING quick passed with failed_checks `[]` and no live authority at `/tmp/automixer_no_wing_proof_direction_post_transport_fix_20260702/20260702T094513Z_no_wing_release_check/summary.json`.
 Supporting real WING read-only tmp capture was recorded in
 `Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`: channel 3 produced 15
@@ -35,13 +35,38 @@ Current targeted surface-contract checks passed:
 rails `4 passed`, `py_compile` passed, JSON/JSONL validation passed, and
 `tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_surface_contract_20260702T0815Z`
 passed.
-Current SmartDSP weighted-score evidence checks passed:
-selected strategy-search/operator-explanation checks `2 passed`,
-`tests/test_smart_dsp_strategy_engine.py` `248 passed`, `py_compile` passed,
-and full suite `4795 passed, 1 skipped, 1 warning`. SmartDSP now exposes
-mode-specific weighted score contributions for selected and alternative
-strategies in offline/dry-run evidence only; no WING live authority, readiness
-closure, queue import, or live write scope changed.
+Current SmartDSP weighted-score and WING-native fit evidence checks passed:
+selected strategy-search/operator-explanation checks `2 passed`, WING-native
+fit tie-break checks `2 passed`, `tests/test_smart_dsp_strategy_engine.py`
+`249 passed`, `py_compile` passed, and full suite `4796 passed, 1 skipped, 1 warning`.
+SmartDSP now exposes mode-specific weighted score contributions and
+WING-native strategy-fit summaries/gaps for selected and alternative
+strategies in offline/dry-run evidence only. The fit selector may prefer a
+close-score WING Rack fw3.0.5 native OSC strategy only with no blockers and no
+lower safety score; no WING live authority, readiness closure, queue import, or
+live write scope changed.
+Current SmartDSP DSP-parameter calculation summary checks passed:
+selected muddy vocal soundcheck strategy `1 passed`,
+`tests/test_smart_dsp_strategy_engine.py` `249 passed`, selected WING MVP rails
+`120 passed`, and `py_compile` passed. SmartDSP now exposes
+`dsp_parameter_calculation_summary` for the selected strategy and alternatives,
+including calculated DSP parameter keys/values, calculation source fields,
+WING OSC apply/review/readback keys, WING-native fit status, and
+readback/rollback requirements. This remains proposal-only/offline evidence:
+`proposal_only=true`, `live_write=false`, no readiness closure and no new WING
+EQ/dynamics/FX/pan/master authority.
+Current SmartDSP problem-first action decision checks passed:
+muddy vocal and vocal masking level-plane tests `2 passed`,
+`tests/test_smart_dsp_strategy_engine.py` `249 passed`, and `py_compile`
+passed. SmartDSP now exposes `problem_action_decision_summary` /
+`selected_problem_action_decision_summary` for selected strategies and
+alternatives, including selected action intent, considered method families,
+considered action intents, method-family score leaders, top alternative actions
+and `selection_basis`. This makes balance-before-EQ, static-EQ-vs-dynamic-EQ,
+de-esser-vs-static-EQ and other strategy choices auditable as
+problem-first decisions, not fixed-method cards. It remains proposal-only:
+`proposal_only=true`, `live_write=false`, no readiness closure and no new WING
+EQ/dynamics/FX/pan/master authority.
 Current runner artifact surface-contract checks passed:
 `tests/test_wing_operator_proposal_validation_runner.py` `21 passed`, and
 `py_compile tools/wing_operator_proposal_validation_runner.py` passed.
@@ -75,8 +100,12 @@ accepted or rejected operator decision records. The decision report now lists
 each source id, a suggested decision JSON path, and the exact template command.
 This is the intended fail-closed state before manual review.
 
-This heartbeat made no new product/runtime change; it synchronized already
-verified product/runtime commits in control-plane state. No WING/backend contact was made by this state-sync cycle, and no live console authority changed. The
+This heartbeat includes one local product/runtime change: SmartDSP strategy
+search now reports mode-specific weighted score contributions, WING-native
+strategy-fit evidence, DSP-parameter calculation summaries, and problem-first
+action decision summaries for selected and alternative strategies in
+offline/dry-run evidence. No WING/backend contact was made by this state-sync
+cycle, and no live console authority changed. The
 committed `20260702T075151Z` artifact records read-only backend/WING
 gate-parameter queries with no live write, and the latest proof-plan runtime
 commit binds future fader/gain proof steps to concrete WING surfaces and

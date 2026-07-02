@@ -164,11 +164,17 @@ from backend.smart_dsp_strategy_engine import (
     WING_PAN_WIDTH_OPERATOR_OWNED_BLOCKER,
     WING_RACK_OSC_FIRMWARE,
     WING_RACK_OSC_TARGET_CONSOLE,
+    WING_NATIVE_STRATEGY_FIT_MIN_ADVANTAGE,
+    WING_NATIVE_STRATEGY_FIT_SCORE_TOLERANCE,
     WING_STRIP_LOW_CUT_TYPE_ALLOWED_VALUES_BY_SURFACE,
     WING_WIDTH_MIN_PERCENT,
+    DSPStrategyCandidate,
     SmartDSPAnalysisInput,
+    _candidate_wing_osc_tradeoff_summary,
     _future_readback_contract,
     _make_candidate,
+    _select_candidate,
+    _selection_policy,
     _with_wing_native_parameter_mappings,
     _wing_target_path_templates,
     analyze_smart_dsp_strategy,
@@ -224,6 +230,85 @@ def _candidate_scores():
     }
 
 
+def _wing_native_fit_candidate(
+    *,
+    strategy_id,
+    method_family,
+    total_score,
+    native_supported,
+    support_level,
+    path_templates=(),
+    actionable=(),
+    apply_keys=(),
+    unsupported=(),
+    review_only=(),
+    absolute=(),
+    blockers=(),
+    safety=0.8,
+):
+    parameters = {key: -2.0 for key in set(actionable) | set(apply_keys)}
+    return DSPStrategyCandidate(
+        strategy_id=strategy_id,
+        method_family=method_family,
+        problem="same_problem",
+        parameters=parameters,
+        scores={**_candidate_scores(), "safety": safety},
+        total_score=total_score,
+        confidence=0.8,
+        reason="fit test candidate",
+        operator_check="operator review before live promotion",
+        rollback_expectation={
+            "required_before_live_promotion": True,
+            "live_write": False,
+        },
+        future_wing_readback_contract={
+            "required_before_live_promotion": True,
+            "requires_real_wing_proof": True,
+            "requires_operator_approval": True,
+            "live_authority_granted": False,
+            "live_write": False,
+            "allowed_live_write_scope_before_wing_proof": [],
+            "wing_osc_applicability": {
+                "target_console": WING_RACK_OSC_TARGET_CONSOLE,
+                "firmware": WING_RACK_OSC_FIRMWARE,
+                "protocol": "OSC UDP 2223",
+                "applicable_corrections_policy": (
+                    "Only corrections backed by WING Rack fw3.0.5 native OSC "
+                    "paths may be considered WING-applicable; all other "
+                    "corrections remain operator-review-only."
+                ),
+                "correction_exists_on_console_required": True,
+                "correction_exists_on_console_policy": (
+                    "wing_rack_fw_3_0_5_console_native_osc_corrections_only"
+                ),
+                "native_osc_required_for_wing_applicable_candidate": True,
+                "osc_path_must_match_firmware": WING_RACK_OSC_FIRMWARE,
+                "target_id": "ch:5",
+                "target_surface_kind": "channel",
+                "target_index_surface": "channel",
+                "target_index": 5,
+                "target_index_valid": True,
+                "target_index_range": [1, 48],
+                "target_requires_concrete_console_index": True,
+                "native_osc_supported": native_supported,
+                "native_osc_support_level": support_level,
+                "native_osc_path_templates": list(path_templates),
+                "unsupported_parameter_keys": list(unsupported),
+                "review_only_parameter_keys": list(review_only),
+                "actionable_parameter_keys": list(actionable),
+                "absolute_value_readback_parameter_keys": list(absolute),
+                "direct_apply_parameter_keys": list(apply_keys),
+                "requires_real_wing_readback": True,
+                "requires_operator_approval": True,
+                "live_authority_granted": False,
+                "live_write": False,
+                "allowed_live_write_scope_before_wing_proof": [],
+            },
+        },
+        blockers=tuple(blockers),
+    )
+
+
 def _assert_weighted_score_summary(summary, *, mode, expected_total_score=None):
     expected_weights = (
         LIVE_STRATEGY_SCORE_WEIGHTS
@@ -256,6 +341,81 @@ def _assert_weighted_score_summary(summary, *, mode, expected_total_score=None):
     assert summary["weighted_score_matches_total"] is True
     if expected_total_score is not None:
         assert summary["total_score"] == expected_total_score
+
+
+def _assert_dsp_parameter_calculation_summary(
+    summary,
+    *,
+    strategy_id=None,
+    method_family=None,
+    expect_calculated=True,
+):
+    if strategy_id is not None:
+        assert summary["strategy_id"] == strategy_id
+    if method_family is not None:
+        assert summary["method_family"] == method_family
+    assert summary["parameter_status"]
+    assert isinstance(summary["calculated_parameter_keys"], list)
+    assert isinstance(summary["calculated_parameter_values"], dict)
+    assert set(summary["calculated_parameter_values"]) == set(
+        summary["calculated_parameter_keys"]
+    )
+    assert isinstance(summary["calculation_source_keys"], list)
+    assert isinstance(summary["calculation_source_values"], dict)
+    assert set(summary["calculation_source_values"]).issubset(
+        set(summary["calculation_source_keys"])
+    )
+    assert isinstance(summary["wing_apply_parameter_keys"], list)
+    assert isinstance(summary["wing_review_only_or_readback_parameter_keys"], list)
+    assert 0.0 <= summary["wing_native_strategy_fit_score"] <= 1.0
+    assert summary["wing_native_strategy_fit_status"]
+    assert summary["proposal_only"] is True
+    assert summary["readback_required_before_promotion"] is True
+    assert summary["rollback_required_before_promotion"] is True
+    assert summary["live_write"] is False
+    assert summary["live_authority_granted"] is False
+    if expect_calculated:
+        assert summary["has_real_dsp_parameter_calculation"] is True
+        assert (
+            summary["calculated_parameter_keys"]
+            or summary["wing_apply_parameter_keys"]
+            or summary["method_family"] in {"analysis", "analysis_only"}
+        )
+
+
+def _assert_problem_action_decision_summary(
+    summary,
+    *,
+    strategy_id=None,
+    method_family=None,
+    expected_action_intent=None,
+    expected_method_families=(),
+):
+    assert summary["schema"] == "smart_dsp.problem_action_decision.v1"
+    assert summary["decision_policy"] == "problem_first_strategy_search_not_fixed_method"
+    if strategy_id is not None:
+        assert summary["selected_strategy_id"] == strategy_id
+        assert summary["selected"]["strategy_id"] == strategy_id
+    if method_family is not None:
+        assert summary["selected_method_family"] == method_family
+        assert summary["selected"]["method_family"] == method_family
+    if expected_action_intent is not None:
+        assert summary["selected_action_intent"] == expected_action_intent
+        assert summary["selected"]["action_intent"] == expected_action_intent
+    for family in expected_method_families:
+        assert family in summary["considered_method_families"]
+    assert summary["considered_strategy_count"] >= 1
+    assert summary["compared_alternative_count"] >= 0
+    assert isinstance(summary["considered_action_intents"], list)
+    assert isinstance(summary["considered_problem_variants"], list)
+    assert isinstance(summary["method_family_score_leaders"], list)
+    assert summary["selection_basis"]
+    assert summary["operator_review_required_before_live_apply"] is True
+    assert summary["readback_required_before_live_promotion"] is True
+    assert summary["rollback_required_before_live_promotion"] is True
+    assert summary["proposal_only"] is True
+    assert summary["live_write"] is False
+    assert summary["live_authority_granted"] is False
 
 
 def _assert_proposal_denial(payload):
@@ -466,6 +626,18 @@ def _assert_tradeoff_wing_osc_summary(
     else:
         assert row["wing_osc_review_only_parameters_apply_ready"] is None
     assert row["wing_osc_candidate_apply_status"]
+    assert isinstance(row["wing_native_strategy_fit"], dict)
+    fit = row["wing_native_strategy_fit"]
+    assert row["wing_native_strategy_fit_score"] == fit["fit_score"]
+    assert row["wing_native_strategy_fit_status"] == fit["fit_status"]
+    assert row["wing_native_strategy_fit_preferable"] == (
+        fit["selection_preferable_for_fast_soundcheck_or_live"]
+    )
+    assert 0.0 <= fit["fit_score"] <= 1.0
+    assert isinstance(fit["fit_status"], str)
+    assert isinstance(fit["path_template_count"], int)
+    assert isinstance(fit["apply_parameter_count"], int)
+    assert isinstance(fit["readback_burden_score"], int)
     if native_supported is not None:
         assert row["wing_osc_native_supported"] is native_supported
     if support_level is not None:
@@ -575,6 +747,54 @@ def _assert_selected_wing_osc_readback_summary(
         assert row["wing_osc_read_after_paths"] == expected_before_paths
     for template in expected_templates_include:
         assert template in row["wing_osc_readback_path_templates"]
+
+
+def test_wing_native_strategy_fit_can_select_close_score_native_candidate():
+    leader = _wing_native_fit_candidate(
+        strategy_id="precise_external_processing",
+        method_family="external_processing",
+        total_score=0.82,
+        native_supported=False,
+        support_level="external_processing_mapping_required",
+    )
+    native = _wing_native_fit_candidate(
+        strategy_id="native_fast_osc_method",
+        method_family="native_channel_processing",
+        total_score=0.77,
+        native_supported=True,
+        support_level="native_osc_path_templates_declared",
+        path_templates=("/ch/{channel}/native/fast",),
+        actionable=("wing_native_fast_value",),
+        apply_keys=("wing_native_fast_value",),
+    )
+
+    selected = _select_candidate(
+        [leader, native],
+        [],
+        _analysis(),
+        "soundcheck",
+    )
+
+    assert selected.strategy_id == "native_fast_osc_method"
+    policy = _selection_policy(
+        selected=selected,
+        alternatives=(leader,),
+        analysis=_analysis(),
+        mode="soundcheck",
+        blockers=(),
+    )
+    assert policy == "soundcheck_wing_native_strategy_fit_priority"
+    leader_summary = _candidate_wing_osc_tradeoff_summary(leader)
+    native_summary = _candidate_wing_osc_tradeoff_summary(native)
+    assert native_summary["wing_native_strategy_fit_preferable"] is True
+    assert leader_summary["wing_native_strategy_fit_preferable"] is False
+    assert (
+        native_summary["wing_native_strategy_fit_score"]
+        - leader_summary["wing_native_strategy_fit_score"]
+    ) >= WING_NATIVE_STRATEGY_FIT_MIN_ADVANTAGE["soundcheck"]
+    assert (
+        leader.total_score - native.total_score
+    ) <= WING_NATIVE_STRATEGY_FIT_SCORE_TOLERANCE["soundcheck"]
 
 
 def _assert_gain_delta_readback_contract(
@@ -4142,6 +4362,23 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
         mode="soundcheck",
         expected_total_score=recommendation.selected_strategy.total_score,
     )
+    assert search["selected_rationale"]["wing_native_strategy_fit"]["fit_score"] >= 0.0
+    assert search["selected_rationale"]["wing_native_strategy_fit"]["fit_status"]
+    _assert_dsp_parameter_calculation_summary(
+        search["selected_rationale"]["dsp_parameter_calculation_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+    )
+    _assert_problem_action_decision_summary(
+        search["selected_rationale"]["problem_action_decision_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+        expected_action_intent="static_spectral_correction",
+        expected_method_families=("eq",),
+    )
+    assert "gain_db" in search["selected_rationale"][
+        "dsp_parameter_calculation_summary"
+    ]["calculated_parameter_keys"]
     _assert_tradeoff_wing_osc_summary(
         search["selected_rationale"],
         native_supported=True,
@@ -4157,6 +4394,13 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
             expected_total_score=row["total_score"],
         )
         assert row["weighted_score_gaps"]
+        assert row["problem_action_summary"]["strategy_id"] == row["strategy_id"]
+        assert row["problem_action_summary"]["live_write"] is False
+        _assert_dsp_parameter_calculation_summary(
+            row["dsp_parameter_calculation_summary"]
+        )
+        assert row["wing_native_strategy_fit"]["fit_status"]
+        assert row["wing_native_strategy_fit_gaps"]
 
     proposal = recommendation.to_operator_proposal()
     _assert_proposal_denial(proposal)
@@ -4166,6 +4410,30 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
         proposal["selected_wing_osc_summary"],
         native_supported=True,
         support_level="native_osc_path_templates_declared",
+    )
+    _assert_dsp_parameter_calculation_summary(
+        proposal["selected_dsp_parameter_calculation_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+    )
+    _assert_problem_action_decision_summary(
+        proposal["problem_action_decision_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+        expected_action_intent="static_spectral_correction",
+        expected_method_families=("eq",),
+    )
+    _assert_dsp_parameter_calculation_summary(
+        proposal["proposed_action"]["dsp_parameter_calculation_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+    )
+    _assert_problem_action_decision_summary(
+        proposal["proposed_action"]["problem_action_decision_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+        expected_action_intent="static_spectral_correction",
+        expected_method_families=("eq",),
     )
     _assert_selected_wing_osc_readback_summary(
         proposal["selected_wing_osc_readback_summary"],
@@ -4270,6 +4538,11 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
     )
     for row in proposal["proposed_action"]["alternatives_considered"]:
         _assert_tradeoff_wing_osc_summary(row)
+        assert row["problem_action_summary"]["strategy_id"] == row["strategy_id"]
+        assert row["problem_action_summary"]["proposal_only"] is True
+        _assert_dsp_parameter_calculation_summary(
+            row["dsp_parameter_calculation_summary"]
+        )
     sections = proposal["operator_explanation_sections"]
     assert sections["problem_found"] == "muddy"
     assert sections["selected_processing_type"] == "eq"
@@ -4278,6 +4551,19 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
         sections["selected_weighted_score_summary"],
         mode="soundcheck",
         expected_total_score=recommendation.selected_strategy.total_score,
+    )
+    assert sections["selected_wing_native_strategy_fit"]["fit_status"]
+    _assert_dsp_parameter_calculation_summary(
+        sections["selected_dsp_parameter_calculation_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+    )
+    _assert_problem_action_decision_summary(
+        sections["selected_problem_action_decision_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+        expected_action_intent="static_spectral_correction",
+        expected_method_families=("eq",),
     )
     _assert_tradeoff_wing_osc_summary(
         sections["selected_wing_osc_summary"],
@@ -4312,6 +4598,12 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
             expected_total_score=row["total_score"],
         )
         assert row["weighted_score_gaps"]
+        assert row["problem_action_summary"]["strategy_id"] == row["strategy_id"]
+        _assert_dsp_parameter_calculation_summary(
+            row["dsp_parameter_calculation_summary"]
+        )
+        assert row["wing_native_strategy_fit"]["fit_status"]
+        assert row["wing_native_strategy_fit_gaps"]
     assert sections["remaining_risk"] == proposal["residual_risk"]
     assert sections["operator_verification"]
     assert sections["rollback_readback"]["required_before_live_promotion"] is True
@@ -4363,6 +4655,21 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
         mode="soundcheck",
         expected_total_score=recommendation.selected_strategy.total_score,
     )
+    assert contract["strategy_search"]["selected_wing_native_strategy_fit"][
+        "fit_status"
+    ]
+    _assert_dsp_parameter_calculation_summary(
+        contract["strategy_search"]["selected_dsp_parameter_calculation_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+    )
+    _assert_problem_action_decision_summary(
+        contract["strategy_search"]["selected_problem_action_decision_summary"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+        expected_action_intent="static_spectral_correction",
+        expected_method_families=("eq",),
+    )
     assert contract["strategy_search"]["alternatives_compared"]
     assert all(
         row["why_not_selected"]
@@ -4374,6 +4681,29 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
             mode="soundcheck",
         )
         assert row["weighted_score_gaps"]
+        assert row["problem_action_summary"]["strategy_id"] == row["strategy_id"]
+        _assert_dsp_parameter_calculation_summary(
+            row["dsp_parameter_calculation_summary"]
+        )
+        assert row["wing_native_strategy_fit"]["fit_status"]
+        assert row["wing_native_strategy_fit_gaps"]
+    _assert_dsp_parameter_calculation_summary(
+        contract["parameter_calculation"][
+            "selected_dsp_parameter_calculation_summary"
+        ],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+    )
+    assert contract["parameter_calculation"][
+        "has_real_dsp_parameter_calculation"
+    ] is True
+    _assert_problem_action_decision_summary(
+        contract["problem_action_selection"],
+        strategy_id="low_mid_corrective_cut",
+        method_family="eq",
+        expected_action_intent="static_spectral_correction",
+        expected_method_families=("eq",),
+    )
     assert "gain_db" in contract["parameter_calculation"]["parameter_keys"]
     assert "wing_eq_band_operations" in contract["parameter_calculation"][
         "wing_osc_apply_parameter_keys"
@@ -9053,7 +9383,28 @@ def test_soundcheck_vocal_masking_rebalances_over_level_masker_before_eq():
     ] == (
         "soundcheck_vocal_masking_level_plane_priority"
     )
+    problem_action = recommendation.evidence["strategy_search"][
+        "selected_rationale"
+    ]["problem_action_decision_summary"]
+    _assert_problem_action_decision_summary(
+        problem_action,
+        strategy_id="vocal_masking_level_plane_rebalance",
+        method_family="gain_fader",
+        expected_action_intent="level_plane_rebalance_before_tone_change",
+        expected_method_families=("gain_fader", "eq", "dynamic_eq"),
+    )
+    assert problem_action["problem_first_not_method_locked"] is True
+    assert problem_action["selection_basis"] == (
+        "balance_or_headroom_before_tone_processing"
+    )
     proposal = recommendation.to_operator_proposal()
+    _assert_problem_action_decision_summary(
+        proposal["problem_action_decision_summary"],
+        strategy_id="vocal_masking_level_plane_rebalance",
+        method_family="gain_fader",
+        expected_action_intent="level_plane_rebalance_before_tone_change",
+        expected_method_families=("gain_fader", "eq", "dynamic_eq"),
+    )
     tradeoffs = {
         item["strategy_id"]: item["why_not_selected"]
         for item in proposal["alternative_tradeoffs"]

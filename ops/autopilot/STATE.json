@@ -5,7 +5,7 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "22852a7e8",
-  "last_heartbeat_utc": "2026-07-02T10:17:24Z",
+  "last_heartbeat_utc": "2026-07-02T11:41:10Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": "Real WING Rack is connected and available for supervised tests, and the operator has allowed necessary test actions. Proof writes are still blocked until accepted or rejected decision records exist for all four unreviewed real WING read-only candidate source ids; only then may the narrow fader/gain-down test proof run.",
@@ -14,8 +14,8 @@
     "status": "wing_test_proof_gate_prepared_waiting_operator_decisions",
     "hardware_evidence": false,
     "product_runtime_changed": true,
-    "product_runtime_change_scope": "Local SmartDSP strategy scoring now exposes mode-specific weighted score contributions for selected and alternative strategies, while WING readiness remains blocked on operator decisions. This improves offline/dry-run decision evidence and operator explanation only; no unrestricted EQ, dynamics, FX, routing, master, scene, live or soundcheck authority is granted.",
-    "pytest": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4795 passed, 1 skipped, 1 warning",
+    "product_runtime_change_scope": "Local SmartDSP strategy scoring now exposes mode-specific weighted score contributions, WING-native strategy-fit evidence, DSP parameter calculation summaries, and problem-first action decision summaries for selected and alternative strategies, while WING readiness remains blocked on operator decisions. This improves offline/dry-run decision evidence and operator explanation only; no unrestricted EQ, dynamics, FX, routing, master, scene, live or soundcheck authority is granted.",
+    "pytest": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4796 passed, 1 skipped, 1 warning",
     "latest_verified_product_runtime_commit": "22852a7e8 Ignore validate-only WING preflight traces",
     "latest_docs_only_report_commit": "242367ac1 Document WING apply preflight decision gate",
     "supervised_apply_preflight_decision_gate_report": "Docs/reports/WING_SUPERVISED_APPLY_PREFLIGHT_DECISION_GATE_20260702.md",
@@ -305,7 +305,10 @@
     "real_wing_supporting_readonly_capture_physical_readbacks": 15,
     "hardware_evidence_note": "Temporary supporting real WING read-only capture passed at /tmp/automixer_real_wing_verified_subset_20260702T_tmp_persist/wing_readonly_preflight/20260702T094851Z_wing_readonly_preflight/summary.json with 15 physical readbacks, no writes, no proposal apply and no live authority. It is not a readiness candidate because the artifact root is outside artifacts/wing_readonly_preflight.",
     "autopilot_blocker_truth_sync": "ops/autopilot/BLOCKERS.md now records the supporting temporary real WING read-only capture while keeping canonical readiness blocked on four operator decision records; targeted WING MVP blocker rails passed.",
-    "smart_dsp_weighted_score_evidence": "backend/smart_dsp_strategy_engine.py now reports score_weights, selected_weighted_score_summary, alternative weighted_score_summary, and weighted_score_gaps in strategy search/operator evidence for soundcheck and live without granting live authority."
+    "smart_dsp_weighted_score_evidence": "backend/smart_dsp_strategy_engine.py now reports score_weights, selected_weighted_score_summary, alternative weighted_score_summary, weighted score contributions, and weighted_score_gaps in strategy search/operator evidence for soundcheck and live without granting live authority.",
+    "smart_dsp_wing_native_strategy_fit_evidence": "backend/smart_dsp_strategy_engine.py now reports wing_native_strategy_fit, wing_native_strategy_fit_score, wing_native_strategy_fit_status, and wing_native_strategy_fit_gaps in strategy search/operator evidence. The selector may prefer a close-score WING Rack fw3.0.5 native OSC strategy only when it has a concrete target, actionable apply keys, no unsupported/review-only apply values, no blockers, and no lower safety score; no live authority is granted.",
+    "smart_dsp_parameter_calculation_summary_evidence": "backend/smart_dsp_strategy_engine.py now reports dsp_parameter_calculation_summary and selected_dsp_parameter_calculation_summary in selected rationale, alternative tradeoffs, operator proposal, operator explanation sections, and the decision-engine contract. The summary lists calculated DSP parameter keys/values, source fields, WING OSC apply/review/readback keys, fit status, and readback/rollback requirements while preserving proposal_only=true and live_write=false.",
+    "smart_dsp_problem_action_decision_evidence": "backend/smart_dsp_strategy_engine.py now reports problem_action_decision_summary and selected_problem_action_decision_summary in selected rationale, proposed action, operator proposal, operator explanation sections, and the decision-engine contract. The summary proves problem-first strategy search by listing selected action intent, considered method families, considered action intents, top alternative actions, method-family score leaders, and selection_basis while preserving proposal_only=true and live_write=false."
   },
   "external_validation_requirements": [
     "Real WING Rack read-only artifact",

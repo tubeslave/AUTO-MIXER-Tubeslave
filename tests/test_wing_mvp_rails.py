@@ -845,7 +845,59 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
     assert state["active_milestone"] == "M001"
     assert state["checkpoint_status"] == "waiting_for_external_validation"
     assert state["last_validation_summary"]["hardware_evidence"] is False
-    assert state["last_validation_summary"]["product_runtime_changed"] is False
+    assert state["last_validation_summary"]["product_runtime_changed"] is True
+    assert "SmartDSP strategy scoring" in state["last_validation_summary"][
+        "product_runtime_change_scope"
+    ]
+    assert "offline/dry-run decision evidence" in state["last_validation_summary"][
+        "product_runtime_change_scope"
+    ]
+    assert "DSP parameter calculation summaries" in state["last_validation_summary"][
+        "product_runtime_change_scope"
+    ]
+    assert "problem-first action decision summaries" in state[
+        "last_validation_summary"
+    ]["product_runtime_change_scope"]
+    assert (
+        "weighted score contributions"
+        in state["last_validation_summary"]["smart_dsp_weighted_score_evidence"]
+    )
+    assert (
+        "wing_native_strategy_fit"
+        in state["last_validation_summary"][
+            "smart_dsp_wing_native_strategy_fit_evidence"
+        ]
+    )
+    assert (
+        "no lower safety score"
+        in state["last_validation_summary"][
+            "smart_dsp_wing_native_strategy_fit_evidence"
+        ]
+    )
+    assert (
+        "dsp_parameter_calculation_summary"
+        in state["last_validation_summary"][
+            "smart_dsp_parameter_calculation_summary_evidence"
+        ]
+    )
+    assert (
+        "proposal_only=true"
+        in state["last_validation_summary"][
+            "smart_dsp_parameter_calculation_summary_evidence"
+        ]
+    )
+    assert (
+        "problem_action_decision_summary"
+        in state["last_validation_summary"][
+            "smart_dsp_problem_action_decision_evidence"
+        ]
+    )
+    assert (
+        "selection_basis"
+        in state["last_validation_summary"][
+            "smart_dsp_problem_action_decision_evidence"
+        ]
+    )
     assert state["last_validation_summary"]["authority"]["live_authority_granted"] is False
     if (
         state["last_validation_summary"].get("wing_readonly_preflight_review_status")
@@ -899,10 +951,12 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
     assert "Control-plane docs/state can proceed without live hardware contact" in blockers
 
     assert "Writer lease: none" in heartbeat
-    assert (
-        "This heartbeat made no product/runtime\nchange" in heartbeat
-        or "This heartbeat made no new product/runtime change" in heartbeat
-    )
+    assert "This heartbeat includes one local product/runtime change" in heartbeat
+    assert "SmartDSP strategy\nsearch now reports mode-specific weighted score" in heartbeat
+    assert "WING-native\nstrategy-fit evidence" in heartbeat
+    assert "`dsp_parameter_calculation_summary`" in heartbeat
+    assert "`problem_action_decision_summary`" in heartbeat
+    assert "no live console authority changed" in heartbeat
     if (
         state["last_validation_summary"].get("wing_readonly_preflight_review_status")
         == "candidate_ready_for_manual_review"
@@ -1024,7 +1078,35 @@ def test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root()
 
     assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
     assert summary["hardware_evidence"] is False
-    assert summary["product_runtime_changed"] is False
+    assert summary["product_runtime_changed"] is True
+    assert "SmartDSP strategy scoring" in summary["product_runtime_change_scope"]
+    assert "offline/dry-run decision evidence" in summary["product_runtime_change_scope"]
+    assert "DSP parameter calculation summaries" in summary["product_runtime_change_scope"]
+    assert "problem-first action decision summaries" in summary[
+        "product_runtime_change_scope"
+    ]
+    assert "weighted score contributions" in summary["smart_dsp_weighted_score_evidence"]
+    assert (
+        "wing_native_strategy_fit"
+        in summary["smart_dsp_wing_native_strategy_fit_evidence"]
+    )
+    assert "no lower safety score" in summary[
+        "smart_dsp_wing_native_strategy_fit_evidence"
+    ]
+    assert (
+        "selected_dsp_parameter_calculation_summary"
+        in summary["smart_dsp_parameter_calculation_summary_evidence"]
+    )
+    assert "live_write=false" in summary[
+        "smart_dsp_parameter_calculation_summary_evidence"
+    ]
+    assert (
+        "selected_problem_action_decision_summary"
+        in summary["smart_dsp_problem_action_decision_evidence"]
+    )
+    assert "proposal_only=true" in summary[
+        "smart_dsp_problem_action_decision_evidence"
+    ]
     assert summary["milestone_decision"] == "WAITING_FOR_EXTERNAL_VALIDATION"
     assert authority["contacts_wing"] is False
     assert authority["contacts_backend"] is False

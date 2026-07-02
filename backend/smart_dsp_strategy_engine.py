@@ -60,6 +60,170 @@ EVIDENCE_EXTRACTION_REQUIRED_COMPONENTS = (
     "feedback_risk",
     "bus_group_master_impact",
 )
+DSP_PARAMETER_CALCULATION_KEYS_BY_METHOD_FAMILY = {
+    "eq": (
+        "filter_type",
+        "frequency_hz",
+        "gain_db",
+        "q",
+        "slope_db_per_octave",
+        "low_cut_frequency_hz",
+        "high_cut_frequency_hz",
+        "target_cut_db",
+        "counterpart_cut_db",
+        "wing_eq_band_operations",
+    ),
+    "dynamic_eq": (
+        "dynamic_eq_frequency_hz",
+        "dynamic_eq_gain_db",
+        "dynamic_eq_q",
+        "dynamic_eq_threshold_dbfs",
+        "dynamic_eq_ratio",
+        "dynamic_eq_attack_ms",
+        "dynamic_eq_release_ms",
+        "dynamic_eq_filter_type",
+        "dynamic_eq_mode",
+        "dynamic_eq_max_gain_reduction_db",
+        "frequency_hz",
+        "gain_db",
+        "q",
+        "threshold_dbfs",
+        "ratio",
+        "attack_ms",
+        "release_ms",
+    ),
+    "de_esser": (
+        "de_esser_frequency_hz",
+        "de_esser_range_db",
+        "de_esser_mode",
+        "frequency_hz",
+        "range_db",
+        "mode",
+    ),
+    "dynamics": (
+        "threshold_dbfs",
+        "ratio",
+        "attack_ms",
+        "hold_ms",
+        "release_ms",
+        "knee_db",
+        "makeup_gain_db",
+        "compression_mix_percent",
+        "target_gain_reduction_db",
+        "max_gain_reduction_db",
+        "compressor_detector",
+        "compressor_envelope_curve",
+        "compressor_auto_timing_enabled",
+        "compressor_crossover_type",
+        "compressor_crossover_depth_db",
+        "compressor_crossover_frequency_hz",
+        "compressor_sidechain_filter_type",
+        "compressor_sidechain_frequency_hz",
+        "compressor_sidechain_q",
+        "compressor_sidechain_source",
+        "compressor_sidechain_tap",
+    ),
+    "gate": (
+        "threshold_dbfs",
+        "gate_threshold_dbfs",
+        "bleed_aware_threshold_dbfs",
+        "range_db",
+        "attack_ms",
+        "hold_ms",
+        "release_ms",
+        "hysteresis_db",
+        "accent_percent",
+        "gate_sidechain_filter_type",
+        "gate_sidechain_frequency_hz",
+        "gate_sidechain_q",
+        "gate_hit_to_bleed_margin_db",
+        "gate_tail_decay_ms",
+        "gate_hit_peak_dbfs",
+    ),
+    "expander": (
+        "threshold_dbfs",
+        "gate_threshold_dbfs",
+        "bleed_aware_threshold_dbfs",
+        "range_db",
+        "ratio",
+        "attack_ms",
+        "hold_ms",
+        "release_ms",
+        "hysteresis_db",
+        "accent_percent",
+        "gate_sidechain_filter_type",
+        "gate_sidechain_frequency_hz",
+        "gate_sidechain_q",
+        "gate_hit_to_bleed_margin_db",
+        "gate_tail_decay_ms",
+        "gate_hit_peak_dbfs",
+    ),
+    "fx": (
+        "send_delta_db",
+        "return_delta_db",
+        "decay_s",
+        "pre_delay_ms",
+        "return_hpf_hz",
+        "return_lpf_hz",
+        "delay_time_ms",
+        "delay_feedback_percent",
+        "delay_low_pass_hz",
+        "ducking_depth_db",
+        "attack_ms",
+        "release_ms",
+        "fx_return_headroom_db",
+        "post_pullback_decay_review_s",
+        "post_pullback_return_hpf_review_hz",
+        "post_pullback_return_lpf_review_hz",
+        "post_pullback_delay_feedback_review_percent",
+        "post_pullback_delay_time_review_ms",
+        "post_pullback_delay_low_pass_review_hz",
+        "post_pullback_delay_ducking_review_db",
+        "post_pullback_fx_return_level_review_db",
+    ),
+    "gain_fader": (
+        "gain_db",
+        "delta_db",
+        "bounded_delta_db",
+        "trim_delta_db",
+        "fader_delta_db",
+        "input_trim_delta_db",
+        "target_level_lufs",
+        "level_plane_error_lu",
+        "summed_bus_level_plane_error_lu",
+        "target_fx_return_headroom_db",
+        "fx_return_headroom_deficit_db",
+    ),
+    "pan": (
+        "target_pan_percent",
+        "pan_delta_percent",
+        "target_width_percent",
+        "width_delta_percent",
+    ),
+    "mute": (
+        "proposed_muted",
+        "mute_delta",
+        "manual_mute_scope",
+    ),
+    "analysis": (),
+    "analysis_only": (),
+}
+DSP_PARAMETER_CALCULATION_SOURCE_SUFFIXES = (
+    "_parameter_source",
+    "_mapping_source",
+)
+DSP_PARAMETER_CALCULATION_SOURCE_KEYS = (
+    "reason",
+    "required_context",
+    "selection_policy",
+    "fx_level_targeting_policy",
+    "wing_gain_write_path_selection_policy",
+    "wing_eq_write_key_selection_policy",
+    "wing_dynamics_write_key_selection_policy",
+    "wing_gate_write_key_selection_policy",
+    "wing_fx_model_parameter_policy",
+)
+PROBLEM_ACTION_DECISION_SCHEMA = "smart_dsp.problem_action_decision.v1"
 MIN_SOURCE_IDENTITY_CONFIDENCE = 0.6
 MIN_AUDIO_EVIDENCE_CONFIDENCE = 0.55
 SOUNDCHECK_MAX_AUDIO_EVIDENCE_AGE_SECONDS = 30.0
@@ -327,6 +491,14 @@ WING_MVP_LIVE_WRITE_SCOPE = ("fader", "gain")
 WING_NATIVE_SOUNDCHECK_SCORE_TOLERANCE = 0.04
 WING_NATIVE_CHANNEL_DSP_FALLBACK_SCORE_TOLERANCE = 0.12
 WING_NATIVE_FX_LEVEL_PULLBACK_SCORE_TOLERANCE = 0.12
+WING_NATIVE_STRATEGY_FIT_SCORE_TOLERANCE = {
+    "soundcheck": 0.08,
+    "live": 0.04,
+}
+WING_NATIVE_STRATEGY_FIT_MIN_ADVANTAGE = {
+    "soundcheck": 0.18,
+    "live": 0.12,
+}
 WING_NATIVE_EQ_PARAMETRIC_BAND_COUNT_BY_SURFACE = {
     "channel": 4,
     "aux": 4,
@@ -1585,6 +1757,14 @@ class SmartDSPRecommendation:
         selected_wing_osc_readback_summary = _candidate_wing_osc_readback_summary(
             self.selected_strategy
         )
+        selected_dsp_parameter_summary = _candidate_dsp_parameter_calculation_summary(
+            self.selected_strategy
+        )
+        problem_action_summary = _problem_action_decision_summary(
+            selected=self.selected_strategy,
+            alternatives=self.alternatives,
+            mode=self.mode,
+        )
         proposed_action = {
             "strategy_id": self.selected_strategy.strategy_id,
             "method_family": self.selected_strategy.method_family,
@@ -1592,6 +1772,8 @@ class SmartDSPRecommendation:
             "parameters": self.selected_strategy.parameters,
             "strategy_scores": self.selected_strategy.scores,
             "total_score": self.selected_strategy.total_score,
+            "dsp_parameter_calculation_summary": selected_dsp_parameter_summary,
+            "problem_action_decision_summary": problem_action_summary,
             "selected_wing_osc_summary": dict(selected_wing_osc_summary),
             "selected_wing_osc_readback_summary": dict(
                 selected_wing_osc_readback_summary
@@ -1613,6 +1795,12 @@ class SmartDSPRecommendation:
                         global_blockers=self.blockers,
                     ),
                     "score_gaps": _score_gap_rows(self.selected_strategy, candidate),
+                    "problem_action_summary": _candidate_problem_action_summary(
+                        candidate
+                    ),
+                    "dsp_parameter_calculation_summary": (
+                        _candidate_dsp_parameter_calculation_summary(candidate)
+                    ),
                     **_candidate_wing_osc_tradeoff_summary(candidate),
                 }
                 for candidate in self.alternatives
@@ -1638,6 +1826,10 @@ class SmartDSPRecommendation:
             "operator_explanation_sections": operator_explanation_sections,
             "decision_engine_contract": decision_engine_contract,
             "evidence_extraction_contract": evidence_extraction_contract,
+            "selected_dsp_parameter_calculation_summary": (
+                selected_dsp_parameter_summary
+            ),
+            "problem_action_decision_summary": problem_action_summary,
             "selected_wing_osc_summary": dict(selected_wing_osc_summary),
             "selected_wing_osc_readback_summary": dict(
                 selected_wing_osc_readback_summary
@@ -28595,6 +28787,103 @@ def _candidate_wing_osc_applicability(candidate: DSPStrategyCandidate) -> Mappin
     return {}
 
 
+def _wing_native_strategy_fit_summary_from_values(
+    *,
+    candidate: DSPStrategyCandidate,
+    native_supported: bool,
+    target_index_valid: bool,
+    path_templates: Sequence[str],
+    unsupported_parameter_keys: Sequence[str],
+    review_only_parameter_keys: Sequence[str],
+    actionable_parameter_keys: Sequence[str],
+    absolute_value_readback_parameter_keys: Sequence[str],
+    apply_parameter_keys: Sequence[str],
+    direct_apply_is_console_native_only: bool,
+    support_level: str,
+    apply_status: str,
+) -> Dict[str, Any]:
+    blocker_count = len(candidate.blockers)
+    analysis_only = candidate.method_family in {"analysis", "analysis_only"}
+    score = 0.0
+    if analysis_only:
+        score += 0.42
+    if native_supported:
+        score += 0.28
+    if target_index_valid or analysis_only:
+        score += 0.1
+    if path_templates or analysis_only:
+        score += 0.1
+    if apply_parameter_keys or analysis_only:
+        score += 0.12
+    if direct_apply_is_console_native_only:
+        score += 0.12
+    if not unsupported_parameter_keys:
+        score += 0.08
+    if not review_only_parameter_keys:
+        score += 0.06
+    if not absolute_value_readback_parameter_keys:
+        score += 0.06
+    if not candidate.blockers:
+        score += 0.08
+    score -= min(blocker_count * 0.08, 0.32)
+    fit_score = round(_clip(score, 0.0, 1.0), 3)
+
+    if analysis_only:
+        fit_status = "analysis_only_no_console_write"
+    elif blocker_count and not native_supported:
+        fit_status = "blocked_unmapped_or_operator_owned_wing_path"
+    elif not native_supported:
+        fit_status = "no_verified_wing_fw_3_0_5_native_path"
+    elif unsupported_parameter_keys:
+        fit_status = "native_path_has_unsupported_parameters"
+    elif review_only_parameter_keys or absolute_value_readback_parameter_keys:
+        fit_status = "native_path_requires_operator_readback_before_apply"
+    elif not apply_parameter_keys:
+        fit_status = "native_path_declared_no_actionable_parameter"
+    else:
+        fit_status = "direct_native_osc_path_after_required_readback"
+
+    fast_soundcheck_or_live_preferable = (
+        native_supported
+        and not candidate.blockers
+        and bool(apply_parameter_keys)
+        and not unsupported_parameter_keys
+        and not review_only_parameter_keys
+        and direct_apply_is_console_native_only
+    )
+    readback_burden = (
+        len(path_templates)
+        + len(absolute_value_readback_parameter_keys)
+        + len(review_only_parameter_keys)
+    )
+    return {
+        "fit_score": fit_score,
+        "fit_status": fit_status,
+        "selection_preferable_for_fast_soundcheck_or_live": (
+            fast_soundcheck_or_live_preferable
+        ),
+        "native_supported": native_supported,
+        "target_index_valid": target_index_valid,
+        "path_template_count": len(path_templates),
+        "actionable_parameter_count": len(actionable_parameter_keys),
+        "apply_parameter_count": len(apply_parameter_keys),
+        "unsupported_parameter_count": len(unsupported_parameter_keys),
+        "review_only_parameter_count": len(review_only_parameter_keys),
+        "absolute_value_readback_parameter_count": len(
+            absolute_value_readback_parameter_keys
+        ),
+        "blocker_count": blocker_count,
+        "readback_burden_score": readback_burden,
+        "support_level": support_level,
+        "apply_status": apply_status,
+        "fit_policy": (
+            "prefer close-score WING Rack fw3.0.5 native OSC strategies with "
+            "concrete target, actionable parameters, no unsupported/review-only "
+            "apply values, and lower readback burden"
+        ),
+    }
+
+
 def _candidate_wing_osc_tradeoff_summary(
     candidate: DSPStrategyCandidate,
 ) -> Dict[str, Any]:
@@ -28711,6 +29000,21 @@ def _candidate_wing_osc_tradeoff_summary(
         apply_status = "analysis_only_no_console_write"
     else:
         apply_status = "not_wing_applicable_until_mapping_or_operator_review"
+    target_index_valid = applicability.get("target_index_valid") is True
+    fit_summary = _wing_native_strategy_fit_summary_from_values(
+        candidate=candidate,
+        native_supported=native_supported,
+        target_index_valid=target_index_valid,
+        path_templates=path_templates,
+        unsupported_parameter_keys=unsupported_parameter_keys,
+        review_only_parameter_keys=review_only_parameter_keys,
+        actionable_parameter_keys=actionable_parameter_keys,
+        absolute_value_readback_parameter_keys=absolute_value_readback_parameter_keys,
+        apply_parameter_keys=apply_parameter_keys,
+        direct_apply_is_console_native_only=direct_apply_is_console_native_only,
+        support_level=support_level,
+        apply_status=apply_status,
+    )
     return {
         "wing_osc_target_console": str(
             applicability.get("target_console") or WING_RACK_OSC_TARGET_CONSOLE
@@ -28748,9 +29052,7 @@ def _candidate_wing_osc_tradeoff_summary(
             applicability.get("target_index_surface") or "unresolved"
         ),
         "wing_osc_target_index": applicability.get("target_index"),
-        "wing_osc_target_index_valid": (
-            applicability.get("target_index_valid") is True
-        ),
+        "wing_osc_target_index_valid": target_index_valid,
         "wing_osc_target_index_range": list(
             applicability.get("target_index_range") or []
         ),
@@ -28835,6 +29137,12 @@ def _candidate_wing_osc_tradeoff_summary(
             )
             or []
         ),
+        "wing_native_strategy_fit": fit_summary,
+        "wing_native_strategy_fit_score": fit_summary["fit_score"],
+        "wing_native_strategy_fit_status": fit_summary["fit_status"],
+        "wing_native_strategy_fit_preferable": fit_summary[
+            "selection_preferable_for_fast_soundcheck_or_live"
+        ],
     }
 
 
@@ -29066,6 +29374,340 @@ def _candidate_wing_osc_readback_summary(
     }
 
 
+def _candidate_wing_native_strategy_fit_summary(
+    candidate: DSPStrategyCandidate,
+) -> Dict[str, Any]:
+    summary = _candidate_wing_osc_tradeoff_summary(candidate)
+    fit = summary.get("wing_native_strategy_fit")
+    if isinstance(fit, Mapping):
+        return dict(fit)
+    return {
+        "fit_score": 0.0,
+        "fit_status": "missing_wing_native_strategy_fit",
+        "selection_preferable_for_fast_soundcheck_or_live": False,
+    }
+
+
+def _wing_native_strategy_fit_gap_rows(
+    selected: DSPStrategyCandidate,
+    alternative: DSPStrategyCandidate,
+) -> List[Dict[str, Any]]:
+    selected_fit = _candidate_wing_native_strategy_fit_summary(selected)
+    alternative_fit = _candidate_wing_native_strategy_fit_summary(alternative)
+    selected_score = _safe_float(selected_fit.get("fit_score"), 0.0)
+    alternative_score = _safe_float(alternative_fit.get("fit_score"), 0.0)
+    rows = [
+        {
+            "metric": "wing_native_strategy_fit_score",
+            "selected_value": round(selected_score, 3),
+            "alternative_value": round(alternative_score, 3),
+            "delta": round(selected_score - alternative_score, 3),
+        },
+        {
+            "metric": "wing_native_readback_burden",
+            "selected_value": int(selected_fit.get("readback_burden_score") or 0),
+            "alternative_value": int(
+                alternative_fit.get("readback_burden_score") or 0
+            ),
+            "delta": int(selected_fit.get("readback_burden_score") or 0)
+            - int(alternative_fit.get("readback_burden_score") or 0),
+        },
+        {
+            "metric": "wing_native_apply_parameter_count",
+            "selected_value": int(selected_fit.get("apply_parameter_count") or 0),
+            "alternative_value": int(alternative_fit.get("apply_parameter_count") or 0),
+            "delta": int(selected_fit.get("apply_parameter_count") or 0)
+            - int(alternative_fit.get("apply_parameter_count") or 0),
+        },
+        {
+            "metric": "wing_native_blocker_count",
+            "selected_value": int(selected_fit.get("blocker_count") or 0),
+            "alternative_value": int(alternative_fit.get("blocker_count") or 0),
+            "delta": int(selected_fit.get("blocker_count") or 0)
+            - int(alternative_fit.get("blocker_count") or 0),
+        },
+    ]
+    return [
+        row
+        for row in rows
+        if row["delta"] != 0
+        or row["metric"] == "wing_native_strategy_fit_score"
+    ]
+
+
+def _candidate_dsp_parameter_calculation_summary(
+    candidate: DSPStrategyCandidate,
+) -> Dict[str, Any]:
+    parameter_keys = DSP_PARAMETER_CALCULATION_KEYS_BY_METHOD_FAMILY.get(
+        candidate.method_family,
+        (),
+    )
+    calculated_values = {
+        key: candidate.parameters[key]
+        for key in parameter_keys
+        if key in candidate.parameters and candidate.parameters[key] is not None
+    }
+    calculation_source_keys = sorted(
+        key
+        for key, value in candidate.parameters.items()
+        if value is not None
+        and (
+            key in DSP_PARAMETER_CALCULATION_SOURCE_KEYS
+            or any(
+                key.endswith(suffix)
+                for suffix in DSP_PARAMETER_CALCULATION_SOURCE_SUFFIXES
+            )
+        )
+    )
+    calculation_sources = {
+        key: candidate.parameters[key]
+        for key in calculation_source_keys[:16]
+    }
+    wing_summary = _candidate_wing_osc_tradeoff_summary(candidate)
+    wing_apply_keys = list(wing_summary["wing_osc_apply_parameter_keys"])
+    wing_review_keys = list(
+        _ordered_unique(
+            [
+                *wing_summary["wing_osc_review_only_parameter_keys"],
+                *wing_summary["wing_osc_absolute_value_readback_parameter_keys"],
+            ]
+        )
+    )
+    analysis_only = candidate.method_family in {"analysis", "analysis_only"}
+    has_calculation = bool(calculated_values) or bool(wing_apply_keys) or analysis_only
+    if analysis_only:
+        status = "analysis_only_no_dsp_parameter_write"
+    elif candidate.blockers:
+        status = "calculated_but_blocked_before_apply"
+    elif not has_calculation:
+        status = "missing_method_parameter_calculation"
+    elif wing_review_keys and not wing_apply_keys:
+        status = "operator_review_only_parameter_calculation"
+    elif wing_review_keys:
+        status = "calculated_with_review_only_values"
+    else:
+        status = "calculated_proposal_requires_readback"
+    return {
+        "strategy_id": candidate.strategy_id,
+        "method_family": candidate.method_family,
+        "problem": candidate.problem,
+        "parameter_status": status,
+        "has_real_dsp_parameter_calculation": has_calculation,
+        "calculated_parameter_keys": list(calculated_values),
+        "calculated_parameter_values": calculated_values,
+        "calculation_source_keys": calculation_source_keys,
+        "calculation_source_values": calculation_sources,
+        "wing_apply_parameter_keys": wing_apply_keys,
+        "wing_review_only_or_readback_parameter_keys": wing_review_keys,
+        "wing_native_strategy_fit_score": wing_summary[
+            "wing_native_strategy_fit_score"
+        ],
+        "wing_native_strategy_fit_status": wing_summary[
+            "wing_native_strategy_fit_status"
+        ],
+        "proposal_only": True,
+        "readback_required_before_promotion": True,
+        "rollback_required_before_promotion": True,
+        "live_write": False,
+        "live_authority_granted": False,
+        "parameter_calculation_policy": (
+            "offline_dry_run_dsp_values_only_until_real_wing_readback_"
+            "rollback_and_operator_approval"
+        ),
+    }
+
+
+def _candidate_problem_action_intent(candidate: DSPStrategyCandidate) -> str:
+    parameters = candidate.parameters
+    problem = str(candidate.problem or "")
+    method_family = str(candidate.method_family or "")
+    strategy_id = str(candidate.strategy_id or "")
+    if method_family in {"analysis", "analysis_only"}:
+        return "hold_or_request_more_context"
+    if (
+        method_family == "gain_fader"
+        or "level_plane" in problem
+        or parameters.get("target_plane") == "ayaic_mix_monolith"
+        or "rebalance" in strategy_id
+    ):
+        if "headroom" in problem or "true_peak" in problem:
+            return "headroom_or_level_pullback"
+        return "level_plane_rebalance_before_tone_change"
+    if method_family == "fx":
+        if "headroom" in problem:
+            return "fx_return_headroom_pullback"
+        return "space_fx_level_or_time_cleanup"
+    if method_family == "de_esser":
+        return "narrow_sibilance_control"
+    if method_family == "dynamic_eq":
+        if "masking" in problem:
+            return "dynamic_unmasking_or_ducking"
+        if "muddy" in problem:
+            return "dynamic_low_mid_control"
+        if "harsh" in problem:
+            return "dynamic_harshness_control"
+        return "dynamic_spectral_control"
+    if method_family == "dynamics":
+        return "envelope_or_gain_reduction_control"
+    if method_family in {"gate", "expander"}:
+        return "bleed_noise_or_tail_control"
+    if method_family == "pan":
+        return "spatial_position_or_width_control"
+    if method_family == "mute":
+        return "manual_mute_or_unmute_control"
+    if method_family == "eq":
+        filter_type = str(parameters.get("filter_type") or "")
+        if filter_type == "high_pass":
+            return "rumble_or_low_spill_cleanup"
+        if "masking" in problem:
+            return "subtractive_frequency_separation"
+        if "sibil" in problem:
+            return "static_sibilance_fallback"
+        if "harsh" in problem:
+            return "static_harshness_cut"
+        if "presence" in problem or "dull" in problem:
+            return "presence_or_air_shape"
+        return "static_spectral_correction"
+    return f"{method_family}_problem_action"
+
+
+def _candidate_problem_action_summary(
+    candidate: DSPStrategyCandidate,
+) -> Dict[str, Any]:
+    parameter_summary = _candidate_dsp_parameter_calculation_summary(candidate)
+    wing_summary = _candidate_wing_osc_tradeoff_summary(candidate)
+    return {
+        "strategy_id": candidate.strategy_id,
+        "method_family": candidate.method_family,
+        "problem": candidate.problem,
+        "action_intent": _candidate_problem_action_intent(candidate),
+        "status": candidate.status,
+        "total_score": candidate.total_score,
+        "blockers": list(candidate.blockers),
+        "has_real_dsp_parameter_calculation": parameter_summary[
+            "has_real_dsp_parameter_calculation"
+        ],
+        "calculated_parameter_keys": list(
+            parameter_summary["calculated_parameter_keys"]
+        ),
+        "wing_native_strategy_fit_status": parameter_summary[
+            "wing_native_strategy_fit_status"
+        ],
+        "wing_osc_candidate_apply_status": wing_summary[
+            "wing_osc_candidate_apply_status"
+        ],
+        "proposal_only": True,
+        "live_write": False,
+        "live_authority_granted": False,
+    }
+
+
+def _problem_action_selection_basis(
+    *,
+    selected: DSPStrategyCandidate,
+    alternatives: Sequence[DSPStrategyCandidate],
+    mode: str,
+) -> str:
+    alternative_method_families = {
+        str(candidate.method_family or "") for candidate in alternatives
+    }
+    selected_intent = _candidate_problem_action_intent(selected)
+    if selected.blockers:
+        return "selected_guard_or_review_action_under_blockers"
+    if selected.method_family in {"analysis", "analysis_only"}:
+        return "hold_processing_when_context_or_safety_is_stronger_than_dsp"
+    if selected_intent in {
+        "level_plane_rebalance_before_tone_change",
+        "headroom_or_level_pullback",
+    } and alternative_method_families.intersection(
+        {"eq", "dynamic_eq", "dynamics", "fx"}
+    ):
+        return "balance_or_headroom_before_tone_processing"
+    if selected.method_family == "de_esser" and "eq" in alternative_method_families:
+        return "narrow_sibilance_processor_before_static_eq"
+    if selected.method_family == "fx" and alternative_method_families.intersection(
+        {"eq", "dynamic_eq"}
+    ):
+        return "fx_level_or_time_cleanup_before_tone_processing"
+    if selected.method_family == "dynamic_eq" and "eq" in alternative_method_families:
+        if normalize_mode(mode) == "live":
+            return "dynamic_processing_selected_but_live_review_required"
+        return "dynamic_problem_evidence_before_static_eq"
+    if selected.method_family == "eq" and alternative_method_families.intersection(
+        {"dynamic_eq", "multiband", "dynamics"}
+    ):
+        return "fast_safe_static_correction_over_slower_or_review_heavy_processing"
+    if selected.method_family == "eq" and "gain_fader" in alternative_method_families:
+        return "tone_evidence_stronger_than_level_plane_rebalance"
+    return "highest_safe_weighted_strategy_for_problem"
+
+
+def _problem_action_decision_summary(
+    *,
+    selected: DSPStrategyCandidate,
+    alternatives: Sequence[DSPStrategyCandidate],
+    mode: str,
+) -> Dict[str, Any]:
+    candidates = (selected, *alternatives)
+    method_families = list(
+        _ordered_unique(str(candidate.method_family or "") for candidate in candidates)
+    )
+    action_intents = list(
+        _ordered_unique(
+            _candidate_problem_action_intent(candidate) for candidate in candidates
+        )
+    )
+    problem_variants = list(
+        _ordered_unique(str(candidate.problem or "") for candidate in candidates)
+    )
+    leaders_by_family: List[Dict[str, Any]] = []
+    for method_family in method_families:
+        family_candidates = [
+            candidate for candidate in candidates if candidate.method_family == method_family
+        ]
+        if not family_candidates:
+            continue
+        leader = max(
+            family_candidates,
+            key=lambda item: (item.total_score, item.scores.get("safety", 0.0)),
+        )
+        leaders_by_family.append(_candidate_problem_action_summary(leader))
+    leaders_by_family.sort(key=lambda item: item["total_score"], reverse=True)
+    return {
+        "schema": PROBLEM_ACTION_DECISION_SCHEMA,
+        "decision_policy": "problem_first_strategy_search_not_fixed_method",
+        "mode": normalize_mode(mode),
+        "selected": _candidate_problem_action_summary(selected),
+        "selected_strategy_id": selected.strategy_id,
+        "selected_method_family": selected.method_family,
+        "selected_action_intent": _candidate_problem_action_intent(selected),
+        "selection_basis": _problem_action_selection_basis(
+            selected=selected,
+            alternatives=alternatives,
+            mode=mode,
+        ),
+        "considered_strategy_count": len(candidates),
+        "compared_alternative_count": len(alternatives),
+        "considered_method_families": method_families,
+        "considered_action_intents": action_intents,
+        "considered_problem_variants": problem_variants,
+        "problem_first_not_method_locked": (
+            len(method_families) > 1 or len(action_intents) > 1
+        ),
+        "method_family_score_leaders": leaders_by_family,
+        "top_alternative_actions": [
+            _candidate_problem_action_summary(candidate)
+            for candidate in alternatives[:6]
+        ],
+        "operator_review_required_before_live_apply": True,
+        "readback_required_before_live_promotion": True,
+        "rollback_required_before_live_promotion": True,
+        "proposal_only": True,
+        "live_write": False,
+        "live_authority_granted": False,
+    }
+
+
 def _is_wing_native_osc_candidate(candidate: DSPStrategyCandidate) -> bool:
     return bool(_candidate_wing_osc_applicability(candidate).get("native_osc_supported"))
 
@@ -29188,6 +29830,104 @@ def _soundcheck_wing_native_same_problem_fallback(
             item.total_score,
             item.confidence,
         ),
+    )
+
+
+def _wing_native_strategy_fit_fallback_for_leader(
+    score_leader: DSPStrategyCandidate,
+    pool: Sequence[DSPStrategyCandidate],
+    *,
+    mode: str,
+) -> Optional[DSPStrategyCandidate]:
+    if score_leader.blockers:
+        return None
+    normalized_mode = normalize_mode(mode)
+    tolerance = WING_NATIVE_STRATEGY_FIT_SCORE_TOLERANCE.get(
+        normalized_mode,
+        WING_NATIVE_STRATEGY_FIT_SCORE_TOLERANCE["soundcheck"],
+    )
+    minimum_fit_advantage = WING_NATIVE_STRATEGY_FIT_MIN_ADVANTAGE.get(
+        normalized_mode,
+        WING_NATIVE_STRATEGY_FIT_MIN_ADVANTAGE["soundcheck"],
+    )
+    leader_fit = _candidate_wing_native_strategy_fit_summary(score_leader)
+    leader_fit_score = _safe_float(leader_fit.get("fit_score"), 0.0)
+    fallback_pool: List[DSPStrategyCandidate] = []
+    for candidate in pool:
+        if (
+            candidate.strategy_id == score_leader.strategy_id
+            or candidate.blockers
+            or candidate.problem != score_leader.problem
+            or score_leader.total_score - candidate.total_score > tolerance
+        ):
+            continue
+        candidate_fit = _candidate_wing_native_strategy_fit_summary(candidate)
+        if (
+            candidate_fit.get("selection_preferable_for_fast_soundcheck_or_live")
+            is not True
+        ):
+            continue
+        if (
+            _safe_float(candidate_fit.get("fit_score"), 0.0) - leader_fit_score
+            < minimum_fit_advantage
+        ):
+            continue
+        if candidate.scores["safety"] < score_leader.scores["safety"]:
+            continue
+        fallback_pool.append(candidate)
+    if not fallback_pool:
+        return None
+    return max(
+        fallback_pool,
+        key=lambda item: (
+            _safe_float(
+                _candidate_wing_native_strategy_fit_summary(item).get("fit_score"),
+                0.0,
+            ),
+            item.scores["safety"],
+            item.scores["reversibility"],
+            item.scores["speed"],
+            item.total_score,
+            item.confidence,
+        ),
+    )
+
+
+def _is_wing_native_strategy_fit_fallback_selection(
+    selected: DSPStrategyCandidate,
+    alternatives: Sequence[DSPStrategyCandidate],
+    *,
+    mode: str,
+) -> bool:
+    selected_fit = _candidate_wing_native_strategy_fit_summary(selected)
+    if (
+        selected_fit.get("selection_preferable_for_fast_soundcheck_or_live")
+        is not True
+    ):
+        return False
+    tolerance = WING_NATIVE_STRATEGY_FIT_SCORE_TOLERANCE.get(
+        normalize_mode(mode),
+        WING_NATIVE_STRATEGY_FIT_SCORE_TOLERANCE["soundcheck"],
+    )
+    minimum_fit_advantage = WING_NATIVE_STRATEGY_FIT_MIN_ADVANTAGE.get(
+        normalize_mode(mode),
+        WING_NATIVE_STRATEGY_FIT_MIN_ADVANTAGE["soundcheck"],
+    )
+    selected_fit_score = _safe_float(selected_fit.get("fit_score"), 0.0)
+    return any(
+        not alternative.blockers
+        and alternative.problem == selected.problem
+        and alternative.total_score > selected.total_score
+        and alternative.total_score - selected.total_score <= tolerance
+        and selected_fit_score
+        - _safe_float(
+            _candidate_wing_native_strategy_fit_summary(alternative).get(
+                "fit_score"
+            ),
+            0.0,
+        )
+        >= minimum_fit_advantage
+        for alternative in alternatives
     )
 
 
@@ -30708,6 +31448,13 @@ def _select_candidate(
         wing_native_fallback = _soundcheck_wing_native_same_problem_fallback(pool)
         if wing_native_fallback is not None:
             return wing_native_fallback
+    fit_fallback = _wing_native_strategy_fit_fallback_for_leader(
+        score_leader,
+        pool,
+        mode=mode,
+    )
+    if fit_fallback is not None:
+        return fit_fallback
     return score_leader
 
 
@@ -32572,6 +33319,17 @@ def _selected_strategy_rationale(
         "selection_policy": selection_policy,
         "strongest_score_dimensions": strongest_dimensions,
         "weighted_score_summary": _weighted_score_summary(selected, mode=mode),
+        "problem_action_decision_summary": _problem_action_decision_summary(
+            selected=selected,
+            alternatives=alternatives,
+            mode=mode,
+        ),
+        "dsp_parameter_calculation_summary": (
+            _candidate_dsp_parameter_calculation_summary(selected)
+        ),
+        "wing_native_strategy_fit": _candidate_wing_native_strategy_fit_summary(
+            selected
+        ),
         "compared_alternative_count": len(alternatives),
         **_candidate_wing_osc_tradeoff_summary(selected),
     }
@@ -32606,6 +33364,17 @@ def _alternative_tradeoffs(
                 alternative,
                 mode=mode,
             ),
+            "problem_action_summary": _candidate_problem_action_summary(alternative),
+            "dsp_parameter_calculation_summary": (
+                _candidate_dsp_parameter_calculation_summary(alternative)
+            ),
+            "wing_native_strategy_fit": _candidate_wing_native_strategy_fit_summary(
+                alternative
+            ),
+            "wing_native_strategy_fit_gaps": _wing_native_strategy_fit_gap_rows(
+                selected,
+                alternative,
+            ),
             "why_not_selected": _why_alternative_lost(
                 selected=selected,
                 alternative=alternative,
@@ -32634,6 +33403,28 @@ def _operator_explanation_sections(
     tradeoff_by_id = {str(item.get("strategy_id")): item for item in tradeoffs}
     selected_wing_osc_summary = _candidate_wing_osc_tradeoff_summary(selected)
     selected_wing_osc_readback_summary = _candidate_wing_osc_readback_summary(selected)
+    selected_dsp_parameter_summary = _candidate_dsp_parameter_calculation_summary(
+        selected
+    )
+    selected_problem_action_summary = _problem_action_decision_summary(
+        selected=selected,
+        alternatives=alternatives,
+        mode=mode,
+    )
+    selected_problem_action_summary = _problem_action_decision_summary(
+        selected=selected,
+        alternatives=alternatives,
+        mode=mode,
+    )
+    selected_wing_native_fit = _candidate_wing_native_strategy_fit_summary(selected)
+    selected_dsp_parameter_calculation = (
+        _candidate_dsp_parameter_calculation_summary(selected)
+    )
+    selected_problem_action_summary = _problem_action_decision_summary(
+        selected=selected,
+        alternatives=alternatives,
+        mode=mode,
+    )
     operator_check = str(selected.operator_check or "").strip()
     rollback_expectation = dict(selected.rollback_expectation)
     selected_action = {
@@ -32703,6 +33494,21 @@ def _operator_explanation_sections(
                     tradeoff.get("weighted_score_summary")
                     or _weighted_score_summary(alternative, mode=mode)
                 ),
+                "problem_action_summary": dict(
+                    tradeoff.get("problem_action_summary")
+                    or _candidate_problem_action_summary(alternative)
+                ),
+                "dsp_parameter_calculation_summary": dict(
+                    tradeoff.get("dsp_parameter_calculation_summary")
+                    or _candidate_dsp_parameter_calculation_summary(alternative)
+                ),
+                "wing_native_strategy_fit": dict(
+                    tradeoff.get("wing_native_strategy_fit")
+                    or _candidate_wing_native_strategy_fit_summary(alternative)
+                ),
+                "wing_native_strategy_fit_gaps": list(
+                    tradeoff.get("wing_native_strategy_fit_gaps") or []
+                ),
                 **_candidate_wing_osc_tradeoff_summary(alternative),
             }
         )
@@ -32715,6 +33521,11 @@ def _operator_explanation_sections(
         "why_this_processing": selected.reason,
         "why_selected": selected.reason,
         "selected_weighted_score_summary": selected_weighted_score_summary,
+        "selected_problem_action_decision_summary": selected_problem_action_summary,
+        "selected_dsp_parameter_calculation_summary": (
+            selected_dsp_parameter_calculation
+        ),
+        "selected_wing_native_strategy_fit": selected_wing_native_fit,
         "selected_wing_osc_summary": dict(selected_wing_osc_summary),
         "selected_wing_osc_readback_summary": dict(
             selected_wing_osc_readback_summary
@@ -32770,6 +33581,14 @@ def _decision_engine_contract(
     selected_wing_osc_summary = _candidate_wing_osc_tradeoff_summary(selected)
     selected_wing_osc_readback_summary = _candidate_wing_osc_readback_summary(
         selected
+    )
+    selected_dsp_parameter_summary = _candidate_dsp_parameter_calculation_summary(
+        selected
+    )
+    selected_problem_action_summary = _problem_action_decision_summary(
+        selected=selected,
+        alternatives=alternatives,
+        mode=mode,
     )
     scoring_dimensions = STRATEGY_SCORE_DIMENSIONS
     score_weights = _strategy_score_weights(mode)
@@ -32923,6 +33742,15 @@ def _decision_engine_contract(
                 selected,
                 mode=mode,
             ),
+            "selected_problem_action_decision_summary": (
+                selected_problem_action_summary
+            ),
+            "selected_dsp_parameter_calculation_summary": (
+                selected_dsp_parameter_summary
+            ),
+            "selected_wing_native_strategy_fit": (
+                _candidate_wing_native_strategy_fit_summary(selected)
+            ),
             "alternatives_compared": [
                 {
                     "strategy_id": row.get("strategy_id"),
@@ -32932,13 +33760,28 @@ def _decision_engine_contract(
                     "score_delta_vs_selected": row.get("score_delta_vs_selected"),
                     "weighted_score_summary": row.get("weighted_score_summary"),
                     "weighted_score_gaps": row.get("weighted_score_gaps"),
+                    "problem_action_summary": row.get("problem_action_summary"),
+                    "dsp_parameter_calculation_summary": row.get(
+                        "dsp_parameter_calculation_summary"
+                    ),
+                    "wing_native_strategy_fit": row.get("wing_native_strategy_fit"),
+                    "wing_native_strategy_fit_gaps": row.get(
+                        "wing_native_strategy_fit_gaps"
+                    ),
                 }
                 for row in tradeoffs
             ],
         },
+        "problem_action_selection": selected_problem_action_summary,
         "parameter_calculation": {
             "parameter_keys": sorted(selected.parameters),
             "parameter_count": len(selected.parameters),
+            "selected_dsp_parameter_calculation_summary": (
+                selected_dsp_parameter_summary
+            ),
+            "has_real_dsp_parameter_calculation": (
+                selected_dsp_parameter_summary["has_real_dsp_parameter_calculation"]
+            ),
             "wing_osc_apply_parameter_keys": list(
                 selected_wing_osc_summary["wing_osc_apply_parameter_keys"]
             ),
@@ -33170,6 +34013,14 @@ def _operator_explanation(
         tradeoff_text = "no competing strategy"
     selected_wing_osc_summary = _candidate_wing_osc_tradeoff_summary(selected)
     selected_wing_osc_readback_summary = _candidate_wing_osc_readback_summary(selected)
+    selected_dsp_parameter_summary = _candidate_dsp_parameter_calculation_summary(
+        selected
+    )
+    selected_problem_action_summary = _problem_action_decision_summary(
+        selected=selected,
+        alternatives=alternatives,
+        mode=analysis.mode,
+    )
     selected_wing_text = (
         "Selected WING OSC: "
         f"{selected_wing_osc_summary['wing_osc_target_console']} "
@@ -33195,6 +34046,17 @@ def _operator_explanation(
         "Selected readback status: "
         f"{selected_wing_osc_readback_summary['wing_osc_readback_status']}."
     )
+    selected_parameter_text = (
+        "Selected DSP calculation: "
+        f"{selected_dsp_parameter_summary['parameter_status']}; "
+        f"keys={selected_dsp_parameter_summary['calculated_parameter_keys'][:8]}."
+    )
+    selected_action_text = (
+        "Problem-first action: "
+        f"{selected_problem_action_summary['selected_action_intent']}; "
+        f"considered_method_families="
+        f"{selected_problem_action_summary['considered_method_families']}."
+    )
     blocker_text = ", ".join(blockers) if blockers else "none"
     return (
         f"Problem: {selected.problem}. Selected {selected.strategy_id} because "
@@ -33202,6 +34064,8 @@ def _operator_explanation(
         f"Alternative tradeoffs: {tradeoff_text}. "
         f"{selected_wing_text} {selected_readback_text} "
         f"{selected_readback_status_text} "
+        f"{selected_action_text} "
+        f"{selected_parameter_text} "
         f"Parameters: {selected.parameters}. Remaining blockers: {blocker_text}. "
         f"Operator check: {selected.operator_check} "
         f"Rollback expectation: {selected.rollback_expectation}. Rollback/readback is required "
@@ -33405,6 +34269,14 @@ def _selection_policy(
         )
     ):
         return "soundcheck_wing_native_osc_same_problem_priority"
+    if _is_wing_native_strategy_fit_fallback_selection(
+        selected,
+        alternatives,
+        mode=mode,
+    ):
+        if mode == "live":
+            return "live_wing_native_strategy_fit_priority"
+        return "soundcheck_wing_native_strategy_fit_priority"
     if mode == "live" and _is_live_line_noise_review_candidate(selected):
         return "live_line_noise_physical_path_review_priority"
     if mode == "live" and _is_live_vocal_noise_review_candidate(selected):
