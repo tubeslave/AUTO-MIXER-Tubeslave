@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-07-02T08:56:41Z
+Generated: 2026-07-02T09:17:29Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `1de0a34ae Block WING gain-up past fader ceiling`
+  `4ac594b22 Expose SmartDSP evidence extraction contract`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
 - Tracked/untracked worktree state: dirty before this setup, with many
@@ -58,7 +58,7 @@ Generated: 2026-07-02T08:56:41Z
   `80e625a4`, `e8a38bc0`, `2cf226437`, `c058270a8`, `afd7ecb78`,
   `0d4358132`, `4f703c1be`, `30712d4f2`, `2a8de72ac`,
   `12a1ad7cc`, `e69ab53ca`, `f8134554c`, `c21082c0d`, and
-  `1de0a34ae`.
+  `1de0a34ae`, `f1bb5f05c`, and `4ac594b22`.
 - The current HEAD now includes `c058270a8`, which adds read-only WING gate
   slot readbacks and an operator decision queue for all unreviewed read-only
   candidates, plus `afd7ecb78`, which binds future fader/gain proof steps to
@@ -84,9 +84,15 @@ Generated: 2026-07-02T08:56:41Z
   context only: no WING live write, live authority or readiness closure is
   granted, and `pan` remains outside the current WING deployment apply
   boundary. `1de0a34ae` uses the read-only current fader value to block WING
-  gain-up candidates that would project the fader above the 0 dB ceiling,
-  keeping the candidate operator-review-only and preserving the current
-  fader/gain live boundary.
+  gain-up candidates that would project the fader above the 0 dB ceiling.
+  `f1bb5f05c` also blocks WING gain-up when WING control readback context
+  exists but the current fader readback is missing, so the ceiling check
+  cannot be bypassed by partial readback state. Both candidates remain
+  operator-review-only and preserve the current fader/gain live boundary.
+  `4ac594b22` exposes a SmartDSP evidence-extraction contract in operator
+  proposals so the operator can see required source identity, level, spectral,
+  masking, transient, noise/bleed, phase/mono, feedback and bus/master evidence
+  coverage before trusting a proposed correction.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -1635,5 +1641,5 @@ Generated: 2026-07-02T08:56:41Z
 - Current WING Rack availability is UNKNOWN.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `1de0a34ae` passed with
-  `4786 passed, 1 skipped, 1 warning`.
+- The latest verified full-suite run for `4ac594b22` passed with
+  `4791 passed, 1 skipped`.

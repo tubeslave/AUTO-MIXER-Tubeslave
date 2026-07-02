@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-07-02T08:56:41Z.
+- Latest heartbeat: 2026-07-02T09:17:29Z.
 - Latest WING read-only candidate:
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`.
 - Decision ledger status: `operator_review_required`; three unreviewed WING
@@ -36,7 +36,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   authority.
 
 - The latest verified product/runtime baseline is now
-  `1de0a34ae Block WING gain-up past fader ceiling`. The current
+  `4ac594b22 Expose SmartDSP evidence extraction contract`. The current
   verified baseline includes `c058270a8` read-only WING gate slot physical
   readbacks and operator decision queue, `afd7ecb78` fader/gain proof steps
   bound to concrete WING surfaces, and `4f703c1be` runner summaries/proposals
@@ -58,9 +58,15 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   WING live write, live authority or readiness closure, and `pan` remains
   outside the current WING deployment apply boundary. `1de0a34ae` uses the
   read-only current fader value to block WING gain-up candidates that would
-  project the fader above the 0 dB ceiling, keeping the candidate
-  operator-review-only and preserving the current fader/gain live boundary. The latest
-  verified full suite passed with `4786 passed, 1 skipped, 1 warning`;
+  project the fader above the 0 dB ceiling. `f1bb5f05c` also blocks WING
+  gain-up when WING control readback context exists but current fader readback
+  is missing, so partial readback state cannot bypass the ceiling check. These
+  candidates remain operator-review-only and preserve the current fader/gain
+  live boundary. `4ac594b22` exposes a SmartDSP evidence-extraction contract
+  in operator proposals, showing required source identity, level, spectral,
+  masking, transient, noise/bleed, phase/mono, feedback and bus/master evidence
+  coverage before a proposed correction is trusted. The latest verified full
+  suite passed with `4791 passed, 1 skipped`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path
@@ -2141,12 +2147,12 @@ live authority is introduced.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T08:56:41Z`, latest
-  verified product/runtime commit `1de0a34ae`, latest WING read-only decision
+- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T09:17:29Z`, latest
+  verified product/runtime commit `4ac594b22`, latest WING read-only decision
   queue candidate
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`,
-  latest no-WING artifact
-  `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
+  latest no-WING backend/offline artifact
+  `/tmp/automixer_no_wing_fader_readback_20260702T0915Z/20260702T091217Z_no_wing_release_check`.
 - Supervised proof surface-contract validation:
   `tests/test_supervised_wing_proof_plan.py`: `186 passed`; selected WING MVP
   rails: `4 passed`; `py_compile`, STATE/RUN_LEDGER validation, and

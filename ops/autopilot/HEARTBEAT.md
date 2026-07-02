@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T08:56:41Z
+Last heartbeat UTC: 2026-07-02T09:17:29Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -17,8 +17,8 @@ candidate source id, then rerun
 `PYTHONPATH=backend python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions`.
 
 Latest check: the control-plane state is synchronized to latest verified
-product/runtime commit `1de0a34ae Block WING gain-up past fader ceiling`.
-Latest verified full pytest passed with `4786 passed, 1 skipped, 1 warning`.
+product/runtime commit `4ac594b22 Expose SmartDSP evidence extraction contract`.
+Latest verified full pytest passed with `4791 passed, 1 skipped`.
 Current targeted surface-contract checks passed:
 `tests/test_supervised_wing_proof_plan.py` `186 passed`, selected WING MVP
 rails `4 passed`, `py_compile` passed, JSON/JSONL validation passed, and
@@ -69,4 +69,8 @@ not count as verified processor-model proof. WING fader, input-trim and pan
 readbacks are also imported as read-only SmartDSP analysis context only; `pan`
 does not become a current WING deployment apply target. WING gain-up candidates
 now also consult the read-only current fader value and block when the projected
-fader would cross the 0 dB ceiling.
+fader would cross the 0 dB ceiling. If WING control readback context exists but
+the current fader value is missing, gain-up is also blocked until the fader
+readback is available. SmartDSP operator proposals now also include an
+evidence-extraction contract that lists required evidence components and their
+coverage without granting live authority.
