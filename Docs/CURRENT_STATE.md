@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-02T08:03:45Z
+Generated: 2026-07-02T08:09:44Z
 
 ## Repository snapshot
 
@@ -61,6 +61,8 @@ Generated: 2026-07-02T08:03:45Z
   candidates, plus `afd7ecb78`, which binds future fader/gain proof steps to
   concrete WING surfaces, addresses and negative-only proof directions. These
   do not grant readiness or live authority before accepted operator decisions.
+  `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` repeats the same fader
+  and input-trim address contract for the human operator.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.

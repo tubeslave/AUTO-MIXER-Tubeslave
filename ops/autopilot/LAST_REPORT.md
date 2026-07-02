@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-07-02T08:03:45Z.
+- Latest heartbeat: 2026-07-02T08:09:44Z.
 - Latest WING read-only candidate:
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`.
 - Decision ledger status: `operator_review_required`; three unreviewed WING
@@ -39,10 +39,13 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   `afd7ecb78 Bind WING proof steps to console surfaces`. The current verified
   baseline includes `c058270a8` read-only WING gate slot physical readbacks and
   operator decision queue, plus `afd7ecb78` fader/gain proof steps bound to
-  concrete WING surfaces, addresses and negative-only proof directions. It was
-  validated by the full suite: `4773 passed, 1 skipped, 1 warning`. This is
-  progress toward the WING MVP gate, but it does not replace the missing
-  accepted operator decisions or accepted real WING physical readback proof.
+  concrete WING surfaces, addresses and negative-only proof directions. The
+  operator runbook now repeats the same fader/input-trim address contract
+  before any proof command. It was validated by the latest recorded full suite:
+  `4773 passed, 1 skipped, 1 warning`, plus current targeted checks for the
+  proof surface contract and no-WING quick gate. This is progress toward the
+  WING MVP gate, but it does not replace the missing accepted operator
+  decisions or accepted real WING physical readback proof.
 
 - M081 WING review decision prestart proof binding rail is now automated:
   review decision templates and accepted decision records must carry the same
@@ -2117,12 +2120,17 @@ live authority is introduced.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T08:03:45Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T08:09:44Z`, latest
   verified product/runtime commit `afd7ecb78`, latest WING read-only decision
   queue candidate
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`,
   latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
+- Supervised proof surface-contract validation:
+  `tests/test_supervised_wing_proof_plan.py`: `186 passed`; selected WING MVP
+  rails: `4 passed`; `py_compile`, STATE/RUN_LEDGER validation, and
+  `tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_surface_contract_20260702T0815Z`:
+  passed.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.

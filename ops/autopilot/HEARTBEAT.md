@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T08:03:45Z
+Last heartbeat UTC: 2026-07-02T08:09:44Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -18,7 +18,12 @@ candidate source id, then rerun
 
 Latest check: the control-plane state is synchronized to latest verified
 product/runtime commit `afd7ecb78 Bind WING proof steps to console surfaces`.
-Full pytest passed with `4773 passed, 1 skipped, 1 warning`.
+Latest recorded full pytest passed with `4773 passed, 1 skipped, 1 warning`.
+Current targeted surface-contract checks passed:
+`tests/test_supervised_wing_proof_plan.py` `186 passed`, selected WING MVP
+rails `4 passed`, `py_compile` passed, JSON/JSONL validation passed, and
+`tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_surface_contract_20260702T0815Z`
+passed.
 
 The latest real WING read-only candidate remains
 `candidate_ready_for_manual_review`. The decision ledger review remains blocked
@@ -31,6 +36,7 @@ This heartbeat made no new product/runtime change. No WING/backend contact was m
 committed `20260702T075151Z` artifact records read-only backend/WING
 gate-parameter queries with no live write, and the latest proof-plan runtime
 commit binds future fader/gain proof steps to concrete WING surfaces and
-negative-only directions. No OSC write path was opened by this cycle. No live
+negative-only directions. The operator runbook now repeats the same
+surface/address contract. No OSC write path was opened by this cycle. No live
 write, readiness closure, live authority grant, accepted hardware evidence or
 Full Autonomous readiness was produced.
