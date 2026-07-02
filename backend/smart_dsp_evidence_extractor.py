@@ -175,6 +175,27 @@ def _resolve_string_state(
     return "" if resolved is None else str(resolved)
 
 
+def _resolve_optional_float_state(
+    explicit: Optional[float],
+    state: Mapping[str, Any],
+    keys: Sequence[str],
+    *,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+) -> Optional[float]:
+    raw = explicit if explicit is not None else _mapping_first_present(state, keys)
+    if raw is None:
+        return None
+    numeric = _readback_float(raw)
+    if numeric is None:
+        return None
+    if minimum is not None:
+        numeric = max(float(minimum), numeric)
+    if maximum is not None:
+        numeric = min(float(maximum), numeric)
+    return numeric
+
+
 def _json_object_from_path(path: str | Path) -> Mapping[str, Any]:
     with Path(path).open("r", encoding="utf-8") as handle:
         payload = json.load(handle)
@@ -357,7 +378,26 @@ def build_current_wing_state_from_readonly_preflight(
             channels.append(channel)
         value_types.append(value_type)
         raw_by_value_type[value_type] = value
-        if value_type == "eq_on":
+        if value_type == "fader":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["current_wing_fader_db"] = round(numeric, 3)
+                state["wing_readonly_fader_db"] = round(numeric, 3)
+            state["current_wing_fader_readback_available"] = True
+        elif value_type == "gain":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                state["current_wing_input_trim_db"] = round(numeric, 3)
+                state["wing_readonly_input_trim_db"] = round(numeric, 3)
+            state["current_wing_gain_readback_available"] = True
+        elif value_type == "pan":
+            numeric = _readback_float(value)
+            if numeric is not None:
+                clamped = _clip(numeric, -100.0, 100.0)
+                state["current_wing_pan_percent"] = round(clamped, 3)
+                state["wing_readonly_pan_percent"] = round(clamped, 3)
+            state["current_wing_pan_readback_available"] = True
+        elif value_type == "eq_on":
             state["current_wing_eq_enabled"] = _readback_bool(value)
             state["current_wing_eq_readback_available"] = True
         elif value_type == "eq_mix":
@@ -410,6 +450,12 @@ def build_current_wing_state_from_readonly_preflight(
     state["current_wing_state_value_types"] = list(_ordered_unique(value_types))
     state["current_wing_state_raw_readback_by_value_type"] = raw_by_value_type
     state["current_wing_state_readback_available"] = bool(value_types)
+    if (
+        state.get("current_wing_fader_readback_available") is True
+        or state.get("current_wing_gain_readback_available") is True
+        or state.get("current_wing_pan_readback_available") is True
+    ):
+        state["current_wing_state_basic_controls_readback_available"] = True
     if state.get("current_wing_eq_readback_available") is True:
         state["current_wing_state_eq_readback_available"] = True
     if state.get("current_wing_dynamics_readback_available") is True:
@@ -3541,6 +3587,9 @@ def build_smart_dsp_analysis_input_from_audio(
     current_wing_pan_width_operator_owned: Optional[bool] = None,
     current_wing_mute_operator_owned: Optional[bool] = None,
     current_wing_gain_operator_owned: Optional[bool] = None,
+    current_wing_fader_db: Optional[float] = None,
+    current_wing_input_trim_db: Optional[float] = None,
+    current_wing_pan_percent: Optional[float] = None,
     rollback_plan_available: bool = False,
     operator_intent: str = "",
     reference_samples: Any = None,
@@ -3560,6 +3609,25 @@ def build_smart_dsp_analysis_input_from_audio(
     allow_inferred_source_identity: bool = False,
     active_performance: bool = False,
 ) -> SmartDSPAnalysisInput:
+    wing_state = dict(current_wing_state or {})
+    resolved_current_wing_pan_percent = _resolve_optional_float_state(
+        current_wing_pan_percent,
+        wing_state,
+        (
+            "current_wing_pan_percent",
+            "wing_readonly_pan_percent",
+            "wing_pan_percent",
+            "pan_percent",
+            "pan",
+        ),
+        minimum=-100.0,
+        maximum=100.0,
+    )
+    resolved_current_pan_percent = (
+        resolved_current_wing_pan_percent
+        if resolved_current_wing_pan_percent is not None
+        else _safe_float(current_pan_percent)
+    )
     evidence = extract_smart_dsp_audio_evidence(
         samples,
         target_id=target_id,
@@ -3575,7 +3643,7 @@ def build_smart_dsp_analysis_input_from_audio(
         summed_bus_target_id=summed_bus_target_id,
         summed_bus_target_plane_lufs=summed_bus_target_plane_lufs,
         desired_stereo_width_request=desired_stereo_width_request,
-        current_pan_percent=current_pan_percent,
+        current_pan_percent=resolved_current_pan_percent,
         fx_return_headroom_db=fx_return_headroom_db,
         fx_return_target_id=fx_return_target_id,
         monitor_feedback_risk=monitor_feedback_risk,
@@ -3595,7 +3663,6 @@ def build_smart_dsp_analysis_input_from_audio(
         source_identity_confirmed = True
         source_identity_confidence = max(source_identity_confidence, inference_confidence)
 
-    wing_state = dict(current_wing_state or {})
     evidence_field_count = len(evidence.to_dict())
     freshness = dict(
         current_state_cache_freshness
@@ -3732,6 +3799,38 @@ def build_smart_dsp_analysis_input_from_audio(
         },
         ("current_wing_gain_operator_owned",),
     )
+    resolved_current_wing_fader_db = _resolve_optional_float_state(
+        current_wing_fader_db,
+        wing_state,
+        ("current_wing_fader_db", "wing_readonly_fader_db", "fader_db", "fader"),
+    )
+    resolved_current_wing_input_trim_db = _resolve_optional_float_state(
+        current_wing_input_trim_db,
+        wing_state,
+        (
+            "current_wing_input_trim_db",
+            "wing_readonly_input_trim_db",
+            "input_trim_db",
+            "trim_db",
+            "gain_db",
+            "gain",
+        ),
+    )
+    resolved_control_readback_available = bool(
+        _resolve_bool_state(
+            None,
+            wing_state,
+            (
+                "current_wing_state_basic_controls_readback_available",
+                "current_wing_fader_readback_available",
+                "current_wing_gain_readback_available",
+                "current_wing_pan_readback_available",
+            ),
+        )
+        or resolved_current_wing_fader_db is not None
+        or resolved_current_wing_input_trim_db is not None
+        or resolved_current_wing_pan_percent is not None
+    )
 
     return SmartDSPAnalysisInput(
         target_id=evidence.target_id,
@@ -3853,6 +3952,10 @@ def build_smart_dsp_analysis_input_from_audio(
         current_wing_pan_width_operator_owned=resolved_pan_width_operator_owned,
         current_wing_mute_operator_owned=resolved_mute_operator_owned,
         current_wing_gain_operator_owned=resolved_gain_operator_owned,
+        current_wing_fader_db=resolved_current_wing_fader_db,
+        current_wing_input_trim_db=resolved_current_wing_input_trim_db,
+        current_wing_pan_percent=resolved_current_wing_pan_percent,
+        current_wing_control_readback_available=resolved_control_readback_available,
         rollback_plan_available=resolved_rollback_plan_available,
         rms_dbfs=evidence.rms_dbfs,
         estimated_lufs=evidence.estimated_lufs,
@@ -3962,7 +4065,7 @@ def build_smart_dsp_analysis_input_from_audio(
         measured_pan_target_percent=evidence.measured_pan_target_percent,
         measured_pan_delta_percent=evidence.measured_pan_delta_percent,
         stereo_width_request=_safe_float(desired_stereo_width_request),
-        current_pan_percent=_safe_float(current_pan_percent),
+        current_pan_percent=_safe_float(resolved_current_pan_percent),
         master_true_peak_db=evidence.master_true_peak_db,
         master_integrated_lufs=evidence.master_integrated_lufs,
         master_presence_frequency_hz=evidence.master_presence_frequency_hz,

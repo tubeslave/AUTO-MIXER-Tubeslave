@@ -1333,6 +1333,10 @@ class SmartDSPAnalysisInput:
     current_wing_pan_width_operator_owned: bool = False
     current_wing_mute_operator_owned: bool = False
     current_wing_gain_operator_owned: bool = False
+    current_wing_fader_db: Optional[float] = None
+    current_wing_input_trim_db: Optional[float] = None
+    current_wing_pan_percent: Optional[float] = None
+    current_wing_control_readback_available: bool = False
     rollback_plan_available: bool = False
     rms_dbfs: float = -30.0
     estimated_lufs: float = -30.0
@@ -33437,6 +33441,31 @@ def analyze_smart_dsp_strategy(
         ),
         "current_state_readback_available": bool(analysis.current_state_readback_available),
         "rollback_plan_available": bool(analysis.rollback_plan_available),
+        "current_wing_controls": {
+            "readback_available": bool(analysis.current_wing_control_readback_available),
+            "fader_db": (
+                round(_safe_float(analysis.current_wing_fader_db), 3)
+                if analysis.current_wing_fader_db is not None
+                else None
+            ),
+            "input_trim_db": (
+                round(_safe_float(analysis.current_wing_input_trim_db), 3)
+                if analysis.current_wing_input_trim_db is not None
+                else None
+            ),
+            "pan_percent": (
+                round(_safe_float(analysis.current_wing_pan_percent), 3)
+                if analysis.current_wing_pan_percent is not None
+                else None
+            ),
+            "source": (
+                "wing_readonly_preflight_artifact"
+                if analysis.current_wing_control_readback_available
+                else ""
+            ),
+            "live_write": False,
+            "live_authority_granted": False,
+        },
         "true_peak_headroom_db": round(_safe_float(analysis.true_peak_headroom_db), 2),
         "rms_dbfs": round(_safe_float(analysis.rms_dbfs), 2),
         "estimated_lufs": round(_safe_float(analysis.estimated_lufs), 2),

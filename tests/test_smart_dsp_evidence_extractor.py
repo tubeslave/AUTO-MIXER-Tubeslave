@@ -970,6 +970,87 @@ def test_readonly_preflight_gate_readback_reaches_smart_dsp_state():
     ] is False
 
 
+def test_readonly_preflight_basic_controls_reach_smart_dsp_state():
+    wing_state = build_current_wing_state_from_readonly_preflight(
+        target_id="ch:3",
+        summary={
+            "run_id": "20260702T075151Z_wing_readonly_preflight",
+            "connection_mode": "wing",
+            "read_only": True,
+            "live_write": False,
+            "write_request_sent": False,
+            "proposal_request_sent": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "readbacks": [
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "fader",
+                    "address": "/ch/3/fdr",
+                    "value": -8.125,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "gain",
+                    "address": "/ch/3/in/set/trim",
+                    "value": 1.25,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "pan",
+                    "address": "/ch/3/pan",
+                    "value": 125.0,
+                },
+            ],
+        },
+    )
+
+    assert wing_state["current_wing_fader_db"] == -8.125
+    assert wing_state["wing_readonly_fader_db"] == -8.125
+    assert wing_state["current_wing_input_trim_db"] == 1.25
+    assert wing_state["wing_readonly_input_trim_db"] == 1.25
+    assert wing_state["current_wing_pan_percent"] == 100.0
+    assert wing_state["wing_readonly_pan_percent"] == 100.0
+    assert wing_state["current_wing_state_basic_controls_readback_available"] is True
+    assert wing_state["current_wing_state_live_authority_granted"] is False
+
+    analysis = build_smart_dsp_analysis_input_from_audio(
+        _tone(440.0, amplitude=0.12, duration_sec=1.0),
+        target_id="ch:3",
+        source_role="lead_vocal",
+        source_label="Lead Vox",
+        sample_rate=SR,
+        source_identity_confirmed=True,
+        source_identity_confidence=0.91,
+        current_wing_state=wing_state,
+    )
+
+    assert analysis.current_wing_fader_db == -8.125
+    assert analysis.current_wing_input_trim_db == 1.25
+    assert analysis.current_wing_pan_percent == 100.0
+    assert analysis.current_wing_control_readback_available is True
+    assert analysis.current_state_readback_available is True
+
+    recommendation = analyze_smart_dsp_strategy(analysis)
+    controls = recommendation.evidence["current_wing_controls"]
+    assert controls["readback_available"] is True
+    assert controls["fader_db"] == -8.125
+    assert controls["input_trim_db"] == 1.25
+    assert controls["pan_percent"] == 100.0
+    assert controls["source"] == "wing_readonly_preflight_artifact"
+    assert controls["live_write"] is False
+    assert controls["live_authority_granted"] is False
+
+
 def test_readonly_preflight_eq_dynamics_readbacks_keep_model_guards_closed():
     wing_state = build_current_wing_state_from_readonly_preflight(
         target_id="ch:3",
@@ -1110,6 +1191,93 @@ def test_readonly_preflight_eq_dynamics_readbacks_keep_model_guards_closed():
     assert "rollback_plan_missing" in recommendation.blockers
 
 
+def test_readonly_preflight_basic_controls_feed_pan_decision_without_authority():
+    wing_state = build_current_wing_state_from_readonly_preflight(
+        target_id="ch:3",
+        summary={
+            "run_id": "20260702T220146Z_wing_readonly_preflight",
+            "connection_mode": "wing",
+            "read_only": True,
+            "live_write": False,
+            "write_request_sent": False,
+            "proposal_request_sent": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "readbacks": [
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "fader",
+                    "address": "/ch/3/fdr",
+                    "value": -12.0,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "gain",
+                    "address": "/ch/3/in/set/trim",
+                    "value": 1.5,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "pan",
+                    "address": "/ch/3/pan",
+                    "value": 18.0,
+                },
+            ],
+        },
+    )
+
+    assert wing_state["current_wing_fader_db"] == -12.0
+    assert wing_state["current_wing_input_trim_db"] == 1.5
+    assert wing_state["current_wing_pan_percent"] == 18.0
+    assert wing_state["current_wing_state_basic_controls_readback_available"] is True
+    assert wing_state["current_wing_state_live_authority_granted"] is False
+
+    samples = _tone(900.0, amplitude=0.12)
+    analysis = build_smart_dsp_analysis_input_from_audio(
+        samples,
+        target_id="ch:3",
+        source_role="lead_vocal",
+        source_label="Lead Vox",
+        sample_rate=SR,
+        source_identity_confirmed=True,
+        source_identity_confidence=0.91,
+        current_wing_state=wing_state,
+        rollback_plan_available=True,
+        target_plane_lufs=-22.0,
+    )
+    recommendation = analyze_smart_dsp_strategy(analysis)
+    controls = recommendation.evidence["current_wing_controls"]
+
+    assert analysis.current_wing_control_readback_available is True
+    assert analysis.current_wing_fader_db == -12.0
+    assert analysis.current_wing_input_trim_db == 1.5
+    assert analysis.current_wing_pan_percent == 18.0
+    assert analysis.current_pan_percent == 18.0
+    assert controls["readback_available"] is True
+    assert controls["fader_db"] == -12.0
+    assert controls["input_trim_db"] == 1.5
+    assert controls["pan_percent"] == 18.0
+    assert controls["live_write"] is False
+    assert controls["live_authority_granted"] is False
+    candidates = {
+        candidate.strategy_id: candidate
+        for candidate in (recommendation.selected_strategy, *recommendation.alternatives)
+    }
+    pan_review = candidates["center_anchor_recenter_review"]
+    assert pan_review.parameters["current_pan_percent"] == 18.0
+    assert pan_review.parameters["target_pan_percent"] == 0.0
+    assert recommendation.to_operator_proposal()["live_apply_allowed"] is False
+
+
 def test_readonly_preflight_state_fails_closed_on_unsafe_artifact_flags():
     wing_state = build_current_wing_state_from_readonly_preflight(
         target_id="ch:3",
@@ -1130,6 +1298,24 @@ def test_readonly_preflight_state_fails_closed_on_unsafe_artifact_flags():
                     "value_type": "gate_model",
                     "address": "/ch/3/gate/mdl",
                     "value": "DEQ",
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "fader",
+                    "address": "/ch/3/fdr",
+                    "value": -6.0,
+                },
+                {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "channel": 3,
+                    "value_type": "pan",
+                    "address": "/ch/3/pan",
+                    "value": 24.0,
                 }
             ],
         },
@@ -1139,6 +1325,8 @@ def test_readonly_preflight_state_fails_closed_on_unsafe_artifact_flags():
     assert "read_only_not_true" in wing_state["current_wing_state_violations"]
     assert "live_write_not_false" in wing_state["current_wing_state_violations"]
     assert "current_wing_gate_model" not in wing_state
+    assert "current_wing_fader_db" not in wing_state
+    assert "current_wing_pan_percent" not in wing_state
     assert wing_state["current_wing_state_live_authority_granted"] is False
 
     analysis = build_smart_dsp_analysis_input_from_audio(
@@ -1154,6 +1342,9 @@ def test_readonly_preflight_state_fails_closed_on_unsafe_artifact_flags():
     recommendation = analyze_smart_dsp_strategy(analysis)
 
     assert analysis.current_wing_gate_model == ""
+    assert analysis.current_wing_fader_db is None
+    assert analysis.current_wing_pan_percent is None
+    assert analysis.current_wing_control_readback_available is False
     assert analysis.current_state_readback_available is False
     assert analysis.rollback_plan_available is False
     assert recommendation.evidence["current_state_cache_freshness"]["status"] == (
