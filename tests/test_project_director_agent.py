@@ -43,8 +43,13 @@ def current_wing_mvp_20260614_index_reports():
     )
 
 
-def test_project_director_selects_first_non_closed_mvp_blocker():
+def test_project_director_selects_first_non_closed_mvp_blocker(monkeypatch):
     director = load_director_module()
+    monkeypatch.setattr(
+        director,
+        "wing_readonly_preflight_review_overlay",
+        lambda project_root: {},
+    )
 
     directive = director.build_directive(
         project_root=PROJECT_ROOT,
@@ -1275,8 +1280,13 @@ def test_project_director_selects_first_non_closed_mvp_blocker():
     )
 
 
-def test_project_director_blocks_extra_context_gate_work_while_wing_waits():
+def test_project_director_blocks_extra_context_gate_work_while_wing_waits(monkeypatch):
     director = load_director_module()
+    monkeypatch.setattr(
+        director,
+        "wing_readonly_preflight_review_overlay",
+        lambda project_root: {},
+    )
 
     directive = director.build_directive(
         project_root=PROJECT_ROOT,
@@ -1402,6 +1412,40 @@ def test_project_director_narrows_post_m104_intake_hardening_loop():
         "Do not keep improving the same WING read-only intake function" in item
         for item in directive["forbidden_scope"]
     )
+
+
+def test_project_director_selects_operator_review_for_real_wing_candidate():
+    director = load_director_module()
+
+    directive = director.build_directive(
+        project_root=PROJECT_ROOT,
+        lookback_commits=12,
+        report_limit=1,
+    )
+
+    assert directive["selected_blocker"] == "WING read-only connection proof"
+    assert directive["selected_blocker_status"] == "blocked_by_real_artifact_review"
+    assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+    assert (
+        directive["wing_readonly_preflight_review_status"]
+        == "candidate_ready_for_manual_review"
+    )
+    assert (
+        directive["wing_readonly_preflight_latest_valid_candidate_run_id"]
+        == "20260701T220146Z_wing_readonly_preflight"
+    )
+    assert directive["wing_readonly_preflight_decision_status"] == "blocked"
+    assert (
+        directive["wing_readonly_preflight_decision_ledger_status"]
+        == "operator_review_required"
+    )
+    assert directive["wing_readonly_preflight_unreviewed_candidate_count"] == 1
+    assert directive["wing_readonly_preflight_decision_blocked_by"] == [
+        "operator_must_record_readonly_preflight_review_decision"
+    ]
+    assert "records an accepted or rejected decision" in directive["selected_action"]
+    assert "does not contact WING/backend" in directive["selected_action"]
+    assert "grant live authority" in directive["selected_action"]
 
 
 def test_project_director_derives_required_files_from_selected_blocker_evidence():

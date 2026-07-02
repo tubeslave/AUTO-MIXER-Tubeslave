@@ -19,9 +19,12 @@ from typing import Sequence
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import codex_direction_guard  # noqa: E402
 import update_mvp_progress  # noqa: E402
+from tools import review_wing_readonly_preflight_artifacts  # noqa: E402
+from tools import review_wing_readonly_preflight_decisions  # noqa: E402
 
 
 DEFAULT_OUTPUT = PROJECT_ROOT / ".paperclip" / "reports" / "project_director_latest.md"
@@ -50,6 +53,10 @@ POST_M104_INTAKE_GUARD_LOOKBACK_BUFFER = 10
 POST_M104_INTAKE_GUARD_COMPLETION_MARKERS = (
     "capture time order",
 )
+WING_READONLY_PREFLIGHT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
+WING_READONLY_PREFLIGHT_DECISION_ROOT = (
+    "artifacts/wing_readonly_preflight_review_decisions"
+)
 
 
 def utc_now() -> str:
@@ -70,6 +77,17 @@ def required_file_candidates_from_evidence(evidence_files: Sequence[str]) -> lis
 
 def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def project_relative_path(project_root: Path, value: object) -> str | None:
+    if value in (None, ""):
+        return None
+    text = str(value)
+    path = Path(text)
+    try:
+        return str(path.resolve().relative_to(project_root.resolve()))
+    except (OSError, ValueError):
+        return text
 
 
 def normalized_scope_text(text: str) -> str:
@@ -197,6 +215,124 @@ def forbidden_scope_for_selected_action(
     return forbidden_scope
 
 
+def wing_readonly_preflight_review_overlay(project_root: Path) -> dict:
+    artifact_report = (
+        review_wing_readonly_preflight_artifacts.build_review_report(
+            artifact_roots=(WING_READONLY_PREFLIGHT_ARTIFACT_ROOT,)
+        )
+    )
+    decision_report = (
+        review_wing_readonly_preflight_decisions.build_decision_review_report(
+            artifact_roots=(WING_READONLY_PREFLIGHT_ARTIFACT_ROOT,),
+            decision_roots=(WING_READONLY_PREFLIGHT_DECISION_ROOT,),
+        )
+    )
+    artifact_sources = [
+        path
+        for path in (
+            project_relative_path(project_root, source)
+            for source in artifact_report.get("artifact_sources", [])
+        )
+        if path
+    ]
+    unreviewed_source_ids = [
+        path
+        for path in (
+            project_relative_path(project_root, source)
+            for source in decision_report.get("unreviewed_candidate_source_ids", [])
+        )
+        if path
+    ]
+    accepted_source_ids = [
+        path
+        for path in (
+            project_relative_path(project_root, source)
+            for source in decision_report.get("accepted_source_ids", [])
+        )
+        if path
+    ]
+    latest_unreviewed_source_id = (
+        unreviewed_source_ids[-1] if unreviewed_source_ids else None
+    )
+    latest_source_id = (
+        latest_unreviewed_source_id
+        or (accepted_source_ids[-1] if accepted_source_ids else None)
+        or (artifact_sources[-1] if artifact_sources else None)
+    )
+    return {
+        "wing_readonly_preflight_review_status": artifact_report.get("status"),
+        "wing_readonly_preflight_review_evidence_status": artifact_report.get(
+            "evidence_status"
+        ),
+        "wing_readonly_preflight_readiness_update_candidate_available": (
+            artifact_report.get("readiness_update_candidate_available") is True
+        ),
+        "wing_readonly_preflight_latest_valid_candidate_run_id": artifact_report.get(
+            "latest_valid_candidate_run_id"
+        ),
+        "wing_readonly_preflight_latest_valid_candidate_source_id": latest_source_id,
+        "wing_readonly_preflight_latest_unreviewed_candidate_source_id": (
+            latest_unreviewed_source_id
+        ),
+        "wing_readonly_preflight_artifact_sources": artifact_sources,
+        "wing_readonly_preflight_decision_status": decision_report.get("status"),
+        "wing_readonly_preflight_decision_ledger_status": decision_report.get(
+            "ledger_status"
+        ),
+        "wing_readonly_preflight_decision_record_count": int(
+            decision_report.get("decision_record_count") or 0
+        ),
+        "wing_readonly_preflight_accepted_record_count": int(
+            decision_report.get("accepted_record_count") or 0
+        ),
+        "wing_readonly_preflight_unreviewed_candidate_count": int(
+            decision_report.get("unreviewed_candidate_count") or 0
+        ),
+        "wing_readonly_preflight_unreviewed_candidate_source_ids": (
+            unreviewed_source_ids
+        ),
+        "wing_readonly_preflight_accepted_source_ids": accepted_source_ids,
+        "wing_readonly_preflight_manual_readiness_update_candidate_available": (
+            decision_report.get("manual_readiness_update_candidate_available") is True
+        ),
+        "wing_readonly_preflight_decision_blocked_by": list(
+            decision_report.get("blocked_by") or []
+        ),
+    }
+
+
+def selected_action_from_wing_readonly_review(overlay: dict) -> str | None:
+    if overlay.get(
+        "wing_readonly_preflight_manual_readiness_update_candidate_available"
+    ):
+        return None
+    if int(overlay.get("wing_readonly_preflight_unreviewed_candidate_count") or 0) <= 0:
+        return None
+    source_id = (
+        overlay.get("wing_readonly_preflight_latest_unreviewed_candidate_source_id")
+        or overlay.get("wing_readonly_preflight_latest_valid_candidate_source_id")
+    )
+    if not source_id:
+        return None
+    return (
+        "Operator reviews the real WING read-only candidate "
+        f"`{source_id}` and records an accepted or rejected decision under "
+        "`artifacts/wing_readonly_preflight_review_decisions/` before any "
+        "readiness update, physical readback promotion, or supervised "
+        "fader/gain proof. Use "
+        "`python3 tools/review_wing_readonly_preflight_artifacts.py --artifact-path "
+        f"{source_id} --decision-template-output "
+        "artifacts/wing_readonly_preflight_review_decisions/"
+        "pending_review_decision_template.json` to refresh the template, then "
+        "`python3 tools/review_wing_readonly_preflight_decisions.py "
+        "--artifact-root artifacts/wing_readonly_preflight --decision-root "
+        "artifacts/wing_readonly_preflight_review_decisions` to verify the "
+        "decision ledger. This is offline review of a real artifact only: it "
+        "does not contact WING/backend, grant live authority, close readiness, "
+        "or allow supervised apply."
+    )
+
+
 def build_directive(*, project_root: Path, lookback_commits: int, report_limit: int) -> dict:
     blocker_path = project_root / ".ai" / "project-layer" / "wing_mvp_blockers.md"
     rows = update_mvp_progress.parse_blocker_table(blocker_path)
@@ -251,6 +387,24 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
         external_validation_wait=external_validation_wait,
         recent_commit_subjects=recent_commit_subjects,
     )
+    review_overlay = wing_readonly_preflight_review_overlay(project_root)
+    review_selected_action = selected_action_from_wing_readonly_review(review_overlay)
+    if review_selected_action and selected_blocker == "WING read-only connection proof":
+        selected_action = review_selected_action
+        selected_action_source = "WING Read-Only Decision Review"
+        selected_status = "blocked_by_real_artifact_review"
+        selected_evidence_files = update_mvp_progress.unique_ordered(
+            [
+                *selected_evidence_files,
+                *review_overlay.get("wing_readonly_preflight_artifact_sources", []),
+                "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
+                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+            ]
+        )
+        external_validation_wait = selected_action_requires_external_validation(
+            status=selected_status,
+            action=selected_action,
+        )
     stop_broad_work = bool(guard_report["stop_the_line"]) or selected_status != "closed"
     required_files = update_mvp_progress.unique_ordered(
         [
@@ -328,6 +482,7 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
             pre_hardware_intake_loop_guard=pre_hardware_intake_loop_guard,
         ),
         "required_files": required_files,
+        **review_overlay,
     }
 
 
@@ -379,6 +534,35 @@ def render_markdown(directive: dict) -> str:
         f"`{missing_markers_json}`",
         f"- Selected action: {directive['selected_action']}",
         f"- Selected evidence file count: `{directive.get('selected_evidence_file_count', 0)}`",
+        "",
+        "## WING Read-Only Review Overlay",
+        "",
+        "- Artifact review status: "
+        f"`{directive.get('wing_readonly_preflight_review_status')}`",
+        "- Artifact evidence status: "
+        f"`{directive.get('wing_readonly_preflight_review_evidence_status')}`",
+        "- Readiness update candidate available: "
+        f"`{str(directive.get('wing_readonly_preflight_readiness_update_candidate_available', False)).lower()}`",
+        "- Latest valid candidate run id: "
+        f"`{directive.get('wing_readonly_preflight_latest_valid_candidate_run_id')}`",
+        "- Latest valid candidate source id: "
+        f"`{directive.get('wing_readonly_preflight_latest_valid_candidate_source_id')}`",
+        "- Latest unreviewed candidate source id: "
+        f"`{directive.get('wing_readonly_preflight_latest_unreviewed_candidate_source_id')}`",
+        "- Decision review status: "
+        f"`{directive.get('wing_readonly_preflight_decision_status')}`",
+        "- Decision ledger status: "
+        f"`{directive.get('wing_readonly_preflight_decision_ledger_status')}`",
+        "- Decision record count: "
+        f"`{directive.get('wing_readonly_preflight_decision_record_count', 0)}`",
+        "- Accepted record count: "
+        f"`{directive.get('wing_readonly_preflight_accepted_record_count', 0)}`",
+        "- Unreviewed candidate count: "
+        f"`{directive.get('wing_readonly_preflight_unreviewed_candidate_count', 0)}`",
+        "- Manual readiness update candidate available: "
+        f"`{str(directive.get('wing_readonly_preflight_manual_readiness_update_candidate_available', False)).lower()}`",
+        "- Decision blocked by: "
+        f"`{json.dumps(directive.get('wing_readonly_preflight_decision_blocked_by', []), ensure_ascii=False)}`",
         "",
         "## Allowed Scope",
         "",
