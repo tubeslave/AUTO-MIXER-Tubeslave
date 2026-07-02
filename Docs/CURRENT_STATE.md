@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-07-02T08:09:44Z
+Generated: 2026-07-02T08:22:59Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `afd7ecb78 Bind WING proof steps to console surfaces`
+  `30712d4f2 Cover WING gate slot conflicts in replay evaluation`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
 - Tracked/untracked worktree state: dirty before this setup, with many
@@ -55,14 +55,20 @@ Generated: 2026-07-02T08:09:44Z
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
   `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`,
   `ff8a70ff`, `2f8bb432`, `1ff17877`, `41a60af6`, `7de7bfe1`,
-  `80e625a4`, `e8a38bc0`, `2cf226437`, `c058270a8`, and `afd7ecb78`.
+  `80e625a4`, `e8a38bc0`, `2cf226437`, `c058270a8`, `afd7ecb78`,
+  `0d4358132`, `4f703c1be`, and `30712d4f2`.
 - The current HEAD now includes `c058270a8`, which adds read-only WING gate
   slot readbacks and an operator decision queue for all unreviewed read-only
   candidates, plus `afd7ecb78`, which binds future fader/gain proof steps to
   concrete WING surfaces, addresses and negative-only proof directions. These
   do not grant readiness or live authority before accepted operator decisions.
   `Docs/runbooks/WING_SUPERVISED_FADER_GAIN_PROOF.md` repeats the same fader
-  and input-trim address contract for the human operator.
+  and input-trim address contract for the human operator. `4f703c1be` also
+  writes the same `wing_surface`, `wing_address`, and `proof_direction` fields
+  into runner summaries and proposals. `0d4358132` blocks WING dynamic-EQ
+  gate-slot parameter apply when the real `gate/mdl` readback does not match
+  the required processor model, and `30712d4f2` covers that fail-closed path in
+  replay evaluation.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -1611,6 +1617,5 @@ Generated: 2026-07-02T08:09:44Z
 - Current WING Rack availability is UNKNOWN.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `afd7ecb78` passed with
-  `4773 passed, 1 skipped, 1 warning`.
+- The latest verified full-suite run for `30712d4f2` passed with
+  `4778 passed, 1 skipped, 1 warning`.
