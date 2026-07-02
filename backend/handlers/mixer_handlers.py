@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 
 def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int], Optional[str], Optional[str], Optional[str]]:
-    value_type = server._normalize_manual_write_kind(data.get("value_type"))
+    value_type = server._normalize_readonly_parameter_kind(data.get("value_type"))
     channel = data.get("channel")
     address = str(data.get("address") or "").strip()
 
@@ -15,7 +15,7 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
             return None, None, None, "invalid_channel"
         if channel_int < 1 or channel_int > 48:
             return None, None, None, "channel_out_of_range"
-        expected_address = server._manual_write_address(channel_int, value_type)
+        expected_address = server._readonly_parameter_address(channel_int, value_type)
         if not expected_address:
             return None, None, None, "missing_read_target"
         if address and address != expected_address:
@@ -23,7 +23,7 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
         return channel_int, value_type, expected_address, None
 
     if address:
-        parsed = server._parse_manual_write_address(address)
+        parsed = server._parse_readonly_parameter_address(address)
         if parsed is None:
             return None, None, None, "unsupported_address"
         channel_int, parsed_type = parsed
@@ -35,7 +35,7 @@ def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int]
             return None, None, None, "channel_out_of_range"
         if value_type and value_type != parsed_type:
             return None, None, None, "address_value_type_mismatch"
-        return channel_int, parsed_type, server._manual_write_address(channel_int, parsed_type), None
+        return channel_int, parsed_type, server._readonly_parameter_address(channel_int, parsed_type), None
 
     return None, None, None, "missing_read_target"
 

@@ -587,14 +587,24 @@ def _request_id_for(channel: int, value_type: str) -> str:
     return f"wing-readonly-preflight:ch{channel}:{value_type}"
 
 
+READONLY_VALUE_TYPE_ADDRESS_TEMPLATES = {
+    "fader": "/ch/{channel}/fdr",
+    "gain": "/ch/{channel}/in/set/trim",
+    "pan": "/ch/{channel}/pan",
+    "eq_on": "/ch/{channel}/eq/on",
+    "eq_mix": "/ch/{channel}/eq/mix",
+    "eq_low_gain": "/ch/{channel}/eq/lg",
+    "eq_high_gain": "/ch/{channel}/eq/hg",
+    "dyn_on": "/ch/{channel}/dyn/on",
+    "dyn_threshold": "/ch/{channel}/dyn/thr",
+    "gate_on": "/ch/{channel}/gate/on",
+    "gate_threshold": "/ch/{channel}/gate/thr",
+}
+
+
 def _address_for(channel: int, value_type: str) -> str:
-    if value_type == "fader":
-        return f"/ch/{channel}/fdr"
-    if value_type == "gain":
-        return f"/ch/{channel}/in/set/trim"
-    if value_type == "pan":
-        return f"/ch/{channel}/pan"
-    return ""
+    template = READONLY_VALUE_TYPE_ADDRESS_TEMPLATES.get(value_type)
+    return template.format(channel=channel) if template is not None else ""
 
 
 def _summary_event_path(payload: Mapping[str, Any], summary_path: Path) -> Path | None:

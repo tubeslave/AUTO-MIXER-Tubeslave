@@ -1430,16 +1430,20 @@ def test_project_director_selects_operator_review_for_real_wing_candidate():
         directive["wing_readonly_preflight_review_status"]
         == "candidate_ready_for_manual_review"
     )
-    assert (
-        directive["wing_readonly_preflight_latest_valid_candidate_run_id"]
-        == "20260701T220146Z_wing_readonly_preflight"
+    latest_run_id = directive["wing_readonly_preflight_latest_valid_candidate_run_id"]
+    latest_source_id = directive[
+        "wing_readonly_preflight_latest_unreviewed_candidate_source_id"
+    ]
+    assert latest_run_id
+    assert latest_source_id == (
+        f"artifacts/wing_readonly_preflight/{latest_run_id}/summary.json"
     )
     assert directive["wing_readonly_preflight_decision_status"] == "blocked"
     assert (
         directive["wing_readonly_preflight_decision_ledger_status"]
         == "operator_review_required"
     )
-    assert directive["wing_readonly_preflight_unreviewed_candidate_count"] == 1
+    assert directive["wing_readonly_preflight_unreviewed_candidate_count"] >= 1
     assert directive["wing_readonly_preflight_decision_blocked_by"] == [
         "operator_must_record_readonly_preflight_review_decision"
     ]

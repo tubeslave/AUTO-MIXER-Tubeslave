@@ -99,9 +99,22 @@ WING_READONLY_PREFLIGHT_PLAN_OUTPUT = (
 )
 WING_READONLY_PREFLIGHT_RUNNER_URL = "ws://localhost:8765"
 WING_READONLY_PREFLIGHT_RUNNER_CHANNELS = "3"
-WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = ("fader", "gain", "pan")
+WING_READONLY_PREFLIGHT_RUNNER_DEFAULT_VALUE_TYPES = ("fader", "gain", "pan")
+# DSP health value types are explicit opt-in readback probes. They do not grant
+# live write/apply authority for EQ, dynamics or gate surfaces.
+WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES = (
+    *WING_READONLY_PREFLIGHT_RUNNER_DEFAULT_VALUE_TYPES,
+    "eq_on",
+    "eq_mix",
+    "eq_low_gain",
+    "eq_high_gain",
+    "dyn_on",
+    "dyn_threshold",
+    "gate_on",
+    "gate_threshold",
+)
 WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES = ",".join(
-    WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
+    WING_READONLY_PREFLIGHT_RUNNER_DEFAULT_VALUE_TYPES
 )
 WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES = (
     "verified_from_physical_readback",

@@ -192,6 +192,30 @@ MANUAL_WRITE_KIND_CONFIG = {
     },
 }
 
+READONLY_PARAMETER_KIND_ALIASES = {
+    **MANUAL_LIVE_WRITE_KIND_ALIASES,
+    "eq_enabled": "eq_on",
+    "eq_wet": "eq_mix",
+    "dynamics_on": "dyn_on",
+    "compressor_on": "dyn_on",
+    "dynamics_threshold": "dyn_threshold",
+    "compressor_threshold": "dyn_threshold",
+    "gate_thr": "gate_threshold",
+    "gate_threshold_db": "gate_threshold",
+}
+
+READONLY_PARAMETER_KIND_CONFIG = {
+    **MANUAL_WRITE_KIND_CONFIG,
+    "eq_on": {"address": "/ch/{channel}/eq/on"},
+    "eq_mix": {"address": "/ch/{channel}/eq/mix"},
+    "eq_low_gain": {"address": "/ch/{channel}/eq/lg"},
+    "eq_high_gain": {"address": "/ch/{channel}/eq/hg"},
+    "dyn_on": {"address": "/ch/{channel}/dyn/on"},
+    "dyn_threshold": {"address": "/ch/{channel}/dyn/thr"},
+    "gate_on": {"address": "/ch/{channel}/gate/on"},
+    "gate_threshold": {"address": "/ch/{channel}/gate/thr"},
+}
+
 SUPPORTED_MANUAL_WRITE_KINDS_SET = frozenset(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
 
 
@@ -934,6 +958,13 @@ class AutoMixerServer:
             return MANUAL_LIVE_WRITE_KIND_ALIASES[value]
         return value
 
+    @staticmethod
+    def _normalize_readonly_parameter_kind(value_type: Any) -> str:
+        value = str(value_type or "").strip().lower().replace("-", "_")
+        if value in READONLY_PARAMETER_KIND_ALIASES:
+            return READONLY_PARAMETER_KIND_ALIASES[value]
+        return value
+
     @classmethod
     def _get_supported_manual_write_kinds(cls) -> tuple[str, ...]:
         return tuple(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
@@ -957,6 +988,13 @@ class AutoMixerServer:
         return config["address"].format(channel=channel)
 
     @staticmethod
+    def _readonly_parameter_address(channel: int, value_type: str) -> str:
+        config = READONLY_PARAMETER_KIND_CONFIG.get(value_type)
+        if not config:
+            return ""
+        return config["address"].format(channel=channel)
+
+    @staticmethod
     def _parse_manual_write_address(address: Any) -> Optional[tuple[int, str]]:
         if isinstance(address, os.PathLike):
             address = address.__fspath__()
@@ -969,6 +1007,31 @@ class AutoMixerServer:
         if not normalized:
             return None
         for value_type, config in MANUAL_WRITE_KIND_CONFIG.items():
+            template = config.get("address", "")
+            if "{channel}" not in template:
+                continue
+            pattern = re.escape(template).replace(r"\{channel\}", r"(?P<channel>\d+)")
+            match = re.fullmatch(pattern, normalized)
+            if match is not None:
+                try:
+                    return int(match.group("channel")), value_type
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    @staticmethod
+    def _parse_readonly_parameter_address(address: Any) -> Optional[tuple[int, str]]:
+        if isinstance(address, os.PathLike):
+            address = address.__fspath__()
+        if isinstance(address, (bytes, bytearray)):
+            try:
+                address = address.decode("utf-8")
+            except UnicodeDecodeError:
+                return None
+        normalized = str(address or "").strip()
+        if not normalized:
+            return None
+        for value_type, config in READONLY_PARAMETER_KIND_CONFIG.items():
             template = config.get("address", "")
             if "{channel}" not in template:
                 continue
@@ -1206,7 +1269,7 @@ class AutoMixerServer:
         prefer_physical: bool = False,
         minimum_cache_updated_at_epoch: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Read a fader/gain value for proof metadata without writing.
+        """Read a whitelisted WING parameter for proof metadata without writing.
 
         Physical readback is used only when the mixer client exposes an explicit
         query helper. Otherwise this falls back to the local mixer state cache.

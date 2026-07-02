@@ -193,6 +193,42 @@ def _valid_summary() -> dict:
     }
 
 
+def _valid_dsp_summary() -> dict:
+    summary = _valid_summary()
+    readbacks = [
+        ("eq_on", "/ch/3/eq/on", 0),
+        ("eq_mix", "/ch/3/eq/mix", 100.0),
+        ("eq_low_gain", "/ch/3/eq/lg", 0.0),
+        ("eq_high_gain", "/ch/3/eq/hg", 0.0),
+        ("dyn_on", "/ch/3/dyn/on", 0),
+        ("dyn_threshold", "/ch/3/dyn/thr", -10.0),
+        ("gate_on", "/ch/3/gate/on", 0),
+        ("gate_threshold", "/ch/3/gate/thr", -40.0),
+    ]
+    summary["value_types"] = [value_type for value_type, _address, _value in readbacks]
+    summary["sent_request_types"] = [
+        "get_operator_mode",
+        "get_state",
+        *["query_mixer_parameter" for _row in readbacks],
+    ]
+    summary["readback_count"] = len(readbacks)
+    summary["physical_readback_count"] = len(readbacks)
+    summary["readbacks"] = [
+        {
+            "type": "mixer_parameter_value",
+            "request_id": f"wing-readonly-preflight:ch3:{value_type}",
+            "status": "verified_from_physical_readback",
+            "source": "physical_readback",
+            "channel": 3,
+            "value_type": value_type,
+            "address": address,
+            "value": value,
+        }
+        for value_type, address, value in readbacks
+    ]
+    return summary
+
+
 def _event(
     seq: int,
     event_type: str,
@@ -700,6 +736,35 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
         in markdown
     )
     assert "does not contact WING" in markdown
+
+
+def test_review_report_accepts_clean_dsp_health_artifact(tmp_path: Path):
+    summary_path = _write_artifact(
+        tmp_path / "preflight" / "run",
+        summary=_valid_dsp_summary(),
+    )
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+
+    assert report["status"] == "candidate_ready_for_manual_review"
+    assert report["valid_candidate_count"] == 1
+    assert report["invalid_candidate_count"] == 0
+    review = report["artifact_reviews"][0]
+    assert review["status"] == "valid_readonly_preflight_artifact"
+    assert review["value_types"] == [
+        "eq_on",
+        "eq_mix",
+        "eq_low_gain",
+        "eq_high_gain",
+        "dyn_on",
+        "dyn_threshold",
+        "gate_on",
+        "gate_threshold",
+    ]
+    assert review["readback_count"] == 8
+    assert review["physical_readback_count"] == 8
+    assert review["violations"] == []
+    assert report["artifact_sources"] == [str(summary_path)]
 
 
 @pytest.mark.parametrize(

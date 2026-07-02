@@ -3032,6 +3032,43 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_query_mixer_parameter_reads_dsp_health_paths_without_writing(
+        self, dummy_wing_server
+    ):
+        server = dummy_wing_server
+        server.mixer_client.state = {}
+        server.mixer_client.query_parameter = MagicMock(
+            return_value={"status": "received", "address": "/ch/3/gate/thr", "value": -42.0}
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["query_mixer_parameter"](
+            websocket,
+            {
+                "request_id": "wing-readonly-preflight:ch3:gate_threshold",
+                "channel": 3,
+                "value_type": "gate_threshold",
+                "address": "/ch/3/gate/thr",
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "mixer_parameter_value"
+        assert payload["request_id"] == "wing-readonly-preflight:ch3:gate_threshold"
+        assert payload["status"] == "verified_from_physical_readback"
+        assert payload["source"] == "physical_readback"
+        assert payload["channel"] == 3
+        assert payload["value_type"] == "gate_threshold"
+        assert payload["address"] == "/ch/3/gate/thr"
+        assert payload["value"] == -42.0
+        server.mixer_client.query_parameter.assert_called_once_with("/ch/3/gate/thr")
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+        server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_get_state_returns_unavailable_state_without_mixer_client(self, minimal_server):
         server = minimal_server
         server.connection_mode = "wing"

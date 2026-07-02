@@ -1,16 +1,16 @@
 # WING Read-Only Preflight Artifact Review
 
-Generated: `2026-07-01T22:13:52Z`
+Generated: `2026-07-02T06:11:38Z`
 Status: `candidate_ready_for_manual_review`
 
 ## Summary
 
 - evidence_status: `readonly_preflight_candidate_available`
-- artifact_count: `1`
-- valid_candidate_count: `1`
+- artifact_count: `2`
+- valid_candidate_count: `2`
 - invalid_candidate_count: `0`
 - readiness_update_candidate_available: `true`
-- latest_valid_candidate_run_id: `20260701T220146Z_wing_readonly_preflight`
+- latest_valid_candidate_run_id: `20260702T061111Z_wing_readonly_preflight`
 - artifact_operator_next_steps: `[]`
 
 ## Safety
@@ -59,6 +59,7 @@ Status: `candidate_ready_for_manual_review`
 ## Artifact Sources
 
 - `artifacts/wing_readonly_preflight/20260701T220146Z_wing_readonly_preflight/summary.json`
+- `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
 
 ## Artifact Details
 
@@ -128,6 +129,73 @@ Status: `candidate_ready_for_manual_review`
   - value_types: `["fader", "gain", "pan"]`
   - readback_count: `3`
   - physical_readback_count: `3`
+  - violations: `[]`
+- source: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
+  - status: `valid_readonly_preflight_artifact`
+  - run_id: `20260702T061111Z_wing_readonly_preflight`
+  - captured_at: `2026-07-02T06:11:11.626Z`
+  - artifact_root: `artifacts/wing_readonly_preflight`
+  - summary_path: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
+  - summary_sha256: `2fdf974421de338de4a89fe4051e3476ebeec118fcb2e7ac0560e0bd60844fca`
+  - events_path: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/events.jsonl`
+  - events_sha256: `62b841b6b1267dae8c3448d195005f7bbaf97cbb0169ed225c8fa3788b6d21cb`
+  - event_log_run_id_matches_summary: `true`
+  - expected_artifacts: `["artifacts/wing_readonly_preflight/<run_id>/summary.json", "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"]`
+  - expected_summary_artifact: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
+  - expected_events_artifact: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/events.jsonl`
+  - summary_path_matches_expected_artifact: `true`
+  - events_path_matches_expected_artifact: `true`
+  - contacts_backend: `true`
+  - queries_console: `true`
+  - write_request_sent: `false`
+  - proposal_request_sent: `false`
+  - sent_request_types: `["get_operator_mode", "get_state", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter"]`
+  - forbidden_request_types_sent: `[]`
+  - channels: `[3]`
+  - operator_confirmed_channels: `[3]`
+  - operator_session_confirmation_required: `true`
+  - operator_confirmed_session_ready: `true`
+  - backend_port_prestart_check_required: `true`
+  - backend_port_prestart_check_must_pass_before_starting_backend: `true`
+  - backend_port_prestart_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+  - backend_port_prestart_check_command_text: `PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick`
+  - backend_port_prestart_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
+  - backend_port_prestart_summary_required: `true`
+  - backend_port_prestart_summary_path: `artifacts/no_wing_release_check/20260702T060916Z_no_wing_release_check/backend_port_prestart/summary.json`
+  - backend_port_prestart_summary_sha256: `5df49ae579811b469b0c01f08325f66af6f08cc46c5c109d47079c11bc716e08`
+  - backend_port_prestart_summary_type: `no_wing_release_check`
+  - backend_port_prestart_summary_status: `passed`
+  - backend_port_prestart_summary_connection_policy: `no_hardware_no_network_no_live_writes`
+  - backend_port_prestart_summary_read_only: `true`
+  - backend_port_prestart_summary_live_write: `false`
+  - backend_port_prestart_summary_contacts_backend: `false`
+  - backend_port_prestart_summary_contacts_wing: `false`
+  - backend_port_prestart_summary_mutates_console_state: `false`
+  - backend_port_prestart_summary_queries_console: `false`
+  - backend_port_prestart_summary_executes_tests: `false`
+  - backend_port_prestart_check_status: `passed`
+  - artifact_manifest_verifier_must_pass_before_websocket: `true`
+  - artifact_manifest_verifier_passed_before_websocket: `true`
+  - artifact_manifest_verifier_websocket_opened_after_pass: `true`
+  - safe_to_stop_listener_by_gate: `false`
+  - live_authority_granted: `false`
+  - backend_port_prestart_gate_execution_allowed: `false`
+  - backend_port_prestart_gate_readiness_closure_allowed: `false`
+  - backend_port_prestart_gate_live_authority_granted: `false`
+  - plan_safe_to_stop_listener_by_gate: `false`
+  - plan_live_authority_granted: `false`
+  - plan_backend_port_prestart_gate_execution_allowed: `false`
+  - plan_backend_port_prestart_gate_readiness_closure_allowed: `false`
+  - plan_backend_port_prestart_gate_live_authority_granted: `false`
+  - safe_to_stop_listener_by_gate_matches_plan: `true`
+  - live_authority_granted_matches_plan: `true`
+  - backend_port_prestart_gate_execution_allowed_matches_plan: `true`
+  - backend_port_prestart_gate_readiness_closure_allowed_matches_plan: `true`
+  - backend_port_prestart_gate_live_authority_granted_matches_plan: `true`
+  - operator_next_step: `None`
+  - value_types: `["eq_on", "eq_mix", "eq_low_gain", "eq_high_gain", "dyn_on", "dyn_threshold", "gate_on", "gate_threshold"]`
+  - readback_count: `8`
+  - physical_readback_count: `8`
   - violations: `[]`
 
 ## Next Required Action

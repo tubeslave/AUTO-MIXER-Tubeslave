@@ -143,6 +143,19 @@ FORBIDDEN_REQUEST_TYPES = {
 PHYSICAL_READBACK_STATUSES = set(WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_STATUSES)
 PHYSICAL_READBACK_SOURCES = set(WING_READONLY_PREFLIGHT_PHYSICAL_READBACK_SOURCES)
 SUPPORTED_VALUE_TYPES = set(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES)
+VALUE_TYPE_ADDRESS_TEMPLATES = {
+    "fader": "/ch/{channel}/fdr",
+    "gain": "/ch/{channel}/in/set/trim",
+    "pan": "/ch/{channel}/pan",
+    "eq_on": "/ch/{channel}/eq/on",
+    "eq_mix": "/ch/{channel}/eq/mix",
+    "eq_low_gain": "/ch/{channel}/eq/lg",
+    "eq_high_gain": "/ch/{channel}/eq/hg",
+    "dyn_on": "/ch/{channel}/dyn/on",
+    "dyn_threshold": "/ch/{channel}/dyn/thr",
+    "gate_on": "/ch/{channel}/gate/on",
+    "gate_threshold": "/ch/{channel}/gate/thr",
+}
 BACKEND_PORT_PRESTART_CHECK_COMMAND = list(
     WING_READONLY_PREFLIGHT_BACKEND_PORT_PRESTART_CHECK_COMMAND
 )
@@ -405,12 +418,9 @@ def sha256_bytes(payload: bytes) -> str:
 
 
 def address_for(channel: int, value_type: str) -> str:
-    if value_type == "fader":
-        return f"/ch/{channel}/fdr"
-    if value_type == "gain":
-        return f"/ch/{channel}/in/set/trim"
-    if value_type == "pan":
-        return f"/ch/{channel}/pan"
+    template = VALUE_TYPE_ADDRESS_TEMPLATES.get(value_type)
+    if template is not None:
+        return template.format(channel=channel)
     raise ValueError(f"Unsupported value_type: {value_type}")
 
 
@@ -608,7 +618,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a read-only WING Rack preflight through backend WebSocket.")
     parser.add_argument("--url", default=WING_READONLY_PREFLIGHT_RUNNER_URL, help="Backend WebSocket URL")
     parser.add_argument("--channels", default=WING_READONLY_PREFLIGHT_RUNNER_CHANNELS, help="Comma-separated WING input channels, each 1..48")
-    parser.add_argument("--value-types", default=WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES, help="Comma-separated read-only value types: fader,gain,pan")
+    parser.add_argument(
+        "--value-types",
+        default=WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES,
+        help=(
+            "Comma-separated read-only value types. Default: "
+            f"{WING_READONLY_PREFLIGHT_RUNNER_VALUE_TYPES}. Supported: "
+            f"{','.join(WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES)}"
+        ),
+    )
     parser.add_argument(
         "--require-physical-readback",
         action="store_true",

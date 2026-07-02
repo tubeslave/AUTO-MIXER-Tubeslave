@@ -389,6 +389,44 @@ def test_parser_defaults_use_shared_target_contract() -> None:
     )
 
 
+def test_build_read_requests_supports_wing_dsp_health_paths() -> None:
+    requests = runner.build_read_requests(
+        (3,),
+        (
+            "eq_on",
+            "eq_mix",
+            "eq_low_gain",
+            "eq_high_gain",
+            "dyn_on",
+            "dyn_threshold",
+            "gate_on",
+            "gate_threshold",
+        ),
+    )
+
+    assert [request["request_id"] for request in requests] == [
+        "wing-readonly-preflight:ch3:eq_on",
+        "wing-readonly-preflight:ch3:eq_mix",
+        "wing-readonly-preflight:ch3:eq_low_gain",
+        "wing-readonly-preflight:ch3:eq_high_gain",
+        "wing-readonly-preflight:ch3:dyn_on",
+        "wing-readonly-preflight:ch3:dyn_threshold",
+        "wing-readonly-preflight:ch3:gate_on",
+        "wing-readonly-preflight:ch3:gate_threshold",
+    ]
+    assert [request["address"] for request in requests] == [
+        "/ch/3/eq/on",
+        "/ch/3/eq/mix",
+        "/ch/3/eq/lg",
+        "/ch/3/eq/hg",
+        "/ch/3/dyn/on",
+        "/ch/3/dyn/thr",
+        "/ch/3/gate/on",
+        "/ch/3/gate/thr",
+    ]
+    assert all(request["type"] == "query_mixer_parameter" for request in requests)
+
+
 def test_validate_args_rejects_plan_only_with_validate_run_inputs_only(
     tmp_path: Path,
 ) -> None:
