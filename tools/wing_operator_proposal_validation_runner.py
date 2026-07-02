@@ -51,6 +51,18 @@ EXPECTED_PARAMETER_EVENTS = {"mixer_parameter_value", "mixer_parameter_read_bloc
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 DEFAULT_PREFLIGHT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 DEFAULT_PREFLIGHT_DECISION_ROOT = "artifacts/wing_readonly_preflight_review_decisions"
+PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE = {
+    "fader": {
+        "wing_surface": "channel_fader",
+        "address_template": "/ch/{channel}/fdr",
+        "proof_direction": "negative_db_move_only",
+    },
+    "gain": {
+        "wing_surface": "input_trim",
+        "address_template": "/ch/{channel}/in/set/trim",
+        "proof_direction": "negative_input_trim_move_only",
+    },
+}
 
 
 def utc_stamp() -> str:
@@ -64,12 +76,20 @@ def json_default(value: Any) -> Any:
         return "<unserializable>"
 
 
+def proof_surface_contract(channel: int, value_type: str) -> Dict[str, str]:
+    contract = PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE.get(value_type)
+    if not contract:
+        raise ValueError(f"Unsupported value_type: {value_type}")
+    return {
+        "wing_surface": contract["wing_surface"],
+        "wing_address": contract["address_template"].format(channel=channel),
+        "proof_direction": contract["proof_direction"],
+        "address_template": contract["address_template"],
+    }
+
+
 def address_for(channel: int, value_type: str) -> str:
-    if value_type == "fader":
-        return f"/ch/{channel}/fdr"
-    if value_type == "gain":
-        return f"/ch/{channel}/in/set/trim"
-    raise ValueError(f"Unsupported value_type: {value_type}")
+    return proof_surface_contract(channel, value_type)["wing_address"]
 
 
 def clamp(value: float, value_type: str) -> float:
@@ -356,6 +376,7 @@ def build_proposal(
     target_value: float,
     reason: str,
 ) -> Dict[str, Any]:
+    surface_contract = proof_surface_contract(channel, value_type)
     return {
         "id": proposal_id,
         "title": f"WING validation: CH{channel} {value_type} {old_value:.2f} -> {target_value:.2f} dB",
@@ -363,6 +384,9 @@ def build_proposal(
         "target": channel,
         "channel": channel,
         "value_type": value_type,
+        "wing_surface": surface_contract["wing_surface"],
+        "wing_address": surface_contract["wing_address"],
+        "proof_direction": surface_contract["proof_direction"],
         "value": target_value,
         "severity": "low",
         "confidence": 1.0,
@@ -371,6 +395,9 @@ def build_proposal(
         "requested_change": {
             "value_type": value_type,
             "channel": channel,
+            "wing_surface": surface_contract["wing_surface"],
+            "wing_address": surface_contract["wing_address"],
+            "proof_direction": surface_contract["proof_direction"],
             "value": target_value,
             "current_value": old_value,
             "delta_db": round(target_value - old_value, 3),
@@ -543,6 +570,16 @@ async def run(args: argparse.Namespace) -> int:
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 2
+
+    surface_contract = proof_surface_contract(args.channel, args.value_type)
+    summary.update(
+        {
+            "wing_surface": surface_contract["wing_surface"],
+            "wing_address": surface_contract["wing_address"],
+            "proof_direction": surface_contract["proof_direction"],
+            "proof_surface_contract": surface_contract,
+        }
+    )
 
     preflight_gate, preflight_gate_error = build_preflight_decision_gate(args)
     summary["preflight_decision_gate"] = preflight_gate

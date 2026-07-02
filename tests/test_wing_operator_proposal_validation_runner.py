@@ -357,6 +357,26 @@ def test_validate_args_blocks_unsafe_invocations(tmp_path: Path, argv: list[str]
     assert expected_error in runner.validate_args(args)
 
 
+def test_build_proposal_binds_gain_to_input_trim_surface() -> None:
+    proposal = runner.build_proposal(
+        proposal_id="unit-gain-proof",
+        channel=3,
+        value_type="gain",
+        old_value=1.0,
+        target_value=0.75,
+        reason="unit regression",
+    )
+
+    assert proposal["wing_surface"] == "input_trim"
+    assert proposal["wing_address"] == "/ch/3/in/set/trim"
+    assert proposal["proof_direction"] == "negative_input_trim_move_only"
+    assert proposal["requested_change"]["wing_surface"] == "input_trim"
+    assert proposal["requested_change"]["wing_address"] == "/ch/3/in/set/trim"
+    assert proposal["requested_change"]["proof_direction"] == (
+        "negative_input_trim_move_only"
+    )
+
+
 @pytest.mark.asyncio
 async def test_dry_run_plans_without_creating_or_applying_proposal(
     tmp_path: Path,
@@ -389,6 +409,15 @@ async def test_dry_run_plans_without_creating_or_applying_proposal(
     assert summary["operator_confirmation_required"] is False
     assert summary["operator_confirmation_match"] is False
     assert summary["address"] == "/ch/7/fdr"
+    assert summary["wing_surface"] == "channel_fader"
+    assert summary["wing_address"] == "/ch/7/fdr"
+    assert summary["proof_direction"] == "negative_db_move_only"
+    assert summary["proof_surface_contract"] == {
+        "wing_surface": "channel_fader",
+        "wing_address": "/ch/7/fdr",
+        "proof_direction": "negative_db_move_only",
+        "address_template": "/ch/{channel}/fdr",
+    }
     assert summary["old_value"] == -10.0
     assert summary["target_value"] == -10.25
     assert [event["event_type"] for event in read_events(summary)] == ["send", "recv", "send", "recv"]
@@ -435,6 +464,15 @@ async def test_dry_run_uses_readonly_physical_read_when_backend_state_missing(
     summary = read_summary(tmp_path)
     assert summary["status"] == "planned"
     assert summary["address"] == "/ch/3/in/set/trim"
+    assert summary["wing_surface"] == "input_trim"
+    assert summary["wing_address"] == "/ch/3/in/set/trim"
+    assert summary["proof_direction"] == "negative_input_trim_move_only"
+    assert summary["proof_surface_contract"] == {
+        "wing_surface": "input_trim",
+        "wing_address": "/ch/3/in/set/trim",
+        "proof_direction": "negative_input_trim_move_only",
+        "address_template": "/ch/{channel}/in/set/trim",
+    }
     assert summary["old_value"] == 1.0
     assert summary["old_value_source"] == "physical_readback"
     assert summary["old_value_status"] == "verified_from_physical_readback"
@@ -605,6 +643,18 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     assert rollback_request["type"] == "rollback_last_manual_write"
     assert rollback_request["approved"] is True
 
+    blocked_proposal = websocket.sent[4]["proposal"]
+    assert blocked_proposal["wing_surface"] == "channel_fader"
+    assert blocked_proposal["wing_address"] == "/ch/4/fdr"
+    assert blocked_proposal["proof_direction"] == "negative_db_move_only"
+    assert blocked_proposal["requested_change"]["wing_surface"] == "channel_fader"
+    assert blocked_proposal["requested_change"]["wing_address"] == "/ch/4/fdr"
+    assert blocked_proposal["requested_change"]["proof_direction"] == "negative_db_move_only"
+    apply_proposal = websocket.sent[8]["proposal"]
+    assert apply_proposal["wing_surface"] == "channel_fader"
+    assert apply_proposal["wing_address"] == "/ch/4/fdr"
+    assert apply_proposal["proof_direction"] == "negative_db_move_only"
+
     summary = read_summary(tmp_path)
     assert summary["status"] == "passed"
     assert summary["reason"] == "proposal_apply_readback_rollback_complete"
@@ -622,6 +672,9 @@ async def test_execute_path_uses_apply_operator_proposal_only_for_write(
     assert summary["operator_confirmed_value_type"] == "fader"
     assert summary["operator_confirmed_delta_db"] == -0.25
     assert summary["operator_confirmation_match"] is True
+    assert summary["wing_surface"] == "channel_fader"
+    assert summary["wing_address"] == "/ch/4/fdr"
+    assert summary["proof_direction"] == "negative_db_move_only"
     assert summary["accepted_readonly_source_id"] == ACCEPTED_READONLY_SOURCE_ID
     assert summary["preflight_decision_gate"]["accepted"] is True
     assert summary["preflight_decision_gate"]["live_authority_granted"] is False
