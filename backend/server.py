@@ -202,6 +202,11 @@ READONLY_PARAMETER_KIND_ALIASES = {
     "compressor_threshold": "dyn_threshold",
     "gate_thr": "gate_threshold",
     "gate_threshold_db": "gate_threshold",
+    "gate_mdl": "gate_model",
+    "gate_att": "gate_attack",
+    "gate_rel": "gate_release",
+    "gate_filt": "gate_filter",
+    "gate_freq": "gate_frequency",
 }
 
 READONLY_PARAMETER_KIND_CONFIG = {
@@ -214,7 +219,25 @@ READONLY_PARAMETER_KIND_CONFIG = {
     "dyn_threshold": {"address": "/ch/{channel}/dyn/thr"},
     "gate_on": {"address": "/ch/{channel}/gate/on"},
     "gate_threshold": {"address": "/ch/{channel}/gate/thr"},
+    "gate_model": {"address": "/ch/{channel}/gate/mdl"},
+    "gate_ratio": {"address": "/ch/{channel}/gate/ratio"},
+    "gate_attack": {"address": "/ch/{channel}/gate/att"},
+    "gate_release": {"address": "/ch/{channel}/gate/rel"},
+    "gate_filter": {"address": "/ch/{channel}/gate/filt"},
+    "gate_gain": {"address": "/ch/{channel}/gate/g"},
+    "gate_frequency": {"address": "/ch/{channel}/gate/f"},
+    "gate_q": {"address": "/ch/{channel}/gate/q"},
+    "gate_mode": {"address": "/ch/{channel}/gate/mode"},
 }
+
+READONLY_ENUM_PARAMETER_KINDS = frozenset(
+    {
+        "gate_model",
+        "gate_ratio",
+        "gate_filter",
+        "gate_mode",
+    }
+)
 
 SUPPORTED_MANUAL_WRITE_KINDS_SET = frozenset(SUPPORTED_MANUAL_LIVE_WRITE_KINDS)
 
@@ -1260,6 +1283,14 @@ class AutoMixerServer:
             return None
         return raw_value
 
+    @staticmethod
+    def _readonly_read_value_available(value_type: str, value: Any) -> bool:
+        if AutoMixerServer._coerce_optional_float(value) is not None:
+            return True
+        if value_type in READONLY_ENUM_PARAMETER_KINDS:
+            return bool(str(value or "").strip())
+        return False
+
     async def _manual_write_read_value(
         self,
         *,
@@ -1294,7 +1325,7 @@ class AutoMixerServer:
                     "error": str(exc),
                 }
             value = self._extract_manual_write_read_value(raw)
-            if self._coerce_optional_float(value) is None:
+            if not self._readonly_read_value_available(value_type, value):
                 return {
                     "value": None,
                     "status": "readback_unavailable",
@@ -1315,7 +1346,7 @@ class AutoMixerServer:
             if physical and physical.get("value") is not None:
                 return physical
 
-        if self._coerce_optional_float(cached_value) is not None:
+        if self._readonly_read_value_available(value_type, cached_value):
             return {
                 "value": cached_value,
                 "status": "verified_from_cache",

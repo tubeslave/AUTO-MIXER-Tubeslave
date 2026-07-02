@@ -665,6 +665,60 @@ def test_decision_review_report_accepts_operator_decision_without_live_authority
     assert "does not contact WING" in markdown
 
 
+def test_decision_review_report_surfaces_operator_queue_for_all_unreviewed_candidates(
+    tmp_path: Path,
+):
+    first_summary = _write_artifact(tmp_path / "first" / "preflight" / "run")
+    second_summary = _write_artifact(tmp_path / "second" / "preflight" / "run")
+
+    report = decision_tool.build_decision_review_report(
+        artifact_paths=(first_summary, second_summary),
+        decision_roots=(tmp_path / "decisions",),
+    )
+
+    assert report["status"] == "blocked"
+    assert report["unreviewed_candidate_count"] == 2
+    assert report["unreviewed_candidate_source_ids"] == [
+        str(first_summary),
+        str(second_summary),
+    ]
+    assert report["manual_readiness_update_candidate_available"] is False
+    assert "unreviewed_candidate_decision_queue" in report["next_required_action"]
+    assert report["decision_review_rerun_command"] == (
+        decision_tool.DECISION_REVIEW_RERUN_COMMAND
+    )
+
+    queue = report["unreviewed_candidate_decision_queue"]
+    assert [item["artifact_source_id"] for item in queue] == [
+        str(first_summary),
+        str(second_summary),
+    ]
+    assert len({item["suggested_decision_path"] for item in queue}) == 2
+    for item in queue:
+        assert item["summary_path"] == item["artifact_source_id"]
+        assert item["suggested_decision_path"].startswith(
+            "artifacts/wing_readonly_preflight_review_decisions/"
+        )
+        assert item["decision_template_command"].startswith(
+            "PYTHONPATH=backend python3 "
+            "tools/review_wing_readonly_preflight_artifacts.py"
+        )
+        assert f"--artifact-path {item['artifact_source_id']}" in item[
+            "decision_template_command"
+        ]
+        assert f"--decision-template-output {item['suggested_decision_path']}" in item[
+            "decision_template_command"
+        ]
+        assert "accepted or rejected" in item["operator_required_outcome"]
+
+    markdown = decision_tool.render_markdown(report)
+    assert "## Operator Decision Queue" in markdown
+    assert str(first_summary) in markdown
+    assert str(second_summary) in markdown
+    assert "decision_review_rerun_command" in markdown
+    assert "does not grant live authority" in markdown
+
+
 def test_decision_review_report_requires_strict_source_authority_denial(monkeypatch):
     def fake_ledger(**_kwargs):
         return {

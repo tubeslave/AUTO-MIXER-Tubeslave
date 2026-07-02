@@ -1,6 +1,6 @@
 # WING Read-Only Preflight Artifact Review
 
-Generated: `2026-07-02T07:09:33Z`
+Generated: `2026-07-02T07:58:03Z`
 Status: `candidate_ready_for_manual_review`
 
 ## Summary
@@ -10,7 +10,7 @@ Status: `candidate_ready_for_manual_review`
 - valid_candidate_count: `1`
 - invalid_candidate_count: `0`
 - readiness_update_candidate_available: `true`
-- latest_valid_candidate_run_id: `20260702T061111Z_wing_readonly_preflight`
+- latest_valid_candidate_run_id: `20260702T075151Z_wing_readonly_preflight`
 - artifact_operator_next_steps: `[]`
 
 ## Safety
@@ -46,7 +46,6 @@ Status: `candidate_ready_for_manual_review`
 - available: `true`
 - required_fields: `["review_id", "artifact_source_id", "run_id", "artifact_captured_at", "artifact_root", "summary_path", "summary_sha256", "events_path", "events_sha256", "channels", "value_types", "operator_confirmed_channels", "operator_confirmed_session_ready", "readback_count", "physical_readback_count", "request_id_policy", "request_id_correlation_required", "event_log_run_id_matches_summary", "decision", "reviewed_by", "reviewed_at", "checklist_ids", "backend_port_prestart_check_required", "backend_port_prestart_check_must_pass_before_starting_backend", "backend_port_prestart_check_command", "backend_port_prestart_check_command_text", "backend_port_prestart_check_failure_detail_fields", "backend_port_prestart_summary_required", "backend_port_prestart_summary_path", "backend_port_prestart_summary_sha256", "backend_port_prestart_summary_type", "backend_port_prestart_summary_status", "backend_port_prestart_summary_connection_policy", "backend_port_prestart_summary_read_only", "backend_port_prestart_summary_live_write", "backend_port_prestart_summary_contacts_backend", "backend_port_prestart_summary_contacts_wing", "backend_port_prestart_summary_mutates_console_state", "backend_port_prestart_summary_queries_console", "backend_port_prestart_summary_executes_tests", "backend_port_prestart_check_status", "artifact_manifest_verifier_must_pass_before_websocket", "artifact_manifest_verifier_passed_before_websocket", "artifact_manifest_verifier_websocket_opened_after_pass", "safe_to_stop_listener_by_gate", "live_authority_granted", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "plan_safe_to_stop_listener_by_gate", "plan_live_authority_granted", "plan_backend_port_prestart_gate_execution_allowed", "plan_backend_port_prestart_gate_readiness_closure_allowed", "plan_backend_port_prestart_gate_live_authority_granted", "safe_to_stop_listener_by_gate_matches_plan", "live_authority_granted_matches_plan", "backend_port_prestart_gate_execution_allowed_matches_plan", "backend_port_prestart_gate_readiness_closure_allowed_matches_plan", "backend_port_prestart_gate_live_authority_granted_matches_plan"]`
 - required_edits: `["set decision to accepted or rejected after manual review", "set reviewed_by to the operator name", "set reviewed_at to a UTC timestamp at or after artifact_captured_at", "remove template_status or replace the generated pending marker before ledger acceptance"]`
-- output: `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`
 
 ## Blockers
 
@@ -58,30 +57,30 @@ Status: `candidate_ready_for_manual_review`
 
 ## Artifact Sources
 
-- `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
+- `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`
 
 ## Artifact Details
 
-- source: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
+- source: `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`
   - status: `valid_readonly_preflight_artifact`
-  - run_id: `20260702T061111Z_wing_readonly_preflight`
-  - captured_at: `2026-07-02T06:11:11.626Z`
+  - run_id: `20260702T075151Z_wing_readonly_preflight`
+  - captured_at: `2026-07-02T07:51:51.642Z`
   - artifact_root: `artifacts/wing_readonly_preflight`
-  - summary_path: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
-  - summary_sha256: `102a70155ee24c86ee7dee242eb4fab7aef6cb17eed9048d1cb7112304d475bc`
-  - events_path: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/events.jsonl`
-  - events_sha256: `62b841b6b1267dae8c3448d195005f7bbaf97cbb0169ed225c8fa3788b6d21cb`
+  - summary_path: `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`
+  - summary_sha256: `c69dbae8da8d6af6e7b29db7abad8ce125e99fb97c5b152b800f96516621f6ce`
+  - events_path: `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/events.jsonl`
+  - events_sha256: `74d6b84e6131ee9f9db08546da439ff5b520fd33ce7f19c008fea9bb8d704c0f`
   - event_log_run_id_matches_summary: `true`
   - expected_artifacts: `["artifacts/wing_readonly_preflight/<run_id>/summary.json", "artifacts/wing_readonly_preflight/<run_id>/events.jsonl"]`
-  - expected_summary_artifact: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
-  - expected_events_artifact: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/events.jsonl`
+  - expected_summary_artifact: `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`
+  - expected_events_artifact: `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/events.jsonl`
   - summary_path_matches_expected_artifact: `true`
   - events_path_matches_expected_artifact: `true`
   - contacts_backend: `true`
   - queries_console: `true`
   - write_request_sent: `false`
   - proposal_request_sent: `false`
-  - sent_request_types: `["get_operator_mode", "get_state", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter"]`
+  - sent_request_types: `["get_operator_mode", "get_state", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter", "query_mixer_parameter"]`
   - forbidden_request_types_sent: `[]`
   - channels: `[3]`
   - operator_confirmed_channels: `[3]`
@@ -125,9 +124,9 @@ Status: `candidate_ready_for_manual_review`
   - backend_port_prestart_gate_readiness_closure_allowed_matches_plan: `true`
   - backend_port_prestart_gate_live_authority_granted_matches_plan: `true`
   - operator_next_step: `None`
-  - value_types: `["eq_on", "eq_mix", "eq_low_gain", "eq_high_gain", "dyn_on", "dyn_threshold", "gate_on", "gate_threshold"]`
-  - readback_count: `8`
-  - physical_readback_count: `8`
+  - value_types: `["gate_model", "gate_on", "gate_threshold", "gate_ratio", "gate_attack", "gate_release"]`
+  - readback_count: `6`
+  - physical_readback_count: `6`
   - violations: `[]`
 
 ## Next Required Action

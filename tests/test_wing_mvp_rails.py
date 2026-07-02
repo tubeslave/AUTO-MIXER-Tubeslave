@@ -847,13 +847,26 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
         state["last_validation_summary"].get("wing_readonly_preflight_review_status")
         == "candidate_ready_for_manual_review"
     ):
-        assert "Operator reviews artifacts/wing_readonly_preflight" in state[
-            "next_action"
-        ]
         assert (
-            "artifacts/wing_readonly_preflight_review_decisions/"
-            "pending_review_decision_template.json"
-        ) in state["next_action"]
+            "Operator reviews artifacts/wing_readonly_preflight" in state["next_action"]
+            or "Operator uses the Operator Decision Queue" in state["next_action"]
+        )
+        if "Operator Decision Queue" in state["next_action"]:
+            assert (
+                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+                in state["next_action"]
+            )
+            assert (
+                state["last_validation_summary"].get(
+                    "wing_readonly_preflight_operator_decision_queue_report"
+                )
+                == "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+            )
+        else:
+            assert (
+                "artifacts/wing_readonly_preflight_review_decisions/"
+                "pending_review_decision_template.json"
+            ) in state["next_action"]
     else:
         assert "operator-supervised WING read-only preflight" in state["next_action"]
 
@@ -882,15 +895,22 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
     assert "Control-plane docs/state can proceed without live hardware contact" in blockers
 
     assert "Writer lease: none" in heartbeat
-    assert "This heartbeat made no product/runtime\nchange" in heartbeat
+    assert (
+        "This heartbeat made no product/runtime\nchange" in heartbeat
+        or "This heartbeat made no new product/runtime change" in heartbeat
+    )
     if (
         state["last_validation_summary"].get("wing_readonly_preflight_review_status")
         == "candidate_ready_for_manual_review"
     ):
         assert "latest real WING read-only candidate" in heartbeat
         assert "operator_review_required" in heartbeat
-        assert "pending_operator_decision" in heartbeat
-        assert "required_edits" in heartbeat
+        if "Operator Decision Queue" in heartbeat:
+            assert "unreviewed candidates" in heartbeat
+            assert "accepted or rejected operator decision records" in heartbeat
+        else:
+            assert "pending_operator_decision" in heartbeat
+            assert "required_edits" in heartbeat
     else:
         assert "M001 still has no real WING read-only artifact" in heartbeat
 
@@ -1095,9 +1115,25 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             "wing_readonly_preflight_latest_valid_candidate_source_id"
         ] == (
             "artifacts/wing_readonly_preflight/"
-            "20260702T061111Z_wing_readonly_preflight/summary.json"
+            "20260702T075151Z_wing_readonly_preflight/summary.json"
         )
-        assert "pending_review_decision_template.json" in state["next_action"]
+        assert state["last_validation_summary"][
+            "wing_readonly_preflight_unreviewed_candidate_count"
+        ] == 3
+        assert state["last_validation_summary"][
+            "wing_readonly_preflight_unreviewed_candidate_source_ids"
+        ] == [
+            "artifacts/wing_readonly_preflight/"
+            "20260701T220146Z_wing_readonly_preflight/summary.json",
+            "artifacts/wing_readonly_preflight/"
+            "20260702T061111Z_wing_readonly_preflight/summary.json",
+            "artifacts/wing_readonly_preflight/"
+            "20260702T075151Z_wing_readonly_preflight/summary.json",
+        ]
+        assert state["last_validation_summary"][
+            "wing_readonly_preflight_operator_decision_queue_report"
+        ] == "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+        assert "Operator Decision Queue" in state["next_action"]
     else:
         assert state["next_action"] == (
             "Wait for operator-supervised WING read-only preflight using "

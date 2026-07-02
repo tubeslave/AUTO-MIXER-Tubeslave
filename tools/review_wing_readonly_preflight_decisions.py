@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shlex
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,6 +63,12 @@ ARTIFACT_MANIFEST_VERIFIER_WS_PROOF_FIELDS = (
     f"artifact_manifest_verifier_passed_before_{WS_TOKEN}",
     f"artifact_manifest_verifier_{WS_TOKEN}_opened_after_pass",
 )
+DECISION_REVIEW_RERUN_COMMAND = (
+    "PYTHONPATH=backend python3 tools/review_wing_readonly_preflight_decisions.py "
+    "--output Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md --quiet"
+)
+DECISION_TEMPLATE_REPORT_OUTPUT = "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md"
+DECISION_TEMPLATE_RECORD_ROOT = "artifacts/wing_readonly_preflight_review_decisions"
 
 
 def utc_now() -> str:
@@ -80,6 +88,67 @@ def _candidate_rows_by_source(
         if source_id:
             rows[source_id] = row
     return rows
+
+
+def _source_slug(source_id: str) -> str:
+    row = "".join(char if char.isalnum() else "-" for char in source_id)
+    parts = [part for part in row.split("-") if part]
+    return "-".join(parts)[-80:] or "unknown-source"
+
+
+def _decision_record_path_for_source(source_id: str, run_id: str) -> str:
+    source_hash = hashlib.sha256(source_id.encode("utf-8")).hexdigest()[:12]
+    run_slug = _source_slug(run_id or Path(source_id).parent.name)
+    return (
+        f"{DECISION_TEMPLATE_RECORD_ROOT}/"
+        f"review-wing-readonly-{run_slug}-{source_hash}.json"
+    )
+
+
+def _decision_template_command(source_id: str, output_path: str) -> str:
+    return shlex.join(
+        [
+            "PYTHONPATH=backend",
+            "python3",
+            "tools/review_wing_readonly_preflight_artifacts.py",
+            "--artifact-path",
+            source_id,
+            "--decision-template-output",
+            output_path,
+            "--output",
+            DECISION_TEMPLATE_REPORT_OUTPUT,
+            "--quiet",
+        ]
+    )
+
+
+def _unreviewed_candidate_decision_queue(
+    unreviewed_source_ids: Sequence[str],
+    candidate_reviews: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    rows_by_source = _candidate_rows_by_source(candidate_reviews)
+    queue: list[dict[str, Any]] = []
+    for source_id in unreviewed_source_ids:
+        row = rows_by_source.get(source_id, {})
+        run_id = str(row.get("run_id") or Path(source_id).parent.name)
+        suggested_decision_path = _decision_record_path_for_source(source_id, run_id)
+        queue.append(
+            {
+                "artifact_source_id": source_id,
+                "run_id": run_id,
+                "summary_path": str(row.get("summary_path") or source_id),
+                "suggested_decision_path": suggested_decision_path,
+                "decision_template_command": _decision_template_command(
+                    source_id,
+                    suggested_decision_path,
+                ),
+                "operator_required_outcome": (
+                    "replace pending fields with accepted or rejected, reviewer, "
+                    "review time, and no template_status marker"
+                ),
+            }
+        )
+    return queue
 
 
 def _accepted_candidate_expected_artifact_trace(
@@ -301,6 +370,13 @@ def build_decision_review_report(
     candidate_review_rows = [
         row for row in candidate_reviews if isinstance(row, Mapping)
     ]
+    unreviewed_candidate_source_ids = _string_list(
+        summary.get("unreviewed_candidate_source_ids")
+    )
+    unreviewed_candidate_decision_queue = _unreviewed_candidate_decision_queue(
+        unreviewed_candidate_source_ids,
+        candidate_review_rows,
+    )
     accepted_candidate_expected_artifact_trace = (
         _accepted_candidate_expected_artifact_trace(
             accepted_source_ids,
@@ -428,9 +504,9 @@ def build_decision_review_report(
         "invalid_records": invalid_records,
         "duplicate_source_ids": _string_list(summary.get("duplicate_source_ids")),
         "conflicting_source_ids": _string_list(summary.get("conflicting_source_ids")),
-        "unreviewed_candidate_source_ids": _string_list(
-            summary.get("unreviewed_candidate_source_ids")
-        ),
+        "unreviewed_candidate_source_ids": unreviewed_candidate_source_ids,
+        "unreviewed_candidate_decision_queue": unreviewed_candidate_decision_queue,
+        "decision_review_rerun_command": DECISION_REVIEW_RERUN_COMMAND,
         "candidate_reviews": candidate_reviews,
         "required_checklist_ids": _string_list(summary.get("required_checklist_ids")),
         "manual_readiness_update_candidate_available": accepted_ready,
@@ -474,6 +550,12 @@ def build_decision_review_report(
                 "flags strictly deny readiness and live authority."
             )
             if accepted_source_ids and not source_authority_denied
+            else (
+                "Operator records accepted or rejected review decisions for every "
+                "source id in unreviewed_candidate_decision_queue, then reruns "
+                f"`{DECISION_REVIEW_RERUN_COMMAND}`."
+            )
+            if unreviewed_candidate_source_ids
             else "Operator rejected the candidate; capture or review a replacement artifact."
             if rejected_only
             else str(summary.get("next_global_step") or "Capture and review WING preflight evidence.")
@@ -590,11 +672,42 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f"- conflicting_source_ids: `{json.dumps(report['conflicting_source_ids'])}`",
         "- unreviewed_candidate_source_ids: "
         f"`{json.dumps(report['unreviewed_candidate_source_ids'])}`",
+        "- decision_review_rerun_command: "
+        f"`{report['decision_review_rerun_command']}`",
         f"- required_checklist_ids: `{json.dumps(report['required_checklist_ids'])}`",
         "",
-        "## Invalid Decision Records",
+        "## Operator Decision Queue",
         "",
     ]
+    decision_queue = (
+        report.get("unreviewed_candidate_decision_queue")
+        if isinstance(report.get("unreviewed_candidate_decision_queue"), list)
+        else []
+    )
+    if decision_queue:
+        for item in decision_queue:
+            row = item if isinstance(item, Mapping) else {}
+            lines.extend(
+                [
+                    f"- artifact_source_id: `{row.get('artifact_source_id')}`",
+                    f"  - run_id: `{row.get('run_id')}`",
+                    f"  - summary_path: `{row.get('summary_path')}`",
+                    f"  - suggested_decision_path: `{row.get('suggested_decision_path')}`",
+                    "  - decision_template_command: "
+                    f"`{row.get('decision_template_command')}`",
+                    "  - operator_required_outcome: "
+                    f"`{row.get('operator_required_outcome')}`",
+                ]
+            )
+    else:
+        lines.append("No unreviewed candidates.")
+    lines.extend(
+        [
+            "",
+            "## Invalid Decision Records",
+            "",
+        ]
+    )
     invalid_records = (
         report.get("invalid_records")
         if isinstance(report.get("invalid_records"), list)
@@ -620,9 +733,9 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
-        "## Candidate Prestart Contract",
-        "",
-    ]
+            "## Candidate Prestart Contract",
+            "",
+        ]
     )
     candidate_reviews = (
         report.get("candidate_reviews")

@@ -9,13 +9,14 @@
   intended backend/WING session and operator review.
 - Latest heartbeat: 2026-07-02T07:50:38Z.
 - Latest WING read-only candidate:
-  `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`.
-- Decision ledger status: `operator_review_required`; no accepted or rejected
-  operator decision record exists yet.
-- Pending review template:
-  `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`.
-  It includes machine-readable `required_edits` and still has
-  `decision: pending_operator_decision`.
+  `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`.
+- Decision ledger status: `operator_review_required`; three unreviewed WING
+  read-only candidates still need accepted or rejected operator decision
+  records.
+- Operator decision queue:
+  `Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md`. It lists
+  every unreviewed source id, a suggested decision JSON path, and the exact
+  template command for each record.
 
 ## Что сделано
 
@@ -27,13 +28,12 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 
 - WING read-only decision handoff was refreshed for the latest real candidate:
   `Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md` now scopes the
-  artifact review to `20260702T061111Z_wing_readonly_preflight`, and the
-  pending decision template points at the same summary SHA and embeds the
-  required operator edits. The decision ledger report remains `blocked` /
-  `operator_review_required` because the operator has not recorded an accepted
-  or rejected decision. This is control-plane handoff evidence only; it creates
-  no new WING/backend contact, live write, readiness closure, accepted hardware
-  evidence or live authority.
+  artifact review to `20260702T075151Z_wing_readonly_preflight`. The decision
+  ledger report remains `blocked` / `operator_review_required` and now shows
+  an `Operator Decision Queue` for all three unreviewed candidate source ids.
+  This is control-plane handoff evidence only; it creates no new WING/backend
+  contact, live write, readiness closure, accepted hardware evidence or live
+  authority.
 
 - The latest verified product/runtime baseline is now
   `2cf226437 Tighten WING preflight decision gates`. That commit tightened the

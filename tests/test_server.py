@@ -3069,6 +3069,61 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("value_type", "address", "value"),
+        [
+            ("gate_model", "/ch/3/gate/mdl", "DEQ"),
+            ("gate_ratio", "/ch/3/gate/ratio", "2:1"),
+            ("gate_attack", "/ch/3/gate/att", 4.0),
+            ("gate_release", "/ch/3/gate/rel", 115.0),
+            ("gate_filter", "/ch/3/gate/filt", "PEQ"),
+            ("gate_gain", "/ch/3/gate/g", -3.5),
+            ("gate_frequency", "/ch/3/gate/f", 74.0),
+            ("gate_q", "/ch/3/gate/q", 1.82),
+            ("gate_mode", "/ch/3/gate/mode", "HIGH"),
+        ],
+    )
+    async def test_query_mixer_parameter_reads_gate_slot_paths_without_writing(
+        self,
+        dummy_wing_server,
+        value_type,
+        address,
+        value,
+    ):
+        server = dummy_wing_server
+        server.mixer_client.state = {}
+        server.mixer_client.query_parameter = MagicMock(
+            return_value={"status": "received", "address": address, "value": value}
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["query_mixer_parameter"](
+            websocket,
+            {
+                "request_id": f"wing-readonly-preflight:ch3:{value_type}",
+                "channel": 3,
+                "value_type": value_type,
+                "address": address,
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "mixer_parameter_value"
+        assert payload["request_id"] == f"wing-readonly-preflight:ch3:{value_type}"
+        assert payload["status"] == "verified_from_physical_readback"
+        assert payload["source"] == "physical_readback"
+        assert payload["channel"] == 3
+        assert payload["value_type"] == value_type
+        assert payload["address"] == address
+        assert payload["value"] == value
+        server.mixer_client.query_parameter.assert_called_once_with(address)
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+        server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_get_state_returns_unavailable_state_without_mixer_client(self, minimal_server):
         server = minimal_server
         server.connection_mode = "wing"
