@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T07:10:30Z
+Last heartbeat UTC: 2026-07-02T07:50:38Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -17,20 +17,23 @@ using
 then rerun
 `PYTHONPATH=backend python3 tools/review_wing_readonly_preflight_decisions.py --artifact-root artifacts/wing_readonly_preflight --decision-root artifacts/wing_readonly_preflight_review_decisions`.
 
-Latest check: the WING read-only artifact review was refreshed for the selected
-candidate and remains `candidate_ready_for_manual_review`. The decision ledger
-review remains blocked with `operator_review_required` because there is no
-accepted or rejected operator decision record yet.
+Latest check: the control-plane state is synchronized to latest verified
+product/runtime commit `2cf226437 Tighten WING preflight decision gates`.
+Current HEAD also contains docs-only report commit `242367ac1 Document WING
+apply preflight decision gate`.
+
+The selected real WING read-only candidate remains
+`candidate_ready_for_manual_review`. The decision ledger review remains blocked
+with `operator_review_required` because there is no accepted or rejected
+operator decision record yet.
 
 The pending template still has
 `template_status: operator_must_replace_placeholders_before_ledger_acceptance`
-and `decision: pending_operator_decision`. It now also embeds a
-machine-readable `required_edits` list for the operator fields that must be
-changed before ledger acceptance. This is the intended fail-closed state before
-manual review.
+and `decision: pending_operator_decision`. It also embeds a machine-readable
+`required_edits` list for the operator fields that must be changed before
+ledger acceptance. This is the intended fail-closed state before manual review.
 
-This heartbeat made no product/runtime
-change to live console authority. No WING/backend contact was made by this
-cycle. No OSC/websocket transport was opened by this cycle. No live write,
-readiness closure, live authority grant, accepted hardware evidence or Full
-Autonomous readiness was produced.
+This heartbeat made no new product/runtime change and no change to live console
+authority. No WING contact was made by this cycle. No OSC write path was opened
+by this cycle. No live write, readiness closure, live authority grant, accepted
+hardware evidence or Full Autonomous readiness was produced.

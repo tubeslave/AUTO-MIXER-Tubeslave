@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-07-02T07:10:30Z.
+- Latest heartbeat: 2026-07-02T07:50:38Z.
 - Latest WING read-only candidate:
   `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`.
 - Decision ledger status: `operator_review_required`; no accepted or rejected
@@ -34,6 +34,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   or rejected decision. This is control-plane handoff evidence only; it creates
   no new WING/backend contact, live write, readiness closure, accepted hardware
   evidence or live authority.
+
+- The latest verified product/runtime baseline is now
+  `2cf226437 Tighten WING preflight decision gates`. That commit tightened the
+  supervised apply preflight decision gate and was validated by the full suite:
+  `4761 passed, 1 skipped, 1 warning`. Current HEAD also contains docs-only
+  report commit `242367ac1 Document WING apply preflight decision gate`. This
+  is progress toward the WING MVP gate, but it does not replace the missing
+  accepted operator decision or real WING physical readback proof.
 
 - M081 WING review decision prestart proof binding rail is now automated:
   review decision templates and accepted decision records must carry the same
@@ -435,9 +443,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
-The current state document is also synchronized with `e8a38bc0` and the latest
-pre-checkpoint state/evidence commit `195e7ff6`; this synchronization did not
-change product runtime behavior.
+The current state document is also synchronized with `2cf226437` as the latest
+verified product/runtime baseline and notes docs-only report commit
+`242367ac1`; this synchronization did not change product runtime behavior.
 
 The current-state freshness rail is now automated by
 `tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence`.
@@ -2108,9 +2116,9 @@ live authority is introduced.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-06-20T02:12:35Z`, latest
-  verified product/runtime commit `e8a38bc0`, latest pre-checkpoint
-  state/evidence commit `b70365f9`, latest no-WING artifact
+- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T07:50:38Z`, latest
+  verified product/runtime commit `2cf226437`, current docs-only report commit
+  `242367ac1`, latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:

@@ -1,13 +1,13 @@
 # Current State
 
-Generated: 2026-06-20T15:44:02Z
+Generated: 2026-07-02T07:50:38Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `e8a38bc0 Verify no-WING coverage in manifest gate`
+  `2cf226437 Tighten WING preflight decision gates`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
 - Tracked/untracked worktree state: dirty before this setup, with many
@@ -55,7 +55,10 @@ Generated: 2026-06-20T15:44:02Z
   `8e85cf39`, `124c1115`, `cb2301e8`, `fe111f12`, `ec189179`, `cda73c11`,
   `14124ff6`, `b239d6f5`, `b595cf00`, `58196c1b`, `305bfac7`,
   `ff8a70ff`, `2f8bb432`, `1ff17877`, `41a60af6`, `7de7bfe1`,
-  `80e625a4`, and `e8a38bc0`.
+  `80e625a4`, `e8a38bc0`, and `2cf226437`.
+- The current HEAD also contains docs-only report commit `242367ac1`, which
+  records the supervised apply preflight decision gate. The latest verified
+  product/runtime baseline remains `2cf226437`.
 - The autonomy evidence overlay now emits and accepts only WING deployment
   live-write targets (`fader`/`gain`) for current WING autonomy-overlay
   evidence; `pan` remains outside the current WING deployment overlay boundary.
@@ -1605,5 +1608,5 @@ Generated: 2026-06-20T15:44:02Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - Existing large uncommitted product changes may affect future focused work,
-  but the latest verified full-suite run for `e8a38bc0` passed with
-  `4045 passed, 1 skipped, 1 warning`.
+  but the latest verified full-suite run for `2cf226437` passed with
+  `4761 passed, 1 skipped, 1 warning`.
