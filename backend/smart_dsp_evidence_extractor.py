@@ -328,6 +328,9 @@ def build_current_wing_state_from_readonly_preflight(
         "current_wing_state_physical_readback_count": 0,
         "current_wing_state_channels": [],
         "current_wing_state_value_types": [],
+        "current_wing_state_rollback_required": True,
+        "current_wing_state_rollback_plan_available": False,
+        "current_wing_state_live_apply_capable": False,
     }
     if violations:
         state["current_wing_state_rejected"] = True
@@ -844,6 +847,76 @@ def _read_only_freshness(
         "live_write": False,
         "queries_console": False,
     }
+
+
+def _current_wing_state_rejected(state: Mapping[str, Any]) -> bool:
+    return _resolve_bool_state(
+        None,
+        state,
+        ("current_wing_state_rejected", "wing_state_rejected"),
+    )
+
+
+def _current_wing_state_readback_available(state: Mapping[str, Any]) -> bool:
+    if _current_wing_state_rejected(state):
+        return False
+    for key in (
+        "current_wing_state_readback_available",
+        "current_wing_state_gate_slot_readback_available",
+        "current_wing_gate_slot_readback_available",
+        "current_wing_eq_model_readback_available",
+        "current_wing_dynamics_model_readback_available",
+        "current_wing_fx_model_readback_available",
+    ):
+        if _bool_or_none(state.get(key)) is True:
+            return True
+    return _safe_float(state.get("current_wing_state_physical_readback_count")) > 0.0
+
+
+def _current_wing_state_rollback_plan_available(state: Mapping[str, Any]) -> bool:
+    if _current_wing_state_rejected(state):
+        return False
+    return _resolve_bool_state(
+        None,
+        state,
+        (
+            "current_wing_state_rollback_plan_available",
+            "rollback_plan_available",
+            "wing_rollback_plan_available",
+        ),
+    )
+
+
+def _freshness_from_current_wing_state(
+    state: Mapping[str, Any],
+    *,
+    fallback_field_count: int,
+) -> Optional[Dict[str, Any]]:
+    if state.get("current_wing_state_source") != "wing_readonly_preflight_artifact":
+        return None
+
+    field_count = int(
+        max(
+            _safe_float(state.get("current_wing_state_physical_readback_count")),
+            _safe_float(state.get("current_wing_state_readback_count")),
+            float(max(0, fallback_field_count)),
+        )
+    )
+    freshness = _read_only_freshness(
+        "wing_readonly_preflight_artifact",
+        field_count=field_count,
+    )
+    if _current_wing_state_rejected(state):
+        freshness["status"] = "rejected"
+        freshness["stale_field_count"] = field_count
+        freshness["fresh_field_count"] = 0
+        freshness["missing_field_count"] = field_count
+    elif not _current_wing_state_readback_available(state):
+        freshness["status"] = "missing_readback"
+        freshness["stale_field_count"] = 0
+        freshness["fresh_field_count"] = 0
+        freshness["missing_field_count"] = field_count
+    return freshness
 
 
 def _resolve_ayaic_target_lufs(source_role: str, source_family: str) -> float:
@@ -3492,11 +3565,25 @@ def build_smart_dsp_analysis_input_from_audio(
         source_identity_confirmed = True
         source_identity_confidence = max(source_identity_confidence, inference_confidence)
 
+    wing_state = dict(current_wing_state or {})
+    evidence_field_count = len(evidence.to_dict())
     freshness = dict(
         current_state_cache_freshness
-        or _read_only_freshness(field_count=len(evidence.to_dict()))
+        or _freshness_from_current_wing_state(
+            wing_state,
+            fallback_field_count=evidence_field_count,
+        )
+        or _read_only_freshness(field_count=evidence_field_count)
     )
-    wing_state = dict(current_wing_state or {})
+    wing_state_rejected = _current_wing_state_rejected(wing_state)
+    resolved_current_state_readback_available = bool(
+        current_state_readback_available
+        or _current_wing_state_readback_available(wing_state)
+    ) and not wing_state_rejected
+    resolved_rollback_plan_available = bool(
+        rollback_plan_available
+        or _current_wing_state_rollback_plan_available(wing_state)
+    ) and not wing_state_rejected
     resolved_eq_filter_operator_owned = _resolve_bool_state(
         current_wing_eq_filter_operator_owned,
         {
@@ -3638,7 +3725,7 @@ def build_smart_dsp_analysis_input_from_audio(
         source_identity_confidence=source_identity_confidence,
         evidence_confidence=evidence.evidence_confidence,
         current_state_cache_freshness=freshness,
-        current_state_readback_available=bool(current_state_readback_available),
+        current_state_readback_available=resolved_current_state_readback_available,
         current_wing_eq_model=_resolve_string_state(
             current_wing_eq_model,
             wing_state,
@@ -3736,7 +3823,7 @@ def build_smart_dsp_analysis_input_from_audio(
         current_wing_pan_width_operator_owned=resolved_pan_width_operator_owned,
         current_wing_mute_operator_owned=resolved_mute_operator_owned,
         current_wing_gain_operator_owned=resolved_gain_operator_owned,
-        rollback_plan_available=bool(rollback_plan_available),
+        rollback_plan_available=resolved_rollback_plan_available,
         rms_dbfs=evidence.rms_dbfs,
         estimated_lufs=evidence.estimated_lufs,
         lra_proxy_db=evidence.lra_proxy_db,

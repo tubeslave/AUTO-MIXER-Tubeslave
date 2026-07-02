@@ -935,9 +935,6 @@ def test_readonly_preflight_gate_readback_reaches_smart_dsp_state():
         sample_rate=SR,
         source_identity_confirmed=True,
         source_identity_confidence=0.91,
-        current_state_cache_freshness=_fresh(),
-        current_state_readback_available=True,
-        rollback_plan_available=True,
         current_wing_state=wing_state,
     )
     recommendation = analyze_smart_dsp_strategy(analysis)
@@ -950,6 +947,17 @@ def test_readonly_preflight_gate_readback_reaches_smart_dsp_state():
     assert analysis.current_wing_gate_model == WING_GATE_REQUIRED_MODEL
     assert analysis.current_wing_gate_enabled is False
     assert analysis.current_wing_gate_slot_readback_available is True
+    assert analysis.current_state_readback_available is True
+    assert analysis.rollback_plan_available is False
+    assert recommendation.evidence["current_state_cache_freshness"]["source"] == (
+        "wing_readonly_preflight_artifact"
+    )
+    assert recommendation.evidence["current_state_cache_freshness"]["status"] == "fresh"
+    assert recommendation.evidence[
+        "current_smart_dsp_context_cache_no_live_authority"
+    ] is True
+    assert "current_state_readback_missing" not in recommendation.blockers
+    assert "rollback_plan_missing" in recommendation.blockers
     assert dynamic_hpf.blockers == (WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER,)
     assert dynamic_hpf.parameters["wing_gate_slot_current_model"] == (
         WING_GATE_REQUIRED_MODEL
@@ -990,6 +998,27 @@ def test_readonly_preflight_state_fails_closed_on_unsafe_artifact_flags():
     assert "live_write_not_false" in wing_state["current_wing_state_violations"]
     assert "current_wing_gate_model" not in wing_state
     assert wing_state["current_wing_state_live_authority_granted"] is False
+
+    analysis = build_smart_dsp_analysis_input_from_audio(
+        _tone(900.0, amplitude=0.04),
+        target_id="ch:3",
+        source_role="lead_vocal",
+        source_label="Lead Vox",
+        sample_rate=SR,
+        source_identity_confirmed=True,
+        source_identity_confidence=0.91,
+        current_wing_state=wing_state,
+    )
+    recommendation = analyze_smart_dsp_strategy(analysis)
+
+    assert analysis.current_wing_gate_model == ""
+    assert analysis.current_state_readback_available is False
+    assert analysis.rollback_plan_available is False
+    assert recommendation.evidence["current_state_cache_freshness"]["status"] == (
+        "rejected"
+    )
+    assert "current_state_readback_missing" in recommendation.blockers
+    assert "rollback_plan_missing" in recommendation.blockers
 
 
 def test_current_wing_state_operator_owned_gate_path_blocks_extracted_dynamic_hpf():
