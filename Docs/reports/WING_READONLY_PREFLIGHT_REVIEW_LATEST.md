@@ -1,6 +1,6 @@
 # WING Read-Only Preflight Artifact Review
 
-Generated: `2026-07-02T06:11:38Z`
+Generated: `2026-07-02T06:22:13Z`
 Status: `candidate_ready_for_manual_review`
 
 ## Summary
@@ -136,7 +136,7 @@ Status: `candidate_ready_for_manual_review`
   - captured_at: `2026-07-02T06:11:11.626Z`
   - artifact_root: `artifacts/wing_readonly_preflight`
   - summary_path: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json`
-  - summary_sha256: `2fdf974421de338de4a89fe4051e3476ebeec118fcb2e7ac0560e0bd60844fca`
+  - summary_sha256: `102a70155ee24c86ee7dee242eb4fab7aef6cb17eed9048d1cb7112304d475bc`
   - events_path: `artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/events.jsonl`
   - events_sha256: `62b841b6b1267dae8c3448d195005f7bbaf97cbb0169ed225c8fa3788b6d21cb`
   - event_log_run_id_matches_summary: `true`

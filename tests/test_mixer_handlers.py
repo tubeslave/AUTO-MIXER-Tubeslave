@@ -69,6 +69,18 @@ class FakeServer:
             return f"/ch/{channel}/pan"
         return ""
 
+    def _normalize_readonly_parameter_kind(self, raw_value: object) -> str:
+        return self._normalize_manual_write_kind(raw_value)
+
+    def _readonly_parameter_address(self, channel: int, value_type: str) -> str:
+        return self._manual_write_address(channel, value_type)
+
+    def _parse_readonly_parameter_address(
+        self,
+        address: object,
+    ) -> Optional[tuple[int, str]]:
+        return self._parse_manual_write_address(address)
+
 
 @pytest.mark.parametrize("value_type", sorted(SUPPORTED_MANUAL_LIVE_WRITE_KINDS))
 def test_parse_readonly_parameter_request_supports_supported_manual_kinds(value_type: str):

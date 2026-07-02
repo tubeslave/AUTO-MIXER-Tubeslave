@@ -226,9 +226,9 @@
   "events_path": "artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/events.jsonl",
   "executes_tests": false,
   "expected_plan_match": true,
-  "expected_plan_path": "artifacts/wing_readonly_preflight_plan/latest_dsp_health_plan.json",
+  "expected_plan_path": "artifacts/wing_readonly_preflight_expected_plans/20260702T061111Z_dsp_health_plan.json",
   "expected_plan_required_for_real_run": true,
-  "expected_plan_sha256": "0ea0f7acfc0f134e0abba2bfb076af427d1c95f2d37e70ca26324bfac7703cae",
+  "expected_plan_sha256": "2848d59fce1485045dc98774c99409e92129e3c348b13510692b78cda1be227e",
   "expected_plan_violations": [],
   "expected_response_types_by_request_type": {
     "get_operator_mode": [

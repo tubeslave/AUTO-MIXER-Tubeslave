@@ -1,6 +1,6 @@
 # WING Read-Only Preflight Decision Review
 
-Generated: `2026-07-02T06:11:44Z`
+Generated: `2026-07-02T06:22:21Z`
 Status: `blocked`
 
 ## Summary
