@@ -1,7 +1,7 @@
 # WING Real Hardware Readiness
 
 Generated: `2026-07-01T22:17:48Z`
-Last updated: `2026-07-01T22:53:52Z`
+Last updated: `2026-07-01T23:18:47Z`
 
 ## Status
 
@@ -102,7 +102,7 @@ must not treat mixed valid/invalid root contents as readiness evidence.
 - valid_candidate_count: `1`
 - invalid_candidate_count: `0`
 - latest release check artifact:
-  `artifacts/no_wing_release_check/20260701T225352Z_no_wing_release_check/summary.json`
+  `artifacts/no_wing_release_check/20260701T231743Z_no_wing_release_check/summary.json`
 - quick release check: `passed`
 - review ledger status: `operator_review_required`
 
@@ -140,6 +140,24 @@ PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick
 
 ## Test Results
 
+Standard full-suite command passed:
+
+```bash
+PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q
+```
+
+Result: `4755 passed, 1 skipped in 186.71s`.
+
+The full-suite pass required three test-only fixes so the suite remains stable
+with real read-only WING artifacts present in the default evidence roots:
+
+- cache default smart-DSP replay reports inside the test process while returning
+  deep copies to each test
+- update the master reference-feed strategy test to expect blocked explanatory
+  alternatives instead of no alternatives
+- isolate supervised proof report tests from repo-local read-only preflight
+  artifacts by injecting a synthetic fail-closed preflight candidate
+
 Targeted tests passed:
 
 ```bash
@@ -156,21 +174,14 @@ PYTHONPATH=backend python3 -m pytest tests/test_operator_product_state.py::test_
 
 Result: `1 passed in 6.60s`.
 
-Standard full-suite command was attempted:
+Fresh no-WING quick release gate passed:
 
 ```bash
-PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q
+PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick
 ```
 
-After fixing two order-dependent test failures, the full command progressed into
-the smart-DSP replay evaluation block but was terminated by the tool/session
-environment with signal `143` before pytest could print a final summary. A
-diagnostic `-vv` run showed the same behavior around the slow
-`tests/test_smart_dsp_replay_evaluation.py` block. Detached attempts left
-orphan pytest shards, which were stopped so no test process remained running.
-
-Therefore the relevant WING/read-only and release-check tests are green, but
-this report does not claim a completed full-suite standard verification.
+Result: `exit:0`; summary artifact
+`artifacts/no_wing_release_check/20260701T231743Z_no_wing_release_check/summary.json`.
 
 ## Boundary
 
