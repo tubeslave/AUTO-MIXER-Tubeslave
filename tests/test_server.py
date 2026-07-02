@@ -2485,6 +2485,99 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
 
+    @pytest.mark.parametrize(
+        "value_type,address,wing_surface,proof_direction,old_value,target_value",
+        [
+            ("fader", "/ch/1/fdr", "channel_fader", "negative_db_move_only", -9.0, -8.75),
+            ("gain", "/ch/1/in/set/trim", "input_trim", "negative_input_trim_move_only", 0.0, 0.25),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_operator_proposal_apply_blocks_positive_wing_proof_direction_even_operator_authored(
+        self,
+        dummy_wing_server,
+        value_type,
+        address,
+        wing_surface,
+        proof_direction,
+        old_value,
+        target_value,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.mixer_client.state[address] = old_value
+        server.mixer_client.state_timestamps[address] = time.time()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "WING proof: proof direction stays negative-only",
+                "channel": 1,
+                "value_type": value_type,
+                "value": target_value,
+                "source": "wing_operator_proposal_validation_runner",
+                "operator_authored": True,
+                "reason": "unit",
+                "requested_change": {
+                    "channel": 1,
+                    "value_type": value_type,
+                    "value": target_value,
+                    "wing_surface": wing_surface,
+                    "wing_address": address,
+                    "proof_direction": proof_direction,
+                },
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        assert create_payload["type"] == "operator_proposal_created"
+        assert create_payload["status"] == "created"
+        proposal_id = create_payload["proposal"]["id"]
+
+        await server._dispatch["preflight_operator_proposal_apply"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "operator_authored": True,
+                "idempotency_key": f"unit-wing-proof-positive-{value_type}-preflight",
+            },
+        )
+        preflight_payload = self._decode_last_message(websocket)
+        assert preflight_payload["type"] == "operator_proposal_apply_preflight"
+        assert preflight_payload["status"] == "blocked"
+        assert preflight_payload["reason"] == "wing_proof_direction_requires_negative_delta"
+        assert preflight_payload["delta_db"] == pytest.approx(round(target_value - old_value, 3))
+        assert preflight_payload["proof_direction"] == proof_direction
+        assert preflight_payload["expected_wing_surface_contract"]["wing_address"] == address
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "operator_authored": True,
+                "idempotency_key": f"unit-wing-proof-positive-{value_type}",
+            },
+        )
+
+        apply_payload = self._decode_last_message(websocket)
+        assert apply_payload["type"] == "operator_proposal_apply_blocked"
+        assert apply_payload["status"] == "apply_blocked"
+        apply_result = apply_payload["apply_result"]
+        assert apply_result["reason"] == "wing_proof_direction_requires_negative_delta"
+        assert apply_result["delta_db"] == pytest.approx(round(target_value - old_value, 3))
+        assert apply_result["proof_direction"] == proof_direction
+        assert apply_result["expected_wing_surface_contract"]["wing_address"] == address
+        server._apply_manual_console_write.assert_not_called()
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_operator_proposal_apply_linked_blocks_wing_surface_contract_mismatch_before_write(self, dummy_wing_server):
         server = dummy_wing_server

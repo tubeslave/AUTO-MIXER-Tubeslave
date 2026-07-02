@@ -372,6 +372,38 @@ def register_handlers(server):
             normalized_change[field] = expected[field]
         return None
 
+    def wing_proof_direction_blocker(change, normalized_change, proposal, *, linked):
+        expected = expected_wing_surface_contract(normalized_change)
+        if expected is None:
+            return None
+        observed = observed_wing_surface_contract(change, proposal, linked=linked)
+        proposal_source = str(getattr(proposal, "source", "") or "").strip()
+        proof_direction_enforced = (
+            proposal_source == WING_OPERATOR_PROOF_RUNNER_SOURCE or bool(observed)
+        )
+        if not proof_direction_enforced:
+            return None
+
+        proof_direction = str(
+            normalized_change.get("proof_direction") or expected["proof_direction"]
+        ).strip()
+        if proof_direction not in {
+            "negative_db_move_only",
+            "negative_input_trim_move_only",
+        }:
+            return None
+        delta = coerce_float(normalized_change.get("delta_db"))
+        if delta is None or delta < 0:
+            return None
+        return {
+            "reason": "wing_proof_direction_requires_negative_delta",
+            "channel": normalized_change["channel"],
+            "value_type": normalized_change["value_type"],
+            "delta_db": normalized_change["delta_db"],
+            "proof_direction": proof_direction,
+            "expected_wing_surface_contract": expected,
+        }
+
     def operator_apply_delta_history():
         history = getattr(server, "_operator_apply_delta_history", None)
         if not isinstance(history, dict):
@@ -606,6 +638,14 @@ def register_handlers(server):
                 "value_type": normalized["value_type"],
                 "delta_db": normalized["delta_db"],
             }
+        direction_error = wing_proof_direction_blocker(
+            change,
+            normalized,
+            proposal,
+            linked=linked,
+        )
+        if direction_error:
+            return normalized, direction_error
         cumulative_error = cumulative_delta_blocker(
             normalized,
             update_history=update_delta_history,
