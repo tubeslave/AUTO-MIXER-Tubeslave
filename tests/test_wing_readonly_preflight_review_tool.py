@@ -527,6 +527,37 @@ def _write_artifact(
     return summary_path
 
 
+def _write_validate_only_summary(run_dir: Path) -> Path:
+    run_dir.mkdir(parents=True)
+    summary_path = run_dir / WING_READONLY_PREFLIGHT_SUMMARY_ARTIFACT_NAME
+    summary = {
+        "run_id": run_dir.name,
+        "status": "blocked",
+        "reason": "expected_plan_mismatch",
+        "proof_artifact_schema": "wing_readonly_preflight.v1",
+        "proof_runner": "wing_readonly_preflight_runner",
+        "artifact_root": str(run_dir.parent),
+        "summary_path": str(summary_path),
+        "validation_only": True,
+        "websocket_opened": False,
+        "read_only": True,
+        "live_write": False,
+        "contacts_backend": False,
+        "contacts_wing": False,
+        "queries_console": False,
+        "write_request_sent": False,
+        "proposal_request_sent": False,
+        "forbidden_request_types_sent": [],
+        "readback_count": 0,
+        "physical_readback_count": 0,
+    }
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return summary_path
+
+
 def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -745,6 +776,28 @@ def test_review_report_accepts_clean_artifact_without_live_authority(tmp_path: P
         in markdown
     )
     assert "does not contact WING" in markdown
+
+
+def test_review_report_ignores_validate_only_no_websocket_artifacts_in_real_root(
+    tmp_path: Path,
+):
+    valid_summary_path = _write_artifact(tmp_path / "preflight" / "real")
+    valid_summary = json.loads(valid_summary_path.read_text(encoding="utf-8"))
+    validate_only_path = _write_validate_only_summary(
+        tmp_path / "preflight" / "20260606T130000Z_wing_readonly_preflight"
+    )
+
+    report = review_tool.build_review_report(artifact_roots=(tmp_path / "preflight",))
+
+    assert report["status"] == "candidate_ready_for_manual_review"
+    assert report["readiness_update_candidate_available"] is True
+    assert report["valid_candidate_count"] == 1
+    assert report["invalid_candidate_count"] == 0
+    assert report["latest_valid_candidate_run_id"] == valid_summary["run_id"]
+    assert report["artifact_sources"] == [str(valid_summary_path)]
+    assert str(validate_only_path) not in report["artifact_sources"]
+    assert report["execution_allowed_by_review"] is False
+    assert report["live_authority_granted"] is False
 
 
 def test_review_report_accepts_clean_dsp_health_artifact(tmp_path: Path):

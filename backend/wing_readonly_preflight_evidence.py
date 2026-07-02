@@ -1,7 +1,7 @@
 """Read-only evidence intake for WING preflight runner artifacts.
 
 This module reviews already-captured ``wing_readonly_preflight.v1`` summaries.
-It never opens WebSocket/OSC connections, never queries hardware, and never
+It never opens network transports, never queries hardware, and never
 turns a preflight artifact into supervised apply permission.
 """
 
@@ -754,6 +754,18 @@ def _run_id_utc_timestamp(value: str) -> datetime | None:
 
 def _run_id_has_valid_utc_timestamp(value: str) -> bool:
     return _run_id_utc_timestamp(value) is not None
+
+
+def _is_validate_only_no_transport_summary(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("validation_only") is True
+        and payload.get(f"{WS_TOKEN}_opened") is False
+        and payload.get("write_request_sent") is not True
+        and payload.get("proposal_request_sent") is not True
+        and payload.get("contacts_backend") is not True
+        and payload.get("contacts_wing") is not True
+        and payload.get("queries_console") is not True
+    )
 
 
 def _validate_candidate_artifact_intake_paths(
@@ -2224,6 +2236,8 @@ def _artifact_records(
     for path in paths:
         try:
             payload = _load_json_artifact(path)
+            if _is_validate_only_no_transport_summary(payload):
+                continue
             validation = validate_wing_readonly_preflight_artifact(
                 payload,
                 summary_path=path,
@@ -2241,6 +2255,8 @@ def _artifact_records(
 
     if artifact_payloads is not None:
         for index, payload in enumerate(artifact_payloads):
+            if _is_validate_only_no_transport_summary(payload):
+                continue
             validation = validate_wing_readonly_preflight_artifact(payload)
             records.append(_record_from_validation(f"inline_payload_{index}", validation))
 
