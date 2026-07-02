@@ -848,6 +848,8 @@ WING_GAIN_WRITE_PATH_SELECTION_POLICY = (
 WING_GAIN_OPERATOR_OWNED_BLOCKER = (
     "wing_gain_operator_owned_edit_requires_operator_review"
 )
+WING_GAIN_UP_FADER_CEILING_BLOCKER = "wing_current_fader_ceiling_blocks_gain_up"
+WING_FADER_CEILING_DBFS = 0.0
 WING_GAIN_WRITE_PATH_PREFERRED_SUFFIX_BY_SOURCE = {
     "trim_delta_db": "in/set/trim",
     "group_delta_db": "fdr",
@@ -12421,6 +12423,49 @@ def _wing_gain_operator_owned_state(
     )
 
 
+def _wing_gain_up_fader_ceiling_state(
+    analysis: SmartDSPAnalysisInput,
+    *,
+    method_family: str,
+    parameters: Mapping[str, Any],
+    gain_up_db: float,
+) -> Tuple[Dict[str, Any], Tuple[str, ...]]:
+    if method_family != "gain_fader" or gain_up_db <= 0.0:
+        return {}, ()
+    if "wing_gain_delta_db" not in parameters:
+        return {}, ()
+    current_fader = _numeric_float_or_none(analysis.current_wing_fader_db)
+    if current_fader is None:
+        return {}, ()
+
+    ceiling = _numeric_float_or_none(parameters.get("future_fader_ceiling_dbfs"))
+    if ceiling is None:
+        ceiling = WING_FADER_CEILING_DBFS
+    requested_delta = max(0.0, _safe_float(gain_up_db))
+    headroom = max(0.0, ceiling - current_fader)
+    limited_delta = min(requested_delta, headroom)
+    projected_fader = current_fader + requested_delta
+    exceeded = projected_fader > ceiling + 1e-9
+    return (
+        {
+            "wing_current_fader_db": round(current_fader, 3),
+            "wing_gain_requested_delta_db": round(requested_delta, 3),
+            "wing_gain_projected_fader_db": round(projected_fader, 3),
+            "wing_gain_fader_ceiling_dbfs": round(ceiling, 3),
+            "wing_gain_fader_headroom_db": round(headroom, 3),
+            "wing_gain_fader_ceiling_limited_delta_db": round(limited_delta, 3),
+            "wing_gain_fader_ceiling_exceeded": exceeded,
+            "wing_gain_fader_ceiling_blocker": (
+                WING_GAIN_UP_FADER_CEILING_BLOCKER if exceeded else None
+            ),
+            "wing_gain_fader_ceiling_policy": (
+                "do_not_raise_current_wing_fader_above_zero_db_ceiling"
+            ),
+        },
+        (WING_GAIN_UP_FADER_CEILING_BLOCKER,) if exceeded else (),
+    )
+
+
 def _wing_aux_dynamics_operator_owned_state(
     analysis: SmartDSPAnalysisInput,
     *,
@@ -12598,6 +12643,15 @@ def _make_candidate(
     aggressive = bool(parameters.get("aggressive"))
     gain_up_db = max(gain_db, delta_db, bounded_delta_db if delta_db > 0.0 else 0.0, 0.0)
     width_widening = width_delta > 0.0 or _safe_float(target_width, 0.0) > 100.0
+    fader_ceiling_state, fader_ceiling_blockers = _wing_gain_up_fader_ceiling_state(
+        analysis,
+        method_family=method_family,
+        parameters=parameters,
+        gain_up_db=gain_up_db,
+    )
+    if fader_ceiling_state:
+        parameters = {**parameters, **fader_ceiling_state}
+    all_blockers.extend(fader_ceiling_blockers)
 
     if gain_db > 0.0 and analysis.true_peak_headroom_db < gain_db + MIN_TRUE_PEAK_HEADROOM_DB:
         all_blockers.append("insufficient_true_peak_headroom_for_boost")

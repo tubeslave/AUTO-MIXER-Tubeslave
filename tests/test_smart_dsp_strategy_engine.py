@@ -106,6 +106,7 @@ from backend.smart_dsp_strategy_engine import (
     WING_EQ_WRITE_PARAMETER_KEYS,
     WING_FADER_MAX_DB,
     WING_FADER_MIN_DB,
+    WING_GAIN_UP_FADER_CEILING_BLOCKER,
     WING_GAIN_WRITE_PATH_SELECTION_POLICY,
     WING_GAIN_WRITE_PATH_SUFFIXES,
     WING_GAIN_OPERATOR_OWNED_BLOCKER,
@@ -17198,6 +17199,69 @@ def test_soundcheck_quiet_source_selects_bounded_level_plane_gain_up():
         path_prefix="/ch/{channel}",
     )
     assert "level_plane_balance" in recommendation.evidence["detected_problems"]
+    assert recommendation.to_operator_proposal()["live_apply_allowed"] is False
+
+
+def test_soundcheck_gain_up_uses_current_wing_fader_headroom_when_safe():
+    recommendation = analyze_smart_dsp_strategy(
+        _analysis(
+            target_id="ch:10",
+            source_role="lead_vocal",
+            problem_hints=("level_plane_balance",),
+            muddiness_score=0.0,
+            estimated_lufs=-30.0,
+            level_plane_error_lu=-8.0,
+            true_peak_headroom_db=8.0,
+            feedback_risk=0.12,
+            bleed_risk=0.1,
+            current_wing_fader_db=-12.0,
+            current_wing_control_readback_available=True,
+        )
+    )
+
+    assert recommendation.selected_strategy.strategy_id == "soundcheck_bounded_gain_up"
+    params = recommendation.selected_strategy.parameters
+    assert params["wing_current_fader_db"] == -12.0
+    assert params["wing_gain_requested_delta_db"] == params["wing_gain_delta_db"]
+    assert params["wing_gain_projected_fader_db"] == -9.0
+    assert params["wing_gain_fader_headroom_db"] == 12.0
+    assert params["wing_gain_fader_ceiling_limited_delta_db"] == params["delta_db"]
+    assert params["wing_gain_fader_ceiling_exceeded"] is False
+    assert params["wing_gain_fader_ceiling_blocker"] is None
+    assert WING_GAIN_UP_FADER_CEILING_BLOCKER not in recommendation.selected_strategy.blockers
+
+
+def test_soundcheck_gain_up_blocks_when_current_wing_fader_would_cross_zero():
+    recommendation = analyze_smart_dsp_strategy(
+        _analysis(
+            target_id="ch:10",
+            source_role="lead_vocal",
+            problem_hints=("level_plane_balance",),
+            muddiness_score=0.0,
+            estimated_lufs=-30.0,
+            level_plane_error_lu=-8.0,
+            true_peak_headroom_db=8.0,
+            feedback_risk=0.12,
+            bleed_risk=0.1,
+            current_wing_fader_db=-1.0,
+            current_wing_control_readback_available=True,
+        )
+    )
+
+    candidates = {
+        candidate.strategy_id: candidate
+        for candidate in (recommendation.selected_strategy, *recommendation.alternatives)
+    }
+    gain_up = candidates["soundcheck_bounded_gain_up"]
+    assert WING_GAIN_UP_FADER_CEILING_BLOCKER in gain_up.blockers
+    params = gain_up.parameters
+    assert params["wing_current_fader_db"] == -1.0
+    assert params["wing_gain_requested_delta_db"] == 3.0
+    assert params["wing_gain_projected_fader_db"] == 2.0
+    assert params["wing_gain_fader_headroom_db"] == 1.0
+    assert params["wing_gain_fader_ceiling_limited_delta_db"] == 1.0
+    assert params["wing_gain_fader_ceiling_exceeded"] is True
+    assert params["wing_gain_fader_ceiling_blocker"] == WING_GAIN_UP_FADER_CEILING_BLOCKER
     assert recommendation.to_operator_proposal()["live_apply_allowed"] is False
 
 
