@@ -149,6 +149,18 @@ DEFAULT_READONLY_PREFLIGHT_PRESTART_SUMMARY = (
     WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_PLACEHOLDER
 )
 DEFAULT_BACKEND_URL = "ws://localhost:8765"
+PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE = {
+    "fader": {
+        "wing_surface": "channel_fader",
+        "address_template": "/ch/{channel}/fdr",
+        "direction": "negative_db_move_only",
+    },
+    "gain": {
+        "wing_surface": "input_trim",
+        "address_template": "/ch/{channel}/in/set/trim",
+        "direction": "negative_input_trim_move_only",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -157,6 +169,9 @@ class WingProofPlanStep:
     value_type: str
     channel: int
     delta_db: float
+    wing_surface: str
+    wing_address: str
+    proof_direction: str
     live_execution_required: bool
     execution_allowed_by_plan: bool
     operator_approval_required: bool
@@ -192,6 +207,13 @@ class WingProofPlanStep:
             raise ValueError("Physical proof plan only supports WING channels 1..48")
         if self.id != f"{self.value_type}_physical_proof_ch{channel}":
             raise ValueError("Physical proof step id must match value type and channel")
+        contract = _proof_surface_contract(self.value_type)
+        if self.wing_surface != contract["wing_surface"]:
+            raise ValueError("Physical proof step must bind the expected WING surface")
+        if self.wing_address != _proof_address(self.value_type, channel):
+            raise ValueError("Physical proof step must bind the expected WING address")
+        if self.proof_direction != contract["direction"]:
+            raise ValueError("Physical proof step must bind the expected proof direction")
         if not math.isfinite(self.delta_db):
             raise ValueError("Physical proof plan only supports finite dB deltas")
         if self.delta_db >= 0:
@@ -1304,6 +1326,19 @@ def _required_evidence_components_by_value_type() -> Dict[str, Tuple[str, ...]]:
     }
 
 
+def _proof_surface_contract(value_type: str) -> Mapping[str, str]:
+    contract = PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE.get(value_type)
+    if not contract:
+        raise ValueError(f"Unsupported supervised WING proof value type: {value_type}")
+    return contract
+
+
+def _proof_address(value_type: str, channel: int) -> str:
+    return _proof_surface_contract(value_type)["address_template"].format(
+        channel=channel
+    )
+
+
 def _proof_command(
     *,
     backend_url: str,
@@ -1504,6 +1539,9 @@ def _build_steps(
                     value_type=value_type,
                     channel=int(channel),
                     delta_db=delta_db,
+                    wing_surface=_proof_surface_contract(value_type)["wing_surface"],
+                    wing_address=_proof_address(value_type, int(channel)),
+                    proof_direction=_proof_surface_contract(value_type)["direction"],
                     live_execution_required=True,
                     execution_allowed_by_plan=False,
                     operator_approval_required=True,
@@ -1749,6 +1787,10 @@ def build_supervised_wing_proof_plan(
             "allowed_supervised_live_value_types": sorted(
                 ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES
             ),
+            "proof_surface_contracts": {
+                value_type: dict(PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE[value_type])
+                for value_type in sorted(ALLOWED_SUPERVISED_WING_PROOF_VALUE_TYPES)
+            },
             "step_count": len(steps),
             "planned_value_types": sorted({step.value_type for step in steps}),
             "planned_channels": [step.channel for step in steps],

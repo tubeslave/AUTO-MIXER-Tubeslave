@@ -71,6 +71,20 @@ GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
 ]
 
 
+def proof_surface_kwargs(value_type="gain", channel=3):
+    if value_type == "fader":
+        return {
+            "wing_surface": "channel_fader",
+            "wing_address": f"/ch/{channel}/fdr",
+            "proof_direction": "negative_db_move_only",
+        }
+    return {
+        "wing_surface": "input_trim",
+        "wing_address": f"/ch/{channel}/in/set/trim",
+        "proof_direction": "negative_input_trim_move_only",
+    }
+
+
 def proof_command(
     value_type="gain",
     channel=3,
@@ -951,6 +965,18 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert plan["summary"]["allowed_supervised_live_value_types"] == sorted(
         WING_READONLY_PREFLIGHT_ALLOWED_SUPERVISED_LIVE_VALUE_TYPES
     )
+    assert plan["summary"]["proof_surface_contracts"] == {
+        "fader": {
+            "wing_surface": "channel_fader",
+            "address_template": "/ch/{channel}/fdr",
+            "direction": "negative_db_move_only",
+        },
+        "gain": {
+            "wing_surface": "input_trim",
+            "address_template": "/ch/{channel}/in/set/trim",
+            "direction": "negative_input_trim_move_only",
+        },
+    }
     assert plan["summary"]["planned_value_types"] == ["fader", "gain"]
     assert plan["summary"]["planned_channels"] == [3, 2, 16]
     assert plan["summary"]["readonly_preflight_required"] is True
@@ -1142,6 +1168,9 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert gain_step["execution_allowed_by_plan"] is False
     assert gain_step["operator_approval_required"] is True
     assert gain_step["delta_db"] == -0.25
+    assert gain_step["wing_surface"] == "input_trim"
+    assert gain_step["wing_address"] == "/ch/3/in/set/trim"
+    assert gain_step["proof_direction"] == "negative_input_trim_move_only"
     assert gain_step["command"][0] == "python3"
     assert "--execute" in gain_step["command"]
     assert "--operator-confirm-channel" in gain_step["command"]
@@ -1167,6 +1196,9 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert "Use gain-down proof only; gain-up remains out of scope for this plan." in gain_step["prerequisites"]
 
     fader_step = plan["steps"][1]
+    assert fader_step["wing_surface"] == "channel_fader"
+    assert fader_step["wing_address"] == "/ch/2/fdr"
+    assert fader_step["proof_direction"] == "negative_db_move_only"
     assert "Review blocked prior proof artifacts for this value type before trusting a new result." in fader_step["prerequisites"]
     assert "blocked_artifacts_for_value_type" in fader_step["evidence_blockers_to_review"]
 
@@ -2758,6 +2790,7 @@ def test_proof_step_rejects_non_finite_delta():
             value_type="gain",
             channel=3,
             delta_db=float("nan"),
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2781,6 +2814,7 @@ def test_proof_step_rejects_non_live_execution_flag():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=False,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2804,6 +2838,7 @@ def test_proof_step_rejects_non_bool_live_execution_flag():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=1,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2827,6 +2862,7 @@ def test_proof_step_rejects_non_bool_execution_authority():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=0,
             operator_approval_required=True,
@@ -2850,6 +2886,7 @@ def test_proof_step_rejects_non_bool_operator_approval():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=1,
@@ -2873,6 +2910,7 @@ def test_proof_step_rejects_out_of_range_channel():
             value_type="fader",
             channel=49,
             delta_db=-0.25,
+            **proof_surface_kwargs("fader", 49),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2896,6 +2934,7 @@ def test_proof_step_rejects_unsupported_value_type():
             value_type="pan",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2919,6 +2958,7 @@ def test_proof_step_rejects_mismatched_id():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2932,6 +2972,50 @@ def test_proof_step_rejects_mismatched_id():
         )
 
 
+@pytest.mark.parametrize(
+    ("override", "expected_error"),
+    [
+        (
+            {"wing_surface": "channel_fader"},
+            "Physical proof step must bind the expected WING surface",
+        ),
+        (
+            {"wing_address": "/ch/3/fdr"},
+            "Physical proof step must bind the expected WING address",
+        ),
+        (
+            {"proof_direction": "bidirectional_gain_move"},
+            "Physical proof step must bind the expected proof direction",
+        ),
+    ],
+)
+def test_proof_step_rejects_mismatched_wing_surface_contract(
+    override,
+    expected_error,
+):
+    kwargs = {
+        "id": "gain_physical_proof_ch3",
+        "value_type": "gain",
+        "channel": 3,
+        "delta_db": -0.25,
+        **proof_surface_kwargs(),
+        "live_execution_required": True,
+        "execution_allowed_by_plan": False,
+        "operator_approval_required": True,
+        "command": proof_command(),
+        "rationale": "unit regression",
+        "prerequisites": proof_prerequisites(),
+        "abort_conditions": proof_abort_conditions(),
+        "expected_artifacts": proof_expected_artifacts(),
+        "evidence_blockers_to_review": (),
+        "required_evidence_components": GAIN_REQUIRED_EVIDENCE_COMPONENTS,
+    }
+    kwargs.update(override)
+
+    with pytest.raises(ValueError, match=expected_error):
+        WingProofPlanStep(**kwargs)
+
+
 def test_proof_step_rejects_mismatched_command_channel_confirmation():
     with pytest.raises(
         ValueError,
@@ -2942,6 +3026,7 @@ def test_proof_step_rejects_mismatched_command_channel_confirmation():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2965,6 +3050,7 @@ def test_proof_step_rejects_duplicate_command_flags():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -2999,6 +3085,7 @@ def test_proof_step_rejects_command_flag_used_as_value():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3030,6 +3117,7 @@ def test_proof_step_rejects_unknown_command_flags():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3063,6 +3151,7 @@ def test_proof_step_rejects_stray_command_arguments():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3096,6 +3185,7 @@ def test_proof_step_rejects_command_without_safety_flags():
             value_type="fader",
             channel=2,
             delta_db=-0.25,
+            **proof_surface_kwargs("fader", 2),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3119,6 +3209,7 @@ def test_proof_step_rejects_non_canonical_runner_command():
             value_type="fader",
             channel=2,
             delta_db=-0.25,
+            **proof_surface_kwargs("fader", 2),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3162,6 +3253,7 @@ def test_proof_step_rejects_non_websocket_backend_url(backend_url):
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3205,6 +3297,7 @@ def test_proof_step_rejects_unsafe_artifact_root(artifact_root):
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3259,6 +3352,7 @@ def test_proof_step_rejects_incomplete_command_structure(command_tail, expected_
             value_type="fader",
             channel=2,
             delta_db=-0.25,
+            **proof_surface_kwargs("fader", 2),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3282,6 +3376,7 @@ def test_proof_step_rejects_mismatched_expected_artifacts():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3305,6 +3400,7 @@ def test_proof_step_rejects_mismatched_abort_conditions():
             value_type="fader",
             channel=2,
             delta_db=-0.25,
+            **proof_surface_kwargs("fader", 2),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3328,6 +3424,7 @@ def test_proof_step_rejects_mismatched_prerequisites():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
@@ -3353,6 +3450,7 @@ def test_proof_step_rejects_mismatched_required_evidence_components():
             value_type="gain",
             channel=3,
             delta_db=-0.25,
+            **proof_surface_kwargs(),
             live_execution_required=True,
             execution_allowed_by_plan=False,
             operator_approval_required=True,
