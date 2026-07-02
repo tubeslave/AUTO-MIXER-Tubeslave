@@ -6810,6 +6810,10 @@ def _wing_osc_applicability(
         and parameters.get("wing_gate_slot_operator_owned_model_edit_requires_review")
         is True
     )
+    gate_slot_model_conflict_blocked = (
+        method_family in {"dynamic_eq", "de_esser", "gate", "expander"}
+        and parameters.get("wing_gate_slot_model_conflict") is True
+    )
     eq_operator_owned_edit_blocked = (
         method_family == "eq"
         and parameters.get("wing_eq_operator_owned_model_edit_requires_review") is True
@@ -6866,6 +6870,12 @@ def _wing_osc_applicability(
         support_level = "gate_slot_operator_owned_model_edit_requires_review"
         unsupported_strategy_reason = (
             "gate_slot_model_matches_but_current_wing_gate_slot_is_operator_owned"
+        )
+    elif gate_slot_model_conflict_blocked:
+        native_supported = False
+        support_level = "gate_slot_model_conflict_requires_operator_review"
+        unsupported_strategy_reason = (
+            "current_wing_gate_slot_model_readback_does_not_match_required_processor_model"
         )
     elif method_family == "dynamic_eq":
         if parameters.get("wing_dynamic_eq_value_mapping_supported") is True:
@@ -7188,6 +7198,16 @@ def _wing_osc_applicability(
         ),
         "gate_slot_operator_owned_model_blocker": (
             parameters.get("wing_gate_slot_operator_owned_model_blocker")
+            if method_family in {"dynamic_eq", "de_esser", "gate", "expander"}
+            else None
+        ),
+        "gate_slot_model_conflict_requires_operator_review": (
+            parameters.get("wing_gate_slot_model_conflict")
+            if method_family in {"dynamic_eq", "de_esser", "gate", "expander"}
+            else None
+        ),
+        "gate_slot_model_conflict_blocker": (
+            parameters.get("wing_gate_slot_model_conflict_blocker")
             if method_family in {"dynamic_eq", "de_esser", "gate", "expander"}
             else None
         ),
@@ -12167,9 +12187,7 @@ def _wing_gate_slot_conflict_state(
     )
     operator_owned = bool(analysis.current_wing_gate_slot_operator_owned)
     conflicting_model = bool(current_model and current_model != required_model)
-    conflicting_slot_in_use = conflicting_model and (
-        current_enabled is not False or operator_owned
-    )
+    conflicting_slot_in_use = bool(readback_available and conflicting_model)
     active_unknown_model = bool(
         not current_model and (current_enabled is True or operator_owned)
     )

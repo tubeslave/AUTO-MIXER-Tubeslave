@@ -4755,6 +4755,78 @@ def test_active_de_esser_gate_slot_blocks_dynamic_eq_plosive_hpf_selection():
     ]["blockers"]
 
 
+def test_real_wing_gate_readback_blocks_deq_dynamic_hpf_model_switch():
+    recommendation = analyze_smart_dsp_strategy(
+        _analysis(
+            target_id="ch:3",
+            problem_hints=("plosive_control", "muddy"),
+            muddiness_score=0.72,
+            low_end_excess_score=0.84,
+            spectral_tilt_score=0.58,
+            plosive_risk_score=0.82,
+            plosive_frequency_hz=82.0,
+            plosive_event_peak_dbfs=-18.4,
+            plosive_event_contrast_db=17.2,
+            plosive_event_rise_time_ms=18.0,
+            plosive_event_recovery_ms=82.0,
+            dynamics_variance_score=0.62,
+            crest_factor_db=18.0,
+            lra_proxy_db=14.0,
+            estimated_lufs=-24.0,
+            level_plane_error_lu=0.2,
+            current_wing_gate_model=WING_GATE_REQUIRED_MODEL,
+            current_wing_gate_enabled=False,
+            current_wing_gate_slot_readback_available=True,
+        )
+    )
+
+    assert recommendation.status == "proposal_only"
+    assert recommendation.selected_strategy.strategy_id == (
+        "static_plosive_high_pass_cleanup"
+    )
+    assert recommendation.selected_strategy.method_family == "eq"
+    alternatives = {
+        candidate.strategy_id: candidate for candidate in recommendation.alternatives
+    }
+    dynamic_hpf = alternatives["vocal_plosive_dynamic_hpf_control"]
+    assert dynamic_hpf.blockers == (WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER,)
+    assert dynamic_hpf.parameters["wing_gate_slot_required_model"] == (
+        WING_DYNAMIC_EQ_GATE_MODEL
+    )
+    assert dynamic_hpf.parameters["wing_gate_slot_current_model"] == (
+        WING_GATE_REQUIRED_MODEL
+    )
+    assert dynamic_hpf.parameters["wing_gate_slot_current_enabled"] is False
+    assert dynamic_hpf.parameters["wing_gate_slot_model_readback_available"] is True
+    assert dynamic_hpf.parameters["wing_gate_slot_model_conflict"] is True
+    assert (
+        dynamic_hpf.parameters["wing_dynamic_eq_gate_slot_parameter_apply_ready"]
+        is False
+    )
+    assert dynamic_hpf.parameters["wing_dynamic_eq_gate_slot_apply_ready_reason"] == (
+        "requires_gate_mdl_readback_equal_deq_before_parameter_apply"
+    )
+    applicability = dynamic_hpf.future_wing_readback_contract[
+        "wing_osc_applicability"
+    ]
+    assert applicability["native_osc_supported"] is False
+    assert applicability["native_osc_support_level"] == (
+        "gate_slot_model_conflict_requires_operator_review"
+    )
+    assert applicability["gate_slot_model_conflict_blocker"] == (
+        WING_GATE_SLOT_MODEL_CONFLICT_BLOCKER
+    )
+    assert applicability["unsupported_strategy_reason"] == (
+        "current_wing_gate_slot_model_readback_does_not_match_required_processor_model"
+    )
+    readback = dynamic_hpf.future_wing_readback_contract["dynamic_eq_readback"]
+    assert readback["gate_slot_current_model"] == WING_GATE_REQUIRED_MODEL
+    assert readback["gate_slot_current_enabled"] is False
+    assert readback["gate_slot_model_conflict"] is True
+    assert readback["gate_model_readback_must_equal"] == WING_DYNAMIC_EQ_GATE_MODEL
+    assert readback["wing_dynamic_eq_gate_slot_parameter_apply_ready"] is False
+
+
 def test_operator_owned_deq_gate_slot_blocks_dynamic_eq_parameter_apply():
     recommendation = analyze_smart_dsp_strategy(
         _analysis(
