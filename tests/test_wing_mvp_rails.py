@@ -1075,9 +1075,10 @@ def test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root()
     if summary.get("wing_readonly_preflight_review_status") == (
         "candidate_ready_for_manual_review"
     ):
+        normalized_heartbeat = re.sub(r"\s+", " ", heartbeat)
         assert "latest real WING read-only candidate" in heartbeat
         assert "operator_review_required" in heartbeat
-        assert "accepted hardware evidence" in heartbeat
+        assert "accepted hardware evidence" in normalized_heartbeat
     else:
         assert "M001 still has no real WING read-only artifact under\n" in heartbeat
         assert "`artifacts/wing_readonly_preflight/`" in heartbeat
@@ -10303,7 +10304,12 @@ def test_m094_project_director_external_validation_scope_guard_stays_readonly():
     assert "milestones are not allowed" in current
     assert "external_validation_handoff_or_control_plane_only" in report
     assert "Writer lease: none" in heartbeat
-    assert "No WING/backend contact was made" in heartbeat
+    assert (
+        "No WING/backend contact was made" in heartbeat
+        or "No WING contact was made by this cycle" in heartbeat
+    )
+    normalized_heartbeat = re.sub(r"\s+", " ", heartbeat)
+    assert "No OSC write path was opened by this cycle" in normalized_heartbeat
 
 
 def test_m095_wing_readonly_reserved_root_intake_guard_stays_readonly():

@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-07-02T07:50:38Z.
+- Latest heartbeat: 2026-07-02T08:03:45Z.
 - Latest WING read-only candidate:
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`.
 - Decision ledger status: `operator_review_required`; three unreviewed WING
@@ -36,12 +36,13 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   authority.
 
 - The latest verified product/runtime baseline is now
-  `2cf226437 Tighten WING preflight decision gates`. That commit tightened the
-  supervised apply preflight decision gate and was validated by the full suite:
-  `4761 passed, 1 skipped, 1 warning`. Current HEAD also contains docs-only
-  report commit `242367ac1 Document WING apply preflight decision gate`. This
-  is progress toward the WING MVP gate, but it does not replace the missing
-  accepted operator decision or real WING physical readback proof.
+  `afd7ecb78 Bind WING proof steps to console surfaces`. The current verified
+  baseline includes `c058270a8` read-only WING gate slot physical readbacks and
+  operator decision queue, plus `afd7ecb78` fader/gain proof steps bound to
+  concrete WING surfaces, addresses and negative-only proof directions. It was
+  validated by the full suite: `4773 passed, 1 skipped, 1 warning`. This is
+  progress toward the WING MVP gate, but it does not replace the missing
+  accepted operator decisions or accepted real WING physical readback proof.
 
 - M081 WING review decision prestart proof binding rail is now automated:
   review decision templates and accepted decision records must carry the same
@@ -443,9 +444,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 These commits do not create hardware proof, do not contact WING and do not
 grant live authority.
 
-The current state document is also synchronized with `2cf226437` as the latest
-verified product/runtime baseline and notes docs-only report commit
-`242367ac1`; this synchronization did not change product runtime behavior.
+The current state document is also synchronized with `afd7ecb78` as the latest
+verified product/runtime baseline. This synchronization did not grant live
+authority or close readiness.
 
 The current-state freshness rail is now automated by
 `tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence`.
@@ -2116,9 +2117,11 @@ live authority is introduced.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T07:50:38Z`, latest
-  verified product/runtime commit `2cf226437`, current docs-only report commit
-  `242367ac1`, latest no-WING artifact
+- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T08:03:45Z`, latest
+  verified product/runtime commit `afd7ecb78`, latest WING read-only decision
+  queue candidate
+  `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`,
+  latest no-WING artifact
   `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`.
 - `/opt/homebrew/bin/python3 tools/memory/memory_lint.py --root .`: PASS.
 - Latest no-WING evidence bundle:
