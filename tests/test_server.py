@@ -2320,6 +2320,238 @@ class TestWingDeploymentWriteBoundary:
         )
 
     @pytest.mark.asyncio
+    async def test_operator_proposal_apply_accepts_matching_wing_surface_contract(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.mixer_client.state["/ch/1/in/set/trim"] = 0.0
+        server.mixer_client.state_timestamps["/ch/1/in/set/trim"] = time.time()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock(
+            return_value={
+                "status": "applied",
+                "channel": 1,
+                "value_type": "gain",
+                "effective_value": -0.25,
+                "old_value": 0.0,
+                "readback_value": -0.25,
+                "readback_status": "verified_from_cache",
+                "rollback_available": True,
+                "rollback_value": 0.0,
+            }
+        )
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "WING proof: gain uses input trim",
+                "channel": 1,
+                "value_type": "gain",
+                "value": -0.25,
+                "source": "wing_operator_proposal_validation_runner",
+                "reason": "unit",
+                "requested_change": {
+                    "channel": 1,
+                    "value_type": "gain",
+                    "value": -0.25,
+                    "wing_surface": "input_trim",
+                    "wing_address": "/ch/1/in/set/trim",
+                    "proof_direction": "negative_input_trim_move_only",
+                },
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        assert create_payload["type"] == "operator_proposal_created"
+        proposal_id = create_payload["proposal"]["id"]
+
+        await server._dispatch["preflight_operator_proposal_apply"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-wing-surface-match-preflight",
+            },
+        )
+        preflight_payload = self._decode_last_message(websocket)
+        assert preflight_payload["type"] == "operator_proposal_apply_preflight"
+        assert preflight_payload["status"] == "ready"
+        assert preflight_payload["normalized_change"]["wing_surface"] == "input_trim"
+        assert preflight_payload["normalized_change"]["wing_address"] == "/ch/1/in/set/trim"
+        assert preflight_payload["normalized_change"]["proof_direction"] == "negative_input_trim_move_only"
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-wing-surface-match",
+            },
+        )
+
+        apply_payload = self._decode_last_message(websocket)
+        assert apply_payload["type"] == "operator_proposal_apply_result"
+        assert apply_payload["status"] == "applied"
+        assert apply_payload["apply_result"]["value_type"] == "gain"
+        server._apply_manual_console_write.assert_awaited_once_with(
+            websocket,
+            channel=1,
+            value=-0.25,
+            value_type="gain",
+            source=f"operator_proposal:{proposal_id}",
+            reason="unit",
+            approved=True,
+            approval_id=proposal_id,
+        )
+
+    @pytest.mark.asyncio
+    async def test_operator_proposal_apply_blocks_wing_surface_contract_mismatch(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "WING proof: gain cannot target fader",
+                "channel": 1,
+                "value_type": "gain",
+                "value": -0.25,
+                "source": "wing_operator_proposal_validation_runner",
+                "reason": "unit",
+                "requested_change": {
+                    "channel": 1,
+                    "value_type": "gain",
+                    "value": -0.25,
+                    "wing_surface": "channel_fader",
+                    "wing_address": "/ch/1/fdr",
+                    "proof_direction": "negative_db_move_only",
+                },
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        assert create_payload["type"] == "operator_proposal_created"
+        assert create_payload["status"] == "created"
+        assert create_payload["proposal"]["requested_change"]["wing_address"] == "/ch/1/fdr"
+        proposal_id = create_payload["proposal"]["id"]
+
+        await server._dispatch["preflight_operator_proposal_apply"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-wing-surface-mismatch-preflight",
+            },
+        )
+        preflight_payload = self._decode_last_message(websocket)
+        assert preflight_payload["type"] == "operator_proposal_apply_preflight"
+        assert preflight_payload["status"] == "blocked"
+        assert preflight_payload["reason"] == "wing_surface_contract_mismatch"
+        assert preflight_payload["expected_wing_surface_contract"]["wing_address"] == "/ch/1/in/set/trim"
+        assert preflight_payload["idempotency"]["reserved"] is False
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-wing-surface-mismatch",
+            },
+        )
+
+        apply_payload = self._decode_last_message(websocket)
+        assert apply_payload["type"] == "operator_proposal_apply_blocked"
+        assert apply_payload["status"] == "apply_blocked"
+        apply_result = apply_payload["apply_result"]
+        assert apply_result["reason"] == "wing_surface_contract_mismatch"
+        assert apply_result["expected_wing_surface_contract"]["wing_surface"] == "input_trim"
+        assert apply_result["expected_wing_surface_contract"]["wing_address"] == "/ch/1/in/set/trim"
+        assert {
+            (item["field"], item["expected"], item["actual"])
+            for item in apply_result["mismatched_contract_fields"]
+        } >= {
+            ("wing_surface", "input_trim", "channel_fader"),
+            ("wing_address", "/ch/1/in/set/trim", "/ch/1/fdr"),
+            ("proof_direction", "negative_input_trim_move_only", "negative_db_move_only"),
+        }
+        server._apply_manual_console_write.assert_not_called()
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_operator_proposal_apply_linked_blocks_wing_surface_contract_mismatch_before_write(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        now = time.time()
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = now
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "title": "WING proof: linked surface mismatch",
+                "value_type": "fader",
+                "source": "wing_operator_proposal_validation_runner",
+                "requested_changes": [
+                    {
+                        "value_type": "fader",
+                        "channel": 1,
+                        "value": -8.25,
+                        "wing_surface": "channel_fader",
+                        "wing_address": "/ch/1/fdr",
+                        "proof_direction": "negative_db_move_only",
+                    },
+                    {
+                        "value_type": "gain",
+                        "channel": 2,
+                        "value": -0.25,
+                        "wing_surface": "channel_fader",
+                        "wing_address": "/ch/2/fdr",
+                        "proof_direction": "negative_db_move_only",
+                    },
+                ],
+                "reason": "unit",
+            },
+        )
+        create_payload = self._decode_last_message(websocket)
+        assert create_payload["type"] == "operator_proposal_created"
+        assert create_payload["status"] == "created"
+        proposal_id = create_payload["proposal"]["id"]
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "unit-linked-wing-surface-mismatch",
+            },
+        )
+
+        apply_payload = self._decode_last_message(websocket)
+        assert apply_payload["type"] == "operator_proposal_apply_blocked"
+        assert apply_payload["status"] == "apply_blocked"
+        apply_result = apply_payload["apply_result"]
+        assert apply_result["reason"] == "wing_surface_contract_mismatch"
+        assert apply_result["requested_change"]["channel"] == 2
+        assert apply_result["expected_wing_surface_contract"]["wing_address"] == "/ch/2/in/set/trim"
+        server._apply_manual_console_write.assert_not_called()
+        server.mixer_client.set_channel_gain.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_operator_proposal_apply_linked_idempotency_key_blocks_duplicate_apply(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "auto"

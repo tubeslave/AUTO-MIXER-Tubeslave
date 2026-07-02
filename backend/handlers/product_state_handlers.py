@@ -213,6 +213,24 @@ APPLY_DELTA_LIMITS_DB = {"fader": 1.0, "gain": 0.5}
 CUMULATIVE_DELTA_LIMITS_DB = {"fader": 3.0, "gain": 1.5}
 CUMULATIVE_DELTA_WINDOW_SEC = 300.0
 PROVEN_LIVE_WRITE_KIND_SET = set(CURRENT_PROVEN_LIVE_WRITE_KINDS)
+WING_OPERATOR_PROOF_RUNNER_SOURCE = "wing_operator_proposal_validation_runner"
+WING_PROOF_SURFACE_CONTRACT_FIELDS = (
+    "wing_surface",
+    "wing_address",
+    "proof_direction",
+)
+WING_PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE = {
+    "fader": {
+        "wing_surface": "channel_fader",
+        "address_template": "/ch/{channel}/fdr",
+        "proof_direction": "negative_db_move_only",
+    },
+    "gain": {
+        "wing_surface": "input_trim",
+        "address_template": "/ch/{channel}/in/set/trim",
+        "proof_direction": "negative_input_trim_move_only",
+    },
+}
 
 
 def manual_write_result_verified(result):
@@ -258,6 +276,101 @@ def register_handlers(server):
             or raw.get("authored_by") == "operator"
             or raw.get("source") == "operator_authored"
         )
+
+    def expected_wing_surface_contract(normalized_change):
+        value_type = str(normalized_change.get("value_type") or "").strip().lower()
+        contract = WING_PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE.get(value_type)
+        if not contract:
+            return None
+        channel = normalized_change.get("channel")
+        address = contract["address_template"].format(channel=channel)
+        return {
+            "wing_surface": contract["wing_surface"],
+            "wing_address": address,
+            "proof_direction": contract["proof_direction"],
+            "address_template": contract["address_template"],
+        }
+
+    def observed_wing_surface_contract(change, proposal, *, linked):
+        sources = []
+        if isinstance(change, dict):
+            sources.append(("requested_change", change))
+            raw_change = change.get("raw")
+            if isinstance(raw_change, dict):
+                sources.append(("requested_change.raw", raw_change))
+        if not linked and proposal is not None:
+            raw_proposal = getattr(proposal, "raw", {})
+            if isinstance(raw_proposal, dict):
+                sources.append(("proposal.raw", raw_proposal))
+
+        observed = {}
+        for field in WING_PROOF_SURFACE_CONTRACT_FIELDS:
+            values = []
+            for source_name, source in sources:
+                if field not in source:
+                    continue
+                values.append({
+                    "source": source_name,
+                    "value": str(source.get(field) or "").strip(),
+                })
+            if values:
+                observed[field] = values
+        return observed
+
+    def validate_wing_surface_contract(change, normalized_change, proposal, *, linked):
+        expected = expected_wing_surface_contract(normalized_change)
+        if expected is None:
+            return None
+        observed = observed_wing_surface_contract(change, proposal, linked=linked)
+        proposal_source = str(getattr(proposal, "source", "") or "").strip()
+        contract_required = proposal_source == WING_OPERATOR_PROOF_RUNNER_SOURCE or bool(observed)
+        if not contract_required:
+            for field in WING_PROOF_SURFACE_CONTRACT_FIELDS:
+                normalized_change[field] = expected[field]
+            return None
+
+        missing = [
+            field
+            for field in WING_PROOF_SURFACE_CONTRACT_FIELDS
+            if field not in observed
+        ]
+        base_error = {
+            "channel": normalized_change["channel"],
+            "value_type": normalized_change["value_type"],
+            "address": normalized_change["address"],
+            "expected_wing_surface_contract": expected,
+            "observed_wing_surface_contract": observed,
+            "wing_surface_contract_required": contract_required,
+            "wing_surface_contract_source": proposal_source or "requested_change",
+        }
+        if missing:
+            return {
+                **base_error,
+                "reason": "wing_surface_contract_missing",
+                "missing_contract_fields": missing,
+            }
+
+        mismatches = []
+        for field, observations in observed.items():
+            expected_value = expected[field]
+            for item in observations:
+                if item["value"] != expected_value:
+                    mismatches.append({
+                        "field": field,
+                        "source": item["source"],
+                        "expected": expected_value,
+                        "actual": item["value"],
+                    })
+        if mismatches:
+            return {
+                **base_error,
+                "reason": "wing_surface_contract_mismatch",
+                "mismatched_contract_fields": mismatches,
+            }
+
+        for field in WING_PROOF_SURFACE_CONTRACT_FIELDS:
+            normalized_change[field] = expected[field]
+        return None
 
     def operator_apply_delta_history():
         history = getattr(server, "_operator_apply_delta_history", None)
@@ -428,6 +541,14 @@ def register_handlers(server):
                 "reason": error,
                 "requested_change": change,
             }
+        surface_error = validate_wing_surface_contract(
+            change,
+            normalized,
+            proposal,
+            linked=linked,
+        )
+        if surface_error:
+            return normalized, surface_error
         read_value = None
         read_helper = getattr(server, "_manual_write_read_value", None)
         if callable(read_helper):
@@ -2665,6 +2786,9 @@ def register_handlers(server):
             "channel": channel,
             "value_type": value_type,
             "address": change.get("address"),
+            "wing_surface": change.get("wing_surface"),
+            "wing_address": change.get("wing_address"),
+            "proof_direction": change.get("proof_direction"),
             "old_value": change.get("old_value"),
             "pre_read_value": pre_read_value,
             "pre_read_status": change.get("pre_read_status"),
@@ -2928,6 +3052,9 @@ def register_handlers(server):
             "channel": channel,
             "value_type": value_type,
             "address": change.get("address"),
+            "wing_surface": change.get("wing_surface"),
+            "wing_address": change.get("wing_address"),
+            "proof_direction": change.get("proof_direction"),
             "effective_value": effective_value,
             "delta_db": change.get("delta_db"),
             "pre_read_value": change.get("pre_read_value"),

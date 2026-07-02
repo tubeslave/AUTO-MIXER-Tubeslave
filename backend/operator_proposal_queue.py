@@ -216,6 +216,10 @@ class OperatorProposalQueue:
                 normalized[key] = optional_value
         if "readback_required" in raw_change:
             normalized["readback_required"] = bool(raw_change.get("readback_required"))
+        for key in ("wing_surface", "wing_address", "proof_direction"):
+            raw_value = raw_change.get(key, payload.get(key))
+            if raw_value is not None:
+                normalized[key] = str(raw_value).strip()
         safety_evidence = raw_change.get("safety_evidence")
         if isinstance(safety_evidence, list):
             normalized["safety_evidence"] = [dict(item) for item in safety_evidence if isinstance(item, dict)]
