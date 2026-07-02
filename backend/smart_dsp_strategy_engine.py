@@ -23,6 +23,19 @@ SMART_DSP_VERSION = "smart_dsp_strategy_engine_v1"
 SMART_DSP_OLD_VALUE_SOURCE = "offline_strategy_evidence_required_before_live_promotion"
 
 SUPPORTED_MODES = {"soundcheck", "live"}
+EVIDENCE_EXTRACTION_REQUIRED_COMPONENTS = (
+    "source_identity",
+    "musical_role",
+    "level_lufs_peak_true_peak",
+    "crest_lra",
+    "spectral_balance",
+    "masking_conflict",
+    "transient_behavior",
+    "noise_floor_bleed",
+    "phase_mono_safety",
+    "feedback_risk",
+    "bus_group_master_impact",
+)
 MIN_SOURCE_IDENTITY_CONFIDENCE = 0.6
 MIN_AUDIO_EVIDENCE_CONFIDENCE = 0.55
 SOUNDCHECK_MAX_AUDIO_EVIDENCE_AGE_SECONDS = 30.0
@@ -1538,6 +1551,10 @@ class SmartDSPRecommendation:
         alternative_tradeoffs = strategy_search_details.get("alternative_tradeoffs", [])
         operator_explanation_sections = self.evidence.get("operator_explanation_sections", {})
         decision_engine_contract = self.evidence.get("decision_engine_contract", {})
+        evidence_extraction_contract = self.evidence.get(
+            "evidence_extraction_contract",
+            {},
+        )
         selected_wing_osc_summary = _candidate_wing_osc_tradeoff_summary(
             self.selected_strategy
         )
@@ -1558,6 +1575,7 @@ class SmartDSPRecommendation:
             **selected_wing_osc_summary,
             **selected_wing_osc_readback_summary,
             "decision_engine_contract": decision_engine_contract,
+            "evidence_extraction_contract": evidence_extraction_contract,
             "alternatives_considered": [
                 {
                     "strategy_id": candidate.strategy_id,
@@ -1595,6 +1613,7 @@ class SmartDSPRecommendation:
             "alternative_tradeoffs": alternative_tradeoffs,
             "operator_explanation_sections": operator_explanation_sections,
             "decision_engine_contract": decision_engine_contract,
+            "evidence_extraction_contract": evidence_extraction_contract,
             "selected_wing_osc_summary": dict(selected_wing_osc_summary),
             "selected_wing_osc_readback_summary": dict(
                 selected_wing_osc_readback_summary
@@ -1624,6 +1643,7 @@ class SmartDSPRecommendation:
                 "operator_explanation": self.operator_explanation,
                 "operator_explanation_sections": operator_explanation_sections,
                 "decision_engine_contract": decision_engine_contract,
+                "evidence_extraction_contract": evidence_extraction_contract,
                 "selected_wing_osc_readback_summary": dict(
                     selected_wing_osc_readback_summary
                 ),
@@ -32864,6 +32884,119 @@ def _decision_engine_contract(
     }
 
 
+def _mapping_has_keys(payload: Any, keys: Sequence[str]) -> bool:
+    if not isinstance(payload, Mapping):
+        return False
+    return all(key in payload for key in keys)
+
+
+def _evidence_extraction_contract(
+    evidence_extraction: Mapping[str, Any],
+) -> Dict[str, Any]:
+    source_identity = evidence_extraction.get("source_identity", {})
+    level = evidence_extraction.get("level", {})
+    spectral_balance = evidence_extraction.get("spectral_balance", {})
+    masking_conflict = evidence_extraction.get("masking_conflict", {})
+    transient_behavior = evidence_extraction.get("transient_behavior", {})
+    noise_floor_bleed = evidence_extraction.get("noise_floor_bleed", {})
+    phase_mono_safety = evidence_extraction.get("phase_mono_safety", {})
+    feedback_risk = evidence_extraction.get("feedback_risk", {})
+    bus_group_master_impact = evidence_extraction.get("bus_group_master_impact", {})
+
+    coverage_checks = {
+        "source_identity": _mapping_has_keys(
+            source_identity,
+            ("source_role", "source_family", "confirmed", "confidence"),
+        ),
+        "musical_role": bool(
+            isinstance(source_identity, Mapping)
+            and str(source_identity.get("musical_role") or "").strip()
+        ),
+        "level_lufs_peak_true_peak": _mapping_has_keys(
+            level,
+            ("rms_dbfs", "estimated_lufs", "true_peak_headroom_db"),
+        ),
+        "crest_lra": _mapping_has_keys(level, ("crest_factor_db", "lra_proxy_db")),
+        "spectral_balance": _mapping_has_keys(
+            spectral_balance,
+            (
+                "muddiness_score",
+                "presence_deficit_score",
+                "presence_harshness_score",
+                "spectral_tilt_score",
+                "low_end_excess_score",
+            ),
+        ),
+        "masking_conflict": _mapping_has_keys(
+            masking_conflict,
+            ("role", "target_id", "frequency_hz", "score", "bandwidth_hz"),
+        ),
+        "transient_behavior": _mapping_has_keys(
+            transient_behavior,
+            ("density", "strength", "peak_dbfs", "rise_time_ms", "decay_ms"),
+        ),
+        "noise_floor_bleed": _mapping_has_keys(
+            noise_floor_bleed,
+            (
+                "noise_floor_dbfs",
+                "bleed_risk",
+                "tail_risk",
+                "chatter_risk",
+                "gate_hit_to_bleed_margin_db",
+            ),
+        ),
+        "phase_mono_safety": _mapping_has_keys(
+            phase_mono_safety,
+            ("phase_correlation", "mono_sum_delta_db"),
+        ),
+        "feedback_risk": _mapping_has_keys(
+            feedback_risk,
+            (
+                "score",
+                "frequency_hz",
+                "frequency_confidence",
+                "monitor_feedback_risk",
+            ),
+        ),
+        "bus_group_master_impact": _mapping_has_keys(
+            bus_group_master_impact,
+            (
+                "summed_bus_evidence_available",
+                "summed_bus_true_peak_headroom_db",
+                "summed_bus_level_plane_error_lu",
+                "master_true_peak_db",
+                "master_integrated_lufs",
+            ),
+        ),
+    }
+    missing_components = [
+        name
+        for name in EVIDENCE_EXTRACTION_REQUIRED_COMPONENTS
+        if not coverage_checks.get(name, False)
+    ]
+    return {
+        "contract_id": "smart_dsp_evidence_extraction_contract_v1",
+        "method_id": SMART_DSP_METHOD_ID,
+        "required_components": list(EVIDENCE_EXTRACTION_REQUIRED_COMPONENTS),
+        "component_coverage": {
+            name: {
+                "available": bool(coverage_checks.get(name, False)),
+                "required_for_strategy_search": True,
+            }
+            for name in EVIDENCE_EXTRACTION_REQUIRED_COMPONENTS
+        },
+        "covered_component_count": len(EVIDENCE_EXTRACTION_REQUIRED_COMPONENTS)
+        - len(missing_components),
+        "missing_components": missing_components,
+        "all_required_components_present": not missing_components,
+        "transport_free": True,
+        "live_write": False,
+        "queue_mutation": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+    }
+
+
 def _operator_explanation(
     *,
     analysis: SmartDSPAnalysisInput,
@@ -33467,6 +33600,9 @@ def analyze_smart_dsp_strategy(
         selection_policy=selection_policy,
         operator_explanation_sections=operator_explanation_sections,
     )
+    evidence_extraction_contract = _evidence_extraction_contract(
+        decision_engine_contract["evidence_extraction"],
+    )
     explanation = _operator_explanation(
         analysis=analysis,
         selected=selected,
@@ -33847,6 +33983,7 @@ def analyze_smart_dsp_strategy(
         },
         "operator_explanation_sections": operator_explanation_sections,
         "decision_engine_contract": decision_engine_contract,
+        "evidence_extraction_contract": evidence_extraction_contract,
         "required_safety_checks": {
             "source_identity": "required_before_live_promotion",
             "current_state_readback": "required_before_live_promotion",

@@ -4249,9 +4249,42 @@ def test_muddy_vocal_soundcheck_selects_corrective_cut_with_alternatives():
         expected_eq_readback_paths
     )
     assert contract["wing_readback_contract"]["live_write"] is False
+    evidence_contract = recommendation.evidence["evidence_extraction_contract"]
+    assert evidence_contract["contract_id"] == (
+        "smart_dsp_evidence_extraction_contract_v1"
+    )
+    assert evidence_contract["required_components"] == [
+        "source_identity",
+        "musical_role",
+        "level_lufs_peak_true_peak",
+        "crest_lra",
+        "spectral_balance",
+        "masking_conflict",
+        "transient_behavior",
+        "noise_floor_bleed",
+        "phase_mono_safety",
+        "feedback_risk",
+        "bus_group_master_impact",
+    ]
+    assert evidence_contract["all_required_components_present"] is True
+    assert evidence_contract["missing_components"] == []
+    assert evidence_contract["component_coverage"]["source_identity"][
+        "available"
+    ] is True
+    assert evidence_contract["component_coverage"]["bus_group_master_impact"][
+        "required_for_strategy_search"
+    ] is True
+    assert evidence_contract["transport_free"] is True
+    assert evidence_contract["live_write"] is False
+    assert evidence_contract["live_authority_granted"] is False
     assert proposal["decision_engine_contract"] == contract
     assert proposal["proposed_action"]["decision_engine_contract"] == contract
     assert proposal["evidence"]["decision_engine_contract"] == contract
+    assert proposal["evidence_extraction_contract"] == evidence_contract
+    assert proposal["proposed_action"]["evidence_extraction_contract"] == (
+        evidence_contract
+    )
+    assert proposal["evidence"]["evidence_extraction_contract"] == evidence_contract
     readback = recommendation.selected_strategy.future_wing_readback_contract
     _assert_common_readback_contract(readback)
     assert readback["eq_band_readback"]["protected_band_policy"] == (
