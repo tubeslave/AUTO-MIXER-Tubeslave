@@ -7,7 +7,7 @@
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
 - Hardware input required now: yes. The next proof requires real WING Rack,
   intended backend/WING session and operator review.
-- Latest heartbeat: 2026-07-02T09:17:29Z.
+- Latest heartbeat: 2026-07-02T09:22:35Z.
 - Latest WING read-only candidate:
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`.
 - Decision ledger status: `operator_review_required`; three unreviewed WING
@@ -66,7 +66,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   in operator proposals, showing required source identity, level, spectral,
   masking, transient, noise/bleed, phase/mono, feedback and bus/master evidence
   coverage before a proposed correction is trusted. The latest verified full
-  suite passed with `4791 passed, 1 skipped`;
+  suite passed with `4791 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path
@@ -2147,7 +2147,7 @@ live authority is introduced.
   passed with `failed_checks: []`, `read_only: true`, `contacts_wing: false`,
   `contacts_backend: false`, `live_authority_granted: false`, and the
   top-level coverage JSON/Markdown verifier checks true.
-- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T09:17:29Z`, latest
+- `Docs/CURRENT_STATE.md` sync: generated `2026-07-02T09:22:35Z`, latest
   verified product/runtime commit `4ac594b22`, latest WING read-only decision
   queue candidate
   `artifacts/wing_readonly_preflight/20260702T075151Z_wing_readonly_preflight/summary.json`,
@@ -2167,9 +2167,9 @@ live authority is introduced.
   `py_compile backend/smart_dsp_replay_evaluation.py backend/smart_dsp_strategy_engine.py`:
   passed.
 - SmartDSP WING readback evidence extraction validation:
-  `tests/test_smart_dsp_evidence_extractor.py`: `82 passed`; combined
+  `tests/test_smart_dsp_evidence_extractor.py`: `83 passed`; combined
   `tests/test_smart_dsp_strategy_engine.py tests/test_smart_dsp_replay_evaluation.py`:
-  `338 passed`; `py_compile backend/smart_dsp_evidence_extractor.py
+  `339 passed`; `py_compile backend/smart_dsp_evidence_extractor.py
   backend/smart_dsp_strategy_engine.py`: passed.
 - WING proof apply surface-contract validation:
   selected `tests/test_server.py` apply/preflight mismatch and linked rollback

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-02T09:17:29Z
+Generated: 2026-07-02T09:22:35Z
 
 ## Repository snapshot
 
@@ -1642,4 +1642,4 @@ Generated: 2026-07-02T09:17:29Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - The latest verified full-suite run for `4ac594b22` passed with
-  `4791 passed, 1 skipped`.
+  `4791 passed, 1 skipped, 1 warning`.

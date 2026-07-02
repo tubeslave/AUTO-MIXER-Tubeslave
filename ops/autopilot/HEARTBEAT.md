@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-02T09:17:29Z
+Last heartbeat UTC: 2026-07-02T09:22:35Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -18,7 +18,7 @@ candidate source id, then rerun
 
 Latest check: the control-plane state is synchronized to latest verified
 product/runtime commit `4ac594b22 Expose SmartDSP evidence extraction contract`.
-Latest verified full pytest passed with `4791 passed, 1 skipped`.
+Latest verified full pytest passed with `4791 passed, 1 skipped, 1 warning`.
 Current targeted surface-contract checks passed:
 `tests/test_supervised_wing_proof_plan.py` `186 passed`, selected WING MVP
 rails `4 passed`, `py_compile` passed, JSON/JSONL validation passed, and
@@ -33,8 +33,8 @@ Current smart-DSP gate-slot conflict checks passed:
 `py_compile backend/smart_dsp_replay_evaluation.py backend/smart_dsp_strategy_engine.py`
 passed.
 Current SmartDSP WING readback evidence extraction checks passed:
-`tests/test_smart_dsp_evidence_extractor.py` `82 passed`, combined
-SmartDSP strategy/replay checks `338 passed`, and extractor/strategy
+`tests/test_smart_dsp_evidence_extractor.py` `83 passed`, combined
+SmartDSP strategy/replay checks `339 passed`, and extractor/strategy
 `py_compile` passed.
 Current WING proof apply surface-contract checks passed:
 selected `tests/test_server.py` apply/preflight mismatch and linked rollback
