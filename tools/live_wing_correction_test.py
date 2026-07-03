@@ -20,9 +20,12 @@
   delay          — phase alignment (входная задержка)
 
 Запуск:
-    python3 tools/live_wing_correction_test.py            # автоselect канала
-    python3 tools/live_wing_correction_test.py --channel 40
-    python3 tools/live_wing_correction_test.py --keep-mute  # не размьючивать в конце
+    python3 tools/live_wing_correction_test.py \
+      --confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING
+    python3 tools/live_wing_correction_test.py --channel 40 \
+      --confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING
+    python3 tools/live_wing_correction_test.py --keep-mute \
+      --confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING
 """
 
 from __future__ import annotations
@@ -44,6 +47,7 @@ SETTLE_S = 0.15
 TOL_DB = 0.11          # допуск для dB-параметров
 TOL_FREQ_REL = 0.06    # относительный допуск для частот (WING квантует)
 TOL_Q_REL = 0.12
+LIVE_WING_CONFIRMATION = "I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING"
 
 
 def load_mixer_config() -> dict:
@@ -113,7 +117,31 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--channel", type=int, default=None, help="номер канала 1..40")
     ap.add_argument("--keep-mute", action="store_true", help="оставить канал замьюченным после теста")
+    ap.add_argument(
+        "--no-restore",
+        action="store_true",
+        help="НЕ восстанавливать исходное состояние: коррекции остаются на пульте, "
+             "исходные значения сохраняются в reports/ для ручного отката",
+    )
+    ap.add_argument(
+        "--unmute-after",
+        action="store_true",
+        help="вместе с --no-restore: снять safety-мьют в конце, оставив коррекции слышимыми",
+    )
+    ap.add_argument(
+        "--confirm-live-wing-write",
+        default="",
+        help=f"обязательная фраза подтверждения: {LIVE_WING_CONFIRMATION}",
+    )
     args = ap.parse_args()
+
+    if args.confirm_live_wing_write != LIVE_WING_CONFIRMATION:
+        print(
+            "FAIL: этот скрипт пишет широкий набор параметров в живой WING. "
+            f"Повтори с --confirm-live-wing-write {LIVE_WING_CONFIRMATION}",
+            file=sys.stderr,
+        )
+        return 2
 
     mixer = load_mixer_config()
     print(f"Подключение к WING {mixer['ip']} (OSC {mixer.get('receive_port', 2223)})...")
@@ -168,9 +196,35 @@ def main() -> int:
         results.append((name, addr, value, actual, ok))
         print(f"  {'PASS' if ok else 'FAIL'}  {name:26s} {addr:22s} -> {value!r:>8}  readback={actual!r}")
 
-    # 3. Восстановить
-    print("Восстановление исходного состояния...")
+    # 3. Восстановить (или сохранить откат и выйти, если --no-restore)
     restore_fail = []
+    if args.no_restore:
+        import json
+        reports_dir = REPO_ROOT / "reports"
+        reports_dir.mkdir(exist_ok=True)
+        stamp = time.strftime("%Y%m%dT%H%M%S")
+        rollback_path = reports_dir / f"live_wing_correction_original_ch{ch}_{stamp}.json"
+        rollback_path.write_text(json.dumps(
+            {"channel": ch, "mixer_ip": mixer["ip"], "saved_at": stamp,
+             "original": {a: v for a, v in original.items()}},
+            ensure_ascii=False, indent=2))
+        print(f"Восстановление ПРОПУЩЕНО (--no-restore). Откат сохранён: {rollback_path}")
+        if args.unmute_after:
+            orig_mute = original.get(f"{C}/mute")
+            client.set_channel_mute(ch, int(orig_mute) if orig_mute is not None else 0)
+            time.sleep(SETTLE_S)
+            print(f"Safety-мьют снят: /ch/{ch}/mute -> {readback(client, f'{C}/mute')!r}")
+        client.disconnect()
+        applied = sum(1 for *_, ok in results if ok)
+        print("\n================ ИТОГ ================")
+        print(f"Канал: {ch}. Применено и подтверждено readback'ом: {applied}/{len(results)}")
+        print("Коррекции ОСТАВЛЕНЫ на пульте.")
+        for name, addr, value, actual, ok in results:
+            if not ok:
+                print(f"  НЕ ПОДТВЕРЖДЕНО: {name} ({addr}): послано {value!r}, readback {actual!r}")
+        return 0 if applied == len(results) else 1
+
+    print("Восстановление исходного состояния...")
     for name, addr, _, kind, setter in reversed(plan):
         orig = original.get(addr)
         if addr.endswith("/mute") and args.keep_mute:
