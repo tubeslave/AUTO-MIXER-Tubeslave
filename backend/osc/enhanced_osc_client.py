@@ -45,6 +45,9 @@ class EnhancedOSCClient:
         from wing_client import WingClient
 
         self._wing = WingClient(ip=ip, port=port)
+        # Heartbeat WingClient сообщает о потере пульта (UDP-тишина) —
+        # запускаем reconnect событийно, не дожидаясь неудачного send()
+        self._wing.on_connection_lost = self._handle_disconnect
         self.ip = ip
         self.port = port
 

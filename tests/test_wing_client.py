@@ -463,3 +463,38 @@ class TestSupervisedWriteGate:
         assert result["write_kind"] == "eq"
         assert result["requested_steps"][0]["address"] == "/ch/3/eq/lg"
         assert result["readback_value"][1]["value"] == 1200.0
+
+    def test_set_eq_band_verified_applies_with_readback(self, connected_supervised_wing_client):
+        """set_eq_band_verified проводит запись через supervised bundle:
+        pre-read → запись → readback-подтверждение каждого параметра."""
+        client = connected_supervised_wing_client
+        client.configure_write_gate(allowed_kinds=["eq"])
+
+        # pre-read (f, g, q) → post-write readback (f, g, q)
+        with patch.object(
+            client, "_wait_for_readback",
+            side_effect=[1000.0, 0.0, 1.0, 2000.0, -6.0, 10.0],
+        ):
+            result = client.set_eq_band_verified(
+                3, 2, freq=2000.0, gain=-6.0, q=10.0,
+                source="test", reason="notch",
+            )
+        assert result["status"] == "applied"
+        assert result["write_kind"] == "eq"
+
+    def test_set_eq_band_verified_reports_unconfirmed_write(self, connected_supervised_wing_client):
+        """Расхождение readback не считается применённым (и откатывается)."""
+        client = connected_supervised_wing_client
+        client.configure_write_gate(allowed_kinds=["eq"])
+
+        # pre-read 0.0, после записи gain пульт вернул 0.0 вместо -6.0,
+        # затем readback отката
+        with patch.object(
+            client, "_wait_for_readback",
+            side_effect=[0.0, 0.0, 0.0],
+        ):
+            result = client.set_eq_band_verified(
+                3, 2, gain=-6.0,
+                source="test", reason="notch",
+            )
+        assert result["status"] != "applied"

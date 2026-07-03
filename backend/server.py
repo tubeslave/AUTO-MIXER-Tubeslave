@@ -186,7 +186,8 @@ class AutoMixerServer:
         
         # Unified audio capture service
         self.audio_capture: Optional[AudioCapture] = None
-        
+        self._audio_capture_device_name: Optional[str] = None
+
         # Feedback detector
         self.feedback_detector: Optional[FeedbackDetector] = None
         
@@ -2097,6 +2098,7 @@ class AutoMixerServer:
             except Exception as e:
                 logger.error(f"Error stopping audio capture: {e}")
             self.audio_capture = None
+            self._audio_capture_device_name = None
         
         # Stop auto soundcheck engine
         if self.auto_soundcheck_engine:
@@ -2106,6 +2108,87 @@ class AutoMixerServer:
             except Exception as e:
                 logger.error(f"Error stopping auto soundcheck engine: {e}")
             self.auto_soundcheck_engine = None
+
+    def _get_shared_audio_capture(
+        self,
+        device_id: Optional[Any] = None,
+        num_channels: int = 40,
+    ) -> Optional[AudioCapture]:
+        """Единый AudioCapture для всех DSP-модулей (правило CLAUDE.md:
+        НЕ создавать PyAudio-потоки в отдельных модулях).
+
+        Контроллеры (gain staging, auto fader/EQ/compressor) при наличии
+        `_audio_capture` подписываются на него вместо открытия собственного
+        PyAudio-потока — раньше 5+ модулей конкурировали за одно устройство
+        (pa.open() блокируется на уровне CoreAudio при занятом девайсе).
+
+        device_id — PyAudio-индекс от фронтенда; резолвится в имя устройства,
+        т.к. индексы PyAudio и sounddevice НЕ совпадают. Возвращает None,
+        если реальный захват не поднялся, — тогда модуль использует свой
+        legacy-fallback на PyAudio.
+
+        AUTOMIXER_SHARED_AUDIO_CAPTURE=false отключает общий захват
+        (тесты/отладка — не трогаем аудиожелезо).
+        """
+        if os.getenv("AUTOMIXER_SHARED_AUDIO_CAPTURE", "true").lower() in ("0", "false", "no"):
+            return None
+        device_name = None
+        if device_id not in (None, "", "default"):
+            try:
+                import pyaudio
+                pa = pyaudio.PyAudio()
+                try:
+                    info = pa.get_device_info_by_index(int(device_id))
+                    device_name = str(info.get("name") or "") or None
+                finally:
+                    pa.terminate()
+            except Exception as e:
+                logger.warning(f"Could not resolve audio device {device_id}: {e}")
+
+        if self.audio_capture is not None:
+            same_device = (
+                device_name is None
+                or self._audio_capture_device_name == device_name
+            )
+            if same_device:
+                return self.audio_capture
+            logger.info(
+                f"Restarting shared AudioCapture: device change "
+                f"'{self._audio_capture_device_name}' -> '{device_name}'"
+            )
+            try:
+                self.audio_capture.stop()
+            except Exception as e:
+                logger.error(f"Error stopping shared AudioCapture: {e}")
+            self.audio_capture = None
+            self._audio_capture_device_name = None
+
+        try:
+            capture = AudioCapture(
+                num_channels=num_channels,
+                sample_rate=48000,
+                source_type=AudioSourceType.SOUNDDEVICE,
+                device_name=device_name,
+            )
+            capture.start()
+            # При отказе стрима AudioCapture молча деградирует в SILENCE —
+            # для DSP это выглядело бы как «всё тихо, коррекций не нужно».
+            # В этом случае честно возвращаем None (модуль откроет свой поток)
+            if capture.source_type != AudioSourceType.SOUNDDEVICE:
+                logger.warning(
+                    "Shared AudioCapture degraded to test source, discarding — "
+                    "module falls back to its own capture"
+                )
+                capture.stop()
+                return None
+            self.audio_capture = capture
+            self._audio_capture_device_name = device_name
+            logger.info(f"Shared AudioCapture started (device={device_name or 'default'})")
+            return capture
+        except Exception as e:
+            logger.error(f"Failed to start shared AudioCapture: {e}")
+            self.audio_capture = None
+            return None
         
         # Disconnect mixer
         if self.mixer_client:
@@ -3170,16 +3253,22 @@ class AutoMixerServer:
                 self.safe_gain_calibrator.add_channel(audio_channel=audio_ch, mixer_channel=mixer_ch)
             
             # Initialize audio analyzer (используем gain_staging только для захвата аудио)
+            # Единый AudioCapture вместо собственного PyAudio-потока модуля
+            shared_capture = await asyncio.get_running_loop().run_in_executor(
+                None, self._get_shared_audio_capture, device_id
+            )
             if not self.gain_staging:
                 logger.info("Initializing audio analyzer for Safe Gain calibration...")
-                
+
                 self.gain_staging = LUFSGainStagingController(
                     mixer_client=self.mixer_client,
                     config=self.config,
-                    bleed_service=self.bleed_service
+                    bleed_service=self.bleed_service,
+                    audio_capture=shared_capture
                 )
             else:
                 self.gain_staging.mixer_client = self.mixer_client
+                self.gain_staging._audio_capture = shared_capture
             
             # Convert channel_settings and channel_mapping for audio analyzer
             converted_settings = {}
@@ -3894,15 +3983,21 @@ class AutoMixerServer:
             return
         
         try:
+            # Единый AudioCapture вместо собственного PyAudio-потока модуля
+            shared_capture = await asyncio.get_running_loop().run_in_executor(
+                None, self._get_shared_audio_capture, device_id
+            )
             # Initialize controller if needed
             if not self.auto_eq_controller:
                 self.auto_eq_controller = AutoEQController(
                     mixer_client=self.mixer_client,
-                    bleed_service=self.bleed_service
+                    bleed_service=self.bleed_service,
+                    audio_capture=shared_capture
                 )
             else:
                 # Update mixer client reference
                 self.auto_eq_controller.mixer_client = self.mixer_client
+                self.auto_eq_controller._audio_capture = shared_capture
             
             # Get event loop for thread-safe callbacks
             loop = asyncio.get_running_loop()
@@ -5127,11 +5222,16 @@ class AutoMixerServer:
                 self.auto_fader_controller.stop()
             
             # Create new controller
+            # Единый AudioCapture вместо собственного PyAudio-потока модуля
+            shared_capture = await asyncio.get_running_loop().run_in_executor(
+                None, self._get_shared_audio_capture, device_id
+            )
             self.auto_fader_controller = AutoFaderController(
                 mixer_client=self.mixer_client,
                 sample_rate=48000,
                 config=self.config,
-                bleed_service=self.bleed_service
+                bleed_service=self.bleed_service,
+                audio_capture=shared_capture
             )
             self.auto_fader_controller.live_apply_adapter = (
                 lambda *, audio_channel, mixer_channel, current_db, target_db, correction_db,
@@ -5323,11 +5423,16 @@ class AutoMixerServer:
                 self.auto_fader_controller.stop()
             
             # Create new controller
+            # Единый AudioCapture вместо собственного PyAudio-потока модуля
+            shared_capture = await asyncio.get_running_loop().run_in_executor(
+                None, self._get_shared_audio_capture, device_id
+            )
             self.auto_fader_controller = AutoFaderController(
                 mixer_client=self.mixer_client,
                 sample_rate=48000,
                 config=self.config,
-                bleed_service=self.bleed_service
+                bleed_service=self.bleed_service,
+                audio_capture=shared_capture
             )
             self.auto_fader_controller.live_apply_adapter = (
                 lambda *, audio_channel, mixer_channel, current_db, target_db, correction_db,
@@ -6076,10 +6181,14 @@ class AutoMixerServer:
         cfg = self.config.get("automation", {}).get("auto_compressor", {})
         duration = cfg.get("soundcheck_duration_per_channel", 7.0)
         target_gr = cfg.get("target_gr_db", 6.0)
+        # Единый AudioCapture вместо собственного PyAudio-потока модуля
+        shared_capture = await asyncio.get_running_loop().run_in_executor(
+            None, self._get_shared_audio_capture, device_id
+        )
         self.auto_compressor_controller = AutoCompressorController(
             self.mixer_client, sample_rate=48000,
             soundcheck_duration_per_channel=duration, target_gr_db=target_gr,
-            bleed_service=self.bleed_service)
+            bleed_service=self.bleed_service, audio_capture=shared_capture)
         loop = asyncio.get_running_loop()
         def on_status(data):
             asyncio.run_coroutine_threadsafe(

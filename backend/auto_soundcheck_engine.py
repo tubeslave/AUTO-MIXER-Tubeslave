@@ -2039,7 +2039,23 @@ class AutoSoundcheckEngine:
                         ch,
                     )
                     return
-                self.mixer_client.set_eq_band(ch, band, event.frequency_hz, -6.0, 10.0)
+                # Notch против заводки: верифицированная запись с readback,
+                # если клиент поддерживает — неподтверждённый notch означает,
+                # что заводка осталась неподавленной
+                if hasattr(self.mixer_client, "set_eq_band_verified"):
+                    result = self.mixer_client.set_eq_band_verified(
+                        ch, band, event.frequency_hz, -6.0, 10.0,
+                        source="feedback_monitor",
+                        reason="feedback_notch",
+                    )
+                    if result.get("status") != "applied":
+                        logger.error(
+                            f"FEEDBACK: Ch {ch} notch NOT confirmed by console "
+                            f"(status={result.get('status')}) — feedback at "
+                            f"{event.frequency_hz:.0f}Hz may remain unsuppressed"
+                        )
+                else:
+                    self.mixer_client.set_eq_band(ch, band, event.frequency_hz, -6.0, 10.0)
             except Exception as e:
                 # Отказ подавления заводки нельзя глотать молча: оператор
                 # должен видеть, что защита не сработала

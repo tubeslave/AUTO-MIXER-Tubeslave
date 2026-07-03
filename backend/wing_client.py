@@ -77,6 +77,15 @@ class WingClient(MixerClientBase):
         # поколение устарело. Без этого disconnect() → connect() оставлял
         # старые потоки живыми (они читали НОВЫЙ сокет и дублировали /xremote)
         self._conn_generation = 0
+        # Heartbeat: время последнего входящего пакета. UDP-запись «успешна»
+        # даже на выключенный пульт, поэтому потерю сети детектируем только
+        # по тишине в приёме (см. _start_xremote_renewal)
+        self._last_rx_time = 0.0
+        self._rx_stale_sec = 25.0  # ~3 периода renewal по 8 c
+        # Колбэк потери соединения (heartbeat): EnhancedOSCClient вешает сюда
+        # запуск reconnect-цикла — иначе потеря замечалась только при
+        # следующем неудачном send()
+        self.on_connection_lost: Optional[Callable[[], None]] = None
         
         self.state = {}
         self.callbacks = {}
@@ -1101,6 +1110,8 @@ class WingClient(MixerClientBase):
                 break
             try:
                 data, addr = self.sock.recvfrom(4096)
+                # Heartbeat: любой входящий пакет подтверждает, что пульт жив
+                self._last_rx_time = time.time()
                 try:
                     osc_msg = OscMessage(data)
                     self._handle_message(osc_msg.address, *osc_msg.params)
@@ -1344,8 +1355,9 @@ class WingClient(MixerClientBase):
         self._start_xremote_renewal()
     
     def _start_xremote_renewal(self):
-        """Periodically send /xremote to maintain subscription"""
+        """Periodically send /xremote to maintain subscription + heartbeat."""
         generation = self._conn_generation
+        self._last_rx_time = time.time()
 
         def renewal_loop():
             # Поток предыдущего подключения переживал reconnect (8-секундный
@@ -1354,9 +1366,37 @@ class WingClient(MixerClientBase):
             while (self.is_connected and not self._stop_receiver
                    and generation == self._conn_generation):
                 time.sleep(8)
-                if self.is_connected and generation == self._conn_generation:
-                    self.send("/xremote")
-                    logger.debug("Renewed /xremote subscription")
+                if not (self.is_connected and generation == self._conn_generation):
+                    break
+                self.send("/xremote")
+                # Активный heartbeat: дешёвый запрос, на который пульт обязан
+                # ответить — /xremote сам по себе ответа не требует
+                self.send("/ch/1/fdr")
+                logger.debug("Renewed /xremote subscription")
+
+                # UDP «отправляется успешно» даже на выключенный пульт —
+                # потеря сети видна только по тишине в приёме. Без этого
+                # state оптимистично считался применённым, а reconnect
+                # EnhancedOSCClient никогда не срабатывал
+                silence = time.time() - self._last_rx_time
+                if silence > self._rx_stale_sec:
+                    logger.error(
+                        f"Wing heartbeat lost: no incoming packets for "
+                        f"{silence:.0f}s — marking disconnected"
+                    )
+                    self._record_telemetry_event(
+                        "transport_heartbeat_lost",
+                        source="xremote_renewal",
+                        silence_sec=round(silence, 1),
+                    )
+                    self.is_connected = False
+                    callback = self.on_connection_lost
+                    if callback is not None:
+                        try:
+                            callback()
+                        except Exception as e:
+                            logger.error(f"on_connection_lost callback error: {e}")
+                    break
 
         thread = threading.Thread(target=renewal_loop, daemon=True)
         thread.start()
@@ -1848,6 +1888,58 @@ class WingClient(MixerClientBase):
         if q is not None:
             self.send(f"/ch/{channel}/eq/{band}q", q)
     
+    def set_eq_band_verified(
+        self,
+        channel: int,
+        band: int,
+        freq: float = None,
+        gain: float = None,
+        q: float = None,
+        *,
+        source: str = "auto_eq",
+        reason: str = "eq_correction",
+        approved: bool = True,
+        approval_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Верифицированная запись EQ-бэнда на пульт.
+
+        В отличие от set_eq_band (fire-and-forget), использует
+        apply_supervised_bundle: pre-read всех параметров → запись →
+        readback-проверка с допуском → откат ВСЕХ параметров бэнда при
+        расхождении. Возвращает gate-словарь со status
+        applied/blocked/error/rolled_back — вызывающий обязан проверить
+        status и не считать коррекцию применённой при любом другом значении.
+        """
+        if band < 1 or band > 4:
+            raise ValueError("Band must be 1-4")
+        steps = []
+        if freq is not None:
+            steps.append({
+                "address": f"/ch/{channel}/eq/{band}f",
+                "value": float(freq),
+                # Пульт квантует частоту по лог-шкале: допуск 1%, минимум 2 Гц
+                "tolerance": max(2.0, abs(float(freq)) * 0.01),
+            })
+        if gain is not None:
+            steps.append({"address": f"/ch/{channel}/eq/{band}g", "value": float(gain)})
+        if q is not None:
+            steps.append({
+                "address": f"/ch/{channel}/eq/{band}q",
+                "value": float(q),
+                "tolerance": 0.1,
+            })
+        if not steps:
+            return {"status": "noop", "reason": "no parameters provided"}
+        return self.apply_supervised_bundle(
+            channel=int(channel),
+            write_kind=self.WRITE_KIND_EQ,
+            steps=steps,
+            source=source,
+            reason=reason,
+            approved=approved,
+            approval_id=approval_id,
+        )
+
     def set_eq_high_shelf(self, channel: int, gain: float = None, freq: float = None, q: float = None, eq_type: str = None):
         """Set EQ high shelf parameters"""
         if gain is not None:

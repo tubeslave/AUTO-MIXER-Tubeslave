@@ -7,6 +7,10 @@ import numpy as np
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+# Тесты не должны открывать реальные аудиоустройства (микрофон, TCC-диалоги
+# macOS): общий AudioCapture в server._get_shared_audio_capture отключается
+os.environ.setdefault("AUTOMIXER_SHARED_AUDIO_CAPTURE", "false")
+
 
 @pytest.fixture
 def sample_rate():

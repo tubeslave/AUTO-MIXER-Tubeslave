@@ -1538,9 +1538,10 @@ class TestReadyForLiveNoClippingTrust:
 
 
 class DummyAutoEQController:
-    def __init__(self, mixer_client=None, bleed_service=None):
+    def __init__(self, mixer_client=None, bleed_service=None, audio_capture=None):
         self.mixer_client = mixer_client
         self.bleed_service = bleed_service
+        self._audio_capture = audio_capture
         self.start_calls = []
 
     def start(self, **kwargs):

@@ -83,6 +83,9 @@ Docs/                    — PDF документация WING, техничес
 - Потолок автоматики для фейдера — 0 dBFS (клэмпы/`FADER_MAX`/`MAX_GAIN_DB` = 0.0); +10 dB доступен только оператору вручную
 - Синхронные вызовы mixer-клиента с `time.sleep` (load_snap/save_snap) из async-хендлеров — только через `asyncio.to_thread`
 - Fader Riding: канал без прочитанного с пульта якоря (`anchor_valid=False`) не управляется вообще
+- Единый AudioCapture: `server._get_shared_audio_capture(device_id)` — модули получают его через `audio_capture=` и подписку; PyAudio-fallback в модулях только когда общий захват недоступен. Индексы PyAudio ≠ индексы sounddevice — резолвить через имя устройства. В тестах `AUTOMIXER_SHARED_AUDIO_CAPTURE=false` (conftest) — не открывать реальный микрофон
+- Потеря WING по UDP видна только по тишине в приёме: heartbeat в renewal-цикле (`_last_rx_time`, активный запрос `/ch/1/fdr`) + `on_connection_lost` → reconnect EnhancedOSCClient. UDP-send «успешен» даже на выключенный пульт
+- Применение DSP-коррекций на пульт — через верифицированные записи: `set_eq_band_verified()` / `apply_supervised_bundle` (pre-read → запись → readback с допуском → rollback). Вызывающий обязан проверять `status == "applied"`; notch против заводки с неподтверждённым readback = заводка не подавлена
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях
 - ScenarioDetector — кэшировать экземпляр, НЕ создавать на каждый аудиоблок
 - server.py — координатор. Логика в handlers/. НЕ добавлять новые маршруты в server.py напрямую

@@ -2526,14 +2526,33 @@ class AutoEQController:
                     )
                 elif band_name.startswith('band'):
                     band_num = int(band_name[-1])
-                    self.mixer_client.set_eq_band(
-                        self.current_channel,
-                        band=band_num,
-                        freq=params.get(f'{band_num}f'),
-                        gain=params.get(f'{band_num}g'),
-                        q=params.get(f'{band_num}q')
-                    )
-            
+                    # Верифицированная запись (pre-read → write → readback →
+                    # rollback), если клиент её поддерживает (WING); иначе
+                    # legacy fire-and-forget
+                    if hasattr(self.mixer_client, 'set_eq_band_verified'):
+                        result = self.mixer_client.set_eq_band_verified(
+                            self.current_channel,
+                            band=band_num,
+                            freq=params.get(f'{band_num}f'),
+                            gain=params.get(f'{band_num}g'),
+                            q=params.get(f'{band_num}q'),
+                            source='auto_eq',
+                            reason='auto_eq_correction',
+                        )
+                        if result.get('status') != 'applied':
+                            logger.warning(
+                                f"EQ band {band_num} ch{self.current_channel} NOT applied: "
+                                f"status={result.get('status')}, reason={result.get('reason')}"
+                            )
+                    else:
+                        self.mixer_client.set_eq_band(
+                            self.current_channel,
+                            band=band_num,
+                            freq=params.get(f'{band_num}f'),
+                            gain=params.get(f'{band_num}g'),
+                            q=params.get(f'{band_num}q')
+                        )
+
             # Store applied corrections in history
             self.applied_corrections_history.append(corrections.copy())
             
