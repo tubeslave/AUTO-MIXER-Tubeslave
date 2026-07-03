@@ -508,7 +508,8 @@ def build_review_report(
         evidence.get("status") == "readonly_preflight_candidate_available"
         and valid_candidate_count > 0
         and invalid_candidate_count == 0
-        and summary.get("readiness_matrix_update_allowed") is True
+        and summary.get("readiness_matrix_update_candidate_available") is True
+        and summary.get("readiness_matrix_update_allowed") is False
         and source_authority_denied
     )
     next_required_action = str(

@@ -420,8 +420,9 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["write_surface_inventory"]["summary"]["allowed_live_surface_ids"] == [
         "product_layer_fader_gain_apply"
     ]
-    assert snapshot["safety_coverage_matrix"]["summary"]["live_allowed_row_ids"] == [
-        "fader_supervised"
+    assert snapshot["safety_coverage_matrix"]["summary"]["live_allowed_row_ids"] == []
+    assert "fader_supervised" in snapshot["safety_coverage_matrix"]["summary"][
+        "missing_or_partial_real_wing_proof_ids"
     ]
     assert snapshot["read_surface_inventory"]["summary"]["claim"] == (
         "read coverage is inventoried but not complete"
@@ -616,13 +617,12 @@ def test_registry_snapshot_can_hide_full_method_inventory():
     assert snapshot["autonomy_mode_transition_gate"]["type"] == "autonomy_mode_transition_gate"
     assert snapshot["autonomy_mode_transition_gate"]["safety"]["live_write"] is False
     assert snapshot["autonomy_mode_transition_gate"]["summary"]["autonomous_apply_allowed_modes"] == []
-    assert snapshot["autonomy_mode_transition_gate"]["summary"]["supervised_current_live_write_kinds"] == [
-        "fader",
-        "gain",
-    ]
+    assert snapshot["autonomy_mode_transition_gate"]["summary"][
+        "supervised_current_live_write_kinds"
+    ] == []
     assert snapshot["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_surfaces"
-    ] == ["preamp", "trim", "fader"]
+    ] == []
     assert "auto" in snapshot["autonomy_mode_transition_gate"]["summary"]["blocked_modes"]
     assert "deessing" not in snapshot["project_goal_capability_matrix"]["summary"][
         "missing_capability_ids"
@@ -1030,9 +1030,28 @@ def test_safety_coverage_matrix_records_live_proof_gaps():
             assert row.status == "hardware_proven_narrow"
             assert "apply_operator_proposal" in row.canonical_gate
         else:
-            assert row.status in {"dry_run_ready", "proposal_only", "quarantined", "blocked"}
+            assert row.status in {
+                "supervised_candidate",
+                "dry_run_ready",
+                "proposal_only",
+                "quarantined",
+                "blocked",
+            }
 
-    assert get_safety_coverage_row("fader_supervised").live_allowed is True
+    fader = get_safety_coverage_row("fader_supervised")
+    assert fader.live_allowed is False
+    assert fader.status == "supervised_candidate"
+    assert fader.rollback_readback == "failed"
+    assert fader.emergency_stop_proof == "missing"
+    assert "rollback_not_applied" in fader.current_blocker
+    assert fader.required_evidence_components == (
+        "physical_pre_read",
+        "bounded_fader_down_apply",
+        "apply_readback",
+        "rollback_readback",
+        "emergency_stop_block",
+        "operator_approval",
+    )
     gain = get_safety_coverage_row("gain_supervised")
     assert gain.live_allowed is False
     assert gain.required_evidence_components == (
@@ -1071,7 +1090,11 @@ def test_safety_coverage_matrix_snapshot_is_fail_closed():
     snapshot = build_safety_coverage_matrix_snapshot()
 
     assert snapshot["type"] == "safety_coverage_matrix"
-    assert snapshot["summary"]["live_apply_policy"] == "supervised_fader_gain_only"
-    assert snapshot["summary"]["live_allowed_row_ids"] == ["fader_supervised"]
+    assert (
+        snapshot["summary"]["live_apply_policy"]
+        == "supervised_fader_gain_policy_only_release_live_blocked"
+    )
+    assert snapshot["summary"]["live_allowed_row_ids"] == []
+    assert "fader_supervised" in snapshot["summary"]["missing_or_partial_real_wing_proof_ids"]
     assert "gain_supervised" in snapshot["summary"]["missing_or_partial_real_wing_proof_ids"]
     assert snapshot["summary"]["status_counts"]["blocked"] >= 1

@@ -2114,7 +2114,7 @@ def proof_report_with_autonomy_overlay(report_status="ok"):
                     "value_type": "gain",
                     "status": "dry_run_only",
                     "safety_review_candidate": False,
-                    "supervised_live_allowed_static": False,
+                    "supervised_live_allowed_static": True,
                     "autonomous_ready": True,
                     "proof_artifact_count": 1,
                     "physical_candidate_count": 0,
@@ -3933,8 +3933,14 @@ def test_supervised_proof_evidence_snapshot_reads_latest_artifact_as_read_only(s
     assert set(rows) == {"fader", "gain"}
     assert rows["gain"]["autonomous_ready"] is False
     assert "source_autonomous_ready_normalized_false" in rows["gain"]["blockers"]
+    assert rows["gain"]["supervised_live_allowed_static"] is False
+    assert (
+        "source_supervised_live_allowed_normalized_false"
+        in rows["gain"]["blockers"]
+    )
     assert rows["gain"]["dry_run_ready_proof_ids"] == ["gain-proof-dry-run"]
     assert rows["fader"]["status"] == "no_current_evidence"
+    assert rows["fader"]["supervised_live_allowed_static"] is False
     assert "set_gain" not in set(_walk_keys(payload))
 
 
@@ -5573,13 +5579,13 @@ def test_main_pipeline_preview_is_read_only_and_does_not_mutate_queue(server):
     ]
     assert main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_kinds"
-    ] == ["fader", "gain", "pan"]
+    ] == []
     assert main_pipeline_registry["autonomy_mode_transition_gate"]["summary"][
         "supervised_current_live_write_surfaces"
-    ] == ["preamp", "trim", "fader", "pan"]
+    ] == []
     assert payload["summary"][
         "autonomy_mode_transition_gate_supervised_current_live_write_surfaces"
-    ] == ["preamp", "trim", "fader", "pan"]
+    ] == []
     assert (
         payload["summary"]["autonomy_mode_transition_gate_mode_count"]
         == len(main_pipeline_registry["autonomy_mode_transition_gate"]["rows"])

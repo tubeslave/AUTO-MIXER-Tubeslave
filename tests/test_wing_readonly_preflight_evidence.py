@@ -573,6 +573,7 @@ def test_wing_readonly_preflight_evidence_reports_missing_without_authority():
     assert evidence["summary"]["artifact_count"] == 0
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["accepted_as_readonly_preflight_candidate"] is False
+    assert evidence["summary"]["readiness_matrix_update_candidate_available"] is False
     assert evidence["summary"]["readiness_matrix_update_allowed"] is False
     assert evidence["summary"]["readiness_closure_allowed_by_evidence"] is False
     assert evidence["summary"]["live_authority_granted"] is False
@@ -598,7 +599,8 @@ def test_valid_physical_preflight_candidate_updates_matrix_but_keeps_manual_revi
     assert evidence["summary"]["operator_review_required"] is True
     assert evidence["summary"]["mvp_blocker_candidate_count"] == 4
     assert evidence["summary"]["mvp_blockers_closed_by_evidence"] == []
-    assert evidence["summary"]["readiness_matrix_update_allowed"] is True
+    assert evidence["summary"]["readiness_matrix_update_candidate_available"] is True
+    assert evidence["summary"]["readiness_matrix_update_allowed"] is False
     assert evidence["summary"]["readiness_closure_allowed_by_evidence"] is False
     assert evidence["summary"]["live_authority_granted"] is False
     assert evidence["summary"]["latest_valid_candidate_run_id"] == "20260606T120000Z_wing_readonly_preflight"
@@ -711,6 +713,7 @@ def test_preflight_evidence_rejects_non_physical_or_forbidden_request_artifact()
     assert evidence["status"] == "readonly_preflight_artifact_replacement_required"
     assert evidence["summary"]["valid_candidate_count"] == 0
     assert evidence["summary"]["invalid_candidate_count"] == 1
+    assert evidence["summary"]["readiness_matrix_update_candidate_available"] is False
     assert evidence["summary"]["readiness_matrix_update_allowed"] is False
     assert evidence["summary"]["live_authority_granted"] is False
     assert "require_physical_readback_not_true" in evidence["summary"]["violations"]
@@ -1294,6 +1297,7 @@ def test_wing_readonly_preflight_evidence_discovers_summary_json_files(tmp_path)
     assert evidence["summary"]["invalid_candidate_count"] == 1
     assert evidence["summary"]["accepted_as_readonly_preflight_candidate"] is False
     assert evidence["summary"]["mvp_blocker_candidate_count"] == 0
+    assert evidence["summary"]["readiness_matrix_update_candidate_available"] is False
     assert evidence["summary"]["readiness_matrix_update_allowed"] is False
     assert evidence["summary"]["latest_valid_candidate_run_id"] == "20260606T120000Z_wing_readonly_preflight"
     assert evidence["summary"]["blocked_by"] == [

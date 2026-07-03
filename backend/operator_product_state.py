@@ -6670,7 +6670,7 @@ def _empty_autonomy_evidence_overlay(*, generated_at: str, report_path: Optional
                 "value_type": value_type,
                 "status": "no_current_evidence",
                 "safety_review_candidate": False,
-                "supervised_live_allowed_static": value_type == "fader",
+                "supervised_live_allowed_static": False,
                 "autonomous_ready": False,
                 "proof_artifact_count": 0,
                 "physical_candidate_count": 0,
@@ -6737,6 +6737,8 @@ def _normalized_autonomy_overlay_row(row: Dict[str, Any]) -> Optional[Dict[str, 
     blockers = _string_list_value(row.get("blockers"))
     if status == "manual_safety_review_candidate" and "automatic_promotion_forbidden" not in blockers:
         blockers.append("automatic_promotion_forbidden")
+    if row.get("supervised_live_allowed_static") is True:
+        blockers.append("source_supervised_live_allowed_normalized_false")
     if row.get("autonomous_ready") is not False:
         blockers.append("source_autonomous_ready_normalized_false")
     return {
@@ -6745,7 +6747,7 @@ def _normalized_autonomy_overlay_row(row: Dict[str, Any]) -> Optional[Dict[str, 
         "value_type": value_type,
         "status": status,
         "safety_review_candidate": bool(row.get("safety_review_candidate")),
-        "supervised_live_allowed_static": bool(row.get("supervised_live_allowed_static")),
+        "supervised_live_allowed_static": False,
         "autonomous_ready": False,
         "proof_artifact_count": _safe_int_value(row.get("proof_artifact_count")),
         "physical_candidate_count": _safe_int_value(row.get("physical_candidate_count")),

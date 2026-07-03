@@ -1448,7 +1448,7 @@ def build_main_pipeline_preview(
                 offline_integration_bundle.get("hardware_evidence", False)
             ),
             "autonomy_mode_transition_gate_blocked_modes": list(
-                autonomy_mode_transition_gate_summary.get("blocked_modes", ())
+                sorted(autonomy_mode_transition_gate_summary.get("blocked_modes", ()))
             ),
             "autonomy_mode_transition_gate_live_apply_allowed_modes": list(
                 autonomy_mode_transition_gate_summary.get("live_apply_allowed_modes", ())

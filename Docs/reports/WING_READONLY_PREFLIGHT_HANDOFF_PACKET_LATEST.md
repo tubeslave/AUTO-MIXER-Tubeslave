@@ -3,6 +3,14 @@
 Generated: `2026-06-18T00:12:31Z`
 Status: `operator_hardware_step_required`
 
+## Packet Scope
+
+- packet_scope: `read_only_preflight_evidence_handoff_only`
+- current_state_authority_sources: `["Docs/CURRENT_STATE.md", "Docs/plans/M001-real-wing-interaction-plan.md", "ops/autopilot/STATE.json"]`
+- superseded_after_accepted_decision_ready: `true`
+- packet_does_not_select_current_next_action_after_decision_ready: `true`
+- scope_note: This packet is only the offline/read-only preflight evidence handoff. After an accepted_decision_ready ledger exists, use the current state sources for the next operator action; this packet does not authorize repeating hardware capture, supervised proof, readiness closure, or live authority by itself.
+
 ## Safety Boundary
 
 - read_only: `true`

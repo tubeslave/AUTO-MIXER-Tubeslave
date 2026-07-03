@@ -195,7 +195,8 @@ def build_autonomy_gap_rollup(report: Mapping[str, Any]) -> dict[str, Any]:
         ],
         "claim": (
             "Full Autonomous remains blocked; this rollup is report-only and does not widen "
-            "the current supervised fader/gain live-write boundary."
+            "current supervised live authority. Policy-level fader/gain is reported "
+            "separately from mode-gate current live-write lists."
         ),
     }
 

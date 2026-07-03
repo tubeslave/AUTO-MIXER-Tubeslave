@@ -137,3 +137,29 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 Exactly one milestone is active: `M001`, currently
 `WAITING_FOR_EXTERNAL_VALIDATION`. See `Docs/ACTIVE_MILESTONE.md` and
 `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`.
+
+Current M001 waiting reason: the canonical WING read-only decision is
+`accepted_decision_ready`, but the latest supervised CH3 fader proof failed
+rollback with `rollback_not_applied`. No roadmap row advances to readiness or
+live authority until the operator restores/verifies CH3 fader state and a clean
+supervised proof rerun supplies apply, physical readback, rollback and
+emergency-stop/block evidence.
+
+## Current external validation requirements
+
+- Operator restores or verifies CH3 fader state after rollback_not_applied
+- Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
+- Separate headroom-safe supervised gain-down proof with the same evidence requirements
+
+Next operator action from `STATE.json`: Do not widen live authority. Operator
+must restore or verify CH3 fader state after the failed rollback with reason
+rollback_not_applied, then rerun the narrow fader proof until apply, physical
+readback, rollback and emergency-stop/block evidence all pass. After that, run
+a separate headroom-safe gain-down proof with the same evidence requirements;
+only then reassess release readiness.
+
+Latest ledger handoff row:
+`full_suite_after_mvp_progress_handoff_guard_passed` at
+`2026-07-03T12:11:35Z`. No live authority changed; release-ready live
+correction families remain `0`, live-allowed safety rows remain `0`, and
+current supervised live-write kinds remain `0`.

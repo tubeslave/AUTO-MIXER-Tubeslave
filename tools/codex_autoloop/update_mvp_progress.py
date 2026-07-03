@@ -19,6 +19,8 @@ from typing import Sequence
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BLOCKERS = PROJECT_ROOT / ".ai" / "project-layer" / "wing_mvp_blockers.md"
 DEFAULT_OUTPUT = PROJECT_ROOT / "Docs" / "reports" / "MVP_PROGRESS_LATEST.md"
+DEFAULT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
+DEFAULT_RUN_LEDGER = PROJECT_ROOT / "ops" / "autopilot" / "RUN_LEDGER.jsonl"
 CLOSED_STATUS = "closed"
 CURRENT_FIRST_COMMAND_HEADING = "## Current First Command"
 EVIDENCE_PATH_RE = re.compile(r"`([^`]+)`")
@@ -687,11 +689,100 @@ def selected_action_text(
     return "All MVP blockers are closed.", "all blockers closed"
 
 
+def load_state(path: Path) -> dict[str, object] | None:
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_latest_ledger_row(path: Path) -> dict[str, object] | None:
+    if not path.exists():
+        return None
+    rows = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return rows[-1] if rows else None
+
+
+def external_validation_handoff_lines(
+    state: dict[str, object] | None,
+    latest_ledger: dict[str, object] | None,
+) -> list[str]:
+    if not state or state.get("program_status") != "WAITING_FOR_EXTERNAL_VALIDATION":
+        return []
+
+    requirements = state.get("external_validation_requirements")
+    if not isinstance(requirements, list):
+        requirements = []
+    score_gate = state.get("strict_pre_release_review")
+    if not isinstance(score_gate, dict):
+        score_gate = {}
+    score = score_gate.get("score", 94)
+    release_threshold = score_gate.get("release_threshold", 95)
+    public_release_ready = str(
+        bool(score_gate.get("public_release_ready", False))
+    ).lower()
+    score_reason = score_gate.get("score_ceiling_reason")
+
+    lines = [
+        "## Current External Validation Handoff",
+        "",
+        "- Program status from `STATE.json`: `WAITING_FOR_EXTERNAL_VALIDATION`",
+        f"- Strict pre-release review score: `{score}/100`",
+        f"- Pre-release score threshold: `{release_threshold}/100`",
+        f"- Public release ready from score gate: `{public_release_ready}`",
+        (
+            f"- Score gate: do not report `{release_threshold}/100` or "
+            "public-release readiness while these external WING requirements "
+            "remain open."
+        ),
+        "- Canonical read-only decision marker: `accepted_decision_ready`",
+        f"- Current blocker from `STATE.json`: {state.get('current_blocker', '')}",
+        (
+            "- Next operator action from `STATE.json`: "
+            f"{state.get('next_operator_action', '')}"
+        ),
+        "- External validation requirements:",
+    ]
+    if score_reason:
+        lines.append(f"- Score ceiling reason: {score_reason}")
+    for requirement in requirements:
+        lines.append(f"  - {requirement}")
+    if latest_ledger:
+        lines.append(
+            "- Latest ledger handoff row: "
+            f"`{latest_ledger.get('event', '')}` at "
+            f"`{latest_ledger.get('recorded_at_utc', '')}`"
+        )
+        authority = latest_ledger.get("authority")
+        if isinstance(authority, dict):
+            lines.append(
+                "- Live authority remains denied: release-ready live correction "
+                "families remain "
+                f"`{authority.get('release_ready_live_family_count')}`, "
+                "live-allowed safety rows remain "
+                f"`{authority.get('safety_coverage_live_allowed_row_count')}`, "
+                "and current supervised live-write kinds remain "
+                f"`{authority.get('supervised_current_live_write_kind_count')}`."
+            )
+    lines.extend(
+        [
+            "- No live authority changed.",
+            "",
+        ]
+    )
+    return lines
+
+
 def build_progress_report(
     rows: Sequence[dict[str, str]],
     *,
     generated_at: str | None = None,
     current_first_command: str | None = None,
+    state: dict[str, object] | None = None,
+    latest_ledger: dict[str, object] | None = None,
 ) -> str:
     generated = generated_at or utc_now()
     first_open = first_open_blocker(rows)
@@ -741,11 +832,16 @@ def build_progress_report(
         f"{json.dumps(missing_markers)}",
         f"- Selected evidence file count: {len(selected_evidence_files)}",
         "",
-        "## Blockers",
-        "",
-        "| Blocker | Status | Next action |",
-        "| --- | --- | --- |",
     ]
+    lines.extend(external_validation_handoff_lines(state, latest_ledger))
+    lines.extend(
+        [
+            "## Blockers",
+            "",
+            "| Blocker | Status | Next action |",
+            "| --- | --- | --- |",
+        ]
+    )
     for row in rows:
         lines.append(
             f"| {row['blocker']} | {row['status']} | {row['next action']} |"
@@ -773,6 +869,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Update supervised WING MVP progress report.")
     parser.add_argument("--blockers", default=str(DEFAULT_BLOCKERS))
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    parser.add_argument("--state", default=str(DEFAULT_STATE))
+    parser.add_argument("--run-ledger", default=str(DEFAULT_RUN_LEDGER))
     parser.add_argument("--print", action="store_true", help="Print report instead of writing only.")
     return parser
 
@@ -785,7 +883,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"No blocker rows found in {blockers_path}", file=sys.stderr)
         return 2
     command_text = current_first_command(blockers_path)
-    report = build_progress_report(rows, current_first_command=command_text)
+    report = build_progress_report(
+        rows,
+        current_first_command=command_text,
+        state=load_state(Path(args.state)),
+        latest_ledger=load_latest_ledger_row(Path(args.run_ledger)),
+    )
     write_report(Path(args.output), report)
     if args.print:
         print(report)

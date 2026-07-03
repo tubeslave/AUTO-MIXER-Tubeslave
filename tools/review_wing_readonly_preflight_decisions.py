@@ -292,9 +292,14 @@ def build_decision_review_report(
         artifact_roots=artifact_roots,
         artifact_paths=artifact_paths,
     )
+    effective_decision_roots = (
+        decision_roots
+        if decision_roots is not None or decision_paths is not None
+        else DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS
+    )
     ledger = build_wing_readonly_preflight_review_decision_ledger(
         preflight_evidence=evidence,
-        decision_roots=decision_roots,
+        decision_roots=effective_decision_roots,
         decision_paths=decision_paths,
     )
     summary = ledger.get("summary") if isinstance(ledger.get("summary"), Mapping) else {}

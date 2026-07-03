@@ -49,6 +49,13 @@ EXPECTED_ROLLBACK_EVENTS = {
 }
 EXPECTED_PARAMETER_EVENTS = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
+FORBIDDEN_DIRECT_REQUEST_TYPES = {
+    "set_fader",
+    "set_gain",
+    "route_output",
+    "load_snap",
+    "save_snap",
+}
 DEFAULT_PREFLIGHT_ARTIFACT_ROOT = "artifacts/wing_readonly_preflight"
 DEFAULT_PREFLIGHT_DECISION_ROOT = "artifacts/wing_readonly_preflight_review_decisions"
 PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE = {
@@ -182,6 +189,27 @@ class EventRecorder:
         summary = dict(summary)
         summary.setdefault("events_path", str(self.events_path))
         summary.setdefault("summary_path", str(self.summary_path))
+        sent_request_types = list(self.sent_request_types)
+        forbidden_sent = [
+            request_type
+            for request_type in sent_request_types
+            if request_type in FORBIDDEN_DIRECT_REQUEST_TYPES
+        ]
+        summary.setdefault("sent_request_types", sent_request_types)
+        summary.setdefault(
+            "proposal_create_request_sent",
+            "create_operator_proposal" in sent_request_types,
+        )
+        summary.setdefault(
+            "live_apply_request_sent",
+            "apply_operator_proposal" in sent_request_types,
+        )
+        summary.setdefault(
+            "rollback_request_sent",
+            "rollback_last_manual_write" in sent_request_types,
+        )
+        summary.setdefault("forbidden_request_types_sent", forbidden_sent)
+        summary.setdefault("direct_live_write_request_sent", bool(forbidden_sent))
         with self.summary_path.open("w", encoding="utf-8") as handle:
             json.dump(summary, handle, ensure_ascii=False, indent=2, sort_keys=True, default=json_default)
             handle.write("\n")
@@ -560,7 +588,7 @@ async def run(args: argparse.Namespace) -> int:
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "write_policy": "apply_operator_proposal_only",
         "physical_proof_requires_execute": True,
-        "forbidden_messages": ["set_fader", "set_gain", "route_output", "load_snap", "save_snap"],
+        "forbidden_messages": sorted(FORBIDDEN_DIRECT_REQUEST_TYPES),
         "preflight_decision_gate_required_for_execute": True,
         "accepted_readonly_source_id": args.accepted_readonly_source_id,
     }

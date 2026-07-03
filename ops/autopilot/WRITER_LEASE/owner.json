@@ -1,8 +1,0 @@
-{
-  "schema": "automixer.autopilot.writer_lease.v1",
-  "owner": "codex-app",
-  "started_at_utc": "2026-07-02T11:47:24Z",
-  "heartbeat_utc": "2026-07-02T11:47:24Z",
-  "checkout": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
-  "intended_action": "smart DSP evidence coverage summary improvement"
-}

@@ -35,6 +35,9 @@ from backend.operator_mode_policy import (
     WING_DEPLOYMENT_LIVE_WRITE_KINDS,
     build_operator_mode_status,
 )  # noqa: E402
+from backend.autonomy_mode_transition_gate import (  # noqa: E402
+    build_autonomy_mode_transition_gate,
+)
 from backend.bus_group_main_dca_physical_readback_contract import (  # noqa: E402
     BUS_GROUP_MAIN_DCA_FORBIDDEN_MUTATION_EVIDENCE_FIELDS,
     BUS_GROUP_MAIN_DCA_PHYSICAL_READBACK_ARTIFACT_TYPE,
@@ -311,6 +314,7 @@ from backend.wing_readonly_preflight_review_decision import (  # noqa: E402
 )
 
 WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS = (
+    "readiness_matrix_update_allowed",
     "readiness_closure_allowed_by_evidence",
     "live_authority_granted",
     "full_autonomous_ready",
@@ -2364,7 +2368,7 @@ def git_executable() -> str:
     return "git"
 
 
-def current_supervised_live_write_kinds() -> tuple[str, ...]:
+def policy_supervised_live_write_kinds() -> tuple[str, ...]:
     status = build_operator_mode_status(
         mode=MODE_SUPERVISED,
         connection_mode="wing",
@@ -2375,7 +2379,7 @@ def current_supervised_live_write_kinds() -> tuple[str, ...]:
     return tuple(str(kind) for kind in capabilities.get("allowed_live_write_kinds", ()) if kind)
 
 
-def current_supervised_live_write_surfaces() -> tuple[str, ...]:
+def policy_supervised_live_write_surfaces() -> tuple[str, ...]:
     status = build_operator_mode_status(
         mode=MODE_SUPERVISED,
         connection_mode="wing",
@@ -2386,6 +2390,26 @@ def current_supervised_live_write_surfaces() -> tuple[str, ...]:
     return tuple(
         str(surface)
         for surface in capabilities.get("allowed_live_write_surfaces", ())
+        if surface
+    )
+
+
+def mode_gate_supervised_live_write_kinds() -> tuple[str, ...]:
+    gate = build_autonomy_mode_transition_gate()
+    summary = gate.get("summary") if isinstance(gate.get("summary"), Mapping) else {}
+    return tuple(
+        str(kind)
+        for kind in summary.get("supervised_current_live_write_kinds", ())
+        if kind
+    )
+
+
+def mode_gate_supervised_live_write_surfaces() -> tuple[str, ...]:
+    gate = build_autonomy_mode_transition_gate()
+    summary = gate.get("summary") if isinstance(gate.get("summary"), Mapping) else {}
+    return tuple(
+        str(surface)
+        for surface in summary.get("supervised_current_live_write_surfaces", ())
         if surface
     )
 
@@ -3988,11 +4012,21 @@ def _accepted_candidate_request_sequence_trace(
         request_sequence_by_source[source_id] = request_sequence
         plan_request_sequence_by_source[source_id] = plan_request_sequence
         matches_plan_by_source[source_id] = matches_plan
+        request_sequence_has_expected_prefix = (
+            len(request_sequence) >= len(expected_request_sequence)
+            and request_sequence[: len(expected_request_sequence)] == expected_request_sequence
+        )
+        plan_sequence_has_expected_prefix = (
+            len(plan_request_sequence) >= len(expected_request_sequence)
+            and plan_request_sequence[: len(expected_request_sequence)]
+            == expected_request_sequence
+        )
         if (
             not request_sequence
-            or request_sequence != expected_request_sequence
             or not plan_request_sequence
-            or plan_request_sequence != expected_request_sequence
+            or request_sequence != plan_request_sequence
+            or not request_sequence_has_expected_prefix
+            or not plan_sequence_has_expected_prefix
             or not matches_plan
         ):
             missing_source_ids.append(source_id)
@@ -4115,6 +4149,8 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
             violations.append("autonomy_gap_rollup_claim_does_not_preserve_auto_block")
         if not isinstance(claim, str) or "does not widen" not in claim:
             violations.append("autonomy_gap_rollup_claim_does_not_preserve_live_boundary")
+        if isinstance(claim, str) and "current supervised fader/gain live-write" in claim:
+            violations.append("autonomy_gap_rollup_claim_overstates_current_supervised_boundary")
         next_required_evidence = rollup.get("next_required_evidence")
         if not isinstance(next_required_evidence, list) or not next_required_evidence:
             violations.append("autonomy_gap_rollup_next_required_evidence_missing")
@@ -4153,20 +4189,30 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
         supervised_write_surfaces = rollup.get("supervised_current_live_write_surfaces")
         if not isinstance(supervised_write_surfaces, list):
             supervised_write_surfaces = []
+        gate_supervised_write_kinds = gate_summary.get("supervised_current_live_write_kinds")
+        if not isinstance(gate_supervised_write_kinds, list):
+            gate_supervised_write_kinds = []
+        gate_supervised_write_surfaces = gate_summary.get("supervised_current_live_write_surfaces")
+        if not isinstance(gate_supervised_write_surfaces, list):
+            gate_supervised_write_surfaces = []
         unexpected_write_kinds = [
             str(kind)
             for kind in supervised_write_kinds
-            if str(kind) not in current_supervised_live_write_kinds()
+            if str(kind) not in policy_supervised_live_write_kinds()
         ]
         unexpected_write_surfaces = [
             str(surface)
             for surface in supervised_write_surfaces
-            if str(surface) not in current_supervised_live_write_surfaces()
+            if str(surface) not in policy_supervised_live_write_surfaces()
         ]
         if unexpected_write_kinds:
             violations.append("autonomy_gap_rollup_unexpected_supervised_live_write_kinds")
         if unexpected_write_surfaces:
             violations.append("autonomy_gap_rollup_unexpected_supervised_live_write_surfaces")
+        if supervised_write_kinds != gate_supervised_write_kinds:
+            violations.append("autonomy_gap_rollup_supervised_live_write_kinds_gate_mismatch")
+        if supervised_write_surfaces != gate_supervised_write_surfaces:
+            violations.append("autonomy_gap_rollup_supervised_live_write_surfaces_gate_mismatch")
 
         detail["autonomy_gap_rollup_present"] = bool(rollup)
         detail["full_auto_gap_bucket_counts"] = dict(rollup_counts)
@@ -4174,10 +4220,22 @@ def validate_supervised_proof_report_gap_rollup(report_path: Path) -> CheckResul
         detail["required_gain_evidence_components"] = required_gain_evidence_components
         detail["next_required_evidence_by_action_family"] = next_by_family
         detail["supervised_current_live_write_kinds"] = list(supervised_write_kinds)
-        detail["policy_supervised_live_write_kinds"] = list(current_supervised_live_write_kinds())
+        detail["mode_gate_supervised_current_live_write_kinds"] = list(
+            gate_supervised_write_kinds
+        )
+        detail["mode_gate_helper_supervised_live_write_kinds"] = list(
+            mode_gate_supervised_live_write_kinds()
+        )
+        detail["policy_supervised_live_write_kinds"] = list(policy_supervised_live_write_kinds())
         detail["supervised_current_live_write_surfaces"] = list(supervised_write_surfaces)
+        detail["mode_gate_supervised_current_live_write_surfaces"] = list(
+            gate_supervised_write_surfaces
+        )
+        detail["mode_gate_helper_supervised_live_write_surfaces"] = list(
+            mode_gate_supervised_live_write_surfaces()
+        )
         detail["policy_supervised_live_write_surfaces"] = list(
-            current_supervised_live_write_surfaces()
+            policy_supervised_live_write_surfaces()
         )
         detail["unexpected_supervised_live_write_surfaces"] = unexpected_write_surfaces
         detail["unexpected_supervised_live_write_kinds"] = unexpected_write_kinds
@@ -5989,6 +6047,9 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     valid_candidate_count = int(summary.get("valid_candidate_count") or 0)
     invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
     accepted = summary.get("accepted_as_readonly_preflight_candidate") is True
+    update_candidate_available = (
+        summary.get("readiness_matrix_update_candidate_available") is True
+    )
     update_allowed = summary.get("readiness_matrix_update_allowed") is True
     candidate_expected = bool(valid_candidate_count) and invalid_candidate_count == 0
     source_authority_flags = {
@@ -6006,8 +6067,12 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
         violations.append("wing_readonly_preflight_invalid_artifacts_present")
     if accepted != candidate_expected:
         violations.append("wing_readonly_preflight_candidate_summary_mismatch")
-    if update_allowed != candidate_expected:
-        violations.append("wing_readonly_preflight_readiness_update_allowed_mismatch")
+    if update_candidate_available != candidate_expected:
+        violations.append(
+            "wing_readonly_preflight_readiness_update_candidate_mismatch"
+        )
+    if update_allowed:
+        violations.append("wing_readonly_preflight_readiness_update_allowed_not_false")
     for key in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS:
         if summary.get(key) is not False:
             violations.append(f"wing_readonly_preflight_summary_{key}_not_false")
@@ -6041,6 +6106,7 @@ def validate_wing_readonly_preflight_evidence_snapshot() -> CheckResult:
     detail["valid_candidate_count"] = valid_candidate_count
     detail["invalid_candidate_count"] = invalid_candidate_count
     detail["accepted_as_readonly_preflight_candidate"] = accepted
+    detail["readiness_matrix_update_candidate_available"] = update_candidate_available
     detail["readiness_matrix_update_allowed"] = update_allowed
     detail["readiness_closure_allowed_by_evidence"] = closure_allowed
     detail["live_authority_granted"] = live_authority
@@ -10284,11 +10350,14 @@ def validate_wing_readonly_preflight_review_decision_ledger_snapshot() -> CheckR
     detail["review_command"] = review_decision_command
     detail["review_exit_codes"] = dict(WING_READONLY_PREFLIGHT_REVIEW_DECISION_EXIT_CODES)
     detail["preflight_evidence_status"] = summary.get("preflight_evidence_status")
-    detail["decision_search_roots"] = (
+    decision_search_roots = (
         list(summary.get("decision_search_roots"))
         if isinstance(summary.get("decision_search_roots"), list)
         else []
     )
+    if not decision_search_roots:
+        decision_search_roots = [WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOT]
+    detail["decision_search_roots"] = decision_search_roots
     detail["review_candidate_count"] = review_candidate_count
     detail["decision_record_count"] = decision_record_count
     detail["accepted_record_count"] = accepted_record_count
@@ -17207,6 +17276,10 @@ def validate_supervised_proof_report_autonomy_overlay(report_path: Path) -> Chec
             row_value_types.add(value_type)
             if value_type not in expected_value_types:
                 violations.append(f"autonomy_overlay_row_{index}_unexpected_value_type")
+            if row.get("supervised_live_allowed_static") is not False:
+                violations.append(
+                    f"autonomy_overlay_row_{index}_supervised_live_allowed_static_not_false"
+                )
             if row.get("autonomous_ready") is not False:
                 violations.append(f"autonomy_overlay_row_{index}_autonomous_ready_not_false")
             if row_status not in expected_row_statuses:
@@ -17273,8 +17346,12 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
         evidence_by_family = detail.get("evidence_requirement_ids_by_action_family")
         next_by_family = detail.get("next_required_evidence_by_action_family")
         supervised_kinds = detail.get("supervised_current_live_write_kinds")
+        gate_supervised_kinds = detail.get("mode_gate_supervised_current_live_write_kinds")
         policy_kinds = detail.get("policy_supervised_live_write_kinds")
         supervised_surfaces = detail.get("supervised_current_live_write_surfaces")
+        gate_supervised_surfaces = detail.get(
+            "mode_gate_supervised_current_live_write_surfaces"
+        )
         policy_surfaces = detail.get("policy_supervised_live_write_surfaces")
         unexpected_kinds = detail.get("unexpected_supervised_live_write_kinds")
         unexpected_surfaces = detail.get("unexpected_supervised_live_write_surfaces")
@@ -17293,9 +17370,15 @@ def autonomy_gap_rollup_summary(results: Sequence[CheckResult]) -> dict[str, obj
             if isinstance(next_by_family, Mapping)
             else {},
             "supervised_current_live_write_kinds": list(supervised_kinds) if isinstance(supervised_kinds, list) else [],
+            "mode_gate_supervised_current_live_write_kinds": list(gate_supervised_kinds)
+            if isinstance(gate_supervised_kinds, list)
+            else [],
             "policy_supervised_live_write_kinds": list(policy_kinds) if isinstance(policy_kinds, list) else [],
             "supervised_current_live_write_surfaces": list(supervised_surfaces)
             if isinstance(supervised_surfaces, list)
+            else [],
+            "mode_gate_supervised_current_live_write_surfaces": list(gate_supervised_surfaces)
+            if isinstance(gate_supervised_surfaces, list)
             else [],
             "policy_supervised_live_write_surfaces": list(policy_surfaces)
             if isinstance(policy_surfaces, list)
@@ -17726,18 +17809,20 @@ def wing_readonly_preflight_evidence_summary(
                 for flag in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
             }
         )
+        source_authority_flags_deny = all(
+            source_authority_flags.get(flag) is False
+            for flag in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
+        )
         source_authority_denied = (
             detail.get("source_authority_denied") is True
-            or all(
-                source_authority_flags.get(flag) is False
-                for flag in WING_READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS
-            )
+            and source_authority_flags_deny
         )
         readiness_update_candidate_available = (
             result.status == "passed"
             and valid_candidate_count > 0
             and invalid_candidate_count == 0
-            and detail.get("readiness_matrix_update_allowed") is True
+            and detail.get("readiness_matrix_update_candidate_available") is True
+            and detail.get("readiness_matrix_update_allowed") is False
             and source_authority_denied
         )
         return {
@@ -17759,6 +17844,9 @@ def wing_readonly_preflight_evidence_summary(
             "invalid_candidate_count": invalid_candidate_count,
             "accepted_as_readonly_preflight_candidate": (
                 detail.get("accepted_as_readonly_preflight_candidate") is True
+            ),
+            "readiness_matrix_update_candidate_available": (
+                detail.get("readiness_matrix_update_candidate_available") is True
             ),
             "readiness_matrix_update_allowed": (
                 detail.get("readiness_matrix_update_allowed") is True
@@ -21655,12 +21743,13 @@ def wing_readonly_preflight_review_decision_summary(
                 for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
             }
         )
+        source_authority_flags_deny = all(
+            source_authority_flags.get(flag) is False
+            for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
+        )
         source_authority_denied = (
             detail.get("source_authority_denied") is True
-            or all(
-                source_authority_flags.get(flag) is False
-                for flag in WING_READONLY_PREFLIGHT_REVIEW_DECISION_SOURCE_AUTHORITY_FLAGS
-            )
+            and source_authority_flags_deny
         )
         return {
             "status": result.status,
@@ -26738,8 +26827,12 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"`{json.dumps(gap_rollup['next_required_evidence_by_action_family'], sort_keys=True)}`",
                 "- supervised_current_live_write_kinds: "
                 f"`{json.dumps(gap_rollup['supervised_current_live_write_kinds'])}`",
+                "- mode_gate_supervised_current_live_write_kinds: "
+                f"`{json.dumps(gap_rollup['mode_gate_supervised_current_live_write_kinds'])}`",
                 "- supervised_current_live_write_surfaces: "
                 f"`{json.dumps(gap_rollup['supervised_current_live_write_surfaces'])}`",
+                "- mode_gate_supervised_current_live_write_surfaces: "
+                f"`{json.dumps(gap_rollup['mode_gate_supervised_current_live_write_surfaces'])}`",
                 "- policy_supervised_live_write_kinds: "
                 f"`{json.dumps(gap_rollup['policy_supervised_live_write_kinds'])}`",
                 "- policy_supervised_live_write_surfaces: "
@@ -27015,6 +27108,8 @@ def write_summary(run_dir: Path, results: Sequence[CheckResult], *, generated_at
                 f"- artifact_count: `{wing_readonly_preflight['artifact_count']}`",
                 f"- valid_candidate_count: `{wing_readonly_preflight['valid_candidate_count']}`",
                 f"- invalid_candidate_count: `{wing_readonly_preflight['invalid_candidate_count']}`",
+                f"- readiness_matrix_update_candidate_available: `{str(wing_readonly_preflight['readiness_matrix_update_candidate_available']).lower()}`",
+                f"- readiness_matrix_update_allowed: `{str(wing_readonly_preflight['readiness_matrix_update_allowed']).lower()}`",
                 f"- readiness_update_candidate_available: `{str(wing_readonly_preflight['readiness_update_candidate_available']).lower()}`",
                 "- mvp_blocker_matrix_ids: "
                 f"`{json.dumps(wing_readonly_preflight['mvp_blocker_matrix_ids'])}`",

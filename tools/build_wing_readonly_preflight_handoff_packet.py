@@ -156,6 +156,19 @@ REVIEW_DECISION_TEMPLATE_REQUIRED_FIELDS = list(
 REVIEW_DECISION_PRESTART_PROOF_FIELDS = list(
     WING_READONLY_PREFLIGHT_REVIEW_DECISION_PRESTART_PROOF_FIELDS
 )
+PACKET_SCOPE = "read_only_preflight_evidence_handoff_only"
+CURRENT_STATE_AUTHORITY_SOURCES = [
+    "Docs/CURRENT_STATE.md",
+    "Docs/plans/M001-real-wing-interaction-plan.md",
+    "ops/autopilot/STATE.json",
+]
+PACKET_SCOPE_NOTE = (
+    "This packet is only the offline/read-only preflight evidence handoff. "
+    "After an accepted_decision_ready ledger exists, use the current state "
+    "sources for the next operator action; this packet does not authorize "
+    "repeating hardware capture, supervised proof, readiness closure, or live "
+    "authority by itself."
+)
 
 
 def utc_now() -> str:
@@ -681,6 +694,11 @@ def build_handoff_packet(
         "type": "wing_readonly_preflight_handoff_packet",
         "generated_at": generated_at or utc_now(),
         "status": "operator_hardware_step_required",
+        "packet_scope": PACKET_SCOPE,
+        "current_state_authority_sources": list(CURRENT_STATE_AUTHORITY_SOURCES),
+        "superseded_after_accepted_decision_ready": True,
+        "packet_does_not_select_current_next_action_after_decision_ready": True,
+        "scope_note": PACKET_SCOPE_NOTE,
         "read_only": True,
         "live_write": False,
         "mutates_console_state": False,
@@ -1005,6 +1023,17 @@ def render_markdown(packet: Mapping[str, Any]) -> str:
         "",
         f"Generated: `{packet['generated_at']}`",
         f"Status: `{packet['status']}`",
+        "",
+        "## Packet Scope",
+        "",
+        f"- packet_scope: `{packet['packet_scope']}`",
+        "- current_state_authority_sources: "
+        f"`{json.dumps(packet['current_state_authority_sources'])}`",
+        "- superseded_after_accepted_decision_ready: "
+        f"`{str(packet['superseded_after_accepted_decision_ready']).lower()}`",
+        "- packet_does_not_select_current_next_action_after_decision_ready: "
+        f"`{str(packet['packet_does_not_select_current_next_action_after_decision_ready']).lower()}`",
+        f"- scope_note: {packet['scope_note']}",
         "",
         "## Safety Boundary",
         "",

@@ -10,8 +10,9 @@ Status: WAITING_FOR_EXTERNAL_VALIDATION
 
 The project can resume autonomous work from a clean, finite plan that verifies
 the no-WING prestart and read-only preflight input gate before any real WING
-contact. A real hardware run remains external validation and must not be
-simulated.
+contact. The canonical read-only decision is now accepted-ready, but the
+remaining supervised proof/rollback run remains external validation and must
+not be simulated.
 
 ## Why this advances the project goal
 
@@ -71,8 +72,27 @@ be trusted.
   with `websocket_opened: false` and `write_request_sent: false`.
 - CP05 milestone review:
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP05_MILESTONE_REVIEW_20260618.md`.
-- M001 autonomous work is complete. The next required proof is external
-  hardware/operator validation.
+- M001 autonomous pre-hardware work is complete, and the canonical read-only
+  decision is `accepted_decision_ready`. The current required external proof is
+  the failed CH3 fader rollback recovery and rerun, followed by separate
+  headroom-safe gain-down proof evidence.
+- Next operator action from `STATE.json`: Do not widen live authority. Operator
+  must restore or verify CH3 fader state after the failed rollback with reason
+  rollback_not_applied, then rerun the narrow fader proof until apply, physical
+  readback, rollback and emergency-stop/block evidence all pass. After that,
+  run a separate headroom-safe gain-down proof with the same evidence
+  requirements; only then reassess release readiness.
+- Latest ledger handoff row:
+  `full_suite_after_mvp_progress_handoff_guard_passed` at
+  `2026-07-03T12:11:35Z`. No live authority changed; release-ready live
+  correction families remain `0`, live-allowed safety rows remain `0`, and
+  current supervised live-write kinds remain `0`.
+
+## Current external validation requirements
+
+- Operator restores or verifies CH3 fader state after rollback_not_applied
+- Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
+- Separate headroom-safe supervised gain-down proof with the same evidence requirements
 
 ## Exact evidence
 
@@ -81,10 +101,11 @@ See `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`.
 ## Real WING interaction plan
 
 The full operator/backend route for real-console work is
-`Docs/plans/M001-real-wing-interaction-plan.md`. It keeps the current milestone
-blocked before writes until read-only artifacts have accepted operator decision
-records, then allows only the supervised `fader`/`gain-down` proof with
-physical readback, rollback and emergency-stop evidence.
+`Docs/plans/M001-real-wing-interaction-plan.md`. It now starts from the
+accepted read-only decision gate and keeps supervised writes blocked until the
+operator restores or verifies CH3 fader state after `rollback_not_applied`.
+Only the explicit supervised `fader`/`gain-down` proof path with physical
+readback, rollback and emergency-stop evidence can move the milestone forward.
 
 ## Rollback
 
@@ -99,6 +120,8 @@ or if no-WING evidence unexpectedly grants live authority.
 
 ## External blockers
 
-Real hardware proof requires WING Rack, intended backend session, operator
-presence and accepted review records. Until that exists, the milestone remains
-`WAITING_FOR_EXTERNAL_VALIDATION`.
+Real hardware proof now requires WING Rack, intended backend session, operator
+presence, CH3 fader state restoration/verification after `rollback_not_applied`,
+and a clean supervised proof rerun. The accepted read-only decision is
+necessary evidence, but it does not close readiness or grant live authority, so
+the milestone remains `WAITING_FOR_EXTERNAL_VALIDATION`.

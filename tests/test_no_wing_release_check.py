@@ -89,8 +89,6 @@ from tools.no_wing_release_check import (
     channel_basic_controls_readback_contract_summary,
     channel_processing_readback_artifact_intake_summary,
     channel_processing_readback_contract_summary,
-    current_supervised_live_write_kinds,
-    current_supervised_live_write_surfaces,
     dlive_state_readback_artifact_intake_summary,
     dlive_state_readback_contract_summary,
     fx_slots_inserts_readback_artifact_intake_summary,
@@ -98,7 +96,11 @@ from tools.no_wing_release_check import (
     gain_proof_artifact_root_for_run,
     matrix_state_readback_artifact_intake_summary,
     matrix_state_readback_contract_summary,
+    mode_gate_supervised_live_write_kinds,
+    mode_gate_supervised_live_write_surfaces,
     next_wing_proof_plan_summary,
+    policy_supervised_live_write_kinds,
+    policy_supervised_live_write_surfaces,
     proof_report_path_for_run,
     raw_mixer_readback_artifact_intake_summary,
     raw_mixer_readback_contract_summary,
@@ -821,7 +823,7 @@ def test_no_wing_release_check_rejects_external_project_command_paths(tmp_path):
     assert "bad_preserve_path:preserve_path:" in message
 
 
-def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy():
+def test_no_wing_release_check_separates_policy_boundary_from_current_mode_gate():
     policy_status = build_operator_mode_status(
         mode=MODE_SUPERVISED,
         connection_mode="wing",
@@ -829,14 +831,16 @@ def test_no_wing_release_check_derives_supervised_boundary_from_operator_policy(
         auto_mode_unlocked=False,
     )
 
-    assert current_supervised_live_write_kinds() == tuple(
+    assert policy_supervised_live_write_kinds() == tuple(
         policy_status["capabilities"]["allowed_live_write_kinds"]
     )
-    assert current_supervised_live_write_kinds() == ("fader", "gain")
-    assert current_supervised_live_write_surfaces() == tuple(
+    assert policy_supervised_live_write_kinds() == ("fader", "gain")
+    assert policy_supervised_live_write_surfaces() == tuple(
         policy_status["capabilities"]["allowed_live_write_surfaces"]
     )
-    assert current_supervised_live_write_surfaces() == ("preamp", "trim", "fader")
+    assert policy_supervised_live_write_surfaces() == ("preamp", "trim", "fader")
+    assert mode_gate_supervised_live_write_kinds() == ()
+    assert mode_gate_supervised_live_write_surfaces() == ()
 
 
 def test_no_wing_release_check_validates_read_surface_fixture_evidence_snapshot():
@@ -1128,12 +1132,14 @@ def test_no_wing_release_check_validates_wing_readonly_preflight_evidence_snapsh
     assert result.detail["valid_candidate_count"] == 0
     assert result.detail["invalid_candidate_count"] == 0
     assert result.detail["accepted_as_readonly_preflight_candidate"] is False
+    assert result.detail["readiness_matrix_update_candidate_available"] is False
     assert result.detail["readiness_matrix_update_allowed"] is False
     assert result.detail["readiness_closure_allowed_by_evidence"] is False
     assert result.detail["live_authority_granted"] is False
     assert result.detail["full_autonomous_ready"] is False
     assert result.detail["source_authority_denied"] is True
     assert result.detail["source_authority_flags"] == {
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
@@ -7511,6 +7517,7 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
             "valid_candidate_count": 1,
             "invalid_candidate_count": 1,
             "accepted_as_readonly_preflight_candidate": True,
+            "readiness_matrix_update_candidate_available": False,
             "readiness_matrix_update_allowed": True,
             "readiness_closure_allowed_by_evidence": True,
             "live_authority_granted": True,
@@ -7556,7 +7563,7 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
     assert "wing_readonly_preflight_evidence_full_autonomous_ready_not_false" in violations
     assert "wing_readonly_preflight_invalid_artifacts_present" in violations
     assert "wing_readonly_preflight_candidate_summary_mismatch" in violations
-    assert "wing_readonly_preflight_readiness_update_allowed_mismatch" in violations
+    assert "wing_readonly_preflight_readiness_update_allowed_not_false" in violations
     assert (
         "wing_readonly_preflight_summary_readiness_closure_allowed_by_evidence_not_false"
         in violations
@@ -7576,6 +7583,7 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_authority_claim(
 @pytest.mark.parametrize(
     ("field", "value"),
     [
+        ("readiness_matrix_update_allowed", True),
         ("readiness_closure_allowed_by_evidence", None),
         ("live_authority_granted", "false"),
         ("full_autonomous_ready", 0),
@@ -7591,7 +7599,8 @@ def test_no_wing_release_check_rejects_non_false_wing_preflight_summary_authorit
         "valid_candidate_count": 1,
         "invalid_candidate_count": 0,
         "accepted_as_readonly_preflight_candidate": True,
-        "readiness_matrix_update_allowed": True,
+        "readiness_matrix_update_candidate_available": True,
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
@@ -10780,15 +10789,16 @@ def valid_proof_report_with_gap_rollup() -> dict:
                         "Add fresh mute-state intent and physical proof before promotion.",
                     ],
                 },
-                "supervised_current_live_write_kinds": ["fader", "gain"],
-                "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
+                "supervised_current_live_write_kinds": [],
+                "supervised_current_live_write_surfaces": [],
                 "next_required_evidence": [
                     "Reduce every Full Autonomous readiness gap bucket to zero before reviewing auto mode.",
                     "Keep live apply limited to current supervised write kinds until physical readback and rollback evidence exists.",
                 ],
                 "claim": (
                     "Full Autonomous remains blocked; this rollup is report-only and does not widen "
-                    "the current supervised fader/gain live-write boundary."
+                    "current supervised live authority. Policy-level fader/gain is reported "
+                    "separately from mode-gate current live-write lists."
                 ),
             }
         },
@@ -10818,6 +10828,8 @@ def valid_proof_report_with_gap_rollup() -> dict:
             "summary": {
                 "autonomous_apply_allowed_modes": [],
                 "blocked_modes": ["auto"],
+                "supervised_current_live_write_kinds": [],
+                "supervised_current_live_write_surfaces": [],
             }
         },
         "autonomy_evidence_overlay": {
@@ -10859,7 +10871,7 @@ def valid_proof_report_with_gap_rollup() -> dict:
                     "value_type": "fader",
                     "status": "no_current_evidence",
                     "safety_review_candidate": False,
-                    "supervised_live_allowed_static": True,
+                    "supervised_live_allowed_static": False,
                     "autonomous_ready": False,
                     "proof_artifact_count": 0,
                     "physical_candidate_count": 0,
@@ -11406,18 +11418,37 @@ def test_no_wing_release_check_validates_proof_report_gap_rollup_schema(tmp_path
         "hardware_readback_rollback_and_emergency_proof",
     ]
     assert "bus_group_matrix" in result.detail["next_required_evidence_by_action_family"]
-    assert result.detail["supervised_current_live_write_kinds"] == ["fader", "gain"]
-    assert result.detail["supervised_current_live_write_surfaces"] == [
-        "preamp",
-        "trim",
-        "fader",
-    ]
+    assert result.detail["supervised_current_live_write_kinds"] == []
+    assert result.detail["supervised_current_live_write_surfaces"] == []
+    assert result.detail["mode_gate_supervised_current_live_write_kinds"] == []
+    assert result.detail["mode_gate_supervised_current_live_write_surfaces"] == []
+    assert result.detail["mode_gate_helper_supervised_live_write_kinds"] == []
+    assert result.detail["mode_gate_helper_supervised_live_write_surfaces"] == []
     assert result.detail["policy_supervised_live_write_kinds"] == ["fader", "gain"]
     assert result.detail["policy_supervised_live_write_surfaces"] == [
         "preamp",
         "trim",
         "fader",
     ]
+
+
+def test_no_wing_release_check_rejects_legacy_current_fader_gain_gap_rollup_claim(
+    tmp_path,
+):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["summary"]["autonomy_gap_rollup"]["claim"] = (
+        "Full Autonomous remains blocked; this rollup is report-only and does not widen "
+        "the current supervised fader/gain live-write boundary."
+    )
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_gap_rollup(report_path)
+
+    assert result.status == "failed"
+    assert "autonomy_gap_rollup_claim_overstates_current_supervised_boundary" in (
+        result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_validates_gain_dry_run_report_schema(tmp_path):
@@ -11489,6 +11520,23 @@ def test_no_wing_release_check_rejects_autonomy_overlay_outside_wing_boundary(tm
     assert result.detail["expected_value_types"] == ["fader", "gain"]
     assert "autonomy_overlay_row_2_unexpected_value_type" in result.detail["violations"]
     assert "autonomy_overlay_fader_gain_rows_missing" in result.detail["violations"]
+
+
+def test_no_wing_release_check_rejects_autonomy_overlay_static_live_allowance(tmp_path):
+    report_path = tmp_path / "supervised_proof_artifact_report.json"
+    payload = valid_proof_report_with_gap_rollup()
+    payload["autonomy_evidence_overlay"]["rows"][0][
+        "supervised_live_allowed_static"
+    ] = True
+    report_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = validate_supervised_proof_report_autonomy_overlay(report_path)
+
+    assert result.status == "failed"
+    assert (
+        "autonomy_overlay_row_0_supervised_live_allowed_static_not_false"
+        in result.detail["violations"]
+    )
 
 
 def test_no_wing_release_check_validates_next_wing_proof_plan_schema(tmp_path):
@@ -13653,6 +13701,14 @@ def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims
         "autonomy_gap_rollup_unexpected_supervised_live_write_surfaces"
         in result.detail["violations"]
     )
+    assert (
+        "autonomy_gap_rollup_supervised_live_write_kinds_gate_mismatch"
+        in result.detail["violations"]
+    )
+    assert (
+        "autonomy_gap_rollup_supervised_live_write_surfaces_gate_mismatch"
+        in result.detail["violations"]
+    )
     assert result.detail["unexpected_supervised_live_write_kinds"] == ["eq"]
     assert result.detail["unexpected_supervised_live_write_surfaces"] == ["send"]
 
@@ -14724,9 +14780,11 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
                 "bus_group_matrix": ["Add bus/group/matrix safety review before promotion."],
                 "mute": ["Add fresh mute-state intent before promotion."],
             },
-            "supervised_current_live_write_kinds": ["fader", "gain"],
+            "supervised_current_live_write_kinds": [],
+            "mode_gate_supervised_current_live_write_kinds": [],
             "policy_supervised_live_write_kinds": ["fader", "gain"],
-            "supervised_current_live_write_surfaces": ["preamp", "trim", "fader"],
+            "supervised_current_live_write_surfaces": [],
+            "mode_gate_supervised_current_live_write_surfaces": [],
             "policy_supervised_live_write_surfaces": ["preamp", "trim", "fader"],
             "unexpected_supervised_live_write_surfaces": [],
             "unexpected_supervised_live_write_kinds": [],
@@ -14771,11 +14829,19 @@ def test_no_wing_release_check_summary_embeds_autonomy_gap_rollup(tmp_path):
     assert "bus_group_assignment_cache_freshness" in markdown_summary
     assert "next_required_evidence_by_action_family" in markdown_summary
     assert (
-        'supervised_current_live_write_kinds: `["fader", "gain"]`'
+        'supervised_current_live_write_kinds: `[]`'
         in markdown_summary
     )
     assert (
-        'supervised_current_live_write_surfaces: `["preamp", "trim", "fader"]`'
+        'mode_gate_supervised_current_live_write_kinds: `[]`'
+        in markdown_summary
+    )
+    assert (
+        'supervised_current_live_write_surfaces: `[]`'
+        in markdown_summary
+    )
+    assert (
+        'mode_gate_supervised_current_live_write_surfaces: `[]`'
         in markdown_summary
     )
     assert (
@@ -15400,12 +15466,14 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
             "valid_candidate_count": 0,
             "invalid_candidate_count": 0,
             "accepted_as_readonly_preflight_candidate": False,
+            "readiness_matrix_update_candidate_available": False,
             "readiness_matrix_update_allowed": False,
             "readiness_closure_allowed_by_evidence": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
             "source_authority_denied": True,
             "source_authority_flags": {
+                "readiness_matrix_update_allowed": False,
                 "readiness_closure_allowed_by_evidence": False,
                 "live_authority_granted": False,
                 "full_autonomous_ready": False,
@@ -15669,10 +15737,13 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert preflight["full_autonomous_ready"] is False
     assert preflight["source_authority_denied"] is True
     assert preflight["source_authority_flags"] == {
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
     }
+    assert preflight["readiness_matrix_update_candidate_available"] is False
+    assert preflight["readiness_matrix_update_allowed"] is False
     assert preflight["readiness_update_candidate_available"] is False
     assert preflight["mvp_blocker_matrix_ids"] == [
         "wing_readonly_connection_proof",
@@ -15871,10 +15942,12 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "live_authority_granted: `false`" in markdown_summary
     assert "source_authority_denied: `true`" in markdown_summary
     assert (
-        'source_authority_flags: `{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_evidence": false}`'
+        'source_authority_flags: `{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_evidence": false, "readiness_matrix_update_allowed": false}`'
         in markdown_summary
     )
     assert "readiness_update_candidate_available: `false`" in markdown_summary
+    assert "readiness_matrix_update_candidate_available: `false`" in markdown_summary
+    assert "readiness_matrix_update_allowed: `false`" in markdown_summary
     assert "artifact_operator_next_steps" in markdown_summary
     assert "Regenerate the offline expected plan" in markdown_summary
     assert "capture_tool_path: `tools/wing_readonly_preflight_runner.py`" in markdown_summary
@@ -15968,6 +16041,66 @@ def test_no_wing_release_check_summary_embeds_wing_readonly_preflight_evidence(
     assert "handoff_packet_artifact_root_matches_capture: `true`" in markdown_summary
     assert "handoff_packet_channel_matches_capture: `true`" in markdown_summary
     assert "handoff_packet_value_types_match_capture: `true`" in markdown_summary
+
+
+def test_wing_readonly_preflight_evidence_summary_rechecks_source_authority_flags():
+    result = CheckResult(
+        name="wing_readonly_preflight_evidence_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "evidence_status": "readonly_preflight_candidate_available",
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "accepted_as_readonly_preflight_candidate": True,
+            "readiness_matrix_update_candidate_available": True,
+            "readiness_matrix_update_allowed": False,
+            "source_authority_denied": True,
+            "source_authority_flags": {
+                "readiness_matrix_update_allowed": True,
+                "readiness_closure_allowed_by_evidence": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+        },
+    )
+
+    summary = wing_readonly_preflight_evidence_summary([result])
+
+    assert summary["source_authority_denied"] is False
+    assert summary["readiness_update_candidate_available"] is False
+    assert summary["source_authority_flags"]["readiness_matrix_update_allowed"] is True
+
+
+def test_wing_readonly_preflight_evidence_summary_requires_reported_authority_denial():
+    result = CheckResult(
+        name="wing_readonly_preflight_evidence_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "evidence_status": "readonly_preflight_candidate_available",
+            "valid_candidate_count": 1,
+            "invalid_candidate_count": 0,
+            "accepted_as_readonly_preflight_candidate": True,
+            "readiness_matrix_update_candidate_available": True,
+            "readiness_matrix_update_allowed": False,
+            "source_authority_flags": {
+                "readiness_matrix_update_allowed": False,
+                "readiness_closure_allowed_by_evidence": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+        },
+    )
+
+    summary = wing_readonly_preflight_evidence_summary([result])
+
+    assert summary["source_authority_denied"] is False
+    assert summary["readiness_update_candidate_available"] is False
 
 
 def test_no_wing_release_check_summary_embeds_wing_preflight_plan_artifact(tmp_path):
@@ -20291,6 +20424,69 @@ def test_no_wing_release_check_summary_embeds_wing_preflight_review_decision(
     assert "wing_readonly_preflight_review_decisions" in markdown_summary
     assert "manual_readiness_update_candidate_available: `false`" in markdown_summary
     assert "invalid_records: `[]`" in markdown_summary
+
+
+def test_wing_readonly_review_decision_summary_rechecks_source_authority_flags():
+    result = CheckResult(
+        name="wing_readonly_preflight_review_decision_ledger_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "ledger_status": "operator_review_decision_records_available",
+            "accepted_record_count": 1,
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 0,
+            "manual_readiness_update_candidate_available": True,
+            "source_authority_denied": True,
+            "source_authority_flags": {
+                "readiness_matrix_update_allowed_by_decision": True,
+                "readiness_closure_allowed_by_decision": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+        },
+    )
+
+    summary = wing_readonly_preflight_review_decision_summary([result])
+
+    assert summary["source_authority_denied"] is False
+    assert summary["manual_readiness_update_candidate_available"] is False
+    assert (
+        summary["source_authority_flags"][
+            "readiness_matrix_update_allowed_by_decision"
+        ]
+        is True
+    )
+
+
+def test_wing_readonly_review_decision_summary_requires_reported_authority_denial():
+    result = CheckResult(
+        name="wing_readonly_preflight_review_decision_ledger_schema",
+        status="passed",
+        started_at="2026-06-05T00:00:00Z",
+        finished_at="2026-06-05T00:00:01Z",
+        duration_sec=1.0,
+        detail={
+            "ledger_status": "operator_review_decision_records_available",
+            "accepted_record_count": 1,
+            "invalid_record_count": 0,
+            "unreviewed_candidate_count": 0,
+            "manual_readiness_update_candidate_available": True,
+            "source_authority_flags": {
+                "readiness_matrix_update_allowed_by_decision": False,
+                "readiness_closure_allowed_by_decision": False,
+                "live_authority_granted": False,
+                "full_autonomous_ready": False,
+            },
+        },
+    )
+
+    summary = wing_readonly_preflight_review_decision_summary([result])
+
+    assert summary["source_authority_denied"] is False
+    assert summary["manual_readiness_update_candidate_available"] is False
 
 
 def test_no_wing_release_check_summary_renders_invalid_wing_review_decision_records(

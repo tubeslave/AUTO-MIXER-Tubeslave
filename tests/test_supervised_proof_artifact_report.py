@@ -823,12 +823,9 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(
     assert report["autonomy_mode_transition_gate"]["safety"]["automatic_mode_change_allowed"] is False
     assert report["autonomy_mode_transition_gate"]["summary"]["autonomous_apply_allowed_modes"] == []
     assert report["autonomy_mode_transition_gate"]["summary"]["full_auto_readiness_gap_bucket_counts"]["read_surface"] > 0
-    assert report["autonomy_mode_transition_gate"]["summary"]["supervised_current_live_write_kinds"] == [
-        "fader",
-        "gain",
-    ]
+    assert report["autonomy_mode_transition_gate"]["summary"]["supervised_current_live_write_kinds"] == []
     assert report["autonomy_mode_transition_gate"]["rows"][2]["mode"] == "supervised"
-    assert report["autonomy_mode_transition_gate"]["rows"][2]["status"] == "limited_available"
+    assert report["autonomy_mode_transition_gate"]["rows"][2]["status"] == "blocked"
     assert report["autonomy_mode_transition_gate"]["rows"][3]["mode"] == "auto"
     assert report["autonomy_mode_transition_gate"]["rows"][3]["status"] == "blocked"
     gap_rollup = report["summary"]["autonomy_gap_rollup"]
@@ -866,17 +863,12 @@ def test_main_writes_report_and_returns_success_for_physical_candidate(
     assert "fresh mute-state intent" in (
         gap_rollup["next_required_evidence_by_action_family"]["mute"][0]
     )
-    assert gap_rollup["supervised_live_apply_allowed"] is True
-    assert gap_rollup["supervised_current_live_write_kinds"] == [
-        "fader",
-        "gain",
-    ]
-    assert gap_rollup["supervised_current_live_write_surfaces"] == [
-        "preamp",
-        "trim",
-        "fader",
-    ]
+    assert gap_rollup["supervised_live_apply_allowed"] is False
+    assert gap_rollup["supervised_current_live_write_kinds"] == []
+    assert gap_rollup["supervised_current_live_write_surfaces"] == []
     assert "Full Autonomous remains blocked" in gap_rollup["claim"]
+    assert "does not widen current supervised live authority" in gap_rollup["claim"]
+    assert "current supervised fader/gain live-write" not in gap_rollup["claim"]
     assert report["next_wing_proof_plan"]["safety"]["execution_allowed_by_plan"] is False
     assert report["next_wing_proof_plan"]["status"] == "manual_review_ready"
     assert report["next_wing_proof_plan"]["summary"]["planned_value_types"] == []

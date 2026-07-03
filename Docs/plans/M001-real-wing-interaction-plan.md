@@ -1,7 +1,8 @@
 # Plan M001: Real WING Rack interaction path
 
-Status: active operator plan, blocked before supervised writes until operator
-decision records are accepted.
+Status: active operator plan, accepted read-only decision recorded; supervised
+write proof remains blocked until the failed CH3 fader rollback is restored or
+verified and the operator approves the exact next proof.
 
 ## Purpose
 
@@ -17,14 +18,18 @@ The plan does not grant full autonomous live mixing authority.
 
 The current gate is not transport failure. Read-only WING commands have worked:
 connection, channel-name scan, physical readback and observation soundcheck
-analysis. Write commands are intentionally blocked until the read-only evidence
-is reviewed and accepted.
+analysis. The canonical read-only decision ledger is accepted-ready, but write
+commands remain blocked because the latest CH3 fader proof failed rollback.
 
 Current blocker:
 
-- decision review status: `operator_review_required`;
-- accepted decision records: `0`;
-- unreviewed read-only source ids: `4`;
+- decision review status: `accepted_decision_ready`;
+- accepted decision records: `1`;
+- rejected decision records: `2`;
+- invalid decision records: `0`;
+- unreviewed read-only source ids: `0`;
+- latest supervised proof status: `failed`;
+- latest supervised proof reason: `rollback_not_applied`;
 - backend WING runtime: observation-only unless explicitly reconnected for the
   supervised proof step;
 - allowed current WING live-write proof types: `fader` and `gain` only;
@@ -269,7 +274,9 @@ On any unexpected state:
 
 ## Current Executable Slice
 
-Because decision review is still blocked, Codex may execute only the safe slice:
+Because the read-only decision gate is accepted-ready but the latest supervised
+fader proof failed rollback, unattended Codex work may execute only the safe
+slice:
 
 1. no-WING quick safety gate;
 2. decision review status refresh;
@@ -277,6 +284,7 @@ Because decision review is still blocked, Codex may execute only the safe slice:
 4. dashboard safety snapshot;
 5. optional read-only scans/preflights with `observation_only=true`.
 
-Codex must not execute the supervised proof until the operator decision ledger
-is `accepted_decision_ready` and the operator approves the exact channel, value
-type and delta.
+Codex must not execute or retry the supervised proof unattended. The operator
+must first restore or verify CH3 fader state after `rollback_not_applied`, then
+approve the exact channel, value type and negative delta before the narrow
+fader proof is rerun. Gain-down proof remains a separate later proof.

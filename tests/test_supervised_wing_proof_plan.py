@@ -811,6 +811,7 @@ def preflight_ready_snapshot() -> dict:
                 "readiness_update_candidate_available": True,
                 "valid_candidate_count": 1,
                 "invalid_candidate_count": 0,
+                "readiness_matrix_update_allowed": False,
                 "readiness_closure_allowed_by_evidence": False,
                 "live_authority_granted": False,
                 "full_autonomous_ready": False,
@@ -984,6 +985,7 @@ def test_plan_builds_gain_and_fader_physical_proof_steps_without_execution_autho
     assert plan["summary"]["readonly_preflight_evidence_status"] == "readonly_preflight_candidate_available"
     assert plan["summary"]["readonly_preflight_evidence_authority_denied"] is True
     assert plan["summary"]["readonly_preflight_evidence_authority_flags"] == {
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,

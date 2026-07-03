@@ -20,5 +20,29 @@
 
 ## First finite Goal
 
-M001-CP05 completed. M001 is `WAITING_FOR_EXTERNAL_VALIDATION` until the
-operator captures and reviews a real WING read-only artifact.
+M001-CP05 completed. M001 remains `WAITING_FOR_EXTERNAL_VALIDATION` because the
+accepted read-only decision does not close release readiness. Its current
+machine status is `accepted_decision_ready`. The current external blocker is
+the failed CH3 fader rollback proof with reason `rollback_not_applied`; the
+operator must restore or verify CH3 fader state, then rerun the narrow
+supervised proof with apply, physical readback, rollback and
+emergency-stop/block evidence.
+
+## Current external validation requirements
+
+- Operator restores or verifies CH3 fader state after rollback_not_applied
+- Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
+- Separate headroom-safe supervised gain-down proof with the same evidence requirements
+
+Next operator action from `STATE.json`: Do not widen live authority. Operator
+must restore or verify CH3 fader state after the failed rollback with reason
+rollback_not_applied, then rerun the narrow fader proof until apply, physical
+readback, rollback and emergency-stop/block evidence all pass. After that, run
+a separate headroom-safe gain-down proof with the same evidence requirements;
+only then reassess release readiness.
+
+Latest ledger handoff row:
+`full_suite_after_mvp_progress_handoff_guard_passed` at
+`2026-07-03T12:11:35Z`. No live authority changed; release-ready live
+correction families remain `0`, live-allowed safety rows remain `0`, and
+current supervised live-write kinds remain `0`.

@@ -13,13 +13,14 @@ from typing import Any, Dict, Iterable, Tuple
 
 COVERAGE_STATUSES = {
     "hardware_proven_narrow",
+    "supervised_candidate",
     "dry_run_ready",
     "proposal_only",
     "quarantined",
     "blocked",
 }
 
-PROOF_STATES = {"passed", "partial", "missing", "not_allowed"}
+PROOF_STATES = {"passed", "partial", "failed", "missing", "not_allowed"}
 
 
 @dataclass(frozen=True)
@@ -74,8 +75,8 @@ SAFETY_COVERAGE_ROWS: Tuple[SafetyCoverageRow, ...] = (
         id="fader_supervised",
         label="Supervised channel fader",
         action_type="fader",
-        status="hardware_proven_narrow",
-        live_allowed=True,
+        status="supervised_candidate",
+        live_allowed=False,
         canonical_gate="apply_operator_proposal -> supervised manual gate",
         unit_tests="passed",
         offline_harness="passed",
@@ -83,11 +84,30 @@ SAFETY_COVERAGE_ROWS: Tuple[SafetyCoverageRow, ...] = (
         real_wing_proof="partial",
         pre_read="passed",
         apply_readback="passed",
-        rollback_readback="passed",
-        emergency_stop_proof="partial",
-        current_blocker="Limited proof only: one narrow fader path, not broad concert readiness.",
-        next_required_evidence="Repeat controlled WING proof across representative channels with connection-loss and emergency-stop reset evidence.",
-        notes=("live scope remains supervised only", "no autonomous fader movement"),
+        rollback_readback="failed",
+        emergency_stop_proof="missing",
+        current_blocker=(
+            "Latest CH3 fader proof applied and read back, but rollback failed "
+            "with rollback_not_applied; no release-ready live fader family exists."
+        ),
+        next_required_evidence=(
+            "Restore or verify CH3 fader state, then rerun one bounded fader "
+            "proof until physical apply readback, rollback readback, and "
+            "emergency-stop/block evidence all pass."
+        ),
+        required_evidence_components=(
+            "physical_pre_read",
+            "bounded_fader_down_apply",
+            "apply_readback",
+            "rollback_readback",
+            "emergency_stop_block",
+            "operator_approval",
+        ),
+        notes=(
+            "supervised_policy_candidate_only",
+            "live release readiness blocked",
+            "no autonomous fader movement",
+        ),
     ),
     SafetyCoverageRow(
         id="gain_supervised",
@@ -314,7 +334,7 @@ def build_safety_coverage_matrix_snapshot() -> Dict[str, Any]:
             "row_count": len(SAFETY_COVERAGE_ROWS),
             "status_counts": status_counts,
             "live_allowed_row_ids": live_allowed_ids,
-            "live_apply_policy": "supervised_fader_gain_only",
+            "live_apply_policy": "supervised_fader_gain_policy_only_release_live_blocked",
             "missing_or_partial_real_wing_proof_ids": missing_real_wing,
             "next_global_step": "Calibrate thresholds and complete gain proof before widening live claims.",
         },

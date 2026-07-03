@@ -146,6 +146,19 @@ def test_handoff_packet_builds_readonly_operator_sequence():
     )
     assert packet["type"] == "wing_readonly_preflight_handoff_packet"
     assert packet["status"] == "operator_hardware_step_required"
+    assert packet["packet_scope"] == "read_only_preflight_evidence_handoff_only"
+    assert packet["current_state_authority_sources"] == [
+        "Docs/CURRENT_STATE.md",
+        "Docs/plans/M001-real-wing-interaction-plan.md",
+        "ops/autopilot/STATE.json",
+    ]
+    assert packet["superseded_after_accepted_decision_ready"] is True
+    assert (
+        packet["packet_does_not_select_current_next_action_after_decision_ready"]
+        is True
+    )
+    assert "accepted_decision_ready" in packet["scope_note"]
+    assert "does not authorize" in packet["scope_note"]
     assert packet["read_only"] is True
     assert packet["live_write"] is False
     assert packet["mutates_console_state"] is False
@@ -968,6 +981,19 @@ def test_handoff_markdown_renders_commands_and_boundaries():
     markdown = handoff.render_markdown(packet)
 
     assert "WING Read-Only Preflight Handoff Packet" in markdown
+    assert "## Packet Scope" in markdown
+    assert (
+        "packet_scope: `read_only_preflight_evidence_handoff_only`" in markdown
+    )
+    assert "Docs/CURRENT_STATE.md" in markdown
+    assert "Docs/plans/M001-real-wing-interaction-plan.md" in markdown
+    assert "ops/autopilot/STATE.json" in markdown
+    assert "superseded_after_accepted_decision_ready: `true`" in markdown
+    assert (
+        "packet_does_not_select_current_next_action_after_decision_ready: `true`"
+        in markdown
+    )
+    assert "does not authorize repeating hardware capture" in markdown
     assert "live_write: `false`" in markdown
     assert "expected_plan_required_for_real_run: `true`" in markdown
     assert "physical_preflight_requires_existing_backend_connection: `true`" in markdown

@@ -1397,8 +1397,20 @@ def test_project_director_narrows_post_m104_intake_hardening_loop():
     assert directive["pre_hardware_intake_guard_requested_lookback_commits"] == 12
     assert directive["pre_hardware_intake_guard_effective_lookback_commits"] == 20
     assert directive["pre_hardware_intake_guard_lookback_floor"] == 20
-    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
-        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+    if directive["selected_blocker_status"] in {
+        "blocked_by_real_artifact_review",
+        "blocked_by_wing_fader_rollback_proof",
+    }:
+        if (
+            directive["selected_blocker_status"]
+            == "blocked_by_wing_fader_rollback_proof"
+        ):
+            assert (
+                directive["selected_action_source"]
+                == "WING Supervised Fader Rollback Proof"
+            )
+        else:
+            assert directive["selected_action_source"] == "WING Read-Only Decision Review"
         assert directive["pre_hardware_intake_hardening_loop_guard"] is False
         assert (
             directive["allowed_autonomous_scope"]
@@ -1436,32 +1448,52 @@ def test_project_director_selects_operator_review_for_real_wing_candidate():
     )
 
     assert directive["selected_blocker"] == "WING read-only connection proof"
-    assert directive["selected_blocker_status"] == "blocked_by_real_artifact_review"
-    assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+    assert directive["selected_blocker_status"] in {
+        "blocked_by_real_artifact_review",
+        "blocked_by_wing_fader_rollback_proof",
+    }
     assert (
         directive["wing_readonly_preflight_review_status"]
         == "candidate_ready_for_manual_review"
     )
     latest_run_id = directive["wing_readonly_preflight_latest_valid_candidate_run_id"]
-    latest_source_id = directive[
-        "wing_readonly_preflight_latest_unreviewed_candidate_source_id"
-    ]
+    latest_source_id = directive["wing_readonly_preflight_latest_valid_candidate_source_id"]
     assert latest_run_id
     assert latest_source_id == (
         f"artifacts/wing_readonly_preflight/{latest_run_id}/summary.json"
     )
-    assert directive["wing_readonly_preflight_decision_status"] == "blocked"
-    assert (
-        directive["wing_readonly_preflight_decision_ledger_status"]
-        == "operator_review_required"
-    )
-    assert directive["wing_readonly_preflight_unreviewed_candidate_count"] >= 1
-    assert directive["wing_readonly_preflight_decision_blocked_by"] == [
-        "operator_must_record_readonly_preflight_review_decision"
-    ]
-    assert "records an accepted or rejected decision" in directive["selected_action"]
-    assert "does not contact WING/backend" in directive["selected_action"]
-    assert "grant live authority" in directive["selected_action"]
+    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
+        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+        assert directive["wing_readonly_preflight_decision_status"] == "blocked"
+        assert (
+            directive["wing_readonly_preflight_decision_ledger_status"]
+            == "operator_review_required"
+        )
+        assert directive["wing_readonly_preflight_unreviewed_candidate_count"] >= 1
+        assert directive["wing_readonly_preflight_decision_blocked_by"] == [
+            "operator_must_record_readonly_preflight_review_decision"
+        ]
+        assert "records an accepted or rejected decision" in directive["selected_action"]
+        assert "does not contact WING/backend" in directive["selected_action"]
+        assert "grant live authority" in directive["selected_action"]
+    else:
+        assert (
+            directive["selected_action_source"]
+            == "WING Supervised Fader Rollback Proof"
+        )
+        assert (
+            directive["wing_readonly_preflight_decision_status"]
+            == "accepted_decision_ready"
+        )
+        assert (
+            directive["wing_readonly_preflight_decision_ledger_status"]
+            == "operator_review_decision_records_available"
+        )
+        assert directive["wing_readonly_preflight_unreviewed_candidate_count"] == 0
+        assert directive["wing_readonly_preflight_accepted_record_count"] == 1
+        assert "rollback_not_applied" in directive["selected_action"]
+        assert "do not widen live authority" in directive["selected_action"]
+        assert "close readiness" in directive["selected_action"]
 
 
 def test_project_director_derives_required_files_from_selected_blocker_evidence():

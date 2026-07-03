@@ -76,6 +76,7 @@ GAP_BUCKETS = (
 )
 
 READONLY_PREFLIGHT_EVIDENCE_SOURCE_AUTHORITY_FLAGS = (
+    "readiness_matrix_update_allowed",
     "readiness_closure_allowed_by_evidence",
     "live_authority_granted",
     "full_autonomous_ready",
@@ -356,6 +357,9 @@ def _wing_readonly_preflight_readiness_overlay(
     violations = summary.get("violations") if isinstance(summary.get("violations"), list) else []
     valid_candidate_count = int(summary.get("valid_candidate_count") or 0)
     invalid_candidate_count = int(summary.get("invalid_candidate_count") or 0)
+    update_candidate_available = (
+        summary.get("readiness_matrix_update_candidate_available") is True
+    )
     update_allowed = summary.get("readiness_matrix_update_allowed") is True
     source_authority_denied = _readonly_preflight_source_authority_denied(summary)
     matrix_rows = [row for row in matrix if isinstance(row, dict)]
@@ -390,7 +394,8 @@ def _wing_readonly_preflight_readiness_overlay(
     candidate_available = (
         valid_candidate_count > 0
         and invalid_candidate_count == 0
-        and update_allowed
+        and update_candidate_available
+        and not update_allowed
         and prestart_summary_contract_valid
         and source_authority_denied
     )
@@ -411,7 +416,10 @@ def _wing_readonly_preflight_readiness_overlay(
         "live_write": False,
         "live_widening_allowed": False,
         "automatic_safety_update_allowed": False,
+        "readiness_matrix_update_allowed": update_allowed,
         "readiness_closure_allowed_by_evidence": False,
+        "readiness_matrix_update_candidate_available": update_candidate_available,
+        "readiness_matrix_update_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
         "source_authority_denied": source_authority_denied,

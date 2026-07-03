@@ -205,7 +205,8 @@ def _readiness_evidence_snapshot_with_candidate(candidate: dict) -> dict:
             "artifact_count": 1,
             "valid_candidate_count": 1,
             "invalid_candidate_count": 0,
-            "readiness_matrix_update_allowed": True,
+            "readiness_matrix_update_candidate_available": True,
+            "readiness_matrix_update_allowed": False,
             "readiness_closure_allowed_by_evidence": False,
             "live_authority_granted": False,
             "full_autonomous_ready": False,
@@ -535,16 +536,20 @@ def test_promotion_readiness_snapshot_is_fail_closed_for_full_autonomous_mode():
     assert preflight["live_write"] is False
     assert preflight["live_widening_allowed"] is False
     assert preflight["automatic_safety_update_allowed"] is False
+    assert preflight["readiness_matrix_update_allowed"] is False
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False
     assert preflight["source_authority_denied"] is True
     assert preflight["source_authority_flags"] == {
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
     }
     assert preflight["evidence_status"] == "operator_preflight_required"
+    assert preflight["readiness_matrix_update_candidate_available"] is False
+    assert preflight["readiness_matrix_update_allowed_by_evidence"] is False
     assert preflight["readiness_update_candidate_available"] is False
     assert preflight["prestart_backend_port_check_required"] is True
     assert preflight["prestart_backend_port_check_must_pass_before_starting_backend"] is True
@@ -672,15 +677,26 @@ def test_fader_is_supervised_only_but_not_autonomous_ready():
     rows = {row.id: row for row in iter_promotion_readiness_rows()}
     row = rows["fader_supervised_promotion"]
 
-    assert row.status == "supervised_live_allowed"
-    assert row.supervised_live_allowed is True
+    assert row.status == "read_coverage_blocked"
+    assert row.supervised_live_allowed is False
     assert row.autonomous_ready is False
     assert row.safety_row_id == "fader_supervised"
-    assert row.safety_status == "hardware_proven_narrow"
+    assert row.safety_status == "supervised_candidate"
+    assert row.evidence_requirement_ids == (
+        "physical_pre_read",
+        "bounded_fader_down_apply",
+        "apply_readback",
+        "rollback_readback",
+        "emergency_stop_block",
+        "operator_approval",
+    )
+    assert "safety_live_not_allowed" in row.blockers
+    assert "capability_declares_live_kind_without_safety_proof" in row.blockers
     assert "mode_full_autonomous_blocked" in row.blockers
     assert "not_autonomous_ready" in row.blockers
     assert "real_wing_proof_partial" in row.blockers
-    assert "emergency_stop_proof_partial" in row.blockers
+    assert "rollback_readback_failed" in row.blockers
+    assert "emergency_stop_proof_missing" in row.blockers
 
 
 def test_gain_declared_executor_surface_is_still_safety_proof_blocked():
@@ -976,6 +992,9 @@ def test_readiness_snapshot_accepts_artifact_bound_prestart_summary_contract():
     preflight = snapshot["summary"]["wing_readonly_preflight_evidence"]
 
     assert preflight["readiness_update_candidate_available"] is True
+    assert preflight["readiness_matrix_update_candidate_available"] is True
+    assert preflight["readiness_matrix_update_allowed"] is False
+    assert preflight["readiness_matrix_update_allowed_by_evidence"] is False
     assert preflight["prestart_backend_port_summary_contract_valid"] is True
     assert preflight["prestart_backend_port_summary_contract_violations"] == []
     assert preflight["readiness_closure_allowed_by_evidence"] is False
@@ -983,6 +1002,7 @@ def test_readiness_snapshot_accepts_artifact_bound_prestart_summary_contract():
     assert preflight["full_autonomous_ready"] is False
     assert preflight["source_authority_denied"] is True
     assert preflight["source_authority_flags"] == {
+        "readiness_matrix_update_allowed": False,
         "readiness_closure_allowed_by_evidence": False,
         "live_authority_granted": False,
         "full_autonomous_ready": False,
@@ -992,6 +1012,7 @@ def test_readiness_snapshot_accepts_artifact_bound_prestart_summary_contract():
 @pytest.mark.parametrize(
     ("field", "value"),
     [
+        ("readiness_matrix_update_allowed", True),
         ("readiness_closure_allowed_by_evidence", None),
         ("live_authority_granted", "false"),
         ("full_autonomous_ready", 0),

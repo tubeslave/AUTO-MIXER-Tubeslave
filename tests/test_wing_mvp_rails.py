@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import re
@@ -60,6 +61,7 @@ from backend.safety_kernel_trace_contract import (
 from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import build_wing_readonly_preflight_handoff_packet as handoff_packet
 from tools import no_wing_release_check as release_check
+from tools import verify_no_wing_artifact_manifest as manifest_verifier
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -80,6 +82,7 @@ SAFETY_CONTRACT = PROJECT_ROOT / "Docs" / "SAFETY_CONTRACT.md"
 CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CAPABILITY_MATRIX.md"
 CONSOLE_CAPABILITY_MATRIX = PROJECT_ROOT / "Docs" / "CONSOLE_CAPABILITY_MATRIX.md"
 M001_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M001-wing-readonly-preflight-evidence-gate.md"
+M001_REAL_WING_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M001-real-wing-interaction-plan.md"
 M011_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M011-offline-replay-evaluation-contract.md"
 M011_ADR = PROJECT_ROOT / "Docs" / "adr" / "offline-replay-evaluation-contract-20260619.md"
 M012_PLAN = PROJECT_ROOT / "Docs" / "plans" / "M012-fault-injection-recovery-contract.md"
@@ -313,6 +316,7 @@ AUTOPILOT_OPERATIONS = PROJECT_ROOT / "ops" / "autopilot" / "OPERATIONS.md"
 AUTOPILOT_HEARTBEAT = PROJECT_ROOT / "ops" / "autopilot" / "HEARTBEAT.md"
 AUTOPILOT_LAST_REPORT = PROJECT_ROOT / "ops" / "autopilot" / "LAST_REPORT.md"
 AUTOPILOT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
+AUTOPILOT_RUN_LEDGER = PROJECT_ROOT / "ops" / "autopilot" / "RUN_LEDGER.jsonl"
 REAL_WING_ARTIFACT_ROOT = PROJECT_ROOT / "artifacts" / "wing_readonly_preflight"
 VALIDATE_INPUTS_READY_SUMMARY = (
     PROJECT_ROOT
@@ -336,6 +340,10 @@ CP04_HANDOFF_REPORT = (
     / "reports"
     / "AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md"
 )
+READONLY_HANDOFF_LATEST = (
+    PROJECT_ROOT / "Docs" / "reports" / "WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"
+)
+MVP_PROGRESS_REPORT = PROJECT_ROOT / "Docs" / "reports" / "MVP_PROGRESS_LATEST.md"
 PROGRESS_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "update_mvp_progress.py"
 PROJECT_DIRECTOR_TOOL = PROJECT_ROOT / "tools" / "codex_autoloop" / "project_director_agent.py"
 RUNNER_TOOL = PROJECT_ROOT / "tools" / "wing_readonly_preflight_runner.py"
@@ -700,6 +708,11 @@ def test_current_state_doc_matches_autopilot_state_evidence():
     summary = state["last_validation_summary"]
     authority = summary["authority"]
     text = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
     latest_commit = re.search(
         r"Latest verified product/runtime commit:\s*`([0-9a-f]+) ",
@@ -715,6 +728,15 @@ def test_current_state_doc_matches_autopilot_state_evidence():
     assert latest_full_suite is not None
     assert latest_full_suite.group(1) == state["last_verified_commit"]
     assert summary["pytest"].rsplit(": ", 1)[-1] == latest_full_suite.group(2)
+    ledger_full_suite_results = [
+        result
+        for row in ledger_rows
+        for result in row.get("results", [])
+        if re.fullmatch(r"\d+ passed, 1 skipped, 1 warning(?: in [0-9.]+s)?", result)
+    ]
+    assert ledger_full_suite_results
+    latest_ledger_full_suite = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
+    assert summary["pytest"].rsplit(": ", 1)[-1] == latest_ledger_full_suite
 
     assert summary["no_wing_artifact"] in text
     assert "tools/verify_no_wing_artifact_manifest.py" in text
@@ -725,8 +747,100 @@ def test_current_state_doc_matches_autopilot_state_evidence():
         assert expected in text
 
     assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
-    assert re.search(r"waiting for external\s+WING/operator validation", text)
+    assert re.search(r"waiting for external\s+WING/operator\s+validation", text)
     assert "No real hardware evidence was produced" in text
+
+
+def test_current_no_wing_quick_evidence_is_repo_local_and_fail_closed():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    summary_text = state["last_validation_summary"]["no_wing_quick"]
+    artifact_dir = state["last_validation_summary"]["no_wing_artifact"]
+
+    assert "/tmp/" not in summary_text
+    assert "--artifact-root artifacts/no_wing_release_check" in summary_text
+    summary_match = re.search(
+        r"summary (artifacts/no_wing_release_check/[^;]+/summary\.json)",
+        summary_text,
+    )
+    assert summary_match is not None
+
+    summary_rel = summary_match.group(1)
+    assert summary_rel == f"{artifact_dir}/summary.json"
+    assert summary_rel.startswith("artifacts/no_wing_release_check/")
+    summary_path = PROJECT_ROOT / summary_rel
+    assert summary_path.exists()
+    artifact_path = PROJECT_ROOT / artifact_dir
+    manifest_path = artifact_path / "artifact-manifest.json"
+    summary_md_path = artifact_path / "summary.md"
+    assert manifest_path.exists()
+    assert summary_md_path.exists()
+
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    verifier_report = manifest_verifier.verify_no_wing_artifact_manifest(artifact_path)
+
+    assert verifier_report["status"] == "passed"
+    assert verifier_report["failed_checks"] == []
+    assert verifier_report["live_authority_granted"] is False
+    assert verifier_report["readiness_closure_allowed"] is False
+    assert verifier_report["readiness_matrix_update_allowed"] is False
+    assert verifier_report["contacts_wing"] is False
+    assert verifier_report["contacts_backend"] is False
+
+    summary_sha256 = hashlib.sha256(summary_path.read_bytes()).hexdigest()
+    summary_md_sha256 = hashlib.sha256(summary_md_path.read_bytes()).hexdigest()
+    manifest_artifacts = {
+        row["artifact_id"]: row for row in manifest["artifacts"]
+    }
+    assert manifest["artifact_manifest_summary_json_sha256"] == summary_sha256
+    assert manifest_artifacts["summary_json"]["sha256"] == summary_sha256
+    assert manifest["artifact_manifest_summary_md_sha256"] == summary_md_sha256
+    assert manifest_artifacts["summary_md"]["sha256"] == summary_md_sha256
+    assert manifest["artifact_manifest_self_consistency_match"] is True
+    assert manifest["artifact_manifest_self_consistency_mismatches"] == []
+    assert manifest["artifact_manifest_contract_cross_surface_match"] is True
+    assert manifest["artifact_manifest_contract_cross_surface_mismatches"] == []
+    assert manifest["artifact_manifest_readiness_matrix_update_allowed"] is False
+    assert manifest["artifact_manifest_readiness_closure_allowed"] is False
+    assert manifest["artifact_manifest_live_authority_granted"] is False
+
+    assert summary["status"] == "passed"
+    assert summary["failed_checks"] == []
+    assert summary["live_authority_granted"] is False
+    assert summary["readiness_closure_allowed"] is False
+    assert summary["readiness_matrix_update_allowed"] is False
+    assert summary["artifact_manifest_readiness_matrix_update_allowed"] is False
+    assert summary["wing_readonly_handoff_plan_verifier_summary_surface_match"] is True
+    assert (
+        summary["wing_readonly_handoff_plan_verifier_summary_surface_mismatches"] == []
+    )
+    assert (
+        summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed"
+        ]
+        is False
+    )
+    assert (
+        summary[
+            "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed"
+        ]
+        is False
+    )
+
+    decision_ledger = summary["wing_readonly_preflight_review_decision_ledger"]
+    assert decision_ledger["accepted_record_count"] == 1
+    assert decision_ledger["rejected_record_count"] == 2
+    assert decision_ledger["invalid_record_count"] == 0
+    assert decision_ledger["unreviewed_candidate_count"] == 0
+    assert decision_ledger["live_authority_granted"] is False
+    assert decision_ledger["readiness_closure_allowed_by_decision"] is False
+    assert decision_ledger["readiness_matrix_update_allowed_by_decision"] is False
 
 
 def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
@@ -745,12 +859,16 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
 
     assert "ID: M001" in active
     assert "Status: WAITING_FOR_EXTERNAL_VALIDATION" in active
-    assert "A real hardware run remains external validation" in active
-    assert "M001 autonomous work is complete" in active
-    assert "Real hardware proof requires WING Rack" in active
+    assert "canonical read-only decision is now accepted-ready" in active
+    assert "M001 autonomous pre-hardware work is complete" in active
+    assert "Real hardware proof now requires WING Rack" in active
+    assert "rollback_not_applied" in active
 
     assert "Exactly one milestone is active: `M001`" in roadmap
     assert "`WAITING_FOR_EXTERNAL_VALIDATION`" in roadmap
+    assert "Current M001 waiting reason" in roadmap
+    assert "accepted_decision_ready" in roadmap
+    assert "rollback_not_applied" in roadmap
     assert markdown_table_row(roadmap, "M001")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
     assert markdown_table_row(roadmap, "M002")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
     for milestone in ("M003", "M004", "M005", "M006"):
@@ -775,7 +893,8 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     assert fader[3] == "no live write"
     assert gain[3] == "no live write"
 
-    assert "real WING Rack read-only artifact" in blockers
+    normalized_blockers = re.sub(r"\s+", " ", blockers)
+    assert "real WING Rack read-only artifact" in normalized_blockers
     assert "WING_REAL_HARDWARE_READONLY_20260702.md" in blockers
     assert "temporary-root capture only" in blockers
     assert "cannot close readiness" in blockers
@@ -802,12 +921,15 @@ def test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state():
     stop_path = state["stop_file"]
     lease_path = state["writer_lease_dir"]
     owner_path = f"{lease_path}/owner.json"
+    gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
 
     for text in (contract, skill, operations):
         assert stop_path in text
         assert lease_path in text
 
     assert owner_path in operations
+    assert lease_path + "/" in gitignore
+    assert not (PROJECT_ROOT / owner_path).exists()
     assert ".codex_autoloop.lock" in contract
     assert ".codex_autoloop.lock" in skill
     assert "RUN_LEDGER.jsonl" in contract
@@ -831,6 +953,414 @@ def test_autopilot_stop_lease_and_recovery_contract_stays_bound_to_state():
     for marker in ("STATE.json", "RUN_LEDGER.jsonl", "active plan", "git\ndiff"):
         assert marker in report
     assert "Resume from the first checkpoint whose required evidence is missing" in report
+
+
+def test_autopilot_latest_ledger_timestamp_matches_current_state_surfaces():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    heartbeat = AUTOPILOT_HEARTBEAT.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest_ledger_ts = ledger_rows[-1]["recorded_at_utc"]
+    assert state["last_heartbeat_utc"] == latest_ledger_ts
+    assert f"Last heartbeat UTC: {latest_ledger_ts}" in heartbeat
+    assert f"- Latest heartbeat: {latest_ledger_ts}." in report
+    assert f"Generated: {latest_ledger_ts}" in current
+
+
+def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_blocked():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest = ledger_rows[-1]
+    latest_authority = latest["authority"]
+    state_summary = state["last_validation_summary"]
+    state_authority = state_summary["authority"]
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert latest["status"] == state["program_status"]
+    assert latest["checkpoint"] == state["active_checkpoint"]
+    assert latest["recorded_at_utc"] == state["last_heartbeat_utc"]
+    assert latest["hardware_contacted"] is False
+    assert latest["live_writes"] is False
+
+    for flag in (
+        "contacts_backend",
+        "contacts_wing",
+        "live_authority_granted",
+        "live_write",
+        "readiness_closure_allowed",
+    ):
+        assert latest_authority[flag] is state_authority[flag] is False
+
+    assert latest_authority["readiness_matrix_update_allowed"] is False
+    assert (
+        latest_authority["release_ready_live_family_count"]
+        == state_summary["wing_correction_apply_readiness_release_ready_live_family_count"]
+        == 0
+    )
+    assert (
+        latest_authority["safety_coverage_live_allowed_row_count"]
+        == len(state_summary["safety_coverage_matrix_live_allowed_row_ids"])
+        == 0
+    )
+    assert (
+        latest_authority["supervised_current_live_write_kind_count"]
+        == len(state_summary["autonomy_mode_transition_supervised_current_live_write_kinds"])
+        == 0
+    )
+    assert latest_authority["unrestricted_live_or_soundcheck_authority"] is False
+
+
+def test_autopilot_latest_ledger_records_external_validation_handoff():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    heartbeat = AUTOPILOT_HEARTBEAT.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest = ledger_rows[-1]
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert latest["status"] == state["program_status"]
+    assert latest["next_operator_action"] == state["next_operator_action"]
+    assert latest["external_validation_requirements"] == state[
+        "external_validation_requirements"
+    ]
+    assert latest["current_blocker"] == state["current_blocker"]
+    for marker in (
+        "rollback_not_applied",
+        "restore or verify CH3 fader state",
+        "fader proof",
+        "physical readback",
+        "rollback",
+        "emergency-stop/block evidence",
+        "headroom-safe",
+    ):
+        assert marker in latest["next_operator_action"]
+    for requirement in latest["external_validation_requirements"]:
+        assert requirement in heartbeat
+        assert requirement in report
+        assert requirement in current
+
+
+def test_autopilot_blockers_doc_records_external_validation_handoff():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    blockers = AUTOPILOT_BLOCKERS.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest = ledger_rows[-1]
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert latest["status"] == state["program_status"]
+    assert latest["current_blocker"] == state["current_blocker"]
+    assert latest["next_operator_action"] == state["next_operator_action"]
+    assert latest["external_validation_requirements"] == state[
+        "external_validation_requirements"
+    ]
+
+    assert "## Current external validation requirements" in blockers
+    for requirement in state["external_validation_requirements"]:
+        assert f"- {requirement}" in blockers
+    assert "Next operator action from `STATE.json`:" in blockers
+    normalized_blockers = re.sub(r"\s+", " ", blockers)
+    assert re.sub(r"\s+", " ", state["next_operator_action"]) in normalized_blockers
+    assert re.sub(
+        r"\s+",
+        " ",
+        (
+            f"Latest ledger handoff row: `{latest['event']}` at "
+            f"`{latest['recorded_at_utc']}`"
+        ),
+    ) in normalized_blockers
+    for marker in (
+        "accepted_decision_ready",
+        "rollback_not_applied",
+        "release-ready live correction families remain `0`",
+        "live-allowed safety rows remain `0`",
+        "current supervised live-write kinds remain `0`",
+        "Live authority remains denied",
+    ):
+        assert marker in normalized_blockers
+
+
+def test_active_milestone_and_m001_plan_record_external_validation_handoff():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    active = ACTIVE_MILESTONE_DOC.read_text(encoding="utf-8")
+    plan = M001_PLAN.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest = ledger_rows[-1]
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert latest["status"] == state["program_status"]
+    assert latest["current_blocker"] == state["current_blocker"]
+    assert latest["next_operator_action"] == state["next_operator_action"]
+    assert latest["external_validation_requirements"] == state[
+        "external_validation_requirements"
+    ]
+
+    expected_latest = re.sub(
+        r"\s+",
+        " ",
+        (
+            f"Latest ledger handoff row: `{latest['event']}` at "
+            f"`{latest['recorded_at_utc']}`"
+        ),
+    )
+    expected_next_action = re.sub(r"\s+", " ", state["next_operator_action"])
+    for surface in (active, plan):
+        normalized_surface = re.sub(r"\s+", " ", surface)
+        assert "## Current external validation requirements" in surface
+        for requirement in state["external_validation_requirements"]:
+            assert f"- {requirement}" in surface
+        assert "Next operator action from `STATE.json`:" in surface
+        assert expected_next_action in normalized_surface
+        assert expected_latest in normalized_surface
+        for marker in (
+            "accepted_decision_ready",
+            "rollback_not_applied",
+            "release-ready live correction families remain `0`",
+            "live-allowed safety rows remain `0`",
+            "current supervised live-write kinds remain `0`",
+            "No live authority changed",
+        ):
+            assert marker in normalized_surface
+
+
+def test_roadmap_records_external_validation_handoff():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest = ledger_rows[-1]
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert latest["status"] == state["program_status"]
+    assert latest["current_blocker"] == state["current_blocker"]
+    assert latest["next_operator_action"] == state["next_operator_action"]
+    assert latest["external_validation_requirements"] == state[
+        "external_validation_requirements"
+    ]
+
+    expected_latest = re.sub(
+        r"\s+",
+        " ",
+        (
+            f"Latest ledger handoff row: `{latest['event']}` at "
+            f"`{latest['recorded_at_utc']}`"
+        ),
+    )
+    normalized_roadmap = re.sub(r"\s+", " ", roadmap)
+    assert "## Current external validation requirements" in roadmap
+    for requirement in state["external_validation_requirements"]:
+        assert f"- {requirement}" in roadmap
+    assert "Next operator action from `STATE.json`:" in roadmap
+    assert re.sub(r"\s+", " ", state["next_operator_action"]) in normalized_roadmap
+    assert expected_latest in normalized_roadmap
+    for marker in (
+        "accepted_decision_ready",
+        "rollback_not_applied",
+        "release-ready live correction families remain `0`",
+        "live-allowed safety rows remain `0`",
+        "current supervised live-write kinds remain `0`",
+        "No live authority changed",
+    ):
+        assert marker in normalized_roadmap
+
+
+def test_project_wing_mvp_blockers_doc_records_external_validation_handoff():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    project_blockers = BLOCKERS_DOC.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest = ledger_rows[-1]
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert latest["status"] == state["program_status"]
+    assert latest["current_blocker"] == state["current_blocker"]
+    assert latest["next_operator_action"] == state["next_operator_action"]
+    assert latest["external_validation_requirements"] == state[
+        "external_validation_requirements"
+    ]
+
+    expected_latest = re.sub(
+        r"\s+",
+        " ",
+        (
+            f"Latest ledger handoff row: `{latest['event']}` at "
+            f"`{latest['recorded_at_utc']}`"
+        ),
+    )
+    normalized_project_blockers = re.sub(r"\s+", " ", project_blockers)
+    assert "## Current external validation handoff" in project_blockers
+    for requirement in state["external_validation_requirements"]:
+        assert f"- {requirement}" in project_blockers
+    assert "Next operator action from `STATE.json`:" in project_blockers
+    assert (
+        re.sub(r"\s+", " ", state["next_operator_action"])
+        in normalized_project_blockers
+    )
+    assert expected_latest in normalized_project_blockers
+    for marker in (
+        "accepted_decision_ready",
+        "rollback_not_applied",
+        "release-ready live correction families remain `0`",
+        "live-allowed safety rows remain `0`",
+        "current supervised live-write kinds remain `0`",
+        "No live authority changed",
+    ):
+        assert marker in normalized_project_blockers
+
+
+def test_mvp_progress_report_records_external_validation_handoff():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    progress_report = MVP_PROGRESS_REPORT.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    latest = ledger_rows[-1]
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert latest["status"] == state["program_status"]
+    assert latest["current_blocker"] == state["current_blocker"]
+    assert latest["next_operator_action"] == state["next_operator_action"]
+    assert latest["external_validation_requirements"] == state[
+        "external_validation_requirements"
+    ]
+
+    normalized_progress = re.sub(r"\s+", " ", progress_report)
+    assert "## Current External Validation Handoff" in progress_report
+    assert "Program status from `STATE.json`: `WAITING_FOR_EXTERNAL_VALIDATION`" in progress_report
+    assert "Strict pre-release review score: `94/100`" in progress_report
+    assert "do not report `95/100` or public-release readiness" in progress_report
+    for requirement in state["external_validation_requirements"]:
+        assert f"  - {requirement}" in progress_report
+    assert (
+        re.sub(r"\s+", " ", state["current_blocker"])
+        in normalized_progress
+    )
+    assert (
+        re.sub(r"\s+", " ", state["next_operator_action"])
+        in normalized_progress
+    )
+    assert re.sub(
+        r"\s+",
+        " ",
+        (
+            f"Latest ledger handoff row: `{latest['event']}` at "
+            f"`{latest['recorded_at_utc']}`"
+        ),
+    ) in normalized_progress
+    for marker in (
+        "accepted_decision_ready",
+        "rollback_not_applied",
+        "release-ready live correction families remain `0`",
+        "live-allowed safety rows remain `0`",
+        "current supervised live-write kinds remain `0`",
+        "No live authority changed",
+    ):
+        assert marker in normalized_progress
+
+
+def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    progress_report = MVP_PROGRESS_REPORT.read_text(encoding="utf-8")
+    current = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    score_gate = state["strict_pre_release_review"]
+
+    assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
+    assert score_gate["score"] == 94
+    assert score_gate["release_threshold"] == 95
+    assert score_gate["score"] < score_gate["release_threshold"]
+    assert score_gate["public_release_ready"] is False
+    assert score_gate["required_before_95"] == state[
+        "external_validation_requirements"
+    ]
+
+    for marker in (
+        "rollback_not_applied",
+        "release-ready live correction family",
+        "physical readback",
+        "rollback",
+        "emergency-stop/block evidence",
+    ):
+        assert marker in score_gate["score_ceiling_reason"]
+
+    normalized_progress = re.sub(r"\s+", " ", progress_report)
+    normalized_current = re.sub(r"\s+", " ", current)
+    normalized_report = re.sub(r"\s+", " ", report)
+    assert (
+        f"Strict pre-release review score: `{score_gate['score']}/100`"
+        in progress_report
+    )
+    assert (
+        f"Pre-release score threshold: `{score_gate['release_threshold']}/100`"
+        in progress_report
+    )
+    assert "Public release ready from score gate: `false`" in progress_report
+    assert score_gate["score_ceiling_reason"] in normalized_progress
+    for surface in (normalized_current, normalized_report):
+        assert f"strict pre-release score is `{score_gate['score']}/100`" in surface
+        assert f"threshold remains `{score_gate['release_threshold']}/100`" in surface
+        assert "public release ready: `false`" in surface
+        assert score_gate["score_ceiling_reason"] in surface
+
+
+def test_autopilot_operator_reports_match_latest_full_suite_evidence():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    heartbeat = AUTOPILOT_HEARTBEAT.read_text(encoding="utf-8")
+    report = AUTOPILOT_LAST_REPORT.read_text(encoding="utf-8")
+    ledger_rows = [
+        json.loads(line)
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    expected_result = state["last_validation_summary"]["pytest"].rsplit(": ", 1)[-1]
+    ledger_full_suite_results = [
+        result
+        for row in ledger_rows
+        for result in row.get("results", [])
+        if re.fullmatch(r"\d+ passed, 1 skipped, 1 warning(?: in [0-9.]+s)?", result)
+    ]
+    assert ledger_full_suite_results
+    latest_ledger_result = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
+    assert latest_ledger_result == expected_result
+
+    assert f"Latest verified full pytest passed with `{expected_result}`." in heartbeat
+    assert re.search(
+        rf"latest verified full suite passed with\s*`{re.escape(expected_result)}`",
+        report,
+        re.IGNORECASE,
+    )
 
 
 def test_goal_transition_fallback_contract_stays_report_only_without_native_goal_tools():
@@ -903,26 +1433,35 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
         state["last_validation_summary"].get("wing_readonly_preflight_review_status")
         == "candidate_ready_for_manual_review"
     ):
-        assert (
-            "Operator reviews artifacts/wing_readonly_preflight" in state["next_action"]
-            or "Operator uses the Operator Decision Queue" in state["next_action"]
-        )
-        if "Operator Decision Queue" in state["next_action"]:
-            assert (
-                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
-                in state["next_action"]
+        if (
+            state["last_validation_summary"].get(
+                "wing_readonly_preflight_decision_status"
             )
-            assert (
-                state["last_validation_summary"].get(
-                    "wing_readonly_preflight_operator_decision_queue_report"
-                )
-                == "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
-            )
+            == "accepted_decision_ready"
+        ):
+            assert "Do not widen live authority" in state["next_action"]
+            assert "rollback_not_applied" in state["next_action"]
         else:
             assert (
-                "artifacts/wing_readonly_preflight_review_decisions/"
-                "pending_review_decision_template.json"
-            ) in state["next_action"]
+                "Operator reviews artifacts/wing_readonly_preflight" in state["next_action"]
+                or "Operator uses the Operator Decision Queue" in state["next_action"]
+            )
+            if "Operator Decision Queue" in state["next_action"]:
+                assert (
+                    "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+                    in state["next_action"]
+                )
+                assert (
+                    state["last_validation_summary"].get(
+                        "wing_readonly_preflight_operator_decision_queue_report"
+                    )
+                    == "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+                )
+            else:
+                assert (
+                    "artifacts/wing_readonly_preflight_review_decisions/"
+                    "pending_review_decision_template.json"
+                ) in state["next_action"]
     else:
         assert "operator-supervised WING read-only preflight" in state["next_action"]
 
@@ -961,14 +1500,24 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
         state["last_validation_summary"].get("wing_readonly_preflight_review_status")
         == "candidate_ready_for_manual_review"
     ):
-        assert "latest real WING read-only candidate" in heartbeat
-        assert "operator_review_required" in heartbeat
-        if "Operator Decision Queue" in heartbeat:
-            assert "unreviewed candidates" in heartbeat
-            assert "accepted or rejected operator decision records" in heartbeat
+        if (
+            state["last_validation_summary"].get(
+                "wing_readonly_preflight_decision_status"
+            )
+            == "accepted_decision_ready"
+        ):
+            assert "accepted_decision_ready" in heartbeat
+            assert "rollback_not_applied" in heartbeat
+            assert "release readiness remains\nblocked" in heartbeat
         else:
-            assert "pending_operator_decision" in heartbeat
-            assert "required_edits" in heartbeat
+            assert "latest real WING read-only candidate" in heartbeat
+            assert "operator_review_required" in heartbeat
+            if "Operator Decision Queue" in heartbeat:
+                assert "unreviewed candidates" in heartbeat
+                assert "accepted or rejected operator decision records" in heartbeat
+            else:
+                assert "pending_operator_decision" in heartbeat
+                assert "required_edits" in heartbeat
     else:
         assert "M001 still has no real WING read-only artifact" in heartbeat
 
@@ -1161,10 +1710,17 @@ def test_validate_only_preflight_evidence_stays_out_of_real_wing_artifact_root()
     if summary.get("wing_readonly_preflight_review_status") == (
         "candidate_ready_for_manual_review"
     ):
-        normalized_heartbeat = re.sub(r"\s+", " ", heartbeat)
-        assert "latest real WING read-only candidate" in heartbeat
-        assert "operator_review_required" in heartbeat
-        assert "accepted hardware evidence" in normalized_heartbeat
+        if summary.get("wing_readonly_preflight_decision_status") == (
+            "accepted_decision_ready"
+        ):
+            assert "accepted_decision_ready" in heartbeat
+            assert "rollback_not_applied" in heartbeat
+            assert "canonical read-only decision ledger is accepted-ready" in heartbeat
+        else:
+            normalized_heartbeat = re.sub(r"\s+", " ", heartbeat)
+            assert "latest real WING read-only candidate" in heartbeat
+            assert "operator_review_required" in heartbeat
+            assert "accepted hardware evidence" in normalized_heartbeat
     else:
         assert "M001 still has no real WING read-only artifact under\n" in heartbeat
         assert "`artifacts/wing_readonly_preflight/`" in heartbeat
@@ -1192,46 +1748,87 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
         state["last_validation_summary"].get("wing_readonly_preflight_review_status")
         == "candidate_ready_for_manual_review"
     ):
-        assert state["last_validation_summary"][
-            "wing_readonly_preflight_decision_ledger_status"
-        ] == "operator_review_required"
-        assert state["last_validation_summary"][
-            "wing_readonly_preflight_review_template_required_edits_present"
-        ] is True
-        assert state["last_validation_summary"][
-            "wing_readonly_preflight_latest_valid_candidate_source_id"
-        ] == (
-            "artifacts/wing_readonly_preflight/"
-            "20260702T095758Z_wing_readonly_preflight/summary.json"
-        )
-        assert state["last_validation_summary"][
-            "wing_readonly_preflight_unreviewed_candidate_count"
-        ] == 4
-        assert state["last_validation_summary"][
-            "wing_readonly_preflight_unreviewed_candidate_source_ids"
-        ] == [
-            "artifacts/wing_readonly_preflight/"
-            "20260701T220146Z_wing_readonly_preflight/summary.json",
-            "artifacts/wing_readonly_preflight/"
-            "20260702T061111Z_wing_readonly_preflight/summary.json",
-            "artifacts/wing_readonly_preflight/"
-            "20260702T075151Z_wing_readonly_preflight/summary.json",
-            "artifacts/wing_readonly_preflight/"
-            "20260702T095758Z_wing_readonly_preflight/summary.json",
-        ]
-        assert state["last_validation_summary"][
-            "wing_readonly_preflight_operator_decision_queue_report"
-        ] == "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
-        assert "Operator Decision Queue" in state["next_action"]
+        if (
+            state["last_validation_summary"].get(
+                "wing_readonly_preflight_decision_status"
+            )
+            == "accepted_decision_ready"
+        ):
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_decision_ledger_status"
+            ] == "operator_review_decision_records_available"
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_unreviewed_candidate_count"
+            ] == 0
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_unreviewed_candidate_source_ids"
+            ] == []
+            assert state["last_validation_summary"][
+                "wing_operator_proposal_validation_latest_status"
+            ] == "failed"
+            assert state["last_validation_summary"][
+                "wing_operator_proposal_validation_latest_reason"
+            ] == "rollback_not_applied"
+            assert state["next_operator_action"] == state["next_action"]
+            assert "Do not widen live authority" in state["next_action"]
+            assert "rollback_not_applied" in state["next_action"]
+            for marker in (
+                "restore or verify CH3 fader state",
+                "fader proof",
+                "physical readback",
+                "rollback",
+                "emergency-stop/block evidence",
+                "headroom-safe gain-down proof",
+            ):
+                assert marker in state["next_operator_action"]
+        else:
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_decision_ledger_status"
+            ] == "operator_review_required"
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_review_template_required_edits_present"
+            ] is True
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_latest_valid_candidate_source_id"
+            ] == (
+                "artifacts/wing_readonly_preflight/"
+                "20260702T095758Z_wing_readonly_preflight/summary.json"
+            )
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_unreviewed_candidate_count"
+            ] == 4
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_unreviewed_candidate_source_ids"
+            ] == [
+                "artifacts/wing_readonly_preflight/"
+                "20260701T220146Z_wing_readonly_preflight/summary.json",
+                "artifacts/wing_readonly_preflight/"
+                "20260702T061111Z_wing_readonly_preflight/summary.json",
+                "artifacts/wing_readonly_preflight/"
+                "20260702T075151Z_wing_readonly_preflight/summary.json",
+                "artifacts/wing_readonly_preflight/"
+                "20260702T095758Z_wing_readonly_preflight/summary.json",
+            ]
+            assert state["last_validation_summary"][
+                "wing_readonly_preflight_operator_decision_queue_report"
+            ] == "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
+            assert "Operator Decision Queue" in state["next_action"]
     else:
+        assert state["next_operator_action"] == state["next_action"]
         assert state["next_action"] == (
             "Wait for operator-supervised WING read-only preflight using "
             "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json."
         )
     assert state["external_validation_requirements"] == [
-        "Real WING Rack read-only artifact",
-        "Operator review of accepted read-only preflight candidate",
-        "Explicit operator approval before supervised fader/gain proof",
+        "Operator restores or verifies CH3 fader state after rollback_not_applied",
+        (
+            "Clean supervised CH3 fader proof rerun with apply, physical "
+            "readback, rollback and emergency-stop/block evidence"
+        ),
+        (
+            "Separate headroom-safe supervised gain-down proof with the same "
+            "evidence requirements"
+        ),
     ]
 
     m002 = markdown_table_row(roadmap, "M002")
@@ -1260,19 +1857,97 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
     assert "Update readiness only after manual review of real WING artifacts" in readiness[3]
     assert "do not close rows from offline evidence" in readiness[3]
 
-    assert (
-        "real WING Rack read-only artifact\n  and operator review are required "
-        "before physical readback intake can begin"
-    ) in autopilot_blockers
-    assert "presence and accepted review records" in active
-    assert "operator captures and reviews a real WING read-only artifact" in plan
-    assert "M001 autonomous pre-hardware work is complete and waiting for external" in current
-    assert "WING/operator validation" in current
+    if (
+        state["last_validation_summary"].get("wing_readonly_preflight_decision_status")
+        == "accepted_decision_ready"
+    ):
+        normalized_autopilot_blockers = re.sub(r"\s+", " ", autopilot_blockers)
+        assert "real WING Rack read-only artifact operator decision gate" in (
+            normalized_autopilot_blockers
+        )
+        assert "failed rollback" in autopilot_blockers
+        assert "release readiness" in autopilot_blockers
+    else:
+        assert (
+            "real WING Rack read-only artifact\n  and operator review are required "
+            "before physical readback intake can begin"
+        ) in autopilot_blockers
+    assert "CH3 fader state restoration/verification" in active
+    assert "accepted read-only decision does not close release readiness" in plan
+    assert "failed CH3 fader rollback proof" in plan
+    assert "operator captures and reviews a real WING read-only artifact" not in plan
+    assert "M001 autonomous pre-hardware work is complete" in current
+    assert "current external blocker is no longer" in current
+    assert "CH3 fader state restoration/verification" in current
     assert "Hardware input required now: yes" in report
-    assert "intended backend/WING session and operator review" in report
-    assert "Wait for the operator-supervised real WING read-only preflight" in report
+    if (
+        state["last_validation_summary"].get("wing_readonly_preflight_decision_status")
+        == "accepted_decision_ready"
+    ):
+        assert "read-only decision gate is accepted-ready" in report
+        assert "rollback_not_applied" in report
+    else:
+        assert "intended backend/WING session and operator review" in report
+        assert "Wait for the operator-supervised real WING read-only preflight" in report
     assert "There is no dependency-ready autonomous\nroadmap milestone" in report
     assert "until that external validation exists" in report
+
+
+def test_real_wing_interaction_plan_matches_accepted_decision_rollback_blocker():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    summary = state["last_validation_summary"]
+    plan = M001_REAL_WING_PLAN.read_text(encoding="utf-8")
+
+    assert summary["wing_readonly_preflight_decision_status"] == "accepted_decision_ready"
+    assert summary["wing_readonly_preflight_accepted_record_count"] == 1
+    assert summary["wing_readonly_preflight_decision_record_count"] == 3
+    assert summary["wing_readonly_preflight_unreviewed_candidate_count"] == 0
+    assert summary["wing_operator_proposal_validation_latest_status"] == "failed"
+    assert summary["wing_operator_proposal_validation_latest_reason"] == (
+        "rollback_not_applied"
+    )
+
+    assert "decision review status: `accepted_decision_ready`" in plan
+    assert "accepted decision records: `1`" in plan
+    assert "rejected decision records: `2`" in plan
+    assert "invalid decision records: `0`" in plan
+    assert "unreviewed read-only source ids: `0`" in plan
+    assert "latest supervised proof status: `failed`" in plan
+    assert "latest supervised proof reason: `rollback_not_applied`" in plan
+    assert "failed CH3 fader rollback" in plan
+    assert "Codex must not execute or retry the supervised proof unattended" in plan
+    assert "restore or verify CH3 fader state after `rollback_not_applied`" in plan
+    assert "Gain-down proof remains a separate later proof" in plan
+    assert "allowed current WING live-write proof types: `fader` and `gain` only" in plan
+    assert "allowed current write direction: small negative move only" in plan
+
+    assert "decision review status: `operator_review_required`" not in plan
+    assert "accepted decision records: `0`" not in plan
+    assert "unreviewed read-only source ids: `4`" not in plan
+    assert "Because decision review is still blocked" not in plan
+
+
+def test_latest_readonly_handoff_packet_declares_scope_after_accepted_decision():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    summary = state["last_validation_summary"]
+    handoff = READONLY_HANDOFF_LATEST.read_text(encoding="utf-8")
+
+    assert summary["wing_readonly_preflight_decision_status"] == "accepted_decision_ready"
+    assert summary["wing_operator_proposal_validation_latest_reason"] == (
+        "rollback_not_applied"
+    )
+    assert "## Packet Scope" in handoff
+    assert "packet_scope: `read_only_preflight_evidence_handoff_only`" in handoff
+    assert "Docs/CURRENT_STATE.md" in handoff
+    assert "Docs/plans/M001-real-wing-interaction-plan.md" in handoff
+    assert "ops/autopilot/STATE.json" in handoff
+    assert "superseded_after_accepted_decision_ready: `true`" in handoff
+    assert (
+        "packet_does_not_select_current_next_action_after_decision_ready: `true`"
+        in handoff
+    )
+    assert "does not authorize repeating hardware capture" in handoff
+    assert "live_authority_granted: `false`" in handoff
 
 
 def test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_approval():
@@ -1829,9 +2504,7 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
         "full_autonomous_ready": False,
         "supervised_only": True,
     }
-    assert snapshot["summary"]["supervised_live_allowed_target_ids"] == [
-        "fader_supervised_promotion"
-    ]
+    assert snapshot["summary"]["supervised_live_allowed_target_ids"] == []
     assert snapshot["summary"]["autonomous_ready_target_ids"] == []
     assert set(snapshot["summary"]["global_blockers"]) >= {
         "mode_full_autonomous_blocked",
@@ -1871,7 +2544,10 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
     allowed_fader = rows_by_id["fader_supervised_promotion"]
     gain_trim = rows_by_id["gain_trim_supervised_promotion"]
     assert allowed_fader["action_family"] == "fader"
-    assert allowed_fader["supervised_live_allowed"] is True
+    assert allowed_fader["supervised_live_allowed"] is False
+    assert allowed_fader["safety_status"] == "supervised_candidate"
+    assert "rollback_readback_failed" in allowed_fader["blockers"]
+    assert "safety_live_not_allowed" in allowed_fader["blockers"]
     assert gain_trim["action_family"] == "gain"
     assert gain_trim["supervised_live_allowed"] is False
     assert "real_wing_proof_missing" in gain_trim["blockers"]
@@ -2021,9 +2697,7 @@ def test_m010_full_autonomous_eligibility_stays_locked_until_completion_gates_pa
         "supervised_only": True,
     }
     assert snapshot["summary"]["autonomous_ready_target_ids"] == []
-    assert snapshot["summary"]["supervised_live_allowed_target_ids"] == [
-        "fader_supervised_promotion"
-    ]
+    assert snapshot["summary"]["supervised_live_allowed_target_ids"] == []
     assert snapshot["summary"]["next_global_step"] == (
         "Run proof gates per action family before widening supervised or "
         "autonomous live writes."
@@ -10368,9 +11042,15 @@ def test_m094_project_director_external_validation_scope_guard_stays_readonly():
     assert directive["selected_blocker_status"] in {
         "tooling_ready_waits_real_wing",
         "blocked_by_real_artifact_review",
+        "blocked_by_wing_fader_rollback_proof",
     }
     if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
         assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+    elif (
+        directive["selected_blocker_status"]
+        == "blocked_by_wing_fader_rollback_proof"
+    ):
+        assert directive["selected_action_source"] == "WING Supervised Fader Rollback Proof"
     assert directive["selected_action_requires_external_validation"] is True
     assert directive["external_validation_wait"] is True
     assert directive["stop_broad_work"] is True
@@ -11193,8 +11873,14 @@ def test_m105_project_director_post_m104_intake_loop_guard_stays_readonly():
         assert heading in adr
     assert "No live transport" in adr
 
-    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
-        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+    if directive["selected_blocker_status"] in {
+        "blocked_by_real_artifact_review",
+        "blocked_by_wing_fader_rollback_proof",
+    }:
+        assert directive["selected_action_source"] in {
+            "WING Read-Only Decision Review",
+            "WING Supervised Fader Rollback Proof",
+        }
         assert directive["pre_hardware_intake_hardening_loop_guard"] is False
         assert (
             directive["allowed_autonomous_scope"]
@@ -11278,8 +11964,14 @@ def test_m106_project_director_post_m105_intake_loop_guard_persists():
         assert heading in adr
     assert "No live transport" in adr
 
-    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
-        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+    if directive["selected_blocker_status"] in {
+        "blocked_by_real_artifact_review",
+        "blocked_by_wing_fader_rollback_proof",
+    }:
+        assert directive["selected_action_source"] in {
+            "WING Read-Only Decision Review",
+            "WING Supervised Fader Rollback Proof",
+        }
         assert directive["pre_hardware_intake_hardening_loop_guard"] is False
         assert (
             directive["allowed_autonomous_scope"]
@@ -11363,8 +12055,14 @@ def test_m107_project_director_intake_loop_guard_lookback_floor_persists():
         directive["pre_hardware_intake_guard_lookback_floor"]
     )
     assert directive["pre_hardware_intake_guard_lookback_floor"] == 20
-    if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
-        assert directive["selected_action_source"] == "WING Read-Only Decision Review"
+    if directive["selected_blocker_status"] in {
+        "blocked_by_real_artifact_review",
+        "blocked_by_wing_fader_rollback_proof",
+    }:
+        assert directive["selected_action_source"] in {
+            "WING Read-Only Decision Review",
+            "WING Supervised Fader Rollback Proof",
+        }
         assert directive["pre_hardware_intake_hardening_loop_guard"] is False
         assert (
             directive["allowed_autonomous_scope"]

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-02T11:41:10Z
+Generated: 2026-07-03T12:11:35Z
 
 ## Repository snapshot
 
@@ -10,7 +10,11 @@ Generated: 2026-07-02T11:41:10Z
   `22852a7e8 Ignore validate-only WING preflight traces`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked/untracked worktree state: clean after the WING proof-gate state sync.
+- Tracked/untracked worktree state: dirty during the current WING rollback
+  blocker review and report sync.
+- Writer lease state: no active writer lease is present; the stale tracked
+  `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
+  `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
 - Complete tracked file count from `rg --files`: 14140.
 - Existing root agent file: only `./AGENTS.md`.
 - Canonical docs tree: `Docs/`. On this macOS checkout `docs` resolves to the
@@ -41,9 +45,52 @@ Generated: 2026-07-02T11:41:10Z
   `CURRENT_PROVEN_LIVE_WRITE_KINDS`, but WING deployment live writes are limited
   by `WING_DEPLOYMENT_LIVE_WRITE_KINDS = ("fader", "gain")`.
 - Full Autonomous Mixing Mode is not ready.
-- No real hardware evidence was produced in the canonical readiness-closing
-  artifact root during this state-sync cycle; existing real WING read-only
-  candidates remain queued for operator review.
+- Canonical WING read-only preflight evidence now has an accepted-ready
+  operator decision report for
+  `artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json`.
+  This still does not close release readiness or grant live authority.
+  `backend/wing_readonly_preflight_evidence.py` now separates
+  `readiness_matrix_update_candidate_available` from
+  `readiness_matrix_update_allowed`, so a clean read-only candidate can be
+  reported without implying evidence-only permission to update readiness rows.
+  `readiness_matrix_update_allowed=false` is now also included in the read-only
+  evidence `source_authority_flags` denial packet consumed by downstream
+  readiness and no-WING summaries, and no-WING summary helpers re-check the
+  full nested flag packet plus require an explicit reported
+  `source_authority_denied=true` before surfacing candidate readiness.
+- A supervised CH3 fader proof artifact exists, but it failed rollback with
+  reason `rollback_not_applied`. Fader and gain remain supervised policy
+  candidates only; release-ready live correction families remain `0`.
+- `Docs/plans/M001-real-wing-interaction-plan.md` now mirrors that current
+  gate: the read-only decision ledger is `accepted_decision_ready` with 1
+  accepted, 2 rejected, 0 invalid and 0 unreviewed records, while supervised
+  proof remains blocked on `rollback_not_applied` until the operator restores
+  or verifies CH3 fader state and approves the exact next negative proof.
+- `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
+  its packet scope as read-only preflight evidence handoff only, and points
+  current next-action authority back to `Docs/CURRENT_STATE.md`,
+  `Docs/plans/M001-real-wing-interaction-plan.md` and
+  `ops/autopilot/STATE.json` after `accepted_decision_ready`.
+- `backend/safety_coverage_matrix.py` now mirrors that blocker: the
+  `fader_supervised` row is `supervised_candidate`, not
+  `hardware_proven_narrow`; `live_allowed_row_ids` is empty until rollback and
+  emergency-stop/block proof pass.
+- `backend/operator_product_state.py` now mirrors the same blocker for
+  product-facing autonomy overlays: `supervised_live_allowed_static` is
+  normalized to `false`, and no-WING validation rejects overlay rows that claim
+  static supervised live allowance before proof passes.
+- `tools/no_wing_release_check.py` now also requires autonomy gap-rollup
+  `supervised_current_live_write_kinds` and surfaces to match the
+  mode-transition gate, keeping policy-level fader/gain separate from current
+  live authority while the gate reports no supervised live write kinds.
+  Its helper API now names the split explicitly:
+  `policy_supervised_live_write_*` for the policy boundary and
+  `mode_gate_supervised_live_write_*` for current gate authority. It also
+  rejects the legacy gap-rollup claim phrase that described fader/gain as the
+  current supervised live-write boundary.
+- No real hardware evidence was produced in this state-sync cycle that closes
+  release readiness; the accepted read-only decision and failed rollback proof
+  do not grant live authority.
 - A supporting real WING read-only tmp capture is documented in
   `Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`. It read 15 channel-3
   values through the existing backend session with `write_request_sent: false`,
@@ -53,9 +100,47 @@ Generated: 2026-07-02T11:41:10Z
 - Operator has reported that the real WING Rack is connected and waiting for
   tests. This is treated as permission for necessary supervised test actions
   only, not unlimited live/soundcheck authority.
-- M001 autonomous pre-hardware work is complete and waiting for external
-  WING/operator validation. The exact real-run handoff is
+- M001 autonomous pre-hardware work is complete, and the canonical read-only
+  decision is accepted-ready. M001 remains waiting for external WING/operator
+  validation because the current external blocker is no longer read-only
+  artifact review; it is CH3 fader state restoration/verification after
+  `rollback_not_applied`, then a clean supervised fader proof rerun and
+  separate headroom-safe gain-down proof. The original real-run handoff remains
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
+- Current external validation requirements:
+  Operator restores or verifies CH3 fader state after rollback_not_applied;
+  Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence;
+  Separate headroom-safe supervised gain-down proof with the same evidence requirements.
+- The strict pre-release score is `94/100`; the threshold remains `95/100`,
+  public release ready: `false`. External WING proof remains open:
+  rollback_not_applied, no release-ready live correction family exists, and
+  fader/gain still require complete apply, physical readback, rollback and
+  emergency-stop/block evidence.
+- `ops/autopilot/STATE.json` now exposes the same safe handoff text as
+  `next_operator_action` and `next_action`. The WING MVP rails require those
+  fields to stay synchronized with the rollback/gain-proof external validation
+  requirements while release readiness is blocked.
+- `ops/autopilot/BLOCKERS.md` now records the same exact
+  `external_validation_requirements`, `next_operator_action` and latest
+  `RUN_LEDGER.jsonl` handoff row as `STATE.json`. The WING MVP rails require
+  the primary blocker file to preserve the CH3 rollback recovery, clean fader
+  proof rerun, physical readback, rollback, emergency-stop/block and separate
+  headroom-safe gain-down requirements.
+- `Docs/ACTIVE_MILESTONE.md` and
+  `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md` now record the
+  same exact external validation requirements, `next_operator_action` and
+  latest `RUN_LEDGER.jsonl` handoff row as `STATE.json`. The WING MVP rails
+  require milestone-level docs to preserve the same CH3 rollback recovery,
+  clean fader proof rerun, physical readback, rollback, emergency-stop/block
+  and separate headroom-safe gain-down requirements.
+- `Docs/ROADMAP.md` now records the same exact external validation
+  requirements, `next_operator_action` and latest `RUN_LEDGER.jsonl` handoff
+  row as `STATE.json`. The WING MVP rails require the top-level dependency
+  roadmap to preserve the same handoff while M001 remains externally blocked.
+- `.ai/project-layer/wing_mvp_blockers.md` now records the same exact external
+  validation requirements, `next_operator_action` and latest
+  `RUN_LEDGER.jsonl` handoff row as `STATE.json` while preserving the existing
+  first-row blocker status selection.
 - After M001-CP05, verified no-WING safety-scope hardening commits narrowed
   WING report/executor/monitor surfaces to the supervised deployment boundary:
   `2b25d91f`, `12f56180`, `56329600`, `2464f0d8`, `d20f7d46`, and
@@ -98,7 +183,8 @@ Generated: 2026-07-02T11:41:10Z
   `f1bb5f05c` also blocks WING gain-up when WING control readback context
   exists but the current fader readback is missing, so the ceiling check
   cannot be bypassed by partial readback state. Both candidates remain
-  operator-review-only and preserve the current fader/gain live boundary.
+  operator-review-only and preserve the policy-level fader/gain boundary while
+  current supervised live authority remains blocked.
   `4ac594b22` exposes a SmartDSP evidence-extraction contract in operator
   proposals so the operator can see required source identity, level, spectral,
   masking, transient, noise/bleed, phase/mono, feedback and bus/master evidence
@@ -266,7 +352,7 @@ Generated: 2026-07-02T11:41:10Z
   `0` unexpected or interesting missing safety/evidence keys.
 - The no-WING top-level Markdown coverage section now also self-checks its own
   required field lines. The fresh no-WING bundle
-  `artifacts/no_wing_release_check/20260619T135106Z_no_wing_release_check`
+  `artifacts/no_wing_release_check/20260703T101148Z_no_wing_release_check`
   reports `no_wing_summary_markdown_top_level_coverage_missing_field_lines: []`,
   `no_wing_summary_markdown_top_level_coverage_field_lines_rendered: true`,
   `live_authority_granted: false`, `readiness_closure_allowed_by_packet: false`
@@ -283,6 +369,15 @@ Generated: 2026-07-02T11:41:10Z
   for the latest verified product/runtime commit, full-suite result, no-WING
   artifact path, artifact-manifest verifier failure list, authority-denial
   flags and external-validation wait state.
+- Current no-WING evidence durability is now covered by
+  `tests/test_wing_mvp_rails.py::test_current_no_wing_quick_evidence_is_repo_local_and_fail_closed`.
+  The rail requires the current no-WING quick summary to live under
+  `artifacts/no_wing_release_check`, not `/tmp`, and re-loads the referenced
+  `summary.json`, `summary.md` and `artifact-manifest.json`. It recomputes the
+  summary artifact SHA256 values, runs `verify_no_wing_artifact_manifest`, and
+  verifies failed checks `[]`, manifest self-consistency, cross-surface denial,
+  read-only handoff verifier consistency, decision-ledger counts and no live
+  authority.
 - Milestone and roadmap waiting state is now covered by
   `tests/test_wing_mvp_rails.py::test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence`.
   The rail checks `ops/autopilot/STATE.json`, `Docs/ACTIVE_MILESTONE.md`,
@@ -328,8 +423,9 @@ Generated: 2026-07-02T11:41:10Z
   The rail checks `ops/autopilot/STATE.json`, `Docs/ROADMAP.md`,
   `Docs/ACTIVE_MILESTONE.md`, `.ai/project-layer/wing_mvp_blockers.md`,
   `ops/autopilot/BLOCKERS.md`, the M001 plan, `ops/autopilot/LAST_REPORT.md`
-  and this file so physical readback remains waiting until a real WING
-  read-only artifact is reviewed and bound to accepted decision records.
+  and this file. A real WING read-only artifact is now accepted-ready, but
+  physical/live readiness still waits on complete fader/gain proof with apply,
+  physical readback, rollback and emergency-stop/block evidence.
 - Supervised fader/gain proof entry is now covered by
   `tests/test_wing_mvp_rails.py::test_supervised_fader_gain_proof_stays_blocked_until_m002_and_operator_approval`.
   The rail checks `Docs/ROADMAP.md`, `Docs/PROJECT_GOAL.md`,
@@ -1684,6 +1780,44 @@ Generated: 2026-07-02T11:41:10Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - The latest verified full-suite run for `22852a7e8` passed with
-  `4796 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
-  WING-native fit, DSP-parameter calculation summary and problem-first action
-  decision summary evidence tests.
+  `4821 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
+  WING-native fit, DSP-parameter calculation summary, problem-first action
+  decision summary evidence tests, the current read-only handoff scope rail and
+  the active milestone waiting-reason/timestamp rails plus the repo-local
+  no-WING evidence, manifest-integrity guard and latest-ledger authority
+  fail-closed guard, the operator-facing full-suite evidence sync guard, the
+  latest-ledger external-validation handoff guard, the BLOCKERS handoff sync
+  guard, the active milestone/M001 plan handoff guard, the roadmap handoff
+  guard, the project-layer blocker handoff guard and the MVP progress report
+  handoff/score gate in the dirty worktree.
+- The latest `RUN_LEDGER.jsonl` row is now tested as an authority surface, not
+  only as a timestamp surface. While M001 remains
+  `WAITING_FOR_EXTERNAL_VALIDATION`, the latest ledger row must match
+  `STATE.json` authority flags, keep hardware contact and live writes false,
+  keep readiness-matrix update permission false, and keep release-ready live
+  families, live-allowed safety rows and current supervised live-write kinds at
+  `0`.
+- `HEARTBEAT.md` and `LAST_REPORT.md` are now tested against the same latest
+  full-suite result from `STATE.json` and `RUN_LEDGER.jsonl`, so
+  operator-facing validation text cannot remain on an older full-suite pass
+  after current state moves forward.
+- The latest `RUN_LEDGER.jsonl` row is also tested as a handoff surface. It
+  must preserve the same `current_blocker`, `next_operator_action` and
+  `external_validation_requirements` as `STATE.json`, so the safe operator
+  handoff remains auditable after mutable state advances.
+- `ops/autopilot/BLOCKERS.md` is now tested as the same handoff surface. It
+  must preserve the exact external validation requirements, safe next operator
+  action and latest ledger handoff row while M001 remains externally blocked.
+- `Docs/ACTIVE_MILESTONE.md` and the active M001 plan are now tested as the
+  same handoff surface. They must preserve the exact external validation
+  requirements, safe next operator action and latest ledger handoff row while
+  M001 remains externally blocked.
+- `Docs/ROADMAP.md` is now tested as the same handoff surface. It must preserve
+  the exact external validation requirements, safe next operator action and
+  latest ledger handoff row while M001 remains externally blocked.
+- `.ai/project-layer/wing_mvp_blockers.md` is now tested as the same handoff
+  surface. It must preserve the exact external validation requirements, safe
+  next operator action and latest ledger handoff row without changing the
+  blocker table's first-row status selection.
+  requirements, safe next operator action and latest ledger handoff row while
+  M001 remains externally blocked.

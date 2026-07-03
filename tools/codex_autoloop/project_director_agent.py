@@ -34,6 +34,7 @@ EXTERNAL_VALIDATION_STATUSES = frozenset(
         "tooling_ready_waits_real_wing",
         "blocked_by_readonly_preflight",
         "blocked_by_real_artifact_review",
+        "blocked_by_wing_fader_rollback_proof",
         "waiting_for_external_validation",
     }
 )
@@ -333,6 +334,26 @@ def selected_action_from_wing_readonly_review(overlay: dict) -> str | None:
     )
 
 
+def selected_action_from_wing_supervised_proof_blocker(overlay: dict) -> str | None:
+    if not overlay.get(
+        "wing_readonly_preflight_manual_readiness_update_candidate_available"
+    ):
+        return None
+    source_id = overlay.get("wing_readonly_preflight_latest_valid_candidate_source_id")
+    if not source_id:
+        return None
+    return (
+        "Operator restores or verifies CH3 fader state after the failed "
+        "`rollback_not_applied` proof, then reruns the narrow supervised fader "
+        "proof for the accepted read-only candidate "
+        f"`{source_id}` until apply, physical readback, rollback and "
+        "emergency-stop/block evidence all pass. Keep gain proof separate and "
+        "headroom-safe. This is external supervised WING validation only: do "
+        "not widen live authority, close readiness, or promote EQ/dynamics/FX/"
+        "routing/master/scene writes."
+    )
+
+
 def build_directive(*, project_root: Path, lookback_commits: int, report_limit: int) -> dict:
     blocker_path = project_root / ".ai" / "project-layer" / "wing_mvp_blockers.md"
     rows = update_mvp_progress.parse_blocker_table(blocker_path)
@@ -389,6 +410,9 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
     )
     review_overlay = wing_readonly_preflight_review_overlay(project_root)
     review_selected_action = selected_action_from_wing_readonly_review(review_overlay)
+    proof_selected_action = selected_action_from_wing_supervised_proof_blocker(
+        review_overlay
+    )
     if review_selected_action and selected_blocker == "WING read-only connection proof":
         selected_action = review_selected_action
         selected_action_source = "WING Read-Only Decision Review"
@@ -399,6 +423,23 @@ def build_directive(*, project_root: Path, lookback_commits: int, report_limit: 
                 *review_overlay.get("wing_readonly_preflight_artifact_sources", []),
                 "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md",
                 "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+            ]
+        )
+        external_validation_wait = selected_action_requires_external_validation(
+            status=selected_status,
+            action=selected_action,
+        )
+    elif proof_selected_action and selected_blocker == "WING read-only connection proof":
+        selected_action = proof_selected_action
+        selected_action_source = "WING Supervised Fader Rollback Proof"
+        selected_status = "blocked_by_wing_fader_rollback_proof"
+        selected_evidence_files = update_mvp_progress.unique_ordered(
+            [
+                *selected_evidence_files,
+                *review_overlay.get("wing_readonly_preflight_accepted_source_ids", []),
+                "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md",
+                "Docs/reports/WING_CORRECTION_APPLY_READINESS_20260703.md",
+                "artifacts/wing_operator_proposal_validation/20260702T210956Z_wing_operator_proposal_ch3_fader/summary.json",
             ]
         )
         external_validation_wait = selected_action_requires_external_validation(

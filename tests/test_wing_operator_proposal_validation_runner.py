@@ -101,6 +101,33 @@ def accepted_preflight_args() -> list[str]:
     return ["--accepted-readonly-source-id", ACCEPTED_READONLY_SOURCE_ID]
 
 
+def test_event_recorder_summary_flags_apply_rollback_and_forbidden_requests(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    recorder = runner.EventRecorder(run_dir)
+    recorder.record("send", {"type": "create_operator_proposal"})
+    recorder.record("send", {"type": "apply_operator_proposal"})
+    recorder.record("send", {"type": "rollback_last_manual_write"})
+    recorder.record("send", {"type": "set_fader"})
+
+    recorder.write_summary({"status": "failed", "reason": "unit"})
+
+    summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["proposal_create_request_sent"] is True
+    assert summary["live_apply_request_sent"] is True
+    assert summary["rollback_request_sent"] is True
+    assert summary["direct_live_write_request_sent"] is True
+    assert summary["forbidden_request_types_sent"] == ["set_fader"]
+    assert summary["sent_request_types"] == [
+        "create_operator_proposal",
+        "apply_operator_proposal",
+        "rollback_last_manual_write",
+        "set_fader",
+    ]
+
+
 def patch_preflight_decision_report(
     monkeypatch: pytest.MonkeyPatch,
     *,

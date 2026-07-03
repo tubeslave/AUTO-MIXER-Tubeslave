@@ -110,6 +110,7 @@ READONLY_PREFLIGHT_REVIEW_CANDIDATE_CONTACT_TRACE_BLOCKER = (
     "accepted_readonly_preflight_candidate_contact_trace_required_before_supervised_proof"
 )
 READONLY_PREFLIGHT_EVIDENCE_AUTHORITY_FLAGS = (
+    "readiness_matrix_update_allowed",
     "readiness_closure_allowed_by_evidence",
     "live_authority_granted",
     "full_autonomous_ready",

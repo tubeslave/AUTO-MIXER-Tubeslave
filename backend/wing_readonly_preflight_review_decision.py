@@ -159,12 +159,9 @@ def _record_list(value: Iterable[Mapping[str, Any]] | None) -> Tuple[Mapping[str
 
 
 def _decision_roots(decision_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
-    roots = (
-        tuple(decision_roots)
-        if decision_roots is not None
-        else DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS
-    )
-    return tuple(Path(root) for root in roots)
+    if decision_roots is None:
+        return ()
+    return tuple(Path(root) for root in decision_roots)
 
 
 def _discover_decision_paths(decision_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
@@ -198,11 +195,12 @@ def _decision_records(
     decision_roots: Iterable[str | Path] | None,
 ) -> Tuple[Mapping[str, Any], ...]:
     records = list(_record_list(decision_records))
-    paths = (
-        tuple(Path(path) for path in decision_paths)
-        if decision_paths is not None
-        else _discover_decision_paths(decision_roots)
-    )
+    if decision_paths is not None:
+        paths = tuple(Path(path) for path in decision_paths)
+    elif decision_roots is not None:
+        paths = _discover_decision_paths(decision_roots)
+    else:
+        paths = ()
     for path in paths:
         try:
             records.append(_load_json_decision(path))
@@ -696,6 +694,14 @@ def build_wing_readonly_preflight_review_decision_ledger(
     """Build a fail-closed ledger for operator review decisions."""
 
     evidence = _mapping(preflight_evidence) or build_wing_readonly_preflight_evidence()
+    effective_decision_roots = (
+        DEFAULT_WING_READONLY_PREFLIGHT_REVIEW_DECISION_ROOTS
+        if preflight_evidence is None
+        and decision_records is None
+        and decision_paths is None
+        and decision_roots is None
+        else decision_roots
+    )
     candidates_by_source = _candidate_items_by_source(evidence)
     records = _mark_review_decision_collisions(
         _validated_record(
@@ -707,7 +713,7 @@ def build_wing_readonly_preflight_review_decision_ledger(
             _decision_records(
                 decision_records=decision_records,
                 decision_paths=decision_paths,
-                decision_roots=decision_roots,
+                decision_roots=effective_decision_roots,
             )
         )
     )
@@ -886,7 +892,7 @@ def build_wing_readonly_preflight_review_decision_ledger(
         "summary": {
             "preflight_evidence_status": evidence.get("status") or "missing",
             "decision_search_roots": [
-                str(root) for root in _decision_roots(decision_roots)
+                str(root) for root in _decision_roots(effective_decision_roots)
             ],
             "review_candidate_count": len(candidates_by_source),
             "decision_record_count": len(records),
