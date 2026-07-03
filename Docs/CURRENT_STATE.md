@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-03T12:11:35Z
+Generated: 2026-07-03T12:31:14Z
 
 ## Repository snapshot
 
@@ -1780,7 +1780,7 @@ Generated: 2026-07-03T12:11:35Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - The latest verified full-suite run for `22852a7e8` passed with
-  `4821 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
+  `4822 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
   WING-native fit, DSP-parameter calculation summary, problem-first action
   decision summary evidence tests, the current read-only handoff scope rail and
   the active milestone waiting-reason/timestamp rails plus the repo-local
@@ -1788,8 +1788,8 @@ Generated: 2026-07-03T12:11:35Z
   fail-closed guard, the operator-facing full-suite evidence sync guard, the
   latest-ledger external-validation handoff guard, the BLOCKERS handoff sync
   guard, the active milestone/M001 plan handoff guard, the roadmap handoff
-  guard, the project-layer blocker handoff guard and the MVP progress report
-  handoff/score gate in the dirty worktree.
+  guard, the project-layer blocker handoff guard, the MVP progress report
+  handoff and the structured pre-release score gate in the dirty worktree.
 - The latest `RUN_LEDGER.jsonl` row is now tested as an authority surface, not
   only as a timestamp surface. While M001 remains
   `WAITING_FOR_EXTERNAL_VALIDATION`, the latest ledger row must match

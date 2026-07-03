@@ -744,10 +744,10 @@ def external_validation_handoff_lines(
             "- Next operator action from `STATE.json`: "
             f"{state.get('next_operator_action', '')}"
         ),
-        "- External validation requirements:",
     ]
     if score_reason:
         lines.append(f"- Score ceiling reason: {score_reason}")
+    lines.append("- External validation requirements:")
     for requirement in requirements:
         lines.append(f"  - {requirement}")
     if latest_ledger:

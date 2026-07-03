@@ -9,7 +9,7 @@
   and waiting for tests; the read-only decision gate is accepted-ready, but the
   next proof still requires operator restoration/verification after failed CH3
   fader rollback before any release-readiness claim.
-- Latest heartbeat: 2026-07-03T12:11:35Z.
+- Latest heartbeat: 2026-07-03T12:31:14Z.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -134,7 +134,17 @@
   so the audit trail keeps the exact safe handoff even after mutable state moves
   forward.
   Latest verified full suite after this rail passed with
-  `4821 passed, 1 skipped, 1 warning`.
+  `4822 passed, 1 skipped, 1 warning`.
+
+- Structured pre-release score gate sync:
+  `STATE.json` now owns `strict_pre_release_review`, and
+  `MVP_PROGRESS_LATEST.md`, `CURRENT_STATE.md` and this report must
+  render score `94/100`, threshold `95/100`,
+  `public_release_ready=false` and the same score ceiling while
+  rollback/gain proof remains open. The gate is report-only and grants
+  no live authority.
+  Latest verified full suite after this rail passed with
+  `4822 passed, 1 skipped, 1 warning`.
 
 - BLOCKERS external-validation handoff sync:
   `ops/autopilot/BLOCKERS.md` now records the exact
@@ -284,7 +294,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   WING proof-direction moves even for operator-authored proof proposals, and
   `22852a7e8` ignores validate-only/no-transport WING preflight traces in real
   artifact roots. The latest verified full suite passed with
-  `4821 passed, 1 skipped, 1 warning`;
+  `4822 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,

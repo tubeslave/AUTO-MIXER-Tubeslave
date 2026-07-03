@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-03T12:11:35Z
+Last heartbeat UTC: 2026-07-03T12:31:14Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -37,7 +37,7 @@ supervised fader proof rerun, and then a separate headroom-safe gain-down proof.
 that it is read-only preflight evidence handoff only, and that current
 next-action authority after `accepted_decision_ready` comes from current state
 and the active real-WING plan, not from the old handoff packet by itself.
-Latest verified full pytest passed with `4821 passed, 1 skipped, 1 warning`.
+Latest verified full pytest passed with `4822 passed, 1 skipped, 1 warning`.
 Repo-local no-WING quick passed with failed_checks `[]` and no live authority at
 `artifacts/no_wing_release_check/20260703T101148Z_no_wing_release_check/summary.json`.
 The current no-WING evidence rail now also reloads
@@ -55,6 +55,12 @@ The operator-report full-suite rail now also binds this heartbeat and
 `LAST_REPORT.md` to the same latest full-suite result recorded in `STATE.json`
 and the newest full-suite `RUN_LEDGER.jsonl` row, so the operator-facing green
 test claim cannot stay stale after a new validation pass.
+The structured pre-release score rail now also requires `STATE.json`
+`strict_pre_release_review`, `Docs/reports/MVP_PROGRESS_LATEST.md`,
+`Docs/CURRENT_STATE.md` and `LAST_REPORT.md` to agree on score `94/100`,
+threshold `95/100`, `public_release_ready=false` and the rollback/gain
+proof score ceiling. This is a report-only guard and grants no live
+authority.
 `STATE.json` now also exposes the same safe handoff text as
 `next_operator_action`, and the WING MVP rails require it to stay synchronized
 with `next_action` while the external rollback/gain proof blocker is open.

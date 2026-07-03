@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-03T12:17:37Z`
+Generated: `2026-07-03T12:31:31Z`
 
 ## Current MVP
 
@@ -29,12 +29,12 @@ Supervised WING Rack proof.
 - Canonical read-only decision marker: `accepted_decision_ready`
 - Current blocker from `STATE.json`: Accepted WING read-only preflight decision is ready for the canonical 20260702T095758Z candidate, and the active decision ledger has 1 accepted, 2 rejected, 0 invalid and 0 unreviewed records. Supervised WING proof is still blocked from release readiness because the CH3 fader proof artifact failed rollback with reason rollback_not_applied, no release-ready live correction family exists, and fader/gain still require complete apply, physical readback, rollback and emergency-stop/block evidence.
 - Next operator action from `STATE.json`: Do not widen live authority. Operator must restore or verify CH3 fader state after the failed rollback with reason rollback_not_applied, then rerun the narrow fader proof until apply, physical readback, rollback and emergency-stop/block evidence all pass. After that, run a separate headroom-safe gain-down proof with the same evidence requirements; only then reassess release readiness.
-- External validation requirements:
 - Score ceiling reason: External WING proof remains open: rollback_not_applied, no release-ready live correction family exists, and fader/gain still require complete apply, physical readback, rollback and emergency-stop/block evidence.
+- External validation requirements:
   - Operator restores or verifies CH3 fader state after rollback_not_applied
   - Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
   - Separate headroom-safe supervised gain-down proof with the same evidence requirements
-- Latest ledger handoff row: `full_suite_after_mvp_progress_handoff_guard_passed` at `2026-07-03T12:11:35Z`
+- Latest ledger handoff row: `full_suite_after_structured_pre_release_score_surface_sync_passed` at `2026-07-03T12:31:14Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 
