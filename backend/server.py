@@ -117,8 +117,24 @@ class AutoMixerServer:
         self.ws_host = ws_host
         self.ws_port = ws_port
         
-        # Load configuration
+        # Load configuration.
+        # Два источника (исторически раздвоены): config/default_config.json —
+        # база self.config, config/automixer.yaml — через ConfigManager
+        # с hot-reload; его секции deep-merge-ятся поверх (секции почти
+        # не пересекаются; automixer.yaml — главный конфиг по CLAUDE.md)
         self.config = self._load_config()
+        self.config_manager = None
+        try:
+            from config_manager import ConfigManager
+            yaml_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), 'config', 'automixer.yaml'
+            )
+            if os.path.exists(yaml_path):
+                self.config_manager = ConfigManager(config_path=yaml_path)
+                self._merge_config_manager_sections()
+                self.config_manager.on_change(self._on_yaml_config_changed)
+        except Exception as e:
+            logger.warning(f"ConfigManager unavailable, using JSON config only: {e}")
 
         # Аутентификация WebSocket API. По умолчанию выключена (совместимость),
         # включается AUTOMIXER_AUTH_ENABLED=true; статический токен —
@@ -2228,6 +2244,37 @@ class AutoMixerServer:
         
         logger.info("Graceful shutdown complete")
     
+    def _merge_config_manager_sections(self):
+        """Deep-merge секций automixer.yaml (через ConfigManager) в self.config."""
+        if not self.config_manager:
+            return
+
+        def deep_merge(base: dict, override: dict):
+            for key, value in override.items():
+                if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                    deep_merge(base[key], value)
+                else:
+                    base[key] = value
+
+        merged = dict(self.config)
+        deep_merge(merged, self.config_manager.to_dict())
+        # Атомарная подмена ссылки: читатели не видят полусмерженного состояния
+        self.config = merged
+
+    def _on_yaml_config_changed(self, _new_config: dict):
+        """Hot-reload automixer.yaml: re-merge + уведомление клиентов."""
+        try:
+            self._merge_config_manager_sections()
+            logger.info("Config hot-reloaded from automixer.yaml")
+            loop = getattr(self, "_main_loop", None)
+            if loop is not None and loop.is_running():
+                loop.call_soon_threadsafe(self._create_broadcast_task, {
+                    "type": "config_reloaded",
+                    "source": "automixer.yaml",
+                })
+        except Exception as e:
+            logger.error(f"Error applying reloaded config: {e}")
+
     def _load_config(self) -> dict:
         """Load configuration from default_config.json"""
         import os
@@ -2324,6 +2371,16 @@ class AutoMixerServer:
         except Exception as e:
             if self._is_connection_closed_error(e):
                 logger.debug("Send failed (client closed): %s", e)
+                # Чистим здесь: исключение проглатывается, поэтому ветка
+                # discard в broadcast (через gather return_exceptions)
+                # недостижима — без этого закрытый сокет навсегда оставался
+                # в списке рассылки, если finally в handler не сработал
+                if websocket in self.connected_clients:
+                    self.connected_clients.discard(websocket)
+                    logger.info(
+                        "Removed disconnected client from broadcast list. "
+                        "Total clients: %s", len(self.connected_clients)
+                    )
             else:
                 logger.error(f"Error sending to client: {e}")
 
@@ -2345,17 +2402,12 @@ class AutoMixerServer:
             logger.warning("No connected clients to broadcast to")
             return
         clients = list(self.connected_clients)
-        results = await asyncio.gather(
+        # Отвалившиеся клиенты удаляются внутри send_to_client (он глотает
+        # исключения, поэтому проверка результатов gather здесь была мёртвой)
+        await asyncio.gather(
             *[self.send_to_client(c, message) for c in clients],
             return_exceptions=True
         )
-        # Remove clients that closed the connection so we stop sending to them
-        for client, result in zip(clients, results):
-            if isinstance(result, Exception) and self._is_connection_closed_error(result):
-                self.connected_clients.discard(client)
-                logger.info("Removed disconnected client from broadcast list. Total clients: %s", len(self.connected_clients))
-            elif isinstance(result, Exception):
-                logger.error("Error broadcasting to client: %s", result)
 
     async def handle_client_message(self, websocket: WebSocketServerProtocol, message: str):
         try:
@@ -4626,18 +4678,25 @@ class AutoMixerServer:
             return
         
         try:
+            # Единый AudioCapture: каналы для межканальной корреляции читаются
+            # из одного захвата, без конкуренции PyAudio-потоков
+            shared_capture = await asyncio.get_running_loop().run_in_executor(
+                None, self._get_shared_audio_capture, device_id
+            )
             # Initialize controller if needed
             settings = settings or {}
             if not self.phase_alignment_controller:
                 self.phase_alignment_controller = PhaseAlignmentController(
                     mixer_client=self.mixer_client,
                     bleed_service=self.bleed_service,
-                    settings=settings
+                    settings=settings,
+                    audio_capture=shared_capture
                 )
             else:
                 self.phase_alignment_controller.mixer_client = self.mixer_client
                 # Update settings for future analyzer instances
                 self.phase_alignment_controller.settings = settings
+                self.phase_alignment_controller._audio_capture = shared_capture
             self.phase_alignment_controller.live_apply_adapter = (
                 lambda *, channel, delay_ms, phase_invert, coherence, max_delay_ms, context=None: (
                     self._apply_soundcheck_supervised_bundle_sync(
@@ -7056,9 +7115,18 @@ class AutoMixerServer:
         
         # Create shutdown event in the correct event loop
         self._shutdown_event = asyncio.Event()
-        
+
         # Set up signal handlers for graceful shutdown
         loop = asyncio.get_running_loop()
+        self._main_loop = loop
+
+        # Hot-reload automixer.yaml (watchdog); правки конфига на живой
+        # системе подхватываются без рестарта
+        if self.config_manager is not None:
+            try:
+                self.config_manager.start_watching()
+            except Exception as e:
+                logger.warning(f"Config hot-reload unavailable: {e}")
         
         for sig in (signal.SIGTERM, signal.SIGINT):
             try:

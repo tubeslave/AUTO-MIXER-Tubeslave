@@ -587,6 +587,48 @@ class DLiveClient(MixerClientBase):
             return fader_value_to_db(int(val))
         return -100.0
 
+    def set_fader_verified(
+        self,
+        channel: int,
+        value_db: float,
+        channel_type: str = "input",
+        timeout_sec: float = 1.0,
+        tolerance_db: float = 0.5,
+    ) -> Dict[str, Any]:
+        """Best-effort верифицированная запись фейдера.
+
+        dLive эхоит изменения параметров NRPN-сообщениями (когда на пульте
+        включён MIDI send) — ждём свежее эхо в state и сравниваем с
+        запрошенным значением. Статусы:
+          applied      — эхо получено и совпало (± tolerance_db)
+          mismatch     — эхо получено, но значение другое (пульт клэмпнул
+                         или оператор двинул фейдер) — НЕ считать применённым
+          unconfirmed  — эха нет; НЕ означает отказ (MIDI send может быть
+                         выключен), но и подтверждения нет
+          error        — отправка не удалась
+        Отката нет: без надёжного readback-протокола прежнее значение
+        неизвестно (в отличие от WING supervised bundle).
+        """
+        key = f"fader/{channel}"
+        # Убираем прошлое значение: иначе прочитаем старое состояние как эхо
+        self.state.pop(key, None)
+        if not self.set_fader(channel, value_db, channel_type):
+            return {"status": "error", "reason": "transport_send_failed",
+                    "channel": channel}
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            raw = self.state.get(key)
+            if raw is not None:
+                echoed_db = fader_value_to_db(int(raw))
+                if abs(echoed_db - value_db) <= tolerance_db:
+                    return {"status": "applied", "channel": channel,
+                            "readback_db": echoed_db}
+                return {"status": "mismatch", "channel": channel,
+                        "requested_db": value_db, "readback_db": echoed_db}
+            time.sleep(0.02)
+        return {"status": "unconfirmed", "channel": channel,
+                "requested_db": value_db}
+
     # ── Mutes (Note On) ───────────────────────────────────────
 
     def set_mute(self, channel: int, muted: bool, channel_type: str = "input"):

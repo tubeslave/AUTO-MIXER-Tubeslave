@@ -37,16 +37,19 @@ class PhaseAlignmentAnalyzer:
                  sample_rate: int = 48000,
                  chunk_size: int = 4096,
                  analysis_window: float = 2.0,
-                 max_delay_ms: float = 10.0):
+                 max_delay_ms: float = 10.0,
+                 audio_capture=None):
         """
         Инициализация анализатора фаз и задержек.
-        
+
         Args:
             device_index: Индекс аудио устройства PyAudio
             sample_rate: Частота дискретизации в Hz
             chunk_size: Размер буфера аудио данных
             analysis_window: Временное окно для анализа (секунды)
             max_delay_ms: Максимальная задержка для поиска (миллисекунды)
+            audio_capture: Общий AudioCapture-сервис (правило CLAUDE.md);
+                при None — legacy-fallback на собственный PyAudio-поток
         """
         self.device_index = device_index
         self.sample_rate = sample_rate
@@ -54,6 +57,7 @@ class PhaseAlignmentAnalyzer:
         self.analysis_window = analysis_window
         self.max_delay_ms = max_delay_ms
         self.max_delay_samples = int(max_delay_ms * sample_rate / 1000.0)
+        self._audio_capture = audio_capture
         
         # Буферы аудио данных по каналам {channel_id: deque of chunks}
         self.audio_buffers: Dict[int, deque] = {}
@@ -106,7 +110,25 @@ class PhaseAlignmentAnalyzer:
         logger.info(f"Channels to align: {channels}")
         logger.info(f"Device index: {self.device_index}")
         logger.info(f"Max delay: {self.max_delay_ms} ms")
-        
+
+        # Предпочитаем общий AudioCapture: каналы читаются из одного захвата
+        # синхронно (важно для межканальной корреляции) и без конкуренции
+        # PyAudio-потоков за устройство
+        if self._audio_capture is not None:
+            try:
+                self.sample_rate = self._audio_capture.sample_rate
+                self.max_delay_samples = int(self.max_delay_ms * self.sample_rate / 1000.0)
+                self._audio_capture.subscribe('phase_alignment', self._audio_capture_poll)
+                self.is_running = True
+                self._stop_event.clear()
+                self._analysis_thread = threading.Thread(target=self._analysis_loop, daemon=True)
+                self._analysis_thread.start()
+                logger.info("Phase alignment: using shared AudioCapture")
+                return True
+            except Exception as e:
+                logger.warning(f"Shared AudioCapture unavailable, falling back to PyAudio: {e}")
+                self._audio_capture = None
+
         try:
             import pyaudio
             self.pyaudio = pyaudio
@@ -170,7 +192,13 @@ class PhaseAlignmentAnalyzer:
         logger.info("Stopping phase alignment analyzer...")
         self._stop_event.set()
         self.is_running = False
-        
+
+        if self._audio_capture is not None:
+            try:
+                self._audio_capture.unsubscribe('phase_alignment')
+            except Exception:
+                pass
+
         if self.stream:
             try:
                 self.stream.stop_stream()
@@ -189,6 +217,23 @@ class PhaseAlignmentAnalyzer:
         
         logger.info("Phase alignment analyzer stopped")
     
+    def _audio_capture_poll(self):
+        """Poll общего AudioCapture: свежий блок каждого канала в буферы.
+
+        Читается ровно block_size (размер блока захвата) — чтение большего
+        окна на каждый poll дублировало бы сэмплы в буферах анализа.
+        """
+        if not self._audio_capture:
+            return
+        n = self._audio_capture.block_size
+        for ch in list(self.audio_buffers.keys()):
+            try:
+                data = self._audio_capture.get_buffer(ch, n)
+                if len(data):
+                    self.audio_buffers[ch].append(np.asarray(data, dtype=np.float32))
+            except Exception as e:
+                logger.debug(f"AudioCapture poll error ch{ch}: {e}")
+
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """Callback для получения аудио данных."""
         if status:
@@ -569,17 +614,20 @@ class PhaseAlignmentController:
     Контроллер для управления анализом и коррекцией фаз и задержек.
     """
     
-    def __init__(self, mixer_client=None, bleed_service=None, settings: dict = None):
+    def __init__(self, mixer_client=None, bleed_service=None, settings: dict = None,
+                 audio_capture=None):
         """
         Инициализация контроллера.
-        
+
         Args:
             mixer_client: Клиент для отправки OSC команд микшеру
             bleed_service: Centralized bleed detection service
             settings: Настройки анализа (max_delay_ms, fft_size, num_coherence_freqs)
+            audio_capture: Общий AudioCapture-сервис для анализатора
         """
         self.mixer_client = mixer_client
         self.bleed_service = bleed_service
+        self._audio_capture = audio_capture
         self.settings = settings or {}
         self.max_delay_ms = self.settings.get('maxDelayMs', 10.0)  # Default 10ms - musically acceptable
         self.analyzer: Optional[PhaseAlignmentAnalyzer] = None
@@ -629,7 +677,8 @@ class PhaseAlignmentController:
         self.analyzer = PhaseAlignmentAnalyzer(
             device_index=device_id,
             max_delay_ms=self.max_delay_ms,
-            chunk_size=settings.get('fftSize', 4096)
+            chunk_size=settings.get('fftSize', 4096),
+            audio_capture=self._audio_capture
         )
         
         def measurement_callback(measurements):

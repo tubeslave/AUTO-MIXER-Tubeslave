@@ -86,6 +86,8 @@ Docs/                    — PDF документация WING, техничес
 - Единый AudioCapture: `server._get_shared_audio_capture(device_id)` — модули получают его через `audio_capture=` и подписку; PyAudio-fallback в модулях только когда общий захват недоступен. Индексы PyAudio ≠ индексы sounddevice — резолвить через имя устройства. В тестах `AUTOMIXER_SHARED_AUDIO_CAPTURE=false` (conftest) — не открывать реальный микрофон
 - Потеря WING по UDP видна только по тишине в приёме: heartbeat в renewal-цикле (`_last_rx_time`, активный запрос `/ch/1/fdr`) + `on_connection_lost` → reconnect EnhancedOSCClient. UDP-send «успешен» даже на выключенный пульт
 - Применение DSP-коррекций на пульт — через верифицированные записи: `set_eq_band_verified()` / `apply_supervised_bundle` (pre-read → запись → readback с допуском → rollback). Вызывающий обязан проверять `status == "applied"`; notch против заводки с неподтверждённым readback = заводка не подавлена
+- dLive: `set_fader_verified()` — best-effort по MIDI-эху (applied/mismatch/unconfirmed, БЕЗ отката); `unconfirmed` ≠ отказ (MIDI send на пульте может быть выключен), но и не подтверждение
+- Конфигурация: default_config.json — база `self.config`, automixer.yaml поверх через ConfigManager (deep-merge, hot-reload через watchdog запускается в `server.start()`); клиенты получают `config_reloaded` broadcast
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях
 - ScenarioDetector — кэшировать экземпляр, НЕ создавать на каждый аудиоблок
 - server.py — координатор. Логика в handlers/. НЕ добавлять новые маршруты в server.py напрямую
