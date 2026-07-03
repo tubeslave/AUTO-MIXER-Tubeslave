@@ -1,0 +1,29 @@
+[submodule "external/AutomaticMixingPapers"]
+	path = external/AutomaticMixingPapers
+	url = https://github.com/csteinmetz1/AutomaticMixingPapers.git
+	ignore = untracked
+
+[submodule "external/Diff-MST"]
+	path = external/Diff-MST
+	url = https://github.com/sai-soum/Diff-MST.git
+	ignore = untracked
+
+[submodule "external/FxNorm-automix"]
+	path = external/FxNorm-automix
+	url = https://github.com/sony/FxNorm-automix.git
+	ignore = untracked
+
+[submodule "external/MuQ-Eval"]
+	path = external/MuQ-Eval
+	url = https://github.com/dgtql/MuQ-Eval
+	ignore = untracked
+
+[submodule "external/automix-toolkit"]
+	path = external/automix-toolkit
+	url = https://github.com/csteinmetz1/automix-toolkit.git
+	ignore = untracked
+
+[submodule "external/dasp-pytorch"]
+	path = external/dasp-pytorch
+	url = https://github.com/csteinmetz1/dasp-pytorch.git
+	ignore = untracked

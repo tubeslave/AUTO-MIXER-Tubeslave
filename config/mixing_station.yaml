@@ -1,0 +1,36 @@
+enabled: true
+transport: "osc"
+host: "127.0.0.1"
+rest_port: 8080
+osc_port: 9000
+console_profile: "wing_rack"
+mode: "offline_visualization"
+dry_run: false
+live_control: false
+discover_paths_on_startup: false
+log_jsonl: "logs/automix_to_mixing_station.jsonl"
+capabilities_file: "config/mixing_station/wing_rack_capabilities.yaml"
+mapping_file: "config/mixing_station/maps/wing_rack.yaml"
+safety_file: "config/mixing_station/safety.yaml"
+emergency_stop_file: "runtime/EMERGENCY_STOP"
+
+# Confirmed from Mixing Station Desktop /openapi.json:
+# POST /console/data/set/{path}/{format}, body {"value": ...}
+rest_command_endpoint: "/console/data/set/{data_path}/{value_format}"
+websocket_path: "/ws"
+websocket_command_path_template: ""
+
+rest_app_state_paths:
+  - "/app/state"
+  - "/api/app/state"
+  - "/api/v1/app/state"
+rest_mixer_state_paths:
+  - "/mixer/state"
+  - "/api/mixer/state"
+  - "/api/v1/mixer/state"
+rest_discovery_paths:
+  - "/console/data/paths"
+  - "/api/explorer"
+  - "/api/paths"
+  - "/api/v1/paths"
+  - "/openapi.json"

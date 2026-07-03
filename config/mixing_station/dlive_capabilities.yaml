@@ -1,0 +1,139 @@
+profile: "dlive"
+notes:
+  - "Mixing Station connects to the dLive MixRack, not the surface."
+  - "Scenes are read-only here; cue lists, soft-keys, and actions are not used."
+  - "Not all deep dLive parameters are exposed through Mixing Station."
+parameters:
+  fader:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: true
+  mute:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: true
+  pan:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: true
+  gain:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  hpf.enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  hpf.frequency:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  peq.band{band}.enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  peq.band{band}.frequency:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  peq.band{band}.gain:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  peq.band{band}.q:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  peq.band{band}.type:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  send.aux{send_index}.level:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  send.fx{send_index}.level:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  compressor.threshold:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  compressor.ratio:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  compressor.makeup_gain:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  gate.threshold:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  channel.name:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  channel.color:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    needs_discovery: true
+  scene.recall:
+    supported: false
+    visualization: false
+    read_only: true
+    forbidden_live: true
+    reason: "dLive scenes are read-only for this integration."
+  cue_list.*:
+    supported: false
+    visualization: false
+    forbidden_live: true
+  soft_key.*:
+    supported: false
+    visualization: false
+    forbidden_live: true
+  action.*:
+    supported: false
+    visualization: false
+    forbidden_live: true
+  phantom_power.enabled:
+    supported: false
+    visualization: false
+    forbidden_live: true

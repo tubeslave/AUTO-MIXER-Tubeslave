@@ -1,0 +1,256 @@
+profile: "wing_rack"
+notes:
+  - "Mixing Station may become read-only if Remote Lock is enabled on the WING Rack."
+  - "Deep paths must be verified in the local Mixing Station API Explorer."
+parameters:
+  fader:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: true
+  mute:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: true
+  pan:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: true
+  gain:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    reason: "Mapped to Mixing Station channel trim (ch.N.preamp.trim), not physical headamp gain."
+  phase.invert:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    reason: "Wing polarity invert is exposed by Mixing Station as ch.N.preamp.inv."
+  polarity.invert:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    reason: "Alias for phase.invert / ch.N.preamp.inv."
+  delay.enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  delay.time:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  hpf.enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  hpf.frequency:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  peq.band{band}.enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  peq.band{band}.frequency:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  peq.band{band}.gain:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  peq.band{band}.q:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  peq.band{band}.type:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    reason: "Band type exists only for some Wing PEQ edge bands; unsupported band/type combinations will be rejected by Mixing Station."
+  send.aux{send_index}.level:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  send.fx{send_index}.level:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.threshold:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.raw_enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    reason: "Raw Wing dynamics on/off is exposed as ch.N.rawDyn.on; use compressor.enabled/dyn.on for normal visualization."
+  compressor.model:
+    supported: true
+    visualization: true
+    read_only: true
+    live_control: false
+    reason: "Wing dynamics model is exposed as ch.N.rawDyn.model. Writing it can reset dyn.* parameters, so the adapter treats it as read-only."
+  compressor.mix:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.ratio:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.knee:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.attack:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.hold:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.release:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.detector:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.envelope:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.auto_time:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.makeup_gain:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.filter.tap:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.filter.source:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.filter.frequency:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.filter.type:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.filter.band{band}.type:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.filter.band{band}.frequency:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  compressor.filter.band{band}.q:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  gate.enabled:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  gate.threshold:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  gate.range:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  gate.attack:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  gate.hold:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  gate.release:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  channel.name:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+    reason: "Mixing Station/Wing name limit is 16 ASCII characters."
+  channel.color:
+    supported: true
+    visualization: true
+    read_only: false
+    live_control: false
+  scene.recall:
+    supported: false
+    visualization: false
+    forbidden_live: true
+    reason: "Scene recall is destructive and blocked."
+  phantom_power.enabled:
+    supported: false
+    visualization: false
+    forbidden_live: true
+    reason: "Phantom power changes are blocked."
+  destructive.*:
+    supported: false
+    visualization: false
+    forbidden_live: true

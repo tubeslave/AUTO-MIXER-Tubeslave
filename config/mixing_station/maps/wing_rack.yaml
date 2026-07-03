@@ -1,0 +1,230 @@
+profile: "wing_rack"
+parameters:
+  fader:
+    data_path: "ch.{channel_index}.mix.lvl"
+    format: "plain"
+    value_type: "float"
+  mute:
+    data_path: "ch.{channel_index}.mix.on"
+    format: "plain"
+    value_type: "bool"
+    invert_bool: true
+  pan:
+    data_path: "ch.{channel_index}.mix.pan"
+    format: "plain"
+    value_type: "float"
+    value_multiplier: 100.0
+  bus.fader:
+    data_path: "ch.{channel_absolute_index}.mix.lvl"
+    format: "plain"
+    value_type: "float"
+  dca.fader:
+    data_path: "ch.{channel_absolute_index}.mix.lvl"
+    format: "plain"
+    value_type: "float"
+  main.fader:
+    data_path: "ch.{channel_absolute_index}.mix.lvl"
+    format: "plain"
+    value_type: "float"
+  gain:
+    data_path: "ch.{channel_index}.preamp.trim"
+    format: "plain"
+    value_type: "float"
+  phase.invert:
+    data_path: "ch.{channel_index}.preamp.inv"
+    format: "plain"
+    value_type: "bool"
+  polarity.invert:
+    data_path: "ch.{channel_index}.preamp.inv"
+    format: "plain"
+    value_type: "bool"
+  delay.enabled:
+    data_path: "ch.{channel_index}.delay.on"
+    format: "plain"
+    value_type: "bool"
+  delay.time:
+    data_path: "ch.{channel_index}.delay.time"
+    format: "plain"
+    value_type: "float"
+  hpf.enabled:
+    data_path: "ch.{channel_index}.preamp.filter.0.on"
+    format: "plain"
+    value_type: "bool"
+  hpf.frequency:
+    data_path: "ch.{channel_index}.preamp.filter.0.freq"
+    format: "plain"
+    value_type: "float"
+  peq.band{band}.enabled:
+    data_path: "ch.{channel_index}.peq.on"
+    format: "plain"
+    value_type: "bool"
+  peq.band{band}.frequency:
+    data_path: "ch.{channel_index}.peq.bands.{band_index}.freq"
+    format: "plain"
+    value_type: "float"
+  peq.band{band}.gain:
+    data_path: "ch.{channel_index}.peq.bands.{band_index}.gain"
+    format: "plain"
+    value_type: "float"
+  peq.band{band}.q:
+    data_path: "ch.{channel_index}.peq.bands.{band_index}.q"
+    format: "plain"
+    value_type: "float"
+  peq.band{band}.type:
+    data_path: "ch.{channel_index}.peq.bands.{band_index}.type"
+    format: "plain"
+    value_type: "int"
+  send.aux{send_index}.level:
+    data_path: "ch.{channel_index}.mix.sends.{send_index_zero}.lvl"
+    format: "plain"
+    value_type: "float"
+  send.fx{send_index}.level:
+    data_path: "ch.{channel_index}.mix.sends.{send_index_zero}.lvl"
+    format: "plain"
+    value_type: "float"
+  compressor.threshold:
+    data_path: "ch.{channel_index}.dyn.thr"
+    format: "plain"
+    value_type: "float"
+  compressor.enabled:
+    data_path: "ch.{channel_index}.dyn.on"
+    format: "plain"
+    value_type: "bool"
+  compressor.raw_enabled:
+    data_path: "ch.{channel_index}.rawDyn.on"
+    format: "plain"
+    value_type: "bool"
+  compressor.model:
+    data_path: "ch.{channel_index}.rawDyn.model"
+    format: "plain"
+    value_type: "int"
+  compressor.mix:
+    data_path: "ch.{channel_index}.dyn.mix"
+    format: "plain"
+    value_type: "float"
+  compressor.ratio:
+    data_path: "ch.{channel_index}.dyn.ratio"
+    format: "plain"
+    value_type: "float"
+  compressor.knee:
+    data_path: "ch.{channel_index}.dyn.knee"
+    format: "plain"
+    value_type: "float"
+  compressor.attack:
+    data_path: "ch.{channel_index}.dyn.attack"
+    format: "plain"
+    value_type: "float"
+  compressor.hold:
+    data_path: "ch.{channel_index}.dyn.hold"
+    format: "plain"
+    value_type: "float"
+  compressor.release:
+    data_path: "ch.{channel_index}.dyn.release"
+    format: "plain"
+    value_type: "float"
+  compressor.detector:
+    data_path: "ch.{channel_index}.dyn.det"
+    format: "plain"
+    value_type: "int"
+  compressor.envelope:
+    data_path: "ch.{channel_index}.dyn.env"
+    format: "plain"
+    value_type: "int"
+  compressor.auto_time:
+    data_path: "ch.{channel_index}.dyn.autoTime"
+    format: "plain"
+    value_type: "bool"
+  compressor.makeup_gain:
+    data_path: "ch.{channel_index}.dyn.gain"
+    format: "plain"
+    value_type: "float"
+  compressor.filter.tap:
+    data_path: "ch.{channel_index}.dyn.filter.tap"
+    format: "plain"
+    value_type: "int"
+  compressor.filter.source:
+    data_path: "ch.{channel_index}.dyn.filter.src"
+    format: "plain"
+    value_type: "int"
+  compressor.filter.frequency:
+    data_path: "ch.{channel_index}.dyn.filter.freq"
+    format: "plain"
+    value_type: "float"
+  compressor.filter.type:
+    data_path: "ch.{channel_index}.dyn.filter.type"
+    format: "plain"
+    value_type: "int"
+  compressor.filter.band{band}.type:
+    data_path: "ch.{channel_index}.dyn.filter.filters.bands.{band_index}.type"
+    format: "plain"
+    value_type: "int"
+  compressor.filter.band{band}.frequency:
+    data_path: "ch.{channel_index}.dyn.filter.filters.bands.{band_index}.freq"
+    format: "plain"
+    value_type: "float"
+  compressor.filter.band{band}.q:
+    data_path: "ch.{channel_index}.dyn.filter.filters.bands.{band_index}.q"
+    format: "plain"
+    value_type: "float"
+  gate.enabled:
+    data_path: "ch.{channel_index}.gate.on"
+    format: "plain"
+    value_type: "bool"
+  gate.threshold:
+    data_path: "ch.{channel_index}.gate.thr"
+    format: "plain"
+    value_type: "float"
+  gate.range:
+    data_path: "ch.{channel_index}.gate.range"
+    format: "plain"
+    value_type: "float"
+  gate.attack:
+    data_path: "ch.{channel_index}.gate.attack"
+    format: "plain"
+    value_type: "float"
+  gate.hold:
+    data_path: "ch.{channel_index}.gate.hold"
+    format: "plain"
+    value_type: "float"
+  gate.release:
+    data_path: "ch.{channel_index}.gate.release"
+    format: "plain"
+    value_type: "float"
+  channel.name:
+    data_path: "ch.{channel_index}.cfg.name"
+    format: "plain"
+    value_type: "string"
+    max_length: 16
+  channel.color:
+    data_path: "ch.{channel_index}.cfg.color"
+    format: "plain"
+    value_type: "int"
+    enum_map:
+      blue: 0
+      cyan: 3
+      green: 4
+      yellow: 6
+      brown: 7
+      red: 8
+      pink: 10
+      purple: 11
+      orange: 12
+      teal: 15
+      gray: 16
+      white: 17
+  main.peq.band{band}.frequency:
+    data_path: "ch.{channel_absolute_index}.peq.bands.{band_index}.freq"
+    format: "plain"
+    value_type: "float"
+  main.peq.band{band}.enabled:
+    data_path: "ch.{channel_absolute_index}.peq.on"
+    format: "plain"
+    value_type: "bool"
+  main.peq.band{band}.gain:
+    data_path: "ch.{channel_absolute_index}.peq.bands.{band_index}.gain"
+    format: "plain"
+    value_type: "float"
+  main.peq.band{band}.q:
+    data_path: "ch.{channel_absolute_index}.peq.bands.{band_index}.q"
+    format: "plain"
+    value_type: "float"
