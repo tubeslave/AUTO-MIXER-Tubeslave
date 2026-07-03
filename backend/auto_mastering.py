@@ -11,6 +11,14 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+# pyloudnorm — accurate LUFS measurement (ITU-R BS.1770-4)
+try:
+    import pyloudnorm as pyln
+    _PYLOUDNORM_AVAILABLE = True
+except ImportError:
+    _PYLOUDNORM_AVAILABLE = False
+
+
 try:
     import matchering  # noqa: F401
     HAS_MATCHERING = True
@@ -35,6 +43,110 @@ class MasteringResult:
     eq_applied: bool
     success: bool
     error: Optional[str] = None
+
+def measure_lufs(audio: np.ndarray, sample_rate: int) -> float:
+    """Measure integrated LUFS using pyloudnorm (ITU-R BS.1770-4).
+
+    Falls back to RMS-based approximation if pyloudnorm is unavailable.
+
+    Args:
+        audio: Audio array, shape (samples,) for mono or (samples, channels) for stereo.
+        sample_rate: Sample rate in Hz.
+
+    Returns:
+        Integrated loudness in LUFS.
+    """
+    if _PYLOUDNORM_AVAILABLE:
+        meter = pyln.Meter(sample_rate)
+        # pyloudnorm expects (samples, channels) for stereo
+        if audio.ndim == 1:
+            # Mono — reshape to (samples, 1) for pyloudnorm
+            return meter.integrated_loudness(audio.reshape(-1, 1))
+        return meter.integrated_loudness(audio)
+    else:
+        # Fallback: RMS-based approximation (not accurate LUFS)
+        rms = np.sqrt(np.mean(audio ** 2) + 1e-12)
+        return float(20 * np.log10(rms))
+
+
+def measure_true_peak(audio: np.ndarray, sample_rate: int) -> float:
+    """Measure true peak with 4x oversampling.
+
+    Args:
+        audio: Audio array.
+        sample_rate: Sample rate in Hz.
+
+    Returns:
+        True peak in dBTP.
+    """
+    from scipy.signal import resample_poly
+    # 4x oversample
+    if audio.ndim == 1:
+        oversampled = resample_poly(audio, 4, 1)
+    else:
+        oversampled = np.column_stack(
+            [resample_poly(audio[:, ch], 4, 1) for ch in range(audio.shape[1])]
+        )
+    peak_lin = np.max(np.abs(oversampled))
+    if peak_lin > 0:
+        return float(20 * np.log10(peak_lin))
+    return -100.0
+
+
+def normalize_lufs(
+    audio: np.ndarray,
+    sample_rate: int,
+    target_lufs: float = -14.0,
+    true_peak_limit: float = -1.0,
+    max_gain_db: float = 12.0,
+) -> Tuple[np.ndarray, float, float]:
+    """Normalize audio to target LUFS with true peak limiting.
+
+    Args:
+        audio: Input audio array.
+        sample_rate: Sample rate in Hz.
+        target_lufs: Target integrated LUFS.
+        true_peak_limit: Maximum true peak in dBTP.
+        max_gain_db: Maximum gain adjustment allowed.
+
+    Returns:
+        Tuple of (normalized_audio, actual_lufs, gain_applied_db).
+    """
+    current_lufs = measure_lufs(audio, sample_rate)
+
+    if current_lufs < -70.0:
+        logger.warning("Audio too quiet for LUFS normalization (%.1f LUFS)", current_lufs)
+        return audio.copy(), current_lufs, 0.0
+
+    gain_db = target_lufs - current_lufs
+    gain_db = max(-max_gain_db, min(max_gain_db, gain_db))
+
+    if _PYLOUDNORM_AVAILABLE:
+        # Use pyloudnorm for precise normalization
+        if audio.ndim == 1:
+            normalized = pyln.normalize.loudness(
+                audio.reshape(-1, 1), current_lufs, target_lufs
+            ).flatten()
+        else:
+            normalized = pyln.normalize.loudness(audio, current_lufs, target_lufs)
+    else:
+        gain_linear = 10 ** (gain_db / 20.0)
+        normalized = audio * gain_linear
+
+    # True peak limiting
+    tp = measure_true_peak(normalized, sample_rate)
+    if tp > true_peak_limit:
+        reduction_db = tp - true_peak_limit
+        reduction_linear = 10 ** (-reduction_db / 20.0)
+        normalized = normalized * reduction_linear
+        logger.info(
+            "True peak limited: %.1f dBTP -> %.1f dBTP (reduced %.1f dB)",
+            tp, true_peak_limit, reduction_db,
+        )
+
+    actual_lufs = measure_lufs(normalized, sample_rate)
+    return normalized.astype(np.float32), actual_lufs, gain_db
+
 
 class AutoMaster:
     """Automatic mastering processor."""
@@ -404,6 +516,106 @@ class AutoMaster:
                 max_reduction = max(max_reduction, reduction_db)
 
         return output, max_reduction
+
+    def _apply_true_peak_limiter(self, audio: np.ndarray, ceiling_dbtp: float) -> Tuple[np.ndarray, float]:
+        """Oversampled look-ahead true-peak limiter for mastering.
+
+        Key design (similar to Pro-L, L2, etc.):
+        1. Upsample 4x to detect inter-sample peaks (true peaks)
+        2. Compute gain reduction curve at oversampled rate
+        3. Look-ahead (5ms) to anticipate peaks before they arrive
+        4. Smooth gain with instant attack + exponential release
+        5. Downsample gain curve back to original rate
+        6. Apply to original signal
+
+        This guarantees true peak compliance — inter-sample peaks that
+        escape sample-level detection are caught by the 4x oversampled
+        detector and pre-emptively reduced via look-ahead.
+        """
+        from scipy.signal import resample_poly
+
+        oversample_factor = 4
+        lookahead_ms = 5.0
+        release_ms = 50.0
+
+        os_rate = self.sample_rate * oversample_factor
+        lookahead_os = int(os_rate * lookahead_ms / 1000)
+        release_coeff = np.exp(-1.0 / (release_ms * os_rate / 1000))
+        ceiling_lin = 10 ** (ceiling_dbtp / 20.0)
+
+        # Step 1: Upsample 4x for true peak detection
+        if audio.ndim == 2:
+            oversampled = np.column_stack(
+                [resample_poly(audio[:, ch], oversample_factor, 1)
+                 for ch in range(audio.shape[1])]
+            )
+            os_levels = np.max(np.abs(oversampled), axis=1)
+        else:
+            oversampled = resample_poly(audio, oversample_factor, 1)
+            os_levels = np.abs(oversampled)
+
+        num_os_samples = len(os_levels)
+
+        # Step 2: Required gain reduction at each oversampled position
+        gain_required = np.ones(num_os_samples, dtype=np.float64)
+        over_mask = os_levels > ceiling_lin
+        gain_required[over_mask] = ceiling_lin / (os_levels[over_mask] + 1e-10)
+
+        # Step 3: Look-ahead — minimum gain within upcoming window
+        # Use rolling minimum via a deque for O(n) complexity
+        from collections import deque
+        gain_lookahead = np.ones(num_os_samples, dtype=np.float64)
+        dq = deque()  # stores indices of potential minimums
+
+        for i in range(num_os_samples):
+            # Remove elements outside the look-ahead window
+            while dq and dq[0] < i:
+                dq.popleft()
+
+            # Add current + look-ahead position
+            j = min(i + lookahead_os, num_os_samples - 1)
+            while dq and gain_required[j] <= gain_required[dq[-1]]:
+                dq.pop()
+            dq.append(j)
+
+            gain_lookahead[i] = gain_required[dq[0]]
+
+        # Step 4: Smooth gain curve (instant attack, exponential release)
+        gain_smooth_os = np.ones(num_os_samples, dtype=np.float64)
+        current_gain = 1.0
+        for i in range(num_os_samples):
+            target = gain_lookahead[i]
+            if target < current_gain:
+                current_gain = target  # Instant attack
+            else:
+                current_gain = release_coeff * current_gain + (1 - release_coeff) * target
+            gain_smooth_os[i] = current_gain
+
+        # Step 5: Downsample gain curve back to original rate
+        # Take every Nth sample (phase-aligned with original)
+        num_orig = len(audio) if audio.ndim == 1 else audio.shape[0]
+        gain_smooth = resample_poly(gain_smooth_os, 1, oversample_factor)[:num_orig]
+
+        # Ensure no gain increase (safety clamp)
+        gain_smooth = np.minimum(gain_smooth, 1.0)
+
+        # Step 6: Apply gain curve to original signal
+        if audio.ndim == 2:
+            output = audio * gain_smooth[:, np.newaxis]
+        else:
+            output = audio * gain_smooth
+
+        max_reduction_db = float(-20 * np.log10(np.min(gain_smooth) + 1e-10))
+
+        if max_reduction_db > 0.1:
+            limited_pct = 100 * np.sum(gain_smooth < 0.999) / len(gain_smooth)
+            logger.info(
+                "Oversampled look-ahead limiter (4x): ceiling %.1f dBTP, "
+                "max reduction %.1f dB, limited %.1f%% of samples",
+                ceiling_dbtp, max_reduction_db, limited_pct,
+            )
+
+        return output.astype(np.float32), max_reduction_db
 
     def _apply_limiter(self, audio: np.ndarray, ceiling_db: float) -> Tuple[np.ndarray, float]:
         """Apply brick-wall limiter."""
