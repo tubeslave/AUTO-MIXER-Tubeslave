@@ -681,7 +681,14 @@ class WingClient(MixerClientBase):
         return self.state.get(f"/ch/{channel}/dyn/on")
     
     def set_compressor_threshold(self, channel: int, threshold: float):
-        """Set compressor threshold (dB, range: -60..0)"""
+        """Set compressor threshold (dB, range: -60..0).
+
+        Адрес порога зависит от загруженной модели динамики: стандартный
+        COMP использует /dyn/thr, ряд эмуляций — /dyn/thr26. Пишем в оба
+        адреса: несуществующий пульт молча игнорирует (подтверждено на
+        реальном WING: запись только в thr26 при модели COMP теряется).
+        """
+        self.send(f"/ch/{channel}/dyn/thr", threshold)
         self.send(f"/ch/{channel}/dyn/thr26", threshold)
     
     def get_compressor_threshold(self, channel: int) -> Optional[float]:
