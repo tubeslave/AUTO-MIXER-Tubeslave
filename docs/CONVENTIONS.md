@@ -87,6 +87,21 @@ json.dumps(data)  # OK
 | FX returns/deep effects | -35 LUFS |
 | Doubles/layers inside a group | about 3 LU below the group plane |
 
+### Основной offline mixing pipeline
+- Основной режим для offline сведения — стандартный no-reference pipeline:
+  Ayaic source/stem/bus balance, Gate по необходимости, bounded source/drum-bus
+  compression до финального gain при избыточном crest factor, FX15-style
+  section/mod space и `spectral_ceiling_eq` как дефолтный спектральный guard.
+- `spectral_ceiling_eq` используется как внутренний потолок спектра по роли
+  источника/шины и собственному broadband-профилю микса. Он не является
+  reference match EQ и не требует внешнего референса.
+- По умолчанию не применять `AIR_MINUS_0_80`, финальный limiter, soft clipper
+  или master-bus compressor. Финальный уровень выставлять линейным gain с
+  true-peak запасом.
+- Reference matching, Mirror EQ к внешнему треку, MoQ/MuQ score chasing и
+  aggressive compression являются отдельными вариантами только по явному
+  запросу оператора.
+
 ### EQ Biquads (Audio EQ Cookbook)
 Все EQ-фильтры по Robert Bristow-Johnson:
 ```
