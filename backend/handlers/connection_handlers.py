@@ -140,7 +140,20 @@ def register_handlers(server):
                 receive_port=discovered.port,
             )
 
+    async def handle_ping(websocket, data):
+        """App-level heartbeat для фронтенда: браузерный WebSocket API не
+        даёт протокольного ping/pong, клиент шлёт {"type": "ping"} и по
+        отсутствию ответа детектирует потерю бэкенда."""
+        await server.send_to_client(websocket, {
+            "type": "pong",
+            "ts": data.get("ts"),
+            "mixer_connected": bool(
+                server.mixer_client and getattr(server.mixer_client, "is_connected", False)
+            ),
+        })
+
     return {
+        "ping": handle_ping,
         "connect_wing": handle_connect_wing,
         "start_wing_telemetry_capture": handle_start_wing_telemetry_capture,
         "stop_wing_telemetry_capture": handle_stop_wing_telemetry_capture,

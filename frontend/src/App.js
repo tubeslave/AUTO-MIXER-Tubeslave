@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import websocketService from './services/websocket';
+import ConnectionBanner from './components/ConnectionBanner';
 import VoiceControlTab from './components/VoiceControlTab';
 import GainStagingTab from './components/GainStagingTab';
 import AutoEQTab from './components/AutoEQTab';
@@ -205,6 +206,17 @@ function App() {
       setStatusMessage('Переподключение...');
     };
 
+    // Автоматический реконнект ws-сервиса: восстанавливаем состояние UI
+    // (промис первого connect() здесь уже не поможет)
+    const handleReconnected = () => {
+      setServerConnected(true);
+      setStatusMessage('Backend OK');
+      websocketService.send({ type: 'get_audio_devices' });
+      websocketService.getOperatorMode();
+      refreshPilotCockpit();
+      refreshProductState();
+    };
+
     const handleAllSettingsLoaded = (data) => {
       if (data.settings && data.settings.mixer) {
         const m = data.settings.mixer;
@@ -270,6 +282,7 @@ function App() {
     websocketService.on('bypass_result', handleBypassResult);
     websocketService.on('mixer_channel_names', handleMixerChannelNames);
     websocketService.on('disconnected', handleDisconnected);
+    websocketService.on('connected', handleReconnected);
     websocketService.on('all_settings_loaded', handleAllSettingsLoaded);
     websocketService.on('dante_routing', handleDanteRouting);
     websocketService.on('supervised_pilot_status', handleSupervisedPilotStatus);
@@ -324,6 +337,7 @@ function App() {
       websocketService.off('bypass_result', handleBypassResult);
       websocketService.off('mixer_channel_names', handleMixerChannelNames);
       websocketService.off('disconnected', handleDisconnected);
+      websocketService.off('connected', handleReconnected);
       websocketService.off('all_settings_loaded', handleAllSettingsLoaded);
       websocketService.off('dante_routing', handleDanteRouting);
       websocketService.off('supervised_pilot_status', handleSupervisedPilotStatus);
@@ -496,6 +510,7 @@ function App() {
 
       {/* Main Content */}
       <main className="main-content">
+        <ConnectionBanner />
         {/* Top bar with session and safety indicators */}
         <div className="topbar">
           <div className="topbar-session">

@@ -1919,3 +1919,46 @@ class TestWingDeploymentWriteBoundary:
         assert active_policies_seen[-1] == reset_policy
         assert complete_payload["live_apply_policy"] == reset_policy
         assert server._active_soundcheck_live_policy is None
+
+
+class TestPingHandler:
+    """App-level heartbeat: фронтенд детектирует потерю бэкенда по pong."""
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_ping_returns_pong_with_mixer_state(
+        self, mock_bleed_service, mock_load_config, dummy_wing_server
+    ):
+        server = dummy_wing_server
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server.handle_client_message(
+            websocket, json.dumps({"type": "ping", "ts": 12345})
+        )
+
+        raw = websocket.send.await_args_list[-1].args[0]
+        payload = json.loads(raw)
+        assert payload["type"] == "pong"
+        assert payload["ts"] == 12345
+        assert payload["mixer_connected"] is True
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_pong_reports_mixer_disconnected(
+        self, mock_bleed_service, mock_load_config, dummy_wing_server
+    ):
+        server = dummy_wing_server
+        server.mixer_client = None
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server.handle_client_message(
+            websocket, json.dumps({"type": "ping"})
+        )
+
+        payload = json.loads(websocket.send.await_args_list[-1].args[0])
+        assert payload["type"] == "pong"
+        assert payload["mixer_connected"] is False

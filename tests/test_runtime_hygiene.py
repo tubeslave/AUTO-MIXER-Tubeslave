@@ -28,10 +28,15 @@ def test_backend_server_importable_from_repo_root():
     assert hasattr(module, "convert_numpy_types")
 
 
+# События, существующие только внутри клиента (notifyListeners /
+# emitConnectionState в websocket.js) — на бэкенд не отправляются
+CLIENT_LOCAL_EVENTS = {"connected", "disconnected", "connection_state"}
+
+
 def test_frontend_websocket_commands_have_backend_handlers():
     frontend_types = _extract_frontend_websocket_types()
     backend_types = _extract_backend_handler_types()
-    assert frontend_types - backend_types == set()
+    assert frontend_types - backend_types - CLIENT_LOCAL_EVENTS == set()
 
 
 def test_conventions_do_not_recommend_direct_wing_fader_writes():

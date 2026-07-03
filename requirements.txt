@@ -16,6 +16,7 @@ joblib>=1.3.0
 chromadb>=0.4.0
 sentence-transformers>=2.2.0
 httpx>=0.24.0
+requests>=2.31.0  # llm_client.py: раньше работал только через транзитивную зависимость
 
 # Infrastructure
 structlog>=23.1.0

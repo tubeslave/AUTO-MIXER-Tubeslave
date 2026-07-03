@@ -43,7 +43,10 @@ from .ml.data_collector import MLDataCollector
 from cross_adaptive_eq import CrossAdaptiveEQ
 from partial_loudness import SimplifiedPartialLoudness
 from auto_panner import AutoPanner
-from auto_reverb import AutoReverb
+try:
+    from auto_reverb import AutoReverb  # optional: module lives in backend/archive/
+except ImportError:
+    AutoReverb = None
 from replay_write_intent_adapter import ReplayWriteIntentAdapter
 
 logger = logging.getLogger(__name__)
@@ -185,8 +188,8 @@ class AutoFaderControllerV2:
         # Intelligent auto panning (IMP 7.2) and auto reverb (IMP 7.5).
         self.auto_panner_enabled = bool(auto_fader_cfg.get("auto_panner_enabled", False))
         self.auto_panner = AutoPanner()
-        self.auto_reverb_enabled = bool(auto_fader_cfg.get("auto_reverb_enabled", False))
-        self.auto_reverb = AutoReverb()
+        self.auto_reverb_enabled = bool(auto_fader_cfg.get("auto_reverb_enabled", False)) and AutoReverb is not None
+        self.auto_reverb = AutoReverb() if AutoReverb is not None else None
         self._panner_applied = False  # Apply once at start of realtime
         self._reverb_applied = False
         

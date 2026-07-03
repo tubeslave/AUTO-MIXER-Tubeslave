@@ -42,9 +42,11 @@ virtual_mixer/           — Эмулятор микшера для тестов
 Docs/                    — PDF документация WING, технические документы
 ```
 
-Подробная архитектура: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-Соглашения по коду и DSP: [docs/CONVENTIONS.md](docs/CONVENTIONS.md)
-Протоколы и инструменты: [docs/TOOLS.md](docs/TOOLS.md)
+Подробная архитектура: [Docs/ARCHITECTURE.md](Docs/ARCHITECTURE.md)
+Соглашения по коду и DSP: [Docs/CONVENTIONS.md](Docs/CONVENTIONS.md)
+Протоколы и инструменты: [Docs/TOOLS.md](Docs/TOOLS.md)
+WebSocket-контракт фронт↔бэк: [Docs/PROTOCOL.md](Docs/PROTOCOL.md)
+Архив неиспользуемого кода: [backend/archive/README.md](backend/archive/README.md) — НЕ импортировать оттуда
 
 ## Критические ограничения (SAFETY)
 

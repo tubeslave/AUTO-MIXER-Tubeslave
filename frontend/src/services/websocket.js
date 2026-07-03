@@ -1,10 +1,89 @@
+const BASE_RECONNECT_MS = 1000;
+const MAX_RECONNECT_MS = 15000;
+const RECONNECT_FACTOR = 1.7;
+const HEARTBEAT_INTERVAL_MS = 5000;
+const HEARTBEAT_MISS_LIMIT = 2;
+const OFFLINE_QUEUE_LIMIT = 100;
+
+function resolveWsUrl() {
+  // Приоритет: env сборки → localStorage (правится без пересборки) →
+  // хост страницы (продакшен за одним хостом) → localhost (dev)
+  if (process.env.REACT_APP_WS_URL) return process.env.REACT_APP_WS_URL;
+  try {
+    const stored = window.localStorage.getItem('automixer_ws_url');
+    if (stored) return stored;
+  } catch (e) { /* приватный режим */ }
+  if (typeof window !== 'undefined' && window.location && window.location.hostname
+      && window.location.protocol.startsWith('http')) {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${proto}://${window.location.hostname}:8765`;
+  }
+  return 'ws://localhost:8765';
+}
+
+function withAuthToken(url) {
+  try {
+    const token = window.localStorage.getItem('automixer_token');
+    if (token) {
+      return url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token);
+    }
+  } catch (e) { /* приватный режим */ }
+  return url;
+}
+
 class WebSocketService {
   constructor() {
     this.ws = null;
-    this.url = 'ws://localhost:8765';
+    this.url = resolveWsUrl();
     this.listeners = new Map();
-    this.reconnectInterval = 3000;
     this.reconnectTimer = null;
+    this.reconnectDelay = BASE_RECONNECT_MS;
+    this.heartbeatTimer = null;
+    this.missedPongs = 0;
+    this.mixerConnected = false;
+    this.offlineQueue = [];
+    this.intentionalClose = false;
+  }
+
+  emitConnectionState(state) {
+    this.notifyListeners('connection_state', {
+      type: 'connection_state',
+      state,
+      mixerConnected: this.mixerConnected,
+      url: this.url,
+    });
+  }
+
+  startHeartbeat() {
+    this.stopHeartbeat();
+    this.missedPongs = 0;
+    this.heartbeatTimer = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      this.missedPongs += 1;
+      if (this.missedPongs > HEARTBEAT_MISS_LIMIT) {
+        // Бэкенд молчит: TCP может «висеть» десятки секунд, не сообщая
+        // об обрыве — принудительно рвём соединение, onclose запустит
+        // реконнект с backoff
+        console.warn('Heartbeat lost, forcing reconnect');
+        try { this.ws.close(); } catch (e) { /* уже закрыт */ }
+        return;
+      }
+      try {
+        this.ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+      } catch (e) { /* onclose разберётся */ }
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  flushOfflineQueue() {
+    const queued = this.offlineQueue.splice(0, this.offlineQueue.length);
+    queued.forEach((message) => this.send(message));
   }
 
   notifyUnsupportedCommand(commandType, eventType, message) {
@@ -21,24 +100,37 @@ class WebSocketService {
   connect() {
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(this.url);
+        this.intentionalClose = false;
+        this.ws = new WebSocket(withAuthToken(this.url));
 
         this.ws.onopen = () => {
-          console.log('WebSocket connected');
+          console.log('WebSocket connected:', this.url);
           if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
           }
+          this.reconnectDelay = BASE_RECONNECT_MS;
+          this.startHeartbeat();
+          this.emitConnectionState('connected');
+          this.notifyListeners('connected', { type: 'connected' });
+          this.flushOfflineQueue();
           resolve();
         };
 
         this.ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-console.log('WebSocket message received:', data.type, data);
-this.notifyListeners(data.type, data);
+            if (data.type === 'pong') {
+              this.missedPongs = 0;
+              if (this.mixerConnected !== Boolean(data.mixer_connected)) {
+                this.mixerConnected = Boolean(data.mixer_connected);
+                this.emitConnectionState('connected');
+              }
+              return;
+            }
+            this.notifyListeners(data.type, data);
           } catch (error) {
-console.error('Error parsing message:', error);
+            console.error('Error parsing message:', error);
           }
         };
 
@@ -47,10 +139,19 @@ console.error('Error parsing message:', error);
           reject(error);
         };
 
-        this.ws.onclose = () => {
-          console.log('WebSocket disconnected');
+        this.ws.onclose = (event) => {
+          this.stopHeartbeat();
           this.notifyListeners('disconnected', {});
-          this.scheduleReconnect();
+          if (event && event.code === 4401) {
+            // Auth отклонён — реконнект с тем же токеном бессмыслен
+            console.error('WebSocket auth rejected (4401), not reconnecting');
+            this.emitConnectionState('unauthorized');
+            return;
+          }
+          this.emitConnectionState('reconnecting');
+          if (!this.intentionalClose) {
+            this.scheduleReconnect();
+          }
         };
       } catch (error) {
         reject(error);
@@ -59,15 +160,22 @@ console.error('Error parsing message:', error);
   }
 
   scheduleReconnect() {
-    if (!this.reconnectTimer) {
-      this.reconnectTimer = setTimeout(() => {
-        console.log('Attempting to reconnect...');
-        this.connect().catch(err => console.error('Reconnect failed:', err));
-      }, this.reconnectInterval);
-    }
+    if (this.reconnectTimer) return;
+    // Экспоненциальный backoff с джиттером: без него упавший бэкенд
+    // получает синхронный флуд реконнектов от всех клиентов
+    const jitter = 0.8 + Math.random() * 0.4;
+    const delay = Math.round(this.reconnectDelay * jitter);
+    this.reconnectDelay = Math.min(this.reconnectDelay * RECONNECT_FACTOR, MAX_RECONNECT_MS);
+    console.log(`Reconnecting in ${delay} ms...`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect().catch(() => this.scheduleReconnect());
+    }, delay);
   }
 
   disconnect() {
+    this.intentionalClose = true;
+    this.stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -80,25 +188,22 @@ console.error('Error parsing message:', error);
 
   send(message) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('Sending WebSocket message:', message);
       try {
-        const jsonMessage = JSON.stringify(message);
-        console.log('Sending JSON string:', jsonMessage);
-this.ws.send(jsonMessage);
-} catch (error) {
-console.error('Error sending WebSocket message:', error);
+        this.ws.send(JSON.stringify(message));
+      } catch (error) {
+        console.error('Error sending WebSocket message:', error);
       }
-    } else {
-      const state = this.ws ? this.ws.readyState : 'null';
-console.error('WebSocket is not connected. ReadyState:', state);
-      console.error('WebSocket object:', this.ws);
-      console.error('Message that failed to send:', message);
-      if (state === 0) {
-        console.warn('WebSocket is still connecting...');
-      } else if (state === 2 || state === 3) {
-        console.warn('WebSocket is closed. Attempting to reconnect...');
-        this.connect().catch(err => console.error('Reconnect failed:', err));
-      }
+      return;
+    }
+    // Оффлайн: кладём в очередь (с лимитом) — уйдёт после реконнекта.
+    // Терять команды оператора молча нельзя
+    if (this.offlineQueue.length >= OFFLINE_QUEUE_LIMIT) {
+      this.offlineQueue.shift();
+    }
+    this.offlineQueue.push(message);
+    console.warn(`WebSocket offline, message queued (${this.offlineQueue.length}):`, message.type);
+    if (!this.reconnectTimer && (!this.ws || this.ws.readyState === WebSocket.CLOSED)) {
+      this.scheduleReconnect();
     }
   }
 
@@ -120,16 +225,14 @@ console.error('WebSocket is not connected. ReadyState:', state);
   }
 
   notifyListeners(eventType, data) {
-if (this.listeners.has(eventType)) {
-      this.listeners.get(eventType).forEach(callback => {
-        try {
-callback(data);
-        } catch (error) {
-console.error(`Error in listener for ${eventType}:`, error);
-        }
-      });
-    } else {
-}
+    if (!this.listeners.has(eventType)) return;
+    this.listeners.get(eventType).forEach(callback => {
+      try {
+        callback(data);
+      } catch (error) {
+        console.error(`Error in listener for ${eventType}:`, error);
+      }
+    });
   }
 
   // Wing direct connection
@@ -960,3 +1063,4 @@ console.error(`Error in listener for ${eventType}:`, error);
 const websocketService = new WebSocketService();
 
 export default websocketService;
+export { WebSocketService, resolveWsUrl, BASE_RECONNECT_MS, MAX_RECONNECT_MS, OFFLINE_QUEUE_LIMIT };
