@@ -1,0 +1,35 @@
+# Облегчённый набор для запуска сервера и теста на пульте.
+#
+# Достаточно для: OSC/MIDI-связи с пультом, DSP-анализа (LUFS, True Peak,
+# GCC-PHAT, EQ, gate, feedback), WebSocket-сервера, аудиозахвата, конфига.
+# Проверено: `import server` поднимается полностью без пакетов ниже.
+#
+# НЕ включает тяжёлые ML/AI-зависимости (torch, scikit-learn, chromadb,
+# sentence-transformers, librosa, numba, matchering, pedalboard) — они
+# нужны только необязательным функциям, не подключённым к боевому пути,
+# тянут ~2 ГБ и рискуют не собраться под свежий Python.
+# Для полного набора со всеми фичами используйте requirements.txt.
+
+# Связь с пультом
+python-osc>=1.8.0
+websockets>=11.0
+
+# DSP
+numpy>=1.24.0
+scipy>=1.10.0
+pyloudnorm>=0.1.1
+
+# Аудиозахват
+sounddevice>=0.4.6
+pyaudio>=0.2.13
+soundfile>=0.12.0
+
+# Сервер / инфраструктура
+aiohttp>=3.8.0
+httpx>=0.24.0
+requests>=2.31.0
+pyyaml>=6.0
+watchdog>=3.0.0
+structlog>=23.1.0
+prometheus-client>=0.17.0
+rapidfuzz>=3.0.0
