@@ -43,6 +43,7 @@ class MasteringResult:
     eq_applied: bool
     success: bool
     error: Optional[str] = None
+    true_peak_dbtp: Optional[float] = None
 
 def measure_lufs(audio: np.ndarray, sample_rate: int) -> float:
     """Measure integrated LUFS using pyloudnorm (ITU-R BS.1770-4).
@@ -252,25 +253,39 @@ class AutoMaster:
             attack_ms=30.0, release_ms=200.0
         )
 
-        # 3. Loudness normalization
-        current_rms = np.sqrt(np.mean(self._monitor_signal(processed) ** 2) + 1e-12)
-        current_db = 20 * np.log10(current_rms)
-        gain_db = self.target_lufs - current_db
-        gain_db = max(-12.0, min(12.0, gain_db))
-        gain_linear = 10 ** (gain_db / 20.0)
-        processed = processed * gain_linear
+        # 3. Loudness normalization — accurate ITU-R BS.1770-4 LUFS via
+        # pyloudnorm when available, RMS approximation otherwise. The gain
+        # clamp is honored in both paths (gain applied explicitly).
+        current_lufs = measure_lufs(processed, self.sample_rate)
+        if current_lufs > -70.0:
+            gain_db = self.target_lufs - current_lufs
+            gain_db = max(-12.0, min(12.0, gain_db))
+            processed = processed * np.float32(10 ** (gain_db / 20.0))
+        else:
+            gain_db = 0.0
+            logger.warning("Audio too quiet for LUFS normalization (%.1f LUFS)", current_lufs)
 
-        # 4. Brick-wall limiter
-        processed, limiter_reduction = self._apply_limiter(processed, self.true_peak_limit)
+        # 4. Oversampled look-ahead true-peak limiter
+        processed, limiter_reduction = self._apply_true_peak_limiter(processed, self.true_peak_limit)
+
+        # 5. True peak safety pass — catch residual inter-sample peaks
+        for _ in range(3):
+            tp_check = measure_true_peak(processed, self.sample_rate)
+            if tp_check > self.true_peak_limit:
+                overshoot = tp_check - self.true_peak_limit + 0.05
+                processed = processed * np.float32(10 ** (-overshoot / 20.0))
+            else:
+                break
 
         # Final measurements
         peak_db = float(20 * np.log10(np.max(np.abs(processed)) + 1e-10))
-        rms_db = float(20 * np.log10(np.sqrt(np.mean(processed ** 2)) + 1e-10))
+        final_lufs = measure_lufs(processed, self.sample_rate)
+        final_true_peak = measure_true_peak(processed, self.sample_rate)
 
         return MasteringResult(
-            audio=processed, peak_db=peak_db, lufs=rms_db,
+            audio=processed, peak_db=peak_db, lufs=final_lufs,
             gain_applied_db=gain_db, limiter_reduction_db=limiter_reduction,
-            eq_applied=True, success=True
+            eq_applied=True, success=True, true_peak_dbtp=final_true_peak
         )
 
     @staticmethod

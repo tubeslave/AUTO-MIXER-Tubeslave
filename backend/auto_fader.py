@@ -872,7 +872,7 @@ class ChannelFaderState:
         # когда мы корректируем фейдер, это влияет на измеряемый уровень.
         # Решение: компенсируем влияние фейдера, добавляя его значение к измеренному LUFS.
         # Если фейдер уменьшает уровень на X dB, то измеренный LUFS на X dB меньше реального pre-fader уровня.
-        # Формула: pre_fader_lufs = measured_lufs + current_fader_db
+        # Формула: pre_fader_lufs = measured_lufs - current_fader_db
         # Пример: если measured_lufs = -30 LUFS, а current_fader = -6 dB, то pre_fader_lufs = -24 LUFS
         # ВАЖНО: знак НЕ инвертировать — сложение даёт положительную обратную связь в контуре
         # Fader Riding (снижение фейдера на d dB занижает pre-fader оценку на 2d) и загоняет

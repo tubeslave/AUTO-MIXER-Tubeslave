@@ -65,6 +65,7 @@ class MeasurementPosition:
     y: float
     height: float
     mic_response: np.ndarray = field(default_factory=lambda: np.array([]))
+    impulse_response: np.ndarray = field(default_factory=lambda: np.array([]))
     timestamp: float = 0.0
     quality_score: float = 0.0
     
@@ -671,6 +672,7 @@ class SystemMeasurement:
         self.fft_size = fft_size
         
         self.sweep_generator = SineSweepGenerator(sample_rate)
+        self.room_response_analyzer = RoomResponseAnalyzer(sample_rate=sample_rate, fft_size=fft_size)
         self.state = MeasurementState.IDLE
         
         # Measurement data
@@ -735,6 +737,7 @@ class SystemMeasurement:
             y=position[1],
             height=position[2],
             mic_response=recorded_signal,
+            impulse_response=impulse_response,
             timestamp=time.time()
         )
         
@@ -809,15 +812,25 @@ class SystemMeasurement:
         result = MeasurementResult()
         result.magnitude_response.frequencies = freqs
         result.magnitude_response.magnitude_db = magnitude
+        result.magnitude_response.coherence = coherence
         result.phase_response.frequencies = freqs
         result.phase_response.phase_deg = phase
         result.phase_response.coherence = coherence
+        result.impulse_response = avg_response
         result.rt60 = rt60_data
         result.positions = self.recorded_responses.copy()
         result.timestamp = time.time()
         
         # Overall quality
         result.overall_quality = np.mean([p.quality_score for p in self.recorded_responses])
+        result.room_analysis = self.room_response_analyzer.analyze(
+            impulse_response=avg_response,
+            magnitude_db=magnitude,
+            frequencies=freqs,
+            coherence=coherence,
+            rt60_data=rt60_data,
+            overall_quality=result.overall_quality,
+        )
         
         self.state = MeasurementState.COMPLETE
         
@@ -933,15 +946,18 @@ class SystemMeasurement:
         # For simplicity, average in time domain
         # In production: use complex averaging in frequency domain
         
-        max_len = max(len(p.mic_response) for p in self.recorded_responses)
+        sources = [
+            p.impulse_response if len(p.impulse_response) > 0 else p.mic_response
+            for p in self.recorded_responses
+        ]
+        max_len = max(len(response) for response in sources)
         averaged = np.zeros(max_len)
         
-        for pos in self.recorded_responses:
-            # Pad to same length
-            response = np.pad(pos.mic_response, (0, max_len - len(pos.mic_response)))
+        for response in sources:
+            response = np.pad(response, (0, max_len - len(response)))
             averaged += response
         
-        averaged /= len(self.recorded_responses)
+        averaged /= max(1, len(sources))
         
         return averaged
     
@@ -965,8 +981,11 @@ class SystemMeasurement:
         # Frequencies (use same length as magnitude)
         freqs = np.linspace(0, self.sample_rate/2, len(magnitude))
         
-        # Coherence (simplified - in production use multiple measurements)
-        coherence = np.ones_like(magnitude) * 0.95
+        coherence = self.room_response_analyzer.calculate_coherence(
+            [p.impulse_response if len(p.impulse_response) > 0 else p.mic_response for p in self.recorded_responses]
+        )
+        if len(coherence) != len(magnitude):
+            coherence = np.ones_like(magnitude) * 0.95
         
         return magnitude_db, phase_deg, freqs, coherence
     
@@ -1249,9 +1268,11 @@ class SystemMeasurementController:
         
         self.measurement = SystemMeasurement(sample_rate)
         self.correction_calculator = CorrectionCalculator()
+        self.room_compensation_planner = RoomCompensationPlanner()
         
         self.last_result: Optional[MeasurementResult] = None
         self.applied_corrections: List[EQCorrection] = []
+        self.last_room_compensation_plan = None
         
         logger.info("SystemMeasurementController initialized")
     
@@ -1286,17 +1307,26 @@ class SystemMeasurementController:
         # Calculate corrections
         corrections = self.correction_calculator.calculate_corrections(result)
         self.applied_corrections = corrections
+        plan = self.room_compensation_planner.plan(result, corrections)
+        self.last_room_compensation_plan = plan
         
         return {
             'status': 'complete',
             'quality': result.overall_quality,
             'rt60': result.rt60.to_dict(),
+            'room_analysis': result.room_analysis.to_dict(),
             'num_corrections': len(corrections),
             'corrections': [c.to_dict() for c in corrections],
             'frequencies': result.magnitude_response.frequencies.tolist(),
             'magnitude': result.magnitude_response.magnitude_db.tolist(),
             'phase': result.phase_response.phase_deg.tolist(),
             'coherence': result.magnitude_response.coherence.tolist(),
+            'recommended_target': plan.recommended_target,
+            'room_compensation_plan': plan.to_dict(),
+            'room_compensation_operator_payload': build_room_compensation_operator_payload(
+                plan,
+                event_type='room_compensation_plan',
+            ),
         }
 
     def analyze_reference_measurement(
