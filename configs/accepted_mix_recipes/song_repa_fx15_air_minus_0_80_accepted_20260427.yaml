@@ -1,0 +1,72 @@
+id: song_repa_fx15_air_minus_0_80_accepted_20260427
+status: operator_accepted_golden_baseline
+accepted_on: "2026-04-28"
+source_material: "SONG REPA"
+
+golden_render:
+  wav: "/Users/dmitrijvolkov/Desktop/Ai MIXING/SONG_REPA_MIXING_STATION_VIS_FX15_AIR_MINUS_0_80_20260427.wav"
+  mp3: "/Users/dmitrijvolkov/Desktop/Ai MIXING/SONG_REPA_MIXING_STATION_VIS_FX15_AIR_MINUS_0_80_20260427.mp3"
+  report: "/Users/dmitrijvolkov/Desktop/Ai MIXING/SONG_REPA_MIXING_STATION_VIS_FX15_AIR_MINUS_0_80_20260427_report.json"
+  sha256_wav: "6d53d5a874560c26200097bc1459d17f052963a9a405c4da13495330abab1f92"
+
+input_assets:
+  multitrack_dir: "/Users/dmitrijvolkov/Desktop/SONG  REPA"
+  reference_mix: "/Users/dmitrijvolkov/Desktop/reference/Theory_Of_A_Deadman-Santa_Monica-spaces.im.mp3"
+
+measured_metrics:
+  sample_rate: 48000
+  channels: 2
+  duration_sec: 204.747
+  integrated_lufs: -14.37
+  peak_dbfs: -4.979
+  rms_dbfs: -16.951
+  muq_a1_closest_score: 0.778733894
+  fx15_muq_score: 0.7725038714706898
+  fx15_final_score: 0.840752705599214
+  reference_score_same_method: 0.7958870023488999
+
+pipeline_recipe:
+  baseline_stack:
+    - "Full project agent/source-knowledge/AutoFOH/phase stack with large_system_polish disabled."
+    - "Drum phase alignment to overhead pair and snare-bottom polarity support."
+    - "Event-based expansion on kick, toms, and lead vocal."
+    - "Cross-adaptive EQ with lead vocal protected as highest priority."
+    - "Kick/bass hierarchy: kick stays ahead of bass in the punch band."
+    - "Stem mix verification before master decisions."
+  fx_and_space:
+    - "AutoFXPlanner shared filtered vocal plate, short drum room, ducked tempo delay, and chorus doubler."
+    - "Reference-guided vocal FX focus from the Santa Monica reference."
+    - "Section-selective subtle modulation/space on low-MuQ windows: 63-102s, 128-166s, 178-202s."
+  final_print:
+    - "Master conformed around -14 LUFS with no clipping."
+    - "Small reversible postmaster air trim: -0.80 dB."
+    - "Accepted final keeps generous headroom near -4.98 dBFS sample peak."
+  mixing_station_visualization:
+    - "Only verified WING Rack fader and pan paths were physically sent."
+    - "HPF, EQ, sends, compressor, and main-air OSC paths were logged but blocked as needs_discovery."
+    - "Do not replay blocked live-console paths until the exact dataPaths are discovered and read back."
+
+future_usage:
+  no_change_candidate: "Use the golden render or exact reproduced recipe as candidate_000_no_change."
+  first_step_for_song_repa: "Start from FX15_SECTION_MOD_SPACE plus air -0.80 dB, not from a raw unity-sum."
+  first_step_for_similar_rock_multitracks: "Recreate the baseline stack, then let new critics and Safety Governor test only small reversible changes."
+  candidate_order:
+    - "Golden no_change baseline."
+    - "AYAIC input level-plane balance if rebuilding from raw stems."
+    - "Reference-guided vocal FX focus."
+    - "Kick/bass hierarchy and cross-adaptive EQ."
+    - "Section-selective modulation/space probes."
+    - "New decision-layer candidates: gain polish, mirror-EQ, light glue, gate/expander, safety trim."
+    - "MuQ/Audiobox/MERT/CLAP/Essentia/PANNs evaluation."
+    - "Safety Governor final acceptance."
+  safety_rules:
+    - "Never pick a candidate only because it is louder; loudness-match before criticism."
+    - "Reject broad postmaster EQ, heavy limiting, or aggressive compression unless critics beat the golden baseline and safety passes."
+    - "Preserve headroom and phase; no OSC/MIDI writes in offline_test."
+
+latest_ai_critic_postcheck:
+  run_id: "SONG_REPA_FX15_BASELINE_PLUS_AI_CRITICS_20260428_153259"
+  output_dir: "/Users/dmitrijvolkov/Desktop/Ai MIXING/SONG_REPA_FX15_BASELINE_PLUS_AI_CRITICS_20260428_153259"
+  selected_candidate: "candidate_000_no_change"
+  decision: "no_change"
+  reason: "Best improvement below min_score_improvement 0.0100; keeping no_change."
