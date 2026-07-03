@@ -791,10 +791,11 @@ class FuzzyFaderController:
 class ChannelFaderState:
     """Состояние фейдера одного канала"""
     
-    def __init__(self, channel_id: int, mixer_channel: int, 
-                 sample_rate: int = 48000, 
+    def __init__(self, channel_id: int, mixer_channel: int,
+                 sample_rate: int = 48000,
                  instrument_type: str = 'custom',
-                 lufs_window_sec: Optional[float] = None):
+                 lufs_window_sec: Optional[float] = None,
+                 tap_point: str = 'post_fader'):
         """
         Args:
             channel_id: Audio channel ID
@@ -803,11 +804,14 @@ class ChannelFaderState:
             instrument_type: Instrument type name
             lufs_window_sec: Integrated LUFS window in seconds. None = full integrated (for Auto Balance),
                             3.0 = sliding window (for real-time). Default None.
+            tap_point: 'post_fader' (сигнал зависит от фейдера, компенсировать)
+                       или 'pre_fader' (сигнал уже до фейдера, НЕ компенсировать).
         """
         self.channel_id = channel_id
         self.mixer_channel = mixer_channel
         self.instrument_type = instrument_type
         self.sample_rate = sample_rate
+        self.tap_point = tap_point if tap_point in ('pre_fader', 'post_fader') else 'post_fader'
         
         # Анализаторы
         self.lufs_meter = LUFSMeter(sample_rate)
@@ -870,7 +874,15 @@ class ChannelFaderState:
         # Если фейдер уменьшает уровень на X dB, то измеренный LUFS на X dB меньше реального pre-fader уровня.
         # Формула: pre_fader_lufs = measured_lufs + current_fader_db
         # Пример: если measured_lufs = -30 LUFS, а current_fader = -6 dB, то pre_fader_lufs = -24 LUFS
-        self.pre_fader_lufs = measured_lufs + self.current_fader
+        # ВАЖНО: знак НЕ инвертировать — сложение даёт положительную обратную связь в контуре
+        # Fader Riding (снижение фейдера на d dB занижает pre-fader оценку на 2d) и загоняет
+        # фейдер в край диапазона. Та же формула уже корректно применена в _compute_auto_balance.
+        # При pre-fader отводе сигнал УЖЕ до фейдера — компенсация не нужна (иначе
+        # завышение уровня на величину фейдера).
+        if self.tap_point == 'pre_fader':
+            self.pre_fader_lufs = measured_lufs
+        else:
+            self.pre_fader_lufs = measured_lufs - self.current_fader
         # Используем компенсированный уровень для дальнейших расчетов (это реальный уровень входного сигнала)
         self.current_lufs = self.pre_fader_lufs
         
@@ -984,6 +996,17 @@ class AutoFaderController:
         
         # Integrated LUFS window (3 seconds for real-time per document)
         self.lufs_window_sec = auto_fader_config.get('lufs_window_sec', 3.0)
+
+        # Точка отвода USB-сигнала. 'post_fader' — сигнал зависит от фейдера,
+        # нужна компенсация pre_fader = measured - fader. 'pre_fader' — сигнал
+        # уже до фейдера (стабилен, не зависит от положения фейдера), компенсацию
+        # применять НЕЛЬЗЯ (иначе завышение уровня на величину фейдера).
+        # Определяется эмпирически: измерить USB при разных положениях фейдера.
+        self.tap_point = str(
+            self.config.get('audio', {}).get('tap_point', 'post_fader')
+        ).lower()
+        if self.tap_point not in ('pre_fader', 'post_fader'):
+            self.tap_point = 'post_fader'
         
         # Envelope parameters for smooth fader movement
         self.attack_ms = auto_fader_config.get('attack_ms', 100.0)
@@ -1234,7 +1257,8 @@ class AutoFaderController:
                     mixer_channel=mixer_ch,
                     sample_rate=self.sample_rate,
                     instrument_type=instrument_type,
-                    lufs_window_sec=self.lufs_window_sec if self.mode == BalanceMode.REALTIME else None
+                    lufs_window_sec=self.lufs_window_sec if self.mode == BalanceMode.REALTIME else None,
+                    tap_point=self.tap_point
                 )
                 self._audio_buffers[audio_ch] = deque(maxlen=10)
                 self.envelopes[audio_ch] = AGCEnvelope(
@@ -2023,9 +2047,14 @@ class AutoFaderController:
                 if fader_val is not None and float(fader_val) > -100:
                     current_fader = float(fader_val)
             
-            # Pre-fader уровень = измеренный post-fader - текущий фейдер
-            pre_fader = integrated - current_fader
-            
+            # Pre-fader уровень. При post-fader отводе вычитаем текущий фейдер;
+            # при pre-fader отводе сигнал уже до фейдера — компенсация не нужна
+            # (иначе баланс завышает уровень канала на величину его фейдера).
+            if getattr(self, 'tap_point', 'post_fader') == 'pre_fader':
+                pre_fader = integrated
+            else:
+                pre_fader = integrated - current_fader
+
             # Проверяем активность по PRE-FADER уровню (не post-fader!)
             # Порог блидинга — каналы ниже этого уровня считаются неактивными
             bleed_thresh = getattr(self, 'bleed_threshold', -50)
