@@ -2555,10 +2555,19 @@ class AutoMixerServer:
                 self._stop_wing_telemetry_capture(reason="connect_failed")
                 self.mixer_client = None
                 self.connection_mode = None
+                # Диагностика: различаем «пульта нет в сети» и «пульт виден,
+                # но OSC-remote выключен». Без этого оператор видел только
+                # «did not respond» и не понимал, что надо включить OSC в
+                # меню пульта (найдено при валидации на реальном WING)
+                diagnosis = await asyncio.get_running_loop().run_in_executor(
+                    None, self._diagnose_wing_unreachable, ip, send_port
+                )
                 await self.broadcast({
                     "type": "connection_status",
                     "connected": False,
-                    "error": "Connection failed - Wing did not respond"
+                    "error": diagnosis["error"],
+                    "diagnosis": diagnosis["code"],
+                    "hint": diagnosis.get("hint"),
                 })
                 
         except Exception as e:
@@ -2571,6 +2580,61 @@ class AutoMixerServer:
                 "connected": False,
                 "error": str(e)
             })
+
+    def _diagnose_wing_unreachable(self, ip: str, osc_port: int) -> dict:
+        """Почему connect к WING не удался: пульта нет в сети или OSC-remote
+        выключен. Discovery-порт 2222 работает всегда, OSC-порт 2223 — только
+        при включённом remote. Синхронный (вызывать через executor)."""
+        import socket as _socket
+
+        # 1. Discovery через broadcast (unicast к пульту нестабилен из-за
+        #    ARP; broadcast всегда доходит). Ждём ответ именно от нашего ip
+        seen_in_discovery = False
+        try:
+            ds = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+            ds.setsockopt(_socket.SOL_SOCKET, _socket.SO_BROADCAST, 1)
+            ds.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+            ds.bind(("0.0.0.0", 0))
+            prefix = ".".join(ip.split(".")[:3])
+            for tgt in ("255.255.255.255", f"{prefix}.255"):
+                try:
+                    ds.sendto(b"WING?", (tgt, 2222))
+                except OSError:
+                    pass
+            ds.settimeout(2.0)
+            deadline = time.time() + 2.0
+            while time.time() < deadline:
+                try:
+                    data, addr = ds.recvfrom(4096)
+                    if addr[0] == ip and data.startswith(b"WING"):
+                        seen_in_discovery = True
+                        break
+                except _socket.timeout:
+                    break
+            ds.close()
+        except Exception:
+            pass
+
+        if seen_in_discovery:
+            return {
+                "code": "osc_remote_disabled",
+                "error": (
+                    f"WING найден в сети ({ip}), но порт управления OSC "
+                    f"({osc_port}) не отвечает"
+                ),
+                "hint": (
+                    "Включите на пульте удалённое управление OSC: "
+                    "Setup → Remote → OSC. Discovery работает, значит сеть в порядке."
+                ),
+            }
+        return {
+            "code": "not_on_network",
+            "error": f"WING не отвечает по адресу {ip}",
+            "hint": (
+                "Проверьте: пульт включён, в той же сети/подсети, IP верный. "
+                "Discovery-запрос на порт 2222 не получил ответа."
+            ),
+        }
 
     async def start_wing_telemetry_capture(
         self,

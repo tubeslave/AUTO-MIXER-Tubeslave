@@ -1962,3 +1962,53 @@ class TestPingHandler:
         payload = json.loads(websocket.send.await_args_list[-1].args[0])
         assert payload["type"] == "pong"
         assert payload["mixer_connected"] is False
+
+
+class TestWingConnectDiagnosis:
+    """Диагностика неудачного connect: различает 'OSC выключен' и
+    'пульта нет в сети'. Найдено при валидации на реальном WING —
+    оператор раньше видел только 'did not respond'."""
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_diagnosis_osc_disabled_when_discovery_answers(
+        self, mock_bleed_service, mock_load_config, dummy_wing_server
+    ):
+        server = dummy_wing_server
+
+        class _Sock:
+            def setsockopt(self, *a): pass
+            def bind(self, *a): pass
+            def settimeout(self, *a): pass
+            def sendto(self, *a): pass
+            def close(self): pass
+            def recvfrom(self, n):
+                return (b"WING,192.168.1.102,ATMOSPHERA", ("192.168.1.102", 2222))
+
+        with patch("socket.socket", return_value=_Sock()):
+            d = server._diagnose_wing_unreachable("192.168.1.102", 2223)
+        assert d["code"] == "osc_remote_disabled"
+        assert "OSC" in d["error"] or "OSC" in d["hint"]
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_diagnosis_not_on_network_when_discovery_silent(
+        self, mock_bleed_service, mock_load_config, dummy_wing_server
+    ):
+        import socket as _s
+        server = dummy_wing_server
+
+        class _Sock:
+            def setsockopt(self, *a): pass
+            def bind(self, *a): pass
+            def settimeout(self, *a): pass
+            def sendto(self, *a): pass
+            def close(self): pass
+            def recvfrom(self, n):
+                raise _s.timeout()
+
+        with patch("socket.socket", return_value=_Sock()):
+            d = server._diagnose_wing_unreachable("192.168.1.250", 2223)
+        assert d["code"] == "not_on_network"
