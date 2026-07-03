@@ -305,6 +305,45 @@ def test_dlive_mute_pair_readback():
     assert client.get_mute(ch) is False
 
 
+# ── Feedback detector: выбор ДОМИНИРУЮЩЕГО пика заводки ──────────────
+
+
+def test_feedback_detector_picks_dominant_peak_frequency():
+    """Notch ставится на частоту доминирующей (самой громкой) заводки,
+    а не первого шумового пика в порядке словаря. Найдено при валидации
+    на реальном аудиотракте: тон 3150 Гц давал событие на случайной
+    частоте, потому что выбор шёл по dict-порядку tracked_peaks."""
+    from feedback_detector import FeedbackDetector, FeedbackDetectorConfig
+
+    sr = 48000
+    fb_freq = 3150.0
+    cfg = FeedbackDetectorConfig(sample_rate=sr, fft_size=4096, persistence_frames=4)
+    det = FeedbackDetector(config=cfg)
+    rng = np.random.default_rng(7)
+
+    detected = []
+    amp = 0.02
+    for _ in range(10):
+        tb = np.arange(int(0.12 * sr)) / sr
+        amp *= 1.6  # растущая заводка
+        tone = (amp * np.sin(2 * np.pi * fb_freq * tb)).astype(np.float32)
+        background = (0.03 * rng.standard_normal(len(tb))).astype(np.float32)
+        block = np.clip(tone + background, -1.0, 1.0).astype(np.float32)
+        ev = det.process_audio(1, np.ascontiguousarray(block))
+        if ev is not None:
+            detected.append(ev.frequency_hz)
+
+    assert detected, "заводка не обнаружена вовсе"
+    # Большинство событий — на реальной частоте заводки (± один бин ~12 Гц);
+    # ранние кадры до накопления persistence могут дать шум
+    on_target = [f for f in detected if abs(f - fb_freq) < 25]
+    assert len(on_target) >= len(detected) * 0.6, (
+        f"доминирующий пик выбран неверно: {detected}"
+    )
+    # Последнее (устойчивое) событие обязано быть на верной частоте
+    assert abs(detected[-1] - fb_freq) < 25, f"устойчивая фаза: {detected[-1]}"
+
+
 # ── dLive: best-effort верификация записи фейдера ───────────────────
 
 

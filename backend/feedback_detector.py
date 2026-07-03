@@ -415,43 +415,52 @@ class FeedbackDetector:
             if peak.persistence <= 0:
                 del state.tracked_peaks[pid]
 
-        for pid, peak in state.tracked_peaks.items():
-            if peak.persistence >= self.config.persistence_frames and peak.is_growing():
-                confidence = min(
-                    1.0,
-                    peak.persistence / (self.config.persistence_frames * 2),
-                )
-                if confidence < self.config.min_confidence:
-                    continue
+        # Среди устойчивых растущих пиков выбираем ДОМИНИРУЮЩИЙ (самый
+        # громкий), а не первый по порядку словаря. Иначе шумовой пик,
+        # случайно набравший persistence, перебивал реальную заводку —
+        # notch ставился на неверную частоту (подтверждено на реальном
+        # аудиотракте: тон 3150 Гц → событие на случайной частоте).
+        candidates = [
+            peak for peak in state.tracked_peaks.values()
+            if peak.persistence >= self.config.persistence_frames and peak.is_growing()
+        ]
+        candidates.sort(key=lambda p: p.magnitude_db, reverse=True)
+        for peak in candidates:
+            confidence = min(
+                1.0,
+                peak.persistence / (self.config.persistence_frames * 2),
+            )
+            if confidence < self.config.min_confidence:
+                continue
 
-                nf = state.add_notch(peak.frequency, confidence, now)
-                if nf is not None:
-                    event = FeedbackEvent(
-                        channel=channel,
-                        frequency_hz=peak.frequency,
-                        magnitude_db=peak.magnitude_db,
-                        action="notch",
-                        confidence=confidence,
-                        timestamp=now,
-                        notch_filter=nf,
-                    )
-                    state.events.append(event)
-                    return event
-                else:
-                    reduction = state.apply_fader_reduction(
-                        step_db=self.config.fader_reduction_step_db,
-                        floor_db=self.config.fader_reduction_floor_db,
-                    )
-                    event = FeedbackEvent(
-                        channel=channel,
-                        frequency_hz=peak.frequency,
-                        magnitude_db=peak.magnitude_db,
-                        action="fader_reduce",
-                        confidence=confidence,
-                        timestamp=now,
-                    )
-                    state.events.append(event)
-                    return event
+            nf = state.add_notch(peak.frequency, confidence, now)
+            if nf is not None:
+                event = FeedbackEvent(
+                    channel=channel,
+                    frequency_hz=peak.frequency,
+                    magnitude_db=peak.magnitude_db,
+                    action="notch",
+                    confidence=confidence,
+                    timestamp=now,
+                    notch_filter=nf,
+                )
+                state.events.append(event)
+                return event
+            else:
+                reduction = state.apply_fader_reduction(
+                    step_db=self.config.fader_reduction_step_db,
+                    floor_db=self.config.fader_reduction_floor_db,
+                )
+                event = FeedbackEvent(
+                    channel=channel,
+                    frequency_hz=peak.frequency,
+                    magnitude_db=peak.magnitude_db,
+                    action="fader_reduce",
+                    confidence=confidence,
+                    timestamp=now,
+                )
+                state.events.append(event)
+                return event
 
         return None
 
