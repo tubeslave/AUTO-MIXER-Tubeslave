@@ -134,10 +134,7 @@ class SignalStats:
         gain_correction = (weight_lufs * delta_lufs) + (weight_peak * delta_peak)
         
         # ИСПРАВЛЕНИЕ: Правильное ограничение
-        if delta_peak < 0:
-            gain_correction = max(gain_correction, delta_peak)
-        else:
-            gain_correction = min(gain_correction, delta_peak)
+        gain_correction = min(gain_correction, delta_peak)
         
         self.gain_limited_by = "blended_peak_lufs"
         self.suggested_gain_db = np.clip(gain_correction, -24.0, 24.0)

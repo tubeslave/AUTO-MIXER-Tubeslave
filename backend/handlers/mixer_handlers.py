@@ -2,6 +2,102 @@
 
 from typing import Any, Optional
 
+try:
+    from live_apply import LiveApplyRequest
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.live_apply import LiveApplyRequest
+
+
+def _wing_boundary_active(server) -> bool:
+    checker = getattr(server, "_is_wing_deployment_write_boundary_active", None)
+    return bool(checker()) if callable(checker) else False
+
+
+def _target_type(operation: str) -> str:
+    return {
+        "set_fader": "channel_fader",
+        "set_gain": "channel_gain",
+        "set_eq": "channel_eq",
+        "set_compressor": "channel_compressor",
+    }.get(operation, operation)
+
+
+def _message_for_live_apply_result(result) -> str:
+    if result.accepted and result.dry_run:
+        return "Dry-run only: no OSC command was sent."
+    if result.accepted and result.readback_status == "confirmed":
+        return "Live apply confirmed by mixer readback."
+    if result.blocked_reason == "confirm_live_apply_required":
+        return "Live apply blocked: confirmation required."
+    if result.blocked_reason == "panic_stop_active":
+        return "Live apply blocked: panic stop is active for manual live apply."
+    if result.blocked_reason == "unsupported_operation":
+        return "Live apply blocked: operation is not gated for console writes."
+    if result.blocked_reason == "mixer_client_unavailable":
+        return "Mixer unavailable: command was not sent."
+    if result.blocked_reason == "readback_timeout":
+        return "Live apply sent, but readback timed out before confirmation."
+    if result.blocked_reason == "readback_query_failed":
+        return "Live apply sent, but readback query failed."
+    return "Live apply blocked." if not result.accepted else "Live apply result recorded."
+
+
+async def _send_live_apply_result(
+    server,
+    websocket,
+    *,
+    operation: str,
+    channel: Any,
+    value: Any,
+    data: dict,
+):
+    result = server.live_apply_service.apply(
+        LiveApplyRequest(
+            source="manual_ui",
+            operation=operation,
+            channel=int(channel),
+            value=float(value),
+            dry_run=data.get("dry_run"),
+            confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+            current_value=data.get("current_value"),
+            min_value=data.get("min_value"),
+            max_value=data.get("max_value"),
+            max_step=data.get("max_step"),
+            replay_correlation_id=str(data.get("replay_correlation_id") or ""),
+            metadata={"handler": f"mixer:{operation}"},
+        ),
+        getattr(server, "mixer_client", None),
+    )
+    payload = {
+        "type": "manual_live_apply_result",
+        "request_id": data.get("request_id"),
+        "operation": operation,
+        "accepted": bool(result.accepted),
+        "blocked": bool(not result.accepted or result.blocked_reason),
+        "blocked_reason": result.blocked_reason,
+        "dry_run_only": bool(result.dry_run and not result.send_attempted),
+        "send_result": result.send_result,
+        "send_status": result.send_status,
+        "readback_status": result.readback_status,
+        "desired_value": result.desired_value,
+        "confirmed_value": result.confirmed_value,
+        "verification_id": result.verification_id,
+        "audit_id": result.audit_id,
+        "replay_correlation_id": result.replay_correlation_id,
+        "failure_reason": result.failure_reason,
+        "timeout_ms": result.timeout_ms,
+        "panic_stop_active": result.panic_stop_active,
+        "panic_stop_scope": result.panic_stop_scope,
+        "panic_stop_reason": result.panic_stop_reason,
+        "shadow_mode_active": result.blocked_reason == "shadow_mode_active",
+        "guard_reasons": list(result.guard_reasons),
+        "message_for_user": _message_for_live_apply_result(result),
+        "live_apply_source": "manual_ui",
+        "target_type": _target_type(operation),
+    }
+    await server.send_to_client(websocket, payload)
+    return result
+
 
 def _parse_readonly_parameter_request(server, data: dict) -> tuple[Optional[int], Optional[str], Optional[str], Optional[str]]:
     value_type = server._normalize_readonly_parameter_kind(data.get("value_type"))
@@ -58,7 +154,7 @@ def register_handlers(server):
     async def handle_set_fader(websocket, data):
         channel = data.get("channel")
         value = data.get("value")
-        if server._is_wing_deployment_write_boundary_active():
+        if _wing_boundary_active(server):
             result = await server._apply_manual_console_write(
                 websocket,
                 channel=channel,
@@ -74,13 +170,19 @@ def register_handlers(server):
                 result_type = "manual_write_error"
             await server.send_to_client(websocket, {"type": result_type, **result})
             return
-        if server.mixer_client:
-            server.mixer_client.set_channel_fader(channel, value)
+        await _send_live_apply_result(
+            server,
+            websocket,
+            operation="set_fader",
+            channel=channel,
+            value=value,
+            data=data,
+        )
 
     async def handle_set_gain(websocket, data):
         channel = data.get("channel")
         value = data.get("value")
-        if server._is_wing_deployment_write_boundary_active():
+        if _wing_boundary_active(server):
             result = await server._apply_manual_console_write(
                 websocket,
                 channel=channel,
@@ -96,13 +198,19 @@ def register_handlers(server):
                 result_type = "manual_write_error"
             await server.send_to_client(websocket, {"type": result_type, **result})
             return
-        if server.mixer_client:
-            server.mixer_client.set_channel_gain(channel, value)
+        await _send_live_apply_result(
+            server,
+            websocket,
+            operation="set_gain",
+            channel=channel,
+            value=value,
+            data=data,
+        )
 
     async def handle_set_mute(websocket, data, surface: str = "set_mute"):
         channel = data.get("channel")
         value = data.get("muted", data.get("value"))
-        if server._is_wing_deployment_write_boundary_active():
+        if _wing_boundary_active(server):
             blocked = await server._block_quarantined_wing_write_surface(
                 websocket,
                 surface=surface,
@@ -122,7 +230,7 @@ def register_handlers(server):
     async def handle_set_pan(websocket, data):
         channel = data.get("channel")
         raw_value = data.get("value", data.get("pan", data.get("pan_percent", 0.0)))
-        if server._is_wing_deployment_write_boundary_active():
+        if _wing_boundary_active(server):
             blocked = await server._block_quarantined_wing_write_surface(
                 websocket,
                 surface="set_pan",
@@ -156,36 +264,44 @@ def register_handlers(server):
         freq = data.get("freq")
         gain = data.get("gain")
         q = data.get("q")
-        blocked = await server._block_quarantined_wing_write_surface(
+        if _wing_boundary_active(server):
+            blocked = await server._block_quarantined_wing_write_surface(
+                websocket,
+                surface="set_eq",
+                result_type="set_eq_result",
+                request=data,
+            )
+            if blocked:
+                return
+        await _send_live_apply_result(
+            server,
             websocket,
-            surface="set_eq",
-            result_type="set_eq_result",
-            request=data,
+            operation="set_eq",
+            channel=channel,
+            value=gain if gain is not None else 0.0,
+            data=data,
         )
-        if blocked:
-            return
-        if server.mixer_client:
-            server.mixer_client.set_eq_band(channel, band, freq, gain, q)
 
     async def handle_set_compressor(websocket, data):
         channel = data.get("channel")
         params = data.get("params", {})
-        blocked = await server._block_quarantined_wing_write_surface(
-            websocket,
-            surface="set_compressor",
-            result_type="set_compressor_result",
-            request=data,
-        )
-        if blocked:
-            return
-        if server.mixer_client:
-            server.mixer_client.set_compressor(
-                channel,
-                params.get("threshold", 0),
-                params.get("ratio", 1),
-                params.get("attack", 0),
-                params.get("release", 0)
+        if _wing_boundary_active(server):
+            blocked = await server._block_quarantined_wing_write_surface(
+                websocket,
+                surface="set_compressor",
+                result_type="set_compressor_result",
+                request=data,
             )
+            if blocked:
+                return
+        await _send_live_apply_result(
+            server,
+            websocket,
+            operation="set_compressor",
+            channel=channel,
+            value=params.get("threshold", 0.0),
+            data=data,
+        )
 
     async def handle_rollback_last_manual_write(websocket, data):
         result = await server._rollback_last_manual_console_write(

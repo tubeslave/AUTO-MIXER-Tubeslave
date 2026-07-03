@@ -35,6 +35,20 @@ def register_handlers(server):
             **server.get_gain_staging_status()
         })
 
+    async def handle_get_gain_staging_recommendations(websocket, data):
+        await server.send_to_client(websocket, {
+            "request_id": data.get("request_id"),
+            "type": "gain_staging_recommendations",
+            **server.get_gain_staging_recommendations(),
+        })
+
+    async def handle_get_live_input_trim_recommendations(websocket, data):
+        await server.send_to_client(websocket, {
+            "request_id": data.get("request_id"),
+            "type": "live_input_trim_recommendations",
+            **server.get_live_input_trim_recommendations(),
+        })
+
     async def handle_update_safe_gain_settings(websocket, data):
         settings = data.get("settings", {})
         await server.update_safe_gain_settings(settings)
@@ -43,5 +57,7 @@ def register_handlers(server):
         "start_realtime_correction": handle_start_realtime_correction,
         "stop_realtime_correction": handle_stop_realtime_correction,
         "get_gain_staging_status": handle_get_gain_staging_status,
+        "get_gain_staging_recommendations": handle_get_gain_staging_recommendations,
+        "get_live_input_trim_recommendations": handle_get_live_input_trim_recommendations,
         "update_safe_gain_settings": handle_update_safe_gain_settings,
     }

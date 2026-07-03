@@ -32,7 +32,10 @@ from scipy.signal import butter, filtfilt, lfilter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
-sys.path.insert(0, str(BACKEND_DIR))
+FFMPEG_TIMEOUT_SEC = 300.0
+for import_path in (str(REPO_ROOT), str(BACKEND_DIR)):
+    if import_path not in sys.path:
+        sys.path.insert(0, import_path)
 
 from ai.agent import AgentAction, AgentMode, MixingAgent  # noqa: E402
 from ai.knowledge_base import KnowledgeBase  # noqa: E402
@@ -820,7 +823,7 @@ def read_audio_file(path: Path) -> tuple[np.ndarray, int]:
                 "-i", str(path),
                 str(decoded),
             ]
-            subprocess.run(cmd, check=True)
+            subprocess.run(cmd, check=True, timeout=FFMPEG_TIMEOUT_SEC)
             audio, sr = sf.read(str(decoded), dtype="float32", always_2d=False)
             return normalize_audio_shape(audio), int(sr)
 
@@ -9938,10 +9941,10 @@ def master_process(
     mix: np.ndarray,
     sr: int,
     target_lufs: float = -16.0,
-    final_limiter: bool = True,
+    final_limiter: bool = False,
     live_peak_ceiling_db: float = -3.0,
     reference_context: ReferenceMixContext | None = None,
-    allow_reference_mastering: bool = True,
+    allow_reference_mastering: bool = False,
     ceiling_dbfs: float = -1.0,
     apply_bus_processing: bool = True,
 ) -> tuple[np.ndarray, dict[str, Any]]:
@@ -10153,13 +10156,43 @@ def _orchestrator_dry_run_enabled(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "codex_orchestrator_dry_run", False))
 
 
+def _offline_final_limiter_enabled(args: argparse.Namespace) -> bool:
+    """Default no-reference renders avoid final limiting unless explicitly asked."""
+    explicit_master = bool(getattr(args, "final_limiter", False)) or bool(
+        getattr(args, "soft_master", False)
+    )
+    return explicit_master and not bool(getattr(args, "no_final_limiter", False))
+
+
+def _offline_reference_mastering_enabled(
+    args: argparse.Namespace,
+    *,
+    final_limiter: bool,
+) -> bool:
+    """Reference mastering is an explicit variant and requires the limiter path."""
+    return (
+        bool(final_limiter)
+        and bool(getattr(args, "reference_mastering", False))
+        and not bool(getattr(args, "no_reference_mastering", False))
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", default=str(Path.home() / "Desktop" / "MIX"))
     parser.add_argument("--output", default=str(ai_mixing_path("AUTO_MIX_AGENT.mp3")))
     parser.add_argument("--report", default=str(ai_logs_path("AUTO_MIX_AGENT_report.json")))
     parser.add_argument("--no-llm", action="store_true")
-    parser.add_argument("--no-final-limiter", action="store_true")
+    parser.add_argument(
+        "--final-limiter",
+        action="store_true",
+        help="Explicitly enable final limiter/target-loudness conforming. The default no-reference pipeline uses static master trim.",
+    )
+    parser.add_argument(
+        "--no-final-limiter",
+        action="store_true",
+        help="Legacy safety flag; keeps final limiter disabled and wins over --final-limiter.",
+    )
     parser.add_argument("--no-drum-vocal-duck", action="store_true")
     parser.add_argument("--live-peak-ceiling-db", type=float, default=-3.0)
     parser.add_argument("--live-channel-peak-ceiling-db", type=float, default=-3.0)
@@ -10183,7 +10216,16 @@ def main() -> int:
     parser.add_argument("--genre", default="", help="Optional genre focus for bounded mix voicing, for example 'rock'")
     parser.add_argument("--reference-dynamics-ride", action="store_true", help="Apply reference-guided stem loudness rides after channel rendering")
     parser.add_argument("--reference-vocal-fx-focus", action="store_true", help="Apply an extra narrow pass that only adjusts lead/BGV/fx space toward the reference")
-    parser.add_argument("--no-reference-mastering", action="store_true", help="Use the reference only for channel/stem decisions and skip stereo reference-mastering on the final mix")
+    parser.add_argument(
+        "--reference-mastering",
+        action="store_true",
+        help="Explicitly allow stereo reference-mastering. Requires --final-limiter or --soft-master.",
+    )
+    parser.add_argument(
+        "--no-reference-mastering",
+        action="store_true",
+        help="Legacy safety flag; reference mastering is disabled by default and this wins over --reference-mastering.",
+    )
     parser.add_argument("--large-system-polish", action="store_true", help="Apply a final translation-oriented pass for PA playback: tame 55-70 Hz, clean 180-350 Hz, and open stereo support layers.")
     parser.add_argument("--autofoh-rounds", type=int, default=DEFAULT_AUTOFOH_ANALYZER_ROUNDS, help="Number of bounded AutoFOH analyzer rounds; use 3 for a slower deep pass.")
     parser.add_argument("--analysis-preview-sec", type=float, default=ANALYZER_RENDER_PREVIEW_SEC, help="Active-window render length used by offline analyzers.")
@@ -10204,6 +10246,11 @@ def main() -> int:
     parser.add_argument("--muq-stem-drift-max-windows", type=int, default=0, help="Limit offline MuQ stem drift windows; 0 means full song.")
     parser.add_argument("--source-rules-mert-only", action="store_true", help="Experimental offline render: build DSP only from measured metrics, rules.jsonl, and MERT shadow scoring; skip built-in project mix passes.")
     args = parser.parse_args()
+    final_limiter = _offline_final_limiter_enabled(args)
+    reference_mastering = _offline_reference_mastering_enabled(
+        args,
+        final_limiter=final_limiter,
+    )
     audio_dir, logs_dir = ensure_ai_output_dirs()
     args.output = str(Path(args.output).expanduser())
     args.report = str(Path(args.report).expanduser())
@@ -10246,7 +10293,7 @@ def main() -> int:
             hpf=hpf,
             target_rms_db=target_rms,
             trim_db=trim,
-            input_fade_ms=args.live_input_fade_ms if args.no_final_limiter else args.channel_input_fade_ms,
+            input_fade_ms=args.live_input_fade_ms if not final_limiter else args.channel_input_fade_ms,
             eq_bands=list(eq),
             comp_threshold_db=threshold,
             comp_ratio=ratio,
@@ -10510,7 +10557,7 @@ def main() -> int:
             args.live_channel_peak_ceiling_db,
             render_cache=render_cache,
         )
-        if args.no_final_limiter
+        if not final_limiter
         else {"enabled": False}
     )
 
@@ -10647,7 +10694,6 @@ def main() -> int:
         mix += rendered
     perceptual_before_master = mix.copy()
 
-    final_limiter = (not args.no_final_limiter) or args.soft_master
     mix, master_report = master_process(
         mix,
         sr,
@@ -10655,7 +10701,7 @@ def main() -> int:
         final_limiter=final_limiter,
         live_peak_ceiling_db=args.live_peak_ceiling_db,
         reference_context=reference_context,
-        allow_reference_mastering=not args.no_reference_mastering,
+        allow_reference_mastering=reference_mastering,
         ceiling_dbfs=args.master_ceiling_dbfs,
         apply_bus_processing=not args.source_rules_mert_only,
     )
@@ -10674,7 +10720,7 @@ def main() -> int:
             "-b:a", "320k",
             str(output),
         ]
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, timeout=FFMPEG_TIMEOUT_SEC)
 
     meter = pyln.Meter(sr)
     final_lufs = None
@@ -10773,6 +10819,11 @@ def main() -> int:
         "kick_presence_boost": kick_presence_boost,
         "kick_focus_cymbal_cut": cymbal_focus_cleanup,
         "soft_master": args.soft_master,
+        "final_limiter_opt_in": bool(args.final_limiter),
+        "final_limiter_legacy_disable": bool(args.no_final_limiter),
+        "reference_mastering_opt_in": bool(args.reference_mastering),
+        "reference_mastering_legacy_disable": bool(args.no_reference_mastering),
+        "standard_no_reference_pipeline": bool(not final_limiter and not reference_mastering),
         "master_target_lufs": round(args.master_target_lufs, 2),
         "master_ceiling_dbfs": round(args.master_ceiling_dbfs, 2),
         "channel_input_fade_ms": round(args.channel_input_fade_ms, 2),

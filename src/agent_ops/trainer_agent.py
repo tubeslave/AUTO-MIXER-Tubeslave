@@ -10,6 +10,10 @@ from typing import Any
 import yaml
 
 
+DEFAULT_TRAINING_SUBPROCESS_TIMEOUT_SEC = 12 * 60 * 60
+TRAINING_TIMEOUT_RETURNCODE = 124
+
+
 @dataclass
 class TrainingResult:
     success: bool
@@ -41,6 +45,7 @@ class TrainerAgent:
         logs_dir: str | Path = "logs/agent_ops",
         runs_dir: str | Path = "artifacts/runs",
         default_python: str = "python",
+        default_timeout_sec: float = DEFAULT_TRAINING_SUBPROCESS_TIMEOUT_SEC,
     ) -> None:
         self.name = name
         self.project_root = Path(project_root).resolve()
@@ -49,6 +54,7 @@ class TrainerAgent:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         self.default_python = default_python
+        self.default_timeout_sec = float(default_timeout_sec)
 
     def run(self, data: dict[str, Any]) -> dict[str, Any]:
         if "experiments_config" in data:
@@ -59,17 +65,26 @@ class TrainerAgent:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         log_path = self.logs_dir / f"trainer_run_{timestamp}.log"
 
-        process = subprocess.run(
-            command,
-            cwd=str(self.project_root),
-            capture_output=True,
-            text=True,
-            shell=False,
-        )
+        timeout_sec = self._timeout_from(data)
+        try:
+            process = subprocess.run(
+                command,
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                shell=False,
+                timeout=timeout_sec,
+            )
+            returncode = process.returncode
+            stdout = process.stdout or ""
+            stderr = process.stderr or ""
+        except subprocess.TimeoutExpired as exc:
+            returncode = TRAINING_TIMEOUT_RETURNCODE
+            stdout = self._coerce_output(exc.stdout)
+            stderr = self._coerce_output(exc.stderr)
+            stderr = (stderr + "\n" if stderr else "") + f"training command timed out after {timeout_sec:.1f}s"
 
         finished_at = time.time()
-        stdout = process.stdout or ""
-        stderr = process.stderr or ""
 
         with log_path.open("w", encoding="utf-8") as log_file:
             log_file.write("COMMAND:\n")
@@ -80,8 +95,8 @@ class TrainerAgent:
             log_file.write(stderr + "\n")
 
         result = TrainingResult(
-            success=process.returncode == 0,
-            returncode=process.returncode,
+            success=returncode == 0,
+            returncode=returncode,
             command=command,
             started_at=started_at,
             finished_at=finished_at,
@@ -138,16 +153,25 @@ class TrainerAgent:
         log_path = run_dir / "train.log"
         metadata_path = run_dir / "metadata.json"
         started_at = time.time()
-        process = subprocess.run(
-            command,
-            cwd=str(self.project_root),
-            capture_output=True,
-            text=True,
-            shell=False,
-        )
+        timeout_sec = self._timeout_from(exp)
+        try:
+            process = subprocess.run(
+                command,
+                cwd=str(self.project_root),
+                capture_output=True,
+                text=True,
+                shell=False,
+                timeout=timeout_sec,
+            )
+            returncode = process.returncode
+            stdout = process.stdout or ""
+            stderr = process.stderr or ""
+        except subprocess.TimeoutExpired as exc:
+            returncode = TRAINING_TIMEOUT_RETURNCODE
+            stdout = self._coerce_output(exc.stdout)
+            stderr = self._coerce_output(exc.stderr)
+            stderr = (stderr + "\n" if stderr else "") + f"training command timed out after {timeout_sec:.1f}s"
         finished_at = time.time()
-        stdout = process.stdout or ""
-        stderr = process.stderr or ""
 
         log_path.write_text(
             "COMMAND:\n"
@@ -165,8 +189,8 @@ class TrainerAgent:
             "run_id": run_id,
             "run_dir": str(run_dir),
             "command": command,
-            "success": process.returncode == 0,
-            "returncode": process.returncode,
+            "success": returncode == 0,
+            "returncode": returncode,
             "duration_sec": round(finished_at - started_at, 3),
             "metrics": metrics,
             "log_path": str(log_path),
@@ -179,6 +203,24 @@ class TrainerAgent:
             encoding="utf-8",
         )
         return result
+
+    def _timeout_from(self, data: dict[str, Any]) -> float:
+        value = data.get("timeout_sec", self.default_timeout_sec)
+        try:
+            timeout_sec = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("timeout_sec must be a positive number") from exc
+        if timeout_sec <= 0:
+            raise ValueError("timeout_sec must be positive")
+        return timeout_sec
+
+    @staticmethod
+    def _coerce_output(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return str(value)
 
     def _resolve_command(self, data: dict[str, Any]) -> list[str]:
         if "command" in data and isinstance(data["command"], list) and data["command"]:

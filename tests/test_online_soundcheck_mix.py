@@ -2,6 +2,7 @@ import importlib.util
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import soundfile as sf
@@ -41,6 +42,19 @@ def test_build_online_schedule_is_ordered_and_positive():
     assert all(item["fade_sec"] > 0.0 for item in schedule)
 
 
+def test_online_soundcheck_final_limiter_is_explicit_opt_in():
+    mod = load_online_soundcheck_module()
+    args = SimpleNamespace(final_limiter=False, no_final_limiter=False)
+
+    assert mod._final_limiter_enabled(args) is False
+
+    args.final_limiter = True
+    assert mod._final_limiter_enabled(args) is True
+
+    args.no_final_limiter = True
+    assert mod._final_limiter_enabled(args) is False
+
+
 def test_crossfade_stage_sequence_applies_stages_in_order():
     mod = load_online_soundcheck_module()
     sr = 10
@@ -67,6 +81,27 @@ def test_channel_triggered_defaults_to_repa_song_desktop_folder():
 
     assert mod.default_repa_song_input_dir() == Path.home() / "Desktop" / "REPA Song"
     assert mod.default_repa_song_output_path().name == "REPA Song_ONLINE_SOUNDCHECK_MIX.wav"
+
+
+def test_channel_triggered_mastering_flags_are_explicit_opt_in():
+    mod = load_channel_triggered_soundcheck_module()
+    args = SimpleNamespace(
+        final_limiter=False,
+        no_final_limiter=False,
+        reference_mastering=False,
+    )
+
+    assert mod._final_limiter_enabled(args) is False
+    assert mod._reference_mastering_enabled(args, final_limiter=False) is False
+
+    args.final_limiter = True
+    args.reference_mastering = True
+    assert mod._final_limiter_enabled(args) is True
+    assert mod._reference_mastering_enabled(args, final_limiter=True) is True
+
+    args.no_final_limiter = True
+    assert mod._final_limiter_enabled(args) is False
+    assert mod._reference_mastering_enabled(args, final_limiter=False) is False
 
 
 def test_channel_triggered_export_audio_writes_pcm_wav(tmp_path):

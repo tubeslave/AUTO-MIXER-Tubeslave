@@ -207,15 +207,21 @@ class _ChannelFeedbackState:
         if len(self.notch_filters) >= self.config.max_notch_filters:
             return None
 
+        used_slots = {int(nf.slot_index) for nf in self.notch_filters}
+        slot_index = next(
+            slot
+            for slot in range(int(self.config.max_notch_filters))
+            if slot not in used_slots
+        )
         q = _q_for_feedback(confidence)
         nf = NotchFilter(
             frequency=frequency,
             gain_db=-3.0,
             q_factor=q,
-            slot_index=self._next_slot,
+            slot_index=slot_index,
             applied_at=now,
         )
-        self._next_slot += 1
+        self._next_slot = max(self._next_slot, slot_index + 1)
         self.notch_filters.append(nf)
         return nf
 
@@ -514,7 +520,7 @@ class FeedbackDetector:
         commands = []
         commands.append((f"/ch/{channel}/eq/on", 1))
         for nf in state.notch_filters:
-            slot = (nf.slot_index % 4) + 1
+            slot = int(nf.slot_index) + 1
             commands.append((f"/ch/{channel}/eq/{slot}f", nf.frequency))
             commands.append((f"/ch/{channel}/eq/{slot}g", nf.gain_db))
             commands.append((f"/ch/{channel}/eq/{slot}q", nf.q_factor))

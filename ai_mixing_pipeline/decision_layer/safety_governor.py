@@ -53,11 +53,14 @@ class DecisionSafetyGovernor:
     def check_render(self, candidate: CandidateActionSet, render_path: str | Path) -> dict[str, Any]:
         reasons: list[str] = []
         warnings: list[str] = []
+        penalties: list[str] = []
         metrics = measure_audio_file(render_path)
         level = metrics.get("level", {}) or {}
         stereo = metrics.get("stereo", {}) or {}
         max_true_peak = float(self.safety.get("max_true_peak_dbfs", -1.0))
         min_headroom = float(self.safety.get("min_headroom_db", 1.0))
+        soft_margin_db = float(self.safety.get("soft_true_peak_margin_db", 2.0))
+        soft_headroom_margin_db = float(self.safety.get("soft_headroom_margin_db", 2.0))
         true_peak = float(level.get("true_peak_dbtp", level.get("peak_dbfs", -120.0)) or -120.0)
         headroom = float(level.get("headroom_db", 0.0) or 0.0)
         clips = int(level.get("clip_count", 0) or 0)
@@ -65,14 +68,21 @@ class DecisionSafetyGovernor:
             reasons.append("clipping_detected")
         if true_peak > max_true_peak + 1e-6:
             reasons.append(f"true_peak_exceeds_limit:{true_peak:.2f}>{max_true_peak:.2f}")
+        elif true_peak > max_true_peak - soft_margin_db:
+            penalties.append(f"true_peak_near_limit:{true_peak:.2f}>{max_true_peak - soft_margin_db:.2f}")
         if headroom < min_headroom - 1e-6:
             reasons.append(f"insufficient_headroom:{headroom:.2f}<{min_headroom:.2f}")
+        elif headroom < min_headroom + soft_headroom_margin_db:
+            penalties.append(f"headroom_near_limit:{headroom:.2f}<{min_headroom + soft_headroom_margin_db:.2f}")
         if bool(self.safety.get("forbid_phase_collapse", True)):
             if bool(stereo.get("phase_cancellation_risk", False)):
                 reasons.append("phase_cancellation_risk")
             if float(stereo.get("inter_channel_correlation", 1.0) or 1.0) < 0.05:
                 reasons.append("phase_correlation_too_low")
         result = self._result(candidate.candidate_id, reasons, warnings)
+        if penalties:
+            result["safety_score"] = max(0.0, float(result["safety_score"]) - 0.05 * len(penalties))
+        result["penalties"] = penalties
         result["metrics"] = metrics
         return result
 
@@ -94,13 +104,18 @@ class DecisionSafetyGovernor:
     def combine(self, candidate_id: str, *results: dict[str, Any]) -> dict[str, Any]:
         reasons: list[str] = []
         warnings: list[str] = []
+        penalties: list[str] = []
         metrics: dict[str, Any] = {}
         for result in results:
             reasons.extend(result.get("reasons", []))
             warnings.extend(result.get("warnings", []))
+            penalties.extend(result.get("penalties", []))
             if result.get("metrics"):
                 metrics = result["metrics"]
         combined = self._result(candidate_id, reasons, warnings)
+        if penalties:
+            combined["safety_score"] = max(0.0, float(combined["safety_score"]) - 0.05 * len(penalties))
+        combined["penalties"] = penalties
         combined["metrics"] = metrics
         return combined
 

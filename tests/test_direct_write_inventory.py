@@ -364,6 +364,26 @@ def _metrics() -> dict[int, dict[str, float]]:
     return {1: {"rms_db": -20.0, "peak_db": -8.0, "lufs": -21.0}}
 
 
+def _assert_auto_balance_inventory_quarantined(
+    controller: AutoFaderController,
+    mixer: FakeMixer,
+    *,
+    expected_target: float | None = None,
+) -> None:
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
+    payload = controller.last_auto_balance_apply_result
+    assert payload is not None
+    assert payload["blocked"] is True
+    assert payload["applied"] is False
+    assert payload["write_policy"] == "proposal_only_quarantined"
+    assert payload["live_write"] is False
+    assert payload["mutates_mixer"] is False
+    if expected_target is not None:
+        assert payload["blocked_calls"]
+        assert payload["blocked_calls"][0]["value_db"] == pytest.approx(expected_target)
+
+
 def test_arrangement_automation_inventory_analysis_only_records_zero_mutation_writes():
     mixer = FakeMixer(
         scenario="arrangement_analysis_only_tick",
@@ -550,13 +570,12 @@ def test_auto_fader_replay_auto_balance_plan_reapplies_through_live_apply_gate()
     }
     controller.auto_balance_pass = 1
 
-    controller.apply_auto_balance()
-
-    assert replay_mixer.event_log
-    event = replay_mixer.event_log[0]
-    assert event["method"] == "set_channel_fader"
-    assert event["value"] == pytest.approx(-5.0)
-    assert event["source_function"] == "_apply_fader_target"
+    assert controller.apply_auto_balance() is False
+    _assert_auto_balance_inventory_quarantined(
+        controller,
+        replay_mixer,
+        expected_target=-5.0,
+    )
 
 
 def test_auto_fader_inventory_apply_auto_balance_records_fake_mixer_fader_write():
@@ -588,21 +607,13 @@ def test_auto_fader_inventory_apply_auto_balance_records_fake_mixer_fader_write(
 
     applied = controller.apply_auto_balance()
 
-    assert applied is True
-
-    mutation_events = mixer.mutation_events()
-    assert [event["method"] for event in mutation_events] == ["set_channel_fader"]
-
-    event = mutation_events[0]
-    assert event["channel"] == 1
-    assert event["value"] == pytest.approx(-4.0)
-    assert event["params"]["value"] == pytest.approx(-4.0)
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_fader_apply_auto_balance"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_fader.py")
-    assert event["source_function"] == "_apply_fader_target"
-    assert mixer.get_channel_fader(1) == pytest.approx(-4.0)
+    assert applied is False
+    _assert_auto_balance_inventory_quarantined(
+        controller,
+        mixer,
+        expected_target=-4.0,
+    )
+    assert mixer.get_channel_fader(1) == pytest.approx(-5.0)
 
 
 def test_auto_fader_inventory_apply_auto_balance_enforces_min_max_fader_clip():
@@ -634,10 +645,13 @@ def test_auto_fader_inventory_apply_auto_balance_enforces_min_max_fader_clip():
 
     applied = controller.apply_auto_balance()
 
-    assert applied is True
-    event = mixer.mutation_events()[0]
-    assert event["value"] == pytest.approx(-25.0)
-    assert state.current_fader == pytest.approx(-25.0)
+    assert applied is False
+    _assert_auto_balance_inventory_quarantined(
+        controller,
+        mixer,
+        expected_target=-25.0,
+    )
+    assert state.current_fader == pytest.approx(-55.0)
 
 
 def test_auto_fader_inventory_apply_auto_balance_without_confirmation_records_zero_writes():
@@ -648,7 +662,6 @@ def test_auto_fader_inventory_apply_auto_balance_without_confirmation_records_ze
     controller = AutoFaderController(
         mixer_client=mixer,
         config={"automation": {"auto_fader": {}}},
-        confirm_live_apply=False,
     )
 
     state = ChannelFaderState(
@@ -670,9 +683,12 @@ def test_auto_fader_inventory_apply_auto_balance_without_confirmation_records_ze
 
     applied = controller.apply_auto_balance()
 
-    assert applied is True
-    assert mixer.event_log == []
-    assert mixer.mutation_events() == []
+    assert applied is False
+    _assert_auto_balance_inventory_quarantined(
+        controller,
+        mixer,
+        expected_target=-4.0,
+    )
     assert mixer.get_channel_fader(1) == pytest.approx(-5.0)
     assert state.current_fader == pytest.approx(-5.0)
 
@@ -707,9 +723,12 @@ def test_auto_fader_inventory_apply_auto_balance_with_automation_frozen_records_
 
     applied = controller.apply_auto_balance()
 
-    assert applied is True
-    assert mixer.event_log == []
-    assert mixer.mutation_events() == []
+    assert applied is False
+    _assert_auto_balance_inventory_quarantined(
+        controller,
+        mixer,
+        expected_target=-4.0,
+    )
     assert mixer.get_channel_fader(1) == pytest.approx(-5.0)
     assert state.current_fader == pytest.approx(-5.0)
 
@@ -744,9 +763,8 @@ def test_auto_fader_inventory_apply_auto_balance_with_locked_channel_records_zer
 
     applied = controller.apply_auto_balance()
 
-    assert applied is True
-    assert mixer.event_log == []
-    assert mixer.mutation_events() == []
+    assert applied is False
+    _assert_auto_balance_inventory_quarantined(controller, mixer)
     assert mixer.get_channel_fader(1) == pytest.approx(-5.0)
     assert state.current_fader == pytest.approx(-5.0)
 
@@ -781,9 +799,12 @@ def test_auto_fader_inventory_apply_auto_balance_with_channel_freeze_until_recor
 
     applied = controller.apply_auto_balance()
 
-    assert applied is True
-    assert mixer.event_log == []
-    assert mixer.mutation_events() == []
+    assert applied is False
+    _assert_auto_balance_inventory_quarantined(
+        controller,
+        mixer,
+        expected_target=-4.0,
+    )
     assert mixer.get_channel_fader(1) == pytest.approx(-5.0)
     assert state.current_fader == pytest.approx(-5.0)
 
@@ -904,20 +925,18 @@ def test_auto_fader_realtime_control_loop_single_iteration_records_one_mutation(
     controller._realtime_control_loop()
 
     assert wait_calls == [controller.update_interval]
-    assert [event["method"] for event in mixer.event_log] == ["set_channel_fader"]
-    assert [event["method"] for event in mixer.mutation_events()] == ["set_channel_fader"]
-
-    event = mixer.event_log[0]
-    assert event["channel"] == 1
-    assert event["value"] == pytest.approx(-3.0)
-    assert event["params"] == {"value": pytest.approx(-3.0)}
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_fader_realtime_control_loop_single_iteration"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_fader.py")
-    assert event["source_function"] == "_apply_fader_target"
-    assert mixer.get_channel_fader(1) == pytest.approx(-3.0)
-    assert state.current_fader == pytest.approx(-3.0)
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
+    payload = controller.last_realtime_fader_apply_result
+    assert payload is not None
+    assert payload["blocked"] is True
+    assert payload["applied"] is False
+    assert payload["write_policy"] == "proposal_only_quarantined"
+    assert payload["blocked_calls"][0]["cmd"] == "set_channel_fader"
+    assert payload["blocked_calls"][0]["channel"] == 1
+    assert payload["blocked_calls"][0]["value_db"] == pytest.approx(-3.0)
+    assert mixer.get_channel_fader(1) == pytest.approx(-5.0)
+    assert state.current_fader == pytest.approx(-5.0)
 
 
 def test_auto_fader_realtime_control_loop_single_iteration_without_confirmation_records_zero_writes(
@@ -930,7 +949,6 @@ def test_auto_fader_realtime_control_loop_single_iteration_without_confirmation_
     controller = AutoFaderController(
         mixer_client=mixer,
         config={"automation": {"auto_fader": {}}},
-        confirm_live_apply=False,
     )
     controller.realtime_enabled = True
     controller.bleed_service = None
@@ -1084,7 +1102,7 @@ def test_auto_fader_realtime_control_loop_single_iteration_with_channel_freeze_u
     assert state.current_fader == pytest.approx(-5.0)
 
 
-def test_auto_soundcheck_reset_channels_records_reset_writes(
+def test_auto_soundcheck_reset_channels_preserves_processing_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ):
     mixer = FakeMixer(
@@ -1102,24 +1120,10 @@ def test_auto_soundcheck_reset_channels_records_reset_writes(
 
     engine._reset_channels()
 
-    assert [event["method"] for event in mixer.event_log] == [
-        "reset_channel_processing",
-        "reset_channel_processing",
-    ]
-    assert [event["channel"] for event in mixer.event_log] == [1, 2]
-    assert [event["transport_kind"] for event in mixer.event_log] == [
-        "mutation",
-        "mutation",
-    ]
-
-    for event in mixer.event_log:
-        assert event["source_file"] is not None
-        assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-        assert event["source_function"] == "_reset_channels"
-        assert event["context"]["scenario"] == "auto_soundcheck_reset_channels"
-
-    assert engine.channels[1].was_reset is True
-    assert engine.channels[2].was_reset is True
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
+    assert engine.channels[1].was_reset is False
+    assert engine.channels[2].was_reset is False
 
 
 def test_auto_soundcheck_feedback_notch_is_blocked_by_default():
@@ -1146,7 +1150,7 @@ def test_auto_soundcheck_feedback_notch_is_blocked_by_default():
     assert mixer.event_log == []
 
 
-def test_auto_soundcheck_feedback_notch_blocks_without_override():
+def test_auto_soundcheck_feedback_notch_records_write_with_override():
     mixer = FakeMixer(
         scenario="auto_soundcheck_feedback_notch_dry_run",
         channel_names={1: "Lead Vox"},
@@ -1187,7 +1191,7 @@ def test_auto_soundcheck_feedback_notch_blocks_without_override():
     assert event["context"]["scenario"] == "auto_soundcheck_feedback_notch_dry_run"
     assert event["source_file"] is not None
     assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert event["source_function"] == "_handle_feedback_event"
+    assert event["source_function"] == "_apply_direct_feedback_emergency_notch"
 
 
 def test_auto_soundcheck_feedback_fader_reduce_is_blocked_by_default():
@@ -1216,7 +1220,7 @@ def test_auto_soundcheck_feedback_fader_reduce_is_blocked_by_default():
     assert info.fader_db == pytest.approx(-5.0)
 
 
-def test_auto_soundcheck_feedback_fader_reduce_records_write_with_override():
+def test_auto_soundcheck_feedback_fader_reduce_stays_blocked_with_notch_override():
     mixer = FakeMixer(
         scenario="auto_soundcheck_feedback_fader_reduce_dry_run",
         channel_names={1: "Lead Vox"},
@@ -1243,18 +1247,9 @@ def test_auto_soundcheck_feedback_fader_reduce_records_write_with_override():
     )
 
     assert engine.auto_apply is False
-    assert [event["method"] for event in mixer.event_log] == ["set_fader"]
-
-    event = mixer.event_log[0]
-    assert event["channel"] == 1
-    assert event["value"] == pytest.approx(-8.0)
-    assert event["params"] == {"value": pytest.approx(-8.0)}
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_soundcheck_feedback_fader_reduce_dry_run"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert event["source_function"] == "_handle_feedback_event"
-    assert info.fader_db == pytest.approx(-8.0)
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
+    assert info.fader_db == pytest.approx(-5.0)
 
 
 @pytest.mark.asyncio
@@ -1281,8 +1276,9 @@ async def test_bypass_mixer_inventory_records_bulk_channel_mutations(
     monkeypatch.setattr(server_module, "WingClient", _WingLikeMixer)
     monkeypatch.setattr(server_module, "EnhancedOSCClient", type("EnhancedOSCClientStub", (), {}))
 
-    payload = await server.bypass_mixer("ws")
+    await server.bypass_mixer("ws")
 
+    payload = messages[-1]
     assert payload["success"] is True
     assert messages[-1]["type"] == "bypass_result"
     assert len(wing_like.event_log) == 360
@@ -1323,19 +1319,9 @@ def test_auto_soundcheck_apply_fader_records_fader_write_from_preset_and_gain_co
 
     engine._apply_fader(1, info, "leadVocal")
 
-    assert [event["method"] for event in mixer.event_log] == ["set_fader"]
-    assert mixer.event_log == mixer.mutation_events()
-
-    event = mixer.event_log[0]
-    assert event["channel"] == 1
-    assert event["value"] == pytest.approx(-5.0)
-    assert event["params"] == {"value": pytest.approx(-5.0)}
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_soundcheck_apply_fader"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert event["source_function"] == "_apply_fader"
-    assert info.fader_db == pytest.approx(-5.0)
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
+    assert info.fader_db == pytest.approx(-100.0)
 
 
 def test_auto_soundcheck_apply_input_gain_records_gain_write():
@@ -1356,17 +1342,8 @@ def test_auto_soundcheck_apply_input_gain_records_gain_write():
 
     engine._apply_input_gain(1, info, "leadVocal")
 
-    assert [event["method"] for event in mixer.event_log] == ["set_gain"]
-
-    event = mixer.event_log[0]
-    assert event["channel"] == 1
-    assert event["value"] == pytest.approx(10.0)
-    assert event["params"] == {"value": pytest.approx(10.0)}
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_soundcheck_apply_input_gain"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert event["source_function"] == "_apply_input_gain"
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
 
 
 def test_auto_soundcheck_apply_pan_records_pan_write():
@@ -1387,17 +1364,8 @@ def test_auto_soundcheck_apply_pan_records_pan_write():
 
     engine._apply_pan(1, info, "electricGuitar")
 
-    assert [event["method"] for event in mixer.event_log] == ["set_pan"]
-
-    event = mixer.event_log[0]
-    assert event["channel"] == 1
-    assert event["value"] == pytest.approx(-25.0)
-    assert event["params"] == {"value": pytest.approx(-25.0)}
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_soundcheck_apply_pan"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert event["source_function"] == "_apply_pan"
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
 
 
 def test_auto_soundcheck_apply_eq_records_eq_band_writes():
@@ -1416,35 +1384,9 @@ def test_auto_soundcheck_apply_eq_records_eq_band_writes():
 
     engine._apply_eq(1, "leadVocal")
 
-    expected_bands = INSTRUMENT_EQ_PRESETS["leadVocal"][:4]
-
-    assert len(mixer.event_log) == 4
-    assert [event["method"] for event in mixer.event_log] == [
-        "set_eq_band",
-        "set_eq_band",
-        "set_eq_band",
-        "set_eq_band",
-    ]
-    assert [event["channel"] for event in mixer.event_log] == [1, 1, 1, 1]
-
-    for event, (band_idx, (freq, gain, q)) in zip(
-        mixer.event_log,
-        enumerate(expected_bands, start=1),
-    ):
-        assert event["value"] == pytest.approx(gain)
-        assert event["params"] == {
-            "band": band_idx,
-            "freq": pytest.approx(freq),
-            "gain": pytest.approx(gain),
-            "q": pytest.approx(q),
-        }
-        assert event["transport_kind"] == "mutation"
-        assert event["context"]["scenario"] == "auto_soundcheck_apply_eq"
-        assert event["source_file"] is not None
-        assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-        assert event["source_function"] == "_apply_eq"
-
-    assert info.eq_applied is True
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
+    assert info.eq_applied is False
 
 
 def test_auto_soundcheck_apply_compressor_records_compressor_write():
@@ -1463,27 +1405,9 @@ def test_auto_soundcheck_apply_compressor_records_compressor_write():
 
     engine._apply_compressor(1, info, "leadVocal")
 
-    expected_threshold, expected_ratio, expected_attack, expected_release = INSTRUMENT_COMPRESSOR["leadVocal"]
-
-    assert [event["method"] for event in mixer.event_log] == ["set_compressor"]
-
-    event = mixer.event_log[0]
-    assert event["channel"] == 1
-    assert event["value"] is None
-    assert event["params"] == {
-        "threshold_db": pytest.approx(expected_threshold),
-        "ratio": pytest.approx(expected_ratio),
-        "attack_ms": pytest.approx(expected_attack),
-        "release_ms": pytest.approx(expected_release),
-        "makeup_db": pytest.approx(0.0),
-        "enabled": True,
-    }
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_soundcheck_apply_compressor"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert event["source_function"] == "_apply_compressor"
-    assert info.compressor_applied is True
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []
+    assert info.compressor_applied is False
 
 
 def test_auto_soundcheck_apply_fx_sends_records_send_level_writes():
@@ -1504,22 +1428,5 @@ def test_auto_soundcheck_apply_fx_sends_records_send_level_writes():
 
     engine._apply_fx_sends(3, info, "leadVocal")
 
-    expected_sends = auto_soundcheck_engine_module.INSTRUMENT_FX_SENDS["leadVocal"]
-
-    assert [event["method"] for event in mixer.event_log] == [
-        "set_send_level",
-        "set_send_level",
-    ]
-    assert [event["channel"] for event in mixer.event_log] == [3, 3]
-
-    for event, (expected_bus, expected_level) in zip(mixer.event_log, expected_sends):
-        assert event["value"] == pytest.approx(expected_level)
-        assert event["params"] == {
-            "send_bus": expected_bus,
-            "value": pytest.approx(expected_level),
-        }
-        assert event["transport_kind"] == "mutation"
-        assert event["context"]["scenario"] == "auto_soundcheck_apply_fx_sends"
-        assert event["source_file"] is not None
-        assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-        assert event["source_function"] == "_apply_fx_sends"
+    assert mixer.event_log == []
+    assert mixer.mutation_events() == []

@@ -63,7 +63,8 @@ class GCCPHATAnalyzer:
         self.sample_rate = sample_rate
         self.fft_size = fft_size
         self.hop_size = hop_size
-        self.max_delay_samples = int(max_delay_ms * sample_rate / 1000.0)
+        requested_delay_samples = int(max_delay_ms * sample_rate / 1000.0)
+        self.max_delay_samples = max(0, min(requested_delay_samples, (fft_size // 2) - 1))
         
         # Pre-compute window
         self.window = np.hanning(fft_size)
@@ -350,7 +351,8 @@ class AutoPhaseAligner:
     
     def _send_delay_command(self, channel: int, measurement: DelayMeasurement) -> Dict[str, Any]:
         """Build blocked delay-write evidence without mutating the mixer."""
-        delay_ms = round(measurement.delay_ms * 50) / 50  # 0.02ms resolution
+        measured_delay_ms = round(measurement.delay_ms * 50) / 50  # 0.02ms resolution
+        delay_ms = round(max(0.0, -measured_delay_ms) * 50) / 50
         self.last_write_attempted = delay_ms > 0
         self.last_write_blocked = delay_ms > 0
         self.last_write_count = 0
@@ -360,7 +362,7 @@ class AutoPhaseAligner:
             return {
                 "applied": False,
                 "blocked": False,
-                "reason": "no_positive_delay_correction",
+                "reason": "target_not_leading_reference",
                 "write_policy": self.write_policy,
                 "live_write_allowed": False,
                 "can_apply_live": False,

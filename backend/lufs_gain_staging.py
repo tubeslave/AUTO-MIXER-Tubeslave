@@ -22,10 +22,24 @@ from scipy import signal
 from enum import Enum
 from dataclasses import dataclass, field
 
+try:
+    from autogain_contract import AutoGainRecommendation, clamp_target_trim
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.autogain_contract import AutoGainRecommendation, clamp_target_trim
+
 logger = logging.getLogger(__name__)
 
 INPUT_TRIM_AUTOGAIN_METHOD_ID = "input_trim_preamp_character"
 INPUT_TRIM_ROLE = "input_headroom_not_mix_balance"
+
+
+@dataclass(frozen=True)
+class TrimApplyResult:
+    accepted: bool
+    desired_value: float
+    confirmed_value: Optional[float] = None
+    blocked_reason: str = ""
+    guard_reasons: tuple[str, ...] = ()
 
 
 def _coerce_float(value: Any, default: float) -> float:
@@ -4608,6 +4622,7 @@ class TruePeakMeter:
         self._design_interpolation_filter()
         
         # Состояние
+        self._filter_zi = np.zeros(max(0, len(self.interp_filter) - 1), dtype=float)
         self._max_peak = 0.0
         self._current_peak = 0.0
     
@@ -4634,7 +4649,12 @@ class TruePeakMeter:
         upsampled[::self.oversample_factor] = samples
         
         # Применяем интерполяционный фильтр
-        interpolated = signal.lfilter(self.interp_filter, 1, upsampled)
+        interpolated, self._filter_zi = signal.lfilter(
+            self.interp_filter,
+            1,
+            upsampled,
+            zi=self._filter_zi,
+        )
         interpolated *= self.oversample_factor  # Компенсация амплитуды
         
         # Находим максимальный пик
@@ -4668,6 +4688,7 @@ class TruePeakMeter:
     
     def reset(self):
         """Полный сброс."""
+        self._filter_zi = np.zeros(max(0, len(self.interp_filter) - 1), dtype=float)
         self._max_peak = 0.0
         self._current_peak = 0.0
 
@@ -4893,12 +4914,16 @@ class LUFSGainStagingController:
                  chunk_size: int = 2048,
                  config: Optional[Dict[str, Any]] = None,
                  bleed_service=None,
-                 audio_capture=None):
+                 audio_capture=None,
+                 dry_run: bool = True,
+                 confirm_live_apply: bool = False):
 
         self.mixer_client = mixer_client
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
         self._audio_capture = audio_capture
+        self.dry_run = bool(dry_run)
+        self.confirm_live_apply = bool(confirm_live_apply)
         
         # Загрузка конфигурации
         self.config = config or {}
@@ -4979,6 +5004,92 @@ class LUFSGainStagingController:
         
         logger.info(f"LUFSGainStagingController initialized: target={self.target_lufs} LUFS, "
                    f"ratio={self.ratio}:1, attack={self.attack_ms}ms, release={self.release_ms}ms")
+
+    def _apply_trim_change(
+        self,
+        channel: int,
+        desired_value: float,
+        *,
+        source: str,
+        current_trim: float,
+        min_value: float,
+        max_value: float,
+        max_step: float,
+    ) -> TrimApplyResult:
+        """Apply a trim change through the legacy confirmation gate."""
+        current = float(current_trim)
+        requested = max(float(min_value), min(float(max_value), float(desired_value)))
+        guard_reasons: List[str] = []
+        step = requested - current
+        max_step = abs(float(max_step))
+        if max_step > 0.0 and abs(step) > max_step:
+            requested = current + (max_step if step > 0 else -max_step)
+            guard_reasons.append("max_step_clamped")
+
+        if self.dry_run:
+            return TrimApplyResult(
+                accepted=False,
+                desired_value=float(requested),
+                blocked_reason="dry_run",
+                guard_reasons=tuple(guard_reasons),
+            )
+        if not self.confirm_live_apply:
+            return TrimApplyResult(
+                accepted=False,
+                desired_value=float(requested),
+                blocked_reason="confirm_live_apply_required",
+                guard_reasons=tuple(guard_reasons),
+            )
+        if self.mixer_client is None:
+            return TrimApplyResult(
+                accepted=False,
+                desired_value=float(requested),
+                blocked_reason="mixer_client_missing",
+                guard_reasons=tuple(guard_reasons),
+            )
+
+        try:
+            send_result = self.mixer_client.set_channel_gain(int(channel), float(requested))
+            if send_result is False:
+                return TrimApplyResult(
+                    accepted=False,
+                    desired_value=float(requested),
+                    blocked_reason="send_rejected",
+                    guard_reasons=tuple(guard_reasons),
+                )
+            confirmed_value: Optional[float] = None
+            if hasattr(self.mixer_client, "confirm_manual_write"):
+                confirmation = self.mixer_client.confirm_manual_write(
+                    operation=str(source),
+                    channel=int(channel),
+                    desired_value=float(requested),
+                )
+                if isinstance(confirmation, dict):
+                    confirmed_raw = confirmation.get("confirmed_value")
+                    if confirmed_raw is not None:
+                        confirmed_value = float(confirmed_raw)
+                    if confirmation.get("failure_reason"):
+                        return TrimApplyResult(
+                            accepted=False,
+                            desired_value=float(requested),
+                            confirmed_value=confirmed_value,
+                            blocked_reason=str(confirmation.get("failure_reason")),
+                            guard_reasons=tuple(guard_reasons),
+                        )
+            return TrimApplyResult(
+                accepted=True,
+                desired_value=float(requested),
+                confirmed_value=confirmed_value if confirmed_value is not None else float(requested),
+                guard_reasons=tuple(guard_reasons),
+            )
+        except Exception as exc:
+            logger.warning("Legacy LUFS trim apply failed: %s", exc)
+            return TrimApplyResult(
+                accepted=False,
+                desired_value=float(requested),
+                blocked_reason="apply_exception",
+                guard_reasons=tuple(guard_reasons),
+            )
     
     def start(self, 
               device_id: int,
@@ -5980,6 +6091,87 @@ class SafeGainCalibrator:
         }
         target = preset_defaults.get(str(preset), float(self.target_peak_db))
         return min(float(max_peak_limit) - 1.0, float(target))
+
+    def get_recommendations(self) -> Dict[int, Dict[str, Any]]:
+        """Return shared AutoGain recommendations without applying mixer writes."""
+        recommendations: Dict[int, Dict[str, Any]] = {}
+        for audio_channel, suggestion in self.suggestions.items():
+            if not isinstance(suggestion, dict):
+                continue
+            mixer_channel = int(self.channel_mapping.get(audio_channel, audio_channel))
+            stats = self.channels.get(audio_channel)
+
+            current_trim = self._current_trim_for_mixer_channel(mixer_channel)
+            if current_trim is None:
+                current_trim = suggestion.get("current_trim_db")
+            if current_trim is None and stats is not None:
+                current_trim = getattr(stats, "current_trim_db", None)
+            current_trim = _coerce_float(current_trim, 0.0)
+
+            requested_delta = _coerce_float(suggestion.get("suggested_gain_db"), 0.0)
+            target_from_suggestion = suggestion.get("target_trim_db")
+            if target_from_suggestion is None:
+                target_trim, delta_db = clamp_target_trim(
+                    current_trim,
+                    requested_delta,
+                    self.local_input_preamp.min_gain_db,
+                    self.local_input_preamp.hard_max_gain_db,
+                )
+            else:
+                target_trim = max(
+                    float(self.local_input_preamp.min_gain_db),
+                    min(
+                        float(self.local_input_preamp.hard_max_gain_db),
+                        _coerce_float(target_from_suggestion, current_trim),
+                    ),
+                )
+                delta_db = target_trim - current_trim
+
+            limited_by = str(suggestion.get("limited_by") or "none")
+            confidence = _coerce_float(suggestion.get("confidence"), 0.0)
+            if confidence <= 0.0 and stats is not None:
+                confidence = _coerce_float(getattr(stats, "suggestion_confidence", 0.0), 0.0)
+            role = str(self.channel_settings.get(audio_channel, {}).get("preset", "unknown"))
+            recommendation = AutoGainRecommendation(
+                channel=mixer_channel,
+                audio_channel=int(audio_channel),
+                mixer_channel=mixer_channel,
+                source="safe_gain_calibrator",
+                current_trim_db=round(current_trim, 3),
+                recommended_target_trim_db=round(float(target_trim), 3),
+                delta_db=round(float(delta_db), 3),
+                reason=(
+                    f"safe_gain_{limited_by}_limited"
+                    if limited_by and limited_by != "none"
+                    else "safe_gain_recommendation"
+                ),
+                confidence=round(float(confidence), 4),
+                limited_by=limited_by,
+                role=role,
+                analysis_state=self.state.value,
+                live_apply_safe=False,
+                dry_run_only=True,
+                level_source="safe_gain_learning",
+                metrics={
+                    "peak_db": suggestion.get("peak_db"),
+                    "lufs": suggestion.get("lufs"),
+                    "crest_factor_db": suggestion.get("crest_factor_db"),
+                    "signal_presence": suggestion.get("signal_presence"),
+                },
+                metadata={
+                    "method_id": suggestion.get("method_id") or self.method_id,
+                    "input_trim_role": suggestion.get("input_trim_role") or INPUT_TRIM_ROLE,
+                    "trim_bounds_db": [
+                        float(self.local_input_preamp.min_gain_db),
+                        float(self.local_input_preamp.hard_max_gain_db),
+                    ],
+                    "operator_action": suggestion.get("operator_action", ""),
+                    "auto_apply_allowed": bool(suggestion.get("auto_apply_allowed", False)),
+                    "safe_gain_apply_path": "manual_review_only",
+                },
+            )
+            recommendations[mixer_channel] = recommendation.to_dict()
+        return recommendations
 
     def apply_corrections(self, channel_ids: Optional[List[int]] = None) -> bool:
         """

@@ -52,8 +52,8 @@
   run a separate headroom-safe gain-down proof with the same evidence
   requirements; only then reassess release readiness.
 - Latest ledger handoff row:
-  `full_suite_after_structured_pre_release_score_surface_sync_passed` at
-  `2026-07-03T12:31:14Z`. That row preserves the same `current_blocker`,
+  `full_suite_after_auth_token_digest_storage_guard_passed` at
+  `2026-07-03T17:50:51Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain

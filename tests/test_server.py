@@ -6,8 +6,11 @@ All tests work without hardware or network (all external connections mocked).
 """
 
 import asyncio
+import errno
 import json
 import os
+import signal
+import subprocess
 import time
 from pathlib import Path
 import numpy as np
@@ -169,6 +172,80 @@ class TestAutoMixerServerInit:
         server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
         assert server.ws_host == "0.0.0.0"
         assert server.ws_port == 9999
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_ws_port_cleanup_requires_explicit_operator_opt_in(self, mock_config, mock_bleed):
+        """Port cleanup is destructive and must not be enabled by default."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_FORCE_CLEANUP_WS_PORT", None)
+            server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+            assert server._ws_port_force_cleanup_enabled() is False
+
+            os.environ["AUTOMIXER_FORCE_CLEANUP_WS_PORT"] = "true"
+            assert server._ws_port_force_cleanup_enabled() is True
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_ws_port_pid_lookup_uses_argv_without_shell(self, mock_config, mock_bleed):
+        """The lsof probe must not invoke a shell or interpolate the port into a command string."""
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        captured = {}
+
+        def fake_run(args, **kwargs):
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            return subprocess.CompletedProcess(args, 0, stdout="123\nnot-a-pid\n456\n", stderr="")
+
+        with patch("server.subprocess.run", side_effect=fake_run):
+            pids = server._pids_listening_on_port("8765")
+
+        assert pids == [123, 456]
+        assert captured["args"] == ["lsof", "-ti", ":8765"]
+        assert "shell" not in captured["kwargs"]
+        assert captured["kwargs"]["check"] is False
+        assert captured["kwargs"]["capture_output"] is True
+        assert captured["kwargs"]["text"] is True
+        assert captured["kwargs"]["timeout"] == 2.0
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_ws_port_pid_lookup_times_out_fail_closed(self, mock_config, mock_bleed):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+        with patch(
+            "server.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd=["lsof"], timeout=2.0),
+        ):
+            assert server._pids_listening_on_port("8765") == []
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_ws_port_force_cleanup_skips_current_pid(self, mock_config, mock_bleed):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+        with (
+            patch.object(server, "_pids_listening_on_port", return_value=[os.getpid(), 222, 222]),
+            patch("server.os.kill") as mock_kill,
+        ):
+            server._force_cleanup_ws_port()
+
+        mock_kill.assert_called_once_with(222, signal.SIGKILL)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_start_refuses_automatic_port_kill_without_opt_in(self, mock_config, mock_bleed):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        error = OSError()
+        error.errno = errno.EADDRINUSE
+
+        with (
+            patch.dict(os.environ, {"AUTOMIXER_FORCE_CLEANUP_WS_PORT": "false"}, clear=False),
+            patch("server.websockets.serve", side_effect=error),
+            pytest.raises(RuntimeError, match="Refusing automatic kill"),
+        ):
+            await server.start()
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -2182,6 +2259,133 @@ class TestWingDeploymentWriteBoundary:
         assert result["reason"] == "live_write_kind_not_allowed_in_mode"
         assert result["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
         server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_manual_write_retries_when_mixer_drops_write(
+        self,
+        _mock_bleed: object,
+        _mock_load_config: object,
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "offline"
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server.mixer_client = DummyWingLike()
+        server.mixer_client._osc_throttle_enabled = True
+        server.mixer_client._osc_throttle_hz = 1000.0
+        server.mixer_client.set_channel_fader = MagicMock(side_effect=[False, True])
+
+        result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:manual_write_retry",
+            approved=True,
+            approval_id="unit-manual-write-retry",
+        )
+
+        assert result["status"] == "applied"
+        assert result["write_attempts"] == 2
+        assert server.mixer_client.set_channel_fader.call_count == 2
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_manual_write_blocked_after_exhausting_write_retries(
+        self,
+        _mock_bleed: object,
+        _mock_load_config: object,
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "offline"
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server.mixer_client = DummyWingLike()
+        server.mixer_client._osc_throttle_enabled = True
+        server.mixer_client._osc_throttle_hz = 1000.0
+        server.mixer_client.set_channel_fader = MagicMock(return_value=False)
+
+        result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:manual_write_retry_exhausted",
+            approved=True,
+            approval_id="unit-manual-write-retry-exhausted",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "mixer_write_failed"
+        assert result["write_attempts"] == 3
+        assert server.mixer_client.set_channel_fader.call_count == 3
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_immediate_rollback_survives_same_address_write_throttle(
+        self,
+        _mock_bleed: object,
+        _mock_load_config: object,
+    ):
+        """Regression for the failed CH3 fader proof (rollback_not_applied).
+
+        WingClient rate-limits repeated writes to the same OSC address and
+        returns False for a dropped write. An approved apply followed by an
+        immediate rollback to the same address must survive that throttle.
+        """
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "offline"
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+
+        client = DummyWingLike()
+        min_interval_sec = 0.05
+        client._osc_throttle_enabled = True
+        client._osc_throttle_hz = 1.0 / min_interval_sec
+        last_send: dict = {}
+        dropped: list = []
+
+        def throttled_set_channel_fader(channel, value):
+            now = time.monotonic()
+            last = last_send.get(channel)
+            if last is not None and (now - last) < min_interval_sec:
+                dropped.append((channel, value))
+                return False
+            last_send[channel] = now
+            client.state.update({f"/ch/{channel}/fdr": float(value)})
+            return True
+
+        client.set_channel_fader = throttled_set_channel_fader
+        server.mixer_client = client
+
+        apply_result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:throttled_apply",
+            approved=True,
+            approval_id="unit-throttled-apply",
+        )
+        assert apply_result["status"] == "applied"
+        assert apply_result["rollback_available"] is True
+
+        rollback_result = await server._rollback_last_manual_console_write(
+            None,
+            source="unit:throttled_rollback",
+            approved=True,
+            approval_id="unit-throttled-rollback",
+        )
+
+        assert rollback_result["status"] == "applied"
+        assert rollback_result["rollback"] is True
+        assert rollback_result["write_attempts"] >= 2
+        assert dropped, "expected the immediate rollback write to be throttle-dropped at least once"
+        assert client.state["/ch/1/fdr"] == -8.0
 
     @pytest.mark.asyncio
     async def test_auto_mode_is_blocked_for_wing_supervised_gate_when_wing_deployment_active(self, dummy_wing_server):

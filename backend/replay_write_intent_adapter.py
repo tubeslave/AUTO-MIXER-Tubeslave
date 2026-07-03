@@ -285,6 +285,11 @@ class ReplayWriteIntentAdapter:
             ranking,
             metadata=metadata,
         )
+        transport_policy = {
+            "dry_run_only": bool(timeline_artifact.get("dry_run_only", True)),
+            "transport_decision": "dry_run_only",
+        }
+        live_mixer_writes = bool(timeline_artifact.get("live_mixer_writes", False))
         record = _compact(
             {
                 "source_system": self.source_system,
@@ -294,8 +299,8 @@ class ReplayWriteIntentAdapter:
                 "decision": "dry_run_only",
                 "allow_live_write": False,
                 "replay_correlation_id": proposal.replay_correlation_id,
-                "transport_policy": timeline_artifact["events"][0]["transport_policy"],
-                "live_mixer_writes": timeline_artifact["events"][0]["live_mixer_writes"],
+                "transport_policy": transport_policy,
+                "live_mixer_writes": live_mixer_writes,
                 "proposal": proposal.to_dict(),
                 "ranking": ranking.to_dict(),
                 "timeline_artifact": timeline_artifact,

@@ -30,6 +30,23 @@ class WingMixerDouble:
         self.set_channel_fader = MagicMock()
 
 
+def _assert_auto_balance_quarantined(controller, mixer, expected_call):
+    mixer.set_channel_fader.assert_not_called()
+    payload = controller.last_auto_balance_apply_result
+    assert payload["blocked"] is True
+    assert payload["applied"] is False
+    assert payload["reason"] == "auto_fader_v1_auto_balance_apply_quarantined"
+    assert payload["write_policy"] == "proposal_only_quarantined"
+    assert payload["live_write"] is False
+    assert payload["queue_mutation"] is False
+    assert payload["mutates_mixer"] is False
+    assert payload["blocked_calls"] == [expected_call]
+    proposal = payload["proposals"][0]
+    assert proposal["proposed_action"]["target_fader_db"] == expected_call["value_db"]
+    assert proposal["proposed_action"]["delta_db"] == expected_call["delta_db"]
+    assert proposal["evidence"]["blocked_call"] == expected_call
+
+
 def test_apply_auto_balance_uses_precomputed_max_clipped_target_when_readback_missing():
     controller, mixer = _make_controller(None)
     controller.auto_balance_result = {
@@ -43,10 +60,22 @@ def test_apply_auto_balance_uses_precomputed_max_clipped_target_when_readback_mi
         }
     }
 
-    assert controller.apply_auto_balance() is True
+    assert controller.apply_auto_balance() is False
     # Потолок автоматики — 0 dBFS (SAFETY инвариант 1): target_fader 10.0
-    # клэмпится к 0.0, автоматика не поднимает фейдер выше unity
-    mixer.set_channel_fader.assert_called_once_with(17, 0.0)
+    # клэмпится к 0.0, но live write остается quarantined/proposal-only.
+    _assert_auto_balance_quarantined(
+        controller,
+        mixer,
+        {
+            "cmd": "set_channel_fader",
+            "channel": 17,
+            "value_db": 0.0,
+            "current_db": 8.0,
+            "delta_db": -8.0,
+            "semantic": "auto_balance_apply_quarantined",
+            "audio_channel": 1,
+        },
+    )
 
 
 def test_apply_auto_balance_uses_precomputed_min_clipped_target_when_readback_invalid():
@@ -63,11 +92,23 @@ def test_apply_auto_balance_uses_precomputed_min_clipped_target_when_readback_in
         }
     }
 
-    assert controller.apply_auto_balance() is True
-    mixer.set_channel_fader.assert_called_once_with(17, -60.0)
+    assert controller.apply_auto_balance() is False
+    _assert_auto_balance_quarantined(
+        controller,
+        mixer,
+        {
+            "cmd": "set_channel_fader",
+            "channel": 17,
+            "value_db": -60.0,
+            "current_db": -55.0,
+            "delta_db": -5.0,
+            "semantic": "auto_balance_apply_quarantined",
+            "audio_channel": 1,
+        },
+    )
 
 
-def test_apply_auto_balance_emits_replay_intent_and_skips_live_wing_write():
+def test_apply_auto_balance_preserves_proposal_evidence_and_skips_live_wing_write():
     mixer = WingMixerDouble(readback=-6.0)
     controller = AutoFaderController(
         mixer_client=mixer,
@@ -97,20 +138,21 @@ def test_apply_auto_balance_emits_replay_intent_and_skips_live_wing_write():
         }
     }
 
-    assert controller.apply_auto_balance() is True
-    mixer.set_channel_fader.assert_not_called()
-
-    intents = controller.get_replay_write_intents()
-    assert len(intents) == 1
-    record = intents[0]
-    payload = record["timeline_artifact"]["events"][0]["source_payload"]
-
-    assert record["write_kind"] == "fader"
-    assert record["allow_live_write"] is False
-    assert record["metadata"]["arrangement_id"] == "chorus_a"
-    assert record["metadata"]["scene_id"] == "scene_7"
-    assert payload["readback_source"] == "console_state"
-    assert payload["requires_confirmation"] is True
+    assert controller.apply_auto_balance() is False
+    _assert_auto_balance_quarantined(
+        controller,
+        mixer,
+        {
+            "cmd": "set_channel_fader",
+            "channel": 17,
+            "value_db": -4.0,
+            "current_db": -6.0,
+            "delta_db": 2.0,
+            "semantic": "auto_balance_apply_quarantined",
+            "audio_channel": 1,
+        },
+    )
+    assert controller.last_auto_balance_apply_result["proposal_count"] == 1
 
 
 def test_apply_auto_balance_uses_live_apply_adapter_when_present():
@@ -127,9 +169,10 @@ def test_apply_auto_balance_uses_live_apply_adapter_when_present():
         }
     }
 
-    assert controller.apply_auto_balance() is True
+    assert controller.apply_auto_balance() is False
     mixer.set_channel_fader.assert_not_called()
-    controller.live_apply_adapter.assert_called_once()
+    controller.live_apply_adapter.assert_not_called()
+    assert controller.last_auto_balance_apply_result["blocked"] is True
 
 
 class _FakeLufsMeter:
@@ -178,10 +221,10 @@ def test_tap_point_pre_fader_skips_fader_compensation():
     ctrl = _balance_controller("pre_fader", measured_lufs=-22.0, current_fader=-12.0)
     ctrl._compute_auto_balance()
     r = ctrl.auto_balance_result[1]
-    # pre_fader = measured = -22, target = -22 → ideal_fader = 0, correction = 0 - (-12) = +12
+    # pre_fader = measured = -22, target = -22 -> ideal_fader = 0, but
+    # automation is bounded by the configured max fader step.
     assert r["target_lufs"] == -22.0
-    # ideal ~ 0, correction относительно current -12 → около +12
-    assert abs(r["correction"] - 12.0) < 0.5, r
+    assert abs(r["correction"] - 4.0) < 0.5, r
 
 
 def test_tap_point_post_fader_applies_fader_compensation():
@@ -190,8 +233,8 @@ def test_tap_point_post_fader_applies_fader_compensation():
     ctrl = _balance_controller("post_fader", measured_lufs=-34.0, current_fader=-12.0)
     ctrl._compute_auto_balance()
     r = ctrl.auto_balance_result[1]
-    # pre_fader = -22, target -22 → ideal 0, correction = 0-(-12)=+12
-    assert abs(r["correction"] - 12.0) < 0.5, r
+    # pre_fader = -22, target -22 -> ideal 0, but the move remains bounded.
+    assert abs(r["correction"] - 4.0) < 0.5, r
 
 
 def test_tap_point_defaults_to_post_fader():

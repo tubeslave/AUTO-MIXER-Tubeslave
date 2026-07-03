@@ -1,5 +1,5 @@
 {
-  "artifact_signature": "9c265b975eb914d02dacfc4ee01d54055bb40bec54ae872c1d15dcc6d62618c9",
+  "artifact_signature": "e2f6e9367bdd4b6d79720c6ba673a010923ccec582433c30177906dc4f4177a1",
   "artifact_type": "deterministic_replay_timeline",
   "dry_run_only": true,
   "live_mixer_writes": false,
@@ -134,7 +134,7 @@
     },
     {
       "confidence_weighted_score": 0.46648799999999996,
-      "event_signature": "eab07c7691f34c3989ec85675ec69c21ed4956d3749d32bafb43c53af70e01f6",
+      "event_signature": "e1047281e6d45e2859659bcadf2fa6ea25b8f8406db0cdf57c09b71b9e8a0cc7",
       "family": "feedback_mitigation",
       "proposal_id": "feedback::notch::5::fb1",
       "rank": 1,
@@ -144,12 +144,18 @@
         "confidence": 0.62,
         "confidence_weighted_score": 0.46648799999999996,
         "critic_breakdown": {
+          "effective_weights": {
+            "safety": 0.05
+          },
           "final_score": 0.88,
           "normalized_weights": {
             "safety": 1.0
           },
           "values": {
             "safety": 0.88
+          },
+          "weight_sources": {
+            "safety": "safety"
           }
         },
         "critic_values": {
@@ -166,7 +172,7 @@
     },
     {
       "confidence_weighted_score": 0.1148,
-      "event_signature": "b9fc67b3dcc16fc0d060e23e46f4ecf7de41a3c6971f55fd485a7ee07d04e6c5",
+      "event_signature": "b50b2c023ed3ba5669c1cc45a7b16d4641496d66921840cb3e4b1ee2c7b08766",
       "family": "gain_adjustment",
       "proposal_id": "gain::auto_soundcheck_engine::12::lead_vocal::v1",
       "rank": 2,
@@ -176,12 +182,18 @@
         "confidence": 0.82,
         "confidence_weighted_score": 0.1148,
         "critic_breakdown": {
+          "effective_weights": {
+            "clarity": 1.0
+          },
           "final_score": 0.14,
           "normalized_weights": {
             "clarity": 1.0
           },
           "values": {
             "clarity": 0.14
+          },
+          "weight_sources": {
+            "clarity": "unknown"
           }
         },
         "critic_values": {

@@ -64,6 +64,7 @@ class OSCManager:
         port: Optional[int] = None,
         rate_limit_hz: Optional[float] = None,
         health_timeout_sec: float = 10.0,
+        shadow_mode_enabled: bool = False,
     ):
         if port is not None:
             send_port = port
@@ -89,6 +90,7 @@ class OSCManager:
         self._send_count = 0
         self._recv_count = 0
         self._wing_client = None
+        self._shadow_mode_enabled = bool(shadow_mode_enabled)
         self._on_connected: Optional[Callable] = None
         self._on_disconnected: Optional[Callable] = None
 
@@ -115,12 +117,35 @@ class OSCManager:
         """
         self._wing_client = wing_client
         self._connected = wing_client.is_connected
+        if hasattr(wing_client, "configure_shadow_transport"):
+            try:
+                wing_client.configure_shadow_transport(enabled=self._shadow_mode_enabled)
+            except TypeError:
+                wing_client.configure_shadow_transport(self._shadow_mode_enabled)
         if self._connected:
             self._state = wing_client.state
             logger.info(f"OSCManager connected via WingClient to {self.ip}")
             if self._on_connected:
                 self._on_connected()
         return self._connected
+
+    def is_shadow_mode_enabled(self) -> bool:
+        """Return whether OSC mutation writes are in shadow/dry-run mode."""
+        if self._wing_client is not None and hasattr(self._wing_client, "is_shadow_mode_enabled"):
+            try:
+                return bool(self._wing_client.is_shadow_mode_enabled())
+            except Exception:
+                return bool(self._shadow_mode_enabled)
+        return bool(self._shadow_mode_enabled)
+
+    def configure_shadow_mode(self, *, enabled: bool) -> None:
+        """Enable or disable mutation shadow mode on the manager and client."""
+        self._shadow_mode_enabled = bool(enabled)
+        if self._wing_client is not None and hasattr(self._wing_client, "configure_shadow_transport"):
+            try:
+                self._wing_client.configure_shadow_transport(enabled=self._shadow_mode_enabled)
+            except TypeError:
+                self._wing_client.configure_shadow_transport(self._shadow_mode_enabled)
 
     def disconnect(self):
         """Disconnect from the mixer."""
@@ -143,6 +168,8 @@ class OSCManager:
             True if sent
         """
         if not self._connected or not self._wing_client:
+            return False
+        if values and self.is_shadow_mode_enabled() and not hasattr(self._wing_client, "configure_shadow_transport"):
             return False
 
         # Throttle check
@@ -167,7 +194,7 @@ class OSCManager:
         if not self._connected or not self._wing_client:
             return False
         self._wing_client.send(address)
-        return self._state.get(address, False)
+        return self._state.get(address)
 
     def subscribe(self, address_pattern: str, callback: Callable):
         """Subscribe to state changes matching a pattern."""

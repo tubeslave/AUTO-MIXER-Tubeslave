@@ -1271,6 +1271,62 @@ def test_stem_mix_verification_checks_slope_and_reseats_kick():
     assert report["after"]["kick_focus"]["kick_click_share_in_drums"] >= report["before"]["kick_focus"]["kick_click_share_in_drums"]
 
 
+def test_offline_master_process_defaults_to_no_limiter_or_reference_mastering(monkeypatch):
+    mod = load_offline_agent_mix()
+    sr = 48_000
+    mix = np.full((4096, 2), 0.08, dtype=np.float32)
+    reference = np.full((4096, 2), 0.12, dtype=np.float32)
+
+    class ForbiddenAutoMaster:
+        def __init__(self, *args, **kwargs):
+            raise AssertionError("reference mastering must be explicit opt-in")
+
+    monkeypatch.setattr(mod, "AutoMaster", ForbiddenAutoMaster)
+    context = mod.ReferenceMixContext(
+        path=Path("/tmp/reference.wav"),
+        source_type="audio",
+        style_profile=mod.StyleProfile(name="ref", loudness_lufs=-13.0),
+        audio=reference,
+        sample_rate=sr,
+    )
+
+    mastered, report = mod.master_process(mix, sr, reference_context=context)
+
+    assert mastered.shape == mix.shape
+    assert report["final_limiter"] is False
+    assert report["soft_limiter"] is False
+    assert report["reference_mastering"]["enabled"] is False
+    assert report["reference_mastering"]["reason"] == "final_limiter_disabled"
+
+
+def test_offline_mastering_flags_are_opt_in_and_legacy_disable_wins():
+    mod = load_offline_agent_mix()
+    args = SimpleNamespace(
+        final_limiter=False,
+        soft_master=False,
+        no_final_limiter=False,
+        reference_mastering=False,
+        no_reference_mastering=False,
+    )
+
+    assert mod._offline_final_limiter_enabled(args) is False
+    assert mod._offline_reference_mastering_enabled(args, final_limiter=False) is False
+
+    args.final_limiter = True
+    args.reference_mastering = True
+    assert mod._offline_final_limiter_enabled(args) is True
+    assert mod._offline_reference_mastering_enabled(args, final_limiter=True) is True
+
+    args.no_final_limiter = True
+    assert mod._offline_final_limiter_enabled(args) is False
+    assert mod._offline_reference_mastering_enabled(args, final_limiter=False) is False
+
+    args.no_final_limiter = False
+    args.no_reference_mastering = True
+    assert mod._offline_final_limiter_enabled(args) is True
+    assert mod._offline_reference_mastering_enabled(args, final_limiter=True) is False
+
+
 def test_master_process_uses_reference_mastering_when_reference_audio_present(monkeypatch):
     mod = load_offline_agent_mix()
     sr = 48_000
@@ -1303,7 +1359,13 @@ def test_master_process_uses_reference_mastering_when_reference_audio_present(mo
         sample_rate=sr,
     )
 
-    mastered, report = mod.master_process(mix, sr, reference_context=context)
+    mastered, report = mod.master_process(
+        mix,
+        sr,
+        final_limiter=True,
+        reference_context=context,
+        allow_reference_mastering=True,
+    )
 
     assert mastered.shape == mix.shape
     assert report["reference_mastering"]["enabled"] is True
@@ -1336,7 +1398,13 @@ def test_master_process_rejects_reference_mastering_when_output_goes_too_quiet(m
         source_paths=[Path("/tmp/reference-a.wav"), Path("/tmp/reference-b.wav")],
     )
 
-    mastered, report = mod.master_process(mix, sr, reference_context=context)
+    mastered, report = mod.master_process(
+        mix,
+        sr,
+        final_limiter=True,
+        reference_context=context,
+        allow_reference_mastering=True,
+    )
 
     assert mastered.shape == mix.shape
     assert report["reference_mastering"]["enabled"] is False
@@ -1371,7 +1439,14 @@ def test_master_process_conforms_reference_mastering_to_target_lufs(monkeypatch)
         source_paths=[Path("/tmp/reference-a.wav"), Path("/tmp/reference-b.wav")],
     )
 
-    mastered, report = mod.master_process(mix, sr, target_lufs=-16.0, reference_context=context)
+    mastered, report = mod.master_process(
+        mix,
+        sr,
+        target_lufs=-16.0,
+        final_limiter=True,
+        reference_context=context,
+        allow_reference_mastering=True,
+    )
 
     assert mastered.shape == mix.shape
     assert report["reference_mastering"]["enabled"] is True

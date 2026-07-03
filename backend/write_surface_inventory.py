@@ -72,6 +72,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         label="Product Layer supervised fader/gain apply",
         status="canonical_supervised",
         paths=(
+            "backend/live_apply.py",
             "backend/operator_proposal_queue.py",
             "backend/handlers/mixer_handlers.py",
             "backend/server.py",
@@ -155,6 +156,35 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         next_action="Continue feeding proposal evidence and rollback values into the queue.",
     ),
     WriteSurface(
+        id="realtime_arrangement_gain_fader_gate_clients",
+        label="Realtime arrangement fader/trim live-apply clients",
+        status="quarantined",
+        paths=(
+            "backend/arrangement_automation/controller.py",
+            "backend/arrangement_automation/live_input_trim_controller.py",
+        ),
+        entrypoints=(
+            "ArrangementAutomationController._apply_safe_offsets",
+            "LiveInputTrimController._apply_trim_decision",
+        ),
+        write_kinds=LIVE_ALLOWED_WRITE_KINDS,
+        allowed_live=False,
+        gate=(
+            "Disabled/dry-run by default and routed through LiveApplyService; not a "
+            "standalone WING live authority or release gate."
+        ),
+        current_policy=(
+            "Realtime arrangement fader and input-trim controllers may produce "
+            "proposal/replay evidence, but must not bypass Product Layer approval, "
+            "operator confirmation, readback, rollback, or emergency-stop proof."
+        ),
+        next_action=(
+            "Keep these clients inventoried as write-adjacent and require explicit "
+            "Product Layer handoff before any release promotion."
+        ),
+        notes=("not_allowed_live_surface", "live_apply_service_client"),
+    ),
+    WriteSurface(
         id="context_gate_bleed_recommendations",
         label="Context-aware gate/bleed recommendations",
         status="proposal_only",
@@ -234,6 +264,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "tools/wing_readonly_preflight_runner.py",
             "tools/build_wing_readonly_preflight_handoff_packet.py",
             "tools/review_wing_readonly_preflight_artifacts.py",
+            "backend/tub345_supervised_write_runner.py",
             "backend/wing_readonly_preflight_contract.py",
             "backend/wing_readonly_preflight_evidence.py",
         ),
@@ -245,6 +276,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "read-only WING preflight runner",
             "read-only WING preflight handoff packet builder",
             "read-only WING preflight artifact review",
+            "TUB supervised WING write runner",
             "read-only WING preflight safety contract",
             "read-only WING preflight evidence intake",
         ),
@@ -266,6 +298,54 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "Keep proof artifacts separate from live readiness claims until physical "
             "readback and rollback are preserved."
         ),
+    ),
+    WriteSurface(
+        id="broad_live_wing_correction_test_tool",
+        label="Broad live WING correction test tool",
+        status="blocked",
+        paths=("tools/live_wing_correction_test.py",),
+        entrypoints=("live_wing_correction_test main",),
+        write_kinds=("fader", "gain", "mute", "eq", "hpf", "compressor", "pan", "phase", "delay"),
+        allowed_live=False,
+        gate=(
+            "Blocked from automation and release readiness. Manual execution requires "
+            "the explicit --confirm-live-wing-write acknowledgement plus operator "
+            "supervision, physical readback, and restoration review."
+        ),
+        current_policy=(
+            "This script can write a broad set of WING channel parameters and is not "
+            "part of the supervised MVP fader/gain apply path."
+        ),
+        next_action=(
+            "Prefer the narrow supervised fader/gain proof runbook. Keep this broad "
+            "test quarantined unless a future operator runbook gives it separate "
+            "readback, rollback, and emergency-stop proof requirements."
+        ),
+        notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
+    ),
+    WriteSurface(
+        id="broad_live_wing_soundcheck_setup_tool",
+        label="Broad live WING soundcheck setup tool",
+        status="blocked",
+        paths=("tools/live_wing_soundcheck_setup.py",),
+        entrypoints=("live_wing_soundcheck_setup main",),
+        write_kinds=("fader", "gain", "hpf", "compressor", "gate"),
+        allowed_live=False,
+        gate=(
+            "Blocked from automation and release readiness. Non-dry-run execution "
+            "requires the explicit --confirm-live-wing-write acknowledgement plus "
+            "operator supervision, physical readback, and rollback review."
+        ),
+        current_policy=(
+            "This script can write broad WING soundcheck settings across active "
+            "channels and is not part of the supervised MVP fader/gain apply path."
+        ),
+        next_action=(
+            "Prefer the narrow supervised fader/gain proof runbook. Keep this "
+            "setup tool blocked unless a future operator runbook gives it separate "
+            "readback, rollback, and emergency-stop proof requirements."
+        ),
+        notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
     ),
     WriteSurface(
         id="ableton_control_surface",

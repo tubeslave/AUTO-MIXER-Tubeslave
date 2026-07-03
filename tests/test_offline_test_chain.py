@@ -6,6 +6,9 @@ import numpy as np
 import soundfile as sf
 
 
+CLI_TIMEOUT_SEC = 120.0
+
+
 def _write_sine(path, freq, amp=0.2, sr=48000):
     t = np.arange(int(sr * 0.25), dtype=np.float32) / sr
     audio = (amp * np.sin(2.0 * np.pi * freq * t)).astype(np.float32)
@@ -56,6 +59,7 @@ def test_offline_test_chain_cli_writes_required_artifacts(tmp_path):
         text=True,
         capture_output=True,
         check=True,
+        timeout=CLI_TIMEOUT_SEC,
     )
     payload = json.loads(result.stdout)
 

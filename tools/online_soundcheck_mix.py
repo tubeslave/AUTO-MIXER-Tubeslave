@@ -26,6 +26,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = REPO_ROOT / "backend"
+FFMPEG_TIMEOUT_SEC = 300.0
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(BACKEND_DIR))
 
@@ -272,11 +273,17 @@ def export_mp3(output_path: Path, audio: np.ndarray, sr: int):
         "-b:a", "320k",
         str(output_path),
     ]
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, timeout=FFMPEG_TIMEOUT_SEC)
     try:
         tmp_wav.unlink()
     except OSError:
         pass
+
+
+def _final_limiter_enabled(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "final_limiter", False)) and not bool(
+        getattr(args, "no_final_limiter", False)
+    )
 
 
 def main() -> int:
@@ -287,8 +294,18 @@ def main() -> int:
     parser.add_argument("--tempo-bpm", type=float, default=120.0)
     parser.add_argument("--use-llm", action="store_true")
     parser.add_argument("--no-codex-correction-pass", action="store_true")
-    parser.add_argument("--no-final-limiter", action="store_true")
+    parser.add_argument(
+        "--final-limiter",
+        action="store_true",
+        help="Explicitly enable final limiter/target-loudness conforming. Default online soundcheck export uses static headroom trim.",
+    )
+    parser.add_argument(
+        "--no-final-limiter",
+        action="store_true",
+        help="Legacy safety flag; keeps final limiter disabled and wins over --final-limiter.",
+    )
     args = parser.parse_args()
+    final_limiter = _final_limiter_enabled(args)
     audio_dir, logs_dir = ensure_ai_output_dirs()
 
     mixmod = load_offline_mix_module()
@@ -396,7 +413,7 @@ def main() -> int:
     online_mix, master_report = mixmod.master_process(
         online_mix,
         sr,
-        final_limiter=not args.no_final_limiter,
+        final_limiter=final_limiter,
         live_peak_ceiling_db=-3.0,
     )
 

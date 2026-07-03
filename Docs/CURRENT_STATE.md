@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-03T12:31:14Z
+Generated: 2026-07-03T17:50:51Z
 
 ## Repository snapshot
 
@@ -88,6 +88,26 @@ Generated: 2026-07-03T12:31:14Z
   `mode_gate_supervised_live_write_*` for current gate authority. It also
   rejects the legacy gap-rollup claim phrase that described fader/gain as the
   current supervised live-write boundary.
+- `backend/auth.py` now stores HMAC-SHA256 digests of issued bearer tokens
+  instead of raw token strings in `AuthManager._tokens`, preserving
+  generate/validate/revoke behavior while reducing token exposure in memory
+  inspection or debugging. This is local API authentication hardening only
+  and grants no WING live authority.
+- ChatGPT Pulse snapshot excerpts now redact secret-like values before
+  writing JSON/Markdown reports, including bearer tokens, `sk-`/`sk-proj-`
+  keys, JSON-style `apiKey`/`accessToken` fields and assignment-style API
+  key/token/password/secret values. This is local report-export hardening
+  only and grants no WING live authority.
+- `tools/live_wing_correction_test.py` now requires an explicit
+  `--confirm-live-wing-write` acknowledgement before loading mixer config or
+  creating a `WingClient`, and `backend/write_surface_inventory.py` records
+  it as a blocked write surface. This prevents accidental broad WING
+  mutation from automation and does not make that script release authority.
+- The vector indexer now redacts generic assignment-style secret values such
+  as `ANTHROPIC_API_KEY`, `AZURE_OPENAI_API_KEY`, `HF_TOKEN`,
+  `DATABASE_PASSWORD`, `SLACK_BOT_TOKEN` and `CLIENT_SECRET` before indexing,
+  while preserving non-secret tokenizer assignments. This is local
+  knowledge-index hardening only and grants no WING live authority.
 - No real hardware evidence was produced in this state-sync cycle that closes
   release readiness; the accepted read-only decision and failed rollback proof
   do not grant live authority.
@@ -1780,7 +1800,7 @@ Generated: 2026-07-03T12:31:14Z
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - The latest verified full-suite run for `22852a7e8` passed with
-  `4822 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
+  `5337 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
   WING-native fit, DSP-parameter calculation summary, problem-first action
   decision summary evidence tests, the current read-only handoff scope rail and
   the active milestone waiting-reason/timestamp rails plus the repo-local
@@ -1789,7 +1809,10 @@ Generated: 2026-07-03T12:31:14Z
   latest-ledger external-validation handoff guard, the BLOCKERS handoff sync
   guard, the active milestone/M001 plan handoff guard, the roadmap handoff
   guard, the project-layer blocker handoff guard, the MVP progress report
-  handoff and the structured pre-release score gate in the dirty worktree.
+  handoff, the structured pre-release score gate, the ML NPZ pickle guard,
+  the torch checkpoint weights-only guard, the dLive TLS verification guard,
+  the agent-training archive guard, the training dataset discovery path guard, the C++ bridge failed-start cleanup guard, the subprocess probe timeout guard, the selected tool subprocess timeout contract
+  and the broader owned subprocess timeout sweep and the vector index secret intake guard in the dirty worktree.
 - The latest `RUN_LEDGER.jsonl` row is now tested as an authority surface, not
   only as a timestamp surface. While M001 remains
   `WAITING_FOR_EXTERNAL_VALIDATION`, the latest ledger row must match

@@ -31,6 +31,7 @@ except ImportError as exc:  # pragma: no cover - environment guard
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 BACKEND_PATH = REPO_ROOT / "backend"
+GIT_METADATA_TIMEOUT_SEC = 2.0
 if str(BACKEND_PATH) not in sys.path:
     sys.path.insert(0, str(BACKEND_PATH))
 if str(SCRIPT_DIR) not in sys.path:
@@ -87,6 +88,7 @@ def git_commit() -> str:
             cwd=str(REPO_ROOT),
             stderr=subprocess.DEVNULL,
             text=True,
+            timeout=GIT_METADATA_TIMEOUT_SEC,
         ).strip()
     except Exception:
         return "unknown"

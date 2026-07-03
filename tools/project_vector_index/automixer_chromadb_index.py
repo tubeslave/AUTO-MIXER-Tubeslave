@@ -80,6 +80,27 @@ SECRET_FILENAMES = {
     "id_ed25519",
 }
 SECRET_SUFFIXES = (".key", ".pem", ".p12", ".pfx")
+SECRET_CONFIG_SUFFIXES = (".env", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf")
+SECRET_NAME_MARKERS = {
+    "credential",
+    "credentials",
+    "password",
+    "passwords",
+    "secret",
+    "secrets",
+    "token",
+    "tokens",
+}
+SECRET_NAME_PHRASES = {
+    "api_key",
+    "api_keys",
+    "apikey",
+    "apikeys",
+    "private_key",
+    "private_keys",
+    "service_account",
+    "service_accounts",
+}
 TOKEN_RE = re.compile(r"[\w./:-]+", re.UNICODE)
 TOKEN_SPLIT_RE = re.compile(r"[^a-z0-9]+")
 SENSITIVE_JSON_KEY_RE = re.compile(
@@ -94,6 +115,15 @@ SECRET_PATTERNS = (
     re.compile(r"(Authorization:\s*Bearer\s+)[A-Za-z0-9._\-]+", re.IGNORECASE),
     re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}\b"),
     re.compile(r"\bsk-proj-[A-Za-z0-9_\-]{16,}\b"),
+)
+GENERIC_SECRET_KEY_PATTERN = (
+    r"(?:[A-Z0-9_]*(?:API[_-]?KEY|PRIVATE[_-]?KEY)[A-Z0-9_]*|"
+    r"(?:[A-Z0-9_]+[_-])?(?:PASSWORD|SECRET|TOKEN)(?:[_-][A-Z0-9_]+)*)"
+)
+GENERIC_SECRET_ASSIGNMENT_RE = re.compile(
+    rf"^(\s*(?:export\s+)?[\"']?({GENERIC_SECRET_KEY_PATTERN})[\"']?\s*[:=]\s*)"
+    r"(?:([\"'])([^\"'\r\n]*)([\"'])|([^\s#,}]+))",
+    re.IGNORECASE | re.MULTILINE,
 )
 WING_QUERY_TERMS = {"wing", "xremote", "osc", "readback", "rollback", "supervised", "console"}
 SAFETY_QUERY_TERMS = {
@@ -159,7 +189,16 @@ def redact_secrets(text: str) -> str:
             redacted = pattern.sub(r"\1<redacted>", redacted)
         else:
             redacted = pattern.sub("<redacted>", redacted)
+    redacted = GENERIC_SECRET_ASSIGNMENT_RE.sub(_redact_secret_assignment, redacted)
     return redacted
+
+
+def _redact_secret_assignment(match: re.Match[str]) -> str:
+    prefix = match.group(1)
+    quote = match.group(3)
+    if quote:
+        return f"{prefix}{quote}<redacted>{match.group(5)}"
+    return f"{prefix}<redacted>"
 
 
 def sanitize_payload(value: Any) -> Any:
@@ -190,7 +229,14 @@ def sanitize_secret_text(text: str, secrets: Iterable[str | None] = ()) -> str:
 def path_is_secret(path: Path) -> bool:
     name = path.name
     lower_name = name.lower()
-    return name in SECRET_FILENAMES or lower_name.endswith(SECRET_SUFFIXES)
+    if name in SECRET_FILENAMES or lower_name.startswith(".env") or lower_name.endswith(SECRET_SUFFIXES):
+        return True
+    if not lower_name.endswith(SECRET_CONFIG_SUFFIXES):
+        return False
+    normalized_stem = TOKEN_SPLIT_RE.sub("_", Path(lower_name).stem).strip("_")
+    if any(phrase in normalized_stem for phrase in SECRET_NAME_PHRASES):
+        return True
+    return any(part in SECRET_NAME_MARKERS for part in normalized_stem.split("_"))
 
 
 def path_has_excluded_part(path: Path) -> bool:
@@ -843,6 +889,8 @@ def read_add_text(args: argparse.Namespace) -> str:
         return args.text
     if args.file:
         path = Path(args.file).expanduser()
+        if path_is_secret(path):
+            raise ValueError(f"refusing to index secret-like file path: {path.name}")
         return path.read_text(encoding="utf-8")
     return sys.stdin.read()
 

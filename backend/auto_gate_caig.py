@@ -338,12 +338,13 @@ class AdaptiveThreshold:
         
         logger.info("AdaptiveThreshold initialized")
     
-    def update_noise_floor(self, rms_db: float):
+    def update_noise_floor(self, rms_db: float, frame_sec: float | None = None):
         """Update noise floor with slow tracking."""
-        # Only track when signal is low
-        if rms_db < self.noise_floor_db + 10:
-            self.noise_floor_db = (self.tracking_coeff * self.noise_floor_db + 
-                                  (1 - self.tracking_coeff) * rms_db)
+        # Track low-level ambience in both directions; ignore clearly active
+        # program material above the current floor.
+        if rms_db < self.noise_floor_db + 25:
+            coeff = self.tracking_coeff
+            self.noise_floor_db = (coeff * self.noise_floor_db + (1 - coeff) * rms_db)
     
     def calculate_threshold(
         self,
@@ -477,10 +478,12 @@ class GateProcessor:
         self,
         features: GateFeatures,
         threshold_db: float,
-        settings: GateSettings
+        settings: GateSettings,
+        frame_samples: int = 1,
     ) -> GateDecision:
         """Process one frame and return decision."""
         decision = GateDecision(channel_id=0, state=self.state)
+        frame_samples = max(1, int(frame_samples))
 
         # C-02 FIX: Implement proper hysteresis.
         # Gate OPENS when signal > threshold (open threshold).
@@ -500,7 +503,7 @@ class GateProcessor:
 
         elif self.state == GateState.OPENING:
             # Attack phase
-            gain_step = abs(settings.range_db) / max(1, self.attack_samples)
+            gain_step = abs(settings.range_db) * frame_samples / max(1, self.attack_samples)
             self.current_gain_db += gain_step
 
             if self.current_gain_db >= 0:
@@ -514,7 +517,7 @@ class GateProcessor:
                 self.hold_counter = self.hold_samples
 
         elif self.state == GateState.HOLD:
-            self.hold_counter -= 1
+            self.hold_counter -= frame_samples
             if self.hold_counter <= 0:
                 self.state = GateState.RELEASING
             # If signal recovers above open threshold during hold, re-open
@@ -523,7 +526,7 @@ class GateProcessor:
 
         elif self.state == GateState.RELEASING:
             # Release phase
-            gain_step = abs(settings.range_db) / max(1, self.release_samples)
+            gain_step = abs(settings.range_db) * frame_samples / max(1, self.release_samples)
             self.current_gain_db -= gain_step
 
             if self.current_gain_db <= settings.range_db:

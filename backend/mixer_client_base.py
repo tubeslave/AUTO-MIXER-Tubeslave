@@ -132,7 +132,18 @@ def create_mixer_client(mixer_type: str, config: dict) -> MixerClientBase:
         ip = config.get("ip", "192.168.3.70")
         port = config.get("port", 51328)
         tls = config.get("tls", False)
+        tls_ca_file = config.get("tls_ca_file") or config.get("dliveTlsCaFile")
+        tls_server_hostname = (
+            config.get("tls_server_hostname") or config.get("dliveTlsServerHostname")
+        )
         midi_channel = config.get("midi_base_channel", 0)
-        return DLiveClient(ip=ip, port=port, tls=tls, midi_base_channel=midi_channel)
+        return DLiveClient(
+            ip=ip,
+            port=port,
+            tls=tls,
+            tls_ca_file=tls_ca_file,
+            tls_server_hostname=tls_server_hostname,
+            midi_base_channel=midi_channel,
+        )
 
     raise ValueError(f"Unknown mixer type: {mixer_type!r}. Supported: 'wing', 'dlive'.")

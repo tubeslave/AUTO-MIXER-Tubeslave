@@ -65,6 +65,7 @@ from tools import build_wing_readonly_preflight_handoff_packet as handoff
 from tools import no_wing_release_check
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+HANDOFF_TOOL_TIMEOUT_SEC = 60.0
 
 
 def write_no_wing_prestart_summary(
@@ -1367,6 +1368,7 @@ def test_handoff_tool_runs_as_repo_local_script_path(tmp_path: Path):
         check=False,
         capture_output=True,
         text=True,
+        timeout=HANDOFF_TOOL_TIMEOUT_SEC,
     )
 
     assert result.returncode == 0, result.stderr

@@ -110,6 +110,11 @@ from signal_metrics import (
 from observation_mixer import ObservationMixerClient
 
 try:
+    from autogain_contract import AutoGainRecommendation, clamp_target_trim
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.autogain_contract import AutoGainRecommendation, clamp_target_trim
+
+try:
     from perceptual import PerceptualEvaluator
 except Exception:
     PerceptualEvaluator = None
@@ -496,8 +501,11 @@ class AutoSoundcheckEngine:
         sample_rate: int = 48000,
         block_size: int = 1024,
         buffer_seconds: float = 5.0,
-        auto_apply: bool = True,
+        auto_apply: bool = False,
         observe_only: bool = False,
+        feedback_emergency_apply: bool = False,
+        use_decision_engine_v2: bool = False,
+        decision_engine_dry_run: bool = False,
         selected_channels: Optional[List[int]] = None,
         auto_discover: bool = True,
         scan_subnet: bool = True,
@@ -516,8 +524,11 @@ class AutoSoundcheckEngine:
         self.sample_rate = sample_rate
         self.block_size = block_size
         self.buffer_seconds = buffer_seconds
-        self.auto_apply = auto_apply
-        self.observe_only = observe_only
+        self.auto_apply = bool(auto_apply)
+        self.observe_only = bool(observe_only)
+        self.feedback_emergency_apply = bool(feedback_emergency_apply)
+        self.use_decision_engine_v2 = bool(use_decision_engine_v2)
+        self.decision_engine_dry_run = bool(decision_engine_dry_run)
         self.auto_discover = auto_discover
         self.scan_subnet = scan_subnet
         self.selected_channels = sorted({
@@ -703,6 +714,10 @@ class AutoSoundcheckEngine:
             context_metadata={
                 "profile_id": self.correction_executor_config.profile_id,
                 "observe_only": bool(self.observe_only),
+                "auto_apply": bool(self.auto_apply),
+                "feedback_emergency_apply": bool(self.feedback_emergency_apply),
+                "use_decision_engine_v2": bool(self.use_decision_engine_v2),
+                "decision_engine_dry_run": bool(self.decision_engine_dry_run),
                 "live_action_executor_enabled": bool(self.correction_executor_config.enabled),
             }
         )
@@ -816,7 +831,11 @@ class AutoSoundcheckEngine:
         logger.info(
             f"AutoSoundcheckEngine: {mode}, target={target}, "
             f"channels={self._configured_channel_count()}, sr={sample_rate}, "
+            f"auto_apply={self.auto_apply}, "
             f"observe_only={observe_only}, "
+            f"feedback_emergency_apply={self.feedback_emergency_apply}, "
+            f"use_decision_engine_v2={self.use_decision_engine_v2}, "
+            f"decision_engine_dry_run={self.decision_engine_dry_run}, "
             f"min_class_conf={self.minimum_auto_apply_classification_confidence:.2f}, "
             f"preserve_existing_processing={self.preserve_existing_processing}, "
             f"eval_enabled={self.evaluation_policy.enabled}, "
@@ -1186,6 +1205,86 @@ class AutoSoundcheckEngine:
         bundle["live_mixer_writes"] = False
         bundle["transport_policy"] = "dry_run_only"
         return bundle
+
+    def get_gain_recommendations(self) -> Dict[int, Dict[str, Any]]:
+        """Return read-only AutoGain recommendations from the latest soundcheck metrics."""
+        recommendations: Dict[int, Dict[str, Any]] = {}
+        trim_min = -12.0
+        trim_max = 12.0
+        target_peak_by_preset = {
+            "kick": -10.0,
+            "snare": -10.0,
+            "tom": -10.0,
+            "bass": -10.0,
+            "leadVocal": -9.0,
+            "backVocal": -10.0,
+            "backingVocal": -10.0,
+            "electricGuitar": -11.0,
+            "acousticGuitar": -12.0,
+            "room": -16.0,
+            "overheads": -14.0,
+            "hihat": -14.0,
+            "cymbals": -14.0,
+        }
+        for ch, info in sorted(self.channels.items()):
+            if not info.has_signal:
+                continue
+            snapshot = info.original_snapshot
+            current_trim = self._as_float(
+                getattr(snapshot, "gain_db", 0.0) if snapshot is not None else 0.0,
+                0.0,
+            )
+            level = getattr(getattr(info, "metrics", None), "level", None)
+            true_peak = self._as_float(
+                getattr(level, "true_peak_dbtp", None),
+                self._as_float(getattr(info, "peak_db", None), -100.0),
+            )
+            rms_db = self._as_float(
+                getattr(level, "rms_db", None),
+                self._as_float(getattr(info, "rms_db", None), -100.0),
+            )
+            crest_factor = self._as_float(getattr(level, "crest_factor_db", None), 0.0)
+            preset = str(info.preset or info.source_role or "unknown")
+            target_peak = target_peak_by_preset.get(preset, -12.0)
+            target_trim, delta_db = clamp_target_trim(
+                current_trim,
+                target_peak - true_peak,
+                trim_min,
+                trim_max,
+            )
+            confidence = 0.8 if info.recognized else 0.65
+            recommendation = AutoGainRecommendation(
+                channel=int(ch),
+                audio_channel=int(ch),
+                mixer_channel=int(ch),
+                source="auto_soundcheck_engine",
+                current_trim_db=round(current_trim, 3),
+                recommended_target_trim_db=round(float(target_trim), 3),
+                delta_db=round(float(delta_db), 3),
+                reason="auto_soundcheck_peak_alignment",
+                confidence=round(confidence, 4),
+                limited_by="trim_bounds" if abs(float(delta_db) - (target_peak - true_peak)) > 1e-6 else "none",
+                role=preset,
+                analysis_state=self.state.value,
+                live_apply_safe=False,
+                dry_run_only=True,
+                level_source="auto_soundcheck_metrics",
+                metrics={
+                    "true_peak_dbtp": round(true_peak, 3),
+                    "rms_db": round(rms_db, 3),
+                    "crest_factor_db": round(crest_factor, 3),
+                    "target_peak_db": round(float(target_peak), 3),
+                },
+                metadata={
+                    "auto_apply_enabled": bool(self.auto_apply),
+                    "trim_bounds_db": {"min": trim_min, "max": trim_max},
+                    "snapshot_available": snapshot is not None,
+                    "preset": preset,
+                    "transport_policy": "dry_run_only",
+                },
+            )
+            recommendations[int(ch)] = recommendation.to_dict()
+        return recommendations
 
     @staticmethod
     def _safe_call(callback, default=None):
@@ -2382,6 +2481,12 @@ class AutoSoundcheckEngine:
                     ip=self.mixer_ip,
                     port=self.mixer_port,
                     tls=self.mixer_tls,
+                    tls_ca_file=getattr(self, "mixer_tls_ca_file", None),
+                    tls_server_hostname=getattr(
+                        self,
+                        "mixer_tls_server_hostname",
+                        None,
+                    ),
                     midi_base_channel=self.midi_base_channel,
                 )
             elif self.mixer_type == "wing":
@@ -5922,6 +6027,10 @@ class AutoSoundcheckEngine:
             f"({event.magnitude_db:.1f}dB)"
         )
         if event.action == "notch" and hasattr(self.mixer_client, "set_eq_band"):
+            if self.feedback_emergency_apply:
+                if self._apply_direct_feedback_emergency_notch(ch, info, event):
+                    self._record_feedback_action_sent(ch)
+                return
             if not self._control_allowed(info, "feedback_notch"):
                 self._log_processing_skip(ch, info, "feedback notch")
                 return
@@ -5968,6 +6077,41 @@ class AutoSoundcheckEngine:
                     logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {actual_fader:.1f}dB")
             except Exception:
                 pass
+
+    def _apply_direct_feedback_emergency_notch(
+        self,
+        ch: int,
+        info: ChannelInfo,
+        event: FeedbackEvent,
+    ) -> bool:
+        """Apply an explicitly opted-in emergency notch without enabling normal auto-apply."""
+        try:
+            notch_band = self._select_feedback_notch_band(info)
+            freq_hz = max(20.0, min(20000.0, float(event.frequency_hz)))
+            gain_db = max(
+                float(self.action_safety_config.feedback_notch_max_cut_db),
+                min(0.0, -6.0),
+            )
+            q = max(float(self.action_safety_config.feedback_notch_min_q), 10.0)
+            set_eq_band = getattr(self.mixer_client, "set_eq_band", None)
+            if not callable(set_eq_band):
+                return False
+            result = set_eq_band(ch, notch_band, freq_hz, gain_db, q)
+            if result is False:
+                return False
+            logger.warning(
+                "Ch %s: emergency feedback notch applied by explicit opt-in "
+                "(band=%s, freq=%.0fHz, gain=%.1fdB, q=%.1f)",
+                ch,
+                notch_band,
+                freq_hz,
+                gain_db,
+                q,
+            )
+            return True
+        except Exception as exc:
+            logger.warning("Ch %s: emergency feedback notch failed: %s", ch, exc)
+            return False
 
     def _suppress_repeated_feedback_event(self, ch: int, event: FeedbackEvent) -> bool:
         if self._feedback_actions_sent_total >= max(0, self.feedback_max_actions_per_run):
@@ -6330,7 +6474,17 @@ class AutoSoundcheckEngine:
                 }
                 for dca_id, snapshot in sorted(self.dca_snapshots.items())
             },
+            "live_apply_enabled": bool(self.auto_apply and not self.observe_only),
+            "dry_run": bool((not self.auto_apply) or self.observe_only),
             "observe_only": self.observe_only,
+            "feedback_reaction_enabled": bool(self.feedback_emergency_apply),
+            "feedback_reaction_policy": (
+                "emergency_notch_direct_opt_in"
+                if self.feedback_emergency_apply
+                else "blocked"
+            ),
+            "use_decision_engine_v2": bool(self.use_decision_engine_v2),
+            "decision_engine_dry_run": bool(self.decision_engine_dry_run),
             "live_action_executor_enabled": self.correction_executor_config.enabled,
             "live_action_profile": self.correction_executor_config.profile_id,
             "promoted_live_action_types": [
@@ -6434,14 +6588,20 @@ def main():
                         help="Number of input channels (default: 48)")
     parser.add_argument("--sample-rate", type=int, default=48000,
                         help="Sample rate (default: 48000)")
+    parser.add_argument("--live-apply", action="store_true",
+                        help="Explicitly apply eligible corrections live")
     parser.add_argument("--no-apply", action="store_true",
                         help="Analyze only, do not apply corrections")
+    parser.add_argument("--allow-feedback-emergency", action="store_true",
+                        help="Allow explicit emergency feedback notch writes")
     parser.add_argument("--log-level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     parser.add_argument("--scan-only", action="store_true",
                         help="Only scan for mixers, do not connect")
 
     args = parser.parse_args()
+    if args.live_apply and args.no_apply:
+        parser.error("--live-apply and --no-apply cannot be used together")
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -6455,6 +6615,8 @@ def main():
         return
 
     auto_discover = not args.no_discover
+    live_apply = bool(args.live_apply and not args.no_apply)
+    feedback_emergency_apply = bool(args.allow_feedback_emergency)
 
     def on_state(state, msg):
         print(f"\n>>> [{state}] {msg}")
@@ -6473,7 +6635,8 @@ def main():
         audio_device_name=args.audio_device,
         num_channels=args.channels,
         sample_rate=args.sample_rate,
-        auto_apply=not args.no_apply,
+        auto_apply=live_apply,
+        feedback_emergency_apply=feedback_emergency_apply,
         auto_discover=auto_discover,
         scan_subnet=args.full_scan,
         on_state_change=on_state,
@@ -6489,7 +6652,8 @@ def main():
     print(f"  Mixer: {mixer_desc}")
     print(f"  Audio: {args.audio_device or 'auto-detect'}")
     print(f"  Channels: {args.channels}")
-    print(f"  Auto-apply: {not args.no_apply}")
+    print(f"  Auto-apply: {live_apply}")
+    print(f"  Feedback emergency apply: {feedback_emergency_apply}")
     print(f"  Auto-discover: {auto_discover}")
     print("=" * 60)
     print()

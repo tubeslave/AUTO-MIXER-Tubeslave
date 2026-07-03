@@ -21,7 +21,7 @@ def _load_dataset_from_file(path: str, n_channels: int) -> Tuple[List[np.ndarray
     path = os.path.abspath(path)
     _, ext = os.path.splitext(path.lower())
     if ext == ".npz":
-        with np.load(path, allow_pickle=True) as raw:
+        with np.load(path, allow_pickle=False) as raw:
             if "multitracks" not in raw.files:
                 raise ValueError("NPZ must include 'multitracks'")
             if "references" not in raw.files:

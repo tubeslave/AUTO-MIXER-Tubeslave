@@ -1,11 +1,13 @@
 import asyncio
 import atexit
+import errno
 import math
 import json
 import logging
 import os
 import re
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -456,11 +458,84 @@ class AutoMixerServer:
         except (TypeError, ValueError):
             return float(default)
 
+    @classmethod
+    def _normalize_tcp_port(cls, port: Any) -> Optional[int]:
+        try:
+            port_number = int(port)
+        except (TypeError, ValueError):
+            return None
+        if 1 <= port_number <= 65535:
+            return port_number
+        return None
+
+    def _ws_port_force_cleanup_enabled(self) -> bool:
+        return self._parse_env_bool(os.getenv("AUTOMIXER_FORCE_CLEANUP_WS_PORT", "false"))
+
+    def _pids_listening_on_port(self, port: Any) -> List[int]:
+        port_number = self._normalize_tcp_port(port)
+        if port_number is None:
+            logger.warning("Refusing port cleanup for invalid WebSocket port: %r", port)
+            return []
+        try:
+            completed = subprocess.run(
+                ["lsof", "-ti", f":{port_number}"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+            )
+        except FileNotFoundError:
+            logger.warning("Cannot inspect port %s because lsof is unavailable", port_number)
+            return []
+        except subprocess.TimeoutExpired:
+            logger.warning("Timed out inspecting port %s with lsof", port_number)
+            return []
+        if completed.returncode not in (0, 1):
+            logger.warning(
+                "lsof failed while inspecting port %s: %s",
+                port_number,
+                (completed.stderr or "").strip(),
+            )
+            return []
+        pids: List[int] = []
+        for raw_pid in completed.stdout.splitlines():
+            try:
+                pids.append(int(raw_pid.strip()))
+            except ValueError:
+                logger.warning(
+                    "Ignoring non-numeric lsof pid for port %s: %r",
+                    port_number,
+                    raw_pid,
+                )
+        return pids
+
+    def _force_cleanup_ws_port(self) -> None:
+        port_number = self._normalize_tcp_port(self.ws_port)
+        if port_number is None:
+            raise RuntimeError(f"Invalid WebSocket port for cleanup: {self.ws_port!r}")
+        current_pid = os.getpid()
+        pids = sorted(
+            {pid for pid in self._pids_listening_on_port(port_number) if pid != current_pid}
+        )
+        if not pids:
+            logger.warning("No external listener PID found for WebSocket port %s", port_number)
+            return
+        for pid in pids:
+            logger.warning(
+                "Force-stopping PID %s on WebSocket port %s after explicit operator opt-in",
+                pid,
+                port_number,
+            )
+            os.kill(pid, signal.SIGKILL)
+
     def _is_wing_deployment_write_boundary_active(self) -> bool:
         return (
-            (self._wing_deployment_write_boundary_enabled or self._wing_observation_only)
-            and self.connection_mode == "wing"
-            and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient))
+            (
+                bool(getattr(self, "_wing_deployment_write_boundary_enabled", False))
+                or bool(getattr(self, "_wing_observation_only", False))
+            )
+            and getattr(self, "connection_mode", "") == "wing"
+            and isinstance(getattr(self, "mixer_client", None), (WingClient, EnhancedOSCClient))
         )
 
     def get_operator_mode_status(self) -> Dict[str, Any]:
@@ -1212,6 +1287,24 @@ class AutoMixerServer:
         elapsed = time.monotonic() - last_write
         return max(0.0, self._manual_write_cooldown_sec - elapsed)
 
+    def _manual_write_retry_delay_sec(self) -> float:
+        """Delay between manual-write attempts when the mixer client drops a write.
+
+        WingClient rate-limits repeated OSC writes to the same address and
+        returns False for a dropped write, so an approved apply followed by an
+        immediate rollback to the same address can silently lose the rollback.
+        The retry must wait longer than that per-address throttle interval.
+        """
+        client = self.mixer_client
+        if getattr(client, "_osc_throttle_enabled", False):
+            try:
+                throttle_hz = float(getattr(client, "_osc_throttle_hz", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                throttle_hz = 0.0
+            if throttle_hz > 0:
+                return min(1.0, (1.0 / throttle_hz) + 0.05)
+        return 0.25
+
     def _manual_write_readback_status(
         self,
         *,
@@ -1598,32 +1691,51 @@ class AutoMixerServer:
             )
 
         write_started_epoch = datetime.now(timezone.utc).timestamp()
-        try:
-            write_result = write_method(channel_int, effective_value)
-        except Exception as exc:
-            logger.error("Manual console write failed: %s", exc, exc_info=True)
-            error_result = {
-                "status": "error",
-                "success": False,
-                "reason": "manual_write_exception",
-                "error": str(exc),
-                "channel": channel_int,
-                "value_type": write_kind,
-                "requested_value": requested_value,
-                "effective_value": effective_value,
-                "old_value": old_value,
-                "pre_read_status": pre_read_status,
-                "pre_read_source": pre_read_source,
-                "pre_read_value": old_value,
-                "proof_status": "blocked",
-                "source": source,
-                "approval_id": approval_id,
-            }
-            if record_event:
-                artifact_path = self._record_manual_write_event("manual_write_error", error_result)
-                if artifact_path:
-                    error_result["artifact_path"] = artifact_path
-            return error_result
+        max_write_attempts = 3
+        retry_delay_sec = self._manual_write_retry_delay_sec()
+        write_attempts = 0
+        write_result: Any = False
+        while True:
+            write_attempts += 1
+            try:
+                write_result = write_method(channel_int, effective_value)
+            except Exception as exc:
+                logger.error("Manual console write failed: %s", exc, exc_info=True)
+                error_result = {
+                    "status": "error",
+                    "success": False,
+                    "reason": "manual_write_exception",
+                    "error": str(exc),
+                    "channel": channel_int,
+                    "value_type": write_kind,
+                    "requested_value": requested_value,
+                    "effective_value": effective_value,
+                    "old_value": old_value,
+                    "pre_read_status": pre_read_status,
+                    "pre_read_source": pre_read_source,
+                    "pre_read_value": old_value,
+                    "proof_status": "blocked",
+                    "source": source,
+                    "approval_id": approval_id,
+                    "write_attempts": write_attempts,
+                }
+                if record_event:
+                    artifact_path = self._record_manual_write_event("manual_write_error", error_result)
+                    if artifact_path:
+                        error_result["artifact_path"] = artifact_path
+                return error_result
+            if write_result is not False or write_attempts >= max_write_attempts:
+                break
+            logger.warning(
+                "Manual console write for ch%s %s returned False (attempt %d/%d); "
+                "retrying in %.3fs in case a same-address write rate limit dropped it",
+                channel_int,
+                write_kind,
+                write_attempts,
+                max_write_attempts,
+                retry_delay_sec,
+            )
+            await asyncio.sleep(retry_delay_sec)
 
         if write_result is False:
             return self._manual_write_blocked_result(
@@ -1641,6 +1753,7 @@ class AutoMixerServer:
                     "pre_read_source": pre_read_source,
                     "pre_read_value": old_value,
                     "method": method_name,
+                    "write_attempts": write_attempts,
                 },
             )
 
@@ -1693,6 +1806,7 @@ class AutoMixerServer:
             "reason": str(reason or "manual_supervised_write"),
             "approval_id": approval_id,
             "method": method_name,
+            "write_attempts": write_attempts,
             "manual_write_supervision": self.get_manual_write_supervision_status(),
         }
         self._last_manual_write_result = dict(result)
@@ -2936,13 +3050,22 @@ class AutoMixerServer:
             })
 
     async def connect_dlive(self, ip: str = "192.168.3.70", port: int = 51328,
-                            tls: bool = False, midi_base_channel: int = 0):
+                            tls: bool = False, midi_base_channel: int = 0,
+                            tls_ca_file: Optional[str] = None,
+                            tls_server_hostname: Optional[str] = None):
         """Connect to Allen & Heath dLive mixer via MIDI over TCP."""
         await self.disconnect_mixer()
         self._agent_force_auto_apply = False
 
         try:
-            client = DLiveClient(ip=ip, port=port, tls=tls, midi_base_channel=midi_base_channel)
+            client = DLiveClient(
+                ip=ip,
+                port=port,
+                tls=tls,
+                tls_ca_file=tls_ca_file,
+                tls_server_hostname=tls_server_hostname,
+                midi_base_channel=midi_base_channel,
+            )
             success = client.connect()
 
             if success:
@@ -7626,16 +7749,20 @@ class AutoMixerServer:
             await server.wait_closed()
             
         except OSError as e:
-            if e.errno == 48:  # Address already in use
-                logger.error(f"Port {self.ws_port} is already in use. Attempting to force cleanup...")
-                # Try to cleanup any existing processes
-                import subprocess
+            if e.errno == errno.EADDRINUSE:
+                if not self._ws_port_force_cleanup_enabled():
+                    raise RuntimeError(
+                        f"Port {self.ws_port} is already in use. Refusing automatic kill; "
+                        "set AUTOMIXER_FORCE_CLEANUP_WS_PORT=true only after confirming "
+                        "the listener is safe to stop."
+                    ) from e
+                logger.error(
+                    "Port %s is already in use. Explicit cleanup opt-in is enabled; "
+                    "attempting safe PID cleanup.",
+                    self.ws_port,
+                )
                 try:
-                    subprocess.run(
-                        f"lsof -ti:{self.ws_port} | xargs kill -9",
-                        shell=True,
-                        capture_output=True
-                    )
+                    self._force_cleanup_ws_port()
                     await asyncio.sleep(1)
                     # Retry
                     server = await websockets.serve(

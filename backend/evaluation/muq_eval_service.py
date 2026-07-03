@@ -521,7 +521,11 @@ class MuQEvalService:
             self._device = self._resolve_device(torch)
             model_config = self._load_model_config(OmegaConf, config_path)
             model = MusicQualityModel(model_config)
-            state = torch.load(str(model_path), map_location=self._device)
+            state = torch.load(
+                str(model_path),
+                map_location=self._device,
+                weights_only=True,
+            )
             if isinstance(state, dict) and "state_dict" in state:
                 state = state["state_dict"]
             model.load_state_dict(state)

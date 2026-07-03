@@ -8,7 +8,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -21,6 +21,7 @@ SUPPORTED_DATA_EXTENSIONS = (".parquet", ".json", ".jsonl", ".csv")
 README_FILENAMES = {"README.md", "readme.md"}
 DEFAULT_MAX_DATASET_BYTES = 50 * 1024 * 1024
 DEFAULT_REPORT_PATH = "/Users/dmitrijvolkov/Downloads/deep-research-report.md"
+HASH_COMMAND_TIMEOUT_SEC = 10.0
 
 
 @dataclass(frozen=True)
@@ -74,11 +75,44 @@ def safe_dataset_dir(dataset_id: str) -> str:
     return safe.strip("._") or "dataset"
 
 
+def safe_dataset_file_parts(filename: str) -> tuple[str, ...]:
+    if not isinstance(filename, str) or not filename:
+        raise ValueError("unsafe dataset filename: empty")
+    if "\x00" in filename:
+        raise ValueError(f"unsafe dataset filename: {filename!r}")
+
+    windows_path = PureWindowsPath(filename)
+    if windows_path.drive or windows_path.root:
+        raise ValueError(f"unsafe dataset filename: {filename}")
+
+    normalized = filename.replace("\\", "/")
+    posix_path = PurePosixPath(normalized)
+    if posix_path.is_absolute():
+        raise ValueError(f"unsafe dataset filename: {filename}")
+
+    parts = tuple(normalized.split("/"))
+    if not parts or any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(f"unsafe dataset filename: {filename}")
+    return parts
+
+
+def safe_dataset_file_path(dataset_dir: Path, filename: str) -> Path:
+    parts = safe_dataset_file_parts(filename)
+    root = dataset_dir.resolve()
+    target = root.joinpath(*parts)
+    try:
+        target.resolve().relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"unsafe dataset filename: {filename}") from exc
+    return target
+
+
 def build_hf_api_url(dataset_id: str) -> str:
     return f"{HF_API_BASE}/{quote(dataset_id, safe='/')}/revision/main"
 
 
 def build_hf_file_url(dataset_id: str, filename: str) -> str:
+    safe_dataset_file_parts(filename)
     encoded_file = quote(filename, safe="/")
     return f"{HF_WEB_BASE}/{dataset_id}/resolve/main/{encoded_file}?download=true"
 
@@ -106,6 +140,7 @@ def sha256_file(path: Path) -> str:
             check=True,
             capture_output=True,
             text=True,
+            timeout=HASH_COMMAND_TIMEOUT_SEC,
         )
         return result.stdout.split()[0]
     except Exception:
@@ -131,6 +166,10 @@ def select_supported_files(siblings: list[dict[str, Any]]) -> list[str]:
         if not isinstance(filename, str) or not filename.strip():
             continue
         if filename.startswith(".") or filename.endswith("/"):
+            continue
+        try:
+            safe_dataset_file_parts(filename)
+        except ValueError:
             continue
         if is_supported_dataset_file(filename):
             selected.append(filename)
@@ -259,7 +298,7 @@ def discover_dataset(
             record["files"].append(file_record)
             continue
         if download:
-            target_path = dataset_dir / filename
+            target_path = safe_dataset_file_path(dataset_dir, filename)
             try:
                 downloaded = download_file(
                     file_url,

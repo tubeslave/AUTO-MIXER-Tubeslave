@@ -19,6 +19,9 @@ from heuristics.spectral_ceiling_eq import (
 from mix_agent.analysis.loader import infer_stem_role
 
 
+CLI_TIMEOUT_SEC = 60.0
+
+
 def _tone(
     frequency_hz: float,
     *,
@@ -212,6 +215,7 @@ def test_inspect_spectral_ceiling_cli_prints_human_report(tmp_path):
         check=True,
         text=True,
         capture_output=True,
+        timeout=CLI_TIMEOUT_SEC,
     )
 
     assert "[SPECTRAL_CEILING_EQ]" in result.stdout

@@ -153,16 +153,19 @@ def test_delay_applied_only_to_early_target():
         delay_ms=10.0, delay_samples=480.0, correlation_peak=1.0,
         psr=30.0, snr_db=30.0, confidence=1.0, coherence=1.0,
     )
-    aligner._send_delay_command(5, lagging)
+    result = aligner._send_delay_command(5, lagging)
     mixer.set_channel_delay.assert_not_called()
+    assert result["blocked"] is False
 
     # Target опережает (delay_ms < 0) → задержка |delay|
     leading = DelayMeasurement(
         delay_ms=-10.0, delay_samples=-480.0, correlation_peak=1.0,
         psr=30.0, snr_db=30.0, confidence=1.0, coherence=1.0,
     )
-    aligner._send_delay_command(5, leading)
-    mixer.set_channel_delay.assert_called_once_with(5, 10.0)
+    result = aligner._send_delay_command(5, leading)
+    mixer.set_channel_delay.assert_not_called()
+    assert result["blocked"] is True
+    assert result["blocked_calls"][0]["delay_ms"] == 10.0
 
 
 def test_max_delay_clamped_to_unambiguous_range():

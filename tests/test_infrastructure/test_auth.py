@@ -27,6 +27,8 @@ class TestAuthManager:
         token = am.generate_token('client_1', expires_hours=1.0)
         assert isinstance(token, str)
         assert len(token) > 20
+        assert token not in am._tokens
+        assert am._token_digest(token) in am._tokens
         assert am.validate_token(token) is True
 
     def test_validate_token_when_disabled(self):
@@ -38,9 +40,11 @@ class TestAuthManager:
         """Revoking a token makes it invalid on subsequent validation."""
         am = AuthManager(enabled=True)
         token = am.generate_token('client_2')
+        token_digest = am._token_digest(token)
         assert am.validate_token(token) is True
         am.revoke_token(token)
         assert am.validate_token(token) is False
+        assert token_digest not in am._tokens
 
     def test_ip_allowlist(self):
         """check_ip allows listed IPs and rejects unlisted ones when enabled."""
@@ -91,11 +95,13 @@ class TestAuthManager:
         """cleanup_expired removes tokens past their expiration time."""
         am = AuthManager(enabled=True)
         token = am.generate_token('expiry_client', expires_hours=0.0)
+        token_digest = am._token_digest(token)
         # Token was created with immediate expiry (expires = time.time() + 0)
         # Wait a tiny bit to ensure it's expired
         time.sleep(0.01)
         am.cleanup_expired()
         assert token not in am._tokens
+        assert token_digest not in am._tokens
 
     def test_authenticate_full_flow(self):
         """authenticate() checks IP, token, and rate limit in sequence."""
@@ -114,3 +120,19 @@ class TestAuthManager:
         # When disabled, everything passes
         am_disabled = AuthManager(enabled=False)
         assert am_disabled.authenticate(token='any', ip='any', client_id='any') is True
+
+    def test_authenticate_rejects_client_id_mismatch(self):
+        """A valid token cannot be rate-limit-sharded under another client id."""
+        am = AuthManager(enabled=True)
+        token = am.generate_token('token_owner')
+
+        assert am.authenticate(token=token, ip='127.0.0.1', client_id='other_client') is False
+
+    def test_authenticate_rate_limits_token_owner_without_claimed_client_id(self):
+        """Rate limiting follows the token owner even when caller omits client_id."""
+        am = AuthManager(enabled=True)
+        am._max_requests_per_minute = 1
+        token = am.generate_token('rate_limited_owner')
+
+        assert am.authenticate(token=token, ip='127.0.0.1') is True
+        assert am.authenticate(token=token, ip='127.0.0.1') is False

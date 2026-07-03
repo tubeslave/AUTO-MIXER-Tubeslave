@@ -73,6 +73,9 @@ class BaseAgent(ABC):
         if self.state == AgentState.RUNNING:
             logger.warning(f"Agent '{self.name}' already running")
             return
+        if self.state == AgentState.PAUSED:
+            self.resume()
+            return
         self.state = AgentState.RUNNING
         logger.info(f"Agent '{self.name}' started")
         await self._run_loop()

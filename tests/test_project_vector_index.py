@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 
@@ -52,6 +53,9 @@ def test_iter_source_paths_excludes_secrets_and_external(tmp_path: Path) -> None
     (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-secret", encoding="utf-8")
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "user_config.json").write_text('{"local": true}', encoding="utf-8")
+    (tmp_path / "config" / "secrets.json").write_text('{"token": "abc"}', encoding="utf-8")
+    (tmp_path / "config" / "api_keys.yaml").write_text("OPENAI_API_KEY: sk-secret", encoding="utf-8")
+    (tmp_path / "config" / "service-account.json").write_text('{"private_key": "secret"}', encoding="utf-8")
     (tmp_path / "external").mkdir()
     (tmp_path / "external" / "README.md").write_text("external", encoding="utf-8")
 
@@ -61,7 +65,24 @@ def test_iter_source_paths_excludes_secrets_and_external(tmp_path: Path) -> None
     assert "Docs/ARCHITECTURE.md" in paths
     assert ".env" not in paths
     assert "config/user_config.json" not in paths
+    assert "config/secrets.json" not in paths
+    assert "config/api_keys.yaml" not in paths
+    assert "config/service-account.json" not in paths
     assert "external/README.md" not in paths
+
+
+def test_read_add_text_refuses_secret_like_file(tmp_path: Path) -> None:
+    secret_path = tmp_path / "paperclip-token.json"
+    secret_path.write_text('{"token": "do-not-index"}', encoding="utf-8")
+
+    args = SimpleNamespace(text=None, file=str(secret_path), stdin=False)
+
+    try:
+        indexer.read_add_text(args)
+    except ValueError as exc:
+        assert "refusing to index secret-like file path" in str(exc)
+    else:
+        raise AssertionError("secret-like file path was indexed")
 
 
 def test_redact_secrets_masks_known_token_shapes() -> None:
@@ -70,6 +91,13 @@ def test_redact_secrets_masks_known_token_shapes() -> None:
             "OPENAI_API_KEY=sk-proj-abc1234567890abcdefghijklmnop",
             "PAPERCLIP_TOKEN=paperclip-token",
             "Authorization: Bearer abc.def-123",
+            "ANTHROPIC_API_KEY=anthropic-secret",
+            "AZURE_OPENAI_API_KEY: azure-secret",
+            "HF_TOKEN='hf-secret'",
+            'DATABASE_PASSWORD="db-secret"',
+            '"SLACK_BOT_TOKEN": "slack-secret",',
+            "export CLIENT_SECRET=client-secret",
+            "FEATURE_TOKENIZER=safe-tokenizer",
         ]
     )
 
@@ -78,6 +106,13 @@ def test_redact_secrets_masks_known_token_shapes() -> None:
     assert "sk-proj-" not in redacted
     assert "paperclip-token" not in redacted
     assert "abc.def-123" not in redacted
+    assert "anthropic-secret" not in redacted
+    assert "azure-secret" not in redacted
+    assert "hf-secret" not in redacted
+    assert "db-secret" not in redacted
+    assert "slack-secret" not in redacted
+    assert "client-secret" not in redacted
+    assert "FEATURE_TOKENIZER=safe-tokenizer" in redacted
     assert "<redacted>" in redacted
 
 

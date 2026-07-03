@@ -47,7 +47,7 @@ def _load_dataset_from_file(path: str, *, n_mels: int, n_frames: int) -> List[tu
     labels: List[int] = []
 
     if ext == ".npz":
-        with np.load(path, allow_pickle=True) as raw:
+        with np.load(path, allow_pickle=False) as raw:
             data = raw["data"] if "data" in raw.files else None
             feat = raw["features"] if "features" in raw.files else None
             lab = raw["labels"] if "labels" in raw.files else None

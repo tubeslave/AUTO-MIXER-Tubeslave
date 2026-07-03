@@ -130,8 +130,8 @@ class TestAutoPhaseAligner:
 
             def compute_delay(self):
                 return DelayMeasurement(
-                    delay_ms=1.23,
-                    delay_samples=59.04,
+                    delay_ms=-1.23,
+                    delay_samples=-59.04,
                     correlation_peak=0.95,
                     psr=12.0,
                     snr_db=36.0,
@@ -158,8 +158,8 @@ class TestAutoPhaseAligner:
                 "channel": 1,
                 "delay_ms": 1.24,
                 "mode": "MS",
-                "measured_delay_ms": 1.23,
-                "delay_samples": 59.04,
+                "measured_delay_ms": -1.23,
+                "delay_samples": -59.04,
                 "confidence": 0.92,
                 "correlation_peak": 0.95,
                 "psr": 12.0,

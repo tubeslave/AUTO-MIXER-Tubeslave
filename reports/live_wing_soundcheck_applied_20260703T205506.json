@@ -1,0 +1,355 @@
+{
+  "applied_at": "20260703T205506",
+  "channels": [
+    {
+      "ch": 1,
+      "name": "KICK",
+      "type": "kick",
+      "actions": {
+        "trim": -11.0,
+        "lc_on": 1,
+        "lc_freq": 40.0,
+        "comp_on": 1,
+        "comp_thr": -12.0,
+        "comp_ratio": "4.0",
+        "comp_att": 2.0,
+        "comp_rel": 80.0,
+        "gate": true,
+        "gate_thr": -40.0,
+        "fader": -2.9
+      },
+      "features": {
+        "rms_dbfs": -24.514498845864697,
+        "peak_dbfs": -6.99748655569935,
+        "crest_db": 17.517012290165347,
+        "centroid": 98.64075728314407,
+        "low_ratio": 0.9771126716182706
+      }
+    },
+    {
+      "ch": 2,
+      "name": "SNARE T",
+      "type": "snare",
+      "actions": {
+        "trim": -7.5,
+        "lc_on": 1,
+        "lc_freq": 100.0,
+        "comp_on": 1,
+        "comp_thr": -15.0,
+        "comp_ratio": "4.0",
+        "comp_att": 3.0,
+        "comp_rel": 100.0,
+        "gate": true,
+        "gate_thr": -40.0,
+        "fader": -2.9
+      },
+      "features": {
+        "rms_dbfs": -27.993106781511297,
+        "peak_dbfs": -10.488258696959548,
+        "crest_db": 17.50484808455175,
+        "centroid": 406.0235134060029,
+        "low_ratio": 0.49688578829410796
+      }
+    },
+    {
+      "ch": 3,
+      "name": "SNARE B",
+      "type": "snare",
+      "actions": {
+        "trim": -12.7,
+        "lc_on": 1,
+        "lc_freq": 100.0,
+        "comp_on": 1,
+        "comp_thr": -15.0,
+        "comp_ratio": "4.0",
+        "comp_att": 3.0,
+        "comp_rel": 100.0,
+        "gate": true,
+        "gate_thr": -40.0,
+        "fader": -2.5
+      },
+      "features": {
+        "rms_dbfs": -23.173897548963303,
+        "peak_dbfs": -5.257633996294006,
+        "crest_db": 17.9162635526693,
+        "centroid": 1604.5420444929289,
+        "low_ratio": 0.28351145564203134
+      }
+    },
+    {
+      "ch": 4,
+      "name": "TOM",
+      "type": "tom",
+      "actions": {
+        "trim": 5.1,
+        "lc_on": 1,
+        "lc_freq": 60.0,
+        "comp_on": 1,
+        "comp_thr": -15.0,
+        "comp_ratio": "3.0",
+        "comp_att": 5.0,
+        "comp_rel": 150.0,
+        "gate": true,
+        "gate_thr": -40.0,
+        "fader": -0.9
+      },
+      "features": {
+        "rms_dbfs": -45.601711775131584,
+        "peak_dbfs": -23.087935646185947,
+        "crest_db": 22.513776128945636,
+        "centroid": 1675.4138505578264,
+        "low_ratio": 0.49043241693976186
+      }
+    },
+    {
+      "ch": 5,
+      "name": "F TOM",
+      "type": "tom",
+      "actions": {
+        "trim": 2.8,
+        "lc_on": 1,
+        "lc_freq": 60.0,
+        "comp_on": 1,
+        "comp_thr": -15.0,
+        "comp_ratio": "3.0",
+        "comp_att": 5.0,
+        "comp_rel": 150.0,
+        "gate": true,
+        "gate_thr": -40.0,
+        "fader": -1.6
+      },
+      "features": {
+        "rms_dbfs": -42.63013725162655,
+        "peak_dbfs": -20.822601475325936,
+        "crest_db": 21.807535776300615,
+        "centroid": 2330.073153481661,
+        "low_ratio": 0.6627397076234062
+      }
+    },
+    {
+      "ch": 6,
+      "name": "OH L",
+      "type": "hi_hat",
+      "actions": {
+        "trim": -1.0,
+        "lc_on": 1,
+        "lc_freq": 150.0,
+        "comp_on": 1,
+        "comp_thr": -20.0,
+        "comp_ratio": "2.0",
+        "comp_att": 1.0,
+        "comp_rel": 50.0,
+        "gate": false,
+        "gate_thr": -45.0,
+        "fader": 0.0
+      },
+      "features": {
+        "rms_dbfs": -40.351114675168105,
+        "peak_dbfs": -16.990939837104506,
+        "crest_db": 23.3601748380636,
+        "centroid": 6249.32061665401,
+        "low_ratio": 0.21890386475035853
+      }
+    },
+    {
+      "ch": 7,
+      "name": "OH R",
+      "type": "hi_hat",
+      "actions": {
+        "trim": -1.5,
+        "lc_on": 1,
+        "lc_freq": 150.0,
+        "comp_on": 1,
+        "comp_thr": -20.0,
+        "comp_ratio": "2.0",
+        "comp_att": 1.0,
+        "comp_rel": 50.0,
+        "gate": false,
+        "gate_thr": -45.0,
+        "fader": -0.9
+      },
+      "features": {
+        "rms_dbfs": -38.99568029322997,
+        "peak_dbfs": -16.5290892414801,
+        "crest_db": 22.466591051749866,
+        "centroid": 2666.772286426541,
+        "low_ratio": 0.2025607248230406
+      }
+    },
+    {
+      "ch": 8,
+      "name": "BASS",
+      "type": "bass",
+      "actions": {
+        "trim": -0.5,
+        "lc_on": 1,
+        "lc_freq": 30.0,
+        "comp_on": 1,
+        "comp_thr": -15.0,
+        "comp_ratio": "6.0",
+        "comp_att": 10.0,
+        "comp_rel": 100.0,
+        "gate": false,
+        "gate_thr": -40.0,
+        "fader": -9.0
+      },
+      "features": {
+        "rms_dbfs": -28.889635193243333,
+        "peak_dbfs": -17.45382869843017,
+        "crest_db": 11.435806494813164,
+        "centroid": 93.36814675620474,
+        "low_ratio": 0.9475887396335712
+      }
+    },
+    {
+      "ch": 9,
+      "name": "GUITAR L",
+      "type": "guitar",
+      "actions": {
+        "trim": -8.1,
+        "lc_on": 1,
+        "lc_freq": 80.0,
+        "comp_on": 1,
+        "comp_thr": -20.0,
+        "comp_ratio": "4.0",
+        "comp_att": 10.0,
+        "comp_rel": 200.0,
+        "gate": false,
+        "gate_thr": -45.0,
+        "fader": -6.8
+      },
+      "features": {
+        "rms_dbfs": -23.561272688783106,
+        "peak_dbfs": -9.915553163053993,
+        "crest_db": 13.645719525729113,
+        "centroid": 431.0286476453718,
+        "low_ratio": 0.5685279165538907
+      }
+    },
+    {
+      "ch": 10,
+      "name": "GUITAR R",
+      "type": "guitar",
+      "actions": {
+        "trim": -7.2,
+        "lc_on": 1,
+        "lc_freq": 80.0,
+        "comp_on": 1,
+        "comp_thr": -20.0,
+        "comp_ratio": "4.0",
+        "comp_att": 10.0,
+        "comp_rel": 200.0,
+        "gate": false,
+        "gate_thr": -45.0,
+        "fader": -7.1
+      },
+      "features": {
+        "rms_dbfs": -24.07715759148422,
+        "peak_dbfs": -10.81834748504323,
+        "crest_db": 13.25881010644099,
+        "centroid": 455.3559752953377,
+        "low_ratio": 0.4602595229436549
+      }
+    },
+    {
+      "ch": 11,
+      "name": "PLAYBACK L",
+      "type": "playback",
+      "actions": {
+        "trim": -4.4,
+        "lc_on": 1,
+        "lc_freq": 20.0,
+        "comp_on": 1,
+        "comp_thr": -18.0,
+        "comp_ratio": "3.0",
+        "comp_att": 10.0,
+        "comp_rel": 200.0,
+        "gate": false,
+        "gate_thr": -60.0,
+        "fader": -5.6
+      },
+      "features": {
+        "rms_dbfs": -28.46315888012066,
+        "peak_dbfs": -13.635276539284506,
+        "crest_db": 14.827882340836153,
+        "centroid": 1061.252352869152,
+        "low_ratio": 0.5927545097110969
+      }
+    },
+    {
+      "ch": 12,
+      "name": "PLAYBACK R",
+      "type": "playback",
+      "actions": {
+        "trim": -3.1,
+        "lc_on": 1,
+        "lc_freq": 20.0,
+        "comp_on": 1,
+        "comp_thr": -18.0,
+        "comp_ratio": "3.0",
+        "comp_att": 10.0,
+        "comp_rel": 200.0,
+        "gate": false,
+        "gate_thr": -60.0,
+        "fader": -6.6
+      },
+      "features": {
+        "rms_dbfs": -28.72150524987714,
+        "peak_dbfs": -14.871951762623784,
+        "crest_db": 13.849553487253356,
+        "centroid": 928.0524097654811,
+        "low_ratio": 0.6318785384071949
+      }
+    },
+    {
+      "ch": 13,
+      "name": "ACCORDION",
+      "type": "line",
+      "actions": {
+        "trim": 3.3,
+        "lc_on": 1,
+        "lc_freq": 40.0,
+        "comp_on": 1,
+        "comp_thr": -20.0,
+        "comp_ratio": "3.0",
+        "comp_att": 10.0,
+        "comp_rel": 200.0,
+        "gate": false,
+        "gate_thr": -45.0,
+        "fader": -10.3
+      },
+      "features": {
+        "rms_dbfs": -33.40282789966183,
+        "peak_dbfs": -21.32205867171201,
+        "crest_db": 12.080769227949819,
+        "centroid": 750.4951245382107,
+        "low_ratio": 0.0003089386513410369
+      }
+    },
+    {
+      "ch": 16,
+      "name": "VOCAL",
+      "type": "vocals",
+      "actions": {
+        "trim": 0.1,
+        "lc_on": 1,
+        "lc_freq": 80.0,
+        "comp_on": 1,
+        "comp_thr": -18.0,
+        "comp_ratio": "3.0",
+        "comp_att": 5.0,
+        "comp_rel": 150.0,
+        "gate": false,
+        "gate_thr": -45.0,
+        "fader": -3.1
+      },
+      "features": {
+        "rms_dbfs": -32.44155433443681,
+        "peak_dbfs": -18.13005829445387,
+        "crest_db": 14.311496039982938,
+        "centroid": 552.7297195881412,
+        "low_ratio": 0.1196037519300093
+      }
+    }
+  ]
+}

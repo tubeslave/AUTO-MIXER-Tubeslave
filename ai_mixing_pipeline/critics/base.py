@@ -15,9 +15,18 @@ def standard_critic_result(
     warnings: list[str] | None = None,
     explanation: str = "",
     model_available: bool = False,
+    score_source: str | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the standard critic payload shape."""
+
+    if score_source is None:
+        if model_available:
+            score_source = "real_model"
+        elif confidence <= 0.0 and not scores:
+            score_source = "unavailable"
+        else:
+            score_source = "proxy"
 
     return {
         "critic_name": critic_name,
@@ -28,6 +37,7 @@ def standard_critic_result(
         "warnings": list(warnings or []),
         "explanation": explanation,
         "model_available": bool(model_available),
+        "score_source": str(score_source),
         "metadata": metadata or {},
     }
 
@@ -72,6 +82,13 @@ class AudioCritic:
         warnings = list(before.get("warnings", [])) + list(after.get("warnings", []))
         confidence = min(float(before.get("confidence", 0.0)), float(after.get("confidence", 0.0)))
         model_available = bool(before.get("model_available")) and bool(after.get("model_available"))
+        score_sources = {str(before.get("score_source", "")), str(after.get("score_source", ""))}
+        if model_available:
+            score_source = "real_model"
+        elif score_sources <= {"unavailable", ""}:
+            score_source = "unavailable"
+        else:
+            score_source = "proxy"
         return standard_critic_result(
             critic_name=self.name,
             role=self.role,
@@ -81,6 +98,7 @@ class AudioCritic:
             warnings=warnings,
             explanation=f"Compared {self.name} before/after scores.",
             model_available=model_available,
+            score_source=score_source,
             metadata={
                 "before": before.get("scores", {}),
                 "after": after.get("scores", {}),
@@ -99,4 +117,5 @@ class AudioCritic:
             warnings=[reason],
             explanation=f"{self.name} is unavailable; pipeline continued.",
             model_available=False,
+            score_source="unavailable",
         )

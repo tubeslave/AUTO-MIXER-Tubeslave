@@ -47,11 +47,13 @@ class FallbackVirtualMixer(VirtualMixer):
             audio, sample_rate = read_audio(path, target_sample_rate=self.sample_rate)
             self.sample_rate = sample_rate
             channel_id = path.stem
+            initial_gain_db = self._initial_channel_gain_db(audio)
             self._audio[channel_id] = audio
             self.state.channels[channel_id] = ChannelState(
                 channel_id=channel_id,
                 path=str(path),
                 role=role_from_channel_map(path, channel_map),
+                gain_db=initial_gain_db,
                 pan=self._default_pan(path.stem),
             )
         self.state.sample_rate = self.sample_rate
@@ -141,6 +143,12 @@ class FallbackVirtualMixer(VirtualMixer):
 
     def import_state(self, state: dict[str, Any]) -> None:
         self.state.metadata.update(dict(state.get("metadata", {}) or {}))
+
+    def _initial_channel_gain_db(self, audio: np.ndarray) -> float:
+        if not self.prevent_clipping:
+            return 0.0
+        _, gain_db = limit_peak(audio, self.peak_ceiling_dbfs)
+        return float(gain_db)
 
     @staticmethod
     def _apply_pan(audio: np.ndarray, pan: float) -> np.ndarray:

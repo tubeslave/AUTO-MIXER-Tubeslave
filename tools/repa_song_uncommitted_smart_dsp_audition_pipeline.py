@@ -39,6 +39,7 @@ FALLBACK_INPUT_DIRS = (
 PIPELINE_NAME = "repa_song_uncommitted_smart_dsp_audition"
 TARGET_LUFS = -15.5
 PEAK_CEILING_DBFS = -2.0
+RENDER_TIMEOUT_SEC = 3600.0
 
 
 def timestamp_slug(now: datetime | None = None) -> str:
@@ -161,6 +162,7 @@ def run_base_soundcheck(
             stdout=log_file,
             stderr=subprocess.STDOUT,
             check=True,
+            timeout=RENDER_TIMEOUT_SEC,
         )
 
 

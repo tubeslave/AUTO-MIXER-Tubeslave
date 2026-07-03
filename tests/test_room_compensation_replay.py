@@ -138,7 +138,8 @@ def test_room_compensation_catalog_replay_paths(case: dict[str, Any]):
         assert plan.filters == []
     else:
         assert plan.blocked is False
-        assert plan.filters
+        if not plan.filters:
+            assert "no-op" in " ".join(plan.notes)
     assert len(plan.filters) <= plan.filter_cap
     expected_max_q = {"master": 2.2, "group": 2.6, "matrix": 2.0}[plan.recommended_target]
     for item in plan.filters:

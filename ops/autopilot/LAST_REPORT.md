@@ -9,7 +9,7 @@
   and waiting for tests; the read-only decision gate is accepted-ready, but the
   next proof still requires operator restoration/verification after failed CH3
   fader rollback before any release-readiness claim.
-- Latest heartbeat: 2026-07-03T12:31:14Z.
+- Latest heartbeat: 2026-07-03T17:50:51Z.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -69,6 +69,104 @@
   request, no write request, no live authority and no readiness closure. It is
   supporting evidence only because the artifact root is under `/tmp`, not the
   canonical `artifacts/wing_readonly_preflight` readiness root.
+- Auth token digest storage guard:
+  `backend/auth.py` now stores HMAC-SHA256 digests of issued bearer tokens
+  instead of raw token strings in `AuthManager._tokens`, while
+  generate/validate/revoke/cleanup behavior remains intact. This is local API
+  authentication hardening only and grants no WING live authority.
+
+- Pulse export secret redaction guard:
+  ChatGPT Pulse snapshot excerpts now redact bearer tokens, `sk-`/`sk-proj-`
+  keys, JSON-style `apiKey`/`accessToken` fields and assignment-style API
+  key/token/password/secret values before writing JSON or Markdown. This is
+  local report-export hardening only and grants no WING live authority.
+
+- Broad live WING correction test guard:
+  `tools/live_wing_correction_test.py` now requires
+  `--confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING` before
+  loading mixer config or creating a `WingClient`, and the write-surface
+  inventory records it as blocked under `broad_live_wing_correction_test_tool`.
+  This prevents accidental broad WING mutation from automation; it does not
+  make the broad correction script release authority.
+
+- Vector index generic secret redaction guard:
+  Project vector indexing now redacts generic assignment-style secret values such
+  as `ANTHROPIC_API_KEY`, `AZURE_OPENAI_API_KEY`, `HF_TOKEN`,
+  `DATABASE_PASSWORD`, `SLACK_BOT_TOKEN` and `CLIENT_SECRET` before indexing,
+  while preserving non-secret tokenizer assignments such as `FEATURE_TOKENIZER`.
+  This is local knowledge-index secret-content hardening only and grants no
+  WING live authority.
+
+- Vector index secret intake guard:
+  Project vector indexing now rejects secret-like config filenames such as
+  `.env.local`, `secrets.json`, `api_keys.yaml` and `service-account.json` before
+  indexing, while preserving normal docs and public config files. Manual
+  `vector-add --file` now refuses secret-like paths before reading. This is local
+  knowledge-index secret ingestion hardening only and grants no WING live
+  authority.
+
+- Owned subprocess timeout sweep:
+  Operator tmux/dry-run/vector-indexer calls, TrainerAgent commands, REPA
+  offline-render scripts, Ayaic MP3 export and repo-local CLI test helpers now
+  carry explicit bounded timeouts. TrainerAgent reports timeout failures with
+  returncode 124 and captured output tails instead of crashing without a report.
+  `tests/test_tool_subprocess_timeout_contract.py` now pins the runtime/tool/test
+  subprocess timeout contract. This is local automation, offline tooling and CI
+  reliability hardening only and grants no WING live authority.
+
+- Subprocess probe timeout guard:
+  `backend/server.py` now bounds the `lsof` port-inspection subprocess and
+  fails closed on timeout during WebSocket startup cleanup checks.
+  `backend/telemetry/session_manager.py` now bounds the git commit metadata
+  probe and returns `None` on timeout. This is local startup/reporting
+  reliability hardening only and grants no WING live authority.
+
+- C++ bridge failed-start cleanup guard:
+  `backend/auto_fader_v2/bridge/cpp_bridge.py` now terminates a partially
+  started native AutoFader core when shared-memory readiness times out or
+  startup fails after process launch, and kills it if graceful termination
+  hangs. `tests/test_cpp_bridge_lifecycle.py` covers timeout cleanup and kill
+  fallback with a fake process. This is local runtime reliability hardening
+  only and grants no WING live authority.
+
+- Training dataset discovery path guard:
+  `scripts/discover_training_datasets.py` now validates Hugging Face file
+  names before URL construction or download target selection, rejects
+  traversal, absolute, Windows-root and malformed path segments, and skips
+  unsafe metadata names during supported-file selection.
+  `tests/test_training_dataset_discovery.py` covers safe nested files and
+  fail-closed unsafe names. This is local training-input hardening only and
+  grants no WING live authority.
+
+- Agent training archive guard:
+  `backend/ml/agent_training_service.py` now validates every ZIP/TAR member
+  name before dataset selection, rejects traversal, absolute, Windows-root,
+  link and special-type entries, and copies only a validated regular file
+  into the temp dataset cache. `tests/test_ml/test_agent_training_archive_loaders.py`
+  covers safe ZIP/TAR inputs plus fail-closed traversal and link cases. This
+  is local training-input hardening only and grants no WING live authority.
+
+- dLive TLS verification guard:
+  `backend/dlive_client.py` now uses `ssl.create_default_context` with
+  certificate and hostname verification enabled by default. dLive factory,
+  server and user-config paths can pass an optional CA file and server-hostname
+  override. Static scan finds no `CERT_NONE`/`check_hostname=False` TLS bypass.
+  This is dLive transport hardening only and grants no WING live authority.
+
+- Torch checkpoint weights-only guard:
+  `backend/evaluation/muq_eval_service.py` and the local sherpa ONNX export
+  script now call `torch.load(..., weights_only=True)`.
+  `tests/test_muq_eval_service.py` pins the MuQ-Eval loader contract with a
+  fake torch module. This is local checkpoint-loading hardening only and
+  grants no WING live authority.
+
+- ML NPZ pickle guard:
+  `backend/ml/train_classifier.py`, `backend/ml/train_gain_predictor.py` and
+  `backend/ml/train_mix_console.py` now load `.npz` training datasets with
+  `allow_pickle=False`; numeric-array fixtures still load and object arrays
+  are rejected. This is local training-input hardening only and grants no
+  WING live authority.
+
 - Blocker truth sync:
   `ops/autopilot/BLOCKERS.md` now records the accepted-ready decision gate and
   the remaining rollback/release-readiness blocker without treating fader/gain
@@ -294,7 +392,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   WING proof-direction moves even for operator-authored proof proposals, and
   `22852a7e8` ignores validate-only/no-transport WING preflight traces in real
   artifact roots. The latest verified full suite passed with
-  `4822 passed, 1 skipped, 1 warning`;
+  `5337 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,
@@ -2995,3 +3093,7 @@ diff. Resume from the first checkpoint whose required evidence is missing.
 M001-CP05 is complete. The next finite Goal should only be created after a real
 WING read-only artifact is available for review, or for another explicitly safe
 independent roadmap item.
+
+- Latest Pulse/live-WING guard validation:
+  The latest verified full suite passed with
+  `5337 passed, 1 skipped, 1 warning`. No WING/backend transport was contacted and no live authority changed.

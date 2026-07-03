@@ -30,6 +30,7 @@ DEFAULT_INPUT_DIR = Path.home() / "Desktop" / "REPA Song"
 DEFAULT_AUDIO_DIR = Path.home() / "Desktop" / "Ai MIXING"
 DEFAULT_LOG_DIR = Path.home() / "Desktop" / "Ai LOGS"
 PIPELINE_NAME = "repa_song_current_soundcheck"
+RENDER_TIMEOUT_SEC = 3600.0
 
 
 def timestamp_slug(now: datetime | None = None) -> str:
@@ -145,6 +146,7 @@ def run_current_soundcheck_renderer(
             stdout=log_file,
             stderr=subprocess.STDOUT,
             check=True,
+            timeout=RENDER_TIMEOUT_SEC,
         )
 
 

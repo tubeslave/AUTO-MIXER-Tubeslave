@@ -32,8 +32,8 @@ a separate headroom-safe gain-down proof with the same evidence requirements;
 only then reassess release readiness.
 
 Latest ledger handoff row:
-`full_suite_after_structured_pre_release_score_surface_sync_passed` at
-`2026-07-03T12:31:14Z`. No live authority changed; release-ready live
+`full_suite_after_auth_token_digest_storage_guard_passed` at
+`2026-07-03T17:50:51Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.
 

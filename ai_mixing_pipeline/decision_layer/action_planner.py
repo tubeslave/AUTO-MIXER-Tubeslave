@@ -127,6 +127,27 @@ class DecisionActionPlanner:
                     safety_limits_snapshot=self._limits(),
                 )
             )
+
+        polish_actions = [
+            *[GainAction(cid, 0.3) for cid in vocal_channels],
+            *[GainAction(cid, 0.2) for cid in kick_channels],
+            *[GainAction(cid, -0.2) for cid in bass_channels],
+            *[
+                GainAction(cid, -0.2)
+                for cid, role in channels.items()
+                if role in {"guitar", "guitars"}
+            ],
+        ]
+        if polish_actions:
+            candidates.append(
+                CandidateActionSet(
+                    candidate_id="candidate_009_gain_balance_polish",
+                    actions=polish_actions,
+                    description="Small static gain-balance polish candidate.",
+                    source="manual_rule",
+                    safety_limits_snapshot=self._limits(),
+                )
+            )
         return ensure_no_change_candidate([candidate for candidate in candidates if candidate.actions])
 
     def _gain_candidate(self, candidate_id: str, channels: list[str], gain_db: float, description: str) -> CandidateActionSet:

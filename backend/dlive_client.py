@@ -257,6 +257,8 @@ class DLiveClient(MixerClientBase):
         ip: str = "192.168.1.70",
         port: int = DLIVE_TCP_PORT,
         tls: bool = False,
+        tls_ca_file: Optional[str] = None,
+        tls_server_hostname: Optional[str] = None,
         midi_base_channel: int = 0,
         user_profile: int = 0,
         password: str = "",
@@ -264,6 +266,8 @@ class DLiveClient(MixerClientBase):
         self.ip = ip
         self.port = port
         self.tls = tls
+        self.tls_ca_file = tls_ca_file
+        self.tls_server_hostname = tls_server_hostname
         self.midi_base_channel = midi_base_channel & 0x0F
         self.user_profile = user_profile
         self.password = password
@@ -281,8 +285,18 @@ class DLiveClient(MixerClientBase):
         self.state_timestamps: Dict[str, float] = {}
         self.callbacks: Dict[str, List[Callable]] = {}
         self._channel_names: Dict[int, str] = {}
+        self._parse_buffer = bytearray()
 
-        logger.info(f"DLiveClient initialized for {ip}:{port} (TLS={tls}, base_ch={midi_base_channel})")
+        logger.info(
+            "DLiveClient initialized for %s:%s (TLS=%s, tls_ca_file=%s, "
+            "tls_server_hostname=%s, base_ch=%s)",
+            ip,
+            port,
+            tls,
+            bool(tls_ca_file),
+            tls_server_hostname or ip,
+            midi_base_channel,
+        )
 
     # ── Connection ─────────────────────────────────────────────
 
@@ -296,10 +310,9 @@ class DLiveClient(MixerClientBase):
             raw.connect((self.ip, self.port))
 
             if self.tls:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                self._ssl_sock = ctx.wrap_socket(raw, server_hostname=self.ip)
+                ctx = ssl.create_default_context(cafile=self.tls_ca_file)
+                server_hostname = self.tls_server_hostname or self.ip
+                self._ssl_sock = ctx.wrap_socket(raw, server_hostname=server_hostname)
                 self._sock = self._ssl_sock
                 # Authenticate
                 auth_msg = f"{chr(self.user_profile)},{self.password}"
@@ -384,6 +397,8 @@ class DLiveClient(MixerClientBase):
 
     def _parse_incoming(self, data: bytes):
         """Best-effort parse of incoming MIDI messages for state tracking."""
+        self._parse_buffer.extend(data)
+        data = bytes(self._parse_buffer)
         i = 0
         while i < len(data):
             status = data[i]
@@ -397,19 +412,29 @@ class DLiveClient(MixerClientBase):
                 i = end + 1
             elif status & 0xF0 == 0xB0:
                 # CC / NRPN — 3 bytes
-                if i + 2 < len(data):
-                    self._handle_cc(status & 0x0F, data[i + 1], data[i + 2])
+                if i + 2 >= len(data):
+                    break
+                self._handle_cc(status & 0x0F, data[i + 1], data[i + 2])
                 i += 3
             elif status & 0xF0 == 0x90:
-                if i + 2 < len(data):
-                    self._handle_note(status & 0x0F, data[i + 1], data[i + 2])
+                if i + 2 >= len(data):
+                    break
+                self._handle_note(status & 0x0F, data[i + 1], data[i + 2])
                 i += 3
             elif status & 0xF0 == 0xE0:
-                if i + 2 < len(data):
-                    self._handle_pitchbend(status & 0x0F, data[i + 1], data[i + 2])
+                if i + 2 >= len(data):
+                    break
+                self._handle_pitchbend(status & 0x0F, data[i + 1], data[i + 2])
                 i += 3
+            elif status & 0xF0 == 0xC0:
+                if i + 1 >= len(data):
+                    break
+                self._set_state_value(f"program/{status & 0x0F}", data[i + 1])
+                i += 2
             else:
                 i += 1
+        if i:
+            del self._parse_buffer[:i]
 
     def _set_state_value(self, key: str, value: Any) -> None:
         self.state[key] = value
@@ -443,9 +468,12 @@ class DLiveClient(MixerClientBase):
     def _handle_note(self, channel: int, note: int, velocity: int):
         key = f"note/{channel}/{note}"
         self._set_state_value(key, velocity)
-        # Track mute state: note number = channel-1, velocity >= 0x40 = muted
-        ch_1based = note + 1
-        self._set_state_value(f"mute/{ch_1based}", velocity >= 0x40)
+        # Track mute state: note number = channel-1. dLive sends a velocity=0
+        # release after both mute and unmute events; release must not overwrite
+        # the latched mute state.
+        if velocity:
+            ch_1based = note + 1
+            self._set_state_value(f"mute/{ch_1based}", velocity >= 0x40)
         self._notify(key, velocity)
 
     def _handle_pitchbend(self, channel: int, lsb: int, msb: int):
@@ -509,6 +537,42 @@ class DLiveClient(MixerClientBase):
         msg = build_nrpn(midi_ch, 0x00, channel - 1, fader_val)
         self._send_raw(msg)
 
+    def set_fader_verified(
+        self,
+        channel: int,
+        value_db: float,
+        channel_type: str = "input",
+        *,
+        timeout_sec: float = 0.5,
+        tolerance_db: float = 0.5,
+    ) -> Dict[str, Any]:
+        """Set a fader and report applied only after matching MIDI echo."""
+        midi_ch = self._midi_channel(channel_type)
+        target_value = db_to_fader_value(value_db)
+        msg = build_nrpn(midi_ch, 0x00, channel - 1, target_value)
+        send_result = self._send_raw(msg)
+        if send_result is False:
+            return {"status": "send_failed", "channel": channel, "target_db": value_db}
+
+        deadline = time.time() + max(0.0, float(timeout_sec))
+        readback_value = self.state.get(f"fader/{channel}")
+        while readback_value is None and time.time() < deadline:
+            time.sleep(0.01)
+            readback_value = self.state.get(f"fader/{channel}")
+
+        if readback_value is None:
+            return {"status": "unconfirmed", "channel": channel, "target_db": value_db}
+
+        readback_db = fader_value_to_db(int(readback_value))
+        status = "applied" if abs(readback_db - float(value_db)) <= tolerance_db else "mismatch"
+        return {
+            "status": status,
+            "channel": channel,
+            "target_db": float(value_db),
+            "readback_db": readback_db,
+            "readback_value": int(readback_value),
+        }
+
     def get_fader(self, channel: int) -> float:
         key = f"fader/{channel}"
         val = self.state.get(key)
@@ -526,9 +590,9 @@ class DLiveClient(MixerClientBase):
         self._send_raw(msg)
 
     def get_mute(self, channel: int) -> bool:
-        key = f"note/{self._midi_channel()}/{channel - 1}"
+        key = f"mute/{channel}"
         val = self.state.get(key, 0)
-        return val >= 0x40
+        return bool(val)
 
     # ── Gain / Preamp (Pitchbend) ──────────────────────────────
 

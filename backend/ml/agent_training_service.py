@@ -12,12 +12,13 @@ import json
 import logging
 import tempfile
 import shutil
+import stat
 import tarfile
 import zipfile
 import re
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 from urllib.parse import quote_plus, quote, urlparse
@@ -1357,6 +1358,45 @@ class AgentTrainingService:
         self._register_run_download(output_path)
         return output_path
 
+    @staticmethod
+    def _safe_archive_member_basename(member_name: str) -> str:
+        if not isinstance(member_name, str) or not member_name:
+            raise ValueError("Unsafe archive entry name: empty")
+        if "\x00" in member_name:
+            raise ValueError(f"Unsafe archive entry name: {member_name!r}")
+
+        windows_path = PureWindowsPath(member_name)
+        if windows_path.drive or windows_path.root:
+            raise ValueError(f"Unsafe archive entry path: {member_name}")
+
+        normalized = member_name.replace("\\", "/")
+        posix_path = PurePosixPath(normalized)
+        if posix_path.is_absolute():
+            raise ValueError(f"Unsafe archive entry path: {member_name}")
+
+        parts = [part for part in posix_path.parts if part and part != "."]
+        if not parts or any(part == ".." for part in parts):
+            raise ValueError(f"Unsafe archive entry path: {member_name}")
+
+        basename = parts[-1]
+        if not basename:
+            raise ValueError(f"Unsafe archive entry path: {member_name}")
+        return basename
+
+    @staticmethod
+    def _reject_unsafe_zip_member(member: zipfile.ZipInfo) -> None:
+        AgentTrainingService._safe_archive_member_basename(member.filename)
+        mode = member.external_attr >> 16
+        file_type = stat.S_IFMT(mode)
+        if file_type and file_type not in {stat.S_IFREG, stat.S_IFDIR}:
+            raise ValueError(f"Unsafe archive entry type: {member.filename}")
+
+    @staticmethod
+    def _reject_unsafe_tar_member(member: tarfile.TarInfo) -> None:
+        AgentTrainingService._safe_archive_member_basename(member.name)
+        if not (member.isfile() or member.isdir()):
+            raise ValueError(f"Unsafe archive entry type: {member.name}")
+
     def _extract_first_supported_in_archive(self, target_name: str, archive: Path) -> Optional[Path]:
         target_dir = archive.parent / f".tmp_{archive.stem}"
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -1370,23 +1410,28 @@ class AgentTrainingService:
 
         if is_zip:
             with zipfile.ZipFile(archive) as zf:
-                members = zf.namelist()
+                members = zf.infolist()
+                for member in members:
+                    self._reject_unsafe_zip_member(member)
                 chosen = None
-                for name in members:
+                for member in members:
+                    name = member.filename
                     if any(name.lower().endswith(ext) for ext in TARGET_DATASET_EXTENSIONS[target_name]):
-                        chosen = name
+                        chosen = member
                         break
                 if chosen is None:
                     raise ValueError(f"No supported files in archive: {archive}")
-                if chosen.endswith("/"):
-                    raise ValueError(f"Archive entry is a directory: {chosen}")
-                raw = target_dir / os.path.basename(chosen)
+                if chosen.is_dir():
+                    raise ValueError(f"Archive entry is a directory: {chosen.filename}")
+                raw = target_dir / self._safe_archive_member_basename(chosen.filename)
                 with zf.open(chosen) as source, open(raw, "wb") as sink:
                     sink.write(source.read())
         elif is_tar:
             mode = "r:gz" if (is_targz or is_tgz) else "r"
             with tarfile.open(archive, mode=mode) as tf:
                 members = tf.getmembers()
+                for member in members:
+                    self._reject_unsafe_tar_member(member)
                 chosen = None
                 for member in members:
                     if not member.isfile():
@@ -1396,7 +1441,7 @@ class AgentTrainingService:
                         break
                 if chosen is None:
                     raise ValueError(f"No supported files in archive: {archive}")
-                raw = target_dir / os.path.basename(chosen.name)
+                raw = target_dir / self._safe_archive_member_basename(chosen.name)
                 extracted = tf.extractfile(chosen)
                 if extracted is None:
                     raise ValueError(f"Unable to extract archive entry: {chosen.name}")

@@ -184,11 +184,12 @@ class SessionManager:
     - Auto-save on changes
     """
 
-    def __init__(self, sessions_dir: str = "sessions"):
+    def __init__(self, sessions_dir: str = "sessions", memory_store: Any = None):
         self._sessions_dir = Path(sessions_dir)
         self._sessions_dir.mkdir(parents=True, exist_ok=True)
         self._current_session: Optional[Session] = None
         self._sessions: Dict[str, Session] = {}
+        self._memory_store = memory_store
 
     def create_session(self, name: str = "default", **config_kwargs) -> Session:
         """Create a new mixing session."""
@@ -198,6 +199,7 @@ class SessionManager:
         self._sessions[session_id] = session
         self._current_session = session
         session.add_event("created")
+        self._record_memory_event(session, "created")
         logger.info(f"Created session '{session_id}'")
         self._save_session(session)
         return session
@@ -227,6 +229,7 @@ class SessionManager:
             if hasattr(config, key):
                 setattr(config, key, value)
         self._current_session.add_event("config_updated", kwargs)
+        self._record_memory_event(self._current_session, "config_updated", extra={"changes": kwargs})
         self._save_session(self._current_session)
         return config
 
@@ -238,10 +241,36 @@ class SessionManager:
         if session:
             session.active = False
             session.add_event("ended")
+            self._record_memory_event(session, "ended")
             self._save_session(session)
             if session == self._current_session:
                 self._current_session = None
             logger.info(f"Ended session '{session.id}'")
+
+    def _record_memory_event(
+        self,
+        session: Session,
+        action: str,
+        *,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Mirror session lifecycle events into centralized operational memory."""
+        store = self._memory_store
+        if store is None or not hasattr(store, "record_session_event"):
+            return
+        config = session.config.to_dict() if isinstance(session.config, SessionConfig) else dict(session.config or {})
+        try:
+            store.record_session_event(
+                action=action,
+                session_id=session.id,
+                session_name=session.name,
+                config=config,
+                active=session.active,
+                event_count=len(session.events),
+                extra=extra or {},
+            )
+        except Exception as exc:
+            logger.warning("Failed to record session memory event: %s", exc)
 
     def destroy_session(self, session_id: str) -> bool:
         """Compatibility alias that removes a session from memory."""

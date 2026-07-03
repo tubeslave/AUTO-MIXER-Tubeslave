@@ -49,6 +49,12 @@ def normalize_mixer_user_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     tls = normalized.get("dliveTls")
     if tls is None:
         tls = normalized.get("tls", False)
+    tls_ca_file = normalized.get("dliveTlsCaFile") or normalized.get("tls_ca_file") or ""
+    tls_server_hostname = (
+        normalized.get("dliveTlsServerHostname")
+        or normalized.get("tls_server_hostname")
+        or ""
+    )
     midi_base_channel = normalized.get("dliveMidiChannel")
     if midi_base_channel is None:
         midi_base_channel = normalized.get("midi_base_channel", 0)
@@ -64,6 +70,10 @@ def normalize_mixer_user_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
         "port": port,
         "dliveTls": tls,
         "tls": tls,
+        "dliveTlsCaFile": tls_ca_file,
+        "tls_ca_file": tls_ca_file,
+        "dliveTlsServerHostname": tls_server_hostname,
+        "tls_server_hostname": tls_server_hostname,
         "dliveMidiChannel": midi_base_channel,
         "midi_base_channel": midi_base_channel,
     })

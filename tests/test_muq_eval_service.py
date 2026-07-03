@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import types
 
 import numpy as np
 
@@ -53,6 +54,88 @@ def test_works_without_installed_muq_eval():
     assert result.model_status == "unavailable"
     assert result.technical_artifacts["fallback"] is True
     assert "clipping_penalty" in result.technical_artifacts
+
+
+def test_muq_checkpoint_loads_weights_only(monkeypatch, tmp_path):
+    root = tmp_path / "muq"
+    src = root / "src"
+    src.mkdir(parents=True)
+    (src / "__init__.py").write_text("", encoding="utf-8")
+    (src / "model.py").write_text(
+        "\n".join(
+            [
+                "class MusicQualityModel:",
+                "    def __init__(self, config):",
+                "        self.config = config",
+                "    def load_state_dict(self, state):",
+                "        self.state = state",
+                "    def to(self, device):",
+                "        self.device = device",
+                "    def eval(self):",
+                "        self.is_eval = True",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config_path = root / "config.yaml"
+    config_path.write_text("{}", encoding="utf-8")
+    model_path = root / "model_state_dict.pt"
+    model_path.write_bytes(b"fake")
+
+    load_calls = []
+
+    class FakeTorch:
+        cuda = types.SimpleNamespace(is_available=lambda: False)
+        backends = types.SimpleNamespace(
+            mps=types.SimpleNamespace(is_available=lambda: False)
+        )
+
+        @staticmethod
+        def load(path, **kwargs):
+            load_calls.append((path, kwargs))
+            return {"state_dict": {"weight": 1.0}}
+
+    class FakeOmegaConf:
+        @staticmethod
+        def load(path):
+            return {}
+
+        @staticmethod
+        def create(value):
+            return value
+
+        @staticmethod
+        def merge(*values):
+            merged = {}
+            for value in values:
+                merged.update(value)
+            return merged
+
+    monkeypatch.setitem(sys.modules, "torch", FakeTorch)
+    monkeypatch.setitem(
+        sys.modules,
+        "omegaconf",
+        types.SimpleNamespace(OmegaConf=FakeOmegaConf),
+    )
+
+    service = _service(
+        enabled=True,
+        muq_eval_root=str(root),
+        checkpoint_config_path=str(config_path),
+        checkpoint_model_path=str(model_path),
+        device="cpu",
+    )
+
+    assert service.model_status == "available"
+    assert load_calls == [
+        (
+            str(model_path),
+            {
+                "map_location": "cpu",
+                "weights_only": True,
+            },
+        )
+    ]
 
 
 def test_normalizes_muq_score():

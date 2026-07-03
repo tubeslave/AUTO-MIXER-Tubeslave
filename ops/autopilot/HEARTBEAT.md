@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-03T12:31:14Z
+Last heartbeat UTC: 2026-07-03T17:50:51Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -37,7 +37,21 @@ supervised fader proof rerun, and then a separate headroom-safe gain-down proof.
 that it is read-only preflight evidence handoff only, and that current
 next-action authority after `accepted_decision_ready` comes from current state
 and the active real-WING plan, not from the old handoff packet by itself.
-Latest verified full pytest passed with `4822 passed, 1 skipped, 1 warning`.
+Latest verified full pytest passed with `5337 passed, 1 skipped, 1 warning`.
+Latest auth token digest storage guard passed: `backend/auth.py` now stores HMAC-SHA256 digests of issued bearer tokens instead of raw token strings in `AuthManager._tokens`, while generate/validate/revoke/cleanup behavior stays intact; targeted auth checks passed and the full suite stayed green.
+Latest Pulse export secret redaction guard passed: ChatGPT Pulse snapshot excerpts now redact bearer tokens, `sk-`/`sk-proj-` keys, JSON-style `apiKey`/`accessToken` fields and assignment-style API key/token/password/secret values before JSON/Markdown export; targeted checks passed and the full suite stayed green.
+Latest broad live WING correction test guard passed: `tools/live_wing_correction_test.py` now requires `--confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING` before loading mixer config or creating a `WingClient`, and `backend/write_surface_inventory.py` records it as a blocked write surface; targeted write-surface checks passed and the full suite stayed green.
+Latest vector index generic secret redaction guard passed: generic assignment-style secret values such as `ANTHROPIC_API_KEY`, `AZURE_OPENAI_API_KEY`, `HF_TOKEN`, `DATABASE_PASSWORD`, `SLACK_BOT_TOKEN` and `CLIENT_SECRET` are redacted before indexing, while non-secret tokenizer assignments remain unchanged; targeted vector/Paperclip/operator checks passed and the full suite stayed green.
+Latest vector index secret intake guard passed: project vector indexing now rejects secret-like config filenames such as `.env.local`, `secrets.json`, `api_keys.yaml` and `service-account.json`, and manual `vector-add --file` refuses secret-like file paths before reading; targeted vector/Paperclip/operator checks passed and the full suite stayed green.
+Latest owned subprocess timeout sweep passed: operator, TrainerAgent, REPA offline-render, Ayaic MP3 and repo-local CLI test subprocess calls now carry explicit timeouts; TrainerAgent timeouts return a failed result instead of crashing; broad owned-code AST scan reports `NO_OWNED_SUBPROCESS_TIMEOUT_GAPS`; targeted checks and the full suite stayed green.
+Latest selected tool subprocess timeout contract passed: FFmpeg export/decode helpers, latency git metadata and dataset hash subprocess calls now carry explicit timeouts; targeted/offline checks passed and the full suite stayed green.
+Latest subprocess probe timeout guard passed: server lsof port inspection and telemetry git metadata probes now use bounded timeouts and fail closed on timeout; targeted server/telemetry checks passed and the full suite stayed green.
+Latest C++ bridge failed-start cleanup guard passed: AutoFader native startup now terminates partial processes on readiness timeout or startup failure, with kill fallback if graceful termination hangs; targeted checks passed and the full suite stayed green.
+Latest training dataset discovery path guard passed: Hugging Face file names are validated before URL construction or download path selection, unsafe metadata paths are skipped, targeted checks passed, and the full suite stayed green.
+Latest agent-training archive guard passed: ZIP/TAR dataset archives now validate all member paths and reject traversal, absolute, Windows-root, link and special-type entries before selecting a local training file; targeted checks passed, archive extraction scan stayed clean, and the full suite stayed green.
+Latest dLive TLS verification guard passed: TLS mode now verifies certificates and hostnames by default, targeted checks passed, and the full suite stayed green.
+Latest torch checkpoint guard validation passed: MuQ-Eval and local ONNX export checkpoint loaders require `weights_only=True`, targeted checks passed, and the full suite stayed green.
+Latest ML NPZ pickle guard validation passed: training dataset loaders use `allow_pickle=False`, targeted ML checks passed, and the full suite stayed green.
 Repo-local no-WING quick passed with failed_checks `[]` and no live authority at
 `artifacts/no_wing_release_check/20260703T101148Z_no_wing_release_check/summary.json`.
 The current no-WING evidence rail now also reloads

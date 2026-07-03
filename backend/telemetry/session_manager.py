@@ -75,6 +75,7 @@ def project_git_commit(repo_root: str | Path | None = None) -> Optional[str]:
             cwd=str(root),
             stderr=subprocess.DEVNULL,
             text=True,
+            timeout=2.0,
         ).strip()
     except Exception:
         return None

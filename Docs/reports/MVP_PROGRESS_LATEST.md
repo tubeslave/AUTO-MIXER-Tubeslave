@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-03T12:31:31Z`
+Generated: `2026-07-03T17:51:39Z`
 
 ## Current MVP
 
@@ -34,7 +34,7 @@ Supervised WING Rack proof.
   - Operator restores or verifies CH3 fader state after rollback_not_applied
   - Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
   - Separate headroom-safe supervised gain-down proof with the same evidence requirements
-- Latest ledger handoff row: `full_suite_after_structured_pre_release_score_surface_sync_passed` at `2026-07-03T12:31:14Z`
+- Latest ledger handoff row: `full_suite_after_auth_token_digest_storage_guard_passed` at `2026-07-03T17:50:51Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 

@@ -9,6 +9,9 @@ from mix_agent.agent import analyze, apply_conservative
 from mix_agent.reporting import render_markdown_report
 
 
+CLI_TIMEOUT_SEC = 120.0
+
+
 def _write_stem(path, frequency, amplitude=0.2, sample_rate=48000, duration=1.0):
     t = np.arange(int(sample_rate * duration), dtype=np.float32) / sample_rate
     audio = (amplitude * np.sin(2.0 * np.pi * frequency * t)).astype(np.float32)
@@ -57,6 +60,7 @@ def test_mix_agent_cli_writes_json_and_markdown(tmp_path):
         check=True,
         text=True,
         capture_output=True,
+        timeout=CLI_TIMEOUT_SEC,
     )
 
     payload = json.loads(out.read_text(encoding="utf-8"))
@@ -80,6 +84,7 @@ def test_mix_agent_cli_writes_json_and_markdown(tmp_path):
         check=True,
         text=True,
         capture_output=True,
+        timeout=CLI_TIMEOUT_SEC,
     )
     assert "# Mix Agent Report" in md.read_text(encoding="utf-8")
 

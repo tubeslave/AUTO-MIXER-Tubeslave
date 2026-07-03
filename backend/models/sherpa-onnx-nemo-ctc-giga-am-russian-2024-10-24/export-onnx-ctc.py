@@ -78,7 +78,11 @@ def add_meta_data(filename: str, meta_data: Dict[str, str]):
 @torch.no_grad()
 def main():
     model = EncDecCTCModel.from_config_file("./ctc_model_config.yaml")
-    ckpt = torch.load("./ctc_model_weights.ckpt", map_location="cpu")
+    ckpt = torch.load(
+        "./ctc_model_weights.ckpt",
+        map_location="cpu",
+        weights_only=True,
+    )
     model.load_state_dict(ckpt, strict=False)
     model.eval()
 

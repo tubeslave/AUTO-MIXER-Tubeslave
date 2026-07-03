@@ -106,6 +106,12 @@ class RoomCompensationPlan:
                 "Dry-run room compensation withheld: measurement confidence is too low. "
                 "No console write was sent."
             )
+        if not self.filters:
+            return (
+                f"Dry-run room compensation plan ready for {self.recommended_target}: "
+                f"no bounded filters were needed at confidence "
+                f"{self.summary.confidence_score:.2f}. No console write was sent."
+            )
         return (
             f"Dry-run room compensation plan ready for {self.recommended_target}: "
             f"{len(self.filters)} bounded filters, confidence "
@@ -195,9 +201,7 @@ class RoomCompensationPlanner:
                 max_q=target_caps["max_q"],
             )
             if not planned_filters:
-                blocked = True
-                blocked_reason = "no_safe_filters_generated"
-                notes.append("No correction survived the room safety limits, so the plan stays report-only.")
+                notes.append("No room correction exceeded safe planning thresholds, so the dry-run plan is a no-op.")
 
         safe_override_guidance = [
             "Dry-run only: this payload must not write to the console.",

@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MEMORY_TOOLS = ROOT / "tools" / "memory"
+TOOL_TIMEOUT_SEC = 30.0
 
 
 def load_memory_lint():
@@ -35,7 +36,14 @@ def run_tool(script: str, *args: str, root: Path | None = None) -> subprocess.Co
     if root is not None:
         command.extend(["--root", str(root)])
     command.extend(args)
-    return subprocess.run(command, cwd=ROOT, capture_output=True, text=True, check=False)
+    return subprocess.run(
+        command,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=TOOL_TIMEOUT_SEC,
+    )
 
 
 def test_required_memory_files_exist() -> None:

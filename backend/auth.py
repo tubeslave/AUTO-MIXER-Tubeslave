@@ -26,7 +26,7 @@ class AuthManager:
     def generate_token(self, client_id: str, expires_hours: float = 24.0) -> str:
         """Generate an authentication token."""
         token = secrets.token_urlsafe(32)
-        self._tokens[token] = {
+        self._tokens[self._token_digest(token)] = {
             'client_id': client_id,
             'created': time.time(),
             'expires': time.time() + expires_hours * 3600,
@@ -34,21 +34,33 @@ class AuthManager:
         logger.info(f"Token generated for client: {client_id}")
         return token
 
+    def _token_digest(self, token: str) -> str:
+        """Derive a stable in-memory lookup key without storing bearer tokens."""
+        return hmac.new(
+            self.secret_key.encode(),
+            token.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def _token_info(self, token: str) -> Optional[dict]:
+        token_digest = self._token_digest(token)
+        info = self._tokens.get(token_digest)
+        if info is None:
+            return None
+        if time.time() > info['expires']:
+            del self._tokens[token_digest]
+            return None
+        return info
+
     def validate_token(self, token: str) -> bool:
         """Validate an authentication token."""
         if not self.enabled:
             return True
-        if token not in self._tokens:
-            return False
-        info = self._tokens[token]
-        if time.time() > info['expires']:
-            del self._tokens[token]
-            return False
-        return True
+        return self._token_info(token) is not None
 
     def revoke_token(self, token: str):
         """Revoke a token."""
-        self._tokens.pop(token, None)
+        self._tokens.pop(self._token_digest(token), None)
 
     def add_allowed_ip(self, ip: str):
         """Add an IP to the allowlist."""
@@ -82,11 +94,20 @@ class AuthManager:
         if ip and not self.check_ip(ip):
             logger.warning(f"Rejected IP: {ip}")
             return False
-        if token and not self.validate_token(token):
+        if not token:
+            logger.warning(f"Missing token from {ip or 'unknown'}")
+            return False
+        token_info = self._token_info(token)
+        if token_info is None:
             logger.warning(f"Invalid token from {ip or 'unknown'}")
             return False
-        if client_id and not self.check_rate_limit(client_id):
-            logger.warning(f"Rate limit exceeded: {client_id}")
+        token_client_id = str(token_info.get('client_id') or '')
+        if client_id and token_client_id and not hmac.compare_digest(client_id, token_client_id):
+            logger.warning(f"Token client mismatch from {ip or 'unknown'}")
+            return False
+        rate_limit_key = token_client_id or client_id
+        if rate_limit_key and not self.check_rate_limit(rate_limit_key):
+            logger.warning(f"Rate limit exceeded: {rate_limit_key}")
             return False
         return True
 

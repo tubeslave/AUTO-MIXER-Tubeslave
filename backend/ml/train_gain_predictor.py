@@ -43,7 +43,7 @@ def _load_dataset_from_file(path: str, *, n_channels: int) -> List[Tuple[np.ndar
     samples: List[Tuple[np.ndarray, np.ndarray, np.ndarray]] = []
 
     if ext == ".npz":
-        with np.load(path, allow_pickle=True) as raw:
+        with np.load(path, allow_pickle=False) as raw:
             channel_data = raw["channel_audios"] if "channel_audios" in raw.files else raw["channels"] if "channels" in raw.files else None
             if channel_data is None:
                 raise ValueError("NPZ must include 'channel_audios' or 'channels'")

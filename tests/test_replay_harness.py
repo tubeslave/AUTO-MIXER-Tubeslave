@@ -182,7 +182,7 @@ def test_replay_autosoundcheck_feedback_path_records_mutation_with_emergency_ove
     assert records[0]["context"]["scenario"] == "autosoundcheck_feedback_direct_mutation"
     assert records[0]["source_file"] is not None
     assert records[0]["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert records[0]["source_function"] == "_handle_feedback_event"
+    assert records[0]["source_function"] == "_apply_direct_feedback_emergency_notch"
 
 
 def test_replay_live_apply_blocks_unconfirmed_request_without_mutation(monkeypatch: pytest.MonkeyPatch):

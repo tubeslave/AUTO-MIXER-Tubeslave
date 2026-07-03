@@ -72,7 +72,7 @@ def test_preview_runs_watchdog_dispatch_preview_without_real_dispatch(tmp_path, 
     config = make_config(tmp_path)
     calls = []
 
-    def fake_run(cmd, cwd, env, text, capture_output, check):
+    def fake_run(cmd, cwd, env, text, capture_output, check, timeout):
         calls.append(
             {
                 "cmd": cmd,
@@ -81,6 +81,7 @@ def test_preview_runs_watchdog_dispatch_preview_without_real_dispatch(tmp_path, 
                 "text": text,
                 "capture_output": capture_output,
                 "check": check,
+                "timeout": timeout,
             }
         )
         write_dry_run_report(tmp_path)
@@ -99,6 +100,7 @@ def test_preview_runs_watchdog_dispatch_preview_without_real_dispatch(tmp_path, 
     assert exit_code == 0
     assert len(calls) == 1
     assert calls[0]["cmd"][-1] == "dispatch-preview"
+    assert calls[0]["timeout"] == automixer_operator.WATCHDOG_PREVIEW_TIMEOUT_SEC
     assert calls[0]["cmd"][-1] != "dispatch"
     assert calls[0]["env"]["AUTOMIXER_WATCHDOG_DISPATCH_DRY_RUN"] == "true"
     assert calls[0]["env"]["AUTOMIXER_WATCHDOG_DISPATCH_FORBID_LIVE_OSC"] == "true"
@@ -112,8 +114,8 @@ def test_cycle_runs_full_safe_dry_run_flow(tmp_path, monkeypatch, capsys):
     config = make_config(tmp_path)
     calls = []
 
-    def fake_run(cmd, cwd, env, text, capture_output, check):
-        calls.append({"cmd": cmd, "env": env})
+    def fake_run(cmd, cwd, env, text, capture_output, check, timeout):
+        calls.append({"cmd": cmd, "env": env, "timeout": timeout})
         write_dry_run_report(tmp_path)
         return subprocess.CompletedProcess(
             cmd,
@@ -130,6 +132,7 @@ def test_cycle_runs_full_safe_dry_run_flow(tmp_path, monkeypatch, capsys):
     assert exit_code == 0
     assert len(calls) == 1
     assert calls[0]["cmd"][-1] == "dispatch-preview"
+    assert calls[0]["timeout"] == automixer_operator.WATCHDOG_PREVIEW_TIMEOUT_SEC
     assert calls[0]["env"]["AUTOMIXER_WATCHDOG_DISPATCH_DRY_RUN"] == "true"
     assert "Automixer Operator Safe Cycle" in output
     assert "[1/5] status/context" in output
@@ -1222,7 +1225,7 @@ def test_vector_indexer_command_wraps_local_chromadb_tool(tmp_path, monkeypatch,
     script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
     calls = []
 
-    def fake_run(cmd, cwd, text, capture_output, check):
+    def fake_run(cmd, cwd, text, capture_output, check, timeout):
         calls.append(
             {
                 "cmd": cmd,
@@ -1230,6 +1233,7 @@ def test_vector_indexer_command_wraps_local_chromadb_tool(tmp_path, monkeypatch,
                 "text": text,
                 "capture_output": capture_output,
                 "check": check,
+                "timeout": timeout,
             }
         )
         return subprocess.CompletedProcess(cmd, 0, stdout='{"record_count": 1}\n', stderr="")
@@ -1246,6 +1250,7 @@ def test_vector_indexer_command_wraps_local_chromadb_tool(tmp_path, monkeypatch,
     assert exit_code == 0
     assert calls[0]["cmd"][1] == str(script)
     assert calls[0]["cmd"][2:5] == ["index", "--project-root", str(tmp_path)]
+    assert calls[0]["timeout"] == automixer_operator.VECTOR_INDEXER_TIMEOUT_SEC
     assert "--dry-run" in calls[0]["cmd"]
     assert '"record_count": 1' in output
 

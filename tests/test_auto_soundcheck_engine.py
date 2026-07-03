@@ -595,6 +595,7 @@ def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch
     mixer = DetectorMixer()
     engine = AutoSoundcheckEngine(
         num_channels=2,
+        auto_apply=True,
         auto_discover=False,
     )
     engine.mixer_client = mixer
@@ -1107,6 +1108,7 @@ def test_monitor_analysis_routes_lead_masking_action_through_safety_layer():
     mixer = DetectorMixer()
     engine = AutoSoundcheckEngine(
         num_channels=2,
+        auto_apply=True,
         auto_discover=False,
     )
     engine.mixer_client = mixer

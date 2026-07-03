@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
-
-from .runner import OfflineTestRunner
+import sys
 
 
 def main() -> int:
@@ -20,13 +21,22 @@ def main() -> int:
         help="Pipeline mode",
     )
     args = parser.parse_args()
-    runner = OfflineTestRunner(
-        input_dir=args.input,
-        output_dir=args.output,
-        config_path=args.config,
-        mode=args.mode,
-    )
-    result = runner.run()
+    captured_stdout = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(captured_stdout):
+            from .runner import OfflineTestRunner
+
+            runner = OfflineTestRunner(
+                input_dir=args.input,
+                output_dir=args.output,
+                config_path=args.config,
+                mode=args.mode,
+            )
+            result = runner.run()
+    finally:
+        diagnostics = captured_stdout.getvalue()
+        if diagnostics:
+            print(diagnostics, end="", file=sys.stderr)
     print(json.dumps(result, ensure_ascii=True, indent=2))
     return 0
 

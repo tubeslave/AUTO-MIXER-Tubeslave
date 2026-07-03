@@ -96,6 +96,7 @@ class MERTStemCritic(AudioCritic):
             metadata={
                 "backend": backend_name,
                 "embedding_size": int(embedding.size),
+                "embedding": embedding.astype(float).tolist(),
                 "metrics": metrics,
             },
         )
@@ -113,6 +114,17 @@ class MERTStemCritic(AudioCritic):
         for key, value in after.get("scores", {}).items():
             if isinstance(value, (int, float)) and key in before.get("scores", {}):
                 delta[key] = float(value) - float(before["scores"][key])
+        before_embedding = np.asarray(before.get("metadata", {}).get("embedding", []), dtype=np.float32)
+        after_embedding = np.asarray(after.get("metadata", {}).get("embedding", []), dtype=np.float32)
+        embedding_similarity = 0.0
+        embedding_distance = 0.0
+        if before_embedding.size and after_embedding.size and before_embedding.size == after_embedding.size:
+            denom = float(np.linalg.norm(before_embedding) * np.linalg.norm(after_embedding))
+            if denom > 0.0:
+                embedding_similarity = float(np.dot(before_embedding, after_embedding) / denom)
+                embedding_similarity = max(-1.0, min(1.0, embedding_similarity))
+                embedding_distance = float(1.0 - embedding_similarity)
+        delta["embedding_cosine_distance"] = embedding_distance
         delta.setdefault("overall", delta.get("stem_embedding_quality", 0.0))
         warnings = list(before.get("warnings", [])) + list(after.get("warnings", []))
         return standard_critic_result(
@@ -124,7 +136,11 @@ class MERTStemCritic(AudioCritic):
             warnings=warnings,
             explanation="Compared MERT/custom-head proxy scores before and after.",
             model_available=bool(before.get("model_available")) and bool(after.get("model_available")),
-            metadata={"before": before.get("metadata", {}), "after": after.get("metadata", {})},
+            metadata={
+                "before": before.get("metadata", {}),
+                "after": after.get("metadata", {}),
+                "embedding_similarity": embedding_similarity,
+            },
         )
 
     @staticmethod

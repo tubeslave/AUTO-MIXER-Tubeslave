@@ -40,6 +40,9 @@ OPENCLAW_LOCAL_PORTS = (18679, 18681, 18682)
 BRIDGE_TMUX_SESSION = "automixer_gpt_control_bridge"
 WATCHDOG_SCRIPT = Path("tools/paperclip_watchdog/automixer_paperclip_watchdog.py")
 VECTOR_INDEXER_SCRIPT = Path("tools/project_vector_index/automixer_chromadb_index.py")
+TMUX_COMMAND_TIMEOUT_SEC = 5.0
+WATCHDOG_PREVIEW_TIMEOUT_SEC = 300.0
+VECTOR_INDEXER_TIMEOUT_SEC = 1800.0
 REPORT_FIELD_RE = re.compile(r"^- ([A-Za-z0-9_]+):\s*(.*)$")
 TERMINAL_ISSUE_STATUSES = {"done", "completed", "closed", "resolved", "cancelled", "canceled"}
 PREVIEW_ISSUE_STATUSES = "backlog,todo,in_progress,in_review,blocked"
@@ -384,6 +387,7 @@ def command_bridge_start(config: OperatorConfig) -> int:
         text=True,
         capture_output=True,
         check=False,
+        timeout=TMUX_COMMAND_TIMEOUT_SEC,
     )
     if result.returncode != 0:
         print("bridge_start: failed")
@@ -410,6 +414,7 @@ def tmux_session_exists(name: str) -> bool:
         text=True,
         capture_output=True,
         check=False,
+        timeout=TMUX_COMMAND_TIMEOUT_SEC,
     )
     return result.returncode == 0
 
@@ -727,6 +732,7 @@ def run_watchdog_preview(
         text=True,
         capture_output=True,
         check=False,
+        timeout=WATCHDOG_PREVIEW_TIMEOUT_SEC,
     )
 
 
@@ -1465,6 +1471,7 @@ def command_vector_indexer(config: OperatorConfig, operator_command: str, extra_
         text=True,
         capture_output=True,
         check=False,
+        timeout=VECTOR_INDEXER_TIMEOUT_SEC,
     )
     if result.stdout:
         print(result.stdout, end="")

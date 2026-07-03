@@ -209,14 +209,30 @@ class CppBridge:
             
             logger.error("Timeout waiting for C++ core to start")
             self.last_error = "Startup timeout"
+            self._cleanup_failed_cpp_start()
             self.status = CoreStatus.ERROR
             return False
             
         except Exception as e:
             logger.error(f"Failed to start C++ core: {e}")
+            self._cleanup_failed_cpp_start()
             self.last_error = str(e)
             self.status = CoreStatus.ERROR
             return False
+
+    def _cleanup_failed_cpp_start(self):
+        """Terminate a partially started C++ core after startup failure."""
+        if self.cpp_process:
+            logger.warning("Stopping partially started C++ core after startup failure")
+            process = self.cpp_process
+            self.cpp_process = None
+            process.terminate()
+            try:
+                process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                logger.warning("Partially started C++ core did not terminate, killing...")
+                process.kill()
+        self.disconnect_shared_memory()
     
     def stop_cpp_core(self):
         """Stop the C++ core process"""

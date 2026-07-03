@@ -24,6 +24,22 @@ DEFAULT_HELPER_DIR = (
     Path.home() / ".codex" / "skills" / "chatgpt-list-chats" / "scripts"
 )
 MAX_TEXT_CHARS = 5000
+SECRET_PATTERNS = (
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL),
+    re.compile(r"(Authorization:\s*Bearer\s+)[A-Za-z0-9._\-]+", re.IGNORECASE),
+    re.compile(r"\bsk-[A-Za-z0-9_\-]{16,}\b"),
+    re.compile(r"\bsk-proj-[A-Za-z0-9_\-]{16,}\b"),
+)
+GENERIC_SECRET_KEY_PATTERN = (
+    r"(?:[A-Z0-9_]*(?:API[_-]?KEY|PRIVATE[_-]?KEY)[A-Z0-9_]*|"
+    r"(?:[A-Z0-9_]+[_-])?(?:PASSWORD|SECRET|TOKEN)(?:[_-][A-Z0-9_]+)*|"
+    r"[A-Z0-9_]*(?:ACCESS|REFRESH)[_-]?TOKEN[A-Z0-9_]*)"
+)
+GENERIC_SECRET_ASSIGNMENT_RE = re.compile(
+    rf"(^|[^\w.-])((?:export\s+)?[\"']?({GENERIC_SECRET_KEY_PATTERN})[\"']?\s*[:=]\s*)"
+    r"(?:([\"'])([^\"'\r\n]*)([\"'])|([^\s#,}]+))",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 
 def utc_now() -> str:
@@ -98,10 +114,30 @@ def text_from_message_parts(parts: list[Any]) -> str:
     return "\n".join(value.strip() for value in values if value and value.strip()).strip()
 
 
+def _redact_secret_assignment(match: re.Match[str]) -> str:
+    leading = match.group(1)
+    prefix = match.group(2)
+    quote = match.group(4)
+    if quote:
+        return f"{leading}{prefix}{quote}<redacted>{match.group(6)}"
+    return f"{leading}{prefix}<redacted>"
+
+
+def redact_secret_text(value: str) -> str:
+    redacted = value
+    for pattern in SECRET_PATTERNS:
+        if pattern.groups:
+            redacted = pattern.sub(r"\1<redacted>", redacted)
+        else:
+            redacted = pattern.sub("<redacted>", redacted)
+    return GENERIC_SECRET_ASSIGNMENT_RE.sub(_redact_secret_assignment, redacted)
+
+
 def sanitize_text(value: str, max_chars: int = MAX_TEXT_CHARS) -> str:
     text = value.replace("\r", "")
     text = re.sub(r"https://sdmntpr[^)\s]+", "[redacted-image-url]", text)
     text = re.sub(r"```.*?```", "[code block omitted]", text, flags=re.S)
+    text = redact_secret_text(text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if len(text) > max_chars:
         return text[:max_chars].rstrip() + "\n...[truncated]"

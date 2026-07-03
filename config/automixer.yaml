@@ -316,7 +316,7 @@ session:
   save_interval: 300
   session_dir: sessions
 soundcheck:
-  auto_apply: true
+  auto_apply: false
   signal_threshold_db: -50.0
   analysis_seconds: 3.0
   analysis_timeout_seconds: 30.0

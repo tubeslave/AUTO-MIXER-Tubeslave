@@ -42,6 +42,7 @@ from output_paths import ai_logs_dir, ai_logs_path, ai_mixing_dir, ai_mixing_pat
 
 ANALYSIS_WINDOW_SEC = 18.0
 COMPENSATION_DB_PER_OCTAVE = 4.5
+FFMPEG_TIMEOUT_SEC = 300.0
 
 BAND_SPECS = {
     "50_100": (50.0, 100.0),
@@ -736,6 +737,7 @@ def export_mp3(wav_path: Path, mp3_path: Path):
         check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        timeout=FFMPEG_TIMEOUT_SEC,
     )
 
 

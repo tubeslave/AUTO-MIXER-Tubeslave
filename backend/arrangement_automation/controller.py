@@ -72,7 +72,10 @@ class ArrangementAutomationController:
         self.live_apply_enabled = bool(self.cfg.get("live_apply_enabled", False))
         self.analysis_only_mode = bool(self.cfg.get("analysis_only_mode", True))
         self.confirm_live_apply = bool(self.cfg.get("confirm_live_apply", False))
-        self.fader_ceiling_db = float(self.cfg.get("fader_ceiling_db", 0.0))
+        raw_fader_ceiling = self.cfg.get("fader_ceiling_db")
+        self.fader_ceiling_db = (
+            float(raw_fader_ceiling) if raw_fader_ceiling is not None else None
+        )
         self.channels: list[int] = []
         self.channel_mapping: Dict[int, int] = {}
         self.roles = {}
@@ -313,7 +316,9 @@ class ArrangementAutomationController:
             # The ceiling is a maximum allowed target level (e.g., -4.6 dB).
             # Offset application can only raise values toward the ceiling, never
             # below it, so we must take the maximum of proposed vs ceiling.
-            target = max(self.fader_ceiling_db, base + float(offset_db))
+            target = base + float(offset_db)
+            if self.fader_ceiling_db is not None:
+                target = max(self.fader_ceiling_db, target)
             try:
                 result = self.live_apply_service.apply(
                     LiveApplyRequest(

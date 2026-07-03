@@ -5,6 +5,7 @@ channel selection, and mixer factory function.
 
 import sys
 import os
+import ssl
 import pytest
 
 # Add backend to path
@@ -191,15 +192,129 @@ class TestDLiveClientIsABC:
         assert issubclass(DLiveClient, MixerClientBase)
 
 
+class _FakeSocket:
+    def __init__(self):
+        self.connected_to = None
+        self.closed = False
+
+    def settimeout(self, timeout):
+        self.timeout = timeout
+
+    def setsockopt(self, *args):
+        self.sockopt = args
+
+    def connect(self, address):
+        self.connected_to = address
+
+    def sendall(self, data):
+        self.sent = data
+
+    def recv(self, size):
+        return b"AuthOK"
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeSSLContext:
+    def __init__(self, cafile=None):
+        self.cafile = cafile
+        self.wrapped = []
+
+    def wrap_socket(self, raw, *, server_hostname):
+        self.wrapped.append((raw, server_hostname))
+        return raw
+
+
+class _NoopThread:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def start(self):
+        pass
+
+    def is_alive(self):
+        return False
+
+    def join(self, timeout=None):
+        pass
+
+
+class TestDLiveClientTLS:
+    def test_tls_uses_default_certificate_verification(self, monkeypatch):
+        raw = _FakeSocket()
+        contexts = []
+
+        def fake_socket(*args, **kwargs):
+            return raw
+
+        def fake_create_default_context(*, cafile=None):
+            context = _FakeSSLContext(cafile=cafile)
+            contexts.append(context)
+            return context
+
+        monkeypatch.setattr("dlive_client.socket.socket", fake_socket)
+        monkeypatch.setattr(
+            "dlive_client.ssl.create_default_context",
+            fake_create_default_context,
+        )
+        monkeypatch.setattr("dlive_client.threading.Thread", _NoopThread)
+
+        client = DLiveClient(
+            ip="10.0.0.1",
+            port=51329,
+            tls=True,
+            tls_ca_file="/secure/dlive-ca.pem",
+            tls_server_hostname="dlive-console.local",
+        )
+
+        assert client.connect() is True
+        assert raw.connected_to == ("10.0.0.1", 51329)
+        assert contexts[0].cafile == "/secure/dlive-ca.pem"
+        assert contexts[0].wrapped == [(raw, "dlive-console.local")]
+
+    def test_tls_connect_fails_closed_on_certificate_error(self, monkeypatch):
+        raw = _FakeSocket()
+
+        def fake_socket(*args, **kwargs):
+            return raw
+
+        class RejectingSSLContext:
+            def wrap_socket(self, raw_sock, *, server_hostname):
+                raise ssl.SSLCertVerificationError("certificate verify failed")
+
+        monkeypatch.setattr("dlive_client.socket.socket", fake_socket)
+        monkeypatch.setattr(
+            "dlive_client.ssl.create_default_context",
+            lambda *, cafile=None: RejectingSSLContext(),
+        )
+
+        client = DLiveClient(ip="10.0.0.1", port=51329, tls=True)
+
+        assert client.connect() is False
+        assert client.is_connected is False
+
+
 class TestMixerFactory:
     """Test create_mixer_client factory function."""
 
     def test_dlive_creation(self):
-        client = create_mixer_client("dlive", {"ip": "10.0.0.1", "port": 51329, "tls": True})
+        client = create_mixer_client(
+            "dlive",
+            {
+                "ip": "10.0.0.1",
+                "port": 51329,
+                "tls": True,
+                "dliveTlsCaFile": "/secure/dlive-ca.pem",
+                "dliveTlsServerHostname": "dlive-console.local",
+            },
+        )
         assert isinstance(client, DLiveClient)
         assert client.ip == "10.0.0.1"
         assert client.port == 51329
         assert client.tls is True
+        assert client.tls_ca_file == "/secure/dlive-ca.pem"
+        assert client.tls_server_hostname == "dlive-console.local"
 
     def test_unknown_mixer_raises(self):
         with pytest.raises(ValueError, match="Unknown mixer type"):

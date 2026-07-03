@@ -370,7 +370,7 @@ class SignalAnalyzer:
         # ── Level ────────────────────────────────────────────
         lm = metrics.level
         lm.peak_db = self._max_peak
-        lm.true_peak_dbtp = self._max_true_peak
+        lm.true_peak_dbtp = max(self._max_true_peak, self._max_peak)
         if self._all_rms:
             lm.rms_db = float(np.mean(self._all_rms[-100:]))
 

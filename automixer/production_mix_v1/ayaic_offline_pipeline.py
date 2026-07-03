@@ -64,6 +64,7 @@ from .models import amp_to_db, db_to_amp, ensure_stereo, jsonable
 
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff", ".flac"}
+FFMPEG_TIMEOUT_SEC = 300.0
 DEFAULT_MASTER_TARGET_LUFS = -20.0
 DEFAULT_MASTER_CEILING_DBFS = None
 DEFAULT_MAX_PHASE_DELAY_MS = 10.0
@@ -6092,6 +6093,7 @@ def _write_mp3(wav_path: Path) -> Path | None:
     subprocess.run(
         ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(wav_path), "-codec:a", "libmp3lame", "-b:a", "320k", str(mp3_path)],
         check=True,
+        timeout=FFMPEG_TIMEOUT_SEC,
     )
     return mp3_path
 

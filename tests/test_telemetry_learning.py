@@ -1,5 +1,6 @@
 import ast
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -19,7 +20,11 @@ from backend.telemetry.schemas import (
     SPLTelemetry,
     timestamp_ms,
 )
-from backend.telemetry.session_manager import TelemetrySessionManager, default_telemetry_config
+from backend.telemetry.session_manager import (
+    TelemetrySessionManager,
+    default_telemetry_config,
+    project_git_commit,
+)
 from backend.telemetry.spl_provider import FileSPLProvider, MockSPLProvider
 from backend.telemetry.streaming_alerts import (
     StreamingAlertEngine,
@@ -32,6 +37,16 @@ def _manager(tmp_path, *, enabled=True):
     config["enabled"] = enabled
     config["storage_dir"] = str(tmp_path / "sessions")
     return TelemetrySessionManager(storage_dir=config["storage_dir"], config=config, repo_root=Path.cwd())
+
+
+def test_project_git_commit_times_out_fail_closed(monkeypatch, tmp_path):
+    def fake_check_output(*args, **kwargs):
+        assert kwargs["timeout"] == 2.0
+        raise subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs["timeout"])
+
+    monkeypatch.setattr("backend.telemetry.session_manager.subprocess.check_output", fake_check_output)
+
+    assert project_git_commit(tmp_path) is None
 
 
 def test_start_session_writes_session_scene_and_manifest(tmp_path):
