@@ -1,0 +1,21 @@
+{
+  "name": "baseline_longer",
+  "run_id": "20260424_214450_baseline_longer",
+  "run_dir": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/runs/20260424_214450_baseline_longer",
+  "command": [
+    "python",
+    "scripts/train.py",
+    "--epochs",
+    "5"
+  ],
+  "success": true,
+  "returncode": 0,
+  "duration_sec": 1.052,
+  "metrics": {
+    "epoch": 4.0,
+    "loss": 0.2
+  },
+  "log_path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/runs/20260424_214450_baseline_longer/train.log",
+  "stdout_tail": "Starting training...\nepoch=0 loss=1.0000\nepoch=1 loss=0.5000\nepoch=2 loss=0.3333\nepoch=3 loss=0.2500\nepoch=4 loss=0.2000\nTraining finished.\n",
+  "stderr_tail": ""
+}

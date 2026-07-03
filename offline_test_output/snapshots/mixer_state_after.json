@@ -1,0 +1,141 @@
+{
+  "phase": "after",
+  "mode": "assisted_offline",
+  "sample_rate": 48000,
+  "selected_candidate_id": "000_initial_mix",
+  "accepted_actions": [],
+  "best_mix_path": "offline_test_output/renders/005_best_mix.wav",
+  "state_applied": true,
+  "osc_midi_sent": false,
+  "tracks": [
+    {
+      "name": "Accordion",
+      "path": "offline_test_input/multitrack/Accordion.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Back Vox L",
+      "path": "offline_test_input/multitrack/Back Vox L.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Back Vox R",
+      "path": "offline_test_input/multitrack/Back Vox R.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Bass",
+      "path": "offline_test_input/multitrack/Bass.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "F Tom",
+      "path": "offline_test_input/multitrack/F Tom.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Guitar L",
+      "path": "offline_test_input/multitrack/Guitar L.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Guitar R",
+      "path": "offline_test_input/multitrack/Guitar R.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "KICK",
+      "path": "offline_test_input/multitrack/KICK.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "OH L",
+      "path": "offline_test_input/multitrack/OH L.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "OH R",
+      "path": "offline_test_input/multitrack/OH R.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Playback L",
+      "path": "offline_test_input/multitrack/Playback L.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Playback R",
+      "path": "offline_test_input/multitrack/Playback R.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "SNARE T",
+      "path": "offline_test_input/multitrack/SNARE T.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Snare B",
+      "path": "offline_test_input/multitrack/Snare B.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Tom",
+      "path": "offline_test_input/multitrack/Tom.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    },
+    {
+      "name": "Vocal",
+      "path": "offline_test_input/multitrack/Vocal.wav",
+      "role": "unknown",
+      "sample_rate": 48000,
+      "duration_sec": 204.747,
+      "channels": 1
+    }
+  ],
+  "channel_map": {}
+}

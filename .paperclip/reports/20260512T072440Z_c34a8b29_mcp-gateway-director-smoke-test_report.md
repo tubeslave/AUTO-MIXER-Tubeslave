@@ -1,0 +1,452 @@
+# MCP gateway director smoke test
+
+## Title
+
+MCP gateway director smoke test
+
+## Timestamp
+
+2026-05-12T07:24:40.494Z
+
+## Original GPT Prompt
+
+```
+Verify run_director creates a dry-run Paperclip task/report, assigns internal roles, and returns the report directly to GPT Chat.
+```
+
+## Director Decision
+
+Create an analysis report only. Keep all work in dry-run mode and return the director report directly to GPT Chat.
+
+## Task Breakdown
+
+1. Classify request mode as analysis.
+2. Capture the original GPT prompt exactly in the Paperclip task and report.
+3. Collect current git branch/status through the gateway allowlisted git snapshot helpers.
+4. Assign deterministic analysis work to Director, DSP Agent, ML Agent, Refactor Agent, Analyzer Agent, and Safety Agent.
+5. Write a task JSON under .paperclip/tasks.
+6. Write a Markdown director report under .paperclip/reports.
+7. Return both summary and directorReport directly in MCP structuredContent for GPT Chat.
+
+## Role Assignments
+
+| Role | Assignment | Structured Output |
+| --- | --- | --- |
+| Director | Coordinate the request, enforce dry-run policy, split work between internal roles, write the task/report artifacts, and return directorReport in the MCP response. | Create an analysis report only. Keep all work in dry-run mode and return the director report directly to GPT Chat. Branch: feature/mcp-director. Prompt length: 129 characters. |
+| DSP Agent | Analyze possible DSP, routing, mixer, gain, EQ, dynamics, and live-console implications from the prompt and git status only. | No DSP runtime action is allowed. Any future audio change must remain behind an explicit human approval gate and separate source-edit workflow. |
+| ML Agent | Analyze ML, evaluation, model, dataset, and scoring implications from the prompt and git status only. | No model call, training run, dataset mutation, or external LLM call is part of this director execution. |
+| Refactor Agent | Identify implementation boundaries and refactor risks without modifying source code during director execution. | The runtime director may create only Paperclip artifacts. Any future source refactor requires a separate approved task. |
+| Analyzer Agent | Summarize current git branch/status and capture repository context needed for a safe task plan. | Git status has 167 changed or untracked entries. 39 modified, 0 deleted, 128 untracked. |
+| Safety Agent | Validate dryRunEnforced=true, sourceCodeChangesAllowed=false, no Codex execution, no external LLM calls, no commit/checkout, and artifact-only writes. | Policy enforced for this execution: dryRun=true, dryRunEnforced=true, sourceCodeChangesAllowed=false, codexAsExecutorAllowed=false, externalLlmAllowedForInternalRoles=false. |
+
+## Risk Assessment
+
+| Risk | Assessment | Mitigation |
+| --- | --- | --- |
+| Source code mutation | Blocked by design. run_director does not call Codex, does not call external LLMs, and writes only Paperclip artifacts. | Keep sourceCodeChangesAllowed=false and require a separate explicit approval for code edits. |
+| Live audio or mixer side effects | Not allowed. The director performs no mixer, OSC, WING, DSP, or automation writes. | Limit runtime actions to git snapshot reads and .paperclip artifact writes. |
+| Dirty working tree ambiguity | Git status has 167 changed or untracked entries. 39 modified, 0 deleted, 128 untracked. | Do not run git checkout/reset/commit. Treat existing changes as user-owned context. |
+| GPT Chat receives only file paths | Addressed. MCP response includes both summary and the full directorReport string. | Keep directorReport in structuredContent and text content for the tool response. |
+
+## Execution Plan
+
+1. Keep this execution dry-run only.
+2. Analyze the prompt and repository state using internal deterministic role outputs.
+3. Record task/report artifacts for Paperclip auditability.
+4. Return the report in directorReport for GPT Chat.
+
+## Next Steps
+
+1. Review the directorReport returned in GPT Chat.
+2. Open the created Paperclip task/report only if a persistent audit trail is needed.
+3. Do not treat this dry-run as approval for source changes.
+4. For further work, call run_director again with planning or implementation_plan mode.
+
+## Created Task File Path
+
+.paperclip/tasks/task_20260512T072440Z_65bab261_mcp-gateway-director-smoke-test.json
+
+## Created Report File Path
+
+.paperclip/reports/20260512T072440Z_c34a8b29_mcp-gateway-director-smoke-test_report.md
+
+## Dry Run Enforcement
+
+- dryRun: true
+- dryRunEnforced: true
+- sourceCodeChangesAllowed: false
+- codexAsExecutorAllowed: false
+- externalLlmAllowedForInternalRoles: false
+- mode: analysis
+
+## Git Branch
+
+```
+feature/mcp-director
+```
+
+## Git Status
+
+```
+## feature/mcp-director
+ M .gitignore
+ M Docs/ARRANGEMENT_AUTOMATION.md
+ M README.md
+ M automixer/production_mix_v1/__main__.py
+ M automixer/production_mix_v1/arrangement_input_levels.py
+ M automixer/production_mix_v1/ayaic_offline_pipeline.py
+ M backend/arrangement_automation/__init__.py
+ M backend/arrangement_automation/controller.py
+ M backend/auto_fader.py
+ M backend/auto_soundcheck_engine.py
+ M backend/handlers/arrangement_automation_handlers.py
+ M backend/handlers/channel_scan_handlers.py
+ M backend/handlers/eq_handlers.py
+ M backend/handlers/gain_staging_handlers.py
+ M backend/handlers/mixer_handlers.py
+ M backend/handlers/phase_handlers.py
+ M backend/handlers/snapshot_handlers.py
+ M backend/handlers/soundcheck_handlers.py
+ M backend/lufs_gain_staging.py
+ M backend/ml/differentiable_console.py
+ M backend/server.py
+ M backend/signal_metrics.py
+ M backend/wing_client.py
+ M config/automixer.yaml
+ M config/default_config.json
+ M docs/ARCHITECTURE.md
+ M frontend/package-lock.json
+ M frontend/src/App.js
+ M frontend/src/components/AutoEQTab.js
+ M frontend/src/components/AutoPannerTab.js
+ M frontend/src/components/CrossAdaptiveEQTab.js
+ M frontend/src/components/GainStagingTab.css
+ M frontend/src/components/GainStagingTab.js
+ M frontend/src/services/websocket.js
+ M tests/test_arrangement_automation.py
+ M tests/test_ayaic_offline_pipeline.py
+ M tests/test_infrastructure/test_config.py
+ M tests/test_server.py
+ M tests/test_wing_client.py
+?? .ai/personas.md
+?? .ai/rules.md
+?? .ai/state.json
+?? .ai/system_prompt.md
+?? .ai/tasks.json
+?? .paperclip/reports/20260508T143224Z_dsp_dsp-agent-repository-task.md
+?? .paperclip/reports/20260508T144803Z_dsp_eq_decision_logic_dry_run_report.md
+?? .paperclip/reports/20260508T152429Z_dsp_report.md
+?? .paperclip/reports/20260508T170329Z_b391e36c_git_report.md
+?? .paperclip/reports/20260508T170329Z_ef099ea9_smoke_report.md
+?? .paperclip/reports/20260508T181626Z_8d80ccbb_git_report.md
+?? .paperclip/reports/20260508T181626Z_f331a5fe_smoke_report.md
+?? .paperclip/reports/20260508T182713Z_913b8059_git_report.md
+?? .paperclip/reports/20260508T182713Z_cb52424b_smoke_report.md
+?? .paperclip/reports/20260508T182839Z_11de4262_git_report.md
+?? .paperclip/reports/20260508T182839Z_7a257858_smoke_report.md
+?? .paperclip/reports/20260508T182908Z_005186c5_smoke_report.md
+?? .paperclip/reports/20260508T182908Z_13c3e87f_git_report.md
+?? .paperclip/reports/20260508T183327Z_a39133fb_smoke_report.md
+?? .paperclip/reports/20260508T183327Z_b5af4e49_git_report.md
+?? .paperclip/reports/20260508T184353Z_5cc1f9e5_git_report.md
+?? .paperclip/reports/20260508T184353Z_b98c197d_smoke_report.md
+?? .paperclip/reports/20260508T184418Z_1293c6c6_git_report.md
+?? .paperclip/reports/20260508T184418Z_397dcb8c_smoke_report.md
+?? .paperclip/reports/20260508T191812Z_0fc3d406_git_report.md
+?? .paperclip/reports/20260508T191812Z_3e50abad_smoke_report.md
+?? .paperclip/reports/20260508T192611Z_9dd326ca_smoke_report.md
+?? .paperclip/reports/20260508T192611Z_a4405df3_git_report.md
+?? .paperclip/reports/20260509T070231Z_a17daf95_director_report.md
+?? .paperclip/reports/20260509T072328Z_run_director_guardrail_report.md
+?? .paperclip/reports/20260509T072527Z_798d8280_smoke_report.md
+?? .paperclip/reports/20260509T072527Z_da6958c2_git_report.md
+?? .paperclip/reports/20260509T091942Z_01342784_smoke_report.md
+?? .paperclip/reports/20260509T091942Z_cccb5aa9_git_report.md
+?? .paperclip/reports/20260509T094117Z_17352771_smoke_report.md
+?? .paperclip/reports/20260509T094117Z_740f3bed_git_report.md
+?? .paperclip/reports/20260509T094117Z_f2152cfd_mcp-gateway-director-smoke-test_report.md
+?? .paperclip/reports/20260509T095315Z_063b14a1_paperclip_report.md
+?? .paperclip/reports/20260509T100310Z_02e2cdd8_spectral-eq._report.md
+?? .paperclip/reports/20260512T071739Z_0ec8a4c1_mcp-gateway-director-smoke-test_report.md
+?? .paperclip/reports/20260512T071739Z_756ba8e9_smoke_report.md
+?? .paperclip/reports/20260512T071739Z_c77dc548_git_report.md
+?? .paperclip/reports/20260512T072440Z_0a8d95d4_smoke_report.md
+?? .paperclip/tasks/task_20260508T143224Z_d3a621be_dsp-agent-repository-task.json
+?? .paperclip/tasks/task_20260508T152429Z_dsp.json
+?? .paperclip/tasks/task_20260508T170328Z_57ed2fbb_smoke.json
+?? .paperclip/tasks/task_20260508T170328Z_b75cec3c_automixer.json
+?? .paperclip/tasks/task_20260508T181626Z_27d30e9a_automixer.json
+?? .paperclip/tasks/task_20260508T181626Z_c4900bdb_smoke.json
+?? .paperclip/tasks/task_20260508T182713Z_1fdcdc84_smoke.json
+?? .paperclip/tasks/task_20260508T182713Z_b6e4aab0_automixer.json
+?? .paperclip/tasks/task_20260508T182839Z_464bd183_smoke.json
+?? .paperclip/tasks/task_20260508T182839Z_88ae3f41_automixer.json
+?? .paperclip/tasks/task_20260508T182908Z_da020252_automixer.json
+?? .paperclip/tasks/task_20260508T182908Z_f139169a_smoke.json
+?? .paperclip/tasks/task_20260508T183327Z_14ad4ca5_smoke.json
+?? .paperclip/tasks/task_20260508T183327Z_755a9eec_automixer.json
+?? .paperclip/tasks/task_20260508T184353Z_377db649_smoke.json
+?? .paperclip/tasks/task_20260508T184353Z_de0ef95c_automixer.json
+?? .paperclip/tasks/task_20260508T184418Z_4d728682_automixer.json
+?? .paperclip/tasks/task_20260508T184418Z_7c0747ba_smoke.json
+?? .paperclip/tasks/task_20260508T190421Z_066e06f4_automixer.json
+?? .paperclip/tasks/task_20260508T191811Z_32edb25a_smoke.json
+?? .paperclip/tasks/task_20260508T191811Z_eb6a8319_automixer.json
+?? .paperclip/tasks/task_20260508T192611Z_216aec3d_smoke.json
+?? .paperclip/tasks/task_20260508T192611Z_c23ec2ba_automixer.json
+?? .paperclip/tasks/task_20260509T064644Z_9dc527f3_automixer.json
+?? .paperclip/tasks/task_20260509T070231Z_eb0d6654_director.json
+?? .paperclip/tasks/task_20260509T072328Z_run_director_request.json
+?? .paperclip/tasks/task_20260509T072527Z_6182a188_automixer.json
+?? .paperclip/tasks/task_20260509T072527Z_f1d91dae_smoke.json
+?? .paperclip/tasks/task_20260509T091942Z_5b1fde6b_smoke.json
+?? .paperclip/tasks/task_20260509T091942Z_c042f576_automixer.json
+?? .paperclip/tasks/task_20260509T094117Z_242b568a_smoke.json
+?? .paperclip/tasks/task_20260509T094117Z_5d2586a6_mcp-gateway-director-smoke-test.json
+?? .paperclip/tasks/task_20260509T094117Z_fed1c5c6_automixer.json
+?? .paperclip/tasks/task_20260509T095315Z_d161c201_paperclip.json
+?? .paperclip/tasks/task_20260509T100121Z_76180dcd_dsp.json
+?? .paperclip/tasks/task_20260509T100310Z_e65d58bb_spectral-eq..json
+?? .paperclip/tasks/task_20260512T071739Z_50ba8b3a_automixer.json
+?? .paperclip/tasks/task_20260512T071739Z_b78756a7_smoke.json
+?? .paperclip/tasks/task_20260512T071739Z_eae5362f_mcp-gateway-director-smoke-test.json
+?? .paperclip/tasks/task_20260512T072440Z_44a53fb0_automixer.json
+?? .paperclip/tasks/task_20260512T072440Z_604dabbb_smoke.json
+?? AGENTS.md
+?? Docs/CONTEXTUAL_COMPRESSION.md
+?? Docs/GLOBAL_PHASE_ALIGNMENT.md
+?? Docs/MUSICAL_OUTPUT_BALANCE.md
+?? Docs/MUSICAL_PANNING.md
+?? Docs/TUB-194_AUTOSOUNDCHECK_FEEDBACK_POLICY_SPLIT.md
+?? Docs/console_write_safety_policy.md
+?? Docs/current_architecture_map.md
+?? Docs/runtime_ownership_matrix.md
+?? ai/
+?? automixer/production_mix_v1/contextual_compression.py
+?? automixer/production_mix_v1/musical_output_balance.py
+?? automixer/production_mix_v1/musical_panning.py
+?? automixer/production_mix_v1/musical_panorama_width.py
+?? automixer/production_mix_v1/snare_pair_coherence.py
+?? automixer/production_mix_v1/snare_top_bottom_balance.py
+?? backend/arrangement_automation/live_input_trim_controller.py
+?? backend/arrangement_automation/wing_meter_reader.py
+?? backend/autogain_contract.py
+?? backend/live_apply.py
+?? backend/maintenance_gate.py
+?? frontend/src/TUB-61_OPERATOR_SUPERVISION_SPEC.md
+?? frontend/src/components/AutoGainSupervisionCard.js
+?? frontend/src/components/autoGainSupervision.js
+?? frontend/src/components/autoGainSupervision.test.js
+?? offline_test_input/
+?? offline_test_output/
+?? project_docs/
+?? scripts/
+?? tests/replay_support.py
+?? tests/test_auto_soundcheck_engine_safety.py
+?? tests/test_autogain_contract.py
+?? tests/test_direct_write_inventory.py
+?? tests/test_gain_staging_handlers.py
+?? tests/test_live_apply_contract.py
+?? tests/test_live_input_trim_replay.py
+?? tests/test_maintenance_gate.py
+?? tests/test_replay_harness.py
+?? tests/test_signal_metrics.py
+?? tests/test_snapshot_handlers.py
+?? tests/test_soundcheck_handlers.py
+?? tools/mcp_remote_gateway/
+?? tools/mcp_remote_gateway_old/
+?? tools/telegram_codex_bridge.py
+```
+
+## Full Git Snapshot
+
+## git branch --show-current
+
+```
+feature/mcp-director
+```
+
+## git status --short --branch
+
+```
+## feature/mcp-director
+ M .gitignore
+ M Docs/ARRANGEMENT_AUTOMATION.md
+ M README.md
+ M automixer/production_mix_v1/__main__.py
+ M automixer/production_mix_v1/arrangement_input_levels.py
+ M automixer/production_mix_v1/ayaic_offline_pipeline.py
+ M backend/arrangement_automation/__init__.py
+ M backend/arrangement_automation/controller.py
+ M backend/auto_fader.py
+ M backend/auto_soundcheck_engine.py
+ M backend/handlers/arrangement_automation_handlers.py
+ M backend/handlers/channel_scan_handlers.py
+ M backend/handlers/eq_handlers.py
+ M backend/handlers/gain_staging_handlers.py
+ M backend/handlers/mixer_handlers.py
+ M backend/handlers/phase_handlers.py
+ M backend/handlers/snapshot_handlers.py
+ M backend/handlers/soundcheck_handlers.py
+ M backend/lufs_gain_staging.py
+ M backend/ml/differentiable_console.py
+ M backend/server.py
+ M backend/signal_metrics.py
+ M backend/wing_client.py
+ M config/automixer.yaml
+ M config/default_config.json
+ M docs/ARCHITECTURE.md
+ M frontend/package-lock.json
+ M frontend/src/App.js
+ M frontend/src/components/AutoEQTab.js
+ M frontend/src/components/AutoPannerTab.js
+ M frontend/src/components/CrossAdaptiveEQTab.js
+ M frontend/src/components/GainStagingTab.css
+ M frontend/src/components/GainStagingTab.js
+ M frontend/src/services/websocket.js
+ M tests/test_arrangement_automation.py
+ M tests/test_ayaic_offline_pipeline.py
+ M tests/test_infrastructure/test_config.py
+ M tests/test_server.py
+ M tests/test_wing_client.py
+?? .ai/personas.md
+?? .ai/rules.md
+?? .ai/state.json
+?? .ai/system_prompt.md
+?? .ai/tasks.json
+?? .paperclip/reports/20260508T143224Z_dsp_dsp-agent-repository-task.md
+?? .paperclip/reports/20260508T144803Z_dsp_eq_decision_logic_dry_run_report.md
+?? .paperclip/reports/20260508T152429Z_dsp_report.md
+?? .paperclip/reports/20260508T170329Z_b391e36c_git_report.md
+?? .paperclip/reports/20260508T170329Z_ef099ea9_smoke_report.md
+?? .paperclip/reports/20260508T181626Z_8d80ccbb_git_report.md
+?? .paperclip/reports/20260508T181626Z_f331a5fe_smoke_report.md
+?? .paperclip/reports/20260508T182713Z_913b8059_git_report.md
+?? .paperclip/reports/20260508T182713Z_cb52424b_smoke_report.md
+?? .paperclip/reports/20260508T182839Z_11de4262_git_report.md
+?? .paperclip/reports/20260508T182839Z_7a257858_smoke_report.md
+?? .paperclip/reports/20260508T182908Z_005186c5_smoke_report.md
+?? .paperclip/reports/20260508T182908Z_13c3e87f_git_report.md
+?? .paperclip/reports/20260508T183327Z_a39133fb_smoke_report.md
+?? .paperclip/reports/20260508T183327Z_b5af4e49_git_report.md
+?? .paperclip/reports/20260508T184353Z_5cc1f9e5_git_report.md
+?? .paperclip/reports/20260508T184353Z_b98c197d_smoke_report.md
+?? .paperclip/reports/20260508T184418Z_1293c6c6_git_report.md
+?? .paperclip/reports/20260508T184418Z_397dcb8c_smoke_report.md
+?? .paperclip/reports/20260508T191812Z_0fc3d406_git_report.md
+?? .paperclip/reports/20260508T191812Z_3e50abad_smoke_report.md
+?? .paperclip/reports/20260508T192611Z_9dd326ca_smoke_report.md
+?? .paperclip/reports/20260508T192611Z_a4405df3_git_report.md
+?? .paperclip/reports/20260509T070231Z_a17daf95_director_report.md
+?? .paperclip/reports/20260509T072328Z_run_director_guardrail_report.md
+?? .paperclip/reports/20260509T072527Z_798d8280_smoke_report.md
+?? .paperclip/reports/20260509T072527Z_da6958c2_git_report.md
+?? .paperclip/reports/20260509T091942Z_01342784_smoke_report.md
+?? .paperclip/reports/20260509T091942Z_cccb5aa9_git_report.md
+?? .paperclip/reports/20260509T094117Z_17352771_smoke_report.md
+?? .paperclip/reports/20260509T094117Z_740f3bed_git_report.md
+?? .paperclip/reports/20260509T094117Z_f2152cfd_mcp-gateway-director-smoke-test_report.md
+?? .paperclip/reports/20260509T095315Z_063b14a1_paperclip_report.md
+?? .paperclip/reports/20260509T100310Z_02e2cdd8_spectral-eq._report.md
+?? .paperclip/reports/20260512T071739Z_0ec8a4c1_mcp-gateway-director-smoke-test_report.md
+?? .paperclip/reports/20260512T071739Z_756ba8e9_smoke_report.md
+?? .paperclip/reports/20260512T071739Z_c77dc548_git_report.md
+?? .paperclip/reports/20260512T072440Z_0a8d95d4_smoke_report.md
+?? .paperclip/tasks/task_20260508T143224Z_d3a621be_dsp-agent-repository-task.json
+?? .paperclip/tasks/task_20260508T152429Z_dsp.json
+?? .paperclip/tasks/task_20260508T170328Z_57ed2fbb_smoke.json
+?? .paperclip/tasks/task_20260508T170328Z_b75cec3c_automixer.json
+?? .paperclip/tasks/task_20260508T181626Z_27d30e9a_automixer.json
+?? .paperclip/tasks/task_20260508T181626Z_c4900bdb_smoke.json
+?? .paperclip/tasks/task_20260508T182713Z_1fdcdc84_smoke.json
+?? .paperclip/tasks/task_20260508T182713Z_b6e4aab0_automixer.json
+?? .paperclip/tasks/task_20260508T182839Z_464bd183_smoke.json
+?? .paperclip/tasks/task_20260508T182839Z_88ae3f41_automixer.json
+?? .paperclip/tasks/task_20260508T182908Z_da020252_automixer.json
+?? .paperclip/tasks/task_20260508T182908Z_f139169a_smoke.json
+?? .paperclip/tasks/task_20260508T183327Z_14ad4ca5_smoke.json
+?? .paperclip/tasks/task_20260508T183327Z_755a9eec_automixer.json
+?? .paperclip/tasks/task_20260508T184353Z_377db649_smoke.json
+?? .paperclip/tasks/task_20260508T184353Z_de0ef95c_automixer.json
+?? .paperclip/tasks/task_20260508T184418Z_4d728682_automixer.json
+?? .paperclip/tasks/task_20260508T184418Z_7c0747ba_smoke.json
+?? .paperclip/tasks/task_20260508T190421Z_066e06f4_automixer.json
+?? .paperclip/tasks/task_20260508T191811Z_32edb25a_smoke.json
+?? .paperclip/tasks/task_20260508T191811Z_eb6a8319_automixer.json
+?? .paperclip/tasks/task_20260508T192611Z_216aec3d_smoke.json
+?? .paperclip/tasks/task_20260508T192611Z_c23ec2ba_automixer.json
+?? .paperclip/tasks/task_20260509T064644Z_9dc527f3_automixer.json
+?? .paperclip/tasks/task_20260509T070231Z_eb0d6654_director.json
+?? .paperclip/tasks/task_20260509T072328Z_run_director_request.json
+?? .paperclip/tasks/task_20260509T072527Z_6182a188_automixer.json
+?? .paperclip/tasks/task_20260509T072527Z_f1d91dae_smoke.json
+?? .paperclip/tasks/task_20260509T091942Z_5b1fde6b_smoke.json
+?? .paperclip/tasks/task_20260509T091942Z_c042f576_automixer.json
+?? .paperclip/tasks/task_20260509T094117Z_242b568a_smoke.json
+?? .paperclip/tasks/task_20260509T094117Z_5d2586a6_mcp-gateway-director-smoke-test.json
+?? .paperclip/tasks/task_20260509T094117Z_fed1c5c6_automixer.json
+?? .paperclip/tasks/task_20260509T095315Z_d161c201_paperclip.json
+?? .paperclip/tasks/task_20260509T100121Z_76180dcd_dsp.json
+?? .paperclip/tasks/task_20260509T100310Z_e65d58bb_spectral-eq..json
+?? .paperclip/tasks/task_20260512T071739Z_50ba8b3a_automixer.json
+?? .paperclip/tasks/task_20260512T071739Z_b78756a7_smoke.json
+?? .paperclip/tasks/task_20260512T071739Z_eae5362f_mcp-gateway-director-smoke-test.json
+?? .paperclip/tasks/task_20260512T072440Z_44a53fb0_automixer.json
+?? .paperclip/tasks/task_20260512T072440Z_604dabbb_smoke.json
+?? AGENTS.md
+?? Docs/CONTEXTUAL_COMPRESSION.md
+?? Docs/GLOBAL_PHASE_ALIGNMENT.md
+?? Docs/MUSICAL_OUTPUT_BALANCE.md
+?? Docs/MUSICAL_PANNING.md
+?? Docs/TUB-194_AUTOSOUNDCHECK_FEEDBACK_POLICY_SPLIT.md
+?? Docs/console_write_safety_policy.md
+?? Docs/current_architecture_map.md
+?? Docs/runtime_ownership_matrix.md
+?? ai/
+?? automixer/production_mix_v1/contextual_compression.py
+?? automixer/production_mix_v1/musical_output_balance.py
+?? automixer/production_mix_v1/musical_panning.py
+?? automixer/production_mix_v1/musical_panorama_width.py
+?? automixer/production_mix_v1/snare_pair_coherence.py
+?? automixer/production_mix_v1/snare_top_bottom_balance.py
+?? backend/arrangement_automation/live_input_trim_controller.py
+?? backend/arrangement_automation/wing_meter_reader.py
+?? backend/autogain_contract.py
+?? backend/live_apply.py
+?? backend/maintenance_gate.py
+?? frontend/src/TUB-61_OPERATOR_SUPERVISION_SPEC.md
+?? frontend/src/components/AutoGainSupervisionCard.js
+?? frontend/src/components/autoGainSupervision.js
+?? frontend/src/components/autoGainSupervision.test.js
+?? offline_test_input/
+?? offline_test_output/
+?? project_docs/
+?? scripts/
+?? tests/replay_support.py
+?? tests/test_auto_soundcheck_engine_safety.py
+?? tests/test_autogain_contract.py
+?? tests/test_direct_write_inventory.py
+?? tests/test_gain_staging_handlers.py
+?? tests/test_live_apply_contract.py
+?? tests/test_live_input_trim_replay.py
+?? tests/test_maintenance_gate.py
+?? tests/test_replay_harness.py
+?? tests/test_signal_metrics.py
+?? tests/test_snapshot_handlers.py
+?? tests/test_soundcheck_handlers.py
+?? tools/mcp_remote_gateway/
+?? tools/mcp_remote_gateway_old/
+?? tools/telegram_codex_bridge.py
+```
+
+## git rev-parse --show-toplevel
+
+```
+/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main
+```
+
+## git log -1 --oneline
+
+```
+f63e235 Add MCP director for Automixer agent orchestration
+```

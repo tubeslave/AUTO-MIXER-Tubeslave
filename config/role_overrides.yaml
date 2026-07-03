@@ -1,0 +1,22 @@
+version: 1
+patterns:
+  "Playback L.wav":
+    role: music_stem
+    confidence: 1.0
+    allowed_action_level: universal_safe
+  "Playback R.wav":
+    role: music_stem
+    confidence: 1.0
+    allowed_action_level: universal_safe
+  "ROOM DR L.wav":
+    role: drum_room
+    confidence: 1.0
+  "ROOM DR R.wav":
+    role: drum_room
+    confidence: 1.0
+  "Ride.wav":
+    role: ride
+    confidence: 1.0
+  "Hi-Hat.wav":
+    role: hihat
+    confidence: 1.0

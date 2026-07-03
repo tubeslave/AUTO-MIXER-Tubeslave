@@ -17,10 +17,21 @@ def register_handlers(server):
         await server.scan_mixer_channel_names(websocket)
 
     async def handle_reset_trim(websocket, data):
-        await server.reset_trim(websocket, data.get("channels", []))
+        await server.request_reset_trim(
+            websocket,
+            data.get("channels", []),
+            dry_run=data.get("dry_run"),
+            confirm_maintenance=bool(data.get("confirm_maintenance", False)),
+            rollback_snapshot_path=data.get("rollback_snapshot_path"),
+        )
 
     async def handle_bypass_mixer(websocket, data):
-        await server.bypass_mixer(websocket)
+        await server.request_bypass_mixer(
+            websocket,
+            dry_run=data.get("dry_run"),
+            confirm_maintenance=bool(data.get("confirm_maintenance", False)),
+            rollback_snapshot_path=data.get("rollback_snapshot_path"),
+        )
 
     return {
         "scan_channel_names": handle_scan_channel_names,

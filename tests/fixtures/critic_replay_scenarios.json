@@ -1,0 +1,73 @@
+{
+  "scenario": "deterministic_critic_replay_v1",
+  "sample_rate": 48000,
+  "events": [
+    {
+      "event_id": "E001",
+      "family": "pumping",
+      "duration_sec": 1.25,
+      "seed": 101,
+      "payload": {
+        "frequency_hz": 210.0,
+        "modulation_depth": 0.45,
+        "modulation_rate_hz": 6.5
+      },
+      "expectations": {
+        "delta_sign": "non_positive"
+      }
+    },
+    {
+      "event_id": "E002",
+      "family": "intelligibility",
+      "duration_sec": 1.5,
+      "seed": 202,
+      "payload": {
+        "lowpass_freq_hz": 2200.0,
+        "highband_gain_db": 2.8
+      },
+      "expectations": {
+        "delta_sign": "positive"
+      }
+    },
+    {
+      "event_id": "E003",
+      "family": "gain_stability",
+      "duration_sec": 1.2,
+      "seed": 303,
+      "payload": {
+        "base_gain_db": -20.0,
+        "after_gain_db": -10.0
+      },
+      "expectations": {
+        "delta_sign": "non_positive"
+      }
+    },
+    {
+      "event_id": "E004",
+      "family": "room_compensation",
+      "duration_sec": 1.1,
+      "seed": 404,
+      "payload": {
+        "room_hum_db": -12.0,
+        "compensation_gain_db": 5.5
+      },
+      "expectations": {
+        "delta_sign": "non_positive"
+      }
+    },
+    {
+      "event_id": "E005",
+      "family": "abrupt_transition",
+      "duration_sec": 1.25,
+      "seed": 505,
+      "payload": {
+        "transition_ratio": 0.45,
+        "attack_gain_db": -8.0,
+        "release_gain_db": 0.0
+      },
+      "expectations": {
+        "delta_sign": "non_negative"
+      }
+    }
+  ]
+}

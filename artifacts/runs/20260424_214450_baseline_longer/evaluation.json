@@ -1,0 +1,15 @@
+{
+  "agent": "evaluator",
+  "status": "ok",
+  "evaluated_run": "20260424_214450_baseline_longer",
+  "metrics": {
+    "epoch": 4.0,
+    "loss": 0.2
+  },
+  "checks": {
+    "run_dir_exists": true,
+    "log_exists": true,
+    "training_success": true
+  },
+  "recommendation": "Если loss стабильно падает — добавь validation set и perceptual metrics."
+}

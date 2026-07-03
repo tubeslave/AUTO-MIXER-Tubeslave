@@ -1,0 +1,46 @@
+{
+  "manifest": {
+    "manifest_id": "replay_manifest::01f7f35931f3d216",
+    "event_seq": 100,
+    "dry_run_only": true,
+    "live_mixer_writes": false,
+    "replay_correlation_count": 6,
+    "replay_correlation_ids": [
+      "corr::fader::2",
+      "corr::feedback::3",
+      "corr::gain::1",
+      "corr::room::master",
+      "corr::speech::4->5",
+      "replay::operator_assistance::9649a45dd29d380c"
+    ],
+    "timeline_event_count": 18,
+    "proposal_count": 6
+  },
+  "ranking": {
+    "run_signature": "155bdae19fdf2788abfa11c2f212aa21078441990d606b9d5245b3c9312cd970",
+    "selected_proposal_id": "feedback::notch::3::fb1",
+    "top_rank_family": "feedback_mitigation",
+    "deterministic_signature": "feedback::notch::3::fb1::gain::auto_soundcheck_engine::1::lead_vocal::v1"
+  },
+  "executor": {
+    "trace_signature": "dd59e2575367201aa0753d32608170d6fea4ad5a51cd0446aa2b1549526c0333",
+    "trace_signature_repeat": "dd59e2575367201aa0753d32608170d6fea4ad5a51cd0446aa2b1549526c0333",
+    "trace_stable": true,
+    "proposals_executed_count": 4,
+    "applied_ratio": 0.667,
+    "restored_state_present": false,
+    "first_state_gain": 0.8
+  },
+  "validation": {
+    "valid": true,
+    "finding_count": 0,
+    "drift_selected_changed": false,
+    "selected_from_executor": null
+  },
+  "rewind": {
+    "manifest_id": "replay_manifest::01f7f35931f3d216",
+    "event_seq": 100,
+    "correlation_count": 6,
+    "replay_dry_run_only": true
+  }
+}

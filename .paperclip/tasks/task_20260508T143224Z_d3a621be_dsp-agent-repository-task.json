@@ -1,0 +1,20 @@
+{
+  "id": "task_20260508T143224Z_d3a621be",
+  "title": "DSP Agent: repository task",
+  "description": "Analyze EQ decision logic in AUTO-MIXER-Tubeslave and create a dry-run report. Do not modify files.",
+  "agent": "dsp",
+  "priority": "normal",
+  "status": "planned",
+  "repoRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "currentBranch": "feature/mcp-director",
+  "targetBranch": "",
+  "createdAt": "2026-05-08T14:32:24.406Z",
+  "updatedAt": "2026-05-08T14:32:24.407Z",
+  "metadata": {
+    "scope": ""
+  },
+  "result": {
+    "reportPath": ".paperclip/reports/20260508T143224Z_dsp_dsp-agent-repository-task.md",
+    "dryRun": true
+  }
+}

@@ -1,0 +1,1042 @@
+[
+  {
+    "candidate_id": "001_candidate_gain_balance",
+    "label": "gain_balance",
+    "actions": [
+      {
+        "action_type": "gain_change",
+        "target": "Accordion",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Back Vox L",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Back Vox R",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Bass",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "F Tom",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Guitar L",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Guitar R",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "KICK",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "OH L",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "OH R",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Playback L",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Playback R",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "SNARE T",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Snare B",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Tom",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "gain_change",
+        "target": "Vocal",
+        "parameters": {
+          "gain_db": -0.3
+        },
+        "reason": "Conservative gain-balance probe for unknown.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.0,
+            1.0
+          ]
+        },
+        "status": "proposed"
+      }
+    ],
+    "safety": {
+      "candidate_id": "001_candidate_gain_balance",
+      "passed": true,
+      "safety_score": 1.0,
+      "reasons": [],
+      "warnings": [],
+      "metrics": {
+        "level": {
+          "peak_dbfs": -1.600000279326729,
+          "true_peak_dbtp": -1.600000279326729,
+          "rms_dbfs": -36.217666146239786,
+          "integrated_lufs": -36.90866614623979,
+          "headroom_db": 1.600000279326729,
+          "clip_count": 0
+        },
+        "spectral": {},
+        "dynamics": {},
+        "stereo": {},
+        "limitations": [
+          "fallback measurement used: No module named 'mix_agent.analysis.dynamics'"
+        ],
+        "sample_rate": 48000,
+        "duration_sec": 204.747
+      }
+    },
+    "final_score": 0.05
+  },
+  {
+    "candidate_id": "002_candidate_eq_cleanup",
+    "label": "eq_cleanup",
+    "actions": [
+      {
+        "action_type": "high_pass_filter",
+        "target": "Accordion",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Back Vox L",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Back Vox R",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Bass",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "F Tom",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Guitar L",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Guitar R",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "KICK",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "OH L",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "OH R",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Playback L",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Playback R",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "SNARE T",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Snare B",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Tom",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "high_pass_filter",
+        "target": "Vocal",
+        "parameters": {
+          "frequency_hz": 70.0
+        },
+        "reason": "Clean unnecessary low-frequency energy before mix-bus decisions.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "frequency_hz": [
+            20.0,
+            140.0
+          ]
+        },
+        "status": "proposed"
+      }
+    ],
+    "safety": {
+      "candidate_id": "002_candidate_eq_cleanup",
+      "passed": true,
+      "safety_score": 1.0,
+      "reasons": [],
+      "warnings": [],
+      "metrics": {
+        "level": {
+          "peak_dbfs": -1.600000279326729,
+          "true_peak_dbtp": -1.600000279326729,
+          "rms_dbfs": -36.609771845636516,
+          "integrated_lufs": -37.30077184563652,
+          "headroom_db": 1.600000279326729,
+          "clip_count": 0
+        },
+        "spectral": {},
+        "dynamics": {},
+        "stereo": {},
+        "limitations": [
+          "fallback measurement used: No module named 'mix_agent.analysis.dynamics'"
+        ],
+        "sample_rate": 48000,
+        "duration_sec": 204.747
+      }
+    },
+    "final_score": 0.05
+  },
+  {
+    "candidate_id": "003_candidate_compression",
+    "label": "compression",
+    "actions": [],
+    "safety": {
+      "candidate_id": "003_candidate_compression",
+      "passed": true,
+      "safety_score": 1.0,
+      "reasons": [],
+      "warnings": [],
+      "metrics": {
+        "level": {
+          "peak_dbfs": -1.600000279326729,
+          "true_peak_dbtp": -1.600000279326729,
+          "rms_dbfs": -36.217666146239786,
+          "integrated_lufs": -36.90866614623979,
+          "headroom_db": 1.600000279326729,
+          "clip_count": 0
+        },
+        "spectral": {},
+        "dynamics": {},
+        "stereo": {},
+        "limitations": [
+          "fallback measurement used: No module named 'mix_agent.analysis.dynamics'"
+        ],
+        "sample_rate": 48000,
+        "duration_sec": 204.747
+      }
+    },
+    "final_score": 0.05
+  },
+  {
+    "candidate_id": "004_candidate_fx",
+    "label": "fx_space",
+    "actions": [
+      {
+        "action_type": "fx_send_change",
+        "target": "all",
+        "parameters": {
+          "send_db": -1.0,
+          "effect": "reverb_delay"
+        },
+        "reason": "Report-only FX wash reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "send_db": [
+            -3.0,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      }
+    ],
+    "safety": {
+      "candidate_id": "004_candidate_fx",
+      "passed": true,
+      "safety_score": 0.95,
+      "reasons": [],
+      "warnings": [
+        "fx_send_change is report-only in offline_test; no OSC/MIDI command is sent."
+      ],
+      "metrics": {
+        "level": {
+          "peak_dbfs": -1.600000279326729,
+          "true_peak_dbtp": -1.600000279326729,
+          "rms_dbfs": -36.217666146239786,
+          "integrated_lufs": -36.90866614623979,
+          "headroom_db": 1.600000279326729,
+          "clip_count": 0
+        },
+        "spectral": {},
+        "dynamics": {},
+        "stereo": {},
+        "limitations": [
+          "fallback measurement used: No module named 'mix_agent.analysis.dynamics'"
+        ],
+        "sample_rate": 48000,
+        "duration_sec": 204.747
+      }
+    },
+    "final_score": 0.0475
+  },
+  {
+    "candidate_id": "005_candidate_vocal_clarity",
+    "label": "vocal_clarity",
+    "actions": [],
+    "safety": {
+      "candidate_id": "005_candidate_vocal_clarity",
+      "passed": true,
+      "safety_score": 1.0,
+      "reasons": [],
+      "warnings": [],
+      "metrics": {
+        "level": {
+          "peak_dbfs": -1.600000279326729,
+          "true_peak_dbtp": -1.600000279326729,
+          "rms_dbfs": -36.217666146239786,
+          "integrated_lufs": -36.90866614623979,
+          "headroom_db": 1.600000279326729,
+          "clip_count": 0
+        },
+        "spectral": {},
+        "dynamics": {},
+        "stereo": {},
+        "limitations": [
+          "fallback measurement used: No module named 'mix_agent.analysis.dynamics'"
+        ],
+        "sample_rate": 48000,
+        "duration_sec": 204.747
+      }
+    },
+    "final_score": 0.06
+  },
+  {
+    "candidate_id": "006_candidate_low_mid_mud_reduction",
+    "label": "low_mid_mud_reduction",
+    "actions": [
+      {
+        "action_type": "eq_correction",
+        "target": "Accordion",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Back Vox L",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Back Vox R",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Bass",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "F Tom",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Guitar L",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Guitar R",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "KICK",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "OH L",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "OH R",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Playback L",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Playback R",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "SNARE T",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Snare B",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Tom",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      },
+      {
+        "action_type": "eq_correction",
+        "target": "Vocal",
+        "parameters": {
+          "frequency_hz": 280.0,
+          "gain_db": -1.1,
+          "q": 0.8
+        },
+        "reason": "Dedicated low-mid mud reduction candidate.",
+        "source": "automix_toolkit_fxnorm_diffmst_deepafx_action_planner",
+        "safe_range": {
+          "gain_db": [
+            -1.5,
+            0.0
+          ]
+        },
+        "status": "proposed"
+      }
+    ],
+    "safety": {
+      "candidate_id": "006_candidate_low_mid_mud_reduction",
+      "passed": true,
+      "safety_score": 1.0,
+      "reasons": [],
+      "warnings": [],
+      "metrics": {
+        "level": {
+          "peak_dbfs": -1.600000279326729,
+          "true_peak_dbtp": -1.600000279326729,
+          "rms_dbfs": -36.217666146239786,
+          "integrated_lufs": -36.90866614623979,
+          "headroom_db": 1.600000279326729,
+          "clip_count": 0
+        },
+        "spectral": {},
+        "dynamics": {},
+        "stereo": {},
+        "limitations": [
+          "fallback measurement used: No module named 'mix_agent.analysis.dynamics'"
+        ],
+        "sample_rate": 48000,
+        "duration_sec": 204.747
+      }
+    },
+    "final_score": 0.05
+  },
+  {
+    "candidate_id": "007_candidate_bass_kick_balance",
+    "label": "bass_kick_balance",
+    "actions": [],
+    "safety": {
+      "candidate_id": "007_candidate_bass_kick_balance",
+      "passed": true,
+      "safety_score": 1.0,
+      "reasons": [],
+      "warnings": [],
+      "metrics": {
+        "level": {
+          "peak_dbfs": -1.600000279326729,
+          "true_peak_dbtp": -1.600000279326729,
+          "rms_dbfs": -36.217666146239786,
+          "integrated_lufs": -36.90866614623979,
+          "headroom_db": 1.600000279326729,
+          "clip_count": 0
+        },
+        "spectral": {},
+        "dynamics": {},
+        "stereo": {},
+        "limitations": [
+          "fallback measurement used: No module named 'mix_agent.analysis.dynamics'"
+        ],
+        "sample_rate": 48000,
+        "duration_sec": 204.747
+      }
+    },
+    "final_score": 0.06
+  }
+]

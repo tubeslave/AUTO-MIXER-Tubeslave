@@ -1,0 +1,36 @@
+{
+  "id": "744fa9ec-b28d-473a-8ec8-0e6e1f69d7fe",
+  "source": "mcp_remote_gateway",
+  "sourceTool": "create_task",
+  "projectRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "createdAt": "2026-05-09T10:01:21.749Z",
+  "title": "Проверка spectral EQ.",
+  "agent": "dsp",
+  "prompt": "Проверить логику spectral EQ без изменения кода.",
+  "metadata": {},
+  "requestedDryRun": true,
+  "dryRun": true,
+  "dryRunEnforced": true,
+  "sourceCodeChangesAllowed": false,
+  "policy": {
+    "dryRun": true,
+    "dryRunEnforced": true,
+    "writesAllowed": [
+      ".paperclip/tasks",
+      ".paperclip/reports"
+    ],
+    "sourceCodeChangesAllowed": false,
+    "shellCommandsAllowed": [
+      "git branch --show-current",
+      "git status --short --branch",
+      "git rev-parse --show-toplevel",
+      "git log -1 --oneline"
+    ],
+    "prohibitedActions": [
+      "source code changes",
+      "dangerous shell commands",
+      "git commit",
+      "git checkout"
+    ]
+  }
+}

@@ -1,0 +1,118 @@
+name: production_mix_v1
+version: 1
+
+mode_defaults:
+  offline:
+    min_score_improvement: 0.002
+    min_muq_delta: 0.0005
+    min_material_final_delta_when_muq_unavailable: 0.010
+    min_material_musical_delta_when_muq_unavailable: 0.020
+    min_verified_reference_final_delta_when_muq_unavailable: 0.001
+    min_verified_reference_musical_delta_when_muq_unavailable: 0.001
+    win_margin_over_reference_when_muq_unavailable: 0.010
+    reference_tiebreak_final_epsilon: 0.005
+    reference_tiebreak_musical_epsilon: 0.005
+    allow_small_improvements: true
+    max_candidates: 24
+
+reference_recipe:
+  inherited_reference_recipe: FX15_SECTION_MOD_SPACE_AIR_MINUS_080
+  enable_inherited_reference: true
+  final_air_trim_db: -0.80
+  fx15_section_mod_space:
+    send_db: -18.0
+    return_level_db: -6.0
+    send_mode: post_fader
+    route_to_main: true
+    wet_target_percent: 6.0
+    pre_delay_ms: 18.0
+    decay_ms: 920.0
+    width: 0.72
+    modulation_depth_ms: 4.5
+    modulation_rate_hz: 0.32
+  scoring:
+    fx_wetness_threshold: 0.002
+    spatial_reflection_threshold: 0.001
+    modulation_energy_threshold: 0.00015
+    compression_gain_reduction_threshold_db: 0.15
+    action_count_penalty: 0.0015
+    overhead_dynamics_penalty: 0.020
+    bass_in_drum_glue_penalty: 0.015
+    reference_taste_bias: 0.003
+    guitar_too_forward_penalty: 0.018
+    guitar_vocal_masking_penalty: 0.014
+    guitar_masking_improvement_reward: 0.026
+    guitar_power_loss_penalty: 0.030
+  guitar_control:
+    enabled: true
+    default_trim_db: -0.7
+    max_reference_trim_db: -1.5
+    min_role_confidence: 0.85
+    presence_ratio_threshold_db: 2.0
+    midrange_ratio_threshold_db: -3.0
+    masking_index_threshold: 0.62
+    max_power_loss_db: 2.25
+
+decision:
+  baseline_candidate_name: candidate_000_no_change
+  accepted_reference_candidate_name: candidate_065_fx15_air_minus_080_reference
+  require_reference_material_improvement: true
+
+safety_limits:
+  max_true_peak_dbfs: -1.0
+  pre_sum_target_true_peak_dbfs: -2.0
+
+autoeq:
+  enabled: false
+  mode: offline
+  safety_profile: conservative
+  apply_static_eq: true
+  apply_dynamic_eq: true
+  apply_group_eq: true
+  apply_master_eq: false
+  report_only: false
+  osc_dry_run: true
+  osc_apply: false
+  live_limits:
+    max_static_gain_db: 1.5
+    max_dynamic_cut_db: 3.0
+    max_dynamic_boost_db: 1.0
+    max_master_eq_db: 0.75
+    max_filters_per_channel: 3
+    max_dynamic_filters_per_channel: 2
+    min_confidence_to_apply: 0.6
+    half_strength_confidence_until: 0.8
+    smoothing_ms: 1000
+    hold_time_ms: 2000
+  offline_limits:
+    max_static_gain_db: 3.0
+    max_dynamic_cut_db: 5.0
+    max_dynamic_boost_db: 1.5
+    max_master_eq_db: 1.5
+    max_filters_per_channel: 5
+    max_dynamic_filters_per_channel: 3
+    min_confidence_to_apply: 0.55
+  priorities:
+    lead_vocal: 100
+    kick: 90
+    snare: 85
+    bass: 85
+    back_vocal: 65
+    guitar: 55
+    accordion: 55
+    playback: 50
+    overheads: 45
+    cymbals: 40
+
+role_detection:
+  role_specific_confidence: 0.85
+  universal_safe_confidence: 0.60
+  playback_role_specific_enabled: false
+
+compression_safety:
+  low_signal_rms_dbfs: -45.0
+  low_signal_lufs: -45.0
+  metrics_conflict_threshold_db: 3.0
+  allow_parallel_compression_on_overheads: false
+  internal_true_peak_review_dbfs: 6.0
+  internal_true_peak_reject_dbfs: 12.0

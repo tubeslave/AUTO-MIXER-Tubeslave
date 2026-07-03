@@ -227,6 +227,12 @@ class SignalAnalyzer:
         self._transient_times.clear()
         self._transient_strengths.clear()
         self._prev_spectrum = None
+        if hasattr(self, "_current_spectrum"):
+            del self._current_spectrum
+        if hasattr(self, "_current_norm_spectrum"):
+            del self._current_norm_spectrum
+        if hasattr(self, "_flux"):
+            del self._flux
         self._time_sec = 0.0
         self._last_env_db = -100.0
         self._max_peak = -100.0
@@ -237,6 +243,7 @@ class SignalAnalyzer:
         self._decay_ms = 0.0
         self._sustain_db = -100.0
         self._release_ms = 0.0
+        self._adsr_sustain_levels = []
 
     def process(self, samples: np.ndarray):
         """Process a block of audio samples."""
@@ -284,7 +291,10 @@ class SignalAnalyzer:
         self._last_env_db = env_db
 
         # ── Spectral ─────────────────────────────────────────
-        self._analyze_spectrum(samples)
+        # Preserve the last meaningful spectral state instead of letting
+        # trailing silence collapse centroid/band metrics to zero.
+        if peak_db > -70.0 or rms_db > -70.0:
+            self._analyze_spectrum(samples)
 
     def _update_adsr(self, env_db: float):
         """Simple ADSR state machine for envelope timing."""
@@ -366,9 +376,7 @@ class SignalAnalyzer:
 
         # Momentary (last value from meter)
         if self._lufs_meter:
-            lm.lufs_momentary = self._lufs_meter._last_lufs if hasattr(self._lufs_meter, '_last_lufs') else -100.0
-            if self._integrated_blocks:
-                lm.lufs_momentary = self._integrated_blocks[-1]
+            lm.lufs_momentary = self._lufs_meter.get_current_lufs()
 
         # Short-term (3s K-weighted)
         if len(self._k_buffer) >= self.sample_rate:

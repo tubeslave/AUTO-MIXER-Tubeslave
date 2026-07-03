@@ -27,7 +27,13 @@ def register_handlers(server):
         await server.reset_eq(websocket, data)
 
     async def handle_reset_all_eq(websocket, data):
-        await server.reset_all_eq(websocket, data)
+        await server.request_reset_all_eq(
+            websocket,
+            data,
+            dry_run=data.get("dry_run") if isinstance(data, dict) else None,
+            confirm_maintenance=bool(data.get("confirm_maintenance", False)) if isinstance(data, dict) else False,
+            rollback_snapshot_path=data.get("rollback_snapshot_path") if isinstance(data, dict) else None,
+        )
 
     async def handle_get_eq_profiles(websocket, data):
         await server.send_to_client(websocket, {

@@ -162,6 +162,46 @@ ratio = max_ratio - (max_ratio - 1) * factor  # Перкуссия получи�
 | Lead Vocal | -16 | ±1 |
 | Backing Vocal | -20 | ±2 |
 
+### Ayaic preset detection: Snare Top/Bottom
+- При определении Ayaic preset для малого барабана не приравнивать `Snare T`
+  и `Snare B` к одному isolated-channel target.
+- `Snare T` / `Snare Top`: целевой isolated уровень `-26 LUFS`.
+- `Snare B` / `Snare Bottom`: целевой isolated уровень `-35 LUFS`.
+- Правильная проверка общего preset: после сложения `Snare T + Snare B`
+  виртуальный stem `Snare` должен быть `-25 LUFS`.
+- Если isolated targets и stem target конфликтуют, приоритет у stem target
+  `Snare = -25 LUFS`, потому что Ayaic balance принимает решение по сумме
+  слоя, а не только по отдельным микрофонам.
+
+### Ayaic preset detection: stereo L/R pairs
+- Для любого Ayaic preset вида `X L` / `X R` или `X Left` / `X Right`
+  isolated targets левого и правого каналов должны быть на `3 LUFS` ниже,
+  чем target одноимённого суммарного preset `X` без суффикса `L/R`.
+- Формула: если `X = N LUFS`, то `X L = N - 3 LUFS` и `X R = N - 3 LUFS`.
+- Примеры: если `Guitar = -25 LUFS`, то `Guitar L = -28 LUFS` и
+  `Guitar R = -28 LUFS`; если `Playback = -25 LUFS`, то
+  `Playback L = -28 LUFS` и `Playback R = -28 LUFS`.
+- При конфликте с isolated-channel fallback приоритет у этого stereo-pair
+  правила и у проверки суммы `X L + X R -> X`.
+
+### Ayaic preset detection: Tom/Floor Tom
+- При определении Ayaic preset для томов не использовать ошибочный target
+  `-22 LUFS`, который мог появляться в логах для `Tom` / `F Tom`.
+- `Tom`: целевой isolated уровень `-25 LUFS`.
+- `F Tom` / `Floor Tom`: целевой isolated уровень `-25 LUFS`.
+- Для Ayaic balance это правило имеет приоритет над generic/live fallback
+  `Toms = -22 LUFS`.
+
+### Ayaic preset detection: Overheads
+- При определении Ayaic preset для overhead-пары не приравнивать `OH L` и
+  `OH R` к суммарному stem target.
+- `Overhead L` / `OH L`: целевой isolated уровень `-38 LUFS`.
+- `Overhead R` / `OH R`: целевой isolated уровень `-38 LUFS`.
+- Правильная проверка общего preset: после сложения `Overhead L + Overhead R`
+  виртуальный stem `Overheads` должен быть `-35 LUFS`.
+- Если isolated targets и stem target конфликтуют, приоритет у stem target
+  `Overheads = -35 LUFS`.
+
 ## Frontend (React)
 
 - React 18, functional components + hooks

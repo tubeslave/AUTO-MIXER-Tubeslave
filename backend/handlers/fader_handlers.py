@@ -27,7 +27,10 @@ def register_handlers(server):
         )
 
     async def handle_apply_auto_balance(websocket, data):
-        await server.apply_auto_balance(websocket)
+        await server.apply_auto_balance(
+            websocket,
+            confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+        )
 
     async def handle_cancel_auto_balance(websocket, data):
         await server.cancel_auto_balance(websocket)

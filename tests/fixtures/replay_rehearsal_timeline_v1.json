@@ -1,0 +1,301 @@
+{
+  "artifact_signature": "468105326de24201b3b3f7f3d0de7273f38bcf6cef5860eedc5807916b287157",
+  "artifact_type": "replay_rehearsal_timeline",
+  "dry_run_only": true,
+  "live_mixer_writes": false,
+  "replay_correlation_ids": [
+    "corr::rehearsal::escalation",
+    "corr::rehearsal::fallback",
+    "corr::rehearsal::operator_review",
+    "corr::rehearsal::post_show_review",
+    "corr::rehearsal::pre_show",
+    "corr::rehearsal::replay_validation",
+    "corr::rehearsal::rollback",
+    "corr::rehearsal::shadow_mode",
+    "corr::rehearsal::soundcheck"
+  ],
+  "scenario_id": "rehearsal::slice1::baseline",
+  "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+  "schema_version": "replay_rehearsal_timeline/v1",
+  "timeline": [
+    {
+      "dry_run_only": true,
+      "event_signature": "95077c4fc5fb5f1627fc027d8395d2985bbe55575400aabb50ce2e4894f4c923",
+      "label": "Pre-show boundary check",
+      "live_mixer_writes": false,
+      "metadata": {
+        "entry_condition": "operator_logged_in"
+      },
+      "ordinal": 1,
+      "replay_correlation_ids": [
+        "corr::rehearsal::pre_show"
+      ],
+      "required_artifacts": [
+        "baseline_manifest",
+        "safety_brief"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 1,
+      "stage": "pre_show",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": true,
+          "metric": "dry_run_only",
+          "notes": "All rehearsal fixtures must remain replay-only",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "8a5a628e468a5b36aa3c04e24073bd1367fa1a76e6837cfa9f22ecae021db8d9",
+      "label": "Soundcheck preparation",
+      "live_mixer_writes": false,
+      "metadata": {
+        "source": "fixture_inventory"
+      },
+      "ordinal": 2,
+      "replay_correlation_ids": [
+        "corr::rehearsal::soundcheck"
+      ],
+      "required_artifacts": [
+        "channel_inventory",
+        "input_roles"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 2,
+      "stage": "soundcheck",
+      "telemetry_expectations": [
+        {
+          "comparator": "lte",
+          "expected": 0.0,
+          "metric": "unexpected_live_mutations",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": "count"
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "70e215052f3d7c6de2c84fcc992e8cfe146d1dea61a785268f8cc29c5582c115",
+      "label": "Replay validation",
+      "live_mixer_writes": false,
+      "metadata": {
+        "validator_family": "policy_consistency"
+      },
+      "ordinal": 3,
+      "replay_correlation_ids": [
+        "corr::rehearsal::replay_validation"
+      ],
+      "required_artifacts": [
+        "graph_checkpoint",
+        "trim_snapshot",
+        "validator_report"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 3,
+      "stage": "replay_validation",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": true,
+          "metric": "validator_passed",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "1ecd7ea09ace64c65a917a3d4dbec0110970866db688efcc64e6ec44cb6efa9b",
+      "label": "Shadow mode comparison",
+      "live_mixer_writes": false,
+      "metadata": {
+        "comparison_target": "operator_vs_ai"
+      },
+      "ordinal": 4,
+      "replay_correlation_ids": [
+        "corr::rehearsal::shadow_mode"
+      ],
+      "required_artifacts": [
+        "shadow_report",
+        "timeline_artifact"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 4,
+      "stage": "shadow_mode",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": false,
+          "metric": "live_mixer_writes",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "d75ffa1cd0e3f0be3a9736ade00669b99c85b8db6cf32d08ab3c8a414f5b188e",
+      "label": "Operator review",
+      "live_mixer_writes": false,
+      "metadata": {
+        "review_surface": "shadow_report_writer"
+      },
+      "ordinal": 5,
+      "replay_correlation_ids": [
+        "corr::rehearsal::operator_review"
+      ],
+      "required_artifacts": [
+        "operator_review_packet"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 5,
+      "stage": "operator_review",
+      "telemetry_expectations": [
+        {
+          "comparator": "gte",
+          "expected": 1.0,
+          "metric": "operator_decision_count",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": "count"
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "ab54602f3cdd814ce2b3a8f2c05a5149799913fecc07796bd8e101a0bf45c601",
+      "label": "Rollback planning",
+      "live_mixer_writes": false,
+      "metadata": {
+        "rollback_reason": "validator_or_operator_request"
+      },
+      "ordinal": 6,
+      "replay_correlation_ids": [
+        "corr::rehearsal::rollback"
+      ],
+      "required_artifacts": [
+        "rollback_simulation_report"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 6,
+      "stage": "rollback",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": true,
+          "metric": "rollback_state_reconstructible",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "45d515ad8cd9ed123223989d742837b0d3a5005822e1eae7409bc659a90fc268",
+      "label": "Escalation review",
+      "live_mixer_writes": false,
+      "metadata": {
+        "notify_roles": [
+          "chief_engineer",
+          "cto_architecture_owner"
+        ]
+      },
+      "ordinal": 7,
+      "replay_correlation_ids": [
+        "corr::rehearsal::escalation"
+      ],
+      "required_artifacts": [
+        "escalation_packet"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 7,
+      "stage": "escalation",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": false,
+          "metric": "transport_activation_attempted",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "dd94040233981badb30b74f1589349c6871417fad6141c121bbca45e12d91f73",
+      "label": "Fallback path",
+      "live_mixer_writes": false,
+      "metadata": {
+        "fallback_virtual_mixer": "allowed"
+      },
+      "ordinal": 8,
+      "replay_correlation_ids": [
+        "corr::rehearsal::fallback"
+      ],
+      "required_artifacts": [
+        "fallback_choice"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 8,
+      "stage": "fallback",
+      "telemetry_expectations": [
+        {
+          "comparator": "eq",
+          "expected": "minimal_safe_automation",
+          "metric": "fallback_mode",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "dry_run_only": true,
+      "event_signature": "722addbd5f1b66864058c6e901c5228fe1c702f4051177de97e9933a736a64c4",
+      "label": "Post-show review",
+      "live_mixer_writes": false,
+      "metadata": {
+        "follow_up_bucket": "slice1"
+      },
+      "ordinal": 9,
+      "replay_correlation_ids": [
+        "corr::rehearsal::post_show_review"
+      ],
+      "required_artifacts": [
+        "summary_report"
+      ],
+      "scenario_id": "rehearsal::slice1::baseline",
+      "scenario_signature": "f54b8b9db0072661b8ebaffd9e490ea582b52b4e27946242743d6a1223fe4a33",
+      "seq": 9,
+      "stage": "post_show_review",
+      "telemetry_expectations": [
+        {
+          "comparator": "gte",
+          "expected": 1.0,
+          "metric": "follow_up_items",
+          "notes": "",
+          "tolerance": 0.0,
+          "unit": "count"
+        }
+      ]
+    }
+  ],
+  "timeline_event_count": 9
+}

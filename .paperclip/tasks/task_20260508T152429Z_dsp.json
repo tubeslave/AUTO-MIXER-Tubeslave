@@ -1,0 +1,5 @@
+{
+  "agent": "dsp",
+  "prompt": "Analyze EQ decision logic. Do not modify files.",
+  "dryRun": true
+}

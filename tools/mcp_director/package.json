@@ -1,0 +1,15 @@
+{
+  "name": "automixer-mcp-director",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "automixer-mcp-director": "./server.js"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "zod": "latest"
+  }
+}

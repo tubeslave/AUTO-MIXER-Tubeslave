@@ -1,0 +1,38 @@
+{
+  "id": "a0e073c7-6f53-4c8b-8a67-ada774b09ea9",
+  "source": "mcp_remote_gateway",
+  "sourceTool": "create_task",
+  "projectRoot": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main",
+  "createdAt": "2026-05-08T19:26:11.146Z",
+  "title": "MCP gateway smoke test",
+  "agent": "automixer",
+  "prompt": "Verify create_task writes only a dry-run Paperclip task.",
+  "metadata": {
+    "source": "tools/mcp_remote_gateway/test.sh"
+  },
+  "requestedDryRun": false,
+  "dryRun": true,
+  "dryRunEnforced": true,
+  "sourceCodeChangesAllowed": false,
+  "policy": {
+    "dryRun": true,
+    "dryRunEnforced": true,
+    "writesAllowed": [
+      ".paperclip/tasks",
+      ".paperclip/reports"
+    ],
+    "sourceCodeChangesAllowed": false,
+    "shellCommandsAllowed": [
+      "git branch --show-current",
+      "git status --short --branch",
+      "git rev-parse --show-toplevel",
+      "git log -1 --oneline"
+    ],
+    "prohibitedActions": [
+      "source code changes",
+      "dangerous shell commands",
+      "git commit",
+      "git checkout"
+    ]
+  }
+}

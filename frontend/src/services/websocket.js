@@ -548,6 +548,24 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
+  getLiveInputTrimStatus() {
+    this.send({
+      type: 'get_live_input_trim_status'
+    });
+  }
+
+  getFreezeStatus() {
+    this.send({
+      type: 'get_freeze_status'
+    });
+  }
+
+  getReadyForLive() {
+    this.send({
+      type: 'get_ready_for_live'
+    });
+  }
+
   // Update Safe Gain Settings (learning duration, etc.)
   updateSafeGainSettings(settings) {
     this.send({
