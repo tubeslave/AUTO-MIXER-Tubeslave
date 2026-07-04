@@ -86,6 +86,78 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _display_path(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _resolve_m005_events_path(
+    *,
+    m005_summary_path: str | Path | None,
+    m005_summary: Mapping[str, Any],
+) -> Path | None:
+    if m005_summary_path is None:
+        return None
+
+    summary_path = _resolve(m005_summary_path).resolve()
+    events_text = m005_summary.get("events_path")
+    if isinstance(events_text, str) and events_text and events_text.strip() == events_text:
+        event_candidate = Path(events_text)
+        if ".." in event_candidate.parts:
+            return None
+        events_path = event_candidate if event_candidate.is_absolute() else PROJECT_ROOT / event_candidate
+    else:
+        events_path = summary_path.parent / "events.jsonl"
+
+    resolved_events = events_path.resolve()
+    if resolved_events.name != "events.jsonl":
+        return None
+    if resolved_events.parent != summary_path.parent:
+        return None
+    return resolved_events
+
+
+def load_m005_event_request_types(
+    *,
+    m005_summary_path: str | Path | None,
+    m005_summary: Mapping[str, Any] | None,
+) -> tuple[list[str] | None, str | None]:
+    if m005_summary is None:
+        return None, None
+    events_path = _resolve_m005_events_path(
+        m005_summary_path=m005_summary_path,
+        m005_summary=m005_summary,
+    )
+    display_events_path = _display_path(events_path)
+    if events_path is None or not events_path.is_file():
+        return None, display_events_path
+
+    request_types: list[str] = []
+    try:
+        for raw_line in events_path.read_text(encoding="utf-8").splitlines():
+            if not raw_line.strip():
+                continue
+            row = json.loads(raw_line)
+            if not isinstance(row, Mapping):
+                return None, display_events_path
+            if row.get("event_type") != "send":
+                continue
+            payload = row.get("payload")
+            if not isinstance(payload, Mapping):
+                return None, display_events_path
+            request_type = payload.get("type")
+            if not isinstance(request_type, str) or not request_type:
+                return None, display_events_path
+            request_types.append(request_type)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, display_events_path
+    return request_types, display_events_path
+
+
 def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -448,6 +520,7 @@ def _record_m005_checks(
     checks: dict[str, bool],
     *,
     m005_summary: Mapping[str, Any] | None,
+    m005_event_request_types: list[str] | None = None,
 ) -> None:
     _record(checks, "m005_summary_supplied", m005_summary is not None)
     if m005_summary is None:
@@ -497,6 +570,15 @@ def _record_m005_checks(
         for request_type in m005_sent_request_types
         if request_type in EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES
     ]
+    if isinstance(m005_event_request_types, list):
+        event_request_types = [str(item) for item in m005_event_request_types]
+    else:
+        event_request_types = []
+    forbidden_from_events = [
+        request_type
+        for request_type in event_request_types
+        if request_type in EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES
+    ]
     _record(
         checks,
         "m005_summary_sent_request_types_present",
@@ -526,6 +608,27 @@ def _record_m005_checks(
         checks,
         "m005_summary_forbidden_requests_empty",
         m005_summary.get("forbidden_request_types_sent") == [],
+    )
+    _record(
+        checks,
+        "m005_events_request_audit_loaded",
+        isinstance(m005_event_request_types, list) and bool(event_request_types),
+    )
+    _record(
+        checks,
+        "m005_events_request_audit_matches_summary",
+        isinstance(m005_event_request_types, list)
+        and event_request_types == m005_sent_request_types,
+    )
+    _record(
+        checks,
+        "m005_events_apply_probe_sent",
+        "apply_operator_proposal" in event_request_types,
+    )
+    _record(
+        checks,
+        "m005_events_no_forbidden_direct_request_types",
+        forbidden_from_events == [],
     )
 
     phases = _get_mapping(m005_summary, "phases")
@@ -577,9 +680,11 @@ def verify_packet(
     packet: Mapping[str, Any],
     *,
     m005_summary: Mapping[str, Any] | None = None,
+    m005_event_request_types: list[str] | None = None,
     proof_summaries_by_artifact: Mapping[str, Mapping[str, Any]] | None = None,
     packet_summary_path: str | None = None,
     m005_summary_path: str | None = None,
+    m005_events_path: str | None = None,
 ) -> dict[str, Any]:
     checks: dict[str, bool] = {}
     _record_packet_checks(checks, packet)
@@ -588,7 +693,11 @@ def verify_packet(
         packet,
         proof_summaries_by_artifact=proof_summaries_by_artifact,
     )
-    _record_m005_checks(checks, m005_summary=m005_summary)
+    _record_m005_checks(
+        checks,
+        m005_summary=m005_summary,
+        m005_event_request_types=m005_event_request_types,
+    )
 
     failed_checks = sorted(name for name, passed in checks.items() if not passed)
     ready = not failed_checks
@@ -606,6 +715,7 @@ def verify_packet(
         "reason": reason,
         "packet_summary": packet_summary_path,
         "m005_summary": m005_summary_path,
+        "m005_events": m005_events_path,
         "proof_artifact_summaries": sorted((proof_summaries_by_artifact or {}).keys()),
         "owner_review_input_ready": ready,
         "live_authority_granted": False,
@@ -624,13 +734,19 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
     m005_path = _resolve(m005_summary) if m005_summary is not None else None
     packet = _load_json(packet_path)
     m005 = _load_json(m005_path) if m005_path is not None else None
+    m005_event_request_types, m005_events_path = load_m005_event_request_types(
+        m005_summary_path=m005_path,
+        m005_summary=m005,
+    )
     proof_summaries = load_packet_proof_summaries(packet)
     return verify_packet(
         packet,
         m005_summary=m005,
+        m005_event_request_types=m005_event_request_types,
         proof_summaries_by_artifact=proof_summaries,
         packet_summary_path=str(packet_summary),
         m005_summary_path=str(m005_summary) if m005_summary is not None else None,
+        m005_events_path=m005_events_path,
     )
 
 

@@ -119,3 +119,17 @@ manually clean summary flags cannot hide a direct write request.
 This is still offline verifier hardening only. It validates the artifact
 contract before owner review and grants no WING contact, live apply authority
 or readiness closure.
+
+## 2026-07-04 Event Log Audit Binding Update
+
+The M006 owner-readiness verifier now cross-checks the M005 summary request
+audit against the runner `events.jsonl` send rows from the same artifact run
+directory. A complete M005 summary is not enough if the event log is missing,
+malformed, points outside the summary run directory, differs from
+`sent_request_types`, lacks the blocked `apply_operator_proposal` probe, or
+contains a forbidden direct write request.
+
+This keeps the append-only event stream as the authoritative request audit for
+owner-review input. The update is offline verifier hardening only; it does not
+run M005, does not contact the backend or WING, and does not grant readiness
+closure or live authority.
