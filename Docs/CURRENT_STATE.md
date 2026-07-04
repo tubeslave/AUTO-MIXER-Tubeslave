@@ -1,17 +1,17 @@
 # Current State
 
-Generated: 2026-07-04T22:37:52Z
+Generated: 2026-07-04T22:57:08Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `f8eb799c6 Require complete soundcheck runtime observation`
+  `455a4028c Bind M005 blocked apply response to verifier`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the read-only
-  soundcheck runtime observation contract commit `f8eb799c6`; ignored
+- Tracked worktree state before this sync: clean after the offline M005/M006
+  blocked-apply response verifier contract commit `455a4028c`; ignored
   large/superseded local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
@@ -110,6 +110,14 @@ Generated: 2026-07-04T22:37:52Z
   the final query must happen after that blocked probe. This prevents
   reordered or hand-edited M005 evidence from becoming owner-review input and
   grants no backend/WING contact or live authority.
+- `455a4028c` binds M005 blocked-write completion and M006 owner-review input
+  to the nested backend `operator_proposal_apply_blocked` response. A
+  phase-level `status=passed` and safe `block_reason` are not enough; the
+  M006 packet artifact now also declares
+  `required_blocked_write_apply_result_type=operator_proposal_apply_blocked`.
+  Current partial M005 evidence still blocks owner review. This is offline
+  verifier hardening only and grants no backend/WING contact, proposal
+  creation, live apply, readiness closure or live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -342,7 +350,7 @@ Generated: 2026-07-04T22:37:52Z
   status and master-bus status. The existing 600.005 second artifact
   recomputes as complete with no missing surfaces. Full backend validation
   also passed: `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`:
-  5476 passed, 1 skipped. The no-WING quick gate failed closed on
+  5479 passed, 1 skipped. The no-WING quick gate failed closed on
   `backend_port_free` because an existing backend listener requires operator
   confirmation; no live authority, readiness closure or current supervised
   live-write kind changed.
@@ -2049,8 +2057,9 @@ Generated: 2026-07-04T22:37:52Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `f8eb799c6` passed with
-  `5476 passed, 1 skipped`. This includes the soundcheck runtime
+- The latest verified full-suite run for `455a4028c` passed with
+  `5479 passed, 1 skipped`. This includes the M005 blocked-apply response
+  owner-verifier binding, the soundcheck runtime
   `operator_runtime_contract` binding, the M005 event-sequence
   owner-verifier binding, the M005 canonical artifact-path owner-verifier
   binding, the M005 event-log owner-verifier binding, the M005 request-audit
