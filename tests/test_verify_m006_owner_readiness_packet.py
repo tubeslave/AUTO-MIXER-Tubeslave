@@ -24,6 +24,14 @@ PARTIAL_M005_SUMMARY = (
     / "20260704T074537Z_wing_m005_disconnect_timeout_stale_proof"
     / "summary.json"
 )
+COMPLETE_M005_SUMMARY_PATH = (
+    "artifacts/wing_timeout_disconnect_proof/"
+    "unit_m005_disconnect_timeout_stale_proof/summary.json"
+)
+COMPLETE_M005_EVENTS_PATH = (
+    "artifacts/wing_timeout_disconnect_proof/"
+    "unit_m005_disconnect_timeout_stale_proof/events.jsonl"
+)
 
 SPEC = importlib.util.spec_from_file_location("verify_m006_owner_readiness_packet", TOOL_PATH)
 assert SPEC is not None
@@ -48,6 +56,8 @@ def complete_m005_summary() -> dict:
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
         "readiness_matrix_update_allowed": False,
+        "summary_path": COMPLETE_M005_SUMMARY_PATH,
+        "events_path": COMPLETE_M005_EVENTS_PATH,
         "direct_live_write_request_sent": False,
         "forbidden_request_types_sent": [],
         "sent_request_types": [
@@ -200,6 +210,8 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "ready_for_owner_review"
@@ -250,6 +262,8 @@ def test_m005_forbidden_request_type_blocks_owner_review_even_if_flags_claim_cle
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "blocked"
@@ -277,6 +291,8 @@ def test_m005_reconnect_without_physical_readback_blocks_owner_review() -> None:
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "blocked"
@@ -298,6 +314,8 @@ def test_m005_event_log_request_mismatch_blocks_owner_review() -> None:
         m005_summary=m005,
         m005_event_request_types=event_request_types,
         proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "blocked"
@@ -322,6 +340,8 @@ def test_m005_event_log_forbidden_request_type_blocks_owner_review_even_if_summa
         m005_summary=m005,
         m005_event_request_types=event_request_types,
         proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "blocked"
@@ -333,8 +353,7 @@ def test_m005_event_log_forbidden_request_type_blocks_owner_review_even_if_summa
     assert result["readiness_closure_allowed"] is False
 
 
-def test_verify_packet_paths_loads_m005_event_log(tmp_path: Path) -> None:
-    packet = load_packet()
+def test_verify_packet_paths_rejects_m005_artifact_outside_canonical_root(tmp_path: Path) -> None:
     m005 = complete_m005_summary()
     m005["m005_complete"] = True
     summary_path = tmp_path / "summary.json"
@@ -345,14 +364,90 @@ def test_verify_packet_paths_loads_m005_event_log(tmp_path: Path) -> None:
 
     result = verifier.verify_packet_paths(PACKET_SUMMARY, summary_path)
 
-    assert result["status"] == "ready_for_owner_review"
-    assert result["reason"] == "m006_owner_review_inputs_verified"
-    assert result["owner_review_input_ready"] is True
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert result["owner_review_input_ready"] is False
     assert result["m005_events"] == str(events_path)
-    assert result["failed_checks"] == []
-    assert result["proof_artifact_summaries"] == packet["input_proof_artifacts"]
+    assert "m005_summary_path_matches_required_glob" in result["failed_checks"]
+    assert "m005_summary_declared_path_matches_input" in result["failed_checks"]
+    assert "m005_events_path_matches_summary_sibling" in result["failed_checks"]
     assert result["live_authority_granted"] is False
     assert result["readiness_closure_allowed"] is False
+
+
+def test_m005_summary_declared_path_mismatch_blocks_owner_review() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005["summary_path"] = (
+        "artifacts/wing_timeout_disconnect_proof/"
+        "different_m005_disconnect_timeout_stale_proof/summary.json"
+    )
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_summary_declared_path_matches_input" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+
+
+def test_m005_summary_declared_events_path_mismatch_blocks_owner_review() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005["events_path"] = (
+        "artifacts/wing_timeout_disconnect_proof/"
+        "unit_m005_disconnect_timeout_stale_proof/other-events.jsonl"
+    )
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_summary_declared_events_path_matches_loaded" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+
+
+def test_m005_noncanonical_summary_path_blocks_owner_review() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    noncanonical_summary = "artifacts/no_wing_release_check/unit_m005/summary.json"
+    noncanonical_events = "artifacts/no_wing_release_check/unit_m005/events.jsonl"
+    m005["summary_path"] = noncanonical_summary
+    m005["events_path"] = noncanonical_events
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=noncanonical_summary,
+        m005_events_path=noncanonical_events,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_summary_path_matches_required_glob" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
 
 
 def test_packet_attempting_to_grant_authority_fails_closed() -> None:
@@ -366,6 +461,8 @@ def test_packet_attempting_to_grant_authority_fails_closed() -> None:
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "blocked"
@@ -390,6 +487,8 @@ def test_missing_referenced_proof_artifact_blocks_owner_review() -> None:
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "blocked"
@@ -414,6 +513,8 @@ def test_proof_artifact_summary_mismatch_blocks_owner_review() -> None:
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=proofs,
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
     )
 
     assert result["status"] == "blocked"

@@ -133,3 +133,17 @@ This keeps the append-only event stream as the authoritative request audit for
 owner-review input. The update is offline verifier hardening only; it does not
 run M005, does not contact the backend or WING, and does not grant readiness
 closure or live authority.
+
+## 2026-07-04 M005 Artifact Path Binding Update
+
+The M006 owner-readiness verifier now also binds the supplied M005 summary to
+the canonical M005 proof root. Owner-review input must use a repo-relative
+`artifacts/wing_timeout_disconnect_proof/*/summary.json` path, the summary's
+declared `summary_path` must match that input path, the declared `events_path`
+must match the loaded event log, and the event log must be the sibling
+`events.jsonl` in the same run directory.
+
+This prevents temporary-root, copied or path-mutated M005 summaries from
+becoming owner-review input. The update is offline verifier hardening only; it
+does not run M005, does not contact the backend or WING, and does not grant
+readiness closure or live authority.

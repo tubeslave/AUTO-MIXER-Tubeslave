@@ -217,6 +217,36 @@ def _is_repo_relative_proof_path(path_text: Any) -> bool:
     )
 
 
+def _is_repo_relative_m005_summary_path(path_text: Any) -> bool:
+    if not isinstance(path_text, str):
+        return False
+    path = Path(path_text)
+    if path.is_absolute() or ".." in path.parts:
+        return False
+    return (
+        len(path.parts) >= 4
+        and path.parts[0] == "artifacts"
+        and path.parts[1] == "wing_timeout_disconnect_proof"
+        and path.name == "summary.json"
+    )
+
+
+def _m005_events_path_matches_summary_path(
+    *,
+    m005_summary_path: str | None,
+    m005_events_path: str | None,
+) -> bool:
+    if not isinstance(m005_summary_path, str) or not isinstance(m005_events_path, str):
+        return False
+    summary_path = Path(m005_summary_path)
+    events_path = Path(m005_events_path)
+    if summary_path.is_absolute() or events_path.is_absolute():
+        return False
+    if ".." in summary_path.parts or ".." in events_path.parts:
+        return False
+    return events_path == summary_path.with_name("events.jsonl")
+
+
 def _packet_input_proof_artifacts(packet: Mapping[str, Any]) -> list[str]:
     artifacts = packet.get("input_proof_artifacts")
     if not isinstance(artifacts, list):
@@ -521,6 +551,8 @@ def _record_m005_checks(
     *,
     m005_summary: Mapping[str, Any] | None,
     m005_event_request_types: list[str] | None = None,
+    m005_summary_path: str | None = None,
+    m005_events_path: str | None = None,
 ) -> None:
     _record(checks, "m005_summary_supplied", m005_summary is not None)
     if m005_summary is None:
@@ -532,6 +564,34 @@ def _record_m005_checks(
         m005_summary.get("proof_artifact_schema") == EXPECTED_M005_SCHEMA,
     )
     _record(checks, "m005_summary_status_passed", m005_summary.get("status") == "passed")
+    _record(
+        checks,
+        "m005_summary_path_supplied",
+        isinstance(m005_summary_path, str) and bool(m005_summary_path),
+    )
+    _record(
+        checks,
+        "m005_summary_path_matches_required_glob",
+        _is_repo_relative_m005_summary_path(m005_summary_path),
+    )
+    _record(
+        checks,
+        "m005_summary_declared_path_matches_input",
+        isinstance(m005_summary_path, str) and m005_summary.get("summary_path") == m005_summary_path,
+    )
+    _record(
+        checks,
+        "m005_summary_declared_events_path_matches_loaded",
+        isinstance(m005_events_path, str) and m005_summary.get("events_path") == m005_events_path,
+    )
+    _record(
+        checks,
+        "m005_events_path_matches_summary_sibling",
+        _m005_events_path_matches_summary_path(
+            m005_summary_path=m005_summary_path,
+            m005_events_path=m005_events_path,
+        ),
+    )
     _record(checks, "m005_summary_complete_true", m005_summary.get("m005_complete") is True)
     _record(
         checks,
@@ -697,6 +757,8 @@ def verify_packet(
         checks,
         m005_summary=m005_summary,
         m005_event_request_types=m005_event_request_types,
+        m005_summary_path=m005_summary_path,
+        m005_events_path=m005_events_path,
     )
 
     failed_checks = sorted(name for name, passed in checks.items() if not passed)
@@ -745,7 +807,7 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
         m005_event_request_types=m005_event_request_types,
         proof_summaries_by_artifact=proof_summaries,
         packet_summary_path=str(packet_summary),
-        m005_summary_path=str(m005_summary) if m005_summary is not None else None,
+        m005_summary_path=_display_path(m005_path) if m005_path is not None else None,
         m005_events_path=m005_events_path,
     )
 
