@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-04T22:57:08Z
+Last heartbeat UTC: 2026-07-04T23:18:10Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -23,15 +23,16 @@ External validation requirements:
 - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
 - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
-Latest check: `455a4028c` bound M005 blocked-write completion and M006
-owner-review input to the nested backend `operator_proposal_apply_blocked`
-response. A phase-level `status=passed` and safe `block_reason` are not enough
-for M005 completion or M006 owner-review input. This heartbeat records no
-WING/backend contact during this checkpoint, no proposal creation, no live
-apply, no readiness-matrix update and no authority widening. The earlier
+Latest check: `f10894198` bound clean M005 owner-review input to rollback-free
+request evidence. The M006 packet contract now requires
+`required_rollback_request_sent=false` and forbids `rollback_last_manual_write`
+as a M005 remediation request type; the verifier rejects M005 summaries/events
+with rollback remediation. This heartbeat records no WING/backend contact
+during this checkpoint, no proposal creation, no live apply, no
+readiness-matrix update and no authority widening. The earlier
 `rollback_not_applied` artifact remains closed audit history, not the active
 blocker.
-Latest verified full pytest passed with `5479 passed, 1 skipped`.
+Latest verified full pytest passed with `5482 passed, 1 skipped`.
 Latest direct mute/pan invalid-value guard passed: direct WebSocket
 `set_mute`, `mute_channel` and `unmute_channel` now reject missing or
 unparseable mute values before mixer writes, and direct `set_pan` rejects

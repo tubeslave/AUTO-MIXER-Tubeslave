@@ -10,7 +10,7 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-04T22:57:08Z.
+- Latest heartbeat: 2026-07-04T23:18:10Z.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -31,14 +31,14 @@
   proof and M006 owner readiness review remain open. The earlier
   `rollback_not_applied` fader artifact is closed by the passed CH3 rerun and
   remains audit history only.
-- Latest M005/M006 verifier hardening: `455a4028c` makes
-  `tools/wing_timeout_disconnect_proof_runner.py` and
-  `tools/verify_m006_owner_readiness_packet.py` require the M005
-  `blocked_write_while_disconnected` phase to include the nested backend
-  `operator_proposal_apply_blocked` response. A phase-level `status=passed`
-  and safe `block_reason` are not enough for M005 completion or M006
-  owner-review input. This grants no backend/WING contact, proposal creation,
-  live write, readiness update or live authority.
+- Latest M005/M006 verifier hardening: `f10894198` makes clean M005
+  owner-review input rollback-free. The M006 packet contract now requires
+  `required_rollback_request_sent=false` and forbids
+  `rollback_last_manual_write` as a M005 remediation request type; the verifier
+  rejects M005 summaries/events with `rollback_request_sent=true` or
+  `rollback_last_manual_write` in the request audit. This grants no
+  backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
 - Latest soundcheck runtime hardening: `f8eb799c6` makes
   `tools/soundcheck_runtime_observation_runner.py` require a complete
   `operator_runtime_contract` before a runtime observation can pass: operator
@@ -573,11 +573,12 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   `22852a7e8` ignores validate-only/no-transport WING preflight traces in real
   artifact roots, `feeed92e7` cross-checks M006 owner-readiness proof
   artifact summaries against packet rows, `ad7f0da18` requires physical
-  reconnect evidence, `f0ccd9842` binds M005 request-audit evidence, and
+  reconnect evidence, `f0ccd9842` binds M005 request-audit evidence,
   `455a4028c` requires the nested `operator_proposal_apply_blocked` backend
   response before M005 blocked-write evidence or M006 owner-review input can
-  be ready. The latest verified full suite passed with
-  `5479 passed, 1 skipped`;
+  be ready, and `f10894198` requires clean M005 owner-review input to be
+  rollback-free. The latest verified full suite passed with
+  `5482 passed, 1 skipped`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,

@@ -58,16 +58,16 @@
   prepares the owner review from the accepted CH3 fader/gain-down artifacts but
   is not an owner decision: M005 is still missing, readiness matrix updates are
   still disallowed, and live authority remains denied.
-- The M005/M006 verifier contract is now stricter: `455a4028c` makes
-  `tools/wing_timeout_disconnect_proof_runner.py` and
-  `tools/verify_m006_owner_readiness_packet.py` require the
-  `blocked_write_while_disconnected` phase to carry the nested backend
-  `operator_proposal_apply_blocked` response before M005 completion or M006
-  owner-review input can be ready. The previous `b605b20f4` request/event
-  sequence ordering, `223b8d433` canonical-path audit, `6cf8c8800`
-  event-log audit, `f0ccd9842` request audit and `ad7f0da18` reconnect
-  physical-readback checks remain in force. This is offline verification
-  only; it does not close M005 or M006.
+- The M005/M006 verifier contract is now stricter: `f10894198` requires clean
+  M005 owner-review input to be rollback-free. The M006 packet contract
+  declares `required_rollback_request_sent=false` and forbids
+  `rollback_last_manual_write` as a M005 remediation request type; the verifier
+  rejects M005 summaries/events that contain rollback remediation. The previous
+  `455a4028c` nested `operator_proposal_apply_blocked` response check,
+  `b605b20f4` request/event sequence ordering, `223b8d433` canonical-path
+  audit, `6cf8c8800` event-log audit, `f0ccd9842` request audit and
+  `ad7f0da18` reconnect physical-readback checks remain in force. This is
+  offline verification only; it does not close M005 or M006.
 - Local runtime/tooling verification on 2026-07-04 is green but does not close
   the blocker: the current backend listener completed the 600.005 second
   read-only observation artifact
@@ -82,7 +82,7 @@
   monitor, meter subscription, read-only channel-level meters, analyzer status
   and master-bus status; the existing 600.005 second artifact recomputes as
   complete with no missing surfaces. Full backend validation also passed:
-  `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`: 5479
+  `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`: 5482
   passed, 1 skipped. The no-WING quick gate failed closed on
   `backend_port_free` because the existing listener still needs operator
   confirmation. M005 still requires the operator-present physical cable-loss,
@@ -139,8 +139,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m005_blocked_apply_response_owner_verifier_bound` at
-  `2026-07-04T22:57:08Z`. That row preserves the same `current_blocker`,
+  `m005_rollback_free_owner_verifier_bound` at
+  `2026-07-04T23:18:10Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain
