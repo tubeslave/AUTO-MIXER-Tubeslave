@@ -66,6 +66,19 @@ LIVE_EVENT_TYPES = {
     "emergency_stop_applied",
     "voice_command_executed",
 }
+RUNTIME_CONTRACT_SURFACES = (
+    "operator_mode_status",
+    "connection_state",
+    "dashboard_snapshot",
+    "channel_inventory",
+    "decision_queue",
+    "safety_monitor",
+    "meter_subscription",
+    "meter_frame",
+    "meter_channel_levels",
+    "analyzer_status",
+    "master_bus_status",
+)
 
 
 def utc_stamp() -> str:
@@ -180,6 +193,41 @@ def _dashboard_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
         "has_analyzer": isinstance(analyzer, dict),
         "analyzer_available": bool(isinstance(analyzer, dict) and analyzer.get("available")),
         "master_bus_available": bool(isinstance(master, dict) and master.get("available")),
+    }
+
+
+def _operator_runtime_contract(summary: Dict[str, Any]) -> Dict[str, Any]:
+    counts = summary.get("counts") if isinstance(summary.get("counts"), dict) else {}
+    dashboard = (
+        summary.get("dashboard_contract")
+        if isinstance(summary.get("dashboard_contract"), dict)
+        else {}
+    )
+    meter = summary.get("meter_contract") if isinstance(summary.get("meter_contract"), dict) else {}
+    checks = {
+        "operator_mode_status": int(counts.get("operator_mode_status") or 0) > 0,
+        "connection_state": bool(dashboard.get("has_connection"))
+        or int(counts.get("connection_status") or 0) > 0,
+        "dashboard_snapshot": int(counts.get("dashboard_snapshot") or 0) > 0,
+        "channel_inventory": int(counts.get("channel_inventory") or 0) > 0,
+        "decision_queue": int(counts.get("decision_queue") or 0) > 0,
+        "safety_monitor": int(counts.get("safety_monitor") or 0) > 0,
+        "meter_subscription": meter.get("subscribed") is True,
+        "meter_frame": int(counts.get("meter_frame") or 0) > 0
+        and int(meter.get("read_only_frames") or 0) > 0,
+        "meter_channel_levels": int(meter.get("max_channel_count") or 0) > 0,
+        "analyzer_status": bool(dashboard.get("has_analyzer")),
+        "master_bus_status": bool(dashboard.get("has_master_bus")),
+    }
+    missing = [surface for surface in RUNTIME_CONTRACT_SURFACES if not checks.get(surface)]
+    return {
+        "required_surfaces": list(RUNTIME_CONTRACT_SURFACES),
+        "checks": checks,
+        "missing_surfaces": missing,
+        "complete": not missing,
+        "read_only": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
     }
 
 
@@ -354,11 +402,14 @@ async def run(args: argparse.Namespace) -> int:
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True, default=json_default))
         return 4
-    if summary["counts"]["dashboard_snapshot"] <= 0 or summary["counts"]["meter_frame"] <= 0:
+
+    runtime_contract = _operator_runtime_contract(summary)
+    summary["operator_runtime_contract"] = runtime_contract
+    if not runtime_contract["complete"]:
         summary.update(
             {
                 "status": "blocked",
-                "reason": "dashboard_or_meter_telemetry_missing",
+                "reason": "operator_runtime_contract_incomplete",
             }
         )
         recorder.write_summary(summary)

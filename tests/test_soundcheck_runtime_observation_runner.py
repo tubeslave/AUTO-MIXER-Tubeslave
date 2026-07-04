@@ -133,6 +133,9 @@ async def test_runtime_observation_collects_readonly_dashboard_and_meter(
     assert summary["dashboard_contract"]["has_master_bus"] is True
     assert summary["dashboard_contract"]["has_analyzer"] is True
     assert summary["dashboard_contract"]["analyzer_available_count"] == 1
+    assert summary["operator_runtime_contract"]["complete"] is True
+    assert summary["operator_runtime_contract"]["missing_surfaces"] == []
+    assert all(summary["operator_runtime_contract"]["checks"].values())
     assert summary["meter_contract"]["subscribed"] is True
     assert summary["meter_contract"]["read_only_frames"] == 1
     assert summary["meter_contract"]["live_write_frames"] == 0
@@ -185,3 +188,52 @@ async def test_runtime_observation_marks_unexpected_live_apply_for_manual_review
     assert summary["live_apply_request_sent"] is False
     assert summary["counts"]["unexpected_live_event"] == 1
     assert summary["unexpected_live_events"][0]["type"] == "operator_proposal_apply_result"
+
+
+@pytest.mark.asyncio
+async def test_runtime_observation_blocks_when_operator_runtime_surfaces_are_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    websocket = FakeWebSocket(
+        [
+            {"type": "meter_stream_status", "subscribed": True, "read_only": True, "live_write": False},
+            {
+                "type": "dashboard_snapshot",
+                "connection": {"connected": True},
+                "master_bus": {"available": True, "read_only": True},
+                "analyzer": {"available": True, "spectrum_bins": [10, 20, 30], "read_only": True},
+            },
+            {
+                "type": "meter_frame",
+                "available": True,
+                "read_only": True,
+                "live_write": False,
+                "channels": [{"channel": 1, "rms_db": -32.0, "peak_db": -12.0}],
+            },
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+    args = parse_args(tmp_path, "--max-events", "3")
+
+    exit_code = await runner.run(args)
+
+    assert exit_code == 5
+    sent_types = [request["type"] for request in websocket.sent]
+    assert not set(sent_types) & runner.WRITE_REQUEST_TYPES
+
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "operator_runtime_contract_incomplete"
+    contract = summary["operator_runtime_contract"]
+    assert contract["complete"] is False
+    assert contract["checks"]["connection_state"] is True
+    assert contract["checks"]["meter_frame"] is True
+    assert contract["checks"]["analyzer_status"] is True
+    assert contract["checks"]["master_bus_status"] is True
+    assert "operator_mode_status" in contract["missing_surfaces"]
+    assert "channel_inventory" in contract["missing_surfaces"]
+    assert "decision_queue" in contract["missing_surfaces"]
+    assert "safety_monitor" in contract["missing_surfaces"]
+    assert summary["write_request_sent"] is False
+    assert summary["live_apply_request_sent"] is False
