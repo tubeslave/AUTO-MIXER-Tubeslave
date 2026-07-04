@@ -1,17 +1,17 @@
 # Current State
 
-Generated: 2026-07-04T22:09:42Z
+Generated: 2026-07-04T22:24:01Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `223b8d433 Bind M005 canonical artifact path to verifier`
+  `b605b20f4 Bind M005 event sequence to owner verifier`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the M005 canonical
-  artifact-path owner-verifier binding commit `223b8d433`; ignored
+- Tracked worktree state before this sync: clean after the M005 event-sequence
+  owner-verifier binding commit `b605b20f4`; ignored
   large/superseded local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
@@ -103,6 +103,13 @@ Generated: 2026-07-04T22:09:42Z
   sibling `events.jsonl` in the same run directory. This prevents temp-root
   or copied M005 summaries from becoming owner-review input and grants no
   backend/WING contact or live authority.
+- `b605b20f4` binds M005 owner-review input to the request sequence proven by
+  both `sent_request_types` and `events.jsonl` send rows: baseline query must
+  precede supervised proposal setup, stale-state query must precede the
+  blocked `apply_operator_proposal` probe, and observation-only reconnect plus
+  the final query must happen after that blocked probe. This prevents
+  reordered or hand-edited M005 evidence from becoming owner-review input and
+  grants no backend/WING contact or live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2037,9 +2044,11 @@ Generated: 2026-07-04T22:09:42Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `223b8d433` passed with
-  `5474 passed, 1 skipped`. This includes the M005 canonical artifact-path
-  owner-verifier binding, the M005 event-log owner-verifier binding, the M005 request-audit owner-verifier binding, M005 reconnect evidence contract hardening, M006 owner-readiness
+- The latest verified full-suite run for `b605b20f4` passed with
+  `5475 passed, 1 skipped`. This includes the M005 event-sequence
+  owner-verifier binding, the M005 canonical artifact-path owner-verifier
+  binding, the M005 event-log owner-verifier binding, the M005 request-audit
+  owner-verifier binding, M005 reconnect evidence contract hardening, M006 owner-readiness
   packet verifier phase-detail checks plus the local SmartDSP
   WING-native fit, DSP-parameter calculation summary, problem-first action
   decision summary evidence tests, the current read-only handoff scope rail and

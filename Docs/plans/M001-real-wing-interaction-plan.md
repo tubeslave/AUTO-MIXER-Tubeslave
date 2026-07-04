@@ -39,6 +39,11 @@ Current gate state:
   supervised proof step;
 - allowed current WING live-write proof types: `fader` and `gain` only;
 - allowed current write direction: small negative move only.
+- M006 owner-review verifier input now also requires complete M005
+  request/event ordering evidence: stale-state query before the blocked
+  `apply_operator_proposal` probe, then observation-only reconnect and final
+  query after the blocked probe. This is offline artifact verification only
+  and does not run M005 or grant live authority.
 
 ## Hard Safety Boundary
 
@@ -355,7 +360,8 @@ operator/owner action, unattended Codex work may execute only the safe slice:
 11. report-only M006 owner review packets and offline verifiers that inventory
    accepted fader/gain proof artifacts, cross-check packet proof rows against
    the referenced proof summaries, require a complete M005 summary contract,
-   and keep readiness updates blocked until M005 and owner acceptance.
+   require M005 request/event sequence ordering, and keep readiness updates
+   blocked until M005 and owner acceptance.
 
 Codex must not execute or retry the supervised proof unattended; this now also
 includes the M005 physical cable-loss proof, reconnect proof and any supervised
