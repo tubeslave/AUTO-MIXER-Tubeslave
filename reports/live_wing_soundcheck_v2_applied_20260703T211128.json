@@ -1,0 +1,2805 @@
+{
+  "applied_at": "20260703T211128",
+  "plan": {
+    "plan_id": "soundcheck_v2_20260703T211128.safety_gate",
+    "created_at": 1783102288.021743,
+    "mode": "soundcheck",
+    "decisions": [
+      {
+        "id": "trim.ch1",
+        "action_type": "gain_correction",
+        "target": "ch1",
+        "parameters": {
+          "gain_db": -11.61,
+          "absolute_trim_db": -11.6
+        },
+        "reason": "gain staging: TP -6.4 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch1.b2",
+        "action_type": "eq_correction",
+        "target": "ch1",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 268.3,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 1.22
+        },
+        "reason": "spectral_ceiling_eq: kick_foundation_punch, tilt -7.4->-4.5 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch1",
+        "action_type": "compression_correction",
+        "target": "ch1",
+        "parameters": {
+          "ratio": 4.0,
+          "threshold_db": -29.0,
+          "makeup_db": 2.0,
+          "attack_ms": 2.0,
+          "release_ms": 90.0
+        },
+        "reason": "crest 26.4 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch2",
+        "action_type": "gain_correction",
+        "target": "ch2",
+        "parameters": {
+          "gain_db": -9.75,
+          "absolute_trim_db": -9.7
+        },
+        "reason": "gain staging: TP -8.3 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch2.b2",
+        "action_type": "eq_correction",
+        "target": "ch2",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 707.1,
+          "gain_db": -0.75,
+          "absolute_gain_db": -0.75,
+          "q": 1.41
+        },
+        "reason": "spectral_ceiling_eq: snare_body_snap, tilt -4.9->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch2.b3",
+        "action_type": "eq_correction",
+        "target": "ch2",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 2291.3,
+          "gain_db": 0.9,
+          "absolute_gain_db": 0.9,
+          "q": 1.15
+        },
+        "reason": "spectral_ceiling_eq: snare_body_snap, tilt -4.9->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch2.b4",
+        "action_type": "eq_correction",
+        "target": "ch2",
+        "parameters": {
+          "band": 4,
+          "frequency_hz": 5656.9,
+          "gain_db": 0.7,
+          "absolute_gain_db": 0.7,
+          "q": 1.41
+        },
+        "reason": "spectral_ceiling_eq: snare_body_snap, tilt -4.9->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch2",
+        "action_type": "compression_correction",
+        "target": "ch2",
+        "parameters": {
+          "ratio": 4.0,
+          "threshold_db": -31.0,
+          "makeup_db": 2.0,
+          "attack_ms": 2.0,
+          "release_ms": 90.0
+        },
+        "reason": "crest 27.2 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch3",
+        "action_type": "gain_correction",
+        "target": "ch3",
+        "parameters": {
+          "gain_db": -14.67,
+          "absolute_trim_db": -14.7
+        },
+        "reason": "gain staging: TP -3.3 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch3.b2",
+        "action_type": "eq_correction",
+        "target": "ch3",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 707.1,
+          "gain_db": -0.53,
+          "absolute_gain_db": -0.53,
+          "q": 1.41
+        },
+        "reason": "spectral_ceiling_eq: snare_body_snap, tilt -3.5->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch3.b3",
+        "action_type": "eq_correction",
+        "target": "ch3",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 3873.0,
+          "gain_db": -0.8,
+          "absolute_gain_db": -0.8,
+          "q": 1.11
+        },
+        "reason": "spectral_ceiling_eq: snare_body_snap, tilt -3.5->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch3",
+        "action_type": "compression_correction",
+        "target": "ch3",
+        "parameters": {
+          "ratio": 4.0,
+          "threshold_db": -24.0,
+          "makeup_db": 2.0,
+          "attack_ms": 2.0,
+          "release_ms": 90.0
+        },
+        "reason": "crest 25.0 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch4",
+        "action_type": "gain_correction",
+        "target": "ch4",
+        "parameters": {
+          "gain_db": 6.0,
+          "absolute_trim_db": 6.0
+        },
+        "reason": "gain staging: TP -24.7 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch4.b2",
+        "action_type": "eq_correction",
+        "target": "ch4",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 268.3,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 1.22
+        },
+        "reason": "spectral_ceiling_eq: tom_body_attack_control, tilt -3.6->-4.5 dB/oct",
+        "confidence": 0.794,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch4.b4",
+        "action_type": "eq_correction",
+        "target": "ch4",
+        "parameters": {
+          "band": 4,
+          "frequency_hz": 6708.2,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 1.68
+        },
+        "reason": "spectral_ceiling_eq: tom_body_attack_control, tilt -3.6->-4.5 dB/oct",
+        "confidence": 0.794,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch4",
+        "action_type": "compression_correction",
+        "target": "ch4",
+        "parameters": {
+          "ratio": 4.0,
+          "threshold_db": -40.0,
+          "makeup_db": 1.976927699982867,
+          "attack_ms": 2.0,
+          "release_ms": 90.0
+        },
+        "reason": "crest 21.9 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch5",
+        "action_type": "gain_correction",
+        "target": "ch5",
+        "parameters": {
+          "gain_db": 6.0,
+          "absolute_trim_db": 6.0
+        },
+        "reason": "gain staging: TP -24.6 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch5.b2",
+        "action_type": "eq_correction",
+        "target": "ch5",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 229.1,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 1.15
+        },
+        "reason": "spectral_ceiling_eq: floor_tom_low_body_control, tilt -4.6->-4.5 dB/oct",
+        "confidence": 0.859,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch5",
+        "action_type": "compression_correction",
+        "target": "ch5",
+        "parameters": {
+          "ratio": 4.0,
+          "threshold_db": -40.0,
+          "makeup_db": 1.3894998882010947,
+          "attack_ms": 2.0,
+          "release_ms": 90.0
+        },
+        "reason": "crest 19.6 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch6",
+        "action_type": "gain_correction",
+        "target": "ch6",
+        "parameters": {
+          "gain_db": 3.79,
+          "absolute_trim_db": 3.8
+        },
+        "reason": "gain staging: TP -21.8 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch6.b1",
+        "action_type": "eq_correction",
+        "target": "ch6",
+        "parameters": {
+          "band": 1,
+          "frequency_hz": 154.9,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 0.7
+        },
+        "reason": "spectral_ceiling_eq: overheads_air_control, tilt -4.0->-1.5 dB/oct",
+        "confidence": 0.836,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch6.b3",
+        "action_type": "eq_correction",
+        "target": "ch6",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 4582.6,
+          "gain_db": 0.69,
+          "absolute_gain_db": 0.69,
+          "q": 1.15
+        },
+        "reason": "spectral_ceiling_eq: overheads_air_control, tilt -4.0->-1.5 dB/oct",
+        "confidence": 0.836,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch6.b4",
+        "action_type": "eq_correction",
+        "target": "ch6",
+        "parameters": {
+          "band": 4,
+          "frequency_hz": 11313.7,
+          "gain_db": 0.8,
+          "absolute_gain_db": 0.8,
+          "q": 1.41
+        },
+        "reason": "spectral_ceiling_eq: overheads_air_control, tilt -4.0->-1.5 dB/oct",
+        "confidence": 0.836,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch6",
+        "action_type": "compression_correction",
+        "target": "ch6",
+        "parameters": {
+          "ratio": 3.0,
+          "threshold_db": -40.0,
+          "makeup_db": 2.0,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 22.7 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch7.b1",
+        "action_type": "eq_correction",
+        "target": "ch7",
+        "parameters": {
+          "band": 1,
+          "frequency_hz": 154.9,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 0.7
+        },
+        "reason": "spectral_ceiling_eq: overheads_air_control, tilt -1.8->-1.5 dB/oct",
+        "confidence": 0.96,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch7.b3",
+        "action_type": "eq_correction",
+        "target": "ch7",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 4899.0,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 0.98
+        },
+        "reason": "spectral_ceiling_eq: overheads_air_control, tilt -1.8->-1.5 dB/oct",
+        "confidence": 0.96,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch7",
+        "action_type": "compression_correction",
+        "target": "ch7",
+        "parameters": {
+          "ratio": 2.5,
+          "threshold_db": -32.0,
+          "makeup_db": 0.9104358069144531,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 17.6 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch8",
+        "action_type": "gain_correction",
+        "target": "ch8",
+        "parameters": {
+          "gain_db": -1.91,
+          "absolute_trim_db": -1.9
+        },
+        "reason": "gain staging: TP -16.1 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch8.b1",
+        "action_type": "eq_correction",
+        "target": "ch8",
+        "parameters": {
+          "band": 1,
+          "frequency_hz": 67.1,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 1.22
+        },
+        "reason": "spectral_ceiling_eq: bass_foundation_definition, tilt -9.9->-4.5 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch8.b2",
+        "action_type": "eq_correction",
+        "target": "ch8",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 229.1,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 1.15
+        },
+        "reason": "spectral_ceiling_eq: bass_foundation_definition, tilt -9.9->-4.5 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch8.b3",
+        "action_type": "eq_correction",
+        "target": "ch8",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 2121.3,
+          "gain_db": 1.0,
+          "absolute_gain_db": 1.0,
+          "q": 1.41
+        },
+        "reason": "spectral_ceiling_eq: bass_foundation_definition, tilt -9.9->-4.5 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch8",
+        "action_type": "compression_correction",
+        "target": "ch8",
+        "parameters": {
+          "ratio": 2.5,
+          "threshold_db": -28.0,
+          "makeup_db": 0.45831312239604927,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 15.8 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch9",
+        "action_type": "gain_correction",
+        "target": "ch9",
+        "parameters": {
+          "gain_db": -3.85,
+          "absolute_trim_db": -3.9
+        },
+        "reason": "gain staging: TP -14.1 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch9.b2",
+        "action_type": "eq_correction",
+        "target": "ch9",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 268.3,
+          "gain_db": -1.2,
+          "absolute_gain_db": -1.2,
+          "q": 1.22
+        },
+        "reason": "spectral_ceiling_eq: electric_guitar_midrange, tilt -6.0->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch9.b3",
+        "action_type": "eq_correction",
+        "target": "ch9",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 4582.6,
+          "gain_db": 0.73,
+          "absolute_gain_db": 0.73,
+          "q": 1.83
+        },
+        "reason": "spectral_ceiling_eq: electric_guitar_midrange, tilt -6.0->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch9",
+        "action_type": "compression_correction",
+        "target": "ch9",
+        "parameters": {
+          "ratio": 2.5,
+          "threshold_db": -23.0,
+          "makeup_db": 0.0,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 13.2 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch10",
+        "action_type": "gain_correction",
+        "target": "ch10",
+        "parameters": {
+          "gain_db": -3.2,
+          "absolute_trim_db": -3.2
+        },
+        "reason": "gain staging: TP -14.8 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch10.b2",
+        "action_type": "eq_correction",
+        "target": "ch10",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 268.3,
+          "gain_db": -1.08,
+          "absolute_gain_db": -1.08,
+          "q": 1.22
+        },
+        "reason": "spectral_ceiling_eq: electric_guitar_midrange, tilt -6.6->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch10.b3",
+        "action_type": "eq_correction",
+        "target": "ch10",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 4582.6,
+          "gain_db": 1.0,
+          "absolute_gain_db": 1.0,
+          "q": 1.83
+        },
+        "reason": "spectral_ceiling_eq: electric_guitar_midrange, tilt -6.6->-3.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch10",
+        "action_type": "compression_correction",
+        "target": "ch10",
+        "parameters": {
+          "ratio": 2.5,
+          "threshold_db": -23.0,
+          "makeup_db": 0.0,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 12.4 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch11",
+        "action_type": "gain_correction",
+        "target": "ch11",
+        "parameters": {
+          "gain_db": -3.41,
+          "absolute_trim_db": -3.4
+        },
+        "reason": "gain staging: TP -14.6 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch11.b2",
+        "action_type": "eq_correction",
+        "target": "ch11",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 300.0,
+          "gain_db": 0.6,
+          "absolute_gain_db": 0.6,
+          "q": 0.67
+        },
+        "reason": "spectral_ceiling_eq: playback_synth_percussion_pad_support, tilt -3.6->-6.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch11.b3",
+        "action_type": "eq_correction",
+        "target": "ch11",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 5196.2,
+          "gain_db": -1.12,
+          "absolute_gain_db": -1.12,
+          "q": 0.87
+        },
+        "reason": "spectral_ceiling_eq: playback_synth_percussion_pad_support, tilt -3.6->-6.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch11",
+        "action_type": "compression_correction",
+        "target": "ch11",
+        "parameters": {
+          "ratio": 2.5,
+          "threshold_db": -25.0,
+          "makeup_db": 0.15474963693889254,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 14.6 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch12",
+        "action_type": "gain_correction",
+        "target": "ch12",
+        "parameters": {
+          "gain_db": -3.14,
+          "absolute_trim_db": -3.1
+        },
+        "reason": "gain staging: TP -14.9 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch12.b2",
+        "action_type": "eq_correction",
+        "target": "ch12",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 300.0,
+          "gain_db": 0.6,
+          "absolute_gain_db": 0.6,
+          "q": 0.67
+        },
+        "reason": "spectral_ceiling_eq: playback_synth_percussion_pad_support, tilt -4.1->-6.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch12.b3",
+        "action_type": "eq_correction",
+        "target": "ch12",
+        "parameters": {
+          "band": 3,
+          "frequency_hz": 5196.2,
+          "gain_db": -0.8,
+          "absolute_gain_db": -0.8,
+          "q": 0.87
+        },
+        "reason": "spectral_ceiling_eq: playback_synth_percussion_pad_support, tilt -4.1->-6.0 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch12",
+        "action_type": "compression_correction",
+        "target": "ch12",
+        "parameters": {
+          "ratio": 2.5,
+          "threshold_db": -25.0,
+          "makeup_db": 0.15396665488124484,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 14.6 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch13",
+        "action_type": "gain_correction",
+        "target": "ch13",
+        "parameters": {
+          "gain_db": 0.95,
+          "absolute_trim_db": 0.9
+        },
+        "reason": "gain staging: TP -18.9 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch13.b2",
+        "action_type": "eq_correction",
+        "target": "ch13",
+        "parameters": {
+          "band": 2,
+          "frequency_hz": 273.9,
+          "gain_db": 0.8,
+          "absolute_gain_db": 0.8,
+          "q": 0.78
+        },
+        "reason": "spectral_ceiling_eq: keys_support_space, tilt 1.7->-4.5 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "eq.ch13.b4",
+        "action_type": "eq_correction",
+        "target": "ch13",
+        "parameters": {
+          "band": 4,
+          "frequency_hz": 10583.0,
+          "gain_db": 0.8,
+          "absolute_gain_db": 0.8,
+          "q": 1.76
+        },
+        "reason": "spectral_ceiling_eq: keys_support_space, tilt 1.7->-4.5 dB/oct",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "heuristics.spectral_ceiling_eq"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch13",
+        "action_type": "compression_correction",
+        "target": "ch13",
+        "parameters": {
+          "ratio": 2.5,
+          "threshold_db": -28.0,
+          "makeup_db": 0.0,
+          "attack_ms": 5.0,
+          "release_ms": 150.0
+        },
+        "reason": "crest 13.3 dB -> bounded compression для контроля crest factor",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch14",
+        "action_type": "gain_correction",
+        "target": "ch14",
+        "parameters": {
+          "gain_db": 4.11,
+          "absolute_trim_db": 4.1
+        },
+        "reason": "gain staging: TP -22.1 dBTP -> цель -18.0",
+        "confidence": 0.333,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch14",
+        "action_type": "compression_correction",
+        "target": "ch14",
+        "parameters": {
+          "ratio": 4.0,
+          "threshold_db": -35.0,
+          "makeup_db": 0.796263547981992,
+          "attack_ms": 2.0,
+          "release_ms": 90.0
+        },
+        "reason": "crest 17.2 dB -> bounded compression для контроля crest factor",
+        "confidence": 0.333,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "trim.ch15",
+        "action_type": "gain_correction",
+        "target": "ch15",
+        "parameters": {
+          "gain_db": 4.84,
+          "absolute_trim_db": 4.8
+        },
+        "reason": "gain staging: TP -22.8 dBTP -> цель -18.0",
+        "confidence": 0.339,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "comp.ch15",
+        "action_type": "compression_correction",
+        "target": "ch15",
+        "parameters": {
+          "ratio": 4.0,
+          "threshold_db": -36.0,
+          "makeup_db": 0.802111978951614,
+          "attack_ms": 2.0,
+          "release_ms": 90.0
+        },
+        "reason": "crest 17.2 dB -> bounded compression для контроля crest factor",
+        "confidence": 0.339,
+        "risk_level": "low",
+        "source_modules": [
+          "crest_control"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "compression_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch1",
+        "action_type": "gain_correction",
+        "target": "ch1.fader",
+        "parameters": {
+          "gain_db": -0.8,
+          "absolute_fader_db": -0.8,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch3",
+        "action_type": "gain_correction",
+        "target": "ch3.fader",
+        "parameters": {
+          "gain_db": -2.2,
+          "absolute_fader_db": -2.2,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch4",
+        "action_type": "gain_correction",
+        "target": "ch4.fader",
+        "parameters": {
+          "gain_db": -7.6,
+          "absolute_fader_db": -7.6,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -28.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch5",
+        "action_type": "gain_correction",
+        "target": "ch5.fader",
+        "parameters": {
+          "gain_db": -10.0,
+          "absolute_fader_db": -10.0,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -28.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch6",
+        "action_type": "gain_correction",
+        "target": "ch6.fader",
+        "parameters": {
+          "gain_db": -7.5,
+          "absolute_fader_db": -7.5,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -28.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch7",
+        "action_type": "gain_correction",
+        "target": "ch7.fader",
+        "parameters": {
+          "gain_db": -12.6,
+          "absolute_fader_db": -12.6,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -28.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch8",
+        "action_type": "gain_correction",
+        "target": "ch8.fader",
+        "parameters": {
+          "gain_db": -11.4,
+          "absolute_fader_db": -11.4,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch9",
+        "action_type": "gain_correction",
+        "target": "ch9.fader",
+        "parameters": {
+          "gain_db": -14.0,
+          "absolute_fader_db": -14.0,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch10",
+        "action_type": "gain_correction",
+        "target": "ch10.fader",
+        "parameters": {
+          "gain_db": -14.8,
+          "absolute_fader_db": -14.8,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch11",
+        "action_type": "gain_correction",
+        "target": "ch11.fader",
+        "parameters": {
+          "gain_db": -12.6,
+          "absolute_fader_db": -12.6,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch12",
+        "action_type": "gain_correction",
+        "target": "ch12.fader",
+        "parameters": {
+          "gain_db": -12.6,
+          "absolute_fader_db": -12.6,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch14",
+        "action_type": "gain_correction",
+        "target": "ch14.fader",
+        "parameters": {
+          "gain_db": -10.0,
+          "absolute_fader_db": -10.0,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "fader.ch15",
+        "action_type": "gain_correction",
+        "target": "ch15.fader",
+        "parameters": {
+          "gain_db": -10.0,
+          "absolute_fader_db": -10.0,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      }
+    ],
+    "source_modules": [
+      "live_wing_soundcheck_v2",
+      "safety_gate_v2"
+    ],
+    "input_summary": {},
+    "notes": [
+      "Safety Gate v2 evaluated this plan before Executor.",
+      "Plan may be executed by Executor."
+    ]
+  },
+  "blocked": [
+    {
+      "id": "trim.ch7",
+      "target": "ch7",
+      "action_type": "gain_correction",
+      "reason": "inside_gain_hysteresis",
+      "decision": {
+        "id": "trim.ch7",
+        "action_type": "gain_correction",
+        "target": "ch7",
+        "parameters": {
+          "gain_db": -0.11,
+          "absolute_trim_db": -0.1
+        },
+        "reason": "gain staging: TP -17.9 dBTP -> цель -18.0",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "lufs_gain_staging.TruePeakMeter"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {}
+      }
+    },
+    {
+      "id": "fader.ch2",
+      "target": "ch2.fader",
+      "action_type": "gain_correction",
+      "reason": "inside_gain_hysteresis",
+      "decision": {
+        "id": "fader.ch2",
+        "action_type": "gain_correction",
+        "target": "ch2.fader",
+        "parameters": {
+          "gain_db": 0.0,
+          "absolute_fader_db": 0.0,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -25.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {}
+      }
+    },
+    {
+      "id": "fader.ch13",
+      "target": "ch13.fader",
+      "action_type": "gain_correction",
+      "reason": "gain_step_exceeds_limit",
+      "decision": {
+        "id": "fader.ch13",
+        "action_type": "gain_correction",
+        "target": "ch13.fader",
+        "parameters": {
+          "gain_db": -19.0,
+          "absolute_fader_db": -19.0,
+          "is_fader_plane": true
+        },
+        "reason": "плоскость Ayaic -30.0 LUFS, сдвиг -20.2",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [
+          "ayaic_planes"
+        ],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {}
+      }
+    }
+  ],
+  "channels": [
+    {
+      "ch": 1,
+      "name": "KICK",
+      "role": "kick",
+      "conf": 1.0,
+      "how": "имя 'KICK'",
+      "meas": {
+        "st_max_lufs": -25.325265884399414,
+        "est_lufs": -32.775922750171866,
+        "true_peak_dbtp": -6.385491269696553,
+        "crest_db": 26.390431480475314
+      },
+      "cur_trim": 0.0,
+      "new_trim": -11.614508730303447,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            268.32815729997475,
+            -1.2,
+            1.2196734422726125
+          ]
+        ]
+      ],
+      "hpf": 32.5,
+      "fader": -0.8,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 2,
+      "name": "SNARE T",
+      "role": "snare",
+      "conf": 1.0,
+      "how": "имя 'SNARE T'",
+      "meas": {
+        "st_max_lufs": -26.174901962280273,
+        "est_lufs": -35.471943837946114,
+        "true_peak_dbtp": -8.250694608827018,
+        "crest_db": 27.221249229119096
+      },
+      "cur_trim": 0.0,
+      "new_trim": -9.749305391172982,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            707.1067811865476,
+            -0.752,
+            1.4142135623730951
+          ]
+        ],
+        [
+          3,
+          [
+            2291.28784747792,
+            0.897,
+            1.14564392373896
+          ]
+        ],
+        [
+          4,
+          [
+            5656.85424949238,
+            0.702,
+            1.4142135623730951
+          ]
+        ]
+      ],
+      "hpf": 115.0,
+      "fader": 0.0,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 3,
+      "name": "SNARE B",
+      "role": "snare",
+      "conf": 1.0,
+      "how": "имя 'SNARE B'",
+      "meas": {
+        "st_max_lufs": -20.263246536254883,
+        "est_lufs": -28.363377990722658,
+        "true_peak_dbtp": -3.327109223290459,
+        "crest_db": 25.036268767432198
+      },
+      "cur_trim": 0.0,
+      "new_trim": -14.67289077670954,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            707.1067811865476,
+            -0.525,
+            1.4142135623730951
+          ]
+        ],
+        [
+          3,
+          [
+            3872.983346207417,
+            -0.797,
+            1.1065666703449764
+          ]
+        ]
+      ],
+      "hpf": 115.0,
+      "fader": -2.2,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 4,
+      "name": "TOM",
+      "role": "tom",
+      "conf": 1.0,
+      "how": "имя 'TOM'",
+      "meas": {
+        "st_max_lufs": -40.629600524902344,
+        "est_lufs": -46.60079498291016,
+        "true_peak_dbtp": -24.69308418297869,
+        "crest_db": 21.90771079993147
+      },
+      "cur_trim": 0.0,
+      "new_trim": 6.0,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            268.32815729997475,
+            -1.2,
+            1.2196734422726125
+          ]
+        ],
+        [
+          4,
+          [
+            6708.203932499369,
+            -1.2,
+            1.6770509831248424
+          ]
+        ]
+      ],
+      "hpf": 62.5,
+      "fader": -7.6,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 5,
+      "name": "F TOM",
+      "role": "floor_tom",
+      "conf": 1.0,
+      "how": "имя 'F TOM'",
+      "meas": {
+        "st_max_lufs": -39.787376403808594,
+        "est_lufs": -44.17251701354981,
+        "true_peak_dbtp": -24.61451746074543,
+        "crest_db": 19.55799955280438
+      },
+      "cur_trim": 0.0,
+      "new_trim": 6.0,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            229.128784747792,
+            -1.2,
+            1.14564392373896
+          ]
+        ]
+      ],
+      "hpf": 47.5,
+      "fader": -10.0,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 6,
+      "name": "OH L",
+      "role": "overheads",
+      "conf": 1.0,
+      "how": "имя 'OH L'",
+      "meas": {
+        "st_max_lufs": -38.460205078125,
+        "est_lufs": -44.495649337768555,
+        "true_peak_dbtp": -21.792166138317484,
+        "crest_db": 22.70348319945107
+      },
+      "cur_trim": 0.0,
+      "new_trim": 3.7921661383174836,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          1,
+          [
+            154.91933384829667,
+            -1.2,
+            0.7041787902195303
+          ]
+        ],
+        [
+          3,
+          [
+            4582.57569495584,
+            0.688,
+            1.14564392373896
+          ]
+        ],
+        [
+          4,
+          [
+            11313.70849898476,
+            0.8,
+            1.4142135623730951
+          ]
+        ]
+      ],
+      "hpf": 400.0,
+      "fader": -7.5,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 7,
+      "name": "OH R",
+      "role": "overheads",
+      "conf": 1.0,
+      "how": "имя 'OH R'",
+      "meas": {
+        "st_max_lufs": -30.626440048217773,
+        "est_lufs": -35.52704975605011,
+        "true_peak_dbtp": -17.8853065283923,
+        "crest_db": 17.641743227657813
+      },
+      "cur_trim": 0.0,
+      "new_trim": -0.11469347160770127,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          1,
+          [
+            154.91933384829667,
+            -1.2,
+            0.7041787902195303
+          ]
+        ],
+        [
+          3,
+          [
+            4898.979485566356,
+            -1.2,
+            0.9797958971132712
+          ]
+        ]
+      ],
+      "hpf": 275.0,
+      "fader": -12.6,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 8,
+      "name": "BASS",
+      "role": "bass",
+      "conf": 1.0,
+      "how": "имя 'BASS'",
+      "meas": {
+        "st_max_lufs": -29.264646530151367,
+        "est_lufs": -31.92441060945585,
+        "true_peak_dbtp": -16.091158119871654,
+        "crest_db": 15.833252489584197
+      },
+      "cur_trim": 0.0,
+      "new_trim": -1.908841880128346,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          1,
+          [
+            67.08203932499369,
+            -1.2,
+            1.2196734422726125
+          ]
+        ],
+        [
+          2,
+          [
+            229.128784747792,
+            -1.2,
+            1.14564392373896
+          ]
+        ],
+        [
+          3,
+          [
+            2121.3203435596424,
+            1.0,
+            1.414213562373095
+          ]
+        ]
+      ],
+      "hpf": 37.5,
+      "fader": -11.4,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 9,
+      "name": "GUITAR L",
+      "role": "guitar",
+      "conf": 1.0,
+      "how": "имя 'GUITAR L'",
+      "meas": {
+        "st_max_lufs": -21.953655242919922,
+        "est_lufs": -27.389843225479126,
+        "true_peak_dbtp": -14.1460948548055,
+        "crest_db": 13.243748370673625
+      },
+      "cur_trim": 0.0,
+      "new_trim": -3.8539051451944992,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            268.32815729997475,
+            -1.2,
+            1.2196734422726125
+          ]
+        ],
+        [
+          3,
+          [
+            4582.57569495584,
+            0.735,
+            1.833030277982336
+          ]
+        ]
+      ],
+      "hpf": 115.0,
+      "fader": -14.0,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 10,
+      "name": "GUITAR R",
+      "role": "guitar",
+      "conf": 1.0,
+      "how": "имя 'GUITAR R'",
+      "meas": {
+        "st_max_lufs": -22.128551483154297,
+        "est_lufs": -27.194921684265136,
+        "true_peak_dbtp": -14.801925869544236,
+        "crest_db": 12.3929958147209
+      },
+      "cur_trim": 0.0,
+      "new_trim": -3.1980741304557636,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            268.32815729997475,
+            -1.085,
+            1.2196734422726125
+          ]
+        ],
+        [
+          3,
+          [
+            4582.57569495584,
+            1.0,
+            1.833030277982336
+          ]
+        ]
+      ],
+      "hpf": 115.0,
+      "fader": -14.8,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 11,
+      "name": "PLAYBACK L",
+      "role": "playback",
+      "conf": 1.0,
+      "how": "имя 'PLAYBACK L'",
+      "meas": {
+        "st_max_lufs": -26.711421966552734,
+        "est_lufs": -29.205853962898253,
+        "true_peak_dbtp": -14.586855415142683,
+        "crest_db": 14.61899854775557
+      },
+      "cur_trim": 0.0,
+      "new_trim": -3.413144584857317,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            300.0,
+            0.6,
+            0.6666666666666666
+          ]
+        ],
+        [
+          3,
+          [
+            5196.152422706632,
+            -1.12,
+            0.8660254037844387
+          ]
+        ]
+      ],
+      "hpf": 80.0,
+      "fader": -12.6,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 12,
+      "name": "PLAYBACK R",
+      "role": "playback",
+      "conf": 1.0,
+      "how": "имя 'PLAYBACK R'",
+      "meas": {
+        "st_max_lufs": -26.298595428466797,
+        "est_lufs": -29.472498893737793,
+        "true_peak_dbtp": -14.856632274212814,
+        "crest_db": 14.61586661952498
+      },
+      "cur_trim": 0.0,
+      "new_trim": -3.1433677257871864,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            300.0,
+            0.6,
+            0.6666666666666666
+          ]
+        ],
+        [
+          3,
+          [
+            5196.152422706632,
+            -0.799,
+            0.8660254037844387
+          ]
+        ]
+      ],
+      "hpf": 80.0,
+      "fader": -12.6,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 13,
+      "name": "ACCORDION",
+      "role": "keys",
+      "conf": 1.0,
+      "how": "имя 'ACCORDION'",
+      "meas": {
+        "st_max_lufs": -28.19745445251465,
+        "est_lufs": -32.20490701198578,
+        "true_peak_dbtp": -18.947254407432656,
+        "crest_db": 13.257652604553126
+      },
+      "cur_trim": 0.0,
+      "new_trim": 0.9472544074326557,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [
+        [
+          2,
+          [
+            273.8612787525831,
+            0.8,
+            0.7824607964359517
+          ]
+        ],
+        [
+          4,
+          [
+            10583.005244258362,
+            0.8,
+            1.7638342073763937
+          ]
+        ]
+      ],
+      "hpf": 105.0,
+      "fader": -19.0,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 14,
+      "name": "BACK L",
+      "role": "snare",
+      "conf": 0.33270053803304567,
+      "how": "классификатор snare (0.33)",
+      "meas": {
+        "st_max_lufs": -35.616188049316406,
+        "est_lufs": -39.29301383278587,
+        "true_peak_dbtp": -22.1079596408579,
+        "crest_db": 17.185054191927968
+      },
+      "cur_trim": 0.0,
+      "new_trim": 4.107959640857899,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [],
+      "hpf": 115.0,
+      "fader": -10.0,
+      "cur_fader": 0.0
+    },
+    {
+      "ch": 15,
+      "name": "BACK R",
+      "role": "snare",
+      "conf": 0.339345762026316,
+      "how": "классификатор snare (0.34)",
+      "meas": {
+        "st_max_lufs": -36.277076721191406,
+        "est_lufs": -40.04570492831144,
+        "true_peak_dbtp": -22.83725701250498,
+        "crest_db": 17.208447915806456
+      },
+      "cur_trim": 0.0,
+      "new_trim": 4.837257012504981,
+      "cur_bands": [
+        [
+          200.0,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          601.3883666992188,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          1499.788330078125,
+          0.0,
+          0.9979702234268188
+        ],
+        [
+          3990.5244140625,
+          0.0,
+          0.9979702234268188
+        ]
+      ],
+      "eq_moves": [],
+      "hpf": 115.0,
+      "fader": -10.0,
+      "cur_fader": 0.0
+    }
+  ]
+}

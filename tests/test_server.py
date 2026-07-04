@@ -845,6 +845,415 @@ class TestAutoMixerServerRuntimeErrors:
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_no_mixer_error_with_authority_denied(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server.mixer_client = None
+        server.broadcast = AsyncMock()
+        command = {"type": "set_pan", "channel": 1, "value": 25.0}
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == "mixer_not_connected"
+        assert payload["surface"] == "voice_command:set_pan"
+        assert payload["command"] == command
+        assert payload["command_type"] == "set_pan"
+        assert payload["channel"] == 1
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_exception_with_authority_denied(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        client.set_channel_pan = MagicMock(side_effect=RuntimeError("pan transport failed"))
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+        command = {"type": "set_pan", "channel": 1, "value": 25.0}
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == "voice_command_exception"
+        assert payload["error"] == "pan transport failed"
+        assert payload["surface"] == "voice_command:set_pan"
+        assert payload["command"] == command
+        assert payload["command_type"] == "set_pan"
+        assert payload["channel"] == 1
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        client.set_channel_pan.assert_called_once_with(1, 25.0)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_unknown_command_with_authority_denied(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+        command = {"type": "raise_master", "channel": 1, "db": 6}
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == "unknown_voice_command"
+        assert payload["surface"] == "voice_command:raise_master"
+        assert payload["command"] == command
+        assert payload["command_type"] == "raise_master"
+        assert payload["channel"] == 1
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        assert client.method_calls == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("command", ["raise channel 1", ["set_fader", 1, -6.0]])
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_malformed_payload_with_authority_denied(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(command)
+
+        expected_request = {"raw_command": command}
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == "malformed_voice_command"
+        assert payload["surface"] == "voice_command"
+        assert payload["command"] == expected_request
+        assert payload["command_type"] == ""
+        assert payload["channel"] is None
+        assert payload["request"] == expected_request
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        assert client.method_calls == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("command", "reason", "method_name"),
+        [
+            ({"type": "set_fader", "value": -6.0}, "missing_channel", "set_channel_fader"),
+            ({"type": "set_gain", "value": -2.0}, "missing_channel", "set_channel_gain"),
+            ({"type": "set_pan", "value": 25.0}, "missing_channel", "set_channel_pan"),
+            ({"type": "mute_channel", "muted": True}, "missing_channel", "set_channel_mute"),
+            ({"type": "volume_up", "db": 1}, "missing_channel", "set_channel_fader"),
+            ({"type": "volume_down", "db": 1}, "missing_channel", "set_channel_fader"),
+            ({"type": "load_snap"}, "missing_snap_name", "load_snap"),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_invalid_basic_request_without_mixer_write(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        reason,
+        method_name,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        client.send = MagicMock()
+        client.set_channel_fader = MagicMock(return_value=True)
+        client.set_channel_gain = MagicMock(return_value=True)
+        client.set_channel_pan = MagicMock(return_value=True)
+        client.set_channel_mute = MagicMock(return_value=True)
+        client.load_snap = MagicMock(return_value=True)
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == reason
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["command"] == command
+        assert payload["command_type"] == command["type"]
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        getattr(client, method_name).assert_not_called()
+        client.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("command", "method_name"),
+        [
+            ({"type": "load_snap", "snap_name": "SHOW_A"}, "load_snap"),
+            ({"type": "eq_on", "channel": 1, "on": 1}, "set_eq_on"),
+            ({"type": "eq_band_up", "channel": 1, "band": "2", "db": 1}, "set_eq_band_gain"),
+            ({"type": "compressor_on", "channel": 1, "on": 1}, "set_compressor_on"),
+            (
+                {"type": "compressor_threshold", "channel": 1, "threshold": -18.0},
+                "set_compressor_threshold",
+            ),
+            ({"type": "compressor_gain_up", "channel": 1, "db": 1}, "set_compressor_gain"),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_unsupported_mixer_without_mixer_write(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        method_name,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        client.load_snap = MagicMock(return_value=True)
+        client.set_eq_on = MagicMock(return_value=True)
+        client.get_eq_band_gain = MagicMock(return_value=0.0)
+        client.set_eq_band_gain = MagicMock(return_value=True)
+        client.set_compressor_on = MagicMock(return_value=True)
+        client.set_compressor_threshold = MagicMock(return_value=True)
+        client.get_compressor_gain = MagicMock(return_value=0.0)
+        client.set_compressor_gain = MagicMock(return_value=True)
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == "unsupported_mixer_client"
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["command"] == command
+        assert payload["command_type"] == command["type"]
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        getattr(client, method_name).assert_not_called()
+        client.get_eq_band_gain.assert_not_called()
+        client.get_compressor_gain.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("command", "reason", "method_name"),
+        [
+            ({"type": "eq_band_up", "channel": 1}, "missing_eq_band", "set_eq_band_gain"),
+            (
+                {"type": "compressor_threshold", "channel": 1},
+                "missing_compressor_threshold",
+                "set_compressor_threshold",
+            ),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_missing_supported_fields_without_mixer_write(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        reason,
+        method_name,
+    ):
+        class VoiceMixerStub:
+            pass
+
+        server = AutoMixerServer()
+        client = VoiceMixerStub()
+        client.is_connected = True
+        client.get_eq_band_gain = MagicMock(return_value=0.0)
+        client.set_eq_band_gain = MagicMock(return_value=True)
+        client.set_compressor_threshold = MagicMock(return_value=True)
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        with patch("server.WingClient", new=VoiceMixerStub), \
+             patch("server.EnhancedOSCClient", new=VoiceMixerStub):
+            await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == reason
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["command"] == command
+        assert payload["command_type"] == command["type"]
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        getattr(client, method_name).assert_not_called()
+        client.get_eq_band_gain.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("command", "reason", "method_name"),
+        [
+            ({"type": "set_fader", "channel": 1, "value": "loud"}, "invalid_value", "set_channel_fader"),
+            ({"type": "set_gain", "channel": 1, "value": "nan"}, "invalid_value", "set_channel_gain"),
+            ({"type": "set_pan", "channel": 1, "value": "left"}, "invalid_value", "set_channel_pan"),
+            ({"type": "set_pan", "channel": 1, "value": True}, "invalid_value", "set_channel_pan"),
+            ({"type": "volume_up", "channel": 1, "db": "loud"}, "invalid_db", "set_channel_fader"),
+            ({"type": "volume_down", "channel": 1, "db": "inf"}, "invalid_db", "set_channel_fader"),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_invalid_numeric_basic_request_without_mixer_access(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        reason,
+        method_name,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        client.send = MagicMock()
+        client.get_channel_fader = MagicMock(return_value=-10.0)
+        client.set_channel_fader = MagicMock(return_value=True)
+        client.set_channel_gain = MagicMock(return_value=True)
+        client.set_channel_pan = MagicMock(return_value=True)
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == reason
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["command"] == command
+        assert payload["command_type"] == command["type"]
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        getattr(client, method_name).assert_not_called()
+        client.get_channel_fader.assert_not_called()
+        client.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("command", "reason", "read_method_name", "write_method_name"),
+        [
+            (
+                {"type": "eq_band_up", "channel": 1, "band": "2", "db": "wide"},
+                "invalid_db",
+                "get_eq_band_gain",
+                "set_eq_band_gain",
+            ),
+            (
+                {"type": "compressor_threshold", "channel": 1, "threshold": "low"},
+                "invalid_compressor_threshold",
+                "get_compressor_gain",
+                "set_compressor_threshold",
+            ),
+            (
+                {"type": "compressor_gain_up", "channel": 1, "db": "boost"},
+                "invalid_db",
+                "get_compressor_gain",
+                "set_compressor_gain",
+            ),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_invalid_numeric_wing_request_without_mixer_access(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        reason,
+        read_method_name,
+        write_method_name,
+    ):
+        class VoiceMixerStub:
+            pass
+
+        server = AutoMixerServer()
+        client = VoiceMixerStub()
+        client.is_connected = True
+        client.get_eq_band_gain = MagicMock(return_value=0.0)
+        client.set_eq_band_gain = MagicMock(return_value=True)
+        client.get_compressor_gain = MagicMock(return_value=0.0)
+        client.set_compressor_threshold = MagicMock(return_value=True)
+        client.set_compressor_gain = MagicMock(return_value=True)
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        with patch("server.WingClient", new=VoiceMixerStub), \
+             patch("server.EnhancedOSCClient", new=VoiceMixerStub):
+            await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["status"] == "error"
+        assert payload["success"] is False
+        assert payload["reason"] == reason
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["command"] == command
+        assert payload["command_type"] == command["type"]
+        assert payload["request"] == command
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        getattr(client, read_method_name).assert_not_called()
+        getattr(client, write_method_name).assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
     async def test_execute_voice_command_mute_channel_applies_mute(self, mock_config, mock_bleed):
         server = AutoMixerServer()
         client = MagicMock()
@@ -914,6 +1323,238 @@ class TestAutoMixerServerRuntimeErrors:
         assert payload["channel"] == 1
         assert payload["value"] == 100.0
         client.set_channel_pan.assert_called_once_with(1, 100.0)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        (
+            "command",
+            "method_name",
+            "expected_call",
+            "value_type",
+            "requested_value",
+        ),
+        [
+            (
+                {"type": "set_fader", "channel": 1, "value": -6.0},
+                "set_channel_fader",
+                ((1, -6.0),),
+                "fader",
+                -6.0,
+            ),
+            (
+                {"type": "set_gain", "channel": 1, "value": -2.0},
+                "set_channel_gain",
+                ((1, -2.0),),
+                "gain",
+                -2.0,
+            ),
+            (
+                {"type": "set_pan", "channel": 1, "value": 150.0},
+                "set_channel_pan",
+                ((1, 100.0),),
+                "pan",
+                100.0,
+            ),
+            (
+                {"type": "mute_channel", "channel": 1, "muted": True},
+                "set_channel_mute",
+                ((1, 1),),
+                "mute",
+                True,
+            ),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_reports_failed_mixer_write(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        method_name,
+        expected_call,
+        value_type,
+        requested_value,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        client.set_channel_fader = MagicMock(return_value=True)
+        client.set_channel_gain = MagicMock(return_value=True)
+        client.set_channel_pan = MagicMock(return_value=True)
+        client.set_channel_mute = MagicMock(return_value=True)
+        getattr(client, method_name).return_value = False
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["success"] is False
+        assert payload["reason"] == "mixer_write_failed"
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["command"] == command["type"]
+        assert payload["channel"] == command["channel"]
+        assert payload["value_type"] == value_type
+        assert payload["requested_value"] == requested_value
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        assert payload["request"] == command
+        getattr(client, method_name).assert_called_once_with(*expected_call[0])
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("command", "initial_db", "expected_requested_value"),
+        [
+            ({"type": "volume_up", "channel": 1, "db": 3}, -10.0, -7.0),
+            ({"type": "volume_down", "channel": 1, "db": 3}, -10.0, -13.0),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_volume_write_failure_does_not_advance_cached_fader(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        initial_db,
+        expected_requested_value,
+    ):
+        server = AutoMixerServer()
+        client = MagicMock()
+        client.is_connected = True
+        client.set_channel_fader = MagicMock(return_value=False)
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+        server.last_fader_values[1] = initial_db
+
+        await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["success"] is False
+        assert payload["reason"] == "mixer_write_failed"
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["value_type"] == "fader"
+        assert payload["requested_value"] == expected_requested_value
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        assert server.last_fader_values[1] == initial_db
+        client.set_channel_fader.assert_called_once_with(1, expected_requested_value)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        (
+            "command",
+            "method_name",
+            "expected_call",
+            "value_type",
+            "requested_value",
+        ),
+        [
+            (
+                {"type": "eq_on", "channel": 1, "on": 1},
+                "set_eq_on",
+                (1, 1),
+                "eq_on",
+                1,
+            ),
+            (
+                {"type": "eq_band_up", "channel": 1, "band": "2", "db": 1},
+                "set_eq_band_gain",
+                (1, "2g", 1.0),
+                "eq_band_gain",
+                1.0,
+            ),
+            (
+                {"type": "eq_band_down", "channel": 1, "band": "2", "db": 1},
+                "set_eq_band_gain",
+                (1, "2g", -1.0),
+                "eq_band_gain",
+                -1.0,
+            ),
+            (
+                {"type": "compressor_on", "channel": 1, "on": 1},
+                "set_compressor_on",
+                (1, 1),
+                "compressor_on",
+                1,
+            ),
+            (
+                {"type": "compressor_threshold", "channel": 1, "threshold": -18.0},
+                "set_compressor_threshold",
+                (1, -18.0),
+                "compressor_threshold",
+                -18.0,
+            ),
+            (
+                {"type": "compressor_gain_up", "channel": 1, "db": 1},
+                "set_compressor_gain",
+                (1, 1.0),
+                "compressor_gain",
+                1.0,
+            ),
+            (
+                {"type": "compressor_gain_down", "channel": 1, "db": 1},
+                "set_compressor_gain",
+                (1, -1.0),
+                "compressor_gain",
+                -1.0,
+            ),
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_execute_voice_command_eq_compressor_reports_failed_mixer_write(
+        self,
+        mock_config,
+        mock_bleed,
+        command,
+        method_name,
+        expected_call,
+        value_type,
+        requested_value,
+    ):
+        class VoiceMixerStub:
+            pass
+
+        server = AutoMixerServer()
+        client = VoiceMixerStub()
+        client.is_connected = True
+        client.set_eq_on = MagicMock(return_value=True)
+        client.get_eq_band_gain = MagicMock(return_value=0.0)
+        client.set_eq_band_gain = MagicMock(return_value=True)
+        client.set_compressor_on = MagicMock(return_value=True)
+        client.set_compressor_threshold = MagicMock(return_value=True)
+        client.get_compressor_gain = MagicMock(return_value=0.0)
+        client.set_compressor_gain = MagicMock(return_value=True)
+        getattr(client, method_name).return_value = False
+        server.mixer_client = client
+        server.broadcast = AsyncMock()
+
+        with patch("server.WingClient", new=VoiceMixerStub), \
+             patch("server.EnhancedOSCClient", new=VoiceMixerStub):
+            await server._execute_voice_command(command)
+
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["success"] is False
+        assert payload["reason"] == "mixer_write_failed"
+        assert payload["surface"] == f"voice_command:{command['type']}"
+        assert payload["command"] == command["type"]
+        assert payload["channel"] == command["channel"]
+        assert payload["value_type"] == value_type
+        assert payload["requested_value"] == requested_value
+        assert payload["live_write"] is False
+        assert payload["live_authority_granted"] is False
+        assert payload["readiness_closure_allowed"] is False
+        getattr(client, method_name).assert_called_once_with(*expected_call)
 
     @pytest.mark.asyncio
     @patch("server.BleedService")
@@ -2132,6 +2773,86 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("message_type", "payload", "surface", "requested_value"),
+        [
+            ("set_mute", {"channel": 1, "muted": True}, "set_mute", True),
+            ("mute_channel", {"channel": 2}, "mute_channel", True),
+            ("unmute_channel", {"channel": 3}, "unmute_channel", False),
+        ],
+    )
+    async def test_websocket_mute_direct_path_reports_failed_mixer_write(
+        self,
+        dummy_wing_server,
+        message_type,
+        payload,
+        surface,
+        requested_value,
+    ):
+        server = dummy_wing_server
+        server.connection_mode = "offline"
+        server.mixer_client.set_channel_mute.return_value = False
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers[message_type](websocket, payload)
+
+        result = self._decode_last_message(websocket)
+        assert result["type"] == "manual_write_blocked"
+        assert result["status"] == "blocked"
+        assert result["success"] is False
+        assert result["reason"] == "mixer_write_failed"
+        assert result["surface"] == surface
+        assert result["value_type"] == "mute"
+        assert result["requested_value"] is requested_value
+        assert result["live_write"] is False
+        assert result["live_authority_granted"] is False
+        assert result["readiness_closure_allowed"] is False
+        server.mixer_client.set_channel_mute.assert_called_once_with(
+            payload["channel"],
+            requested_value,
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("message_type", "payload", "surface", "requested_value"),
+        [
+            ("set_mute", {"channel": 1, "muted": "maybe"}, "set_mute", "maybe"),
+            ("set_mute", {"channel": 1}, "set_mute", None),
+            ("unmute_channel", {"channel": 3, "muted": "maybe"}, "unmute_channel", "maybe"),
+        ],
+    )
+    async def test_websocket_mute_direct_path_rejects_invalid_bool_without_mixer_write(
+        self,
+        dummy_wing_server,
+        message_type,
+        payload,
+        surface,
+        requested_value,
+    ):
+        server = dummy_wing_server
+        server.connection_mode = "offline"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers[message_type](websocket, payload)
+
+        result = self._decode_last_message(websocket)
+        assert result["type"] == "manual_write_blocked"
+        assert result["status"] == "blocked"
+        assert result["success"] is False
+        assert result["reason"] == "invalid_mute"
+        assert result["surface"] == surface
+        assert result["value_type"] == "mute"
+        assert result["requested_value"] == requested_value
+        assert result["live_write"] is False
+        assert result["live_authority_granted"] is False
+        assert result["readiness_closure_allowed"] is False
+        server.mixer_client.set_channel_mute.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_websocket_pan_is_quarantined_for_wing_deployment_boundary(self, dummy_wing_server):
         server = dummy_wing_server
         websocket = MagicMock()
@@ -2168,6 +2889,67 @@ class TestWingDeploymentWriteBoundary:
         )
 
         assert websocket.send.await_count == 0
+        server.mixer_client.set_channel_pan.assert_called_once_with(1, 100.0)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("raw_value", ["left", True, float("inf")])
+    async def test_websocket_pan_direct_path_rejects_invalid_value_without_mixer_write(
+        self,
+        dummy_wing_server,
+        raw_value,
+    ):
+        server = dummy_wing_server
+        server.connection_mode = "offline"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_pan"](
+            websocket,
+            {"channel": 1, "pan_percent": raw_value},
+        )
+
+        result = self._decode_last_message(websocket)
+        assert result["type"] == "manual_write_blocked"
+        assert result["status"] == "blocked"
+        assert result["success"] is False
+        assert result["reason"] == "invalid_value"
+        assert result["surface"] == "set_pan"
+        assert result["value_type"] == "pan"
+        assert result["requested_value"] == raw_value
+        assert result["live_write"] is False
+        assert result["live_authority_granted"] is False
+        assert result["readiness_closure_allowed"] is False
+        server.mixer_client.set_channel_pan.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_websocket_pan_direct_path_reports_failed_mixer_write(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.connection_mode = "offline"
+        server.mixer_client.set_channel_pan.return_value = False
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_pan"](
+            websocket,
+            {"channel": 1, "pan_percent": 125.0},
+        )
+
+        result = self._decode_last_message(websocket)
+        assert result["type"] == "manual_write_blocked"
+        assert result["status"] == "blocked"
+        assert result["success"] is False
+        assert result["reason"] == "mixer_write_failed"
+        assert result["surface"] == "set_pan"
+        assert result["value_type"] == "pan"
+        assert result["requested_value"] == 100.0
+        assert result["live_write"] is False
+        assert result["live_authority_granted"] is False
+        assert result["readiness_closure_allowed"] is False
         server.mixer_client.set_channel_pan.assert_called_once_with(1, 100.0)
 
     @pytest.mark.asyncio
@@ -2385,6 +3167,166 @@ class TestWingDeploymentWriteBoundary:
         assert rollback_result["rollback"] is True
         assert rollback_result["write_attempts"] >= 2
         assert dropped, "expected the immediate rollback write to be throttle-dropped at least once"
+        assert client.state["/ch/1/fdr"] == -8.0
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_immediate_rollback_survives_trailing_edge_write_throttle(
+        self,
+        _mock_bleed: object,
+        _mock_load_config: object,
+    ):
+        """Composition contract with trailing-edge throttle semantics.
+
+        A throttled write may be queued and flushed at last_send + interval
+        instead of dropped; the flush itself restarts the throttle window, so
+        the manual-write retry delay must span two full intervals or the retry
+        is throttled again and the proof misreports mixer_write_failed.
+        """
+        import threading
+
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "offline"
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+
+        client = DummyWingLike()
+        min_interval_sec = 0.05
+        client._osc_throttle_enabled = True
+        client._osc_throttle_hz = 1.0 / min_interval_sec
+        lock = threading.Lock()
+        last_send: dict = {}
+        pending: dict = {}
+        timers: dict = {}
+        deferred_flushes: list = []
+
+        def flush(channel):
+            with lock:
+                timers.pop(channel, None)
+                value = pending.pop(channel, None)
+                if value is None:
+                    return
+                last_send[channel] = time.monotonic()
+                client.state.update({f"/ch/{channel}/fdr": float(value)})
+                deferred_flushes.append((channel, value))
+
+        def trailing_edge_set_channel_fader(channel, value):
+            with lock:
+                now = time.monotonic()
+                last = last_send.get(channel)
+                if channel in timers or (
+                    last is not None and now - last < min_interval_sec
+                ):
+                    pending[channel] = value
+                    if channel not in timers:
+                        timer = threading.Timer(
+                            max(0.0, last + min_interval_sec - now),
+                            flush,
+                            args=(channel,),
+                        )
+                        timer.daemon = True
+                        timers[channel] = timer
+                        timer.start()
+                    return False
+                last_send[channel] = now
+                client.state.update({f"/ch/{channel}/fdr": float(value)})
+                return True
+
+        client.set_channel_fader = trailing_edge_set_channel_fader
+        server.mixer_client = client
+
+        apply_result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:trailing_edge_apply",
+            approved=True,
+            approval_id="unit-trailing-edge-apply",
+        )
+        assert apply_result["status"] == "applied"
+
+        rollback_result = await server._rollback_last_manual_console_write(
+            None,
+            source="unit:trailing_edge_rollback",
+            approved=True,
+            approval_id="unit-trailing-edge-rollback",
+        )
+
+        assert rollback_result["status"] == "applied"
+        assert rollback_result["rollback"] is True
+        assert rollback_result["write_attempts"] == 2
+        assert deferred_flushes, "expected the first rollback attempt to be queued and flushed"
+        assert client.state["/ch/1/fdr"] == -8.0
+
+    @pytest.mark.asyncio
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    @patch("server.BleedService")
+    async def test_supervised_proof_sequence_apply_rollback_emergency_stop_blocks_next_apply(
+        self,
+        _mock_bleed: object,
+        _mock_load_config: object,
+    ):
+        """Mirror the operator proof rerun: apply, immediate rollback through a
+        same-address throttle, emergency stop, then a later apply must block."""
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        server.connection_mode = "offline"
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+
+        client = DummyWingLike()
+        min_interval_sec = 0.05
+        client._osc_throttle_enabled = True
+        client._osc_throttle_hz = 1.0 / min_interval_sec
+        last_send: dict = {}
+
+        def throttled_set_channel_fader(channel, value):
+            now = time.monotonic()
+            last = last_send.get(channel)
+            if last is not None and (now - last) < min_interval_sec:
+                return False
+            last_send[channel] = now
+            client.state.update({f"/ch/{channel}/fdr": float(value)})
+            return True
+
+        client.set_channel_fader = throttled_set_channel_fader
+        server.mixer_client = client
+
+        apply_result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:proof_sequence_apply",
+            approved=True,
+            approval_id="unit-proof-sequence-apply",
+        )
+        assert apply_result["status"] == "applied"
+
+        rollback_result = await server._rollback_last_manual_console_write(
+            None,
+            source="unit:proof_sequence_rollback",
+            approved=True,
+            approval_id="unit-proof-sequence-rollback",
+        )
+        assert rollback_result["status"] == "applied"
+        assert rollback_result["rollback_status"] in {"applied", "partial"}
+        assert client.state["/ch/1/fdr"] == -8.0
+
+        server._manual_write_emergency_stopped = True
+
+        blocked_result = await server._apply_manual_console_write(
+            websocket=None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:proof_sequence_after_emergency",
+            approved=True,
+            approval_id="unit-proof-sequence-after-emergency",
+        )
+        assert blocked_result["status"] == "blocked"
+        assert blocked_result["reason"] == "emergency_stop_active"
         assert client.state["/ch/1/fdr"] == -8.0
 
     @pytest.mark.asyncio
@@ -4066,6 +5008,70 @@ class TestWingDeploymentWriteBoundary:
             *self._quarantined_operator_expectation(surface),
         )
         getattr(server.mixer_client, method_name).assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("message_type", "payload", "result_type", "method_name"),
+        [
+            (
+                "set_insert",
+                {"target_type": "channel", "target": 1, "position": "pre", "slot": "FX1", "on": 1},
+                "insert_updated",
+                "set_insert",
+            ),
+            (
+                "set_fx_model",
+                {"slot": "FX1", "model": "PLATE"},
+                "fx_slot_updated",
+                "set_fx_model",
+            ),
+            (
+                "set_fx_on",
+                {"slot": "FX1", "on": 1},
+                "fx_slot_updated",
+                "set_fx_on",
+            ),
+            (
+                "set_fx_mix",
+                {"slot": "FX1", "mix": 50},
+                "fx_slot_updated",
+                "set_fx_mix",
+            ),
+            (
+                "set_fx_parameter",
+                {"slot": "FX1", "parameter": 1, "value": 0.5},
+                "fx_parameter_updated",
+                "set_fx_parameter",
+            ),
+        ],
+    )
+    async def test_fx_write_handlers_fail_closed_when_mixer_write_returns_false(
+        self,
+        dummy_wing_server,
+        message_type,
+        payload,
+        result_type,
+        method_name,
+    ):
+        server = dummy_wing_server
+        server.connection_mode = "offline"
+        getattr(server.mixer_client, method_name).return_value = False
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = fx_handlers.register_handlers(server)
+
+        await handlers[message_type](websocket, payload)
+
+        result = self._decode_last_message(websocket)
+        assert result["type"] == result_type
+        assert result["status"] == "blocked"
+        assert result["reason"] == "mixer_write_failed"
+        assert result["surface"] == method_name
+        assert result["write_result"] is False
+        assert result["live_write"] is False
+        assert result["live_authority_granted"] is False
+        assert result["readiness_closure_allowed"] is False
+        getattr(server.mixer_client, method_name).assert_called_once()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

@@ -681,7 +681,7 @@ def test_fader_is_supervised_only_but_not_autonomous_ready():
     assert row.supervised_live_allowed is False
     assert row.autonomous_ready is False
     assert row.safety_row_id == "fader_supervised"
-    assert row.safety_status == "supervised_candidate"
+    assert row.safety_status == "hardware_proven_narrow"
     assert row.evidence_requirement_ids == (
         "physical_pre_read",
         "bounded_fader_down_apply",
@@ -694,9 +694,9 @@ def test_fader_is_supervised_only_but_not_autonomous_ready():
     assert "capability_declares_live_kind_without_safety_proof" in row.blockers
     assert "mode_full_autonomous_blocked" in row.blockers
     assert "not_autonomous_ready" in row.blockers
-    assert "real_wing_proof_partial" in row.blockers
-    assert "rollback_readback_failed" in row.blockers
-    assert "emergency_stop_proof_missing" in row.blockers
+    assert "real_wing_proof_partial" not in row.blockers
+    assert "rollback_readback_failed" not in row.blockers
+    assert "emergency_stop_proof_missing" not in row.blockers
 
 
 def test_gain_declared_executor_surface_is_still_safety_proof_blocked():
@@ -706,9 +706,9 @@ def test_gain_declared_executor_surface_is_still_safety_proof_blocked():
     assert row.supervised_live_allowed is False
     assert row.autonomous_ready is False
     assert row.safety_row_id == "gain_supervised"
-    assert row.safety_status == "dry_run_ready"
+    assert row.safety_status == "hardware_proven_narrow"
     assert "safety_live_not_allowed" in row.blockers
-    assert "real_wing_proof_missing" in row.blockers
+    assert "real_wing_proof_missing" not in row.blockers
     assert "capability_declares_live_kind_without_safety_proof" in row.blockers
     assert row.evidence_requirement_ids == (
         "physical_pre_read",

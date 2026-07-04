@@ -294,7 +294,7 @@ def main() -> int:
                   f"/ch/{ch}/in/set/dlymode"]
     for b in plan.buses:
         n = b.fx_slot.replace("FX", "")
-        addrs += [f"/fx/{n}/mdl", f"/fx/{n}/on", f"/fx/{n}/fxmix"] + [f"/fx/{n}/{i}" for i in range(1, 7)]
+        addrs += [f"/fx/{n}/mdl", f"/fx/{n}/fxmix"] + [f"/fx/{n}/{i}" for i in range(1, 7)]
         addrs.append(f"/bus/{b.bus_id}/fdr")
     for s in plan.sends:
         addrs += [f"/ch/{s.channel_id}/send/{s.bus_id}/lvl", f"/ch/{s.channel_id}/send/{s.bus_id}/on",

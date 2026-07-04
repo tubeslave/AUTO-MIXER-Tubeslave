@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-03T17:50:51Z
+Last heartbeat UTC: 2026-07-04T08:04:59Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -20,9 +20,8 @@ headroom-safe.
 
 External validation requirements:
 
-- Operator restores or verifies CH3 fader state after rollback_not_applied
-- Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
-- Separate headroom-safe supervised gain-down proof with the same evidence requirements
+- Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
+- Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
 Latest check: the control-plane state, safety coverage matrix and operator
 product-state autonomy overlay are synchronized to the current WING
@@ -37,8 +36,59 @@ supervised fader proof rerun, and then a separate headroom-safe gain-down proof.
 that it is read-only preflight evidence handoff only, and that current
 next-action authority after `accepted_decision_ready` comes from current state
 and the active real-WING plan, not from the old handoff packet by itself.
-Latest verified full pytest passed with `5337 passed, 1 skipped, 1 warning`.
+Latest verified full pytest passed with `5434 passed, 1 skipped, 1 warning`.
+Latest direct mute/pan invalid-value guard passed: direct WebSocket
+`set_mute`, `mute_channel` and `unmute_channel` now reject missing or
+unparseable mute values before mixer writes, and direct `set_pan` rejects
+malformed, boolean, NaN or infinite values instead of silently coercing them to
+center pan; focused checks, server tests, WING rails, adjacent WING/client/FX
+tests and full pytest passed.
+Latest voice command numeric validation guard passed: malformed, boolean,
+NaN or infinite numeric inputs for direct fader/gain/pan, volume relative dB,
+EQ band gain and compressor threshold/gain now emit explicit
+`voice_command_error` payloads with live/readiness authority denied before any
+mixer readback or write method can run; focused checks, server tests, WING
+rails, adjacent WING/client/FX/mixer tests and full pytest passed.
+Latest voice command malformed payload guard passed: non-mapping payloads
+such as raw strings or lists now emit explicit `voice_command_error` payloads
+with `reason=malformed_voice_command`, `status=error`, `success=false` and
+live/readiness authority denied before any mixer write/readback method can run;
+focused checks, server tests, WING rails and full pytest passed.
+Latest voice command invalid request guard passed: unknown command types, missing
+`channel`, missing `snap_name`, missing EQ band, missing compressor threshold
+and unsupported mixer-client paths now emit explicit `voice_command_error`
+payloads with `status=error`, `success=false` and live/readiness authority
+denied; invalid requests do not call mixer write/readback methods; focused
+checks, server tests, WING rails and full pytest passed.
+Latest voice command error authority guard passed: no-mixer and exception
+paths now emit explicit `voice_command_error` payloads with `status=error`,
+`success=false`, surface/request/channel metadata and live/readiness authority
+denied instead of silent no-op or underspecified errors; `CancelledError` still
+re-raises; focused checks, server tests, WING rails and full pytest passed.
+Latest voice command write-result guard passed: direct voice `set_fader`,
+`set_gain`, `set_pan`, `mute_channel`, `volume_up`/`volume_down`, EQ and
+compressor write commands now emit fail-closed `voice_command_blocked`
+responses when mixer writes return `False`; cached fader state is not advanced
+after failed volume voice writes; focused checks, server tests and full pytest
+passed with no WING/backend contact or live authority changes.
+Latest supervised rollback retry runbook guard passed: manual-write retry delay now waits two full throttle intervals, proof-sequence regression covers apply/rollback/emergency-stop/block, and the runbook uses the current accepted read-only source id with write-attempt guidance; targeted server checks passed and the full suite stayed green.
+Latest WING client write-result guard passed: `set_channel_mute` and `set_channel_pan` now return the underlying `send` result, so dropped writes can fail closed in callers; targeted WING client checks passed and the full suite stayed green.
+External broad live soundcheck v2 reports observed: `reports/live_wing_soundcheck_v2_original_20260703T211128.json` and `reports/live_wing_soundcheck_v2_applied_20260703T211128.json` are not release proof and require operator review/rollback decision before any readiness claim.
+External broad live soundcheck v2 stage2 reports observed: `reports/live_wing_soundcheck_v2s2_original_20260703T212521.json` and `reports/live_wing_soundcheck_v2s2_applied_20260703T212521.json` are not release proof and require operator review/rollback decision before any readiness claim.
+External broad live soundcheck v2 stage3 reports observed: `reports/live_wing_soundcheck_v2s3_original_20260703T213559.json` and `reports/live_wing_soundcheck_v2s3_applied_20260703T213559.json` are not release proof and require operator review/rollback decision before any readiness claim.
+Latest live soundcheck static acknowledgement contract passed: `tests/test_write_surface_inventory_static_scan.py` now enumerates `tools/live_wing_soundcheck*.py`, requires the exact acknowledgement before config/client/audio-device context, and confirms blocked write-surface inventory coverage; targeted checks passed and the full suite stayed green.
+Latest raw OSC send inventory guard passed: direct `send(..., value)` patterns are now treated as write-adjacent by the static scan; meter subscription transport, enhanced gain direct apply, legacy snapshot navigation scripts and `tools/live_wing_soundcheck_daemon.py` are inventoried as non-authoritative blocked/quarantined surfaces; targeted checks and full pytest passed.
+Latest WING client bridge write-result guard passed: MixerClientBase-compatible fader/gain/mute/pan/HPF/polarity/delay/send-level methods now return underlying `send()` results, and low-cut/delay/send multi-write helpers fail closed if any sub-write fails; targeted WING client checks and full pytest passed.
+Latest WING client all-write-result guard passed: all direct `WingClient.set_*` wrappers that call `send()` now return the underlying or aggregate `send()` result, including EQ, dynamics, gate, bus, main, matrix, FX, insert, reverb and channel-send helpers; targeted WING client checks, static inventory checks, WING MVP rails and full pytest passed.
+Latest mixer mute/pan write-result guard passed: direct WebSocket `set_mute`, `mute_channel`, `unmute_channel` and `set_pan` paths now report blocked/error when mixer writes return `False` or raise, instead of silently swallowing failed mute/pan writes; targeted checks, server tests, WING MVP rails and full pytest passed.
+Latest FX handler write-result guard passed: FX/insert direct-write WebSocket handlers now return blocked `mixer_write_failed` or `mixer_write_exception` responses when mixer writes fail, instead of emitting `insert_updated`, `fx_slot_updated` or `fx_parameter_updated`; targeted checks, server tests, WING MVP rails and full pytest passed.
+Latest AutoFX unsupported action guard passed: `AutoFXPlanner` no longer emits `set_fx_on` in blocked FX apply evidence; WING FX slot activity is documented as loaded-model-derived, the unsupported `/fx/N/on` action is excluded from `blocked_calls`, AutoFX remains proposal-only, and focused checks, WING MVP rails and full pytest passed.
+Latest WING FX unsupported path guard passed: `WingClient.set_fx_on` now fails closed instead of writing nonexistent `/fx/N/on`; FX slot read/query helpers use official FW 3.1 model/fxmix metadata, `set_reverb_params` avoids the unsupported path, observation-mode dry runs do not shadow it, and stage3 rollback snapshots skip it; targeted checks, WING MVP rails and full pytest passed.
 Latest auth token digest storage guard passed: `backend/auth.py` now stores HMAC-SHA256 digests of issued bearer tokens instead of raw token strings in `AuthManager._tokens`, while generate/validate/revoke/cleanup behavior stays intact; targeted auth checks passed and the full suite stayed green.
+Latest auth token owner rate-limit guard passed: `AuthManager.authenticate` now rejects caller `client_id` mismatches and rate-limits by the issued token owner even when `client_id` is omitted; targeted auth checks passed and the full suite stayed green.
+Latest broad live WING soundcheck setup guard passed: `tools/live_wing_soundcheck_setup.py` remains blocked from non-dry-run execution without `--confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING`, and `backend/write_surface_inventory.py` records it as a blocked write surface; targeted write-surface checks passed and the full suite stayed green.
+Latest broad live WING soundcheck v2 guard passed: `tools/live_wing_soundcheck_v2.py` is now recorded as a blocked write surface, and non-dry-run execution requires `--confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING` before config or `WingClient` access; targeted write-surface checks passed and the full suite stayed green.
+Latest broad live WING soundcheck v2 stage2 guard passed: `tools/live_wing_soundcheck_v2_stage2.py` is now recorded as a blocked write surface, and non-dry-run execution requires `--confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING` before config or `WingClient` access; targeted write-surface checks passed and the full suite stayed green.
 Latest Pulse export secret redaction guard passed: ChatGPT Pulse snapshot excerpts now redact bearer tokens, `sk-`/`sk-proj-` keys, JSON-style `apiKey`/`accessToken` fields and assignment-style API key/token/password/secret values before JSON/Markdown export; targeted checks passed and the full suite stayed green.
 Latest broad live WING correction test guard passed: `tools/live_wing_correction_test.py` now requires `--confirm-live-wing-write I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING` before loading mixer config or creating a `WingClient`, and `backend/write_surface_inventory.py` records it as a blocked write surface; targeted write-surface checks passed and the full suite stayed green.
 Latest vector index generic secret redaction guard passed: generic assignment-style secret values such as `ANTHROPIC_API_KEY`, `AZURE_OPENAI_API_KEY`, `HF_TOKEN`, `DATABASE_PASSWORD`, `SLACK_BOT_TOKEN` and `CLIENT_SECRET` are redacted before indexing, while non-secret tokenizer assignments remain unchanged; targeted vector/Paperclip/operator checks passed and the full suite stayed green.
@@ -71,7 +121,7 @@ and the newest full-suite `RUN_LEDGER.jsonl` row, so the operator-facing green
 test claim cannot stay stale after a new validation pass.
 The structured pre-release score rail now also requires `STATE.json`
 `strict_pre_release_review`, `Docs/reports/MVP_PROGRESS_LATEST.md`,
-`Docs/CURRENT_STATE.md` and `LAST_REPORT.md` to agree on score `94/100`,
+`Docs/CURRENT_STATE.md` and `LAST_REPORT.md` to agree on score `95/100`,
 threshold `95/100`, `public_release_ready=false` and the rollback/gain
 proof score ceiling. This is a report-only guard and grants no live
 authority.
@@ -214,7 +264,6 @@ coverage `5 passed`, selected product-state preflight/plan/dry-run checks
 `tools/no_wing_release_check.py --quick --artifact-root /tmp/automixer_no_wing_basic_controls_20260702T0850Z`
 passed.
 
-
 Supporting real WING read-only evidence was also captured into a temporary root:
 `/tmp/automixer_real_wing_verified_subset_20260702T_tmp_persist/wing_readonly_preflight/20260702T094851Z_wing_readonly_preflight/summary.json`. It passed with 15 physical readbacks and no writes, but it
 does not close readiness because the canonical review contract only accepts
@@ -263,3 +312,5 @@ as connected and available for supervised tests, but permission is limited to
 necessary fader/gain-down proof actions after accepted read-only decisions; it
 does not grant unrestricted EQ, dynamics, FX, routing, master, scene, live or
 soundcheck authority.
+
+Latest M005 software disconnect protection evidence (partial): on the real WING, software disconnect made physical readback unavailable, an approved supervised write attempt produced no applied write, and reconnect restored verified readback with CH3 unchanged at 0.0. Physical cable-loss/timeout phases were skipped by operator decision and remain the open M005 evidence. See artifacts/wing_timeout_disconnect_proof/20260704T074537Z_wing_m005_disconnect_timeout_stale_proof/summary.json.

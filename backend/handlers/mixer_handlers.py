@@ -1,5 +1,6 @@
 """Mixer control message handlers (fader, gain, EQ band, compressor, state)."""
 
+import math
 from typing import Any, Optional
 
 try:
@@ -42,6 +43,81 @@ def _message_for_live_apply_result(result) -> str:
     return "Live apply blocked." if not result.accepted else "Live apply result recorded."
 
 
+def _coerce_finite_float(value: Any) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
+    if str(type(value).__module__).startswith("unittest.mock"):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(parsed):
+        return None
+    return parsed
+
+
+def _coerce_positive_int(value: Any, *, max_value: int | None = None) -> Optional[int]:
+    parsed = _coerce_finite_float(value)
+    if parsed is None or not parsed.is_integer():
+        return None
+    integer = int(parsed)
+    if integer < 1:
+        return None
+    if max_value is not None and integer > max_value:
+        return None
+    return integer
+
+
+async def _send_invalid_live_apply_request(
+    server,
+    websocket,
+    *,
+    operation: str,
+    channel: Any,
+    value_type: str,
+    requested_value: Any,
+    data: dict,
+    reason: str = "invalid_value",
+):
+    await server.send_to_client(
+        websocket,
+        {
+            "type": "manual_live_apply_result",
+            "request_id": data.get("request_id"),
+            "operation": operation,
+            "channel": channel,
+            "accepted": False,
+            "blocked": True,
+            "blocked_reason": reason,
+            "dry_run_only": True,
+            "send_result": None,
+            "send_status": "not_sent",
+            "readback_status": "not_requested",
+            "desired_value": None,
+            "confirmed_value": None,
+            "verification_id": None,
+            "audit_id": "",
+            "replay_correlation_id": str(data.get("replay_correlation_id") or ""),
+            "failure_reason": reason,
+            "timeout_ms": None,
+            "panic_stop_active": False,
+            "panic_stop_scope": None,
+            "panic_stop_reason": None,
+            "shadow_mode_active": False,
+            "guard_reasons": [reason],
+            "message_for_user": "Live apply blocked: invalid request.",
+            "live_apply_source": "manual_ui",
+            "target_type": _target_type(operation),
+            "value_type": value_type,
+            "requested_value": requested_value,
+            "live_write": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        },
+    )
+
+
 async def _send_live_apply_result(
     server,
     websocket,
@@ -50,13 +126,41 @@ async def _send_live_apply_result(
     channel: Any,
     value: Any,
     data: dict,
+    value_type: str = "value",
 ):
+    channel_int = _coerce_positive_int(channel)
+    if channel_int is None:
+        await _send_invalid_live_apply_request(
+            server,
+            websocket,
+            operation=operation,
+            channel=channel,
+            value_type="channel",
+            requested_value=channel,
+            data=data,
+            reason="invalid_channel",
+        )
+        return None
+
+    value_float = _coerce_finite_float(value)
+    if value_float is None:
+        await _send_invalid_live_apply_request(
+            server,
+            websocket,
+            operation=operation,
+            channel=channel_int,
+            value_type=value_type,
+            requested_value=value,
+            data=data,
+        )
+        return None
+
     result = server.live_apply_service.apply(
         LiveApplyRequest(
             source="manual_ui",
             operation=operation,
-            channel=int(channel),
-            value=float(value),
+            channel=channel_int,
+            value=value_float,
             dry_run=data.get("dry_run"),
             confirm_live_apply=bool(data.get("confirm_live_apply", False)),
             current_value=data.get("current_value"),
@@ -151,6 +255,35 @@ def _readonly_parameter_blocked_payload(data: dict, reason: str) -> dict[str, An
 
 
 def register_handlers(server):
+    async def send_direct_write_failed(
+        websocket,
+        data: dict,
+        *,
+        surface: str,
+        value_type: str,
+        requested_value: Any,
+        reason: str,
+        error: str | None = None,
+    ):
+        status = "error" if error else "blocked"
+        payload = {
+            "type": "manual_write_error" if error else "manual_write_blocked",
+            "request_id": data.get("request_id"),
+            "status": status,
+            "success": False,
+            "reason": reason,
+            "surface": surface,
+            "channel": data.get("channel"),
+            "value_type": value_type,
+            "requested_value": requested_value,
+            "live_write": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
+        if error:
+            payload["error"] = error
+        await server.send_to_client(websocket, payload)
+
     async def handle_set_fader(websocket, data):
         channel = data.get("channel")
         value = data.get("value")
@@ -225,7 +358,39 @@ def register_handlers(server):
             if blocked:
                 return
         if server.mixer_client:
-            server.mixer_client.set_channel_mute(channel, value)
+            parsed_value = server._coerce_optional_bool(value)
+            if parsed_value is None:
+                await send_direct_write_failed(
+                    websocket,
+                    data,
+                    surface=surface,
+                    value_type="mute",
+                    requested_value=value,
+                    reason="invalid_mute",
+                )
+                return
+            try:
+                write_result = server.mixer_client.set_channel_mute(channel, int(parsed_value))
+            except Exception as exc:
+                await send_direct_write_failed(
+                    websocket,
+                    data,
+                    surface=surface,
+                    value_type="mute",
+                    requested_value=bool(parsed_value),
+                    reason="mixer_write_exception",
+                    error=str(exc),
+                )
+                return
+            if write_result is False:
+                await send_direct_write_failed(
+                    websocket,
+                    data,
+                    surface=surface,
+                    value_type="mute",
+                    requested_value=bool(parsed_value),
+                    reason="mixer_write_failed",
+                )
 
     async def handle_set_pan(websocket, data):
         channel = data.get("channel")
@@ -240,12 +405,41 @@ def register_handlers(server):
             if blocked:
                 return
 
-        value = server._coerce_optional_float(raw_value)
+        value = server._coerce_finite_float(raw_value)
         if value is None:
-            value = 0.0
+            await send_direct_write_failed(
+                websocket,
+                data,
+                surface="set_pan",
+                value_type="pan",
+                requested_value=raw_value,
+                reason="invalid_value",
+            )
+            return
         value = server._clamp_manual_write_value(value, "pan")
         if server.mixer_client:
-            server.mixer_client.set_channel_pan(channel, value)
+            try:
+                write_result = server.mixer_client.set_channel_pan(channel, value)
+            except Exception as exc:
+                await send_direct_write_failed(
+                    websocket,
+                    data,
+                    surface="set_pan",
+                    value_type="pan",
+                    requested_value=value,
+                    reason="mixer_write_exception",
+                    error=str(exc),
+                )
+                return
+            if write_result is False:
+                await send_direct_write_failed(
+                    websocket,
+                    data,
+                    surface="set_pan",
+                    value_type="pan",
+                    requested_value=value,
+                    reason="mixer_write_failed",
+                )
 
     async def handle_mute_channel(websocket, data):
         payload = dict(data)
@@ -273,13 +467,49 @@ def register_handlers(server):
             )
             if blocked:
                 return
+        if _coerce_positive_int(band, max_value=4) is None:
+            await _send_invalid_live_apply_request(
+                server,
+                websocket,
+                operation="set_eq",
+                channel=channel,
+                value_type="eq_band",
+                requested_value=band,
+                data=data,
+            )
+            return
+        freq_value = _coerce_finite_float(freq)
+        if freq_value is None or freq_value <= 0:
+            await _send_invalid_live_apply_request(
+                server,
+                websocket,
+                operation="set_eq",
+                channel=channel,
+                value_type="eq_frequency",
+                requested_value=freq,
+                data=data,
+            )
+            return
+        q_value = _coerce_finite_float(q)
+        if q_value is None or q_value <= 0:
+            await _send_invalid_live_apply_request(
+                server,
+                websocket,
+                operation="set_eq",
+                channel=channel,
+                value_type="eq_q",
+                requested_value=q,
+                data=data,
+            )
+            return
         await _send_live_apply_result(
             server,
             websocket,
             operation="set_eq",
             channel=channel,
-            value=gain if gain is not None else 0.0,
+            value=gain,
             data=data,
+            value_type="eq_gain",
         )
 
     async def handle_set_compressor(websocket, data):
@@ -294,13 +524,25 @@ def register_handlers(server):
             )
             if blocked:
                 return
+        if not isinstance(params, dict):
+            await _send_invalid_live_apply_request(
+                server,
+                websocket,
+                operation="set_compressor",
+                channel=channel,
+                value_type="compressor_params",
+                requested_value=params,
+                data=data,
+            )
+            return
         await _send_live_apply_result(
             server,
             websocket,
             operation="set_compressor",
             channel=channel,
-            value=params.get("threshold", 0.0),
+            value=params.get("threshold"),
             data=data,
+            value_type="compressor_threshold",
         )
 
     async def handle_rollback_last_manual_write(websocket, data):

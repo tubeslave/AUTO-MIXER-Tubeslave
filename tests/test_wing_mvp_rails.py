@@ -990,17 +990,26 @@ def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_bloc
     assert latest["status"] == state["program_status"]
     assert latest["checkpoint"] == state["active_checkpoint"]
     assert latest["recorded_at_utc"] == state["last_heartbeat_utc"]
-    assert latest["hardware_contacted"] is False
-    assert latest["live_writes"] is False
-
-    for flag in (
-        "contacts_backend",
-        "contacts_wing",
-        "live_authority_granted",
-        "live_write",
-        "readiness_closure_allowed",
-    ):
-        assert latest_authority[flag] is state_authority[flag] is False
+    operator_approved_proof_row = latest_authority.get("operator_approved") is True
+    if operator_approved_proof_row:
+        # Operator-approved supervised proof rows may contact hardware and
+        # perform bounded writes, but must never widen standing authority.
+        assert latest["event"].startswith("supervised_")
+        for flag in ("live_authority_granted", "readiness_closure_allowed"):
+            assert latest_authority[flag] is False
+        assert state_authority["live_authority_granted"] is False
+        assert state_authority["readiness_closure_allowed"] is False
+    else:
+        assert latest["hardware_contacted"] is False
+        assert latest["live_writes"] is False
+        for flag in (
+            "contacts_backend",
+            "contacts_wing",
+            "live_authority_granted",
+            "live_write",
+            "readiness_closure_allowed",
+        ):
+            assert latest_authority[flag] is state_authority[flag] is False
 
     assert latest_authority["readiness_matrix_update_allowed"] is False
     assert (
@@ -1041,13 +1050,11 @@ def test_autopilot_latest_ledger_records_external_validation_handoff():
     ]
     assert latest["current_blocker"] == state["current_blocker"]
     for marker in (
-        "rollback_not_applied",
-        "restore or verify CH3 fader state",
-        "fader proof",
-        "physical readback",
-        "rollback",
-        "emergency-stop/block evidence",
-        "headroom-safe",
+        "Do not widen live authority",
+        "M005",
+        "disconnect/timeout/stale-state",
+        "M006",
+        "readiness review",
     ):
         assert marker in latest["next_operator_action"]
     for requirement in latest["external_validation_requirements"]:
@@ -1258,8 +1265,11 @@ def test_mvp_progress_report_records_external_validation_handoff():
     normalized_progress = re.sub(r"\s+", " ", progress_report)
     assert "## Current External Validation Handoff" in progress_report
     assert "Program status from `STATE.json`: `WAITING_FOR_EXTERNAL_VALIDATION`" in progress_report
-    assert "Strict pre-release review score: `94/100`" in progress_report
-    assert "do not report `95/100` or public-release readiness" in progress_report
+    assert "Strict pre-release review score: `95/100`" in progress_report
+    assert (
+        "score `95/100` is evidence-backed by the passed supervised CH3 fader "
+        "and gain-down proof artifacts" in progress_report
+    )
     for requirement in state["external_validation_requirements"]:
         assert f"  - {requirement}" in progress_report
     assert (
@@ -1297,20 +1307,39 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
     score_gate = state["strict_pre_release_review"]
 
     assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
-    assert score_gate["score"] == 94
+    assert score_gate["score"] == 95
     assert score_gate["release_threshold"] == 95
-    assert score_gate["score"] < score_gate["release_threshold"]
-    assert score_gate["public_release_ready"] is False
-    assert score_gate["required_before_95"] == state[
-        "external_validation_requirements"
+    assert score_gate["score"] >= score_gate["release_threshold"]
+    assert score_gate["public_release_ready"] is True
+    assert "supervised narrow" in score_gate["public_release_scope"]
+    assert "no autonomous mixing" in score_gate["public_release_scope"]
+    assert score_gate["required_before_95"] == []
+    assert score_gate["evidence"] == [
+        "artifacts/wing_operator_proposal_validation/"
+        "20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json",
+        "artifacts/wing_operator_proposal_validation/"
+        "20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json",
     ]
+    for artifact in score_gate["evidence"]:
+        assert (PROJECT_ROOT / artifact).is_file()
+        artifact_summary = json.loads(
+            (PROJECT_ROOT / artifact).read_text(encoding="utf-8")
+        )
+        assert artifact_summary["status"] == "passed"
+        assert artifact_summary["rollback_result"]["status"] == "applied"
+        assert (
+            artifact_summary["post_emergency_apply_result"]["status"]
+            == "apply_blocked"
+        )
 
     for marker in (
-        "rollback_not_applied",
-        "release-ready live correction family",
+        "fader and gain-down proofs passed",
         "physical readback",
         "rollback",
-        "emergency-stop/block evidence",
+        "emergency-stop/block",
+        "M006",
+        "M005",
+        "no autonomy",
     ):
         assert marker in score_gate["score_ceiling_reason"]
 
@@ -1325,12 +1354,17 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
         f"Pre-release score threshold: `{score_gate['release_threshold']}/100`"
         in progress_report
     )
-    assert "Public release ready from score gate: `false`" in progress_report
+    assert (
+        "Public release ready from score gate: `true` "
+        "(supervised narrow WING fader/gain-down MVP scope only)"
+        in progress_report
+    )
     assert score_gate["score_ceiling_reason"] in normalized_progress
     for surface in (normalized_current, normalized_report):
         assert f"strict pre-release score is `{score_gate['score']}/100`" in surface
         assert f"threshold remains `{score_gate['release_threshold']}/100`" in surface
-        assert "public release ready: `false`" in surface
+        assert "public release ready: `true`" in surface
+        assert "supervised narrow WING fader/gain-down MVP" in surface
         assert score_gate["score_ceiling_reason"] in surface
 
 
@@ -1440,7 +1474,8 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
             == "accepted_decision_ready"
         ):
             assert "Do not widen live authority" in state["next_action"]
-            assert "rollback_not_applied" in state["next_action"]
+            assert "M005" in state["next_action"]
+            assert "M006" in state["next_action"]
         else:
             assert (
                 "Operator reviews artifacts/wing_readonly_preflight" in state["next_action"]
@@ -1765,20 +1800,23 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             ] == []
             assert state["last_validation_summary"][
                 "wing_operator_proposal_validation_latest_status"
-            ] == "failed"
+            ] == "passed"
             assert state["last_validation_summary"][
                 "wing_operator_proposal_validation_latest_reason"
-            ] == "rollback_not_applied"
+            ] == "supervised_wing_mvp_gain_down_proof_ch3"
+            assert state["last_validation_summary"][
+                "supervised_ch3_fader_proof_rerun"
+            ].startswith("passed: ")
+            assert state["last_validation_summary"][
+                "supervised_ch3_gain_down_proof"
+            ].startswith("passed: ")
             assert state["next_operator_action"] == state["next_action"]
             assert "Do not widen live authority" in state["next_action"]
-            assert "rollback_not_applied" in state["next_action"]
             for marker in (
-                "restore or verify CH3 fader state",
-                "fader proof",
-                "physical readback",
-                "rollback",
-                "emergency-stop/block evidence",
-                "headroom-safe gain-down proof",
+                "M005",
+                "disconnect/timeout/stale-state",
+                "M006",
+                "readiness review",
             ):
                 assert marker in state["next_operator_action"]
         else:
@@ -1820,14 +1858,13 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json."
         )
     assert state["external_validation_requirements"] == [
-        "Operator restores or verifies CH3 fader state after rollback_not_applied",
         (
-            "Clean supervised CH3 fader proof rerun with apply, physical "
-            "readback, rollback and emergency-stop/block evidence"
+            "Supervised WING disconnect/timeout/stale-state protection proof "
+            "(M005) with operator present"
         ),
         (
-            "Separate headroom-safe supervised gain-down proof with the same "
-            "evidence requirements"
+            "Owner readiness review that updates the MVP readiness matrix from "
+            "the accepted CH3 fader and gain-down proof artifacts (M006)"
         ),
     ]
 
@@ -1902,9 +1939,9 @@ def test_real_wing_interaction_plan_matches_accepted_decision_rollback_blocker()
     assert summary["wing_readonly_preflight_accepted_record_count"] == 1
     assert summary["wing_readonly_preflight_decision_record_count"] == 3
     assert summary["wing_readonly_preflight_unreviewed_candidate_count"] == 0
-    assert summary["wing_operator_proposal_validation_latest_status"] == "failed"
+    assert summary["wing_operator_proposal_validation_latest_status"] == "passed"
     assert summary["wing_operator_proposal_validation_latest_reason"] == (
-        "rollback_not_applied"
+        "supervised_wing_mvp_gain_down_proof_ch3"
     )
 
     assert "decision review status: `accepted_decision_ready`" in plan
@@ -1912,12 +1949,18 @@ def test_real_wing_interaction_plan_matches_accepted_decision_rollback_blocker()
     assert "rejected decision records: `2`" in plan
     assert "invalid decision records: `0`" in plan
     assert "unreviewed read-only source ids: `0`" in plan
-    assert "latest supervised proof status: `failed`" in plan
-    assert "latest supervised proof reason: `rollback_not_applied`" in plan
-    assert "failed CH3 fader rollback" in plan
+    assert "latest supervised proof status: `passed`" in plan
+    assert (
+        "latest supervised proof reason: `supervised_wing_mvp_gain_down_proof_ch3`"
+        in plan
+    )
+    assert "earlier failed CH3 fader rollback" in plan
+    assert "closed by the passed rerun" in plan
+    assert "20260704T045741Z_wing_operator_proposal_ch3_fader" in plan
+    assert "20260704T045820Z_wing_operator_proposal_ch3_gain" in plan
     assert "Codex must not execute or retry the supervised proof unattended" in plan
-    assert "restore or verify CH3 fader state after `rollback_not_applied`" in plan
-    assert "Gain-down proof remains a separate later proof" in plan
+    assert "M005" in plan
+    assert "M006" in plan
     assert "allowed current WING live-write proof types: `fader` and `gain` only" in plan
     assert "allowed current write direction: small negative move only" in plan
 
@@ -1934,7 +1977,7 @@ def test_latest_readonly_handoff_packet_declares_scope_after_accepted_decision()
 
     assert summary["wing_readonly_preflight_decision_status"] == "accepted_decision_ready"
     assert summary["wing_operator_proposal_validation_latest_reason"] == (
-        "rollback_not_applied"
+        "supervised_wing_mvp_gain_down_proof_ch3"
     )
     assert "## Packet Scope" in handoff
     assert "packet_scope: `read_only_preflight_evidence_handoff_only`" in handoff
@@ -2545,13 +2588,15 @@ def test_m009_non_fader_gain_live_expansion_requires_adr_hardware_and_family_pro
     gain_trim = rows_by_id["gain_trim_supervised_promotion"]
     assert allowed_fader["action_family"] == "fader"
     assert allowed_fader["supervised_live_allowed"] is False
-    assert allowed_fader["safety_status"] == "supervised_candidate"
-    assert "rollback_readback_failed" in allowed_fader["blockers"]
+    assert allowed_fader["safety_status"] == "hardware_proven_narrow"
+    assert "rollback_readback_failed" not in allowed_fader["blockers"]
     assert "safety_live_not_allowed" in allowed_fader["blockers"]
     assert gain_trim["action_family"] == "gain"
     assert gain_trim["supervised_live_allowed"] is False
-    assert "real_wing_proof_missing" in gain_trim["blockers"]
-    assert "apply_readback_missing" in gain_trim["blockers"]
+    assert gain_trim["safety_status"] == "hardware_proven_narrow"
+    assert "real_wing_proof_missing" not in gain_trim["blockers"]
+    assert "apply_readback_missing" not in gain_trim["blockers"]
+    assert "safety_live_not_allowed" in gain_trim["blockers"]
 
     console_live_expansion_rows = {
         "Pan": (

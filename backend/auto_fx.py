@@ -149,6 +149,14 @@ class AutoFXPlanner:
             "requires_physical_schema_readback": True,
             "live_write_authority": False,
         }
+        fx_slot_activation_contract = {
+            "status": "unsupported_wing_fx_slot_on_path_excluded",
+            "source": "wing_fw_3_1_fx_surface",
+            "slot_activity_source": "loaded_model",
+            "unsupported_action_excluded": "set_fx_on",
+            "unsupported_address": "/fx/N/on",
+            "live_write_authority": False,
+        }
         rollback_fx_readback = {
             "status": "required_before_live_promotion",
             "source": FX_READ_REQUIRED_SOURCE,
@@ -182,6 +190,7 @@ class AutoFXPlanner:
             "hpf_hz": min((bus.hpf_hz for bus in plan.buses), default=None),
             "lpf_hz": max((bus.lpf_hz for bus in plan.buses), default=None),
             "send_level_limit": send_level_limit,
+            "fx_slot_activation_contract": fx_slot_activation_contract,
             "fx_return_headroom": fx_return_headroom,
             "return_level_safety": return_level_safety,
             "dry_wet_bounds": dry_wet_bounds,
@@ -258,6 +267,7 @@ class AutoFXPlanner:
                 "current_fx_send_return_cache_freshness": "not_provided",
                 "current_fx_send_return_cache_no_live_authority": True,
                 "current_fx_parameter_schema_hints": current_fx_parameter_schema_hints,
+                "fx_slot_activation_contract": fx_slot_activation_contract,
                 "fx_parameter_schema_no_live_authority": True,
                 "current_fx_parameter_schema_no_live_authority": True,
                 "source_role": "multi_source_fx_plan",
@@ -283,7 +293,6 @@ class AutoFXPlanner:
         calls: list[dict[str, Any]] = []
         for bus in plan.buses:
             calls.append({"cmd": "set_fx_model", "slot": bus.fx_slot, "model": bus.model})
-            calls.append({"cmd": "set_fx_on", "slot": bus.fx_slot, "on": 1})
             calls.append({"cmd": "set_fx_mix", "slot": bus.fx_slot, "mix": 100.0})
             calls.append({"cmd": "set_fx_return_level", "bus": bus.bus_id, "level_db": bus.return_level_db})
 

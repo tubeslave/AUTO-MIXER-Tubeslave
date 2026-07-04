@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-03T17:51:39Z`
+Generated: `2026-07-04T02:46:56Z`
 
 ## Current MVP
 
@@ -22,19 +22,18 @@ Supervised WING Rack proof.
 ## Current External Validation Handoff
 
 - Program status from `STATE.json`: `WAITING_FOR_EXTERNAL_VALIDATION`
-- Strict pre-release review score: `94/100`
+- Strict pre-release review score: `95/100`
 - Pre-release score threshold: `95/100`
-- Public release ready from score gate: `false`
-- Score gate: do not report `95/100` or public-release readiness while these external WING requirements remain open.
+- Public release ready from score gate: `true` (supervised narrow WING fader/gain-down MVP scope only)
+- Score gate: score `95/100` is evidence-backed by the passed supervised CH3 fader and gain-down proof artifacts (`artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json`, `artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json`). Public release readiness is scoped to the supervised narrow WING fader/gain-down MVP only; it grants no autonomy, no non-fader/gain live family and no readiness-matrix closure.
 - Canonical read-only decision marker: `accepted_decision_ready`
-- Current blocker from `STATE.json`: Accepted WING read-only preflight decision is ready for the canonical 20260702T095758Z candidate, and the active decision ledger has 1 accepted, 2 rejected, 0 invalid and 0 unreviewed records. Supervised WING proof is still blocked from release readiness because the CH3 fader proof artifact failed rollback with reason rollback_not_applied, no release-ready live correction family exists, and fader/gain still require complete apply, physical readback, rollback and emergency-stop/block evidence.
-- Next operator action from `STATE.json`: Do not widen live authority. Operator must restore or verify CH3 fader state after the failed rollback with reason rollback_not_applied, then rerun the narrow fader proof until apply, physical readback, rollback and emergency-stop/block evidence all pass. After that, run a separate headroom-safe gain-down proof with the same evidence requirements; only then reassess release readiness.
-- Score ceiling reason: External WING proof remains open: rollback_not_applied, no release-ready live correction family exists, and fader/gain still require complete apply, physical readback, rollback and emergency-stop/block evidence.
+- Current blocker from `STATE.json`: Supervised CH3 fader and gain-down proofs passed on the real WING Rack with apply, physical readback, rollback and emergency-stop/block evidence (artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json and artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json); the earlier rollback_not_applied failure is closed by the passed rerun. The read-only decision ledger remains accepted_decision_ready. Release-ready live correction families remain 0 until the M006 owner readiness review accepts the proof artifacts, live-allowed safety rows remain 0, and current supervised live-write kinds remain 0; the remaining external items are the M005 supervised disconnect/timeout/stale-state protection proof and the M006 readiness review.
+- Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
+- Score ceiling reason: Score 95/100 is evidence-backed: supervised CH3 fader and gain-down proofs passed with apply, physical readback, rollback and emergency-stop/block evidence; the earlier rollback_not_applied failure is closed, and a release-ready live correction family review (M006) plus the M005 timeout/disconnect proof remain the next gates. This score grants no autonomy, no non-fader/gain live family and no readiness-matrix closure by itself.
 - External validation requirements:
-  - Operator restores or verifies CH3 fader state after rollback_not_applied
-  - Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
-  - Separate headroom-safe supervised gain-down proof with the same evidence requirements
-- Latest ledger handoff row: `full_suite_after_auth_token_digest_storage_guard_passed` at `2026-07-03T17:50:51Z`
+  - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
+  - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
+- Latest ledger handoff row: `supervised_m005_software_disconnect_partial_evidence_recorded` at `2026-07-04T08:04:59Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 

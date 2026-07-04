@@ -1,0 +1,1354 @@
+{
+  "applied_at": "20260703T212521",
+  "plan": {
+    "plan_id": "soundcheck_v2s2_20260703T212521.safety_gate",
+    "created_at": 1783103121.341192,
+    "mode": "soundcheck",
+    "decisions": [
+      {
+        "id": "vocal.trim.ch16",
+        "action_type": "gain_correction",
+        "target": "ch16",
+        "parameters": {
+          "gain_db": 1.99
+        },
+        "reason": "гейн-стейджинг вокала (дождались активности)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "gain_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "vocal.eq.ch16.b2",
+        "action_type": "eq_correction",
+        "target": "ch16",
+        "parameters": {
+          "frequency_hz": 268.32815729997475,
+          "gain_db": -1.11,
+          "q": 1.2196734422726125
+        },
+        "reason": "spectral ceiling лид-вокала",
+        "confidence": 0.991,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "vocal.eq.ch16.b3",
+        "action_type": "eq_correction",
+        "target": "ch16",
+        "parameters": {
+          "frequency_hz": 1581.1388300841897,
+          "gain_db": 1.2,
+          "q": 1.0540925533894598
+        },
+        "reason": "spectral ceiling лид-вокала",
+        "confidence": 0.991,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "vocal.eq.ch16.b4",
+        "action_type": "eq_correction",
+        "target": "ch16",
+        "parameters": {
+          "frequency_hz": 10583.005244258362,
+          "gain_db": 1.2,
+          "q": 1.7638342073763937
+        },
+        "reason": "spectral ceiling лид-вокала",
+        "confidence": 0.991,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch1",
+        "action_type": "pan_correction",
+        "target": "ch1",
+        "parameters": {
+          "pan": 0.0,
+          "pan_step": 1.0,
+          "absolute_pan": 0.0
+        },
+        "reason": "шаблон панорамы (kick)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch2",
+        "action_type": "pan_correction",
+        "target": "ch2",
+        "parameters": {
+          "pan": 0.0,
+          "pan_step": 1.0,
+          "absolute_pan": 0.0
+        },
+        "reason": "шаблон панорамы (snare)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch3",
+        "action_type": "pan_correction",
+        "target": "ch3",
+        "parameters": {
+          "pan": 0.0,
+          "pan_step": 1.0,
+          "absolute_pan": 0.0
+        },
+        "reason": "шаблон панорамы (snare)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch5",
+        "action_type": "pan_correction",
+        "target": "ch5",
+        "parameters": {
+          "pan": 0.22,
+          "pan_step": 1.0,
+          "absolute_pan": 22.0
+        },
+        "reason": "шаблон панорамы (floor_tom)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch6",
+        "action_type": "pan_correction",
+        "target": "ch6",
+        "parameters": {
+          "pan": -0.67,
+          "pan_step": 1.0,
+          "absolute_pan": -67.0
+        },
+        "reason": "шаблон панорамы (overheads)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch7",
+        "action_type": "pan_correction",
+        "target": "ch7",
+        "parameters": {
+          "pan": 0.67,
+          "pan_step": 1.0,
+          "absolute_pan": 67.0
+        },
+        "reason": "шаблон панорамы (overheads)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch8",
+        "action_type": "pan_correction",
+        "target": "ch8",
+        "parameters": {
+          "pan": 0.0,
+          "pan_step": 1.0,
+          "absolute_pan": 0.0
+        },
+        "reason": "шаблон панорамы (bass)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch9",
+        "action_type": "pan_correction",
+        "target": "ch9",
+        "parameters": {
+          "pan": -0.45,
+          "pan_step": 1.0,
+          "absolute_pan": -45.0
+        },
+        "reason": "шаблон панорамы (guitar)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch10",
+        "action_type": "pan_correction",
+        "target": "ch10",
+        "parameters": {
+          "pan": 0.45,
+          "pan_step": 1.0,
+          "absolute_pan": 45.0
+        },
+        "reason": "шаблон панорамы (guitar)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch11",
+        "action_type": "pan_correction",
+        "target": "ch11",
+        "parameters": {
+          "pan": -0.9,
+          "pan_step": 1.0,
+          "absolute_pan": -90.0
+        },
+        "reason": "шаблон панорамы (playback)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch12",
+        "action_type": "pan_correction",
+        "target": "ch12",
+        "parameters": {
+          "pan": 0.9,
+          "pan_step": 1.0,
+          "absolute_pan": 90.0
+        },
+        "reason": "шаблон панорамы (playback)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch13",
+        "action_type": "pan_correction",
+        "target": "ch13",
+        "parameters": {
+          "pan": -0.22,
+          "pan_step": 1.0,
+          "absolute_pan": -22.0
+        },
+        "reason": "шаблон панорамы (keys)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "pan.ch16",
+        "action_type": "pan_correction",
+        "target": "ch16",
+        "parameters": {
+          "pan": 0.0,
+          "pan_step": 1.0,
+          "absolute_pan": 0.0
+        },
+        "reason": "шаблон панорамы (lead_vocal)",
+        "confidence": 1.0,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "pan_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch5.low_mid.1",
+        "action_type": "eq_correction",
+        "target": "ch5",
+        "parameters": {
+          "frequency_hz": 375.0,
+          "gain_db": -3.261497237743762,
+          "q": 4.0
+        },
+        "reason": "mirror EQ low_mid: masker ch5 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch1.low_mid.1",
+        "action_type": "eq_correction",
+        "target": "ch1",
+        "parameters": {
+          "frequency_hz": 375.0,
+          "gain_db": 1.630748618871881,
+          "q": 2.0
+        },
+        "reason": "mirror EQ low_mid: masker ch5 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch5.mid.2",
+        "action_type": "eq_correction",
+        "target": "ch5",
+        "parameters": {
+          "frequency_hz": 1250.0,
+          "gain_db": -2.4965164174668417,
+          "q": 4.0
+        },
+        "reason": "mirror EQ mid: masker ch5 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch1.mid.2",
+        "action_type": "eq_correction",
+        "target": "ch1",
+        "parameters": {
+          "frequency_hz": 1250.0,
+          "gain_db": 1.2482582087334209,
+          "q": 2.0
+        },
+        "reason": "mirror EQ mid: masker ch5 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch6.low_mid.1",
+        "action_type": "eq_correction",
+        "target": "ch6",
+        "parameters": {
+          "frequency_hz": 375.0,
+          "gain_db": -5.054125675563578,
+          "q": 4.0
+        },
+        "reason": "mirror EQ low_mid: masker ch6 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch6.mid.2",
+        "action_type": "eq_correction",
+        "target": "ch6",
+        "parameters": {
+          "frequency_hz": 1250.0,
+          "gain_db": -5.844093221269219,
+          "q": 4.0
+        },
+        "reason": "mirror EQ mid: masker ch6 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch7.low_mid.1",
+        "action_type": "eq_correction",
+        "target": "ch7",
+        "parameters": {
+          "frequency_hz": 375.0,
+          "gain_db": -3.387798765663316,
+          "q": 4.0
+        },
+        "reason": "mirror EQ low_mid: masker ch7 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch7.high_mid.2",
+        "action_type": "eq_correction",
+        "target": "ch7",
+        "parameters": {
+          "frequency_hz": 3000.0,
+          "gain_db": -3.6790429350596936,
+          "q": 4.0
+        },
+        "reason": "mirror EQ high_mid: masker ch7 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch9.bass.1",
+        "action_type": "eq_correction",
+        "target": "ch9",
+        "parameters": {
+          "frequency_hz": 120.0,
+          "gain_db": -3.3647250688836747,
+          "q": 4.0
+        },
+        "reason": "mirror EQ bass: masker ch9 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch10.bass.1",
+        "action_type": "eq_correction",
+        "target": "ch10",
+        "parameters": {
+          "frequency_hz": 120.0,
+          "gain_db": -4.3842772535518275,
+          "q": 4.0
+        },
+        "reason": "mirror EQ bass: masker ch10 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch11.sub.1",
+        "action_type": "eq_correction",
+        "target": "ch11",
+        "parameters": {
+          "frequency_hz": 40.0,
+          "gain_db": -1.6058502746560164,
+          "q": 4.0
+        },
+        "reason": "mirror EQ sub: masker ch11 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch11.bass.2",
+        "action_type": "eq_correction",
+        "target": "ch11",
+        "parameters": {
+          "frequency_hz": 120.0,
+          "gain_db": -4.607205833872792,
+          "q": 4.0
+        },
+        "reason": "mirror EQ bass: masker ch11 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch12.sub.1",
+        "action_type": "eq_correction",
+        "target": "ch12",
+        "parameters": {
+          "frequency_hz": 40.0,
+          "gain_db": -1.3668360858245139,
+          "q": 4.0
+        },
+        "reason": "mirror EQ sub: masker ch12 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch12.bass.2",
+        "action_type": "eq_correction",
+        "target": "ch12",
+        "parameters": {
+          "frequency_hz": 120.0,
+          "gain_db": -3.927257664906074,
+          "q": 4.0
+        },
+        "reason": "mirror EQ bass: masker ch12 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch13.high_mid.1",
+        "action_type": "eq_correction",
+        "target": "ch13",
+        "parameters": {
+          "frequency_hz": 3000.0,
+          "gain_db": -2.388065036296486,
+          "q": 4.0
+        },
+        "reason": "mirror EQ high_mid: masker ch13 vs masked ch1",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch16.high_mid.1",
+        "action_type": "eq_correction",
+        "target": "ch16",
+        "parameters": {
+          "frequency_hz": 3000.0,
+          "gain_db": 1.941202719714605,
+          "q": 2.0
+        },
+        "reason": "mirror EQ high_mid: masker ch1 vs masked ch16",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch16.high.2",
+        "action_type": "eq_correction",
+        "target": "ch16",
+        "parameters": {
+          "frequency_hz": 6000.0,
+          "gain_db": 1.7858754527144352,
+          "q": 2.0
+        },
+        "reason": "mirror EQ high: masker ch1 vs masked ch16",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch2.air.1",
+        "action_type": "eq_correction",
+        "target": "ch2",
+        "parameters": {
+          "frequency_hz": 12000.0,
+          "gain_db": 1.154651101507019,
+          "q": 2.0
+        },
+        "reason": "mirror EQ air: masker ch5 vs masked ch2",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch2.high.2",
+        "action_type": "eq_correction",
+        "target": "ch2",
+        "parameters": {
+          "frequency_hz": 6000.0,
+          "gain_db": 1.5216036958933425,
+          "q": 2.0
+        },
+        "reason": "mirror EQ high: masker ch6 vs masked ch2",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch9.sub.2",
+        "action_type": "eq_correction",
+        "target": "ch9",
+        "parameters": {
+          "frequency_hz": 40.0,
+          "gain_db": -5.393330141008825,
+          "q": 4.0
+        },
+        "reason": "mirror EQ sub: masker ch9 vs masked ch2",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch10.sub.2",
+        "action_type": "eq_correction",
+        "target": "ch10",
+        "parameters": {
+          "frequency_hz": 40.0,
+          "gain_db": -4.37158581211586,
+          "q": 4.0
+        },
+        "reason": "mirror EQ sub: masker ch10 vs masked ch2",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch13.bass.2",
+        "action_type": "eq_correction",
+        "target": "ch13",
+        "parameters": {
+          "frequency_hz": 120.0,
+          "gain_db": -4.324870533083621,
+          "q": 4.0
+        },
+        "reason": "mirror EQ bass: masker ch13 vs masked ch2",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch3.sub.1",
+        "action_type": "eq_correction",
+        "target": "ch3",
+        "parameters": {
+          "frequency_hz": 40.0,
+          "gain_db": 1.7746086971427113,
+          "q": 2.0
+        },
+        "reason": "mirror EQ sub: masker ch6 vs masked ch3",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch3.sub.2",
+        "action_type": "eq_correction",
+        "target": "ch3",
+        "parameters": {
+          "frequency_hz": 40.0,
+          "gain_db": 2.0,
+          "q": 2.0
+        },
+        "reason": "mirror EQ sub: masker ch7 vs masked ch3",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch8.low_mid.1",
+        "action_type": "eq_correction",
+        "target": "ch8",
+        "parameters": {
+          "frequency_hz": 375.0,
+          "gain_db": 0.8476114110352833,
+          "q": 2.0
+        },
+        "reason": "mirror EQ low_mid: masker ch7 vs masked ch8",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      },
+      {
+        "id": "mirror.ch8.mid.2",
+        "action_type": "eq_correction",
+        "target": "ch8",
+        "parameters": {
+          "frequency_hz": 1250.0,
+          "gain_db": 1.7697393806146846,
+          "q": 2.0
+        },
+        "reason": "mirror EQ mid: masker ch7 vs masked ch8",
+        "confidence": 0.8,
+        "risk_level": "low",
+        "source_modules": [],
+        "expected_audio_effect": "",
+        "safe_to_apply": true,
+        "metadata": {
+          "safety_gate": {
+            "allowed": true,
+            "reason": "eq_allowed",
+            "dry_run": false,
+            "send_to_executor": true
+          }
+        }
+      }
+    ],
+    "source_modules": [
+      "live_wing_soundcheck_v2_stage2",
+      "safety_gate_v2"
+    ],
+    "input_summary": {},
+    "notes": [
+      "Safety Gate v2 evaluated this plan before Executor.",
+      "Plan may be executed by Executor."
+    ]
+  },
+  "blocked": [],
+  "phase_plan": [
+    [
+      3,
+      null,
+      null,
+      "SNARE B: corr -0.01, лаг 12.79 мс (conf 0.51) — без изменений"
+    ],
+    [
+      1,
+      null,
+      null,
+      "KICK -> OH: лаг -3.02 мс, conf 0.55 — не применяем"
+    ],
+    [
+      2,
+      null,
+      null,
+      "SNARE T -> OH: лаг -4.54 мс, conf 0.51 — не применяем"
+    ],
+    [
+      5,
+      null,
+      null,
+      "F TOM -> OH: лаг 12.88 мс, conf 0.50 — не применяем"
+    ]
+  ],
+  "pan_plan": [
+    [
+      1,
+      0.0
+    ],
+    [
+      2,
+      0.0
+    ],
+    [
+      3,
+      0.0
+    ],
+    [
+      5,
+      22.0
+    ],
+    [
+      6,
+      -67.0
+    ],
+    [
+      7,
+      67.0
+    ],
+    [
+      8,
+      0.0
+    ],
+    [
+      9,
+      -45.0
+    ],
+    [
+      10,
+      45.0
+    ],
+    [
+      11,
+      -90.0
+    ],
+    [
+      12,
+      90.0
+    ],
+    [
+      13,
+      -22.0
+    ],
+    [
+      16,
+      0.0
+    ]
+  ],
+  "mirror": {
+    "5": [
+      [
+        375.0,
+        -3.261497237743762,
+        4.0,
+        "low_mid"
+      ],
+      [
+        1250.0,
+        -2.4965164174668417,
+        4.0,
+        "mid"
+      ]
+    ],
+    "1": [
+      [
+        375.0,
+        1.630748618871881,
+        2.0,
+        "low_mid"
+      ],
+      [
+        1250.0,
+        1.2482582087334209,
+        2.0,
+        "mid"
+      ]
+    ],
+    "6": [
+      [
+        375.0,
+        -5.054125675563578,
+        4.0,
+        "low_mid"
+      ],
+      [
+        1250.0,
+        -5.844093221269219,
+        4.0,
+        "mid"
+      ]
+    ],
+    "7": [
+      [
+        375.0,
+        -3.387798765663316,
+        4.0,
+        "low_mid"
+      ],
+      [
+        3000.0,
+        -3.6790429350596936,
+        4.0,
+        "high_mid"
+      ]
+    ],
+    "9": [
+      [
+        120.0,
+        -3.3647250688836747,
+        4.0,
+        "bass"
+      ],
+      [
+        40.0,
+        -5.393330141008825,
+        4.0,
+        "sub"
+      ]
+    ],
+    "10": [
+      [
+        120.0,
+        -4.3842772535518275,
+        4.0,
+        "bass"
+      ],
+      [
+        40.0,
+        -4.37158581211586,
+        4.0,
+        "sub"
+      ]
+    ],
+    "11": [
+      [
+        40.0,
+        -1.6058502746560164,
+        4.0,
+        "sub"
+      ],
+      [
+        120.0,
+        -4.607205833872792,
+        4.0,
+        "bass"
+      ]
+    ],
+    "12": [
+      [
+        40.0,
+        -1.3668360858245139,
+        4.0,
+        "sub"
+      ],
+      [
+        120.0,
+        -3.927257664906074,
+        4.0,
+        "bass"
+      ]
+    ],
+    "13": [
+      [
+        3000.0,
+        -2.388065036296486,
+        4.0,
+        "high_mid"
+      ],
+      [
+        120.0,
+        -4.324870533083621,
+        4.0,
+        "bass"
+      ]
+    ],
+    "16": [
+      [
+        3000.0,
+        1.941202719714605,
+        2.0,
+        "high_mid"
+      ],
+      [
+        6000.0,
+        1.7858754527144352,
+        2.0,
+        "high"
+      ]
+    ],
+    "2": [
+      [
+        12000.0,
+        1.154651101507019,
+        2.0,
+        "air"
+      ],
+      [
+        6000.0,
+        1.5216036958933425,
+        2.0,
+        "high"
+      ]
+    ],
+    "3": [
+      [
+        40.0,
+        1.7746086971427113,
+        2.0,
+        "sub"
+      ],
+      [
+        40.0,
+        2.0,
+        2.0,
+        "sub"
+      ]
+    ],
+    "8": [
+      [
+        375.0,
+        0.8476114110352833,
+        2.0,
+        "low_mid"
+      ],
+      [
+        1250.0,
+        1.7697393806146846,
+        2.0,
+        "mid"
+      ]
+    ]
+  },
+  "vocal": {
+    "ch": 16,
+    "trim": 1.9867576035680585,
+    "cur_trim": 0.0,
+    "fader": -7.6580191565376765,
+    "hpf": 95.0,
+    "eq_moves": [
+      [
+        2,
+        [
+          268.32815729997475,
+          -1.107,
+          1.2196734422726125
+        ]
+      ],
+      [
+        3,
+        [
+          1581.1388300841897,
+          1.2,
+          1.0540925533894598
+        ]
+      ],
+      [
+        4,
+        [
+          10583.005244258362,
+          1.2,
+          1.7638342073763937
+        ]
+      ]
+    ],
+    "comp": {
+      "threshold_db": -26.0,
+      "ratio": 3.0,
+      "attack_ms": 5.0,
+      "release_ms": 150.0,
+      "makeup_db": 1.0
+    }
+  }
+}

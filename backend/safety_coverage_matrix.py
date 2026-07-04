@@ -75,25 +75,27 @@ SAFETY_COVERAGE_ROWS: Tuple[SafetyCoverageRow, ...] = (
         id="fader_supervised",
         label="Supervised channel fader",
         action_type="fader",
-        status="supervised_candidate",
+        status="hardware_proven_narrow",
         live_allowed=False,
         canonical_gate="apply_operator_proposal -> supervised manual gate",
         unit_tests="passed",
         offline_harness="passed",
         fake_mixer_proof="passed",
-        real_wing_proof="partial",
+        real_wing_proof="passed",
         pre_read="passed",
         apply_readback="passed",
-        rollback_readback="failed",
-        emergency_stop_proof="missing",
+        rollback_readback="passed",
+        emergency_stop_proof="passed",
         current_blocker=(
-            "Latest CH3 fader proof applied and read back, but rollback failed "
-            "with rollback_not_applied; no release-ready live fader family exists."
+            "CH3 fader proof rerun passed on real WING with apply, physical "
+            "readback, rollback and emergency-stop/block evidence "
+            "(20260704T045741Z); release-ready live fader family still "
+            "requires the M006 owner readiness review."
         ),
         next_required_evidence=(
-            "Restore or verify CH3 fader state, then rerun one bounded fader "
-            "proof until physical apply readback, rollback readback, and "
-            "emergency-stop/block evidence all pass."
+            "M005 supervised disconnect/timeout/stale-state protection proof "
+            "and the M006 owner readiness review that accepts the passed "
+            "proof artifacts into the readiness matrix."
         ),
         required_evidence_components=(
             "physical_pre_read",
@@ -113,19 +115,28 @@ SAFETY_COVERAGE_ROWS: Tuple[SafetyCoverageRow, ...] = (
         id="gain_supervised",
         label="Supervised input gain/trim",
         action_type="gain",
-        status="dry_run_ready",
+        status="hardware_proven_narrow",
         live_allowed=False,
         canonical_gate="apply_operator_proposal -> supervised manual gate",
         unit_tests="passed",
         offline_harness="passed",
-        fake_mixer_proof="partial",
-        real_wing_proof="missing",
-        pre_read="partial",
-        apply_readback="missing",
-        rollback_readback="missing",
-        emergency_stop_proof="missing",
-        current_blocker="Physical WING gain proof is not complete.",
-        next_required_evidence="One small supervised gain-down proof with physical pre-read, apply readback, rollback readback, and blocked unsafe follow-up.",
+        fake_mixer_proof="passed",
+        real_wing_proof="passed",
+        pre_read="passed",
+        apply_readback="passed",
+        rollback_readback="passed",
+        emergency_stop_proof="passed",
+        current_blocker=(
+            "CH3 gain-down proof passed on real WING with apply, physical "
+            "readback, rollback and emergency-stop/block evidence "
+            "(20260704T045820Z); release-ready live gain family still "
+            "requires the M006 owner readiness review."
+        ),
+        next_required_evidence=(
+            "M005 supervised disconnect/timeout/stale-state protection proof "
+            "and the M006 owner readiness review; gain-up stays blocked "
+            "unless operator-authored."
+        ),
         required_evidence_components=(
             "physical_pre_read",
             "bounded_gain_down_apply",

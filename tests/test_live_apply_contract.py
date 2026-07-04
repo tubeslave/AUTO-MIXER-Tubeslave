@@ -974,6 +974,46 @@ async def test_mixer_handler_marks_readback_query_failure_as_not_applied():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message_type", "payload", "blocked_reason", "value_type", "requested_value"),
+    [
+        ("set_fader", {"channel": "left", "value": -5.0}, "invalid_channel", "channel", "left"),
+        ("set_gain", {"channel": 3, "value": "nan"}, "invalid_value", "value", "nan"),
+        ("set_gain", {"channel": 3, "value": True}, "invalid_value", "value", True),
+    ],
+)
+async def test_mixer_handler_rejects_invalid_live_apply_request_before_audit(
+    message_type,
+    payload,
+    blocked_reason,
+    value_type,
+    requested_value,
+):
+    events = []
+    mixer = FakeMixer()
+    service = LiveApplyService(audit_sink=events.append)
+    server = FakeServer(mixer, service)
+    handlers = mixer_handlers.register_handlers(server)
+
+    await handlers[message_type]("ws", payload)
+
+    assert events == []
+    assert mixer.calls == []
+    result = server.sent_messages[-1][1]
+    assert result["type"] == "manual_live_apply_result"
+    assert result["accepted"] is False
+    assert result["blocked"] is True
+    assert result["blocked_reason"] == blocked_reason
+    assert result["send_status"] == "not_sent"
+    assert result["readback_status"] == "not_requested"
+    assert result["value_type"] == value_type
+    assert result["requested_value"] == requested_value
+    assert result["live_write"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+
+
+@pytest.mark.asyncio
 async def test_mixer_handler_set_eq_is_blocked_until_gated_live_apply_exists():
     events = []
     mixer = FakeMixer()
@@ -997,6 +1037,42 @@ async def test_mixer_handler_set_eq_is_blocked_until_gated_live_apply_exists():
     assert payload["readback_status"] == "not_requested"
     assert payload["target_type"] == "channel_eq"
     assert payload["message_for_user"] == "Live apply blocked: operation is not gated for console writes."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "value_type", "requested_value"),
+    [
+        ({"channel": 5, "band": 2, "freq": 1200.0, "q": 1.2}, "eq_gain", None),
+        ({"channel": 5, "band": 5, "freq": 1200.0, "gain": -3.0, "q": 1.2}, "eq_band", 5),
+        ({"channel": 5, "band": 2, "freq": 1200.0, "gain": -3.0, "q": 0}, "eq_q", 0),
+    ],
+)
+async def test_mixer_handler_set_eq_rejects_invalid_numeric_shape_before_unsupported_result(
+    payload,
+    value_type,
+    requested_value,
+):
+    events = []
+    mixer = FakeMixer()
+    service = LiveApplyService(audit_sink=events.append)
+    server = FakeServer(mixer, service)
+    handlers = mixer_handlers.register_handlers(server)
+
+    await handlers["set_eq"]("ws", payload)
+
+    assert events == []
+    assert mixer.calls == []
+    result = server.sent_messages[-1][1]
+    assert result["type"] == "manual_live_apply_result"
+    assert result["accepted"] is False
+    assert result["blocked"] is True
+    assert result["blocked_reason"] == "invalid_value"
+    assert result["target_type"] == "channel_eq"
+    assert result["value_type"] == value_type
+    assert result["requested_value"] == requested_value
+    assert result["send_status"] == "not_sent"
+    assert result["live_authority_granted"] is False
 
 
 @pytest.mark.asyncio
@@ -1026,6 +1102,41 @@ async def test_mixer_handler_set_compressor_is_blocked_until_gated_live_apply_ex
     assert payload["readback_status"] == "not_requested"
     assert payload["target_type"] == "channel_compressor"
     assert payload["message_for_user"] == "Live apply blocked: operation is not gated for console writes."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "value_type", "requested_value"),
+    [
+        ({"channel": 6, "params": {}}, "compressor_threshold", None),
+        ({"channel": 6, "params": ["threshold", -18.0]}, "compressor_params", ["threshold", -18.0]),
+    ],
+)
+async def test_mixer_handler_set_compressor_rejects_invalid_params_before_unsupported_result(
+    payload,
+    value_type,
+    requested_value,
+):
+    events = []
+    mixer = FakeMixer()
+    service = LiveApplyService(audit_sink=events.append)
+    server = FakeServer(mixer, service)
+    handlers = mixer_handlers.register_handlers(server)
+
+    await handlers["set_compressor"]("ws", payload)
+
+    assert events == []
+    assert mixer.calls == []
+    result = server.sent_messages[-1][1]
+    assert result["type"] == "manual_live_apply_result"
+    assert result["accepted"] is False
+    assert result["blocked"] is True
+    assert result["blocked_reason"] == "invalid_value"
+    assert result["target_type"] == "channel_compressor"
+    assert result["value_type"] == value_type
+    assert result["requested_value"] == requested_value
+    assert result["send_status"] == "not_sent"
+    assert result["live_authority_granted"] is False
 
 
 @pytest.mark.asyncio

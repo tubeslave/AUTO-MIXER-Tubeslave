@@ -1,0 +1,10 @@
+{
+  "mixer_ip": "192.168.1.102",
+  "saved_at": "20260703T225501",
+  "experiment": "fable5_in_context_decisions",
+  "original": {
+    "/ch/9/fdr": -6.0,
+    "/ch/10/fdr": -6.0,
+    "/ch/7/fdr": 0.0
+  }
+}

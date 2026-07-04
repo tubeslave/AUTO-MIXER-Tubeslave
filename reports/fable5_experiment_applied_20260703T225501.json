@@ -1,0 +1,51 @@
+{
+  "applied_at": "20260703T225501",
+  "experiment": "fable5_in_context_decisions",
+  "decided_by": "claude-fable-5 (in-context, цикл 2 фонового режима)",
+  "safety_contract": {
+    "fader_ceiling_dbfs": 0.0,
+    "fader_moves": "только вниз, шаг <= 6 dB за проход",
+    "trim": "без изменений",
+    "mute": "не трогаем"
+  },
+  "verified_writes": 3,
+  "total_writes": 3,
+  "rollback_file": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/reports/fable5_experiment_original_20260703T225501.json",
+  "results": [
+    {
+      "ch": 9,
+      "addr": "/ch/9/fdr",
+      "value": -9.5,
+      "readback": -9.5,
+      "verified": true,
+      "send_accepted": true
+    },
+    {
+      "ch": 10,
+      "addr": "/ch/10/fdr",
+      "value": -9.5,
+      "readback": -9.5,
+      "verified": true,
+      "send_accepted": true
+    },
+    {
+      "ch": 7,
+      "addr": "/ch/7/fdr",
+      "value": -1.5,
+      "readback": -1.4999980926513672,
+      "verified": true,
+      "send_accepted": true
+    }
+  ],
+  "deliberate_non_actions": [
+    "VOCAL: неактивен в захвате — решения отложены",
+    "TOM/F TOM: по-прежнему не играют — только дозамер",
+    "Feedback-скан: кандидатов нет (узкие пики музыкальные, crest высокий)",
+    "EQ: не верифицируем по pre-trim USB tap — состояние подтверждено readback, изменений не требуется"
+  ],
+  "channel_reasoning": {
+    "9": "Источник стабилен два захвата (est -24.2/-24.5), dev +9.5 над якорем BASS; после шага -6 dB довожу до цели: fader -9.5 (шаг -3.5, в пределах лимита).",
+    "10": "Зеркально L: dev +9.7, fader -9.5.",
+    "7": "Асимметрия OH R/L +6.3 dB подтверждена двумя независимыми захватами — частично центрирую образ тарелок: fader -1.5 (осторожный шаг, остальное — позиция барабанщика)."
+  }
+}

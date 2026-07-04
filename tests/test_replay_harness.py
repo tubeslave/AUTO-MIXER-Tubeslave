@@ -326,7 +326,7 @@ async def test_replay_handler_unsupported_operation_is_blocked_without_mutation(
             "freq": 800,
             "gain": -3,
             "q": 1.0,
-            "params": {"attack": 10, "release": 100},
+            "params": {"threshold": -18.0, "attack": 10, "release": 100},
             "dry_run": False,
             "confirm_live_apply": True,
         },

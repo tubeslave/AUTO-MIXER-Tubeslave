@@ -79,7 +79,7 @@ def test_dry_run_only_gain_evidence_cannot_update_safety_row():
     assert snapshot["summary"]["autonomous_ready_row_ids"] == []
     assert gain["status"] == "dry_run_only"
     assert gain["safety_row_id"] == "gain_supervised"
-    assert gain["current_safety_status"] == "dry_run_ready"
+    assert gain["current_safety_status"] == "hardware_proven_narrow"
     assert gain["current_live_allowed"] is False
     assert gain["safety_row_review_candidate"] is False
     assert gain["automatic_safety_update_allowed"] is False

@@ -46,6 +46,8 @@ MANUAL_RECOVERY_SCRIPTS = (
     "backend/disable_modules_set_faders.py",
 )
 
+LIVE_WING_CONFIRMATION = "I_UNDERSTAND_THIS_WRITES_TO_LIVE_WING"
+
 RISKY_WRITE_TOKEN_RE = re.compile(
     r"\b(?:"
     r"set_fader|set_main_fader|set_bus_fader|set_dca_fader|set_dca_level|"
@@ -78,6 +80,10 @@ RISKY_WRITE_TOKEN_RE = re.compile(
     r"reset_channel_eq|reset_channel_hpf|reset_channel_dynamics|reset_channel_processing|"
     r"mute_channel|unmute_channel"
     r")['\"]"
+    r"|\b(?:self\.|client\.|mixer_client\.|osc_client\.|self\.mixer_client\.|"
+    r"self\._wing_client\.)send\(\s*(?:f)?['\"][^'\"]+['\"]\s*,"
+    r"|\b(?:client|mixer_client|osc_client|self\.mixer_client|self\._wing_client)"
+    r"\.send\(\s*(?:addr|address)\s*,"
     r"|\bclient\.send\(\s*(?:addr|address)\s*,\s*value\s*\)"
 )
 
@@ -124,6 +130,15 @@ def _files_with_risky_write_tokens() -> list[str]:
     return sorted(files)
 
 
+def _live_wing_soundcheck_tools() -> list[str]:
+    tools_dir = REPO_ROOT / "tools"
+    return sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in tools_dir.glob("live_wing_soundcheck*.py")
+        if path.is_file()
+    )
+
+
 def test_write_surface_inventory_covers_files_with_direct_write_tokens():
     """New direct-write token files must be represented in the safety inventory."""
 
@@ -136,6 +151,48 @@ def test_write_surface_inventory_covers_files_with_direct_write_tokens():
     ]
 
     assert uncovered == []
+
+
+def test_live_wing_soundcheck_tools_require_ack_before_config_or_client():
+    """Broad live-soundcheck tools must fail closed before touching WING context."""
+
+    inventory_paths = _inventory_paths()
+    offenders = {}
+    for relative_path in _live_wing_soundcheck_tools():
+        source = (REPO_ROOT / relative_path).read_text(
+            encoding="utf-8", errors="ignore"
+        )
+        guard_index = source.find(
+            "args.confirm_live_wing_write != LIVE_WING_CONFIRMATION"
+        )
+        wing_context_indexes = tuple(
+            index
+            for index in (
+                source.find("yaml.safe_load", max(guard_index, 0)),
+                source.find("WingClient(", max(guard_index, 0)),
+                source.find("sd.query_devices(", max(guard_index, 0)),
+                source.find("sd.rec(", max(guard_index, 0)),
+            )
+            if index >= 0
+        )
+        failures = []
+        if "--confirm-live-wing-write" not in source:
+            failures.append("missing_cli_ack_flag")
+        if LIVE_WING_CONFIRMATION not in source:
+            failures.append("missing_exact_ack_value")
+        if not _path_is_inventory_covered(relative_path, inventory_paths):
+            failures.append("missing_write_surface_inventory_entry")
+        if guard_index < 0:
+            failures.append("missing_non_dry_run_ack_guard")
+        if not wing_context_indexes:
+            failures.append("missing_wing_context")
+        elif guard_index > min(wing_context_indexes):
+            failures.append("ack_guard_after_wing_context")
+        if failures:
+            offenders[relative_path] = failures
+
+    assert _live_wing_soundcheck_tools()
+    assert offenders == {}
 
 
 def test_static_scan_treats_string_mute_actions_as_write_tokens():
@@ -211,6 +268,9 @@ def test_static_scan_treats_raw_client_send_value_probes_as_write_tokens():
 
     assert RISKY_WRITE_TOKEN_RE.search("client.send(addr, value)")
     assert RISKY_WRITE_TOKEN_RE.search("client.send(address, value)")
+    assert RISKY_WRITE_TOKEN_RE.search('client.send("/ch/1/fdr", -6.0)')
+    assert RISKY_WRITE_TOKEN_RE.search('self.mixer_client.send(f"/ch/{ch}/fdr", value)')
+    assert RISKY_WRITE_TOKEN_RE.search('osc_client.send(f"/ch/{channel}/trim", state["current_trim"])')
 
 
 def test_static_scan_treats_fx_and_insert_actions_as_write_tokens():

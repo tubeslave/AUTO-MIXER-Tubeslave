@@ -1,0 +1,58 @@
+{
+  "proof": "wing_m005_disconnect_timeout_stale_protection",
+  "channel": 3,
+  "address": "/ch/3/fdr",
+  "write_policy": "blocked_write_attempts_only",
+  "proof_direction": "negative_db_move_only",
+  "live_authority_granted": false,
+  "readiness_closure_allowed": false,
+  "phases": {
+    "baseline": {
+      "status": "passed",
+      "readback": {
+        "status": "verified_from_physical_readback",
+        "value": 0.0,
+        "source": "physical_readback"
+      }
+    },
+    "clean-loss": {
+      "status": "passed",
+      "query_after_disconnect": {
+        "type": "mixer_parameter_value",
+        "status": "readback_unavailable",
+        "value": null,
+        "source": "unavailable",
+        "error": null
+      },
+      "write_attempt_after_disconnect": {
+        "type": "no_response",
+        "status": null,
+        "reason": null
+      }
+    },
+    "reconnect": {
+      "status": "passed",
+      "readback": {
+        "status": "verified_from_physical_readback",
+        "value": 0.0,
+        "source": "physical_readback"
+      },
+      "ch3_unchanged": true
+    },
+    "cable-loss": {
+      "status": "skipped_by_operator",
+      "note": "Operator chose to skip the physical cable-pull phase in this session."
+    },
+    "recover": {
+      "status": "skipped_by_operator",
+      "note": "Operator chose to skip the physical cable-pull phase in this session."
+    }
+  },
+  "updated_at_utc": "2026-07-04T08:04:23Z",
+  "status": "partial_passed_software_disconnect_only",
+  "operator_decision": "physical cable-loss phase skipped; software disconnect/stale-readback/blocked-write and reconnect-recovery phases passed on real WING",
+  "remaining_m005_evidence": [
+    "physical network link-loss protection proof (query timeout, blocked writes, recovery) with operator pulling the WING cable"
+  ],
+  "incident_note": "First clean-loss attempt used a wrong ws message type (disconnect), the mixer stayed connected and the approved CH3 fader -0.25 write applied for real; it was rolled back through rollback_last_manual_write with verified physical readback (0.0) before the hardened rerun. Events retain both attempts."
+}

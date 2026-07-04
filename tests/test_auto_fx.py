@@ -104,6 +104,7 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
     assert mixer.calls == []
 
     blocked = result["blocked_calls"]
+    assert all(call["cmd"] != "set_fx_on" for call in blocked)
     assert {"cmd": "set_fx_model", "slot": "FX1", "model": "PLATE"} in blocked
     assert {"cmd": "set_fx_model", "slot": "FX2", "model": "ROOM"} in blocked
     assert {
@@ -241,6 +242,14 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
         "requires_physical_schema_readback": True,
         "live_write_authority": False,
     }
+    assert source_evidence["fx_slot_activation_contract"] == {
+        "status": "unsupported_wing_fx_slot_on_path_excluded",
+        "source": "wing_fw_3_1_fx_surface",
+        "slot_activity_source": "loaded_model",
+        "unsupported_action_excluded": "set_fx_on",
+        "unsupported_address": "/fx/N/on",
+        "live_write_authority": False,
+    }
     assert source_evidence["source_identity_downstream_trust"] == {
         "status": "legacy_multi_source_unverified",
         "trusted_for_downstream": False,
@@ -275,3 +284,16 @@ def test_apply_to_mixer_without_mixer_still_reports_no_mutation():
     assert result["operator_correction"]["objective_family"] == "fx_sends"
     assert result["operator_correction"]["live_apply_allowed"] is False
     assert result["operator_correction"]["queue_import_allowed"] is False
+
+
+def test_auto_fx_blocked_calls_exclude_unsupported_wing_fx_on_action():
+    planner = AutoFXPlanner(tempo_bpm=120.0)
+    plan = planner.create_plan({1: "lead_vocal", 2: "snare"})
+
+    result = planner.apply_to_mixer(None, plan)
+
+    blocked_commands = [call["cmd"] for call in result["blocked_calls"]]
+    assert "set_fx_model" in blocked_commands
+    assert "set_fx_mix" in blocked_commands
+    assert "set_channel_send" in blocked_commands
+    assert "set_fx_on" not in blocked_commands

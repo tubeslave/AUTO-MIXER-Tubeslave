@@ -135,6 +135,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "backend/auto_soundcheck_engine.py",
             "backend/agents/fader_agent.py",
             "backend/agents/gain_agent.py",
+            "backend/enhanced_gain_agent.py",
             "backend/lufs_gain_staging.py",
             "backend/auto_fader.py",
             "backend/live_shared_mix.py",
@@ -348,6 +349,105 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
     ),
     WriteSurface(
+        id="broad_live_wing_soundcheck_v2_tool",
+        label="Broad live WING soundcheck v2 tool",
+        status="blocked",
+        paths=("tools/live_wing_soundcheck_v2.py",),
+        entrypoints=("live_wing_soundcheck_v2 main",),
+        write_kinds=("fader", "gain", "hpf", "eq", "compressor", "gate"),
+        allowed_live=False,
+        gate=(
+            "Blocked from automation and release readiness. Non-dry-run execution "
+            "requires the explicit --confirm-live-wing-write acknowledgement plus "
+            "operator supervision, physical readback, and rollback review."
+        ),
+        current_policy=(
+            "This script can write broad WING soundcheck v2 settings across active "
+            "channels and is not part of the supervised MVP fader/gain apply path."
+        ),
+        next_action=(
+            "Prefer the narrow supervised fader/gain proof runbook. Keep this v2 "
+            "setup tool blocked unless a future operator runbook gives it separate "
+            "readback, rollback, and emergency-stop proof requirements."
+        ),
+        notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
+    ),
+    WriteSurface(
+        id="broad_live_wing_soundcheck_v2_stage2_tool",
+        label="Broad live WING soundcheck v2 stage2 tool",
+        status="blocked",
+        paths=("tools/live_wing_soundcheck_v2_stage2.py",),
+        entrypoints=("live_wing_soundcheck_v2_stage2 main",),
+        write_kinds=("gain", "hpf", "eq", "compressor", "fader", "pan", "phase", "delay"),
+        allowed_live=False,
+        gate=(
+            "Blocked from automation and release readiness. Non-dry-run execution "
+            "requires the explicit --confirm-live-wing-write acknowledgement plus "
+            "operator supervision, physical readback, and rollback review."
+        ),
+        current_policy=(
+            "This script can write broad WING stage2 soundcheck settings including "
+            "phase, delay, pan, EQ, dynamics, trim and fader; it is not part of the "
+            "supervised MVP fader/gain apply path."
+        ),
+        next_action=(
+            "Prefer the narrow supervised fader/gain proof runbook. Keep this "
+            "stage2 setup tool blocked unless a future operator runbook gives it "
+            "separate readback, rollback, and emergency-stop proof requirements."
+        ),
+        notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
+    ),
+    WriteSurface(
+        id="broad_live_wing_soundcheck_v2_stage3_tool",
+        label="Broad live WING soundcheck v2 stage3 tool",
+        status="blocked",
+        paths=("tools/live_wing_soundcheck_v2_stage3.py",),
+        entrypoints=("live_wing_soundcheck_v2_stage3 main",),
+        write_kinds=("phase", "delay", "fx", "bus_fader", "send"),
+        allowed_live=False,
+        gate=(
+            "Blocked from automation and release readiness. Non-dry-run execution "
+            "requires the explicit --confirm-live-wing-write acknowledgement plus "
+            "operator supervision, physical readback, and rollback review."
+        ),
+        current_policy=(
+            "This script can write broad WING stage3 soundcheck settings including "
+            "phase, delay, FX models/parameters, bus faders and channel sends; it is "
+            "not part of the supervised MVP fader/gain apply path."
+        ),
+        next_action=(
+            "Prefer the narrow supervised fader/gain proof runbook. Keep this "
+            "stage3 setup tool blocked unless a future operator runbook gives it "
+            "separate readback, rollback, and emergency-stop proof requirements."
+        ),
+        notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
+    ),
+    WriteSurface(
+        id="broad_live_wing_soundcheck_daemon_tool",
+        label="Broad live WING soundcheck daemon tool",
+        status="blocked",
+        paths=("tools/live_wing_soundcheck_daemon.py",),
+        entrypoints=("live_wing_soundcheck_daemon main",),
+        write_kinds=("fader", "gain", "eq"),
+        allowed_live=False,
+        gate=(
+            "Blocked from automation and release readiness. Non-dry-run execution "
+            "requires the explicit --confirm-live-wing-write acknowledgement plus "
+            "operator supervision, physical readback, and rollback review."
+        ),
+        current_policy=(
+            "This daemon can continuously write WING fader, trim and EQ settings "
+            "during a broad live soundcheck loop; it is not part of the supervised "
+            "MVP fader/gain apply path."
+        ),
+        next_action=(
+            "Prefer the narrow supervised fader/gain proof runbook. Keep this "
+            "daemon blocked unless a future operator runbook gives it separate "
+            "readback, rollback, stop and emergency-stop proof requirements."
+        ),
+        notes=("requires_explicit_live_write_ack", "continuous_broad_live_loop", "not_mvp_release_authority"),
+    ),
+    WriteSurface(
         id="ableton_control_surface",
         label="Ableton OSC control surface",
         status="lab_only",
@@ -391,12 +491,60 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         ),
     ),
     WriteSurface(
+        id="wing_meter_subscription_transport",
+        label="WING meter subscription transport",
+        status="quarantined",
+        paths=("backend/arrangement_automation/wing_meter_reader.py",),
+        entrypoints=("WingMeterReader.start", "mixer_client.send meter subscribe"),
+        write_kinds=("transport",),
+        allowed_live=False,
+        gate=(
+            "Read telemetry subscription only; it may contact WING for meter "
+            "frames but must not be treated as console-state mutation or live "
+            "apply authority."
+        ),
+        current_policy=(
+            "Meter subscriptions can support supervised measurements, but they "
+            "do not grant readiness closure, apply authority, or proof of a "
+            "write-capable correction family."
+        ),
+        next_action=(
+            "Keep meter transport behind explicit supervised/read-only flows "
+            "and preserve untrusted/stale readings as fail-closed evidence."
+        ),
+    ),
+    WriteSurface(
+        id="legacy_enhanced_gain_agent_direct_apply",
+        label="Legacy enhanced gain agent direct apply",
+        status="quarantined",
+        paths=("backend/enhanced_gain_agent.py",),
+        entrypoints=("apply_to_mixer", "osc_client.send"),
+        write_kinds=("gain", "hpf"),
+        allowed_live=False,
+        gate=(
+            "Legacy direct OSC apply path is quarantined; gain/HPF outputs must "
+            "flow through proposal evidence and the Product Layer supervised "
+            "fader/gain boundary."
+        ),
+        current_policy=(
+            "Do not call apply_to_mixer for WING deployment. The agent may "
+            "produce analysis/proposals only unless a future proof creates a "
+            "narrow supervised apply contract."
+        ),
+        next_action=(
+            "Replace legacy direct apply with proposal DTOs and physical "
+            "readback/rollback requirements before any live use."
+        ),
+    ),
+    WriteSurface(
         id="routing_snapshot_scene_writes",
         label="Routing, snapshot, and scene writes",
         status="quarantined",
         paths=(
             "backend/handlers/routing_handlers.py",
             "backend/handlers/snapshot_handlers.py",
+            "backend/list_all_snapshots.py",
+            "backend/list_snapshots.py",
             "backend/load_snap.py",
             "backend/load_snap_v2.py",
             "backend/load_snap_final.py",

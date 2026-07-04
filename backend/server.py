@@ -13,7 +13,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Set, Optional, Union, List, Dict, Any, TYPE_CHECKING
+from typing import Set, Optional, Union, List, Dict, Any, Mapping, TYPE_CHECKING
 import websockets
 import numpy as np
 
@@ -963,15 +963,21 @@ class AutoMixerServer:
             "compressor_gain_down",
         }
 
+    def _normalize_voice_command_payload(self, command: Any) -> Dict[str, Any]:
+        if isinstance(command, Mapping):
+            return dict(command)
+        return {"raw_command": command}
+
     async def _block_quarantined_voice_command_if_needed(self, command: Dict[str, Any]) -> bool:
-        cmd_type = str((command or {}).get("type") or "").strip().lower()
+        command = self._normalize_voice_command_payload(command)
+        cmd_type = str(command.get("type") or "").strip().lower()
         if (
             not self._is_wing_deployment_write_boundary_active()
             or not self._is_voice_command_write_surface(cmd_type)
         ):
             return False
 
-        request_payload = dict(command or {})
+        request_payload = dict(command)
         surface = f"voice_command:{cmd_type}"
         payload = {
             "type": "voice_command_blocked",
@@ -1001,6 +1007,60 @@ class AutoMixerServer:
             payload["artifact_path"] = artifact_path
         await self.broadcast(payload)
         return True
+
+    async def _broadcast_voice_command_write_failed(
+        self,
+        command: Dict[str, Any],
+        *,
+        value_type: str,
+        requested_value: Any,
+        reason: str = "mixer_write_failed",
+    ) -> None:
+        command = self._normalize_voice_command_payload(command)
+        cmd_type = str(command.get("type") or "").strip().lower()
+        payload = {
+            "type": "voice_command_blocked",
+            "status": "blocked",
+            "success": False,
+            "reason": reason,
+            "surface": f"voice_command:{cmd_type}",
+            "command": cmd_type,
+            "channel": command.get("channel"),
+            "value_type": value_type,
+            "requested_value": requested_value,
+            "live_write": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "request": dict(command),
+        }
+        await self.broadcast(payload)
+
+    async def _broadcast_voice_command_error(
+        self,
+        command: Dict[str, Any],
+        *,
+        reason: str,
+        error: Optional[str] = None,
+    ) -> None:
+        command = self._normalize_voice_command_payload(command)
+        cmd_type = str(command.get("type") or "").strip().lower()
+        payload = {
+            "type": "voice_command_error",
+            "status": "error",
+            "success": False,
+            "reason": reason,
+            "surface": f"voice_command:{cmd_type}" if cmd_type else "voice_command",
+            "command": command,
+            "command_type": cmd_type,
+            "channel": command.get("channel"),
+            "request": dict(command),
+            "live_write": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
+        if error is not None:
+            payload["error"] = error
+        await self.broadcast(payload)
 
     def _manual_write_blocked_result(
         self,
@@ -1278,6 +1338,15 @@ class AutoMixerServer:
         except (TypeError, ValueError):
             return None
 
+    @staticmethod
+    def _coerce_finite_float(value: Any) -> Optional[float]:
+        if isinstance(value, bool):
+            return None
+        parsed = AutoMixerServer._coerce_optional_float(value)
+        if parsed is None or not math.isfinite(parsed):
+            return None
+        return parsed
+
     def _manual_write_cooldown_remaining(self, channel: int, value_type: str) -> float:
         if self._manual_write_cooldown_sec <= 0:
             return 0.0
@@ -1291,9 +1360,12 @@ class AutoMixerServer:
         """Delay between manual-write attempts when the mixer client drops a write.
 
         WingClient rate-limits repeated OSC writes to the same address and
-        returns False for a dropped write, so an approved apply followed by an
-        immediate rollback to the same address can silently lose the rollback.
-        The retry must wait longer than that per-address throttle interval.
+        returns False for a throttled write, so an approved apply followed by an
+        immediate rollback to the same address can lose the rollback. The retry
+        must wait two full throttle intervals: with trailing-edge throttle
+        semantics a queued value is flushed at last_send + interval, and a retry
+        arriving less than one interval after that flush would be throttled
+        again.
         """
         client = self.mixer_client
         if getattr(client, "_osc_throttle_enabled", False):
@@ -1302,7 +1374,7 @@ class AutoMixerServer:
             except (TypeError, ValueError):
                 throttle_hz = 0.0
             if throttle_hz > 0:
-                return min(1.0, (1.0 / throttle_hz) + 0.05)
+                return min(1.0, (2.0 / throttle_hz) + 0.05)
         return 0.25
 
     def _manual_write_readback_status(
@@ -7443,19 +7515,43 @@ class AutoMixerServer:
 
     async def _execute_voice_command(self, command: dict):
         """Execute a recognized voice command"""
+        command = self._normalize_voice_command_payload(command)
+        if "raw_command" in command and "type" not in command:
+            await self._broadcast_voice_command_error(
+                command,
+                reason="malformed_voice_command",
+            )
+            return
         if not self.mixer_client:
             logger.warning("No mixer connected, cannot execute voice command")
+            await self._broadcast_voice_command_error(
+                command,
+                reason="mixer_not_connected",
+            )
             return
         
         try:
-            cmd_type = command.get("type")
+            cmd_type = str(command.get("type") or "").strip().lower()
             channel = command.get("channel")
             if await self._block_quarantined_voice_command_if_needed(command):
                 return
             
             if cmd_type == "set_fader":
-                value = command.get("value", 0.5)
-                self.mixer_client.set_channel_fader(channel, value)
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
+                value = self._coerce_finite_float(command.get("value", 0.5))
+                if value is None:
+                    await self._broadcast_voice_command_error(command, reason="invalid_value")
+                    return
+                write_result = self.mixer_client.set_channel_fader(channel, value)
+                if write_result is False:
+                    await self._broadcast_voice_command_write_failed(
+                        command,
+                        value_type="fader",
+                        requested_value=value,
+                    )
+                    return
                 await self.broadcast({
                     "type": "voice_command_executed",
                     "command": cmd_type,
@@ -7464,8 +7560,21 @@ class AutoMixerServer:
                 })
                 
             elif cmd_type == "set_gain":
-                value = command.get("value", 0.0)
-                self.mixer_client.set_channel_gain(channel, value)
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
+                value = self._coerce_finite_float(command.get("value", 0.0))
+                if value is None:
+                    await self._broadcast_voice_command_error(command, reason="invalid_value")
+                    return
+                write_result = self.mixer_client.set_channel_gain(channel, value)
+                if write_result is False:
+                    await self._broadcast_voice_command_write_failed(
+                        command,
+                        value_type="gain",
+                        requested_value=value,
+                    )
+                    return
                 await self.broadcast({
                     "type": "voice_command_executed",
                     "command": cmd_type,
@@ -7474,12 +7583,23 @@ class AutoMixerServer:
                 })
 
             elif cmd_type == "set_pan":
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
                 raw_value = command.get("value", command.get("pan", command.get("pan_percent", 0.0)))
-                value = self._coerce_optional_float(raw_value)
+                value = self._coerce_finite_float(raw_value)
                 if value is None:
-                    value = 0.0
+                    await self._broadcast_voice_command_error(command, reason="invalid_value")
+                    return
                 value = self._clamp_manual_write_value(value, "pan")
-                self.mixer_client.set_channel_pan(channel, value)
+                write_result = self.mixer_client.set_channel_pan(channel, value)
+                if write_result is False:
+                    await self._broadcast_voice_command_write_failed(
+                        command,
+                        value_type="pan",
+                        requested_value=value,
+                    )
+                    return
                 await self.broadcast({
                     "type": "voice_command_executed",
                     "command": cmd_type,
@@ -7489,21 +7609,36 @@ class AutoMixerServer:
                 
             elif cmd_type == "load_snap":
                 snap_name = command.get("snap_name")
-                if isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    success = self.mixer_client.load_snap(snap_name)
-                    await self.broadcast({
-                        "type": "voice_command_executed",
-                        "command": cmd_type,
-                        "snap_name": snap_name,
-                        "success": success
-                    })
+                if not snap_name:
+                    await self._broadcast_voice_command_error(command, reason="missing_snap_name")
+                    return
+                if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+                    await self._broadcast_voice_command_error(command, reason="unsupported_mixer_client")
+                    return
+                success = self.mixer_client.load_snap(snap_name)
+                await self.broadcast({
+                    "type": "voice_command_executed",
+                    "command": cmd_type,
+                    "snap_name": snap_name,
+                    "success": success
+                })
                     
             elif cmd_type == "mute_channel":
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
                 muted = command.get("muted", True)
                 parsed_mute = self._coerce_optional_bool(muted)
                 if parsed_mute is None:
                     parsed_mute = bool(muted)
-                self.mixer_client.set_channel_mute(channel, int(parsed_mute))
+                write_result = self.mixer_client.set_channel_mute(channel, int(parsed_mute))
+                if write_result is False:
+                    await self._broadcast_voice_command_write_failed(
+                        command,
+                        value_type="mute",
+                        requested_value=bool(parsed_mute),
+                    )
+                    return
                 await self.broadcast({
                     "type": "voice_command_executed",
                     "command": cmd_type,
@@ -7512,8 +7647,11 @@ class AutoMixerServer:
                     })
                 
             elif cmd_type == "volume_up":
-                db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
+                    db_change = self._coerce_finite_float(command.get("db", 3))
+                    if db_change is None:
+                        await self._broadcast_voice_command_error(command, reason="invalid_db")
+                        return
                     # Try to get current value from tracked values first, then from mixer
                     current_db = self.last_fader_values.get(channel)
                     
@@ -7526,7 +7664,14 @@ class AutoMixerServer:
                     if current_db is not None:
                         # Add dB directly (Wing uses dB values)
                         new_db = min(10.0, current_db + db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
+                        write_result = self.mixer_client.set_channel_fader(channel, new_db)
+                        if write_result is False:
+                            await self._broadcast_voice_command_write_failed(
+                                command,
+                                value_type="fader",
+                                requested_value=new_db,
+                            )
+                            return
                         # Update tracked value
                         self.last_fader_values[channel] = new_db
                         logger.info(f"Increased channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (+{db_change} dB)")
@@ -7534,7 +7679,14 @@ class AutoMixerServer:
                         # Fallback: use last known or default to 0
                         last_known = self.last_fader_values.get(channel, 0.0)
                         new_db = min(10.0, last_known + db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
+                        write_result = self.mixer_client.set_channel_fader(channel, new_db)
+                        if write_result is False:
+                            await self._broadcast_voice_command_write_failed(
+                                command,
+                                value_type="fader",
+                                requested_value=new_db,
+                            )
+                            return
                         self.last_fader_values[channel] = new_db
                         logger.info(f"Increased channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
                     
@@ -7546,11 +7698,15 @@ class AutoMixerServer:
                         "new_db": new_db
                     })
                 else:
-                    logger.warning(f"volume_up command ignored: channel is None")
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
                     
             elif cmd_type == "volume_down":
-                db_change = command.get("db", 3)  # Get dB value directly (default 3 dB)
                 if channel is not None:
+                    db_change = self._coerce_finite_float(command.get("db", 3))
+                    if db_change is None:
+                        await self._broadcast_voice_command_error(command, reason="invalid_db")
+                        return
                     # Try to get current value from tracked values first, then from mixer
                     current_db = self.last_fader_values.get(channel)
                     
@@ -7563,7 +7719,14 @@ class AutoMixerServer:
                     if current_db is not None:
                         # Subtract dB directly (Wing uses dB values)
                         new_db = max(-144.0, current_db - db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
+                        write_result = self.mixer_client.set_channel_fader(channel, new_db)
+                        if write_result is False:
+                            await self._broadcast_voice_command_write_failed(
+                                command,
+                                value_type="fader",
+                                requested_value=new_db,
+                            )
+                            return
                         # Update tracked value
                         self.last_fader_values[channel] = new_db
                         logger.info(f"Decreased channel {channel} fader: {current_db:.1f} dB -> {new_db:.1f} dB (-{db_change} dB)")
@@ -7571,7 +7734,14 @@ class AutoMixerServer:
                         # Fallback: use last known or default to 0
                         last_known = self.last_fader_values.get(channel, 0.0)
                         new_db = max(-144.0, last_known - db_change)
-                        self.mixer_client.set_channel_fader(channel, new_db)
+                        write_result = self.mixer_client.set_channel_fader(channel, new_db)
+                        if write_result is False:
+                            await self._broadcast_voice_command_write_failed(
+                                command,
+                                value_type="fader",
+                                requested_value=new_db,
+                            )
+                            return
                         self.last_fader_values[channel] = new_db
                         logger.info(f"Decreased channel {channel} fader by {db_change} dB (to {new_db:.1f} dB, using tracked value)")
                     
@@ -7583,12 +7753,26 @@ class AutoMixerServer:
                         "new_db": new_db
                     })
                 else:
-                    logger.warning(f"volume_down command ignored: channel is None")
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
             
             elif cmd_type == "eq_on":
                 on = command.get("on", 1)
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
+                if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+                    await self._broadcast_voice_command_error(command, reason="unsupported_mixer_client")
+                    return
                 if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_eq_on(channel, on)
+                    write_result = self.mixer_client.set_eq_on(channel, on)
+                    if write_result is False:
+                        await self._broadcast_voice_command_write_failed(
+                            command,
+                            value_type="eq_on",
+                            requested_value=on,
+                        )
+                        return
                     logger.info(f"Set EQ {'on' if on else 'off'} for channel {channel}")
                     await self.broadcast({
                         "type": "voice_command_executed",
@@ -7599,7 +7783,19 @@ class AutoMixerServer:
             
             elif cmd_type == "eq_band_up" or cmd_type == "eq_band_down":
                 band = command.get("band")
-                db_change = command.get("db", 3)
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
+                if not band:
+                    await self._broadcast_voice_command_error(command, reason="missing_eq_band")
+                    return
+                db_change = self._coerce_finite_float(command.get("db", 3))
+                if db_change is None:
+                    await self._broadcast_voice_command_error(command, reason="invalid_db")
+                    return
+                if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+                    await self._broadcast_voice_command_error(command, reason="unsupported_mixer_client")
+                    return
                 if channel is not None and band and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     # Get current gain
                     band_gain_key = f"{band}g" if band in ["1", "2", "3", "4"] else ("lg" if band == "low" else "hg")
@@ -7610,7 +7806,14 @@ class AutoMixerServer:
                     else:
                         new_gain = max(-15.0, current_gain - db_change)
                     
-                    self.mixer_client.set_eq_band_gain(channel, band_gain_key, new_gain)
+                    write_result = self.mixer_client.set_eq_band_gain(channel, band_gain_key, new_gain)
+                    if write_result is False:
+                        await self._broadcast_voice_command_write_failed(
+                            command,
+                            value_type="eq_band_gain",
+                            requested_value=new_gain,
+                        )
+                        return
                     logger.info(f"Set EQ band {band} for channel {channel}: {current_gain:.1f} dB -> {new_gain:.1f} dB")
                     await self.broadcast({
                         "type": "voice_command_executed",
@@ -7622,8 +7825,21 @@ class AutoMixerServer:
             
             elif cmd_type == "compressor_on":
                 on = command.get("on", 1)
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
+                if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+                    await self._broadcast_voice_command_error(command, reason="unsupported_mixer_client")
+                    return
                 if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_compressor_on(channel, on)
+                    write_result = self.mixer_client.set_compressor_on(channel, on)
+                    if write_result is False:
+                        await self._broadcast_voice_command_write_failed(
+                            command,
+                            value_type="compressor_on",
+                            requested_value=on,
+                        )
+                        return
                     logger.info(f"Set compressor {'on' if on else 'off'} for channel {channel}")
                     await self.broadcast({
                         "type": "voice_command_executed",
@@ -7633,9 +7849,29 @@ class AutoMixerServer:
                     })
             
             elif cmd_type == "compressor_threshold":
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
                 threshold = command.get("threshold")
+                if threshold is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_compressor_threshold")
+                    return
+                threshold = self._coerce_finite_float(threshold)
+                if threshold is None:
+                    await self._broadcast_voice_command_error(command, reason="invalid_compressor_threshold")
+                    return
+                if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+                    await self._broadcast_voice_command_error(command, reason="unsupported_mixer_client")
+                    return
                 if channel is not None and threshold is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
-                    self.mixer_client.set_compressor_threshold(channel, threshold)
+                    write_result = self.mixer_client.set_compressor_threshold(channel, threshold)
+                    if write_result is False:
+                        await self._broadcast_voice_command_write_failed(
+                            command,
+                            value_type="compressor_threshold",
+                            requested_value=threshold,
+                        )
+                        return
                     logger.info(f"Set compressor threshold for channel {channel}: {threshold:.1f} dB")
                     await self.broadcast({
                         "type": "voice_command_executed",
@@ -7645,7 +7881,16 @@ class AutoMixerServer:
                     })
             
             elif cmd_type == "compressor_gain_up" or cmd_type == "compressor_gain_down":
-                db_change = command.get("db", 3)
+                if channel is None:
+                    await self._broadcast_voice_command_error(command, reason="missing_channel")
+                    return
+                db_change = self._coerce_finite_float(command.get("db", 3))
+                if db_change is None:
+                    await self._broadcast_voice_command_error(command, reason="invalid_db")
+                    return
+                if not isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
+                    await self._broadcast_voice_command_error(command, reason="unsupported_mixer_client")
+                    return
                 if channel is not None and isinstance(self.mixer_client, (WingClient, EnhancedOSCClient)):
                     current_gain = self.mixer_client.get_compressor_gain(channel) or 0.0
                     if cmd_type == "compressor_gain_up":
@@ -7653,7 +7898,14 @@ class AutoMixerServer:
                     else:
                         new_gain = max(-6.0, current_gain - db_change)
                     
-                    self.mixer_client.set_compressor_gain(channel, new_gain)
+                    write_result = self.mixer_client.set_compressor_gain(channel, new_gain)
+                    if write_result is False:
+                        await self._broadcast_voice_command_write_failed(
+                            command,
+                            value_type="compressor_gain",
+                            requested_value=new_gain,
+                        )
+                        return
                     logger.info(f"Set compressor gain for channel {channel}: {current_gain:.1f} dB -> {new_gain:.1f} dB")
                     await self.broadcast({
                         "type": "voice_command_executed",
@@ -7661,6 +7913,12 @@ class AutoMixerServer:
                         "channel": channel,
                         "new_gain": new_gain
                     })
+            else:
+                await self._broadcast_voice_command_error(
+                    command,
+                    reason="unknown_voice_command",
+                )
+                return
             
             logger.info("=" * 60)
             logger.info(f"✅ EXECUTED VOICE COMMAND: {cmd_type}")
@@ -7676,11 +7934,11 @@ class AutoMixerServer:
             logger.error(f"❌ ERROR EXECUTING VOICE COMMAND: {e}")
             logger.error(f"   Command: {command}")
             logger.error("=" * 60)
-            await self.broadcast({
-                "type": "voice_command_error",
-                "error": str(e),
-                "command": command
-            })
+            await self._broadcast_voice_command_error(
+                command,
+                reason="voice_command_exception",
+                error=str(e),
+            )
 
     async def handler(self, websocket: WebSocketServerProtocol):
         await self.register_client(websocket)

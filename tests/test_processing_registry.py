@@ -421,7 +421,7 @@ def test_registry_snapshot_can_hide_full_method_inventory():
         "product_layer_fader_gain_apply"
     ]
     assert snapshot["safety_coverage_matrix"]["summary"]["live_allowed_row_ids"] == []
-    assert "fader_supervised" in snapshot["safety_coverage_matrix"]["summary"][
+    assert "fader_supervised" not in snapshot["safety_coverage_matrix"]["summary"][
         "missing_or_partial_real_wing_proof_ids"
     ]
     assert snapshot["read_surface_inventory"]["summary"]["claim"] == (
@@ -1031,6 +1031,7 @@ def test_safety_coverage_matrix_records_live_proof_gaps():
             assert "apply_operator_proposal" in row.canonical_gate
         else:
             assert row.status in {
+                "hardware_proven_narrow",
                 "supervised_candidate",
                 "dry_run_ready",
                 "proposal_only",
@@ -1040,10 +1041,10 @@ def test_safety_coverage_matrix_records_live_proof_gaps():
 
     fader = get_safety_coverage_row("fader_supervised")
     assert fader.live_allowed is False
-    assert fader.status == "supervised_candidate"
-    assert fader.rollback_readback == "failed"
-    assert fader.emergency_stop_proof == "missing"
-    assert "rollback_not_applied" in fader.current_blocker
+    assert fader.status == "hardware_proven_narrow"
+    assert fader.rollback_readback == "passed"
+    assert fader.emergency_stop_proof == "passed"
+    assert "M006" in fader.current_blocker
     assert fader.required_evidence_components == (
         "physical_pre_read",
         "bounded_fader_down_apply",
@@ -1082,7 +1083,7 @@ def test_safety_coverage_matrix_records_live_proof_gaps():
     assert mute.pre_read == "missing"
     assert mute.rollback_readback == "missing"
     assert "manual_mute_authority_preserved" in mute.notes
-    assert gain.real_wing_proof == "missing"
+    assert gain.real_wing_proof == "passed"
     assert get_safety_coverage_row("routing_snapshots_scenes").status == "blocked"
 
 
@@ -1095,6 +1096,6 @@ def test_safety_coverage_matrix_snapshot_is_fail_closed():
         == "supervised_fader_gain_policy_only_release_live_blocked"
     )
     assert snapshot["summary"]["live_allowed_row_ids"] == []
-    assert "fader_supervised" in snapshot["summary"]["missing_or_partial_real_wing_proof_ids"]
-    assert "gain_supervised" in snapshot["summary"]["missing_or_partial_real_wing_proof_ids"]
+    assert "fader_supervised" not in snapshot["summary"]["missing_or_partial_real_wing_proof_ids"]
+    assert "gain_supervised" not in snapshot["summary"]["missing_or_partial_real_wing_proof_ids"]
     assert snapshot["summary"]["status_counts"]["blocked"] >= 1

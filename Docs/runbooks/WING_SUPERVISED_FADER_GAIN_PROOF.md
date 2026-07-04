@@ -110,7 +110,12 @@ Forbidden live writes:
 
 ## Fader Proof Command
 
-Replace channel `3` and delta `-0.25` with the operator-approved values:
+Replace channel `3` and delta `-0.25` with the operator-approved values.
+`--accepted-readonly-source-id` must be the summary path of the currently
+accepted decision record (see
+`Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md`
+`accepted_source_ids`); a rejected or stale candidate id fails the preflight
+decision gate before any WebSocket step:
 
 ```bash
 python3 tools/wing_operator_proposal_validation_runner.py \
@@ -121,7 +126,7 @@ python3 tools/wing_operator_proposal_validation_runner.py \
   --operator-confirm-channel 3 \
   --operator-confirm-value-type fader \
   --operator-confirm-delta-db -0.25 \
-  --accepted-readonly-source-id artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json \
+  --accepted-readonly-source-id artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json \
   --execute \
   --prove-blocked-apply \
   --prove-emergency-stop \
@@ -142,7 +147,7 @@ python3 tools/wing_operator_proposal_validation_runner.py \
   --operator-confirm-channel 3 \
   --operator-confirm-value-type gain \
   --operator-confirm-delta-db -0.25 \
-  --accepted-readonly-source-id artifacts/wing_readonly_preflight/20260702T061111Z_wing_readonly_preflight/summary.json \
+  --accepted-readonly-source-id artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json \
   --execute \
   --prove-blocked-apply \
   --prove-emergency-stop \
@@ -165,6 +170,10 @@ The artifact must show:
 - apply readback status is `verified_from_physical_readback`
 - rollback went through `rollback_last_manual_write`
 - rollback readback status is `verified_from_physical_readback`
+- `write_attempts` may be greater than `1` on apply or rollback: the backend
+  retries a console write that the per-address OSC rate limit rejected. This
+  is expected behavior, not a fault, as long as the final status is `applied`
+  and the readback is verified
 - emergency stop was applied
 - later apply was blocked with `emergency_stop_active`
 - fader/gain physical readback was recorded after apply and rollback

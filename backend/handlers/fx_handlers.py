@@ -13,6 +13,53 @@ def register_handlers(server):
             request=request,
         )
 
+    async def send_write_failed(websocket, data, surface, result_type, reason, **extra):
+        payload = {
+            "request_id": data.get("request_id"),
+            "type": result_type,
+            "status": "blocked",
+            "reason": reason,
+            "surface": surface,
+            "live_write": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
+        payload.update(extra)
+        await server.send_to_client(websocket, payload)
+
+    async def call_write_or_fail_closed(
+        websocket,
+        data,
+        surface,
+        result_type,
+        write_method,
+        *args,
+        **kwargs,
+    ):
+        try:
+            write_result = write_method(*args, **kwargs)
+        except Exception as exc:
+            await send_write_failed(
+                websocket,
+                data,
+                surface,
+                result_type,
+                "mixer_write_exception",
+                error=str(exc),
+            )
+            return False
+        if write_result is False:
+            await send_write_failed(
+                websocket,
+                data,
+                surface,
+                result_type,
+                "mixer_write_failed",
+                write_result=False,
+            )
+            return False
+        return True
+
     async def handle_get_fx_overview(websocket, data):
         if not server.mixer_client:
             return
@@ -55,14 +102,20 @@ def register_handlers(server):
             return
         if not server.mixer_client or not hasattr(server.mixer_client, "set_insert"):
             return
-        server.mixer_client.set_insert(
+        if not await call_write_or_fail_closed(
+            websocket,
+            data,
+            "set_insert",
+            "insert_updated",
+            server.mixer_client.set_insert,
             data.get("target_type", "channel"),
             data.get("target"),
             data.get("position", "pre"),
             slot=data.get("slot", "NONE"),
             on=data.get("on"),
             mode=data.get("mode"),
-        )
+        ):
+            return
         if hasattr(server.mixer_client, "get_insert"):
             insert_state = server.mixer_client.get_insert(
                 data.get("target_type", "channel"),
@@ -88,7 +141,16 @@ def register_handlers(server):
         if not server.mixer_client or not hasattr(server.mixer_client, "set_fx_model"):
             return
         slot = data.get("slot")
-        server.mixer_client.set_fx_model(slot, data.get("model"))
+        if not await call_write_or_fail_closed(
+            websocket,
+            data,
+            "set_fx_model",
+            "fx_slot_updated",
+            server.mixer_client.set_fx_model,
+            slot,
+            data.get("model"),
+        ):
+            return
         await server.send_to_client(websocket, {
             "request_id": data.get("request_id"),
             "type": "fx_slot_updated",
@@ -106,7 +168,16 @@ def register_handlers(server):
         if not server.mixer_client or not hasattr(server.mixer_client, "set_fx_on"):
             return
         slot = data.get("slot")
-        server.mixer_client.set_fx_on(slot, data.get("on"))
+        if not await call_write_or_fail_closed(
+            websocket,
+            data,
+            "set_fx_on",
+            "fx_slot_updated",
+            server.mixer_client.set_fx_on,
+            slot,
+            data.get("on"),
+        ):
+            return
         await server.send_to_client(websocket, {
             "request_id": data.get("request_id"),
             "type": "fx_slot_updated",
@@ -124,7 +195,16 @@ def register_handlers(server):
         if not server.mixer_client or not hasattr(server.mixer_client, "set_fx_mix"):
             return
         slot = data.get("slot")
-        server.mixer_client.set_fx_mix(slot, data.get("mix"))
+        if not await call_write_or_fail_closed(
+            websocket,
+            data,
+            "set_fx_mix",
+            "fx_slot_updated",
+            server.mixer_client.set_fx_mix,
+            slot,
+            data.get("mix"),
+        ):
+            return
         await server.send_to_client(websocket, {
             "request_id": data.get("request_id"),
             "type": "fx_slot_updated",
@@ -148,7 +228,17 @@ def register_handlers(server):
         slot = data.get("slot")
         parameter = data.get("parameter")
         value = data.get("value")
-        server.mixer_client.set_fx_parameter(slot, parameter, value)
+        if not await call_write_or_fail_closed(
+            websocket,
+            data,
+            "set_fx_parameter",
+            "fx_parameter_updated",
+            server.mixer_client.set_fx_parameter,
+            slot,
+            parameter,
+            value,
+        ):
+            return
         await server.send_to_client(websocket, {
             "request_id": data.get("request_id"),
             "type": "fx_parameter_updated",

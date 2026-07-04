@@ -361,8 +361,15 @@ class ObservationMixerClient:
         return self._record("set_fx_model", (fx_slot, model), {}, {f"/fx/{fx_num}/mdl": model})
 
     def set_fx_on(self, fx_slot: str, on: int):
-        fx_num = self._normalize_fx_slot(fx_slot)
-        return self._record("set_fx_on", (fx_slot, on), {}, {f"/fx/{fx_num}/on": on})
+        return self._record(
+            "set_fx_on",
+            (fx_slot, on),
+            {
+                "supported": False,
+                "reason": "wing_fx_slot_has_no_on_path_model_controls_activity",
+            },
+            {},
+        )
 
     def set_fx_mix(self, fx_slot: str, mix: float):
         fx_num = self._normalize_fx_slot(fx_slot)

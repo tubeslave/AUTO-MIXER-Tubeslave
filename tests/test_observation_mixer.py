@@ -91,9 +91,11 @@ def test_observation_mixer_tracks_fx_and_insert_shadow_state():
 
     assert mixer.set_fx_mix("FX3", 75.0) is True
     assert mixer.set_fx_model("FX3", "PLATE") is True
+    assert mixer.set_fx_on("FX3", 1) is True
     assert mixer.set_insert("main", 1, "post", slot="FX3", on=1) is True
 
     assert mixer.state["/fx/3/fxmix"] == 75.0
     assert mixer.state["/fx/3/mdl"] == "PLATE"
+    assert "/fx/3/on" not in mixer.state
     assert mixer.state["/main/1/postins/ins"] == "FX3"
     assert mixer.state["/main/1/postins/on"] == 1

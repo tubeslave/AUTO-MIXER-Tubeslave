@@ -30,19 +30,13 @@ emergency-stop/block evidence.
 
 ## Current external validation requirements
 
-- Operator restores or verifies CH3 fader state after rollback_not_applied
-- Clean supervised CH3 fader proof rerun with apply, physical readback, rollback and emergency-stop/block evidence
-- Separate headroom-safe supervised gain-down proof with the same evidence requirements
+- Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
+- Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
-Next operator action from `STATE.json`: Do not widen live authority. Operator
-must restore or verify CH3 fader state after the failed rollback with reason
-rollback_not_applied, then rerun the narrow fader proof until apply, physical
-readback, rollback and emergency-stop/block evidence all pass. After that, run
-a separate headroom-safe gain-down proof with the same evidence requirements;
-only then reassess release readiness.
+Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 
 Latest ledger handoff row:
-`full_suite_after_auth_token_digest_storage_guard_passed` at
-`2026-07-03T17:50:51Z`. No live authority changed; release-ready live
+`supervised_m005_software_disconnect_partial_evidence_recorded` at
+`2026-07-04T08:04:59Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.

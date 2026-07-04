@@ -1,8 +1,10 @@
 # Plan M001: Real WING Rack interaction path
 
-Status: active operator plan, accepted read-only decision recorded; supervised
-write proof remains blocked until the failed CH3 fader rollback is restored or
-verified and the operator approves the exact next proof.
+Status: active operator plan, accepted read-only decision recorded; the
+supervised CH3 fader and gain-down proofs have passed on the real console with
+operator approval, and the next external steps are the M005
+disconnect/timeout/stale-state protection proof and the M006 owner readiness
+review.
 
 ## Purpose
 
@@ -18,18 +20,21 @@ The plan does not grant full autonomous live mixing authority.
 
 The current gate is not transport failure. Read-only WING commands have worked:
 connection, channel-name scan, physical readback and observation soundcheck
-analysis. The canonical read-only decision ledger is accepted-ready, but write
-commands remain blocked because the latest CH3 fader proof failed rollback.
+analysis. The canonical read-only decision ledger is accepted-ready, and the
+earlier failed CH3 fader rollback is closed by the passed rerun
+`20260704T045741Z_wing_operator_proposal_ch3_fader` plus the passed gain-down
+proof `20260704T045820Z_wing_operator_proposal_ch3_gain`, both with apply,
+physical readback, rollback and emergency-stop/block evidence.
 
-Current blocker:
+Current gate state:
 
 - decision review status: `accepted_decision_ready`;
 - accepted decision records: `1`;
 - rejected decision records: `2`;
 - invalid decision records: `0`;
 - unreviewed read-only source ids: `0`;
-- latest supervised proof status: `failed`;
-- latest supervised proof reason: `rollback_not_applied`;
+- latest supervised proof status: `passed`;
+- latest supervised proof reason: `supervised_wing_mvp_gain_down_proof_ch3`;
 - backend WING runtime: observation-only unless explicitly reconnected for the
   supervised proof step;
 - allowed current WING live-write proof types: `fader` and `gain` only;
@@ -284,7 +289,10 @@ slice:
 4. dashboard safety snapshot;
 5. optional read-only scans/preflights with `observation_only=true`.
 
-Codex must not execute or retry the supervised proof unattended. The operator
-must first restore or verify CH3 fader state after `rollback_not_applied`, then
-approve the exact channel, value type and negative delta before the narrow
-fader proof is rerun. Gain-down proof remains a separate later proof.
+Codex must not execute or retry the supervised proof unattended. The CH3 fader
+and gain-down proofs are complete: the operator verified CH3 state by read-only
+physical readback, then approved the exact channel, value type and negative
+delta for each proof before it ran. The next steps are the M005 supervised
+disconnect/timeout/stale-state protection proof with the operator present and
+the M006 owner readiness review that updates the readiness matrix from the
+accepted proof artifacts.

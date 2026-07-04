@@ -111,7 +111,7 @@ def test_overlay_maps_physical_fader_candidate_and_legacy_gain_remediation_to_ta
     assert fader["physical_candidate_proof_ids"] == ["physical-fader-proof"]
     assert fader["autonomous_ready"] is False
     assert "safety_live_not_allowed" in fader["blockers"]
-    assert "rollback_readback_failed" in fader["blockers"]
+    assert "rollback_readback_failed" not in fader["blockers"]
     assert "automatic_promotion_forbidden" in fader["blockers"]
 
     gain = rows["gain"]

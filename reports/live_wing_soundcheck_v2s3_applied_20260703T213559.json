@@ -1,0 +1,258 @@
+{
+  "applied_at": "20260703T213559",
+  "tempo_bpm": 166.7,
+  "fx_plan": {
+    "buses": [
+      {
+        "bus_id": 13,
+        "name": "Vocal Plate",
+        "fx_type": "reverb",
+        "fx_slot": "FX1",
+        "model": "PLATE",
+        "return_level_db": -4.0,
+        "params": {
+          "decay_s": 1.55,
+          "predelay_ms": 42.0,
+          "density": 0.72,
+          "brightness": 0.58
+        },
+        "hpf_hz": 220.0,
+        "lpf_hz": 7800.0,
+        "duck_source": "lead_vocal",
+        "duck_depth_db": 1.8,
+        "reason": "Lead vocal needs depth while dry vocal remains forward."
+      },
+      {
+        "bus_id": 14,
+        "name": "Drum Room",
+        "fx_type": "reverb",
+        "fx_slot": "FX2",
+        "model": "ROOM",
+        "return_level_db": -4.0,
+        "params": {
+          "decay_s": 0.72,
+          "predelay_ms": 10.0,
+          "density": 0.86,
+          "brightness": 0.42
+        },
+        "hpf_hz": 180.0,
+        "lpf_hz": 5600.0,
+        "duck_source": null,
+        "duck_depth_db": 0.0,
+        "reason": "Short dense drum space supports snare/toms without washing overheads."
+      },
+      {
+        "bus_id": 15,
+        "name": "Tempo Delay",
+        "fx_type": "delay",
+        "fx_slot": "FX3",
+        "model": "STEREO_DELAY",
+        "return_level_db": -0.5,
+        "params": {
+          "left_delay_ms": 269.9460107978405,
+          "right_delay_ms": 359.9280143971206,
+          "feedback": 0.22,
+          "width": 0.85
+        },
+        "hpf_hz": 260.0,
+        "lpf_hz": 5200.0,
+        "duck_source": "lead_vocal",
+        "duck_depth_db": 4.0,
+        "reason": "Tempo delay is audible in vocal gaps, not over lyric consonants."
+      },
+      {
+        "bus_id": 16,
+        "name": "Mod Doubler",
+        "fx_type": "chorus",
+        "fx_slot": "FX4",
+        "model": "CHORUS",
+        "return_level_db": -11.0,
+        "params": {
+          "left_delay_ms": 11.0,
+          "right_delay_ms": 17.0,
+          "depth": 0.16,
+          "rate_hz": 0.45
+        },
+        "hpf_hz": 220.0,
+        "lpf_hz": 8500.0,
+        "duck_source": null,
+        "duck_depth_db": 0.0,
+        "reason": "Subtle stereo modulation widens backing parts without moving the lead center."
+      }
+    ],
+    "sends": [
+      {
+        "channel_id": 2,
+        "instrument": "snare",
+        "bus_id": 14,
+        "send_db": -17.0,
+        "post_fader": true,
+        "reason": "short drum room/plate support"
+      },
+      {
+        "channel_id": 3,
+        "instrument": "snare",
+        "bus_id": 14,
+        "send_db": -17.0,
+        "post_fader": true,
+        "reason": "short drum room/plate support"
+      },
+      {
+        "channel_id": 4,
+        "instrument": "rack_tom",
+        "bus_id": 14,
+        "send_db": -19.0,
+        "post_fader": true,
+        "reason": "tom depth follows drum room"
+      },
+      {
+        "channel_id": 5,
+        "instrument": "floor_tom",
+        "bus_id": 14,
+        "send_db": -19.0,
+        "post_fader": true,
+        "reason": "floor tom depth follows drum room"
+      },
+      {
+        "channel_id": 6,
+        "instrument": "overhead",
+        "bus_id": 14,
+        "send_db": -30.0,
+        "post_fader": true,
+        "reason": "tiny cohesion only; overheads already contain room"
+      },
+      {
+        "channel_id": 7,
+        "instrument": "overhead",
+        "bus_id": 14,
+        "send_db": -30.0,
+        "post_fader": true,
+        "reason": "tiny cohesion only; overheads already contain room"
+      },
+      {
+        "channel_id": 9,
+        "instrument": "electric_guitar",
+        "bus_id": 13,
+        "send_db": -25.0,
+        "post_fader": true,
+        "reason": "small shared plate to place guitars behind vocal"
+      },
+      {
+        "channel_id": 9,
+        "instrument": "electric_guitar",
+        "bus_id": 16,
+        "send_db": -26.0,
+        "post_fader": true,
+        "reason": "subtle width without hard center masking"
+      },
+      {
+        "channel_id": 10,
+        "instrument": "electric_guitar",
+        "bus_id": 13,
+        "send_db": -25.0,
+        "post_fader": true,
+        "reason": "small shared plate to place guitars behind vocal"
+      },
+      {
+        "channel_id": 10,
+        "instrument": "electric_guitar",
+        "bus_id": 16,
+        "send_db": -26.0,
+        "post_fader": true,
+        "reason": "subtle width without hard center masking"
+      },
+      {
+        "channel_id": 11,
+        "instrument": "playback",
+        "bus_id": 13,
+        "send_db": -29.0,
+        "post_fader": true,
+        "reason": "minimal glue; playback likely already processed"
+      },
+      {
+        "channel_id": 12,
+        "instrument": "playback",
+        "bus_id": 13,
+        "send_db": -29.0,
+        "post_fader": true,
+        "reason": "minimal glue; playback likely already processed"
+      },
+      {
+        "channel_id": 13,
+        "instrument": "accordion",
+        "bus_id": 13,
+        "send_db": -23.0,
+        "post_fader": true,
+        "reason": "shared plate for melodic depth"
+      },
+      {
+        "channel_id": 13,
+        "instrument": "accordion",
+        "bus_id": 15,
+        "send_db": -29.0,
+        "post_fader": true,
+        "reason": "low tempo echo for phrase tails"
+      },
+      {
+        "channel_id": 16,
+        "instrument": "lead_vocal",
+        "bus_id": 13,
+        "send_db": -18.0,
+        "post_fader": true,
+        "reason": "lead vocal plate depth"
+      },
+      {
+        "channel_id": 16,
+        "instrument": "lead_vocal",
+        "bus_id": 15,
+        "send_db": -24.0,
+        "post_fader": true,
+        "reason": "ducked tempo delay for vocal phrases"
+      }
+    ],
+    "notes": [
+      "Shared stereo FX returns; no per-channel insert reverbs by default.",
+      "FX sends are post-fader so agent balance moves preserve wet/dry ratio.",
+      "Returns are filtered to keep low end clear and vocal presence readable.",
+      "Vocal plate and tempo delay are ducked from lead vocal activity."
+    ]
+  },
+  "phase_actions": [
+    [
+      3,
+      null,
+      null,
+      "SNARE B vs T: 5 ударов, лаг 0.10±0.19 мс, corr +0.53 -> фаза согласована"
+    ],
+    [
+      1,
+      null,
+      null,
+      "KICK -> OH: несогласованно ({'ok': False, 'n': 7, 'onsets': 24, 'lag_ms': 3.618573418363226, 'mad_ms': 5.361201576894721, 'corr': 0.013859871947381051})"
+    ],
+    [
+      2,
+      null,
+      null,
+      "SNARE T -> OH: несогласованно ({'ok': False, 'n': 9, 'onsets': 23, 'lag_ms': 3.5460293228492645, 'mad_ms': 4.027010322039, 'corr': -0.1861085968296366})"
+    ],
+    [
+      4,
+      null,
+      null,
+      "TOM -> OH: несогласованно ({'ok': False, 'n': 10, 'onsets': 24, 'lag_ms': -0.06361585367809987, 'mad_ms': 1.3001732152245764, 'corr': 0.11999764962405846})"
+    ],
+    [
+      5,
+      null,
+      null,
+      "F TOM -> OH: несогласованно ({'ok': False, 'n': 0, 'onsets': 11})"
+    ]
+  ],
+  "return_levels": {
+    "13": -4.0,
+    "14": -4.0,
+    "15": -3.0,
+    "16": -11.0
+  }
+}
