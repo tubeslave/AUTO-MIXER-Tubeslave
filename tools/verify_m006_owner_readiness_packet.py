@@ -247,6 +247,47 @@ def _m005_events_path_matches_summary_path(
     return events_path == summary_path.with_name("events.jsonl")
 
 
+def _m005_request_sequence_proves_disconnect_flow(request_types: Any) -> bool:
+    if not isinstance(request_types, list):
+        return False
+    sequence = [item for item in request_types if isinstance(item, str)]
+    if len(sequence) != len(request_types):
+        return False
+
+    def find_after(request_type: str, start_index: int) -> int | None:
+        try:
+            return sequence.index(request_type, start_index)
+        except ValueError:
+            return None
+
+    baseline_query = find_after("query_mixer_parameter", 0)
+    if baseline_query is None:
+        return False
+    supervised_mode = find_after("set_operator_mode", baseline_query + 1)
+    if supervised_mode is None:
+        return False
+    proposal = find_after("create_operator_proposal", supervised_mode + 1)
+    if proposal is None:
+        return False
+    stale_query = find_after("query_mixer_parameter", proposal + 1)
+    if stale_query is None:
+        return False
+    blocked_apply = find_after("apply_operator_proposal", stale_query + 1)
+    if blocked_apply is None:
+        return False
+    reconnect = find_after("connect_wing", blocked_apply + 1)
+    if reconnect is None:
+        return False
+    reconnect_query = find_after("query_mixer_parameter", reconnect + 1)
+    if reconnect_query is None:
+        return False
+
+    return (
+        find_after("apply_operator_proposal", 0) == blocked_apply
+        and find_after("connect_wing", 0) == reconnect
+    )
+
+
 def _packet_input_proof_artifacts(packet: Mapping[str, Any]) -> list[str]:
     artifacts = packet.get("input_proof_artifacts")
     if not isinstance(artifacts, list):
@@ -651,6 +692,11 @@ def _record_m005_checks(
     )
     _record(
         checks,
+        "m005_summary_request_sequence_proves_disconnect_flow",
+        _m005_request_sequence_proves_disconnect_flow(m005_sent_request_types),
+    )
+    _record(
+        checks,
         "m005_summary_no_forbidden_direct_request_types",
         forbidden_from_sent == [],
     )
@@ -684,6 +730,11 @@ def _record_m005_checks(
         checks,
         "m005_events_apply_probe_sent",
         "apply_operator_proposal" in event_request_types,
+    )
+    _record(
+        checks,
+        "m005_events_request_sequence_proves_disconnect_flow",
+        _m005_request_sequence_proves_disconnect_flow(event_request_types),
     )
     _record(
         checks,

@@ -147,3 +147,18 @@ This prevents temporary-root, copied or path-mutated M005 summaries from
 becoming owner-review input. The update is offline verifier hardening only; it
 does not run M005, does not contact the backend or WING, and does not grant
 readiness closure or live authority.
+
+## 2026-07-04 M005 Event Sequence Binding Update
+
+The M006 owner-readiness verifier now requires the M005 request audit and
+matching `events.jsonl` send rows to prove the disconnect proof order:
+physical baseline query, supervised proposal setup, stale-state query,
+blocked `apply_operator_proposal` probe, observation-only reconnect, and
+final physical readback query. A complete-looking summary is blocked if the
+request sequence applies before the stale-state query or reconnects before the
+blocked-write probe.
+
+This prevents hand-edited or reordered M005 evidence from becoming
+owner-review input. The update is offline verifier hardening only; it does not
+run M005, does not contact the backend or WING, and does not grant readiness
+closure or live authority.

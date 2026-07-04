@@ -326,6 +326,42 @@ def test_m005_event_log_request_mismatch_blocks_owner_review() -> None:
     assert result["readiness_closure_allowed"] is False
 
 
+def test_m005_apply_before_stale_query_blocks_owner_review_even_if_flags_claim_complete() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    bad_sequence = [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+        "set_operator_mode",
+        "create_operator_proposal",
+        "apply_operator_proposal",
+        "query_mixer_parameter",
+        "connect_wing",
+        "query_mixer_parameter",
+    ]
+    m005["sent_request_types"] = bad_sequence
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=bad_sequence,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_summary_request_sequence_proves_disconnect_flow" in result["failed_checks"]
+    assert "m005_events_request_sequence_proves_disconnect_flow" in result["failed_checks"]
+    assert "m005_events_request_audit_matches_summary" not in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+
+
 def test_m005_event_log_forbidden_request_type_blocks_owner_review_even_if_summary_claims_clean() -> None:
     packet = load_packet()
     m005 = complete_m005_summary()
