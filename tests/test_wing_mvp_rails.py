@@ -742,7 +742,7 @@ def test_current_state_doc_matches_autopilot_state_evidence():
         result
         for row in ledger_rows
         for result in row.get("results", [])
-        if re.fullmatch(r"\d+ passed, 1 skipped, 1 warning(?: in [0-9.]+s)?", result)
+        if re.fullmatch(r"\d+ passed, 1 skipped(?:, 1 warning)?(?: in [0-9.]+s)?", result)
     ]
     assert ledger_full_suite_results
     latest_ledger_full_suite = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
@@ -1393,7 +1393,7 @@ def test_autopilot_operator_reports_match_latest_full_suite_evidence():
         result
         for row in ledger_rows
         for result in row.get("results", [])
-        if re.fullmatch(r"\d+ passed, 1 skipped, 1 warning(?: in [0-9.]+s)?", result)
+        if re.fullmatch(r"\d+ passed, 1 skipped(?:, 1 warning)?(?: in [0-9.]+s)?", result)
     ]
     assert ledger_full_suite_results
     latest_ledger_result = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])

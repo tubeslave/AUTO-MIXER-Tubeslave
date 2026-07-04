@@ -10,7 +10,7 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-04T19:31:13Z.
+- Latest heartbeat: 2026-07-04T20:46:15Z.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -31,6 +31,12 @@
   proof and M006 owner readiness review remain open. The earlier
   `rollback_not_applied` fader artifact is closed by the passed CH3 rerun and
   remains audit history only.
+- Latest M006 verifier hardening: `feeed92e7` makes
+  `tools/verify_m006_owner_readiness_packet.py` load the exact fader/gain
+  proof summaries referenced by the owner-review packet and cross-check them
+  against packet rows. Missing, path-unsafe, stale or mismatched proof
+  summaries keep owner-review input blocked. This grants no backend/WING
+  contact, live write, readiness update or live authority.
 - Status marker: read-only decision gate is accepted-ready; release readiness
   remains blocked on M005/M006.
 - External validation requirements:
@@ -555,8 +561,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   coverage before a proposed correction is trusted. `0dd5687f8` blocks positive
   WING proof-direction moves even for operator-authored proof proposals, and
   `22852a7e8` ignores validate-only/no-transport WING preflight traces in real
-  artifact roots. The latest verified full suite passed with
-  `5434 passed, 1 skipped, 1 warning`;
+  artifact roots, and `feeed92e7` cross-checks M006 owner-readiness proof
+  artifact summaries against packet rows. The latest verified full suite passed with
+  `5464 passed, 1 skipped`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,

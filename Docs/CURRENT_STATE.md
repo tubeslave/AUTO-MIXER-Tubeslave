@@ -1,18 +1,18 @@
 # Current State
 
-Generated: 2026-07-04T19:31:13Z
+Generated: 2026-07-04T20:46:15Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `22852a7e8 Ignore validate-only WING preflight traces`
+  `feeed92e7 Cross-check M006 proof artifacts`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the split was landed as
-  separate commits through `d466d13135`; ignored large/superseded local
-  evidence remains local-only.
+- Tracked worktree state before this sync: clean after the M006 verifier
+  proof-artifact cross-check commit `feeed92e7`; ignored large/superseded
+  local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
@@ -70,6 +70,12 @@ Generated: 2026-07-04T19:31:13Z
   restoration/verification plus fader/gain-down proof rerun passed; and the
   open external items are M005 disconnect/timeout/stale-state proof and M006
   readiness review.
+- `tools/verify_m006_owner_readiness_packet.py` now verifies the M006 review
+  packet against the exact fader/gain proof summaries referenced by the packet
+  rows. It does not glob for substitute artifacts, and it keeps owner-review
+  input blocked if a referenced proof summary is missing, path-unsafe, stale
+  or inconsistent. This is offline verifier hardening only: M005 remains
+  incomplete and M006 is still not an owner decision.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2004,8 +2010,9 @@ Generated: 2026-07-04T19:31:13Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `22852a7e8` passed with
-  `5434 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
+- The latest verified full-suite run for `feeed92e7` passed with
+  `5464 passed, 1 skipped`. This includes the M006 owner-readiness
+  packet verifier proof-artifact cross-check plus the local SmartDSP
   WING-native fit, DSP-parameter calculation summary, problem-first action
   decision summary evidence tests, the current read-only handoff scope rail and
   the active milestone waiting-reason/timestamp rails plus the repo-local

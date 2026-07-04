@@ -58,6 +58,11 @@
   prepares the owner review from the accepted CH3 fader/gain-down artifacts but
   is not an owner decision: M005 is still missing, readiness matrix updates are
   still disallowed, and live authority remains denied.
+- The M006 packet verifier is now stricter: `feeed92e7` makes
+  `tools/verify_m006_owner_readiness_packet.py` load the exact fader/gain proof
+  summaries referenced by the packet rows and block owner-review input when a
+  referenced proof summary is missing, path-unsafe, stale or inconsistent. This
+  is offline verification only; it does not close M005 or M006.
 - Local runtime/tooling verification on 2026-07-04 is green but does not close
   the blocker: the current backend listener completed the 600.005 second
   read-only observation artifact
@@ -124,8 +129,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `landed_split_handoff_truth_surfaces_synced` at
-  `2026-07-04T19:31:13Z`. That row preserves the same `current_blocker`,
+  `m006_verifier_proof_artifact_cross_check_synced` at
+  `2026-07-04T20:46:15Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain
