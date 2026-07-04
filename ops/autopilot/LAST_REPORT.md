@@ -10,7 +10,7 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-04T21:38:23Z.
+- Latest heartbeat: 2026-07-04T21:55:43Z.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -31,11 +31,12 @@
   proof and M006 owner readiness review remain open. The earlier
   `rollback_not_applied` fader artifact is closed by the passed CH3 rerun and
   remains audit history only.
-- Latest M005/M006 verifier hardening: `f0ccd9842` makes
-  `tools/verify_m006_owner_readiness_packet.py` require M005 request-audit
-  evidence before owner-review input can be ready: `sent_request_types`, the
-  blocked `apply_operator_proposal` probe, no forbidden direct write request
-  types and matching forbidden-request audit fields. This grants no
+- Latest M005/M006 verifier hardening: `6cf8c8800` makes
+  `tools/verify_m006_owner_readiness_packet.py` require M005 event-log
+  request evidence before owner-review input can be ready: `events.jsonl`
+  send rows from the same artifact run directory must match
+  `sent_request_types`, include the blocked `apply_operator_proposal` probe
+  and contain no forbidden direct write request types. This grants no
   backend/WING contact, live write, readiness update or live authority.
 - Status marker: read-only decision gate is accepted-ready; release readiness
   remains blocked on M005/M006.
@@ -565,7 +566,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   artifact summaries against packet rows, `ad7f0da18` requires physical
   reconnect evidence, and `f0ccd9842` binds M005 request-audit evidence before
   owner-review input can be ready. The latest verified full suite passed with
-  `5468 passed, 1 skipped`;
+  `5471 passed, 1 skipped`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,

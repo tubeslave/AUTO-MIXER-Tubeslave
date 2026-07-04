@@ -58,13 +58,14 @@
   prepares the owner review from the accepted CH3 fader/gain-down artifacts but
   is not an owner decision: M005 is still missing, readiness matrix updates are
   still disallowed, and live authority remains denied.
-- The M005/M006 verifier contract is now stricter: `f0ccd9842` makes
-  `tools/verify_m006_owner_readiness_packet.py` require M005
-  `sent_request_types`, the blocked `apply_operator_proposal` probe, no
-  forbidden direct write request types and a matching
-  `forbidden_request_types_sent` audit before owner-review input can be
-  ready. The previous `ad7f0da18` reconnect physical-readback checks remain
-  in force. This is offline verification only; it does not close M005 or M006.
+- The M005/M006 verifier contract is now stricter: `6cf8c8800` makes
+  `tools/verify_m006_owner_readiness_packet.py` require M005 `events.jsonl`
+  send rows from the same artifact run directory, match them to
+  `sent_request_types`, require the blocked `apply_operator_proposal` probe
+  in the event stream and reject forbidden direct write request types there
+  before owner-review input can be ready. The previous `f0ccd9842` request
+  audit and `ad7f0da18` reconnect physical-readback checks remain in force.
+  This is offline verification only; it does not close M005 or M006.
 - Local runtime/tooling verification on 2026-07-04 is green but does not close
   the blocker: the current backend listener completed the 600.005 second
   read-only observation artifact
@@ -74,8 +75,8 @@
   no live apply request sent. Frontend test/build passed, targeted backend
   meter/runtime-observation/M005-runner/proposal tests passed, and WING MVP
   rails passed. Full backend validation also passed:
-  `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q`: 5453
-  passed, 1 skipped, 1 warning. The no-WING quick gate failed closed on
+  `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q`: 5471
+  passed, 1 skipped. The no-WING quick gate failed closed on
   `backend_port_free` because the existing listener still needs operator
   confirmation. M005 still requires the operator-present physical cable-loss,
   stale-readback, blocked-write and reconnect proof, and M006 still requires
@@ -131,8 +132,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m005_request_audit_owner_verifier_bound` at
-  `2026-07-04T21:38:23Z`. That row preserves the same `current_blocker`,
+  `m005_event_log_owner_verifier_bound` at
+  `2026-07-04T21:55:43Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain

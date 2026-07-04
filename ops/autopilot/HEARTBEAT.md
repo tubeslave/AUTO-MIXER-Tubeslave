@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-04T21:38:23Z
+Last heartbeat UTC: 2026-07-04T21:55:43Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -23,15 +23,15 @@ External validation requirements:
 - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
 - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
-Latest check: `f0ccd9842` bound the M005 request audit to the offline M006
-owner-readiness verifier. Owner-review input now requires
-`sent_request_types`, the blocked `apply_operator_proposal` probe, no
-forbidden direct write request types and matching forbidden-request audit
-fields. This heartbeat records no WING/backend contact, no live apply, no
-readiness-matrix update and no authority widening. The earlier
-`rollback_not_applied` artifact remains closed audit history, not the active
-blocker.
-Latest verified full pytest passed with `5468 passed, 1 skipped`.
+Latest check: `6cf8c8800` bound the M005 event-log request audit to the
+offline M006 owner-readiness verifier. Owner-review input now requires
+`events.jsonl` send rows from the same M005 artifact run directory to match
+`sent_request_types`, include the blocked `apply_operator_proposal` probe
+and contain no forbidden direct write request types. This heartbeat records
+no WING/backend contact, no live apply, no readiness-matrix update and no
+authority widening. The earlier `rollback_not_applied` artifact remains
+closed audit history, not the active blocker.
+Latest verified full pytest passed with `5471 passed, 1 skipped`.
 Latest direct mute/pan invalid-value guard passed: direct WebSocket
 `set_mute`, `mute_channel` and `unmute_channel` now reject missing or
 unparseable mute values before mixer writes, and direct `set_pan` rejects
