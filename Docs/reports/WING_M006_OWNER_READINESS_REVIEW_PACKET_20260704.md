@@ -74,6 +74,20 @@ Acceptance prerequisites:
 The M005 summary must also keep `live_authority_granted=false`,
 `readiness_closure_allowed=false`, and `readiness_matrix_update_allowed=false`.
 
+## Offline Verifier
+
+Before owner review, run:
+
+```bash
+python3 tools/verify_m006_owner_readiness_packet.py \
+  --packet-summary artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json \
+  --m005-summary artifacts/wing_timeout_disconnect_proof/<accepted_m005_run>/summary.json
+```
+
+Until the M005 summary is complete, the verifier must return `blocked` and keep
+`live_authority_granted=false`, `readiness_closure_allowed=false`, and
+`readiness_matrix_update_allowed=false`.
+
 Allowed after owner acceptance:
 
 - accept `fader_supervised` evidence for the narrow supervised fader path only;

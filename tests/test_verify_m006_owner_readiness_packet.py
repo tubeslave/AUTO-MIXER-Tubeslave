@@ -17,6 +17,13 @@ PACKET_SUMMARY = (
     / "20260704T191101Z_m006_owner_readiness_review_packet"
     / "summary.json"
 )
+PARTIAL_M005_SUMMARY = (
+    PROJECT_ROOT
+    / "artifacts"
+    / "wing_timeout_disconnect_proof"
+    / "20260704T074537Z_wing_m005_disconnect_timeout_stale_proof"
+    / "summary.json"
+)
 
 SPEC = importlib.util.spec_from_file_location("verify_m006_owner_readiness_packet", TOOL_PATH)
 assert SPEC is not None
@@ -100,6 +107,33 @@ def test_partial_m005_summary_keeps_owner_review_blocked() -> None:
     assert "m005_summary_missing_evidence_empty" in result["failed_checks"]
     assert "m005_summary_remaining_evidence_empty" in result["failed_checks"]
     assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_current_partial_m005_artifact_keeps_owner_review_blocked() -> None:
+    packet = load_packet()
+    partial_m005 = json.loads(PARTIAL_M005_SUMMARY.read_text(encoding="utf-8"))
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=partial_m005,
+        m005_summary_path=str(PARTIAL_M005_SUMMARY.relative_to(PROJECT_ROOT)),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert result["owner_review_input_ready"] is False
+    assert result["m005_summary"] == (
+        "artifacts/wing_timeout_disconnect_proof/"
+        "20260704T074537Z_wing_m005_disconnect_timeout_stale_proof/summary.json"
+    )
+    assert "m005_summary_schema_matches" in result["failed_checks"]
+    assert "m005_summary_status_passed" in result["failed_checks"]
+    assert "m005_summary_complete_true" in result["failed_checks"]
+    assert "m005_summary_missing_evidence_empty" in result["failed_checks"]
+    assert "m005_disconnect_phase_operator_confirmed_physical_loss" in result["failed_checks"]
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
     assert result["readiness_matrix_update_allowed"] is False
 
 

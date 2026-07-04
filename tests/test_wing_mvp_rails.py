@@ -2312,6 +2312,10 @@ def test_m006_owner_review_packet_requires_complete_m005_summary_contract():
     assert "`live_authority_granted=false`" in report
     assert "`readiness_closure_allowed=false`" in report
     assert "`readiness_matrix_update_allowed=false`" in report
+    assert "python3 tools/verify_m006_owner_readiness_packet.py" in report
+    assert "--packet-summary artifacts/wing_owner_readiness_review/" in report
+    assert "--m005-summary artifacts/wing_timeout_disconnect_proof/<accepted_m005_run>/summary.json" in report
+    assert "the verifier must return `blocked`" in report
     assert "does not close M005 or M006" in report
     assert "does not update\nthe readiness matrix and does not grant live authority" in report
 
