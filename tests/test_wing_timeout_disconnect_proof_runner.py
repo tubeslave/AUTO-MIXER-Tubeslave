@@ -162,6 +162,24 @@ def standard_prefix_responses() -> list[dict[str, Any]]:
 
 
 @pytest.mark.asyncio
+async def test_dry_run_marks_all_m005_evidence_missing(tmp_path: Path) -> None:
+    exit_code = await runner.run(parse_args(tmp_path))
+
+    assert exit_code == 0
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "planned"
+    assert summary["m005_complete"] is False
+    assert summary["completed_m005_evidence"] == []
+    assert summary["missing_m005_evidence"] == list(runner.M005_REQUIRED_EVIDENCE)
+    assert summary["remaining_m005_evidence"] == [
+        runner.M005_EVIDENCE_DESCRIPTIONS[item] for item in runner.M005_REQUIRED_EVIDENCE
+    ]
+    assert summary["live_authority_granted"] is False
+    assert summary["readiness_closure_allowed"] is False
+    assert summary["live_apply_request_sent"] is False
+
+
+@pytest.mark.asyncio
 async def test_software_disconnect_probe_uses_canonical_disconnect_and_blocks_write(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -211,9 +229,85 @@ async def test_software_disconnect_probe_uses_canonical_disconnect_and_blocks_wr
     assert summary["phases"]["blocked_write_while_disconnected"]["block_reason"] == (
         "mixer_not_connected"
     )
-    assert summary["remaining_m005_evidence"] == [
-        "physical network link-loss phase still requires operator cable pull"
+    assert summary["m005_complete"] is False
+    assert summary["completed_m005_evidence"] == [
+        "physical_baseline_readback",
+        "stale_readback_unavailable",
+        "blocked_write_while_disconnected",
     ]
+    assert summary["missing_m005_evidence"] == [
+        "operator_confirmed_physical_cable_loss",
+        "reconnect_recovery_verified",
+    ]
+    assert summary["remaining_m005_evidence"] == [
+        runner.M005_EVIDENCE_DESCRIPTIONS["operator_confirmed_physical_cable_loss"],
+        runner.M005_EVIDENCE_DESCRIPTIONS["reconnect_recovery_verified"],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_physical_cable_loss_with_reconnect_marks_m005_complete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_accepted_preflight_gate(monkeypatch)
+    websocket = FakeWebSocket(
+        [
+            *standard_prefix_responses()[:-1],
+            unavailable_readback(),
+            {
+                "type": "operator_proposal_apply_blocked",
+                "status": "apply_blocked",
+                "apply_result": {"status": "blocked", "reason": "mixer_not_connected"},
+            },
+            {"type": "connection_status", "connected": True},
+            physical_readback(0.0),
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+
+    exit_code = await runner.run(
+        execute_args(
+            tmp_path,
+            "--disconnect-mode",
+            "physical-cable-loss",
+            "--operator-confirm-physical-cable-loss",
+            runner.PHYSICAL_CABLE_CONFIRMATION,
+            "--physical-loss-wait-sec",
+            "0",
+            "--reconnect-wing-ip",
+            "192.0.2.10",
+        )
+    )
+
+    assert exit_code == 0
+    sent_types = [request["type"] for request in websocket.sent]
+    assert sent_types == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+        "set_operator_mode",
+        "create_operator_proposal",
+        "query_mixer_parameter",
+        "apply_operator_proposal",
+        "connect_wing",
+        "query_mixer_parameter",
+    ]
+    assert "disconnect_mixer" not in sent_types
+    connect_request = next(
+        request for request in websocket.sent if request["type"] == "connect_wing"
+    )
+    assert connect_request["observation_only"] is True
+
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "passed"
+    assert summary["m005_complete"] is True
+    assert summary["completed_m005_evidence"] == list(runner.M005_REQUIRED_EVIDENCE)
+    assert summary["missing_m005_evidence"] == []
+    assert summary["remaining_m005_evidence"] == []
+    assert summary["live_authority_granted"] is False
+    assert summary["readiness_closure_allowed"] is False
+    assert summary["readiness_matrix_update_allowed"] is False
 
 
 @pytest.mark.asyncio

@@ -58,6 +58,22 @@ SAFE_BLOCK_REASONS = {
 }
 DEFAULT_ARTIFACT_ROOT = "artifacts/wing_timeout_disconnect_proof"
 PHYSICAL_CABLE_CONFIRMATION = "WING_CABLE_PULLED_BY_OPERATOR"
+M005_REQUIRED_EVIDENCE = (
+    "physical_baseline_readback",
+    "operator_confirmed_physical_cable_loss",
+    "stale_readback_unavailable",
+    "blocked_write_while_disconnected",
+    "reconnect_recovery_verified",
+)
+M005_EVIDENCE_DESCRIPTIONS = {
+    "physical_baseline_readback": "physical baseline readback before link loss",
+    "operator_confirmed_physical_cable_loss": (
+        "operator-confirmed physical cable-loss phase still requires supervised WING cable pull"
+    ),
+    "stale_readback_unavailable": "stale-state query must report readback unavailable",
+    "blocked_write_while_disconnected": "blocked write probe must be blocked while disconnected",
+    "reconnect_recovery_verified": "reconnect recovery must verify channel unchanged from baseline",
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -199,6 +215,69 @@ def _unexpected_apply(payload: Dict[str, Any]) -> bool:
     )
 
 
+def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
+    phases = summary.get("phases") if isinstance(summary.get("phases"), dict) else {}
+    completed: list[str] = []
+
+    baseline = phases.get("baseline") if isinstance(phases.get("baseline"), dict) else {}
+    baseline_readback = baseline.get("readback") if isinstance(baseline.get("readback"), dict) else {}
+    if baseline.get("status") == "passed" and _readback_is_physical(baseline_readback):
+        completed.append("physical_baseline_readback")
+
+    disconnect = phases.get("disconnect") if isinstance(phases.get("disconnect"), dict) else {}
+    if (
+        summary.get("disconnect_mode") == "physical-cable-loss"
+        and disconnect.get("status") == "operator_confirmed_physical_cable_loss"
+        and disconnect.get("confirmation") == PHYSICAL_CABLE_CONFIRMATION
+    ):
+        completed.append("operator_confirmed_physical_cable_loss")
+
+    stale_readback = (
+        phases.get("stale_readback") if isinstance(phases.get("stale_readback"), dict) else {}
+    )
+    if stale_readback.get("status") == "passed" and _readback_is_unavailable(
+        stale_readback.get("readback") if isinstance(stale_readback.get("readback"), dict) else {}
+    ):
+        completed.append("stale_readback_unavailable")
+
+    blocked_write = (
+        phases.get("blocked_write_while_disconnected")
+        if isinstance(phases.get("blocked_write_while_disconnected"), dict)
+        else {}
+    )
+    if (
+        blocked_write.get("status") == "passed"
+        and blocked_write.get("block_reason") in SAFE_BLOCK_REASONS
+    ):
+        completed.append("blocked_write_while_disconnected")
+
+    reconnect = (
+        phases.get("reconnect_recovery")
+        if isinstance(phases.get("reconnect_recovery"), dict)
+        else {}
+    )
+    if reconnect.get("status") == "passed" and reconnect.get("unchanged_from_baseline") is True:
+        completed.append("reconnect_recovery_verified")
+
+    return completed
+
+
+def _annotate_m005_evidence(summary: Dict[str, Any]) -> Dict[str, Any]:
+    completed = _completed_m005_evidence(summary)
+    missing = [item for item in M005_REQUIRED_EVIDENCE if item not in completed]
+    summary["required_m005_evidence"] = list(M005_REQUIRED_EVIDENCE)
+    summary["completed_m005_evidence"] = completed
+    summary["missing_m005_evidence"] = missing
+    summary["remaining_m005_evidence"] = [M005_EVIDENCE_DESCRIPTIONS[item] for item in missing]
+    summary["m005_complete"] = not missing
+    return summary
+
+
+class M005EventRecorder(EventRecorder):
+    def write_summary(self, summary: Dict[str, Any]) -> None:
+        super().write_summary(_annotate_m005_evidence(summary))
+
+
 async def _query_parameter(
     ws: Any,
     recorder: EventRecorder,
@@ -307,7 +386,7 @@ async def run(args: argparse.Namespace) -> int:
     run_id = f"{utc_stamp()}_wing_m005_disconnect_timeout_stale_proof"
     run_dir = Path(args.artifact_root) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
-    recorder = EventRecorder(run_dir)
+    recorder = M005EventRecorder(run_dir)
     address = address_for(args.channel, args.value_type)
     summary: Dict[str, Any] = {
         "run_id": run_id,
@@ -607,11 +686,6 @@ async def run(args: argparse.Namespace) -> int:
                     "status": "passed",
                     "reason": "blocked_write_while_disconnected_verified",
                     "fail_closed": True,
-                    "remaining_m005_evidence": (
-                        []
-                        if args.disconnect_mode == "physical-cable-loss"
-                        else ["physical network link-loss phase still requires operator cable pull"]
-                    ),
                 }
             )
             recorder.write_summary(summary)

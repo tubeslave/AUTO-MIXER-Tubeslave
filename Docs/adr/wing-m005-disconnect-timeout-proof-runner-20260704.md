@@ -60,8 +60,11 @@ keeps disconnect evidence separate from normal supervised apply proof.
 - Record summary fields that keep `live_authority_granted=false`,
   `readiness_closure_allowed=false`, and
   `readiness_matrix_update_allowed=false`.
-- Keep software-disconnect proof marked as leaving physical link-loss evidence
-  still required.
+- Record `required_m005_evidence`, `completed_m005_evidence`,
+  `missing_m005_evidence`, `remaining_m005_evidence`, and `m005_complete`
+  so a partial runner pass cannot be mistaken for complete M005 closure.
+- Keep software-disconnect proof marked as leaving physical cable-loss and
+  reconnect-recovery evidence still required.
 
 ## Test plan
 
@@ -73,6 +76,9 @@ keeps disconnect evidence separate from normal supervised apply proof.
 - Validation test for physical cable-loss operator confirmation.
 - Preflight gate test that blocks before opening the WebSocket.
 - Unexpected apply test that sends rollback and marks manual review required.
+- Summary-contract tests that dry-run and software-disconnect evidence keep
+  `m005_complete=false`, while physical cable loss plus reconnect recovery is
+  the only complete M005 artifact shape.
 - Full repository pytest before landing.
 
 ## Risks and rollback
